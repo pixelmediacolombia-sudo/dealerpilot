@@ -80,17 +80,9 @@ export function SalesAIWorkspace() {
     leadId: number;
   } | null>(null);
 
-  const { data: convsData, isLoading: convsLoading } = useListConversations({
-    params: { query: { dealerId: DEALER_ID } },
-    query: { refetchInterval: 15000 },
-  });
-  const { data: leadsData, isLoading: leadsLoading } = useListLeads({
-    params: { query: { dealerId: DEALER_ID } },
-    query: { refetchInterval: 15000 },
-  });
-  const { data: dpData } = useGetDownPaymentIntelligence({
-    params: { query: { dealerId: DEALER_ID } },
-  });
+  const { data: convsData, isLoading: convsLoading } = useListConversations({ dealerId: DEALER_ID });
+  const { data: leadsData, isLoading: leadsLoading } = useListLeads({ dealerId: DEALER_ID });
+  const { data: dpData } = useGetDownPaymentIntelligence({ dealerId: DEALER_ID });
   const { data: scenariosData } = useListSimulatorScenarios();
   const { mutateAsync: runSim } = useRunSimulator();
 

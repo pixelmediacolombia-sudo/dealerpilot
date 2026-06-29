@@ -53,12 +53,10 @@ export function LeadDetail() {
   const { mutateAsync: updateLead } = useUpdateLead();
 
   const lead = data?.lead;
-  const { data: convData } = useGetConversation(lead?.conversationId!, {
-    query: { enabled: !!lead?.conversationId },
-  });
+  const { data: convData } = useGetConversation(lead?.conversationId ?? 0);
 
   async function handleStatus(status: string) {
-    await updateLead({ params: { path: { id } }, data: { status } });
+    await updateLead({ id, data: { status } });
     toast({ title: `Lead marked as ${status}` });
     refetch();
   }

@@ -9,12 +9,46 @@
 export interface Lead {
   id: number;
   /** @nullable */
+  conversationId?: number | null;
+  /** @nullable */
+  dealerId?: number | null;
+  /** @nullable */
   buyerName?: string | null;
-  messageText: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  language?: string | null;
+  /** @nullable */
+  vehicleId?: number | null;
+  /** @nullable */
+  listingId?: number | null;
+  /** @nullable */
+  sourceUrl?: string | null;
+  /** @nullable */
+  messageText?: string | null;
   /** @nullable */
   suggestedReply?: string | null;
   /** @nullable */
-  sourceUrl?: string | null;
+  publishedDownPayment?: number | null;
+  /** @nullable */
+  buyerAvailableDownPayment?: number | null;
+  /** @nullable */
+  buyerTimeline?: string | null;
+  /** @nullable */
+  hasId?: boolean | null;
+  /** @nullable */
+  hasProofOfIncome?: boolean | null;
+  /** @nullable */
+  appointmentIntent?: boolean | null;
+  /** @nullable */
+  leadScore?: number | null;
+  /** @nullable */
+  temperature?: string | null;
   status: string;
+  /** @nullable */
+  conversationSummary?: string | null;
+  /** @nullable */
+  notes?: string | null;
   createdAt: string;
+  updatedAt: string;
 }

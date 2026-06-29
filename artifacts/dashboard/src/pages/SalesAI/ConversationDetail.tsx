@@ -48,9 +48,7 @@ export function ConversationDetail() {
   const { toast } = useToast();
   const id = Number(params?.id);
 
-  const { data, isLoading, refetch } = useGetConversation(id, {
-    query: { refetchInterval: 10000 },
-  });
+  const { data, isLoading, refetch } = useGetConversation(id);
   const { mutateAsync: updateStatus } = useUpdateConversationStatus();
   const { mutateAsync: updateLead } = useUpdateLead();
 
@@ -88,14 +86,14 @@ export function ConversationDetail() {
 
   async function handleMarkStatus(status: string) {
     if (!lead) return;
-    await updateLead({ params: { path: { id: lead.id } }, data: { status } });
+    await updateLead({ id: lead.id, data: { status } });
     toast({ title: `Lead marked as ${status}` });
     refetch();
   }
 
   async function handleConvStatus(status: string) {
     if (!conv) return;
-    await updateStatus({ params: { path: { id: conv.id } }, data: { status } });
+    await updateStatus({ id: conv.id, data: { status } });
     toast({ title: `Conversation ${status}` });
     refetch();
   }

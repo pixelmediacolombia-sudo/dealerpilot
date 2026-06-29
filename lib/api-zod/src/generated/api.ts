@@ -388,12 +388,29 @@ export const CreateMessageContextResponse = zod.object({
   "suggestedReply": zod.string(),
   "lead": zod.object({
   "id": zod.number(),
+  "conversationId": zod.number().nullish(),
+  "dealerId": zod.number().nullish(),
   "buyerName": zod.string().nullish(),
-  "messageText": zod.string(),
-  "suggestedReply": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "language": zod.string().nullish(),
+  "vehicleId": zod.number().nullish(),
+  "listingId": zod.number().nullish(),
   "sourceUrl": zod.string().nullish(),
+  "messageText": zod.string().nullish(),
+  "suggestedReply": zod.string().nullish(),
+  "publishedDownPayment": zod.number().nullish(),
+  "buyerAvailableDownPayment": zod.number().nullish(),
+  "buyerTimeline": zod.string().nullish(),
+  "hasId": zod.boolean().nullish(),
+  "hasProofOfIncome": zod.boolean().nullish(),
+  "appointmentIntent": zod.boolean().nullish(),
+  "leadScore": zod.number().nullish(),
+  "temperature": zod.string().nullish(),
   "status": zod.string(),
-  "createdAt": zod.string()
+  "conversationSummary": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
 })
 })
 
@@ -405,12 +422,29 @@ export const CreateMessageContextResponse = zod.object({
 export const GetLeadsResponse = zod.object({
   "leads": zod.array(zod.object({
   "id": zod.number(),
+  "conversationId": zod.number().nullish(),
+  "dealerId": zod.number().nullish(),
   "buyerName": zod.string().nullish(),
-  "messageText": zod.string(),
-  "suggestedReply": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "language": zod.string().nullish(),
+  "vehicleId": zod.number().nullish(),
+  "listingId": zod.number().nullish(),
   "sourceUrl": zod.string().nullish(),
+  "messageText": zod.string().nullish(),
+  "suggestedReply": zod.string().nullish(),
+  "publishedDownPayment": zod.number().nullish(),
+  "buyerAvailableDownPayment": zod.number().nullish(),
+  "buyerTimeline": zod.string().nullish(),
+  "hasId": zod.boolean().nullish(),
+  "hasProofOfIncome": zod.boolean().nullish(),
+  "appointmentIntent": zod.boolean().nullish(),
+  "leadScore": zod.number().nullish(),
+  "temperature": zod.string().nullish(),
   "status": zod.string(),
-  "createdAt": zod.string()
+  "conversationSummary": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
 }))
 })
 
@@ -1988,6 +2022,313 @@ export const UpdateDealerBrandDnaResponse = zod.object({
   "defaultTemplateKey": zod.string(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Ingest a Messenger conversation and generate AI reply
+ */
+export const ConversationIntakeBody = zod.object({
+  "extensionId": zod.string().optional(),
+  "externalThreadRef": zod.string(),
+  "sourceUrl": zod.string().nullish(),
+  "buyerName": zod.string().nullish(),
+  "visibleMessages": zod.array(zod.string()).optional(),
+  "currentMessage": zod.string().nullish(),
+  "detectedMarketplaceListingUrl": zod.string().nullish(),
+  "detectedVehicleTitle": zod.string().nullish(),
+  "marketplaceDownPayment": zod.number().nullish(),
+  "marketplaceAskingPrice": zod.number().nullish(),
+  "vehicleType": zod.string().nullish(),
+  "timestamp": zod.string().nullish()
+})
+
+export const ConversationIntakeResponse = zod.object({
+  "conversationId": zod.number(),
+  "leadId": zod.number(),
+  "suggestedReply": zod.string().nullish(),
+  "language": zod.string()
+})
+
+
+/**
+ * @summary List all conversations for a dealer
+ */
+export const ListConversationsQueryParams = zod.object({
+  "dealerId": zod.coerce.number().optional(),
+  "status": zod.coerce.string().optional()
+})
+
+export const ListConversationsResponse = zod.object({
+  "conversations": zod.array(zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "externalThreadRef": zod.string(),
+  "buyerName": zod.string().nullish(),
+  "language": zod.string(),
+  "sourceUrl": zod.string().nullish(),
+  "detectedListingUrl": zod.string().nullish(),
+  "detectedVehicleTitle": zod.string().nullish(),
+  "vehicleId": zod.number().nullish(),
+  "listingId": zod.number().nullish(),
+  "marketplaceDownPayment": zod.number().nullish(),
+  "marketplaceAskingPrice": zod.number().nullish(),
+  "vehicleType": zod.string().nullish(),
+  "status": zod.string(),
+  "lastMessageAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "lead": zod.object({
+
+}).passthrough().nullish(),
+  "lastMessage": zod.object({
+
+}).passthrough().nullish()
+}))
+})
+
+
+/**
+ * @summary Get a conversation with messages and lead
+ */
+export const GetConversationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetConversationResponse = zod.object({
+  "conversation": zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "externalThreadRef": zod.string(),
+  "buyerName": zod.string().nullish(),
+  "language": zod.string(),
+  "sourceUrl": zod.string().nullish(),
+  "detectedListingUrl": zod.string().nullish(),
+  "detectedVehicleTitle": zod.string().nullish(),
+  "vehicleId": zod.number().nullish(),
+  "listingId": zod.number().nullish(),
+  "marketplaceDownPayment": zod.number().nullish(),
+  "marketplaceAskingPrice": zod.number().nullish(),
+  "vehicleType": zod.string().nullish(),
+  "status": zod.string(),
+  "lastMessageAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "lead": zod.object({
+
+}).passthrough().nullish(),
+  "lastMessage": zod.object({
+
+}).passthrough().nullish()
+}),
+  "messages": zod.array(zod.object({
+  "id": zod.number(),
+  "conversationId": zod.number(),
+  "role": zod.string(),
+  "content": zod.string(),
+  "suggestedReply": zod.string().nullish(),
+  "createdAt": zod.string()
+})),
+  "lead": zod.object({
+
+}).passthrough().nullish()
+})
+
+
+/**
+ * @summary Update conversation status
+ */
+export const UpdateConversationStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateConversationStatusBody = zod.object({
+  "status": zod.string()
+})
+
+export const UpdateConversationStatusResponse = zod.object({
+  "ok": zod.boolean().optional()
+})
+
+
+/**
+ * @summary List leads for a dealer
+ */
+export const ListLeadsQueryParams = zod.object({
+  "dealerId": zod.coerce.number().optional(),
+  "temperature": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional()
+})
+
+export const ListLeadsResponse = zod.object({
+  "leads": zod.array(zod.object({
+  "id": zod.number(),
+  "conversationId": zod.number().nullish(),
+  "dealerId": zod.number().nullish(),
+  "buyerName": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "language": zod.string().nullish(),
+  "vehicleId": zod.number().nullish(),
+  "listingId": zod.number().nullish(),
+  "sourceUrl": zod.string().nullish(),
+  "messageText": zod.string().nullish(),
+  "suggestedReply": zod.string().nullish(),
+  "publishedDownPayment": zod.number().nullish(),
+  "buyerAvailableDownPayment": zod.number().nullish(),
+  "buyerTimeline": zod.string().nullish(),
+  "hasId": zod.boolean().nullish(),
+  "hasProofOfIncome": zod.boolean().nullish(),
+  "appointmentIntent": zod.boolean().nullish(),
+  "leadScore": zod.number().nullish(),
+  "temperature": zod.string().nullish(),
+  "status": zod.string(),
+  "conversationSummary": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Get a single lead
+ */
+export const GetLeadParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetLeadResponse = zod.object({
+  "lead": zod.object({
+  "id": zod.number(),
+  "conversationId": zod.number().nullish(),
+  "dealerId": zod.number().nullish(),
+  "buyerName": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "language": zod.string().nullish(),
+  "vehicleId": zod.number().nullish(),
+  "listingId": zod.number().nullish(),
+  "sourceUrl": zod.string().nullish(),
+  "messageText": zod.string().nullish(),
+  "suggestedReply": zod.string().nullish(),
+  "publishedDownPayment": zod.number().nullish(),
+  "buyerAvailableDownPayment": zod.number().nullish(),
+  "buyerTimeline": zod.string().nullish(),
+  "hasId": zod.boolean().nullish(),
+  "hasProofOfIncome": zod.boolean().nullish(),
+  "appointmentIntent": zod.boolean().nullish(),
+  "leadScore": zod.number().nullish(),
+  "temperature": zod.string().nullish(),
+  "status": zod.string(),
+  "conversationSummary": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+})
+
+
+/**
+ * @summary Update a lead
+ */
+export const UpdateLeadParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateLeadBody = zod.object({
+  "status": zod.string().optional(),
+  "temperature": zod.string().optional(),
+  "phone": zod.string().nullish(),
+  "buyerTimeline": zod.string().nullish(),
+  "hasId": zod.boolean().nullish(),
+  "hasProofOfIncome": zod.boolean().nullish(),
+  "appointmentIntent": zod.boolean().nullish(),
+  "notes": zod.string().nullish(),
+  "leadScore": zod.number().nullish()
+})
+
+export const UpdateLeadResponse = zod.object({
+  "lead": zod.object({
+  "id": zod.number(),
+  "conversationId": zod.number().nullish(),
+  "dealerId": zod.number().nullish(),
+  "buyerName": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "language": zod.string().nullish(),
+  "vehicleId": zod.number().nullish(),
+  "listingId": zod.number().nullish(),
+  "sourceUrl": zod.string().nullish(),
+  "messageText": zod.string().nullish(),
+  "suggestedReply": zod.string().nullish(),
+  "publishedDownPayment": zod.number().nullish(),
+  "buyerAvailableDownPayment": zod.number().nullish(),
+  "buyerTimeline": zod.string().nullish(),
+  "hasId": zod.boolean().nullish(),
+  "hasProofOfIncome": zod.boolean().nullish(),
+  "appointmentIntent": zod.boolean().nullish(),
+  "leadScore": zod.number().nullish(),
+  "temperature": zod.string().nullish(),
+  "status": zod.string(),
+  "conversationSummary": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+})
+
+
+/**
+ * @summary Get down payment performance by vehicle type
+ */
+export const GetDownPaymentIntelligenceQueryParams = zod.object({
+  "dealerId": zod.coerce.number().optional()
+})
+
+export const GetDownPaymentIntelligenceResponse = zod.object({
+  "summary": zod.array(zod.object({
+  "vehicleType": zod.string(),
+  "variants": zod.array(zod.object({
+  "publishedDownPayment": zod.number(),
+  "totalConversations": zod.number(),
+  "hotLeads": zod.number(),
+  "appointmentReady": zod.number()
+}))
+})),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary List available simulator scenarios
+ */
+export const ListSimulatorScenariosResponse = zod.object({
+  "scenarios": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "language": zod.string(),
+  "vehicleType": zod.string(),
+  "downPayment": zod.number(),
+  "messageCount": zod.number()
+}))
+})
+
+
+/**
+ * @summary Run a simulator scenario
+ */
+export const RunSimulatorBody = zod.object({
+  "scenarioKey": zod.string().optional(),
+  "customMessages": zod.array(zod.string()).optional(),
+  "buyerName": zod.string().optional()
+})
+
+export const RunSimulatorResponse = zod.object({
+  "conversationId": zod.number(),
+  "leadId": zod.number(),
+  "suggestedReply": zod.string(),
+  "language": zod.string(),
+  "leadScore": zod.number(),
+  "temperature": zod.string(),
+  "messages": zod.array(zod.string())
 })
 
 

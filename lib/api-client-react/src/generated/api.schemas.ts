@@ -209,14 +209,48 @@ export interface MessageContextInput {
 export interface Lead {
   id: number;
   /** @nullable */
+  conversationId?: number | null;
+  /** @nullable */
+  dealerId?: number | null;
+  /** @nullable */
   buyerName?: string | null;
-  messageText: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  language?: string | null;
+  /** @nullable */
+  vehicleId?: number | null;
+  /** @nullable */
+  listingId?: number | null;
+  /** @nullable */
+  sourceUrl?: string | null;
+  /** @nullable */
+  messageText?: string | null;
   /** @nullable */
   suggestedReply?: string | null;
   /** @nullable */
-  sourceUrl?: string | null;
+  publishedDownPayment?: number | null;
+  /** @nullable */
+  buyerAvailableDownPayment?: number | null;
+  /** @nullable */
+  buyerTimeline?: string | null;
+  /** @nullable */
+  hasId?: boolean | null;
+  /** @nullable */
+  hasProofOfIncome?: boolean | null;
+  /** @nullable */
+  appointmentIntent?: boolean | null;
+  /** @nullable */
+  leadScore?: number | null;
+  /** @nullable */
+  temperature?: string | null;
   status: string;
+  /** @nullable */
+  conversationSummary?: string | null;
+  /** @nullable */
+  notes?: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface MessageContextResult {
@@ -1025,6 +1059,181 @@ export interface LaunchChecklistResponse {
   checklist: LaunchChecklist;
 }
 
+export interface ConversationIntakeInput {
+  extensionId?: string;
+  externalThreadRef: string;
+  /** @nullable */
+  sourceUrl?: string | null;
+  /** @nullable */
+  buyerName?: string | null;
+  visibleMessages?: string[];
+  /** @nullable */
+  currentMessage?: string | null;
+  /** @nullable */
+  detectedMarketplaceListingUrl?: string | null;
+  /** @nullable */
+  detectedVehicleTitle?: string | null;
+  /** @nullable */
+  marketplaceDownPayment?: number | null;
+  /** @nullable */
+  marketplaceAskingPrice?: number | null;
+  /** @nullable */
+  vehicleType?: string | null;
+  /** @nullable */
+  timestamp?: string | null;
+}
+
+export interface ConversationIntakeResult {
+  conversationId: number;
+  leadId: number;
+  /** @nullable */
+  suggestedReply?: string | null;
+  language: string;
+}
+
+/**
+ * @nullable
+ */
+export type ConversationSummaryLead = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type ConversationSummaryLastMessage = { [key: string]: unknown } | null;
+
+export interface ConversationSummary {
+  id: number;
+  dealerId: number;
+  externalThreadRef: string;
+  /** @nullable */
+  buyerName?: string | null;
+  language: string;
+  /** @nullable */
+  sourceUrl?: string | null;
+  /** @nullable */
+  detectedListingUrl?: string | null;
+  /** @nullable */
+  detectedVehicleTitle?: string | null;
+  /** @nullable */
+  vehicleId?: number | null;
+  /** @nullable */
+  listingId?: number | null;
+  /** @nullable */
+  marketplaceDownPayment?: number | null;
+  /** @nullable */
+  marketplaceAskingPrice?: number | null;
+  /** @nullable */
+  vehicleType?: string | null;
+  status: string;
+  /** @nullable */
+  lastMessageAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  lead?: ConversationSummaryLead;
+  /** @nullable */
+  lastMessage?: ConversationSummaryLastMessage;
+}
+
+export interface ConversationListResponse {
+  conversations: ConversationSummary[];
+}
+
+export interface ConversationMessage {
+  id: number;
+  conversationId: number;
+  role: string;
+  content: string;
+  /** @nullable */
+  suggestedReply?: string | null;
+  createdAt: string;
+}
+
+/**
+ * @nullable
+ */
+export type ConversationDetailResponseLead = { [key: string]: unknown } | null;
+
+export interface ConversationDetailResponse {
+  conversation: ConversationSummary;
+  messages: ConversationMessage[];
+  /** @nullable */
+  lead?: ConversationDetailResponseLead;
+}
+
+export interface LeadListResponse {
+  leads: Lead[];
+}
+
+export interface LeadDetailResponse {
+  lead: Lead;
+}
+
+export interface LeadUpdateInput {
+  status?: string;
+  temperature?: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  buyerTimeline?: string | null;
+  /** @nullable */
+  hasId?: boolean | null;
+  /** @nullable */
+  hasProofOfIncome?: boolean | null;
+  /** @nullable */
+  appointmentIntent?: boolean | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  leadScore?: number | null;
+}
+
+export interface DownPaymentVariant {
+  publishedDownPayment: number;
+  totalConversations: number;
+  hotLeads: number;
+  appointmentReady: number;
+}
+
+export interface DownPaymentGroup {
+  vehicleType: string;
+  variants: DownPaymentVariant[];
+}
+
+export interface DownPaymentIntelligenceResponse {
+  summary: DownPaymentGroup[];
+  total: number;
+}
+
+export interface SimulatorScenario {
+  key: string;
+  label: string;
+  language: string;
+  vehicleType: string;
+  downPayment: number;
+  messageCount: number;
+}
+
+export interface SimulatorScenariosResponse {
+  scenarios: SimulatorScenario[];
+}
+
+export interface SimulatorRunBody {
+  scenarioKey?: string;
+  customMessages?: string[];
+  buyerName?: string;
+}
+
+export interface SimulatorRunResponse {
+  conversationId: number;
+  leadId: number;
+  suggestedReply: string;
+  language: string;
+  leadScore: number;
+  temperature: string;
+  messages: string[];
+}
+
 export type ListVehiclesParams = {
 /**
  * Search by VIN, stock number, make, or model
@@ -1109,5 +1318,28 @@ export type ListCreativeJobsParams = {
  * Filter by job status
  */
 status?: string;
+};
+
+export type ListConversationsParams = {
+dealerId?: number;
+status?: string;
+};
+
+export type UpdateConversationStatusBody = {
+  status: string;
+};
+
+export type UpdateConversationStatus200 = {
+  ok?: boolean;
+};
+
+export type ListLeadsParams = {
+dealerId?: number;
+temperature?: string;
+status?: string;
+};
+
+export type GetDownPaymentIntelligenceParams = {
+dealerId?: number;
 };
 

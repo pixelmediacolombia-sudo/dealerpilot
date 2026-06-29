@@ -121,16 +121,16 @@ Write a short, natural reply (2–4 sentences). Ask ONE qualifying question if a
 
   const response = await openai.chat.completions.create({
     model: "gpt-5-mini",
-    max_completion_tokens: 200,
+    max_completion_tokens: 1024,
     messages: [{ role: "user", content: prompt }],
   });
 
-  return (
-    response.choices[0]?.message?.content?.trim() ??
-    (language === "es"
+  const raw = response.choices[0]?.message?.content?.trim();
+  return raw && raw.length > 0
+    ? raw
+    : language === "es"
       ? "¡Hola! Gracias por tu interés. ¿Estás buscando comprar esta semana o solo explorando opciones?"
-      : "Hi! Thanks for reaching out. Are you looking to purchase this week or just exploring options?")
-  );
+      : "Hi! Thanks for reaching out. Are you looking to purchase this week or just exploring options?";
 }
 
 router.post("/conversations/intake", async (req, res) => {
@@ -181,13 +181,11 @@ router.post("/conversations/intake", async (req, res) => {
       .where(eq(vehiclesTable.dealerId, DEALER_ID))
       .limit(20);
 
-    const match = vRow.find(
-      (v) =>
-        detectedVehicleTitle &&
-        v.title
-          ?.toLowerCase()
-          .includes(detectedVehicleTitle.toLowerCase().slice(0, 10)),
-    );
+    const match = vRow.find((v) => {
+      if (!detectedVehicleTitle) return false;
+      const vTitle = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ");
+      return vTitle.toLowerCase().includes(detectedVehicleTitle.toLowerCase().slice(0, 10));
+    });
     if (match) vehicleId = match.id;
   }
 

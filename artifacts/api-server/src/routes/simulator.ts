@@ -155,7 +155,17 @@ NEVER say: guaranteed approval, everyone approved, bad credit, denied, rejected,
 Match buyer language (English/Spanish). Keep reply to 2–4 sentences. Ask ONE question at a time.
 `;
 
-function computeLeadScore(s: (typeof SCENARIOS)[ScenarioKey] & { phone?: string }): {
+type ScoreInput = {
+  downPayment: number;
+  phone?: string;
+  buyerTimeline?: string;
+  buyerAvailableDownPayment?: number;
+  hasId?: boolean;
+  hasProofOfIncome?: boolean;
+  appointmentIntent?: boolean;
+};
+
+function computeLeadScore(s: ScoreInput): {
   score: number;
   temperature: "Hot" | "Warm" | "Cold";
 } {
@@ -219,12 +229,14 @@ Write a short reply (2–4 sentences) asking ONE qualifying question.`;
 
   const aiResponse = await openai.chat.completions.create({
     model: "gpt-5-mini",
-    max_completion_tokens: 200,
+    max_completion_tokens: 1024,
     messages: [{ role: "user", content: prompt }],
   });
+  const rawReply = aiResponse.choices[0]?.message?.content?.trim();
   const suggestedReply =
-    aiResponse.choices[0]?.message?.content?.trim() ??
-    "Thanks for your interest! Are you looking to purchase this week?";
+    rawReply && rawReply.length > 0
+      ? rawReply
+      : "Thanks for your interest! Are you looking to purchase this week?";
 
   const [conv] = await db
     .insert(conversationsTable)
@@ -254,7 +266,7 @@ Write a short reply (2–4 sentences) asking ONE qualifying question.`;
   });
 
   const { score, temperature } = computeLeadScore(
-    scenario ?? { label: "", language: lang as "en" | "es", messages, vehicleType, downPayment },
+    scenario ?? { downPayment },
   );
 
   const [lead] = await db
@@ -264,7 +276,6 @@ Write a short reply (2–4 sentences) asking ONE qualifying question.`;
       dealerId: DEALER_ID,
       buyerName: name,
       language: lang,
-      vehicleType,
       publishedDownPayment: downPayment,
       buyerAvailableDownPayment:
         scenario && "buyerAvailableDownPayment" in scenario

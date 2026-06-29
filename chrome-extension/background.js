@@ -8,9 +8,6 @@ async function getBackendUrl() {
   return (backendUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, "");
 }
 
-// A stable, randomly generated id identifying this extension install. Used as the
-// `extensionId` when claiming jobs so the backend can attribute ownership. This
-// never contains any Facebook credentials.
 async function getExtensionId() {
   const { extensionId } = await chrome.storage.local.get("extensionId");
   if (extensionId) return extensionId;
@@ -103,10 +100,6 @@ const handlers = {
     return apiPost(`/api/publishing/jobs/${message.jobId}/fail`, body);
   },
 
-  // Send a progress event for a publishing job.
-  // event: one of job_claimed | marketplace_opened | photos_loading | photos_uploaded |
-  //        fields_filled | validation_passed | waiting_operator | auto_publish_clicked |
-  //        published | failed | skipped | safety_halt
   async SEND_JOB_EVENT(message) {
     const extensionId = await getExtensionId();
     return apiPost(`/api/publishing/jobs/${message.jobId}/event`, {
@@ -124,6 +117,38 @@ const handlers = {
   async OPEN_MARKETPLACE() {
     const tab = await chrome.tabs.create({ url: MARKETPLACE_CREATE_URL });
     return { tabId: tab.id };
+  },
+
+  // ---- Sales AI: Conversation Intake ----
+  // Called by the Messenger content script when a buyer message is detected.
+  // Sends conversation context to the backend, receives an AI suggested reply.
+  // Does NOT auto-send the reply — operator must click "Insert Reply".
+  async CONVERSATION_INTAKE(message) {
+    const extensionId = await getExtensionId();
+    return apiPost("/api/conversations/intake", {
+      extensionId,
+      externalThreadRef: message.externalThreadRef,
+      sourceUrl: message.sourceUrl,
+      buyerName: message.buyerName,
+      visibleMessages: message.visibleMessages || [],
+      currentMessage: message.currentMessage,
+      detectedMarketplaceListingUrl: message.detectedMarketplaceListingUrl,
+      detectedVehicleTitle: message.detectedVehicleTitle,
+      marketplaceDownPayment: message.marketplaceDownPayment,
+      marketplaceAskingPrice: message.marketplaceAskingPrice,
+      vehicleType: message.vehicleType,
+      timestamp: new Date().toISOString(),
+    });
+  },
+
+  // Fetch lead status for a conversation thread
+  async GET_CONVERSATION_LEAD(message) {
+    return apiGet(`/api/conversations?dealerId=1`).then((data) => {
+      const conv = (data.conversations || []).find(
+        (c) => c.externalThreadRef === message.externalThreadRef,
+      );
+      return { conversation: conv || null };
+    });
   },
 };
 

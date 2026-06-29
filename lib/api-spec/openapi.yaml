@@ -1185,6 +1185,204 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+
+  /conversations/intake:
+    post:
+      operationId: conversationIntake
+      tags: [sales-ai]
+      summary: Ingest a Messenger conversation and generate AI reply
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationIntakeInput"
+      responses:
+        "200":
+          description: Intake result with suggested reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationIntakeResult"
+
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [sales-ai]
+      summary: List all conversations for a dealer
+      parameters:
+        - in: query
+          name: dealerId
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationListResponse"
+
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      tags: [sales-ai]
+      summary: Get a conversation with messages and lead
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Conversation detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetailResponse"
+
+  /conversations/{id}/status:
+    patch:
+      operationId: updateConversationStatus
+      tags: [sales-ai]
+      summary: Update conversation status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  /leads:
+    get:
+      operationId: listLeads
+      tags: [sales-ai]
+      summary: List leads for a dealer
+      parameters:
+        - in: query
+          name: dealerId
+          schema: { type: integer }
+        - in: query
+          name: temperature
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of leads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadListResponse"
+
+  /leads/{id}:
+    get:
+      operationId: getLead
+      tags: [sales-ai]
+      summary: Get a single lead
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Lead detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadDetailResponse"
+    patch:
+      operationId: updateLead
+      tags: [sales-ai]
+      summary: Update a lead
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadUpdateInput"
+      responses:
+        "200":
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadDetailResponse"
+
+  /down-payment-intelligence:
+    get:
+      operationId: getDownPaymentIntelligence
+      tags: [sales-ai]
+      summary: Get down payment performance by vehicle type
+      parameters:
+        - in: query
+          name: dealerId
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Down payment intelligence summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownPaymentIntelligenceResponse"
+
+  /simulator/scenarios:
+    get:
+      operationId: listSimulatorScenarios
+      tags: [sales-ai]
+      summary: List available simulator scenarios
+      responses:
+        "200":
+          description: Scenarios list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulatorScenariosResponse"
+
+  /simulator/run:
+    post:
+      operationId: runSimulator
+      tags: [sales-ai]
+      summary: Run a simulator scenario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulatorRunBody"
+      responses:
+        "200":
+          description: Simulator result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulatorRunResponse"
 components:
   schemas:
     HealthStatus:
@@ -1420,17 +1618,6 @@ components:
         chatText: { type: string, minLength: 1 }
         buyerName: { type: string }
         sourceUrl: { type: string }
-    Lead:
-      type: object
-      required: [id, messageText, status, createdAt]
-      properties:
-        id: { type: integer }
-        buyerName: { type: ["string", "null"] }
-        messageText: { type: string }
-        suggestedReply: { type: ["string", "null"] }
-        sourceUrl: { type: ["string", "null"] }
-        status: { type: string }
-        createdAt: { type: string }
     MessageContextResult:
       type: object
       required: [suggestedReply, lead]
@@ -2456,205 +2643,7 @@ components:
         checklist:
           $ref: "#/components/schemas/LaunchChecklist"
 
-  /conversations/intake:
-    post:
-      operationId: conversationIntake
-      tags: [sales-ai]
-      summary: Ingest a Messenger conversation and generate AI reply
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ConversationIntakeBody"
-      responses:
-        "200":
-          description: Intake result with suggested reply
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConversationIntakeResponse"
-
-  /conversations:
-    get:
-      operationId: listConversations
-      tags: [sales-ai]
-      summary: List all conversations for a dealer
-      parameters:
-        - in: query
-          name: dealerId
-          schema: { type: integer }
-        - in: query
-          name: status
-          schema: { type: string }
-      responses:
-        "200":
-          description: List of conversations
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConversationListResponse"
-
-  /conversations/{id}:
-    get:
-      operationId: getConversation
-      tags: [sales-ai]
-      summary: Get a conversation with messages and lead
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: integer }
-      responses:
-        "200":
-          description: Conversation detail
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConversationDetailResponse"
-
-  /conversations/{id}/status:
-    patch:
-      operationId: updateConversationStatus
-      tags: [sales-ai]
-      summary: Update conversation status
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: integer }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [status]
-              properties:
-                status: { type: string }
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok: { type: boolean }
-
-  /leads:
-    get:
-      operationId: listLeads
-      tags: [sales-ai]
-      summary: List leads for a dealer
-      parameters:
-        - in: query
-          name: dealerId
-          schema: { type: integer }
-        - in: query
-          name: temperature
-          schema: { type: string }
-        - in: query
-          name: status
-          schema: { type: string }
-      responses:
-        "200":
-          description: List of leads
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LeadListResponse"
-
-  /leads/{id}:
-    get:
-      operationId: getLead
-      tags: [sales-ai]
-      summary: Get a single lead
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: integer }
-      responses:
-        "200":
-          description: Lead detail
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LeadDetailResponse"
-    patch:
-      operationId: updateLead
-      tags: [sales-ai]
-      summary: Update a lead
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: integer }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateLeadBody"
-      responses:
-        "200":
-          description: Updated lead
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LeadDetailResponse"
-
-  /down-payment-intelligence:
-    get:
-      operationId: getDownPaymentIntelligence
-      tags: [sales-ai]
-      summary: Get down payment performance by vehicle type
-      parameters:
-        - in: query
-          name: dealerId
-          schema: { type: integer }
-      responses:
-        "200":
-          description: Down payment intelligence summary
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DownPaymentIntelligenceResponse"
-
-  /simulator/scenarios:
-    get:
-      operationId: listSimulatorScenarios
-      tags: [sales-ai]
-      summary: List available simulator scenarios
-      responses:
-        "200":
-          description: Scenarios list
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SimulatorScenariosResponse"
-
-  /simulator/run:
-    post:
-      operationId: runSimulator
-      tags: [sales-ai]
-      summary: Run a simulator scenario
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SimulatorRunBody"
-      responses:
-        "200":
-          description: Simulator result
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SimulatorRunResponse"
-
-    ConversationIntakeBody:
+    ConversationIntakeInput:
       type: object
       required: [externalThreadRef]
       properties:
@@ -2672,7 +2661,7 @@ components:
         marketplaceAskingPrice: { type: ["integer", "null"] }
         vehicleType: { type: ["string", "null"] }
         timestamp: { type: ["string", "null"] }
-    ConversationIntakeResponse:
+    ConversationIntakeResult:
       type: object
       required: [conversationId, leadId, language]
       properties:
@@ -2772,7 +2761,7 @@ components:
       required: [lead]
       properties:
         lead: { $ref: "#/components/schemas/Lead" }
-    UpdateLeadBody:
+    LeadUpdateInput:
       type: object
       properties:
         status: { type: string }

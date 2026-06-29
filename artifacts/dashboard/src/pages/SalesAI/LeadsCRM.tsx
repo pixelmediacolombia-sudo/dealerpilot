@@ -45,10 +45,7 @@ function statusBadge(status: string) {
 
 export function LeadsCRM() {
   const [, navigate] = useLocation();
-  const { data, isLoading } = useListLeads({
-    params: { query: { dealerId: DEALER_ID } },
-    query: { refetchInterval: 15000 },
-  });
+  const { data, isLoading } = useListLeads({ dealerId: DEALER_ID });
   const leads = data?.leads ?? [];
 
   return (
@@ -163,13 +160,13 @@ export function LeadsCRM() {
 
                               <div className="flex items-center gap-2">
                                 {lead.hasId && (
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" title="Has ID" />
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" aria-label="Has ID" />
                                 )}
                                 {lead.hasProofOfIncome && (
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" title="Income proof" />
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" aria-label="Income proof" />
                                 )}
                                 {lead.appointmentIntent && (
-                                  <Calendar className="w-3 h-3 text-yellow-400" title="Appointment intent" />
+                                  <Calendar className="w-3 h-3 text-yellow-400" aria-label="Appointment intent" />
                                 )}
                                 {lead.leadScore != null && (
                                   <span className="ml-auto text-[10px] font-bold text-muted-foreground/60">
