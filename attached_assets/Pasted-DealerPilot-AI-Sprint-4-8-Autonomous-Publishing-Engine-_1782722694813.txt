@@ -1,0 +1,357 @@
+DealerPilot AI — Sprint 4.8
+
+Autonomous Publishing Engine + Photo Quality Decision
+
+Sprint 4.7 is complete.
+
+Before building Sales AI, we need to complete the Marketplace publishing automation layer.
+
+DO NOT modify:
+
+* Inventory XML parser
+* Listing Intelligence logic unless needed for scheduling
+* Creative Intelligence schema unless needed for photo quality status
+* Existing Chrome Extension connection model
+* Existing UI design system
+
+GOAL:
+DealerPilot should be able to automatically select, prepare, and publish vehicles in controlled batches through the Chrome Extension.
+
+The operator should be able to configure:
+
+* how many vehicles to publish
+* how often to publish
+* what days/times to publish
+* whether to require approval before final publish
+* whether the extension can auto-click final Publish in controlled mode
+* whether to use original photos or generated creatives
+
+Default Alpha rule:
+Publish 3–4 vehicles every 2 days.
+
+⸻
+
+MODULE 1 — Auto Publish Schedule
+
+Create a new section inside Marketplace AI:
+
+Auto Publish Plan
+
+Fields:
+
+* enabled / disabled
+* vehicles per batch
+* frequency: daily, every 2 days, weekly
+* preferred posting window
+* max posts per day
+* minimum delay between posts
+* require operator approval before final publish: true/false
+* auto-click final Publish: true/false
+* use original photos if quality score is good: true/false
+* generate AI creative only if photo score is low: true/false
+
+Default:
+
+* enabled: false
+* vehicles per batch: 4
+* frequency: every 2 days
+* max posts per day: 4
+* minimum delay: 10–20 minutes
+* require operator approval: true
+* auto-click final Publish: false initially
+* original photos if good: true
+* creative only if needed: true
+
+⸻
+
+MODULE 2 — Batch Publishing Queue
+
+Create visual batch publishing queue.
+
+Statuses:
+
+* Scheduled
+* Preparing
+* Waiting Extension
+* Posting
+* Published
+* Failed
+* Skipped
+* Needs Review
+
+Show:
+
+* batch number
+* vehicles selected
+* progress bar
+* current vehicle
+* completed count
+* failed count
+* skipped count
+* estimated time remaining
+
+Example UI:
+
+Publishing Batch 2 of 4
+
+Vehicle 1 / 4
+
+Generating listing…
+Uploading photos…
+Filling Marketplace…
+Waiting for confirmation…
+Published
+
+⸻
+
+MODULE 3 — Vehicle Selection Logic
+
+DealerPilot should automatically select vehicles for publishing.
+
+Selection rules:
+
+* status Active or Ready
+* not already Published
+* has enough photos
+* has price
+* has mileage
+* has VIN
+* prioritize:
+    * trucks
+    * SUVs
+    * high-margin vehicles
+    * fresh inventory
+    * vehicles with strong photo quality
+    * vehicles not posted before
+
+Avoid:
+
+* sold/removed vehicles
+* missing price
+* missing VIN
+* missing photos
+* vehicles already live
+* vehicles with failed validation
+
+Create a publish_priority_score.
+
+⸻
+
+MODULE 4 — Photo Quality Analyzer
+
+Before deciding whether to generate a creative, analyze the XML photos.
+
+Photo Quality Score 0–100.
+
+Evaluate:
+
+* number of photos
+* first photo quality
+* vehicle visibility
+* image resolution
+* lighting
+* background cleanliness
+* angle
+* duplicates
+* interior/exterior variety
+* blurry/dark photos
+
+Decision:
+
+* score 80–100: use original photos
+* score 60–79: use original photos but recommend AI cover
+* score below 60: generate AI Creative before publishing
+* missing photos: mark Needs Review
+
+Create fields:
+
+* photo_quality_score
+* photo_quality_label
+* photo_decision
+* recommended_cover_image
+* needs_ai_creative
+
+⸻
+
+MODULE 5 — Publishing Validation
+
+Before queueing any vehicle, validate:
+
+Required:
+
+* VIN
+* year
+* make
+* model
+* price
+* mileage
+* at least 5 photos
+* listing generated
+* photo decision complete
+
+If validation fails:
+
+* do not queue
+* mark Needs Review
+* show reason
+
+⸻
+
+MODULE 6 — Auto Listing Preparation
+
+When a vehicle is selected for auto publishing:
+
+If no listing exists:
+
+* generate listing
+
+If no photo score exists:
+
+* analyze photos
+
+If photo score is low:
+
+* queue AI Creative job
+
+If ready:
+
+* create publishing job
+
+⸻
+
+MODULE 7 — Chrome Extension Auto Publish Mode
+
+Extend the extension to support batch publishing.
+
+Modes:
+
+1. Assisted Mode
+
+* fill form
+* operator manually clicks Publish
+
+2. Controlled Auto Mode
+
+* fill form
+* validate fields
+* optional screenshot/preview
+* click Publish automatically only if:
+    * auto-click final Publish is enabled
+    * all validation checks pass
+    * no Facebook checkpoint/login/captcha/security warning
+    * job belongs to this extension
+    * posting limit not exceeded
+
+Safety:
+
+* stop immediately if Facebook shows login, checkpoint, captcha, suspicious activity, restriction, or error
+* do not store Facebook password
+* do not bypass security
+* log every step
+* send step progress to backend
+
+⸻
+
+MODULE 8 — Live Progress Events
+
+The extension should send progress updates:
+
+* job claimed
+* Marketplace opened
+* photos loading
+* photos uploaded
+* fields filled
+* validation passed
+* waiting for operator
+* auto publish clicked
+* published
+* failed
+
+Backend stores publishing events.
+
+UI shows live progress.
+
+⸻
+
+MODULE 9 — Published Listing URL
+
+After publish:
+
+* extension attempts to capture Marketplace listing URL
+* if found, save it
+* if not found, mark Published Pending URL
+* operator can paste URL later
+
+⸻
+
+MODULE 10 — UI Updates
+
+Marketplace AI should include:
+
+Tabs:
+
+* Ready
+* Scheduled
+* Publishing
+* Published
+* Needs Review
+* Failed
+
+Add:
+
+Auto Publish Plan card
+
+Batch Progress card
+
+Photo Quality badges
+
+Use Original Photos badge
+
+AI Creative Needed badge
+
+Needs Review reasons
+
+⸻
+
+MODULE 11 — Database
+
+Add or update tables as needed:
+
+* auto_publish_settings
+* publishing_batches
+* publishing_events
+* vehicle_photo_scores
+* publish_priority_scores
+
+Do not break existing publishing_jobs lifecycle.
+
+⸻
+
+MODULE 12 — Test Checklist
+
+Verify:
+
+* auto publish schedule can be configured
+* system selects 3–4 vehicles
+* sold vehicles are skipped
+* missing photos are skipped
+* photo quality score is generated
+* high-quality photos use originals
+* low-quality photos queue AI Creative
+* publishing batch created
+* extension claims batch jobs
+* progress bar updates
+* assisted mode works
+* controlled auto mode only runs when enabled
+* failed jobs log reason
+* published jobs save URL when available
+* typecheck clean
+
+⸻
+
+IMPORTANT:
+Do not enable full auto-click publish by default.
+
+Default should be Assisted Mode.
+
+Controlled Auto Mode must exist, but remain off until the operator explicitly enables it.

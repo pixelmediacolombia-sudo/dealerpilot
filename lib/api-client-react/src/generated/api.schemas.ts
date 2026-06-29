@@ -660,6 +660,230 @@ export interface DealerBrandDnaUpdate {
   defaultTemplateKey?: string;
 }
 
+export interface AutoPublishSettings {
+  /** @nullable */
+  id?: number | null;
+  dealerId: number;
+  enabled: boolean;
+  vehiclesPerBatch: number;
+  frequencyDays: number;
+  preferredWindowStart: string;
+  preferredWindowEnd: string;
+  maxPostsPerDay: number;
+  minDelayMinutes: number;
+  maxDelayMinutes: number;
+  requireApproval: boolean;
+  autoClickPublish: boolean;
+  useOriginalPhotos: boolean;
+  aiCreativeIfLow: boolean;
+  photoScoreThreshold: number;
+  /** @nullable */
+  createdAt?: string | null;
+  /** @nullable */
+  updatedAt?: string | null;
+}
+
+export interface AutoPublishSettingsResponse {
+  settings: AutoPublishSettings;
+}
+
+export interface AutoPublishSettingsInput {
+  enabled?: boolean;
+  vehiclesPerBatch?: number;
+  frequencyDays?: number;
+  preferredWindowStart?: string;
+  preferredWindowEnd?: string;
+  maxPostsPerDay?: number;
+  minDelayMinutes?: number;
+  maxDelayMinutes?: number;
+  requireApproval?: boolean;
+  autoClickPublish?: boolean;
+  useOriginalPhotos?: boolean;
+  aiCreativeIfLow?: boolean;
+  photoScoreThreshold?: number;
+}
+
+export interface PublishingBatch {
+  id: number;
+  dealerId: number;
+  batchNumber: number;
+  status: string;
+  mode: string;
+  totalVehicles: number;
+  completedCount: number;
+  failedCount: number;
+  skippedCount: number;
+  needsReviewCount: number;
+  /** @nullable */
+  scheduledAt?: string | null;
+  /** @nullable */
+  startedAt?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublishingBatchResponse {
+  batch: PublishingBatch;
+}
+
+export interface PublishingBatchList {
+  batches: PublishingBatch[];
+}
+
+export interface BatchJobSummary {
+  id: number;
+  vehicleId: number;
+  status: string;
+  mode: string;
+  /** @nullable */
+  vehicleLabel?: string | null;
+  /** @nullable */
+  batchId?: number | null;
+  priority?: number;
+  /** @nullable */
+  scheduledAt?: string | null;
+  /** @nullable */
+  startedAt?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  /** @nullable */
+  failedReason?: string | null;
+  /** @nullable */
+  listingUrl?: string | null;
+  needsReview?: boolean;
+  /** @nullable */
+  reviewReason?: string | null;
+  attempts?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PublishingBatchDetail {
+  batch: PublishingBatch;
+  jobs: BatchJobSummary[];
+}
+
+export type CreateBatchInputMode = typeof CreateBatchInputMode[keyof typeof CreateBatchInputMode];
+
+
+export const CreateBatchInputMode = {
+  Assisted: 'Assisted',
+  Controlled: 'Controlled',
+} as const;
+
+export interface CreateBatchInput {
+  dealerId: number;
+  mode?: CreateBatchInputMode;
+  /**
+     * @minimum 1
+     * @maximum 20
+     */
+  count?: number;
+  scheduledAt?: string;
+}
+
+export interface IneligibleVehicle {
+  vehicleId: number;
+  /** @nullable */
+  reason?: string | null;
+}
+
+export interface CreateBatchResponse {
+  batch: PublishingBatch;
+  jobs: BatchJobSummary[];
+  ineligible?: IneligibleVehicle[];
+}
+
+export interface PatchBatchInput {
+  status?: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface PublishingEvent {
+  id: number;
+  jobId: number;
+  vehicleId: number;
+  dealerId: number;
+  /** @nullable */
+  batchId?: number | null;
+  event: string;
+  /** @nullable */
+  details?: string | null;
+  /** @nullable */
+  extensionId?: string | null;
+  createdAt: string;
+}
+
+export interface PublishingEventResponse {
+  event: PublishingEvent;
+}
+
+export interface PublishingEventList {
+  events: PublishingEvent[];
+}
+
+export interface PublishingEventInput {
+  /** @minLength 1 */
+  event: string;
+  extensionId?: string;
+  details?: string;
+  batchId?: number;
+}
+
+export interface VehiclePhotoScore {
+  id: number;
+  vehicleId: number;
+  dealerId: number;
+  photoScore: number;
+  photoLabel: string;
+  photoDecision: string;
+  totalPhotos: number;
+  uniquePhotos: number;
+  /** @nullable */
+  recommendedCoverUrl?: string | null;
+  needsAiCreative: number;
+  /** @nullable */
+  scoreBreakdown?: string | null;
+  analyzedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VehiclePhotoScoreResponse {
+  score: VehiclePhotoScore | null;
+}
+
+export interface VehiclePhotoScoreList {
+  scores: VehiclePhotoScore[];
+}
+
+export interface PublishPriorityScore {
+  id: number;
+  vehicleId: number;
+  dealerId: number;
+  priorityScore: number;
+  bodyStyleBonus: number;
+  priceBonus: number;
+  freshnessBonus: number;
+  photoBonus: number;
+  neverPublishedBonus: number;
+  eligible: number;
+  /** @nullable */
+  ineligibleReason?: string | null;
+  computedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublishPriorityScoreList {
+  scores: PublishPriorityScore[];
+}
+
 export type ListVehiclesParams = {
 /**
  * Search by VIN, stock number, make, or model
@@ -698,6 +922,18 @@ export type ListPublishingJobsParams = {
  * Filter by job status
  */
 status?: string;
+};
+
+export type ListPublishingBatchesParams = {
+dealerId?: number;
+};
+
+export type ListVehiclePhotoScoresParams = {
+dealerId?: number;
+};
+
+export type ListPublishPriorityScoresParams = {
+dealerId?: number;
 };
 
 export type ListCreativeStudioParams = {

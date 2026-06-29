@@ -40,12 +40,20 @@ function setDot(dot, kind) {
   dot.className = "dot" + (kind ? " " + kind : "");
 }
 
+function getModeLabel(job) {
+  if (!job) return "";
+  const mode = job.mode || "Assisted";
+  return mode === "Controlled" ? " [AUTO]" : " [Assisted]";
+}
+
 function renderStart() {
   if (activeJob) {
-    startBtn.textContent = "Reopen Marketplace (active job)";
+    const modeLabel = getModeLabel(activeJob);
+    startBtn.textContent = `Reopen Marketplace${modeLabel}`;
     startBtn.disabled = false;
   } else if (nextJob) {
-    startBtn.textContent = "Start Publishing Job";
+    const modeLabel = getModeLabel(nextJob);
+    startBtn.textContent = `Start Publishing Job${modeLabel}`;
     startBtn.disabled = false;
   } else {
     startBtn.textContent = "Start Publishing Job";
@@ -78,7 +86,7 @@ async function refresh() {
 
   const res = await send({ type: "GET_NEXT_JOB" });
   if (res && res.ok) {
-    nextJob = res.data.job || null;
+    nextJob = res.data && res.data.job ? res.data.job : (res.data || null);
     el.vJobs.textContent = nextJob ? "1+ ready" : "None";
   } else {
     nextJob = null;
@@ -86,7 +94,7 @@ async function refresh() {
   }
 
   el.vCurrent.textContent = activeJob
-    ? activeJob.listingTitle || `Job #${activeJob.id}`
+    ? (activeJob.listingTitle || `Job #${activeJob.id}`) + getModeLabel(activeJob)
     : "None";
   el.vSync.textContent = new Date().toLocaleTimeString();
   renderStart();
@@ -111,7 +119,6 @@ startBtn.addEventListener("click", async () => {
   setStatus("Claiming job…");
   const claim = await send({ type: "CLAIM_JOB", jobId: nextJob.id });
   if (!claim || !claim.ok) {
-    // 409 => someone else claimed it; refresh to fetch another.
     if (claim && claim.status === 409) {
       setStatus("Job was already claimed. Fetching another…", "err");
     } else {
@@ -122,9 +129,30 @@ startBtn.addEventListener("click", async () => {
     return;
   }
 
-  const claimedJob = claim.data.job || claim.data;
+  const claimedJob = (claim.data && claim.data.job) ? claim.data.job : claim.data;
+
+  // Send job_claimed progress event
+  await send({
+    type: "SEND_JOB_EVENT",
+    jobId: claimedJob.id,
+    event: "job_claimed",
+    batchId: claimedJob.batchId || undefined,
+  });
+
+  // Safety check: if mode is Controlled and autoClickPublish is disabled, warn operator
+  if (claimedJob.mode === "Controlled") {
+    setStatus("Controlled mode — DealerPilot will auto-click Publish if all checks pass.", "ok");
+  }
+
   await chrome.storage.local.set({ activeJob: claimedJob });
   activeJob = claimedJob;
+
+  await send({
+    type: "SEND_JOB_EVENT",
+    jobId: claimedJob.id,
+    event: "marketplace_opened",
+    batchId: claimedJob.batchId || undefined,
+  });
 
   setStatus("Job claimed. Opening Marketplace…", "ok");
   await send({ type: "OPEN_MARKETPLACE" });
@@ -136,9 +164,6 @@ refreshBtn.addEventListener("click", () => {
   refresh();
 });
 
-// Poll the backend for job availability while the popup is open. Popups close
-// when they lose focus, so the interval is naturally torn down with the page;
-// we also clear it explicitly on unload to be safe.
 const POLL_MS = 5000;
 const pollTimer = setInterval(refresh, POLL_MS);
 window.addEventListener("unload", () => clearInterval(pollTimer));

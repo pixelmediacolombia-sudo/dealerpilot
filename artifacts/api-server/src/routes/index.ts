@@ -7,6 +7,7 @@ import connectionRouter from "./connection";
 import feedRouter from "./feed";
 import listingsRouter from "./listings";
 import publishingRouter from "./publishing";
+import autoPublishRouter from "./autoPublish";
 import creativeRouter from "./creative";
 
 const router: IRouter = Router();
@@ -19,6 +20,7 @@ router.use(connectionRouter);
 router.use(feedRouter);
 router.use(listingsRouter);
 router.use(publishingRouter);
+router.use(autoPublishRouter);
 router.use(creativeRouter);
 
 export default router;

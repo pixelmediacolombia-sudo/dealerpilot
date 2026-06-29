@@ -972,6 +972,415 @@ export const FailPublishingJobResponse = zod.object({
 
 
 /**
+ * @summary Record a progress event for a publishing job (from the Chrome extension)
+ */
+export const AddPublishingJobEventParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const AddPublishingJobEventBody = zod.object({
+  "event": zod.string().min(1),
+  "extensionId": zod.string().optional(),
+  "details": zod.string().optional(),
+  "batchId": zod.number().optional()
+})
+
+export const AddPublishingJobEventResponse = zod.object({
+  "event": zod.object({
+  "id": zod.number(),
+  "jobId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "batchId": zod.number().nullish(),
+  "event": zod.string(),
+  "details": zod.string().nullish(),
+  "extensionId": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+})
+
+
+/**
+ * @summary Get all progress events for a publishing job
+ */
+export const ListPublishingJobEventsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListPublishingJobEventsResponse = zod.object({
+  "events": zod.array(zod.object({
+  "id": zod.number(),
+  "jobId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "batchId": zod.number().nullish(),
+  "event": zod.string(),
+  "details": zod.string().nullish(),
+  "extensionId": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Get auto-publish schedule settings for a dealer
+ */
+export const GetAutoPublishSettingsParams = zod.object({
+  "dealerId": zod.coerce.number()
+})
+
+export const GetAutoPublishSettingsResponse = zod.object({
+  "settings": zod.object({
+  "id": zod.number().nullish(),
+  "dealerId": zod.number(),
+  "enabled": zod.boolean(),
+  "vehiclesPerBatch": zod.number(),
+  "frequencyDays": zod.number(),
+  "preferredWindowStart": zod.string(),
+  "preferredWindowEnd": zod.string(),
+  "maxPostsPerDay": zod.number(),
+  "minDelayMinutes": zod.number(),
+  "maxDelayMinutes": zod.number(),
+  "requireApproval": zod.boolean(),
+  "autoClickPublish": zod.boolean(),
+  "useOriginalPhotos": zod.boolean(),
+  "aiCreativeIfLow": zod.boolean(),
+  "photoScoreThreshold": zod.number(),
+  "createdAt": zod.string().nullish(),
+  "updatedAt": zod.string().nullish()
+})
+})
+
+
+/**
+ * @summary Create or update auto-publish settings for a dealer
+ */
+export const UpdateAutoPublishSettingsParams = zod.object({
+  "dealerId": zod.coerce.number()
+})
+
+export const UpdateAutoPublishSettingsBody = zod.object({
+  "enabled": zod.boolean().optional(),
+  "vehiclesPerBatch": zod.number().optional(),
+  "frequencyDays": zod.number().optional(),
+  "preferredWindowStart": zod.string().optional(),
+  "preferredWindowEnd": zod.string().optional(),
+  "maxPostsPerDay": zod.number().optional(),
+  "minDelayMinutes": zod.number().optional(),
+  "maxDelayMinutes": zod.number().optional(),
+  "requireApproval": zod.boolean().optional(),
+  "autoClickPublish": zod.boolean().optional(),
+  "useOriginalPhotos": zod.boolean().optional(),
+  "aiCreativeIfLow": zod.boolean().optional(),
+  "photoScoreThreshold": zod.number().optional()
+})
+
+export const UpdateAutoPublishSettingsResponse = zod.object({
+  "settings": zod.object({
+  "id": zod.number().nullish(),
+  "dealerId": zod.number(),
+  "enabled": zod.boolean(),
+  "vehiclesPerBatch": zod.number(),
+  "frequencyDays": zod.number(),
+  "preferredWindowStart": zod.string(),
+  "preferredWindowEnd": zod.string(),
+  "maxPostsPerDay": zod.number(),
+  "minDelayMinutes": zod.number(),
+  "maxDelayMinutes": zod.number(),
+  "requireApproval": zod.boolean(),
+  "autoClickPublish": zod.boolean(),
+  "useOriginalPhotos": zod.boolean(),
+  "aiCreativeIfLow": zod.boolean(),
+  "photoScoreThreshold": zod.number(),
+  "createdAt": zod.string().nullish(),
+  "updatedAt": zod.string().nullish()
+})
+})
+
+
+/**
+ * @summary List publishing batches for a dealer
+ */
+export const ListPublishingBatchesQueryParams = zod.object({
+  "dealerId": zod.coerce.number().optional()
+})
+
+export const ListPublishingBatchesResponse = zod.object({
+  "batches": zod.array(zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "batchNumber": zod.number(),
+  "status": zod.string(),
+  "mode": zod.string(),
+  "totalVehicles": zod.number(),
+  "completedCount": zod.number(),
+  "failedCount": zod.number(),
+  "skippedCount": zod.number(),
+  "needsReviewCount": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Select vehicles and create an auto-publish batch
+ */
+export const createPublishingBatchBodyCountMax = 20;
+
+
+
+export const CreatePublishingBatchBody = zod.object({
+  "dealerId": zod.number(),
+  "mode": zod.enum(['Assisted', 'Controlled']).optional(),
+  "count": zod.number().min(1).max(createPublishingBatchBodyCountMax).optional(),
+  "scheduledAt": zod.string().optional()
+})
+
+export const CreatePublishingBatchResponse = zod.object({
+  "batch": zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "batchNumber": zod.number(),
+  "status": zod.string(),
+  "mode": zod.string(),
+  "totalVehicles": zod.number(),
+  "completedCount": zod.number(),
+  "failedCount": zod.number(),
+  "skippedCount": zod.number(),
+  "needsReviewCount": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}),
+  "jobs": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "status": zod.string(),
+  "mode": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "batchId": zod.number().nullish(),
+  "priority": zod.number().optional(),
+  "scheduledAt": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "listingUrl": zod.string().nullish(),
+  "needsReview": zod.boolean().optional(),
+  "reviewReason": zod.string().nullish(),
+  "attempts": zod.number().optional(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional()
+})),
+  "ineligible": zod.array(zod.object({
+  "vehicleId": zod.number(),
+  "reason": zod.string().nullish()
+})).optional()
+})
+
+
+/**
+ * @summary Get a batch with its jobs
+ */
+export const GetPublishingBatchParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPublishingBatchResponse = zod.object({
+  "batch": zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "batchNumber": zod.number(),
+  "status": zod.string(),
+  "mode": zod.string(),
+  "totalVehicles": zod.number(),
+  "completedCount": zod.number(),
+  "failedCount": zod.number(),
+  "skippedCount": zod.number(),
+  "needsReviewCount": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}),
+  "jobs": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "status": zod.string(),
+  "mode": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "batchId": zod.number().nullish(),
+  "priority": zod.number().optional(),
+  "scheduledAt": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "listingUrl": zod.string().nullish(),
+  "needsReview": zod.boolean().optional(),
+  "reviewReason": zod.string().nullish(),
+  "attempts": zod.number().optional(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional()
+}))
+})
+
+
+/**
+ * @summary Update batch status
+ */
+export const UpdatePublishingBatchParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdatePublishingBatchBody = zod.object({
+  "status": zod.string().optional(),
+  "startedAt": zod.string().optional(),
+  "completedAt": zod.string().optional()
+})
+
+export const UpdatePublishingBatchResponse = zod.object({
+  "batch": zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "batchNumber": zod.number(),
+  "status": zod.string(),
+  "mode": zod.string(),
+  "totalVehicles": zod.number(),
+  "completedCount": zod.number(),
+  "failedCount": zod.number(),
+  "skippedCount": zod.number(),
+  "needsReviewCount": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+})
+
+
+/**
+ * @summary Get photo quality score for a vehicle
+ */
+export const GetVehiclePhotoScoreParams = zod.object({
+  "vehicleId": zod.coerce.number()
+})
+
+export const GetVehiclePhotoScoreResponse = zod.object({
+  "score": zod.union([zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "photoScore": zod.number(),
+  "photoLabel": zod.string(),
+  "photoDecision": zod.string(),
+  "totalPhotos": zod.number(),
+  "uniquePhotos": zod.number(),
+  "recommendedCoverUrl": zod.string().nullish(),
+  "needsAiCreative": zod.number(),
+  "scoreBreakdown": zod.string().nullish(),
+  "analyzedAt": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}),zod.null()])
+})
+
+
+/**
+ * @summary Analyze and store photo quality score for a vehicle
+ */
+export const AnalyzeVehiclePhotoScoreParams = zod.object({
+  "vehicleId": zod.coerce.number()
+})
+
+export const AnalyzeVehiclePhotoScoreResponse = zod.object({
+  "score": zod.union([zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "photoScore": zod.number(),
+  "photoLabel": zod.string(),
+  "photoDecision": zod.string(),
+  "totalPhotos": zod.number(),
+  "uniquePhotos": zod.number(),
+  "recommendedCoverUrl": zod.string().nullish(),
+  "needsAiCreative": zod.number(),
+  "scoreBreakdown": zod.string().nullish(),
+  "analyzedAt": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}),zod.null()])
+})
+
+
+/**
+ * @summary List photo scores for dealer vehicles
+ */
+export const ListVehiclePhotoScoresQueryParams = zod.object({
+  "dealerId": zod.coerce.number().optional()
+})
+
+export const ListVehiclePhotoScoresResponse = zod.object({
+  "scores": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "photoScore": zod.number(),
+  "photoLabel": zod.string(),
+  "photoDecision": zod.string(),
+  "totalPhotos": zod.number(),
+  "uniquePhotos": zod.number(),
+  "recommendedCoverUrl": zod.string().nullish(),
+  "needsAiCreative": zod.number(),
+  "scoreBreakdown": zod.string().nullish(),
+  "analyzedAt": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary List publish priority scores for dealer vehicles
+ */
+export const ListPublishPriorityScoresQueryParams = zod.object({
+  "dealerId": zod.coerce.number().optional()
+})
+
+export const ListPublishPriorityScoresResponse = zod.object({
+  "scores": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "priorityScore": zod.number(),
+  "bodyStyleBonus": zod.number(),
+  "priceBonus": zod.number(),
+  "freshnessBonus": zod.number(),
+  "photoBonus": zod.number(),
+  "neverPublishedBonus": zod.number(),
+  "eligible": zod.number(),
+  "ineligibleReason": zod.string().nullish(),
+  "computedAt": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
  * @summary List one creative workspace per vehicle
  */
 export const ListCreativeStudioQueryParams = zod.object({

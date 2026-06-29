@@ -20,9 +20,13 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AutoPublishSettingsInput,
+  AutoPublishSettingsResponse,
   ClaimJobInput,
   CompleteJobInput,
   ConnectionStatus,
+  CreateBatchInput,
+  CreateBatchResponse,
   CreativeJob,
   CreativeJobList,
   CreativeStudioList,
@@ -46,7 +50,10 @@ import type {
   ListCreativeJobsParams,
   ListCreativeStudioParams,
   ListListingWorkspacesParams,
+  ListPublishPriorityScoresParams,
+  ListPublishingBatchesParams,
   ListPublishingJobsParams,
+  ListVehiclePhotoScoresParams,
   ListVehiclesParams,
   ListingDetail,
   ListingVersion,
@@ -56,6 +63,14 @@ import type {
   MessageContextInput,
   MessageContextResult,
   NextPublishingJob,
+  PatchBatchInput,
+  PublishPriorityScoreList,
+  PublishingBatchDetail,
+  PublishingBatchList,
+  PublishingBatchResponse,
+  PublishingEventInput,
+  PublishingEventList,
+  PublishingEventResponse,
   PublishingJob,
   PublishingJobList,
   PublishingJobPayload,
@@ -64,6 +79,8 @@ import type {
   Vehicle,
   VehicleDetail,
   VehicleList,
+  VehiclePhotoScoreList,
+  VehiclePhotoScoreResponse,
   VehicleStats,
   VehicleStatusUpdate
 } from './api.schemas';
@@ -2122,6 +2139,919 @@ export const useFailPublishingJob = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getFailPublishingJobMutationOptions(options));
     }
+
+export const getAddPublishingJobEventUrl = (id: number,) => {
+
+
+
+
+  return `/api/publishing/jobs/${id}/event`
+}
+
+/**
+ * @summary Record a progress event for a publishing job (from the Chrome extension)
+ */
+export const addPublishingJobEvent = async (id: number,
+    publishingEventInput: PublishingEventInput, options?: RequestInit): Promise<PublishingEventResponse> => {
+
+  return customFetch<PublishingEventResponse>(getAddPublishingJobEventUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(publishingEventInput)
+  }
+);}
+
+
+
+
+export const getAddPublishingJobEventMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addPublishingJobEvent>>, TError,{id: number;data: BodyType<PublishingEventInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addPublishingJobEvent>>, TError,{id: number;data: BodyType<PublishingEventInput>}, TContext> => {
+
+const mutationKey = ['addPublishingJobEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addPublishingJobEvent>>, {id: number;data: BodyType<PublishingEventInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addPublishingJobEvent(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddPublishingJobEventMutationResult = NonNullable<Awaited<ReturnType<typeof addPublishingJobEvent>>>
+    export type AddPublishingJobEventMutationBody = BodyType<PublishingEventInput>
+    export type AddPublishingJobEventMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Record a progress event for a publishing job (from the Chrome extension)
+ */
+export const useAddPublishingJobEvent = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addPublishingJobEvent>>, TError,{id: number;data: BodyType<PublishingEventInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addPublishingJobEvent>>,
+        TError,
+        {id: number;data: BodyType<PublishingEventInput>},
+        TContext
+      > => {
+      return useMutation(getAddPublishingJobEventMutationOptions(options));
+    }
+
+export const getListPublishingJobEventsUrl = (id: number,) => {
+
+
+
+
+  return `/api/publishing/jobs/${id}/events`
+}
+
+/**
+ * @summary Get all progress events for a publishing job
+ */
+export const listPublishingJobEvents = async (id: number, options?: RequestInit): Promise<PublishingEventList> => {
+
+  return customFetch<PublishingEventList>(getListPublishingJobEventsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPublishingJobEventsQueryKey = (id: number,) => {
+    return [
+    `/api/publishing/jobs/${id}/events`
+    ] as const;
+    }
+
+
+export const getListPublishingJobEventsQueryOptions = <TData = Awaited<ReturnType<typeof listPublishingJobEvents>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPublishingJobEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPublishingJobEventsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPublishingJobEvents>>> = ({ signal }) => listPublishingJobEvents(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPublishingJobEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPublishingJobEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listPublishingJobEvents>>>
+export type ListPublishingJobEventsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get all progress events for a publishing job
+ */
+
+export function useListPublishingJobEvents<TData = Awaited<ReturnType<typeof listPublishingJobEvents>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPublishingJobEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPublishingJobEventsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAutoPublishSettingsUrl = (dealerId: number,) => {
+
+
+
+
+  return `/api/auto-publish/settings/${dealerId}`
+}
+
+/**
+ * @summary Get auto-publish schedule settings for a dealer
+ */
+export const getAutoPublishSettings = async (dealerId: number, options?: RequestInit): Promise<AutoPublishSettingsResponse> => {
+
+  return customFetch<AutoPublishSettingsResponse>(getGetAutoPublishSettingsUrl(dealerId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAutoPublishSettingsQueryKey = (dealerId: number,) => {
+    return [
+    `/api/auto-publish/settings/${dealerId}`
+    ] as const;
+    }
+
+
+export const getGetAutoPublishSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getAutoPublishSettings>>, TError = ErrorType<unknown>>(dealerId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAutoPublishSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAutoPublishSettingsQueryKey(dealerId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAutoPublishSettings>>> = ({ signal }) => getAutoPublishSettings(dealerId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: dealerId !== null && dealerId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAutoPublishSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAutoPublishSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getAutoPublishSettings>>>
+export type GetAutoPublishSettingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get auto-publish schedule settings for a dealer
+ */
+
+export function useGetAutoPublishSettings<TData = Awaited<ReturnType<typeof getAutoPublishSettings>>, TError = ErrorType<unknown>>(
+ dealerId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAutoPublishSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAutoPublishSettingsQueryOptions(dealerId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateAutoPublishSettingsUrl = (dealerId: number,) => {
+
+
+
+
+  return `/api/auto-publish/settings/${dealerId}`
+}
+
+/**
+ * @summary Create or update auto-publish settings for a dealer
+ */
+export const updateAutoPublishSettings = async (dealerId: number,
+    autoPublishSettingsInput: AutoPublishSettingsInput, options?: RequestInit): Promise<AutoPublishSettingsResponse> => {
+
+  return customFetch<AutoPublishSettingsResponse>(getUpdateAutoPublishSettingsUrl(dealerId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(autoPublishSettingsInput)
+  }
+);}
+
+
+
+
+export const getUpdateAutoPublishSettingsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAutoPublishSettings>>, TError,{dealerId: number;data: BodyType<AutoPublishSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAutoPublishSettings>>, TError,{dealerId: number;data: BodyType<AutoPublishSettingsInput>}, TContext> => {
+
+const mutationKey = ['updateAutoPublishSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAutoPublishSettings>>, {dealerId: number;data: BodyType<AutoPublishSettingsInput>}> = (props) => {
+          const {dealerId,data} = props ?? {};
+
+          return  updateAutoPublishSettings(dealerId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAutoPublishSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateAutoPublishSettings>>>
+    export type UpdateAutoPublishSettingsMutationBody = BodyType<AutoPublishSettingsInput>
+    export type UpdateAutoPublishSettingsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create or update auto-publish settings for a dealer
+ */
+export const useUpdateAutoPublishSettings = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAutoPublishSettings>>, TError,{dealerId: number;data: BodyType<AutoPublishSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAutoPublishSettings>>,
+        TError,
+        {dealerId: number;data: BodyType<AutoPublishSettingsInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAutoPublishSettingsMutationOptions(options));
+    }
+
+export const getListPublishingBatchesUrl = (params?: ListPublishingBatchesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/auto-publish/batches?${stringifiedParams}` : `/api/auto-publish/batches`
+}
+
+/**
+ * @summary List publishing batches for a dealer
+ */
+export const listPublishingBatches = async (params?: ListPublishingBatchesParams, options?: RequestInit): Promise<PublishingBatchList> => {
+
+  return customFetch<PublishingBatchList>(getListPublishingBatchesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPublishingBatchesQueryKey = (params?: ListPublishingBatchesParams,) => {
+    return [
+    `/api/auto-publish/batches`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPublishingBatchesQueryOptions = <TData = Awaited<ReturnType<typeof listPublishingBatches>>, TError = ErrorType<unknown>>(params?: ListPublishingBatchesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPublishingBatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPublishingBatchesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPublishingBatches>>> = ({ signal }) => listPublishingBatches(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPublishingBatches>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPublishingBatchesQueryResult = NonNullable<Awaited<ReturnType<typeof listPublishingBatches>>>
+export type ListPublishingBatchesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List publishing batches for a dealer
+ */
+
+export function useListPublishingBatches<TData = Awaited<ReturnType<typeof listPublishingBatches>>, TError = ErrorType<unknown>>(
+ params?: ListPublishingBatchesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPublishingBatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPublishingBatchesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePublishingBatchUrl = () => {
+
+
+
+
+  return `/api/auto-publish/batches`
+}
+
+/**
+ * @summary Select vehicles and create an auto-publish batch
+ */
+export const createPublishingBatch = async (createBatchInput: CreateBatchInput, options?: RequestInit): Promise<CreateBatchResponse> => {
+
+  return customFetch<CreateBatchResponse>(getCreatePublishingBatchUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createBatchInput)
+  }
+);}
+
+
+
+
+export const getCreatePublishingBatchMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPublishingBatch>>, TError,{data: BodyType<CreateBatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPublishingBatch>>, TError,{data: BodyType<CreateBatchInput>}, TContext> => {
+
+const mutationKey = ['createPublishingBatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPublishingBatch>>, {data: BodyType<CreateBatchInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPublishingBatch(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePublishingBatchMutationResult = NonNullable<Awaited<ReturnType<typeof createPublishingBatch>>>
+    export type CreatePublishingBatchMutationBody = BodyType<CreateBatchInput>
+    export type CreatePublishingBatchMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Select vehicles and create an auto-publish batch
+ */
+export const useCreatePublishingBatch = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPublishingBatch>>, TError,{data: BodyType<CreateBatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPublishingBatch>>,
+        TError,
+        {data: BodyType<CreateBatchInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePublishingBatchMutationOptions(options));
+    }
+
+export const getGetPublishingBatchUrl = (id: number,) => {
+
+
+
+
+  return `/api/auto-publish/batches/${id}`
+}
+
+/**
+ * @summary Get a batch with its jobs
+ */
+export const getPublishingBatch = async (id: number, options?: RequestInit): Promise<PublishingBatchDetail> => {
+
+  return customFetch<PublishingBatchDetail>(getGetPublishingBatchUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublishingBatchQueryKey = (id: number,) => {
+    return [
+    `/api/auto-publish/batches/${id}`
+    ] as const;
+    }
+
+
+export const getGetPublishingBatchQueryOptions = <TData = Awaited<ReturnType<typeof getPublishingBatch>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublishingBatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublishingBatchQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublishingBatch>>> = ({ signal }) => getPublishingBatch(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublishingBatch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublishingBatchQueryResult = NonNullable<Awaited<ReturnType<typeof getPublishingBatch>>>
+export type GetPublishingBatchQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get a batch with its jobs
+ */
+
+export function useGetPublishingBatch<TData = Awaited<ReturnType<typeof getPublishingBatch>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublishingBatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublishingBatchQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdatePublishingBatchUrl = (id: number,) => {
+
+
+
+
+  return `/api/auto-publish/batches/${id}`
+}
+
+/**
+ * @summary Update batch status
+ */
+export const updatePublishingBatch = async (id: number,
+    patchBatchInput: PatchBatchInput, options?: RequestInit): Promise<PublishingBatchResponse> => {
+
+  return customFetch<PublishingBatchResponse>(getUpdatePublishingBatchUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(patchBatchInput)
+  }
+);}
+
+
+
+
+export const getUpdatePublishingBatchMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePublishingBatch>>, TError,{id: number;data: BodyType<PatchBatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePublishingBatch>>, TError,{id: number;data: BodyType<PatchBatchInput>}, TContext> => {
+
+const mutationKey = ['updatePublishingBatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePublishingBatch>>, {id: number;data: BodyType<PatchBatchInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updatePublishingBatch(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePublishingBatchMutationResult = NonNullable<Awaited<ReturnType<typeof updatePublishingBatch>>>
+    export type UpdatePublishingBatchMutationBody = BodyType<PatchBatchInput>
+    export type UpdatePublishingBatchMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Update batch status
+ */
+export const useUpdatePublishingBatch = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePublishingBatch>>, TError,{id: number;data: BodyType<PatchBatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePublishingBatch>>,
+        TError,
+        {id: number;data: BodyType<PatchBatchInput>},
+        TContext
+      > => {
+      return useMutation(getUpdatePublishingBatchMutationOptions(options));
+    }
+
+export const getGetVehiclePhotoScoreUrl = (vehicleId: number,) => {
+
+
+
+
+  return `/api/auto-publish/vehicles/${vehicleId}/photo-score`
+}
+
+/**
+ * @summary Get photo quality score for a vehicle
+ */
+export const getVehiclePhotoScore = async (vehicleId: number, options?: RequestInit): Promise<VehiclePhotoScoreResponse> => {
+
+  return customFetch<VehiclePhotoScoreResponse>(getGetVehiclePhotoScoreUrl(vehicleId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVehiclePhotoScoreQueryKey = (vehicleId: number,) => {
+    return [
+    `/api/auto-publish/vehicles/${vehicleId}/photo-score`
+    ] as const;
+    }
+
+
+export const getGetVehiclePhotoScoreQueryOptions = <TData = Awaited<ReturnType<typeof getVehiclePhotoScore>>, TError = ErrorType<unknown>>(vehicleId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVehiclePhotoScore>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVehiclePhotoScoreQueryKey(vehicleId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVehiclePhotoScore>>> = ({ signal }) => getVehiclePhotoScore(vehicleId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: vehicleId !== null && vehicleId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVehiclePhotoScore>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVehiclePhotoScoreQueryResult = NonNullable<Awaited<ReturnType<typeof getVehiclePhotoScore>>>
+export type GetVehiclePhotoScoreQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get photo quality score for a vehicle
+ */
+
+export function useGetVehiclePhotoScore<TData = Awaited<ReturnType<typeof getVehiclePhotoScore>>, TError = ErrorType<unknown>>(
+ vehicleId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVehiclePhotoScore>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVehiclePhotoScoreQueryOptions(vehicleId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAnalyzeVehiclePhotoScoreUrl = (vehicleId: number,) => {
+
+
+
+
+  return `/api/auto-publish/vehicles/${vehicleId}/photo-score`
+}
+
+/**
+ * @summary Analyze and store photo quality score for a vehicle
+ */
+export const analyzeVehiclePhotoScore = async (vehicleId: number, options?: RequestInit): Promise<VehiclePhotoScoreResponse> => {
+
+  return customFetch<VehiclePhotoScoreResponse>(getAnalyzeVehiclePhotoScoreUrl(vehicleId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAnalyzeVehiclePhotoScoreMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeVehiclePhotoScore>>, TError,{vehicleId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeVehiclePhotoScore>>, TError,{vehicleId: number}, TContext> => {
+
+const mutationKey = ['analyzeVehiclePhotoScore'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeVehiclePhotoScore>>, {vehicleId: number}> = (props) => {
+          const {vehicleId} = props ?? {};
+
+          return  analyzeVehiclePhotoScore(vehicleId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeVehiclePhotoScoreMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeVehiclePhotoScore>>>
+
+    export type AnalyzeVehiclePhotoScoreMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Analyze and store photo quality score for a vehicle
+ */
+export const useAnalyzeVehiclePhotoScore = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeVehiclePhotoScore>>, TError,{vehicleId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeVehiclePhotoScore>>,
+        TError,
+        {vehicleId: number},
+        TContext
+      > => {
+      return useMutation(getAnalyzeVehiclePhotoScoreMutationOptions(options));
+    }
+
+export const getListVehiclePhotoScoresUrl = (params?: ListVehiclePhotoScoresParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/auto-publish/photo-scores?${stringifiedParams}` : `/api/auto-publish/photo-scores`
+}
+
+/**
+ * @summary List photo scores for dealer vehicles
+ */
+export const listVehiclePhotoScores = async (params?: ListVehiclePhotoScoresParams, options?: RequestInit): Promise<VehiclePhotoScoreList> => {
+
+  return customFetch<VehiclePhotoScoreList>(getListVehiclePhotoScoresUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVehiclePhotoScoresQueryKey = (params?: ListVehiclePhotoScoresParams,) => {
+    return [
+    `/api/auto-publish/photo-scores`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListVehiclePhotoScoresQueryOptions = <TData = Awaited<ReturnType<typeof listVehiclePhotoScores>>, TError = ErrorType<unknown>>(params?: ListVehiclePhotoScoresParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVehiclePhotoScores>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVehiclePhotoScoresQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVehiclePhotoScores>>> = ({ signal }) => listVehiclePhotoScores(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVehiclePhotoScores>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVehiclePhotoScoresQueryResult = NonNullable<Awaited<ReturnType<typeof listVehiclePhotoScores>>>
+export type ListVehiclePhotoScoresQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List photo scores for dealer vehicles
+ */
+
+export function useListVehiclePhotoScores<TData = Awaited<ReturnType<typeof listVehiclePhotoScores>>, TError = ErrorType<unknown>>(
+ params?: ListVehiclePhotoScoresParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVehiclePhotoScores>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVehiclePhotoScoresQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListPublishPriorityScoresUrl = (params?: ListPublishPriorityScoresParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/auto-publish/priority-scores?${stringifiedParams}` : `/api/auto-publish/priority-scores`
+}
+
+/**
+ * @summary List publish priority scores for dealer vehicles
+ */
+export const listPublishPriorityScores = async (params?: ListPublishPriorityScoresParams, options?: RequestInit): Promise<PublishPriorityScoreList> => {
+
+  return customFetch<PublishPriorityScoreList>(getListPublishPriorityScoresUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPublishPriorityScoresQueryKey = (params?: ListPublishPriorityScoresParams,) => {
+    return [
+    `/api/auto-publish/priority-scores`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPublishPriorityScoresQueryOptions = <TData = Awaited<ReturnType<typeof listPublishPriorityScores>>, TError = ErrorType<unknown>>(params?: ListPublishPriorityScoresParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPublishPriorityScores>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPublishPriorityScoresQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPublishPriorityScores>>> = ({ signal }) => listPublishPriorityScores(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPublishPriorityScores>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPublishPriorityScoresQueryResult = NonNullable<Awaited<ReturnType<typeof listPublishPriorityScores>>>
+export type ListPublishPriorityScoresQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List publish priority scores for dealer vehicles
+ */
+
+export function useListPublishPriorityScores<TData = Awaited<ReturnType<typeof listPublishPriorityScores>>, TError = ErrorType<unknown>>(
+ params?: ListPublishPriorityScoresParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPublishPriorityScores>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPublishPriorityScoresQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListCreativeStudioUrl = (params?: ListCreativeStudioParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -82,7 +82,7 @@ const handlers = {
   async CLAIM_JOB(message) {
     const extensionId = await getExtensionId();
     const job = await apiPost(`/api/publishing/jobs/${message.jobId}/claim`, { extensionId });
-    return job;
+    return { job };
   },
 
   async GET_JOB_PAYLOAD(message) {
@@ -101,6 +101,20 @@ const handlers = {
     const body = { extensionId };
     if (message.reason) body.reason = message.reason;
     return apiPost(`/api/publishing/jobs/${message.jobId}/fail`, body);
+  },
+
+  // Send a progress event for a publishing job.
+  // event: one of job_claimed | marketplace_opened | photos_loading | photos_uploaded |
+  //        fields_filled | validation_passed | waiting_operator | auto_publish_clicked |
+  //        published | failed | skipped | safety_halt
+  async SEND_JOB_EVENT(message) {
+    const extensionId = await getExtensionId();
+    return apiPost(`/api/publishing/jobs/${message.jobId}/event`, {
+      event: message.event,
+      extensionId,
+      details: message.details || undefined,
+      batchId: message.batchId || undefined,
+    });
   },
 
   async GET_EXTENSION_ID() {

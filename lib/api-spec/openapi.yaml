@@ -617,6 +617,262 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /publishing/jobs/{id}/event:
+    post:
+      operationId: addPublishingJobEvent
+      tags: [publishing]
+      summary: Record a progress event for a publishing job (from the Chrome extension)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishingEventInput"
+      responses:
+        "200":
+          description: Created event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishingEventResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /publishing/jobs/{id}/events:
+    get:
+      operationId: listPublishingJobEvents
+      tags: [publishing]
+      summary: Get all progress events for a publishing job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Events list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishingEventList"
+
+  /auto-publish/settings/{dealerId}:
+    get:
+      operationId: getAutoPublishSettings
+      tags: [publishing]
+      summary: Get auto-publish schedule settings for a dealer
+      parameters:
+        - name: dealerId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutoPublishSettingsResponse"
+    put:
+      operationId: updateAutoPublishSettings
+      tags: [publishing]
+      summary: Create or update auto-publish settings for a dealer
+      parameters:
+        - name: dealerId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AutoPublishSettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutoPublishSettingsResponse"
+
+  /auto-publish/batches:
+    get:
+      operationId: listPublishingBatches
+      tags: [publishing]
+      summary: List publishing batches for a dealer
+      parameters:
+        - name: dealerId
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Batches
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishingBatchList"
+    post:
+      operationId: createPublishingBatch
+      tags: [publishing]
+      summary: Select vehicles and create an auto-publish batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBatchInput"
+      responses:
+        "200":
+          description: Created batch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateBatchResponse"
+        "422":
+          description: No eligible vehicles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auto-publish/batches/{id}:
+    get:
+      operationId: getPublishingBatch
+      tags: [publishing]
+      summary: Get a batch with its jobs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Batch detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishingBatchDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updatePublishingBatch
+      tags: [publishing]
+      summary: Update batch status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchBatchInput"
+      responses:
+        "200":
+          description: Updated batch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishingBatchResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auto-publish/vehicles/{vehicleId}/photo-score:
+    get:
+      operationId: getVehiclePhotoScore
+      tags: [publishing]
+      summary: Get photo quality score for a vehicle
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Photo score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehiclePhotoScoreResponse"
+    post:
+      operationId: analyzeVehiclePhotoScore
+      tags: [publishing]
+      summary: Analyze and store photo quality score for a vehicle
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Analyzed photo score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehiclePhotoScoreResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auto-publish/photo-scores:
+    get:
+      operationId: listVehiclePhotoScores
+      tags: [publishing]
+      summary: List photo scores for dealer vehicles
+      parameters:
+        - name: dealerId
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Photo scores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehiclePhotoScoreList"
+
+  /auto-publish/priority-scores:
+    get:
+      operationId: listPublishPriorityScores
+      tags: [publishing]
+      summary: List publish priority scores for dealer vehicles
+      parameters:
+        - name: dealerId
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Priority scores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishPriorityScoreList"
+
   /creative/studio:
     get:
       operationId: listCreativeStudio
@@ -1660,3 +1916,306 @@ components:
         brandStyle: { type: string, minLength: 1 }
         backgroundStyle: { type: string, minLength: 1 }
         defaultTemplateKey: { type: string, minLength: 1 }
+
+    AutoPublishSettings:
+      type: object
+      required:
+        [
+          dealerId,
+          enabled,
+          vehiclesPerBatch,
+          frequencyDays,
+          preferredWindowStart,
+          preferredWindowEnd,
+          maxPostsPerDay,
+          minDelayMinutes,
+          maxDelayMinutes,
+          requireApproval,
+          autoClickPublish,
+          useOriginalPhotos,
+          aiCreativeIfLow,
+          photoScoreThreshold,
+        ]
+      properties:
+        id: { type: ["integer", "null"] }
+        dealerId: { type: integer }
+        enabled: { type: boolean }
+        vehiclesPerBatch: { type: integer }
+        frequencyDays: { type: integer }
+        preferredWindowStart: { type: string }
+        preferredWindowEnd: { type: string }
+        maxPostsPerDay: { type: integer }
+        minDelayMinutes: { type: integer }
+        maxDelayMinutes: { type: integer }
+        requireApproval: { type: boolean }
+        autoClickPublish: { type: boolean }
+        useOriginalPhotos: { type: boolean }
+        aiCreativeIfLow: { type: boolean }
+        photoScoreThreshold: { type: integer }
+        createdAt: { type: ["string", "null"] }
+        updatedAt: { type: ["string", "null"] }
+    AutoPublishSettingsResponse:
+      type: object
+      required: [settings]
+      properties:
+        settings:
+          $ref: "#/components/schemas/AutoPublishSettings"
+    AutoPublishSettingsInput:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        vehiclesPerBatch: { type: integer }
+        frequencyDays: { type: integer }
+        preferredWindowStart: { type: string }
+        preferredWindowEnd: { type: string }
+        maxPostsPerDay: { type: integer }
+        minDelayMinutes: { type: integer }
+        maxDelayMinutes: { type: integer }
+        requireApproval: { type: boolean }
+        autoClickPublish: { type: boolean }
+        useOriginalPhotos: { type: boolean }
+        aiCreativeIfLow: { type: boolean }
+        photoScoreThreshold: { type: integer }
+
+    PublishingBatch:
+      type: object
+      required:
+        [
+          id,
+          dealerId,
+          batchNumber,
+          status,
+          mode,
+          totalVehicles,
+          completedCount,
+          failedCount,
+          skippedCount,
+          needsReviewCount,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: integer }
+        dealerId: { type: integer }
+        batchNumber: { type: integer }
+        status: { type: string }
+        mode: { type: string }
+        totalVehicles: { type: integer }
+        completedCount: { type: integer }
+        failedCount: { type: integer }
+        skippedCount: { type: integer }
+        needsReviewCount: { type: integer }
+        scheduledAt: { type: ["string", "null"] }
+        startedAt: { type: ["string", "null"] }
+        completedAt: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    PublishingBatchResponse:
+      type: object
+      required: [batch]
+      properties:
+        batch:
+          $ref: "#/components/schemas/PublishingBatch"
+    PublishingBatchList:
+      type: object
+      required: [batches]
+      properties:
+        batches:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublishingBatch"
+    BatchJobSummary:
+      type: object
+      required: [id, vehicleId, status, mode]
+      properties:
+        id: { type: integer }
+        vehicleId: { type: integer }
+        status: { type: string }
+        mode: { type: string }
+        vehicleLabel: { type: ["string", "null"] }
+        batchId: { type: ["integer", "null"] }
+        priority: { type: integer }
+        scheduledAt: { type: ["string", "null"] }
+        startedAt: { type: ["string", "null"] }
+        completedAt: { type: ["string", "null"] }
+        failedReason: { type: ["string", "null"] }
+        listingUrl: { type: ["string", "null"] }
+        needsReview: { type: boolean }
+        reviewReason: { type: ["string", "null"] }
+        attempts: { type: integer }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    PublishingBatchDetail:
+      type: object
+      required: [batch, jobs]
+      properties:
+        batch:
+          $ref: "#/components/schemas/PublishingBatch"
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BatchJobSummary"
+    CreateBatchInput:
+      type: object
+      required: [dealerId]
+      properties:
+        dealerId: { type: integer }
+        mode:
+          type: string
+          enum: [Assisted, Controlled]
+        count: { type: integer, minimum: 1, maximum: 20 }
+        scheduledAt: { type: string }
+    IneligibleVehicle:
+      type: object
+      required: [vehicleId]
+      properties:
+        vehicleId: { type: integer }
+        reason: { type: ["string", "null"] }
+    CreateBatchResponse:
+      type: object
+      required: [batch, jobs]
+      properties:
+        batch:
+          $ref: "#/components/schemas/PublishingBatch"
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BatchJobSummary"
+        ineligible:
+          type: array
+          items:
+            $ref: "#/components/schemas/IneligibleVehicle"
+    PatchBatchInput:
+      type: object
+      properties:
+        status: { type: string }
+        startedAt: { type: string }
+        completedAt: { type: string }
+
+    PublishingEvent:
+      type: object
+      required: [id, jobId, vehicleId, dealerId, event, createdAt]
+      properties:
+        id: { type: integer }
+        jobId: { type: integer }
+        vehicleId: { type: integer }
+        dealerId: { type: integer }
+        batchId: { type: ["integer", "null"] }
+        event: { type: string }
+        details: { type: ["string", "null"] }
+        extensionId: { type: ["string", "null"] }
+        createdAt: { type: string }
+    PublishingEventResponse:
+      type: object
+      required: [event]
+      properties:
+        event:
+          $ref: "#/components/schemas/PublishingEvent"
+    PublishingEventList:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublishingEvent"
+    PublishingEventInput:
+      type: object
+      required: [event]
+      properties:
+        event: { type: string, minLength: 1 }
+        extensionId: { type: string }
+        details: { type: string }
+        batchId: { type: integer }
+
+    VehiclePhotoScore:
+      type: object
+      required:
+        [
+          id,
+          vehicleId,
+          dealerId,
+          photoScore,
+          photoLabel,
+          photoDecision,
+          totalPhotos,
+          uniquePhotos,
+          needsAiCreative,
+          analyzedAt,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: integer }
+        vehicleId: { type: integer }
+        dealerId: { type: integer }
+        photoScore: { type: integer }
+        photoLabel: { type: string }
+        photoDecision: { type: string }
+        totalPhotos: { type: integer }
+        uniquePhotos: { type: integer }
+        recommendedCoverUrl: { type: ["string", "null"] }
+        needsAiCreative: { type: integer }
+        scoreBreakdown: { type: ["string", "null"] }
+        analyzedAt: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    VehiclePhotoScoreResponse:
+      type: object
+      required: [score]
+      properties:
+        score:
+          oneOf:
+            - $ref: "#/components/schemas/VehiclePhotoScore"
+            - type: "null"
+    VehiclePhotoScoreList:
+      type: object
+      required: [scores]
+      properties:
+        scores:
+          type: array
+          items:
+            $ref: "#/components/schemas/VehiclePhotoScore"
+
+    PublishPriorityScore:
+      type: object
+      required:
+        [
+          id,
+          vehicleId,
+          dealerId,
+          priorityScore,
+          bodyStyleBonus,
+          priceBonus,
+          freshnessBonus,
+          photoBonus,
+          neverPublishedBonus,
+          eligible,
+          computedAt,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: integer }
+        vehicleId: { type: integer }
+        dealerId: { type: integer }
+        priorityScore: { type: integer }
+        bodyStyleBonus: { type: integer }
+        priceBonus: { type: integer }
+        freshnessBonus: { type: integer }
+        photoBonus: { type: integer }
+        neverPublishedBonus: { type: integer }
+        eligible: { type: integer }
+        ineligibleReason: { type: ["string", "null"] }
+        computedAt: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    PublishPriorityScoreList:
+      type: object
+      required: [scores]
+      properties:
+        scores:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublishPriorityScore"

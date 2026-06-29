@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   pgTable,
   serial,
@@ -19,6 +20,9 @@ export const publishingJobsTable = pgTable(
     listingVersionId: integer("listing_version_id").notNull(),
     vehicleId: integer("vehicle_id").notNull(),
     dealerId: integer("dealer_id").notNull(),
+    batchId: integer("batch_id"),
+    // Assisted: operator clicks Publish manually. Controlled: extension may auto-click.
+    mode: text("mode").notNull().default("Assisted"),
     status: text("status").notNull().default("Queued"),
     priority: integer("priority").notNull().default(0),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
@@ -27,6 +31,9 @@ export const publishingJobsTable = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true }),
     failedReason: text("failed_reason"),
     attempts: integer("attempts").notNull().default(0),
+    listingUrl: text("listing_url"),
+    needsReview: boolean("needs_review").notNull().default(false),
+    reviewReason: text("review_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
