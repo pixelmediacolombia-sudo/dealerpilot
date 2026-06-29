@@ -1,0 +1,427 @@
+# DealerPilot AI — Sprint 4.6
+
+## Mission Control UX Refinement
+
+Sprint 4.5 is complete.
+
+Do NOT build new features.
+
+Do NOT create new routes.
+
+Do NOT modify the backend.
+
+Do NOT modify APIs.
+
+Do NOT modify database schema.
+
+Do NOT touch the Chrome Extension.
+
+Do NOT touch workers.
+
+This sprint is **100% UI/UX refinement**.
+
+The objective is simple:
+
+DealerPilot should feel like the AI operating system for dealerships.
+
+Not a dashboard.
+
+Not an admin panel.
+
+An AI copilot.
+
+---
+
+# IMPORTANT
+
+I have attached multiple screenshots of Autolander.
+
+These screenshots are **UX inspiration only**.
+
+Do NOT copy their layout.
+
+Do NOT copy their branding.
+
+Do NOT recreate their UI.
+
+Study them only to understand:
+
+• simplicity
+
+• hierarchy
+
+• spacing
+
+• visual rhythm
+
+• action-first workflow
+
+DealerPilot must become its own product.
+
+More premium.
+
+More AI-first.
+
+More enterprise.
+
+---
+
+# DESIGN PRINCIPLES
+
+Everything should answer one question:
+
+"What should I do next?"
+
+Every screen should naturally guide the operator toward the next action.
+
+Reduce cognitive load.
+
+Reduce clicks.
+
+Increase whitespace.
+
+Increase typography hierarchy.
+
+Remove visual noise.
+
+---
+
+# 1 — SALES HUB
+
+Completely rethink the Sales Hub.
+
+It should become the AI Mission Control.
+
+Not a statistics page.
+
+Instead of showing raw metrics like:
+
+256 Vehicles
+
+53 Updates
+
+18 Listings
+
+Convert everything into AI recommendations.
+
+Examples:
+
+DealerPilot recommends publishing 18 vehicles today.
+
+5 listings need renewal.
+
+3 vehicles require price updates.
+
+12 Marketplace conversations are waiting for an AI response.
+
+Every recommendation must end with ONE primary CTA.
+
+Publish Now
+
+Update Prices
+
+Renew Listings
+
+Review Leads
+
+Generate Creatives
+
+Never place two equally-important buttons inside the same card.
+
+One action.
+
+One decision.
+
+---
+
+# 2 — VEHICLE CARDS
+
+Status belongs on the image.
+
+Every vehicle card should support overlay badges.
+
+Examples:
+
+LIVE
+
+NEW
+
+PRICE DROP
+
+AI GENERATED
+
+READY
+
+QUEUED
+
+PUBLISHED
+
+RENEW
+
+SOLD
+
+NEEDS REVIEW
+
+These badges should appear in the image corners.
+
+The operator should understand vehicle status before reading text.
+
+---
+
+# 3 — MARKETPLACE AI
+
+Inventory
+
+Listings
+
+Publishing
+
+These are one workflow.
+
+Keep existing backend architecture.
+
+But redesign the UI into one workspace.
+
+Tabs only.
+
+Ready
+
+Generating
+
+Publishing
+
+Published
+
+Renewals
+
+Needs Update
+
+Sold
+
+Switching tabs must feel instant.
+
+No additional navigation.
+
+---
+
+# 4 — SIDEBAR
+
+Simplify navigation.
+
+Maximum six primary items.
+
+Recommended:
+
+Sales Hub
+
+Marketplace AI
+
+Creative AI
+
+Sales AI
+
+Dealer DNA
+
+Settings
+
+Move Connections, System Configuration, Control Center and admin utilities into Settings.
+
+The sidebar should represent the operator's daily workflow.
+
+Nothing else.
+
+---
+
+# 5 — GLOBAL HEADER
+
+Persistent top bar.
+
+Always visible.
+
+Display:
+
+Current Dealer
+
+Facebook Connection
+
+Chrome Extension
+
+Last Inventory Sync
+
+AI Status
+
+Never force the user to open another screen just to verify system health.
+
+---
+
+# 6 — BULK OPERATIONS
+
+Every vehicle list should support:
+
+Select All
+
+Multiple Selection
+
+Floating Action Bar
+
+Actions:
+
+Publish
+
+Generate Listing
+
+Generate Creative
+
+Renew
+
+Update Price
+
+Mark Sold
+
+Keep backend unchanged.
+
+Only improve UX.
+
+---
+
+# 7 — LIVE AI
+
+Whenever AI is working...
+
+The interface should feel alive.
+
+No generic loading spinners.
+
+Show progress.
+
+Examples:
+
+Generating Listings
+
+Vehicle 8 of 25
+
+Progress Bar
+
+Estimated Remaining Time
+
+Publishing to Marketplace
+
+Waiting for Chrome Extension
+
+Completed
+
+The user should always know what DealerPilot is doing.
+
+---
+
+# 8 — AI VOICE
+
+DealerPilot speaks.
+
+Do not use spreadsheet language.
+
+Avoid labels like:
+
+256 Vehicles
+
+12 Listings
+
+3 Updates
+
+Replace with AI language.
+
+Examples:
+
+DealerPilot found 18 vehicles ready to publish.
+
+DealerPilot recommends updating prices on 3 vehicles.
+
+DealerPilot generated 6 new creatives today.
+
+12 buyers are waiting for a response.
+
+The dashboard should feel like an intelligent assistant.
+
+---
+
+# 9 — TYPOGRAPHY
+
+Use stronger visual hierarchy.
+
+Small colored eyebrow labels.
+
+Large bold titles.
+
+One accent word.
+
+Example:
+
+MARKETPLACE
+
+Publishing
+
+Or
+
+SALES
+
+Mission Control
+
+Increase whitespace.
+
+Reduce borders.
+
+Use shadows more than outlines.
+
+---
+
+# 10 — CARDS
+
+Every card must answer one question.
+
+Every card must end with one CTA.
+
+No card should simply display information.
+
+Every card should drive action.
+
+---
+
+# 11 — KEEP EVERYTHING WORKING
+
+This sprint is frontend only.
+
+All APIs must remain untouched.
+
+All routes must remain untouched.
+
+All database tables remain untouched.
+
+All backend functionality remains untouched.
+
+Chrome Extension remains untouched.
+
+Publishing Engine remains untouched.
+
+Workers remain untouched.
+
+Only redesign the experience.
+
+---
+
+# DELIVERABLE
+
+When finished provide:
+
+• Before vs After summary
+
+• UX decisions made
+
+• Screenshots of every redesigned workspace
+
+• Typecheck result
+
+• Confirmation that backend was not modified
+
+• Confirmation that all existing features continue working
+
+Do not stop until the entire UI feels like a premium AI operating system rather than an admin dashboard.

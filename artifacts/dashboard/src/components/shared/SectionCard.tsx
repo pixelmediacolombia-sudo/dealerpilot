@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { renderIcon, type IconLike } from "./renderIcon";
 
 interface SectionCardProps {
-  title?: string;
+  title?: ReactNode;
   description?: string;
   icon?: IconLike;
   action?: ReactNode;

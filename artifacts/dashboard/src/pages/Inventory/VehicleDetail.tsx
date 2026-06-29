@@ -101,14 +101,15 @@ export function VehicleDetail() {
 
   const { vehicle, images, changes, sourceRaw } = data;
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case "Active": return "bg-blue-500/10 text-blue-400 border-blue-500/20";
-      case "Ready to Publish": return "bg-primary/10 text-primary border-primary/20";
-      case "Published": return "bg-success/10 text-success border-success/20";
+      case "Published": return { label: "LIVE", className: "bg-success/80 text-success-foreground border-success/20" };
+      case "Ready to Publish": return { label: "READY", className: "bg-blue-500/80 text-white border-blue-500/20" };
+      case "AI Generated": return { label: "AI", className: "bg-accent/80 text-accent-foreground border-accent/20" };
+      case "Active": return { label: "ACTIVE", className: "bg-secondary/80 text-secondary-foreground border-secondary/20" };
       case "Archived":
-      case "Sold/Removed": return "bg-muted text-muted-foreground border-border";
-      default: return "bg-secondary text-secondary-foreground border-border";
+      case "Sold/Removed": return { label: "SOLD", className: "bg-destructive/80 text-destructive-foreground border-destructive/20" };
+      default: return { label: status.toUpperCase(), className: "bg-secondary/80 text-secondary-foreground border-secondary/20" };
     }
   };
 
@@ -138,10 +139,6 @@ export function VehicleDetail() {
                   <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
                     {vehicle.year} {vehicle.make} {vehicle.model}
                   </h1>
-                  <Badge variant="outline" className={cn("px-3 py-1 text-sm font-medium", getStatusColor(vehicle.status))}>
-                    <StatusPulse color={getPulseColor(vehicle.status) as any} className="mr-2" />
-                    {vehicle.status}
-                  </Badge>
                 </div>
                 <div className="flex items-center gap-3 text-muted-foreground font-medium">
                   <span className="text-foreground">{vehicle.trim || "Base"}</span>
@@ -201,6 +198,11 @@ export function VehicleDetail() {
                 {images.length > 0 ? (
                   <div className="space-y-2">
                     <div className="aspect-[21/9] rounded-xl overflow-hidden bg-secondary relative group">
+                      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 items-end">
+                        <Badge variant="outline" className={cn("backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border", getStatusBadge(vehicle.status).className)}>
+                          {getStatusBadge(vehicle.status).label}
+                        </Badge>
+                      </div>
                       <img 
                         src={images[0].url} 
                         alt="Primary" 

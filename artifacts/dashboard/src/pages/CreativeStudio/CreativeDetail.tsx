@@ -35,7 +35,8 @@ import {
   CheckCircle2,
   Star,
   ImageIcon,
-  LayoutTemplate
+  LayoutTemplate,
+  Sparkles
 } from "lucide-react";
 import { SectionCard, EmptyState, StatusPulse } from "@/components/shared";
 
@@ -55,7 +56,7 @@ function ratingClass(rating: string | null | undefined) {
 function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="flex justify-between text-xs font-medium uppercase tracking-wider mb-2">
+      <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-2">
         <span className="text-muted-foreground">{label}</span>
         <span className="text-foreground">{value}</span>
       </div>
@@ -87,21 +88,21 @@ function VersionView({
 }) {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl glass-panel">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="bg-secondary/50 text-muted-foreground uppercase text-[10px] tracking-wider">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-6 p-5 rounded-2xl glass-panel border border-white/5">
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant="outline" className="bg-secondary/50 text-muted-foreground uppercase text-[10px] tracking-widest px-3 py-1">
             {version.templateKey}
           </Badge>
-          <Badge variant="outline" className="bg-secondary/50 text-muted-foreground uppercase text-[10px] tracking-wider">
+          <Badge variant="outline" className="bg-secondary/50 text-muted-foreground uppercase text-[10px] tracking-widest px-3 py-1">
             {version.brandStyle}
           </Badge>
-          <Badge variant="outline" className="bg-secondary/50 text-muted-foreground uppercase text-[10px] tracking-wider">
+          <Badge variant="outline" className="bg-secondary/50 text-muted-foreground uppercase text-[10px] tracking-widest px-3 py-1">
             {version.backgroundStyle}
           </Badge>
           <Badge
             variant="outline"
             className={cn(
-              "uppercase text-[10px] tracking-wider",
+              "uppercase text-[10px] tracking-widest px-3 py-1",
               version.status === "Approved"
                 ? "bg-green-500/10 text-green-500 border-green-500/20"
                 : "bg-secondary/50 text-muted-foreground",
@@ -110,8 +111,8 @@ function VersionView({
             {version.status}
           </Badge>
           {version.isDefault && (
-            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 uppercase text-[10px] tracking-wider">
-              <Star className="w-3 h-3 mr-1 fill-primary" /> Default
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 uppercase text-[10px] tracking-widest px-3 py-1">
+              <Star className="w-3.5 h-3.5 mr-1.5 fill-primary" /> Default
             </Badge>
           )}
         </div>
@@ -121,51 +122,56 @@ function VersionView({
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
-            size="sm"
-            className="gap-2 border-border/50 hover:bg-secondary"
+            className="gap-2 border-border/50 hover:bg-secondary h-10 px-5 text-xs font-bold uppercase tracking-widest"
             onClick={onSetDefault}
             disabled={settingDefault || version.isDefault}
           >
             {settingDefault ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
-            {version.isDefault ? "Default" : "Set as Default"}
+            {version.isDefault ? "Default Version" : "Set as Default"}
           </Button>
           <Button
-            size="sm"
             className={cn(
-              "gap-2", 
-              version.status === "Approved" ? "bg-green-500/10 text-green-500 hover:bg-green-500/20 hover:text-green-500 border border-green-500/20" : ""
+              "gap-2 h-10 px-6 text-xs font-bold uppercase tracking-widest transition-all", 
+              version.status === "Approved" ? "bg-green-500/10 text-green-500 hover:bg-green-500/20 border border-green-500/20" : "bg-primary text-primary-foreground hover:bg-primary/90"
             )}
             onClick={onApprove}
             disabled={approving || version.status === "Approved"}
             variant={version.status === "Approved" ? "outline" : "default"}
           >
             {approving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            {version.status === "Approved" ? "Approved" : "Approve"}
+            {version.status === "Approved" ? "Approved" : "Approve Creative"}
           </Button>
         </div>
       </div>
 
       {/* Creative previews */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         <div className="animate-in slide-in-from-bottom-4" style={{ animationDelay: "100ms" }}>
+          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 pl-2">Cover Format</div>
           <CreativePreviewCard spec={version.renderSpec} format="cover" />
         </div>
         <div className="animate-in slide-in-from-bottom-4" style={{ animationDelay: "200ms" }}>
+          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 pl-2">Story Format</div>
           <CreativePreviewCard spec={version.renderSpec} format="story" />
         </div>
         <div className="animate-in slide-in-from-bottom-4" style={{ animationDelay: "300ms" }}>
+          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 pl-2">Feed Format</div>
           <CreativePreviewCard spec={version.renderSpec} format="feed" />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
         {/* Export outputs */}
-        <SectionCard title="Export Outputs" icon={ImageIcon}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <SectionCard 
+          title="Export Outputs" 
+          icon={ImageIcon}
+          className="border-white/5"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {version.outputs.map((o) => (
-              <div key={o.format} className="rounded-lg border border-border/50 bg-secondary/30 p-4 hover:bg-secondary/50 transition-colors">
-                <div className="font-semibold tracking-tight">{o.label}</div>
-                <div className="text-xs font-medium text-muted-foreground/80 mt-1 uppercase tracking-wider">
+              <div key={o.format} className="rounded-xl border border-white/5 bg-secondary/30 p-5 hover:bg-secondary/50 transition-colors group cursor-pointer">
+                <div className="font-bold tracking-tight text-foreground/90 group-hover:text-primary transition-colors">{o.label}</div>
+                <div className="text-[10px] font-bold text-muted-foreground/60 mt-2 uppercase tracking-widest">
                   {o.format} · {o.width}×{o.height}
                 </div>
               </div>
@@ -176,15 +182,16 @@ function VersionView({
         {/* Score */}
         {version.score && (
           <SectionCard 
-            title="Creative Score" 
+            title="AI Creative Score" 
             icon={Gauge}
+            className="border-white/5"
             action={
-              <Badge variant="outline" className={cn("ml-2 font-bold px-3 py-1", ratingClass(version.score.rating))}>
-                {version.score.overall} · {version.score.rating}
+              <Badge variant="outline" className={cn("ml-2 font-bold px-3 py-1.5 uppercase text-[10px] tracking-widest", ratingClass(version.score.rating))}>
+                {version.score.overall} SCORE
               </Badge>
             }
           >
-            <div className="space-y-5">
+            <div className="space-y-6">
               <ScoreBar label="Brand Consistency" value={version.score.brandConsistency} />
               <ScoreBar label="Vehicle Visibility" value={version.score.vehicleVisibility} />
               <ScoreBar label="Lighting" value={version.score.lighting} />
@@ -224,8 +231,8 @@ export function CreativeDetail() {
       onSuccess: () => {
         invalidate();
         toast({
-          title: "Generation started",
-          description: "A new creative is being generated in the background.",
+          title: "DealerPilot started generation",
+          description: "A new AI creative is being generated in the background.",
         });
       },
       onError: (err) =>
@@ -237,7 +244,7 @@ export function CreativeDetail() {
     mutation: {
       onSuccess: (v) => {
         invalidate();
-        toast({ title: "Creative approved", description: `Version ${v.version} approved.` });
+        toast({ title: "Creative approved", description: `DealerPilot marked Version ${v.version} as approved.` });
       },
       onError: (err) =>
         toast({ title: "Approve failed", description: err.message, variant: "destructive" }),
@@ -248,7 +255,7 @@ export function CreativeDetail() {
     mutation: {
       onSuccess: (v) => {
         invalidate();
-        toast({ title: "Default updated", description: `Version ${v.version} is now the default.` });
+        toast({ title: "Default updated", description: `DealerPilot set Version ${v.version} as the default.` });
       },
       onError: (err) =>
         toast({ title: "Update failed", description: err.message, variant: "destructive" }),
@@ -268,7 +275,10 @@ export function CreativeDetail() {
     return (
       <AppLayout>
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <div className="flex flex-col items-center gap-4">
+             <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">DealerPilot is loading...</p>
+          </div>
         </div>
       </AppLayout>
     );
@@ -281,7 +291,7 @@ export function CreativeDetail() {
           <EmptyState
             icon={Car}
             title="Vehicle not found"
-            description="The requested vehicle could not be found or has been removed."
+            description="DealerPilot could not locate this vehicle."
             action={<Link href="/creative-studio"><Button>Back to Creative Studio</Button></Link>}
           />
         </div>
@@ -303,14 +313,16 @@ export function CreativeDetail() {
       <div className="flex-1 overflow-y-auto">
         <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
           <Link href="/creative-studio">
-            <Button variant="ghost" size="sm" className="gap-2 -ml-3 text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="w-4 h-4" /> Back to Studio
+            <Button variant="ghost" size="sm" className="gap-2 -ml-4 text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-full px-4 text-[10px] uppercase font-bold tracking-widest">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Studio
             </Button>
           </Link>
 
           {/* Header */}
-          <div className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-8">
-            <div className="w-full md:w-72 aspect-[4/3] bg-muted/30 rounded-xl overflow-hidden shrink-0 relative group">
+          <div className="glass-panel p-8 rounded-3xl flex flex-col md:flex-row gap-10 border border-white/5 shadow-2xl shadow-black/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10 pointer-events-none" />
+            
+            <div className="w-full md:w-80 aspect-[4/3] bg-muted/30 rounded-2xl overflow-hidden shrink-0 relative group shadow-inner">
               {primaryImage ? (
                 <>
                   <img
@@ -318,7 +330,7 @@ export function CreativeDetail() {
                     alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -327,32 +339,35 @@ export function CreativeDetail() {
               )}
             </div>
             
-            <div className="flex-1 flex flex-col">
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground/90">
-                {vehicle.year} {vehicle.make} {vehicle.model}
+            <div className="flex-1 flex flex-col z-10">
+              <div className="text-primary text-[10px] font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5" /> AI Creative Subject
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground/90">
+                {vehicle.year} {vehicle.make} <span className="text-primary">{vehicle.model}</span>
               </h1>
-              <p className="text-muted-foreground mt-2 text-lg">
+              <p className="text-muted-foreground mt-3 text-lg font-medium">
                 {vehicle.trim || "Base"} • {vehicle.bodyStyle || "Vehicle"}
               </p>
               
-              <div className="flex flex-wrap gap-x-8 gap-y-4 mt-6">
+              <div className="flex flex-wrap gap-x-12 gap-y-6 mt-8">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Price</p>
-                  <p className="text-xl font-bold text-primary">{formatCurrency(vehicle.price)}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-1.5">Price</p>
+                  <p className="text-2xl font-bold text-foreground/90">{formatCurrency(vehicle.price)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Mileage</p>
-                  <p className="text-xl font-semibold text-foreground/80">{formatMileage(vehicle.mileage)}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-1.5">Mileage</p>
+                  <p className="text-2xl font-semibold text-foreground/80">{formatMileage(vehicle.mileage)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">VIN</p>
-                  <p className="text-xl font-semibold text-foreground/80">{vehicle.vin.slice(-8)}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-1.5">VIN</p>
+                  <p className="text-2xl font-semibold text-foreground/80">{vehicle.vin.slice(-8)}</p>
                 </div>
               </div>
               
-              <div className="mt-auto pt-8 flex flex-wrap items-center gap-3">
+              <div className="mt-auto pt-10 flex flex-wrap items-center gap-4">
                 <Select value={effectiveTemplateKey} onValueChange={setTemplateKey}>
-                  <SelectTrigger className="w-[220px] bg-secondary/50 border-border/50">
+                  <SelectTrigger className="w-[240px] h-12 bg-secondary/50 border-white/10 rounded-xl text-sm font-medium">
                     <SelectValue placeholder="Select template" />
                   </SelectTrigger>
                   <SelectContent>
@@ -371,7 +386,7 @@ export function CreativeDetail() {
                     })
                   }
                   disabled={generate.isPending || activeJobs.length > 0}
-                  className="gap-2 premium-gradient-btn"
+                  className="gap-2 h-12 px-6 rounded-xl font-bold text-[11px] uppercase tracking-widest premium-gradient-btn"
                 >
                   {generate.isPending || activeJobs.length > 0 ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -379,10 +394,10 @@ export function CreativeDetail() {
                     <Wand2 className="w-4 h-4" />
                   )}
                   {activeJobs.length > 0
-                    ? "Generating..."
+                    ? "DealerPilot is Generating..."
                     : sortedVersions.length === 0
-                      ? "Generate Creative"
-                      : "Generate Again"}
+                      ? "Generate AI Creative"
+                      : "Generate New Variation"}
                 </Button>
               </div>
             </div>
@@ -390,17 +405,18 @@ export function CreativeDetail() {
 
           {/* Active job progress */}
           {activeJobs.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-4 pt-4">
               {activeJobs.map((job) => (
-                <div key={job.id} className="glass-panel p-4 rounded-xl border border-primary/20 bg-primary/5">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium flex items-center gap-2 text-primary">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {job.status === "Generating" && job.step ? job.step : "Queued"}
+                <div key={job.id} className="glass-panel p-6 rounded-2xl border border-primary/20 bg-primary/5 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-primary/5 animate-pulse pointer-events-none" />
+                  <div className="relative z-10 flex items-center justify-between mb-4">
+                    <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
+                      <div className="w-2 h-2 rounded-full bg-primary animate-ping" />
+                      {job.status === "Generating" && job.step ? job.step : "DealerPilot is queuing your job..."}
                     </span>
-                    <span className="text-sm font-bold text-primary">{job.progress}%</span>
+                    <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{job.progress}% Complete</span>
                   </div>
-                  <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                  <div className="h-2 rounded-full bg-secondary/50 overflow-hidden relative z-10">
                     <div
                       className="h-full rounded-full bg-primary transition-all duration-500 relative"
                       style={{ width: `${job.progress}%` }}
@@ -415,15 +431,17 @@ export function CreativeDetail() {
 
           {/* Versions */}
           {sortedVersions.length === 0 ? (
-            <EmptyState
-              icon={LayoutTemplate}
-              title="No creative generated yet"
-              description="Pick a template and generate an on-brand Marketplace creative built from your Dealer Brand DNA and this vehicle's photos."
-            />
+            <div className="pt-8">
+              <EmptyState
+                icon={LayoutTemplate}
+                title="No creatives generated yet"
+                description="Ask DealerPilot to generate an on-brand Marketplace creative built from your Dealer Brand DNA and this vehicle's photos."
+              />
+            </div>
           ) : (
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                <History className="w-4 h-4" />
+            <div className="space-y-8 pt-8">
+              <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-2">
+                <History className="w-3.5 h-3.5" />
                 Version History
               </div>
               
@@ -432,16 +450,16 @@ export function CreativeDetail() {
                 onValueChange={(v) => setActiveVersionId(Number(v))}
                 className="w-full"
               >
-                <TabsList className="flex-wrap h-auto bg-card/60 p-1 border border-border/50">
+                <TabsList className="flex-wrap h-auto bg-card/40 p-1.5 border border-white/5 rounded-xl">
                   {sortedVersions.map((v) => (
                     <TabsTrigger 
                       key={v.id} 
                       value={String(v.id)} 
-                      className="gap-2 px-4 py-2 data-[state=active]:bg-secondary data-[state=active]:text-foreground"
+                      className="gap-2 px-5 py-2.5 rounded-lg data-[state=active]:bg-primary/20 data-[state=active]:text-primary font-bold text-xs transition-all"
                     >
                       v{v.version}
                       {v.isDefault && (
-                        <Star className="w-3 h-3 fill-primary text-primary" />
+                        <Star className="w-3.5 h-3.5 fill-primary text-primary" />
                       )}
                     </TabsTrigger>
                   ))}
@@ -449,10 +467,10 @@ export function CreativeDetail() {
                 
                 {sortedVersions.map((v) => (
                   <TabsContent key={v.id} value={String(v.id)} className="mt-8 outline-none">
-                    <div className="text-xs font-medium text-muted-foreground/60 uppercase tracking-widest mb-6 flex items-center gap-2">
-                      <span className="text-foreground/80">{v.templateKey}</span> 
-                      <span>•</span> 
-                      <span>{formatDate(v.createdAt)}</span>
+                    <div className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-6 flex items-center gap-3 pl-2">
+                      <span className="text-primary">{v.templateKey}</span> 
+                      <span className="w-1 h-1 rounded-full bg-white/20" /> 
+                      <span>Generated {formatDate(v.createdAt)}</span>
                     </div>
                     <VersionView
                       version={v}

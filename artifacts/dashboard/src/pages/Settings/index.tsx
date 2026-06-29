@@ -5,6 +5,9 @@ import {
   useGetDealer, 
   useUpdateDealer, 
   useSyncDealerFeed,
+  useGetConnectionStatus,
+  useListFeedRuns,
+  getListFeedRunsQueryKey,
   getGetDealerQueryKey,
   getListVehiclesQueryKey,
   getGetVehicleStatsQueryKey
@@ -15,9 +18,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/format";
-import { Save, RefreshCw, AlertCircle, CheckCircle2, Loader2, Building2, Settings as SettingsIcon } from "lucide-react";
+import { 
+  Save, RefreshCw, AlertCircle, CheckCircle2, Loader2, Building2, 
+  Settings as SettingsIcon, Server, Database, Rss, Puzzle, 
+  Facebook, Store, MessageCircle, Bot, Activity, History
+} from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { PageHeader, SectionCard } from "@/components/shared";
+import { PageHeader, SectionCard, StatusPulse } from "@/components/shared";
+import { cn } from "@/lib/utils";
 
 export function Settings() {
   const { toast } = useToast();
@@ -28,6 +36,11 @@ export function Settings() {
   const dealerId = dealersData?.dealers[0]?.id;
   const { data: dealer, isLoading: dealerLoading } = useGetDealer(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getGetDealerQueryKey(dealerId!) }
+  });
+
+  const { data: connections } = useGetConnectionStatus();
+  const { data: feedRunsData } = useListFeedRuns(dealerId!, {
+    query: { enabled: !!dealerId, queryKey: getListFeedRunsQueryKey(dealerId!) }
   });
 
   // Local state for forms
@@ -82,6 +95,35 @@ export function Settings() {
     });
   };
 
+  const getStatusConfig = (serviceStatus: string) => {
+    switch (serviceStatus?.toLowerCase()) {
+      case "connected":
+      case "online":
+        return { color: "success", label: "Online" } as const;
+      case "offline":
+      case "error":
+        return { color: "destructive", label: "Offline" } as const;
+      case "not_synced":
+      case "warning":
+        return { color: "warning", label: "Degraded" } as const;
+      case "coming_soon":
+        return { color: "info", label: "Pending" } as const;
+      default:
+        return { color: "muted", label: "Unknown" } as const;
+    }
+  };
+
+  const services = [
+    { key: 'backend', name: 'Core API Server', icon: Server, description: 'Main orchestration and task runner' },
+    { key: 'database', name: 'Primary Database', icon: Database, description: 'Persistent state storage' },
+    { key: 'xmlFeed', name: 'Inventory Sync', icon: Rss, description: 'Nightly dealer feed ingestion' },
+    { key: 'chromeExtension', name: 'Publishing Agent', icon: Puzzle, description: 'Browser automation bridge' },
+    { key: 'facebookSession', name: 'FB Auth Token', icon: Facebook, description: 'Marketplace session state' },
+    { key: 'marketplace', name: 'Marketplace API', icon: Store, description: 'Listing publication endpoints' },
+    { key: 'messenger', name: 'Messenger Graph', icon: MessageCircle, description: 'Lead interception' },
+    { key: 'openai', name: 'Intelligence Engine', icon: Bot, description: 'AI generation and natural language' },
+  ] as const;
+
   if (dealerLoading) {
     return (
       <AppLayout>
@@ -95,11 +137,12 @@ export function Settings() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-5xl mx-auto space-y-8 pb-20">
+        <div className="p-8 max-w-5xl mx-auto space-y-8 pb-20 fade-in slide-in-from-bottom-4 duration-500 animate-in">
           
           <PageHeader 
-            title="Control Center"
-            description="Manage dealership profiles, billing, and system integrations."
+            eyebrow="CONFIGURATION"
+            title="System Settings"
+            description="Manage your dealership profile, inventory feed, and verify DealerPilot's real-time telemetry."
             icon={SettingsIcon}
           />
 
@@ -107,36 +150,37 @@ export function Settings() {
             
             <SectionCard 
               title="Dealership Profile" 
-              description="General information about the primary active dealership."
+              description="General information about your active dealership."
               icon={Building2}
+              className="border-white/5"
             >
               <div className="space-y-6">
                 <div className="grid gap-6 sm:grid-cols-2">
                   <div className="space-y-3">
-                    <Label htmlFor="name">Dealership Name</Label>
+                    <Label htmlFor="name" className="text-xs uppercase tracking-wider text-muted-foreground">Dealership Name</Label>
                     <Input 
                       id="name" 
                       value={name} 
                       onChange={(e) => setName(e.target.value)} 
-                      className="bg-background"
+                      className="bg-black/20 border-white/10"
                     />
                   </div>
                   <div className="space-y-3">
-                    <Label htmlFor="website">Website URL</Label>
+                    <Label htmlFor="website" className="text-xs uppercase tracking-wider text-muted-foreground">Website URL</Label>
                     <Input 
                       id="website" 
                       value={websiteUrl} 
                       onChange={(e) => setWebsiteUrl(e.target.value)}
                       placeholder="https://"
-                      className="bg-background"
+                      className="bg-black/20 border-white/10"
                     />
                   </div>
                 </div>
-                <div className="flex justify-end">
+                <div className="flex justify-end pt-2">
                   <Button 
                     onClick={handleSaveDealer} 
                     disabled={updateDealer.isPending}
-                    className="w-full sm:w-auto gap-2"
+                    className="w-full sm:w-auto gap-2 premium-gradient-btn"
                   >
                     {updateDealer.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save Profile
@@ -149,23 +193,24 @@ export function Settings() {
               title="Inventory Feed Integration" 
               description="Configure your automated nightly XML inventory source."
               icon={RefreshCw}
+              className="border-white/5"
             >
               <div className="space-y-8">
                 <div className="space-y-3">
-                  <Label htmlFor="xml">XML Feed URL</Label>
+                  <Label htmlFor="xml" className="text-xs uppercase tracking-wider text-muted-foreground">XML Feed URL</Label>
                   <div className="flex gap-3">
                     <Input 
                       id="xml" 
                       value={xmlFeedUrl} 
                       onChange={(e) => setXmlFeedUrl(e.target.value)}
                       placeholder="https://..."
-                      className="flex-1 font-mono text-sm bg-background"
+                      className="flex-1 font-mono text-sm bg-black/20 border-white/10"
                     />
                     <Button 
                       variant="secondary"
                       onClick={handleSaveDealer}
                       disabled={updateDealer.isPending}
-                      className="whitespace-nowrap"
+                      className="whitespace-nowrap bg-white/10 hover:bg-white/15"
                     >
                       Save URL
                     </Button>
@@ -226,6 +271,91 @@ export function Settings() {
                     </Alert>
                   )}
                 </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard 
+              title="System Connections" 
+              description="Real-time telemetry for the DealerPilot operating system."
+              icon={Activity}
+              className="border-white/5"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {services.map(({ key, name, icon: Icon, description }) => {
+                  const svc = connections?.[key as keyof typeof connections];
+                  const config = getStatusConfig(svc?.status || "unknown");
+
+                  return (
+                    <div key={key} className="flex flex-col justify-between p-4 rounded-xl bg-black/20 border border-white/5 hover:border-white/10 transition-colors">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Icon className="w-5 h-5 text-muted-foreground" />
+                          <StatusPulse status={config.color} />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-foreground tracking-tight">{name}</h4>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{description}</p>
+                        </div>
+                      </div>
+                      {(svc?.lastHeartbeatAt || svc?.backendUrl || svc?.detail) && (
+                        <div className="mt-4 pt-3 border-t border-white/5">
+                          {svc?.detail && (
+                            <p className="text-[10px] font-mono text-muted-foreground line-clamp-1 truncate mb-2">{svc.detail}</p>
+                          )}
+                          {svc?.lastHeartbeatAt && (
+                            <p className="text-[10px] text-muted-foreground">Heartbeat: {formatDate(svc.lastHeartbeatAt)}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title="Feed Run History"
+              description="Last 5 inventory sync operations."
+              icon={History}
+              className="border-white/5"
+            >
+              <div className="space-y-3">
+                {(!feedRunsData?.feedRuns || feedRunsData.feedRuns.length === 0) ? (
+                  <div className="text-center p-6 bg-black/20 rounded-xl border border-white/5 border-dashed">
+                    <p className="text-sm text-muted-foreground">No sync history available.</p>
+                  </div>
+                ) : (
+                  feedRunsData.feedRuns.slice(0, 5).map((run) => (
+                    <div key={run.id} className="flex items-center justify-between p-4 rounded-xl bg-black/20 border border-white/5">
+                      <div className="flex items-center gap-4">
+                        {run.status === "success" ? (
+                          <div className="p-2 bg-success/10 text-success rounded-lg">
+                            <CheckCircle2 className="w-4 h-4" />
+                          </div>
+                        ) : run.status === "error" ? (
+                          <div className="p-2 bg-destructive/10 text-destructive rounded-lg">
+                            <AlertCircle className="w-4 h-4" />
+                          </div>
+                        ) : (
+                          <div className="p-2 bg-warning/10 text-warning rounded-lg animate-pulse">
+                            <Loader2 className="w-4 h-4" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{formatDate(run.startedAt)}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Imported: {run.vehiclesImported} • New: {run.vehiclesNew} • Updated: {run.vehiclesUpdated} • Removed: {run.vehiclesRemoved}
+                          </p>
+                        </div>
+                      </div>
+                      {run.errorMessage && (
+                        <div className="text-xs font-mono text-destructive max-w-xs truncate">
+                          {run.errorMessage}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </SectionCard>
 

@@ -45,7 +45,7 @@ function creativeStatusClass(status: string) {
     case "Queued":
       return "bg-blue-500/10 text-blue-500 border-blue-500/20";
     case "Failed":
-      return "bg-destructive/10 text-destructive border-destructive/20";
+      return "bg-amber-500/10 text-amber-500 border-amber-500/20";
     default:
       return "bg-secondary text-muted-foreground border-border";
   }
@@ -64,7 +64,7 @@ function jobStatusClass(status: string) {
     case "Queued":
       return "bg-amber-500/10 text-amber-500";
     case "Failed":
-      return "bg-destructive/10 text-destructive";
+      return "bg-amber-500/10 text-amber-500";
     default:
       return "bg-secondary text-muted-foreground";
   }
@@ -96,8 +96,7 @@ export function CreativeStudio() {
   const activeJobs = (jobsData?.jobs ?? []).filter(
     (j) => j.status === "Queued" || j.status === "Generating",
   );
-  const recentJobs = (jobsData?.jobs ?? []).slice(0, 6);
-
+  
   const readyCount = vehicles.filter(
     (v) => v.creativeStatus === "Generated" || v.creativeStatus === "Approved",
   ).length;
@@ -108,32 +107,33 @@ export function CreativeStudio() {
       <div className="flex-1 overflow-y-auto animate-in fade-in duration-500">
         <div className="p-8 max-w-7xl mx-auto space-y-8">
           <PageHeader 
+            eyebrow="CREATIVE INTELLIGENCE"
             title="Creative Studio"
-            description="Generate on-brand Marketplace creatives from your Dealer Brand DNA."
+            description="DealerPilot is ready to generate on-brand Marketplace creatives from your vehicle photos."
             icon={Sparkles}
           />
 
           {/* Stats Row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <KpiCard 
-              label="Vehicles"
+              label="DealerPilot tracks"
               value={vehicles.length}
               icon={Car}
             />
             <KpiCard 
-              label="Creatives"
+              label="DealerPilot generated"
               value={totalCreatives}
               icon={ImageIcon}
               valueColor="text-primary"
             />
             <KpiCard 
-              label="Ready"
+              label="DealerPilot found"
               value={readyCount}
               icon={Gauge}
               valueColor="text-green-500"
             />
             <KpiCard 
-              label="In Queue"
+              label="DealerPilot is generating"
               value={activeJobs.length}
               icon={Loader2}
               valueColor="text-blue-500"
@@ -141,62 +141,62 @@ export function CreativeStudio() {
             />
           </div>
 
-          {/* Generation Queue */}
-          {recentJobs.length > 0 && (
-            <SectionCard title="Generation Queue" icon={Clock} className="border-border">
-              <div className="space-y-4">
-                {recentJobs.map((job) => (
-                  <div key={job.id} className="flex items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium truncate flex items-center gap-2">
-                          <StatusPulse 
-                            status={job.status === "Completed" ? "success" : job.status === "Failed" ? "error" : "warning"}
-                          />
-                          {job.vehicleLabel || `Vehicle #${job.vehicleId}`}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className={cn("ml-2 shrink-0 font-normal uppercase text-[10px] tracking-wider", jobStatusClass(job.status))}
+          {/* Active Jobs Live Progress */}
+          {activeJobs.length > 0 && (
+            <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-50 animate-pulse" />
+              <h3 className="text-primary text-[10px] font-bold uppercase tracking-widest mb-6 relative z-10 flex items-center gap-2">
+                <StatusPulse color="blue" /> 
+                DealerPilot is generating creatives — {activeJobs.length} active job{activeJobs.length === 1 ? '' : 's'}
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+                {activeJobs.map((job) => (
+                  <div key={job.id} className="bg-card/80 backdrop-blur-md rounded-xl p-4 border border-primary/20 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold truncate text-foreground/90">
+                        {job.vehicleLabel || `Vehicle #${job.vehicleId}`}
+                      </span>
+                      <Badge variant="outline" className={cn("shrink-0 uppercase text-[9px] tracking-wider", jobStatusClass(job.status))}>
+                        {job.status === "Generating" && job.step ? job.step : job.status}
+                      </Badge>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-secondary overflow-hidden relative">
+                       {job.status === "Queued" ? (
+                          <div className="absolute inset-0 bg-primary/20">
+                            <div className="h-full w-1/3 bg-primary/40 animate-pulse rounded-full" />
+                          </div>
+                       ) : (
+                         <div
+                          className="h-full rounded-full bg-primary transition-all duration-500 relative"
+                          style={{ width: `${job.progress}%` }}
                         >
-                          {job.status === "Generating" && job.step
-                            ? `${job.step} · ${job.progress}%`
-                            : job.status}
-                        </Badge>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-                        <div
-                          className={cn(
-                            "h-full rounded-full transition-all duration-500",
-                            job.status === "Failed" ? "bg-destructive" : "bg-primary",
-                          )}
-                          style={{ width: `${job.status === "Completed" ? 100 : job.progress}%` }}
-                        />
-                      </div>
+                          <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                        </div>
+                       )}
                     </div>
                   </div>
                 ))}
               </div>
-            </SectionCard>
+            </div>
           )}
 
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 items-center p-1">
+          <div className="flex flex-col sm:flex-row gap-4 items-center pt-4">
             <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Search VIN, make, model..."
-                className="pl-9 bg-card/60 backdrop-blur-xl border-border/50 focus-visible:ring-primary/50"
+                placeholder="Ask DealerPilot to find a VIN, make, or model..."
+                className="pl-11 h-12 bg-card/60 backdrop-blur-xl border-border/50 focus-visible:ring-primary/50 text-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[200px] bg-card/60 backdrop-blur-xl border-border/50 focus:ring-primary/50">
-                <SelectValue placeholder="All Statuses" />
+              <SelectTrigger className="w-full sm:w-[240px] h-12 bg-card/60 backdrop-blur-xl border-border/50 focus:ring-primary/50">
+                <SelectValue placeholder="Filter by AI Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="all">All AI Statuses</SelectItem>
                 <SelectItem value="None">No Creative</SelectItem>
                 <SelectItem value="Generating">Generating</SelectItem>
                 <SelectItem value="Generated">Generated</SelectItem>
@@ -207,21 +207,23 @@ export function CreativeStudio() {
 
           {/* Grid */}
           {isLoading ? (
-            <div className="py-20 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-4">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="aspect-[4/3] rounded-xl bg-secondary/50 animate-pulse" />
+              ))}
             </div>
           ) : vehicles.length === 0 ? (
             <EmptyState
               icon={Wand2}
               title="No vehicles found"
-              description="Try adjusting your search or filters to find what you're looking for."
+              description="DealerPilot couldn't find any vehicles matching your search criteria."
             />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 pt-4">
               {vehicles.map((v, i) => (
                 <Link key={v.vehicleId} href={`/creative-studio/${v.vehicleId}`}>
                   <div 
-                    className="group glass-panel rounded-xl overflow-hidden hover-lift cursor-pointer flex flex-col h-full animate-in fade-in slide-in-from-bottom-4"
+                    className="group glass-panel rounded-2xl overflow-hidden hover-lift cursor-pointer flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 shadow-sm hover:shadow-primary/5 border border-white/5 hover:border-primary/20"
                     style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}
                   >
                     <div className="aspect-[4/3] bg-secondary relative overflow-hidden">
@@ -237,12 +239,13 @@ export function CreativeStudio() {
                         </div>
                       )}
                       
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/30" />
                       
-                      <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+                      {/* Statuses are INSIDE the image overlay */}
+                      <div className="absolute top-4 left-4 flex flex-wrap gap-2 z-10">
                         <Badge
                           variant="outline"
-                          className={cn("backdrop-blur-md font-medium uppercase text-[10px] tracking-wider", creativeStatusClass(v.creativeStatus))}
+                          className={cn("backdrop-blur-md font-medium uppercase text-[10px] tracking-widest px-2.5 py-1 border-white/10", creativeStatusClass(v.creativeStatus))}
                         >
                           {(v.creativeStatus === "Generating" || v.creativeStatus === "Queued") && (
                             <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
@@ -251,29 +254,31 @@ export function CreativeStudio() {
                         </Badge>
                       </div>
                       
-                      <div className="absolute bottom-3 right-3">
+                      <div className="absolute bottom-4 right-4 z-10">
                          {v.creativeScore != null && (
-                          <Badge variant="outline" className={cn("backdrop-blur-md font-bold text-xs", ratingClass(v.creativeRating))}>
-                            <Gauge className="w-3 h-3 mr-1" />
-                            {v.creativeScore}
+                          <Badge variant="outline" className={cn("backdrop-blur-md font-bold text-[10px] uppercase tracking-widest px-2.5 py-1 border-white/10", ratingClass(v.creativeRating))}>
+                            <Gauge className="w-3 h-3 mr-1.5" />
+                            {v.creativeScore} SCORE
                           </Badge>
                         )}
                       </div>
                     </div>
                     
-                    <div className="p-5 flex flex-col flex-1">
-                      <div className="font-semibold tracking-tight text-lg truncate mb-1 text-foreground/90 group-hover:text-primary transition-colors">
+                    <div className="p-6 flex flex-col flex-1 bg-card/40 backdrop-blur-xl">
+                      <div className="text-primary text-[10px] font-bold uppercase tracking-widest mb-2">
+                        {v.vin.slice(-6)}
+                      </div>
+                      <div className="font-bold tracking-tight text-xl truncate mb-1 text-foreground/90 group-hover:text-primary transition-colors">
                         {v.label}
                       </div>
-                      <div className="text-muted-foreground text-sm truncate mb-4">
-                        {v.bodyStyle || "Vehicle"} • {v.versionCount} creative
-                        {v.versionCount === 1 ? "" : "s"}
+                      <div className="text-muted-foreground text-sm truncate mb-6">
+                        {v.bodyStyle || "Vehicle"} • {v.versionCount} AI creative{v.versionCount === 1 ? "" : "s"}
                       </div>
-                      <div className="mt-auto pt-2 border-t border-border/40 flex items-center justify-between">
-                        <div className="font-bold text-foreground/80">{formatCurrency(v.price)}</div>
-                        <span className="text-xs font-medium text-muted-foreground/60 uppercase tracking-widest">
-                          {v.vin.slice(-6)}
-                        </span>
+                      <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between">
+                        <div className="font-bold text-foreground/90 text-lg">{formatCurrency(v.price)}</div>
+                        <div className="text-xs font-semibold text-primary/80 group-hover:text-primary flex items-center gap-1 uppercase tracking-widest transition-colors">
+                          View Details
+                        </div>
                       </div>
                     </div>
                   </div>

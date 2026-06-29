@@ -67,12 +67,12 @@ function ColorList({
   onChange: (next: string[]) => void;
 }) {
   return (
-    <div className="space-y-3">
-      <Label className="text-sm font-medium text-foreground">{label}</Label>
+    <div className="space-y-4">
+      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{label}</Label>
       <div className="flex flex-wrap gap-3">
         {colors.map((c, i) => (
-          <div key={i} className="flex items-center gap-2 rounded-lg border border-border bg-background p-1 pr-2 shadow-sm transition-all hover:border-primary/50">
-            <div className="relative overflow-hidden rounded-md">
+          <div key={i} className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-1.5 pr-3 shadow-sm transition-all hover:border-primary/50 group">
+            <div className="relative overflow-hidden rounded-lg">
               <input
                 type="color"
                 value={c}
@@ -81,19 +81,19 @@ function ColorList({
                   next[i] = e.target.value;
                   onChange(next);
                 }}
-                className="h-8 w-8 cursor-pointer appearance-none rounded-md border-0 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0"
+                className="h-10 w-10 cursor-pointer appearance-none rounded-lg border-0 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0"
                 aria-label={`${label} ${i + 1}`}
               />
             </div>
-            <span className="text-xs font-mono text-muted-foreground uppercase">{c}</span>
+            <span className="text-xs font-mono font-bold text-foreground/80 uppercase tracking-wider">{c}</span>
             {colors.length > 1 && (
               <button
                 type="button"
                 onClick={() => onChange(colors.filter((_, idx) => idx !== i))}
-                className="text-muted-foreground hover:text-destructive transition-colors ml-1"
+                className="text-muted-foreground/50 hover:text-destructive transition-colors ml-1 opacity-0 group-hover:opacity-100"
                 aria-label="Remove color"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -103,10 +103,10 @@ function ColorList({
             type="button"
             variant="outline"
             size="sm"
-            className="h-[42px] border-dashed gap-1 hover:border-primary hover:text-primary transition-colors"
+            className="h-[52px] rounded-xl border-dashed border-white/20 gap-2 hover:border-primary hover:text-primary transition-colors text-[10px] font-bold uppercase tracking-widest"
             onClick={() => onChange([...colors, "#888888"])}
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" /> Add
           </Button>
         )}
       </div>
@@ -141,7 +141,7 @@ export function DealerDna() {
         if (dealerId) {
           queryClient.invalidateQueries({ queryKey: getGetDealerBrandDnaQueryKey(dealerId) });
         }
-        toast({ title: "Brand DNA saved", description: "Your creative defaults were updated." });
+        toast({ title: "DealerPilot saved DNA", description: "Your creative defaults were successfully updated." });
       },
       onError: (err) =>
         toast({ title: "Save failed", description: err.message, variant: "destructive" }),
@@ -195,7 +195,10 @@ export function DealerDna() {
     return (
       <AppLayout>
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <div className="flex flex-col items-center gap-4">
+             <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">DealerPilot is loading DNA...</p>
+          </div>
         </div>
       </AppLayout>
     );
@@ -204,13 +207,14 @@ export function DealerDna() {
   return (
     <AppLayout>
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <div className="p-8 max-w-7xl mx-auto w-full flex-1 overflow-y-auto">
+        <div className="p-8 max-w-7xl mx-auto w-full flex-1 overflow-y-auto animate-in fade-in duration-500">
           <PageHeader
-            title="Dealer Brand DNA"
-            description="Your brand defaults drive every creative generated in the studio."
+            eyebrow="BRAND IDENTITY"
+            title={<>Brand <span className="text-primary">DNA</span></>}
+            description="DealerPilot uses your brand defaults to drive every creative generated in the studio."
             icon={Dna}
             action={
-              <Button onClick={handleSave} disabled={update.isPending} className="gap-2 premium-gradient-btn">
+              <Button onClick={handleSave} disabled={update.isPending} className="gap-2 h-11 px-6 rounded-xl font-bold text-[11px] uppercase tracking-widest premium-gradient-btn shadow-lg">
                 {update.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
@@ -221,16 +225,17 @@ export function DealerDna() {
             }
           />
 
-          <div className="grid grid-cols-1 xl:grid-cols-5 gap-8 items-start pb-20">
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-10 items-start pt-6 pb-20">
             {/* Form */}
-            <div className="xl:col-span-3 space-y-6">
+            <div className="xl:col-span-3 space-y-8">
               
               <SectionCard 
-                title="Color Palette" 
-                description="The core colors that define your brand identity across all touchpoints."
+                title={<span className="font-bold tracking-tight text-xl">Color Palette</span>}
+                description="The core colors that tell DealerPilot how to tint overlays and text."
                 icon={Palette}
+                className="border-white/5 bg-card/40 backdrop-blur-md"
               >
-                <div className="space-y-8">
+                <div className="space-y-8 mt-2">
                   <ColorList
                     label="Primary Colors"
                     colors={form.primaryColors}
@@ -250,19 +255,20 @@ export function DealerDna() {
               </SectionCard>
 
               <SectionCard
-                title="Typography & Assets"
-                description="Font choices and logos used in generated creatives."
+                title={<span className="font-bold tracking-tight text-xl">Typography & Assets</span>}
+                description="Font choices and logos DealerPilot applies to your creatives."
                 icon={Type}
+                className="border-white/5 bg-card/40 backdrop-blur-md"
               >
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-8 mt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                     <div className="space-y-3">
-                      <Label>Preferred Font</Label>
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Preferred Font</Label>
                       <Select
                         value={form.preferredFont}
                         onValueChange={(v) => set("preferredFont", v)}
                       >
-                        <SelectTrigger className="h-10 bg-background">
+                        <SelectTrigger className="h-12 bg-black/20 border-white/10 rounded-xl font-medium">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -276,28 +282,29 @@ export function DealerDna() {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <Label>Logo URL</Label>
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Logo URL</Label>
                     <Input
                       placeholder="https://example.com/logo.png"
                       value={form.logoUrl}
                       onChange={(e) => set("logoUrl", e.target.value)}
-                      className="bg-background font-mono text-sm"
+                      className="h-12 bg-black/20 border-white/10 rounded-xl font-mono text-sm"
                     />
-                    <p className="text-xs text-muted-foreground">Used as a fallback if a vehicle-specific overlay logo isn't provided.</p>
+                    <p className="text-[11px] font-medium text-muted-foreground/60">Used as a fallback if DealerPilot doesn't have a vehicle-specific logo.</p>
                   </div>
                 </div>
               </SectionCard>
 
               <SectionCard
-                title="Creative Defaults"
-                description="Base styles and templates for new studio variations."
+                title={<span className="font-bold tracking-tight text-xl">Creative Defaults</span>}
+                description="Base styles DealerPilot uses when spinning up new studio variations."
                 icon={LayoutTemplate}
+                className="border-white/5 bg-card/40 backdrop-blur-md"
               >
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-2">
                     <div className="space-y-3">
-                      <Label>Brand Style</Label>
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Brand Style</Label>
                       <Select value={form.brandStyle} onValueChange={(v) => set("brandStyle", v)}>
-                        <SelectTrigger className="h-10 bg-background">
+                        <SelectTrigger className="h-12 bg-black/20 border-white/10 rounded-xl font-medium">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -310,12 +317,12 @@ export function DealerDna() {
                       </Select>
                     </div>
                     <div className="space-y-3">
-                      <Label>Background Style</Label>
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Background Style</Label>
                       <Select
                         value={form.backgroundStyle}
                         onValueChange={(v) => set("backgroundStyle", v)}
                       >
-                        <SelectTrigger className="h-10 bg-background">
+                        <SelectTrigger className="h-12 bg-black/20 border-white/10 rounded-xl font-medium">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -328,12 +335,12 @@ export function DealerDna() {
                       </Select>
                     </div>
                     <div className="space-y-3 sm:col-span-2">
-                      <Label>Default Template</Label>
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Default Template</Label>
                       <Select
                         value={form.defaultTemplateKey}
                         onValueChange={(v) => set("defaultTemplateKey", v)}
                       >
-                        <SelectTrigger className="h-10 bg-background">
+                        <SelectTrigger className="h-12 bg-black/20 border-white/10 rounded-xl font-medium">
                           <SelectValue placeholder="Select template" />
                         </SelectTrigger>
                         <SelectContent>
@@ -352,15 +359,16 @@ export function DealerDna() {
 
             {/* Live preview */}
             <div className="xl:col-span-2">
-              <div className="sticky top-8 space-y-6">
+              <div className="sticky top-8 space-y-6 glass-panel p-8 rounded-3xl border border-primary/20 bg-primary/5 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -z-10 pointer-events-none" />
                 <div>
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-success animate-pulse" /> Live Preview
+                  <h3 className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-2 text-primary mb-1">
+                    <div className="w-2 h-2 rounded-full bg-primary animate-ping" /> AI Live Preview
                   </h3>
-                  <p className="text-sm text-muted-foreground">Changes reflect instantly below</p>
+                  <p className="text-sm font-medium text-foreground/80 tracking-tight">DealerPilot updates this preview as you edit</p>
                 </div>
                 
-                <div className="space-y-6 p-6 rounded-xl border border-border/50 bg-secondary/20">
+                <div className="space-y-8 mt-6">
                   {previewSpec && <CreativePreviewCard spec={previewSpec} format="cover" />}
                   {previewSpec && <CreativePreviewCard spec={previewSpec} format="story" />}
                 </div>

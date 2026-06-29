@@ -2,3 +2,4 @@
 - [Feed import safety](feed-import-safety.md) — zero-parse feeds must abort (else inventory is wiped to Sold/Removed); dealer feed URLs are SSRF-guarded.
 - [Creative Intelligence Engine](creative-engine.md) — pluggable image pipeline: keep renderSpec+outputs contract stable so a real provider swaps in with no DB/UI changes; versioning + worker invariants.
 - [Dashboard design system](dashboard-design-system.md) — premium dark theme tokens/utilities + shared component vocabulary; make shared components flexible supersets when parallel DESIGN subagents consume them.
+- [Sprint 4.6 UX patterns](sprint46-ux-patterns.md) — AI voice copy, global header hook signatures, sidebar 6-item structure, ReactNode title props on shared components.

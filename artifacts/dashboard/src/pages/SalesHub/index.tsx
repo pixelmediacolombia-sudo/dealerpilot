@@ -8,17 +8,14 @@ import {
   Image as ImageIcon,
   CheckCircle2,
   AlertCircle,
-  Activity
+  Activity,
+  Server, Database, Rss, Puzzle, Facebook, Store, Bot, Settings
 } from "lucide-react";
 import { format } from "date-fns";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { 
-  PageHeader, 
-  KpiCard, 
-  SectionCard, 
   StatusPulse,
-  AnimatedCounter
 } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,7 +28,8 @@ import {
   useListListingWorkspaces,
   useListPublishingJobs,
   useListCreativeStudio,
-  useGetLeads
+  useGetLeads,
+  useGetConnectionStatus
 } from "@workspace/api-client-react";
 
 export function SalesHub() {
@@ -46,239 +44,192 @@ export function SalesHub() {
 
   // 2. Fetch Data
   const { data: vehicleStats, isLoading: isLoadingStats } = useGetVehicleStats();
-  const { data: listingWorkspaces, isLoading: isLoadingWorkspaces } = useListListingWorkspaces();
-  const { data: publishingJobs, isLoading: isLoadingJobs } = useListPublishingJobs();
   const { data: creativeStudio, isLoading: isLoadingCreative } = useListCreativeStudio();
   const { data: leads, isLoading: isLoadingLeads } = useGetLeads();
+  const { data: connections, isLoading: isLoadingConnections } = useGetConnectionStatus();
 
   // Loading state
   const isLoading = isLoadingDealers || isLoadingDealer || isLoadingStats || 
-                    isLoadingWorkspaces || isLoadingJobs || isLoadingCreative || isLoadingLeads;
+                    isLoadingCreative || isLoadingLeads || isLoadingConnections;
 
   // Derived Data
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  // Summaries
-  const listingsGenerated = listingWorkspaces?.workspaces.reduce((acc, w) => acc + (w.versionCount || 0), 0) || 0;
-  const creativesGenerated = creativeStudio?.vehicles.reduce((acc, v) => acc + (v.versionCount || 0), 0) || 0;
-  const completedJobs = publishingJobs?.jobs.filter(j => j.status === 'completed').length || 0;
-  const aiActivityTotal = listingsGenerated + creativesGenerated + completedJobs;
-
-  // KPI calculations
-  const totalInventory = vehicleStats?.total || 0;
-  const publishedInventory = vehicleStats?.published || 0;
-  
-  const publishSuccessRate = publishingJobs?.jobs.length 
-    ? Math.round((completedJobs / publishingJobs.jobs.length) * 100)
-    : 100;
-
+  const vehiclesReady = vehicleStats?.readyToPublish || 0;
+  const newVehicles = vehicleStats?.new || 0;
   const pendingLeads = leads?.leads.filter(l => l.status === 'new').length || 0;
-  const totalLeads = leads?.leads.length || 0;
+  const priceChanges = vehicleStats?.priceChanged || 0;
 
-  // Recommendations
-  const actionItems = [];
-  if (vehicleStats?.readyToPublish && vehicleStats.readyToPublish > 0) {
-    actionItems.push({
-      id: "ready-publish",
-      title: `${vehicleStats.readyToPublish} vehicles ready to publish`,
-      description: "AI has finished generating listings and creatives. Review and publish to Marketplace.",
-      icon: Sparkles,
-      color: "text-primary",
-      bg: "bg-primary/10",
-      action: () => setLocation("/listings"),
-      cta: "Review Listings"
-    });
-  }
-  
-  const failedJobs = publishingJobs?.jobs.filter(j => j.status === 'failed').length || 0;
-  if (failedJobs > 0) {
-    actionItems.push({
-      id: "failed-jobs",
-      title: `${failedJobs} publishing jobs failed`,
-      description: "Some listings could not be published to Facebook Marketplace. Check the error logs.",
-      icon: AlertCircle,
-      color: "text-destructive",
-      bg: "bg-destructive/10",
-      action: () => setLocation("/publishing"),
-      cta: "View Queue"
-    });
-  }
+  const aiActivityTotal = (vehicleStats?.published || 0) + (creativeStudio?.vehicles.reduce((acc, v) => acc + (v.versionCount || 0), 0) || 0) + (leads?.leads.length || 0);
 
-  if (pendingLeads > 0) {
-    actionItems.push({
-      id: "pending-leads",
-      title: `${pendingLeads} new leads waiting`,
-      description: "Buyers have messaged your dealership. The AI is ready with suggested replies.",
-      icon: MessageSquare,
-      color: "text-accent",
-      bg: "bg-accent/10",
-      action: () => setLocation("/leads"),
-      cta: "View Leads"
-    });
-  }
-
-  if (vehicleStats?.priceChanged && vehicleStats.priceChanged > 0) {
-    actionItems.push({
-      id: "price-changes",
-      title: `${vehicleStats.priceChanged} price changes detected`,
-      description: "Recent feed sync detected price drops. AI can update the listings automatically.",
-      icon: TrendingUp,
-      color: "text-warning",
-      bg: "bg-warning/10",
-      action: () => setLocation("/inventory"),
-      cta: "Update Inventory"
-    });
-  }
-
-  // Fallback if everything is perfect
-  if (actionItems.length === 0 && !isLoading) {
-    actionItems.push({
-      id: "all-good",
-      title: "All systems nominal",
-      description: "Your AI copilot is actively monitoring inventory, leads, and listings.",
-      icon: CheckCircle2,
-      color: "text-success",
-      bg: "bg-success/10",
-      action: () => setLocation("/inventory"),
-      cta: "View Inventory"
-    });
-  }
+  const getServiceColor = (serviceStatus?: string) => {
+    switch (serviceStatus?.toLowerCase()) {
+      case "connected":
+      case "online": return "success";
+      case "offline":
+      case "error": return "destructive";
+      case "not_synced":
+      case "warning": return "warning";
+      case "coming_soon": return "info";
+      default: return "muted";
+    }
+  };
 
   return (
     <AppLayout>
-      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="p-6 md:p-10 max-w-[1400px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* Header Section */}
-        <div className="flex flex-col gap-2">
-          {isLoading ? (
-            <Skeleton className="h-10 w-64 bg-white/5" />
-          ) : (
-            <h1 className="text-3xl font-bold tracking-tight text-white">
-              {greeting}, {dealer?.name || "Operator"}
-            </h1>
-          )}
-          
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-white/5 w-fit px-3 py-1.5 rounded-full border border-white/10">
-            <StatusPulse color="primary" />
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/5">
+          <div className="flex flex-col gap-2">
             {isLoading ? (
-              <Skeleton className="h-4 w-48 bg-white/5" />
+              <Skeleton className="h-12 w-64 bg-white/5" />
             ) : (
-              <span>
-                AI Copilot has processed <strong className="text-white">{aiActivityTotal}</strong> actions today
-              </span>
+              <h1 className="text-4xl font-bold tracking-tight text-white">
+                {greeting}, {dealer?.name || "Operator"}
+              </h1>
             )}
+            
+            <div className="flex items-center gap-2 text-sm text-primary/80 bg-primary/10 w-fit px-4 py-2 rounded-full border border-primary/20">
+              <StatusPulse color="primary" />
+              {isLoading ? (
+                <Skeleton className="h-4 w-48 bg-white/5" />
+              ) : (
+                <span>
+                  DealerPilot processed <strong className="text-primary font-semibold">{aiActivityTotal} actions</strong> today.
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Compact System Pulse */}
+          <div className="flex flex-col items-start md:items-end gap-2">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+              <Activity className="w-3 h-3" /> System Pulse
+            </h3>
+            <div className="flex items-center gap-3">
+              {[
+                { key: 'xmlFeed', icon: Rss, name: 'Feed' },
+                { key: 'chromeExtension', icon: Puzzle, name: 'Extension' },
+                { key: 'marketplace', icon: Store, name: 'Marketplace' },
+                { key: 'openai', icon: Bot, name: 'AI' }
+              ].map((svc) => (
+                <div key={svc.key} className="flex items-center gap-1.5 bg-black/20 px-2 py-1.5 rounded border border-white/5" title={svc.name}>
+                  <svc.icon className="w-3.5 h-3.5 text-muted-foreground" />
+                  <StatusPulse status={getServiceColor(connections?.[svc.key as keyof typeof connections]?.status)} />
+                </div>
+              ))}
+              <Button variant="ghost" size="icon" className="h-7 w-7 bg-white/5 hover:bg-white/10 ml-2" onClick={() => setLocation("/settings")}>
+                <Settings className="w-3.5 h-3.5 text-muted-foreground" />
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Action Panel */}
-        <SectionCard 
-          title="Recommended Actions" 
-          description="Your copilot has identified tasks that need your attention."
-          className="border-primary/20 shadow-[0_0_30px_-15px_rgba(var(--primary),0.3)]"
-        >
-          {isLoading ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <Skeleton className="h-24 bg-white/5 rounded-xl" />
-              <Skeleton className="h-24 bg-white/5 rounded-xl" />
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {actionItems.map((item) => (
-                <div key={item.id} className="flex items-start gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors group">
-                  <div className={`p-2.5 rounded-lg ${item.bg} ${item.color} shrink-0`}>
-                    <item.icon className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-white tracking-tight">{item.title}</h4>
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
-                    <Button 
-                      variant="link" 
-                      className="px-0 mt-2 h-auto text-primary hover:text-primary/80"
-                      onClick={item.action}
-                    >
-                      {item.cta} <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </SectionCard>
-
-        {/* KPI Clusters */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold tracking-tight">Mission Control Metrics</h2>
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5" /> Live Data
+        {/* Mission Control Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* Card 1: MARKETPLACE */}
+          <div className="glass-panel p-8 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-primary/30 transition-all duration-500 hover:shadow-[0_0_40px_-15px_rgba(var(--primary),0.3)]">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+            <div className="flex flex-col h-full">
+              <span className="text-primary text-[10px] font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
+                <Store className="w-3.5 h-3.5" /> Marketplace
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-4">
+                DealerPilot found <strong className="font-bold">{vehiclesReady}</strong> vehicles ready to publish.
+              </h2>
+              <p className="text-muted-foreground mb-8 max-w-md">
+                Your inventory has been synced and AI has generated optimized listings. Review and push them live to Facebook Marketplace.
+              </p>
+              <div className="mt-auto">
+                <Button 
+                  size="lg" 
+                  className="w-full sm:w-auto premium-gradient-btn gap-2"
+                  onClick={() => setLocation("/publishing")}
+                >
+                  Publish Now <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </div>
             </div>
           </div>
-          
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-32 bg-white/5 rounded-xl" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Marketplace Cluster */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Marketplace</h3>
-                <KpiCard
-                  title="Active Inventory"
-                  value={totalInventory}
-                  icon={CarFront}
-                  accentColor="blue"
-                  trend={{ value: 12, label: "from last week", isPositive: true }}
-                />
-                <KpiCard
-                  title="Published Listings"
-                  value={publishedInventory}
-                  icon={Sparkles}
-                  accentColor="blue"
-                />
-              </div>
 
-              {/* AI Cluster */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">AI Engines</h3>
-                <KpiCard
-                  title="Creatives Generated"
-                  value={creativesGenerated}
-                  icon={ImageIcon}
-                  accentColor="purple"
-                  trend={{ value: 5, label: "today", isPositive: true }}
-                />
-                <KpiCard
-                  title="Publishing Success"
-                  value={publishSuccessRate}
-                  formatValue={(v) => `${v}%`}
-                  icon={CheckCircle2}
-                  accentColor="green"
-                />
-              </div>
-
-              {/* Leads Cluster */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Sales & Leads</h3>
-                <KpiCard
-                  title="Total Conversations"
-                  value={totalLeads}
-                  icon={MessageSquare}
-                  accentColor="orange"
-                  trend={{ value: 8, label: "this week", isPositive: true }}
-                />
-                <KpiCard
-                  title="Pending Replies"
-                  value={pendingLeads}
-                  icon={AlertCircle}
-                  accentColor={pendingLeads > 0 ? "orange" : "green"}
-                />
+          {/* Card 2: CREATIVES */}
+          <div className="glass-panel p-8 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-accent/30 transition-all duration-500 hover:shadow-[0_0_40px_-15px_rgba(var(--accent),0.3)]">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-accent/10 rounded-full blur-3xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+            <div className="flex flex-col h-full">
+              <span className="text-accent text-[10px] font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
+                <ImageIcon className="w-3.5 h-3.5" /> Creatives
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-4">
+                DealerPilot queued <strong className="font-bold">{newVehicles}</strong> vehicles for design generation.
+              </h2>
+              <p className="text-muted-foreground mb-8 max-w-md">
+                AI is ready to generate high-converting composite images and branded templates for your newly imported inventory.
+              </p>
+              <div className="mt-auto">
+                <Button 
+                  size="lg" 
+                  className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-white gap-2"
+                  onClick={() => setLocation("/creative-studio")}
+                >
+                  Generate Creatives <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
               </div>
             </div>
-          )}
+          </div>
+
+          {/* Card 3: LEADS */}
+          <div className="glass-panel p-8 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-success/30 transition-all duration-500 hover:shadow-[0_0_40px_-15px_rgba(var(--success),0.3)]">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-success/10 rounded-full blur-3xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+            <div className="flex flex-col h-full">
+              <span className="text-success text-[10px] font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
+                <MessageSquare className="w-3.5 h-3.5" /> Leads
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-4">
+                DealerPilot captured <strong className="font-bold">{pendingLeads}</strong> new buyer messages.
+              </h2>
+              <p className="text-muted-foreground mb-8 max-w-md">
+                AI has analyzed buyer intent and drafted suggested replies based on listing context. Review and send to potential buyers.
+              </p>
+              <div className="mt-auto">
+                <Button 
+                  size="lg" 
+                  className="w-full sm:w-auto bg-success hover:bg-success/90 text-white gap-2"
+                  onClick={() => setLocation("/sales-ai")}
+                >
+                  Review Leads <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: INVENTORY */}
+          <div className="glass-panel p-8 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-warning/30 transition-all duration-500 hover:shadow-[0_0_40px_-15px_rgba(var(--warning),0.3)]">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-warning/10 rounded-full blur-3xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+            <div className="flex flex-col h-full">
+              <span className="text-warning text-[10px] font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
+                <Rss className="w-3.5 h-3.5" /> Inventory
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-4">
+                DealerPilot detected <strong className="font-bold">{priceChanges}</strong> pricing updates.
+              </h2>
+              <p className="text-muted-foreground mb-8 max-w-md">
+                The latest inventory feed sync discovered price drops or updates. Allow AI to revise existing listing strategies automatically.
+              </p>
+              <div className="mt-auto">
+                <Button 
+                  size="lg" 
+                  className="w-full sm:w-auto bg-warning hover:bg-warning/90 text-black font-semibold gap-2"
+                  onClick={() => setLocation("/inventory")}
+                >
+                  Update Inventory <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </div>

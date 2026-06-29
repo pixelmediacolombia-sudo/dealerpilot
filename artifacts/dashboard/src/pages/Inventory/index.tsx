@@ -27,14 +27,15 @@ export function InventoryDashboard() {
     sort: sortOrder
   });
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case "Active": return "bg-blue-500/10 text-blue-400 border-blue-500/20";
-      case "Ready to Publish": return "bg-primary/10 text-primary border-primary/20";
-      case "Published": return "bg-success/10 text-success border-success/20";
+      case "Published": return { label: "LIVE", className: "bg-success/80 text-success-foreground border-success/20" };
+      case "Ready to Publish": return { label: "READY", className: "bg-blue-500/80 text-white border-blue-500/20" };
+      case "AI Generated": return { label: "AI", className: "bg-accent/80 text-accent-foreground border-accent/20" };
+      case "Active": return { label: "ACTIVE", className: "bg-secondary/80 text-secondary-foreground border-secondary/20" };
       case "Archived":
-      case "Sold/Removed": return "bg-muted text-muted-foreground border-border";
-      default: return "bg-secondary text-secondary-foreground border-border";
+      case "Sold/Removed": return { label: "SOLD", className: "bg-destructive/80 text-destructive-foreground border-destructive/20" };
+      default: return { label: status.toUpperCase(), className: "bg-secondary/80 text-secondary-foreground border-secondary/20" };
     }
   };
 
@@ -44,8 +45,9 @@ export function InventoryDashboard() {
         <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
           
           <PageHeader 
+            eyebrow="Intelligence Engine"
             title="Vehicle Intelligence" 
-            description="Manage and track your vehicle catalog with AI insights."
+            description="DealerPilot AI analyzed your catalog and identified these vehicles for review."
             action={
               <div className="flex items-center gap-2">
                 <div className="bg-secondary/50 rounded-lg p-1 border border-border/50 flex">
@@ -60,26 +62,26 @@ export function InventoryDashboard() {
           {/* Stats Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard 
-              title="Total Vehicles"
+              title="DealerPilot Catalog"
               value={stats?.total || 0}
               icon={<Car className="w-4 h-4" />}
               isLoading={statsLoading}
             />
             <KpiCard 
-              title="Active Inventory"
+              title="AI Active Inventory"
               value={stats?.active || 0}
               icon={<Activity className="w-4 h-4" />}
               trend={{ value: 12, isPositive: true }}
               isLoading={statsLoading}
             />
             <KpiCard 
-              title="Ready to Publish"
+              title="AI Ready to Publish"
               value={stats?.readyToPublish || 0}
               icon={<Tag className="w-4 h-4 text-primary" />}
               isLoading={statsLoading}
             />
             <KpiCard 
-              title="Published"
+              title="Live on Marketplace"
               value={stats?.published || 0}
               icon={<Share className="w-4 h-4 text-success" />}
               isLoading={statsLoading}
@@ -170,15 +172,15 @@ export function InventoryDashboard() {
                       )}
                       
                       {/* Gradient Overlay for bottom of image */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-70 group-hover:opacity-90 transition-opacity duration-300" />
                       
-                      <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
-                        <Badge variant="outline" className={cn("backdrop-blur-xl font-medium px-2.5 py-1", getStatusColor(vehicle.status))}>
-                          {vehicle.status}
+                      <div className="absolute top-3 right-3 flex flex-col gap-2 items-end z-10">
+                        <Badge variant="outline" className={cn("backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border", getStatusBadge(vehicle.status).className)}>
+                          {getStatusBadge(vehicle.status).label}
                         </Badge>
                       </div>
                       
-                      <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end text-white">
+                      <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end text-white z-10">
                          <div className="font-bold text-xl drop-shadow-md">
                           {formatCurrency(vehicle.price)}
                         </div>
@@ -202,9 +204,6 @@ export function InventoryDashboard() {
                         <div className="flex items-center gap-1.5">
                           <div className={cn("w-2 h-2 rounded-full", vehicle.imageCount > 0 ? "bg-primary" : "bg-muted")} />
                           {vehicle.imageCount} Photos
-                        </div>
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity text-primary font-medium flex items-center gap-1">
-                          View Details &rarr;
                         </div>
                       </div>
                     </CardContent>

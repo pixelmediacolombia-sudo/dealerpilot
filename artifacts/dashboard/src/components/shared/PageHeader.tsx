@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { renderIcon, type IconLike } from "./renderIcon";
 
 interface PageHeaderProps {
-  title: string;
+  title: ReactNode;
   subtitle?: string;
   description?: string;
   eyebrow?: string;

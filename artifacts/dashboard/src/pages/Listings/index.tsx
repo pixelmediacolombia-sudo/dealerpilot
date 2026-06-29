@@ -41,33 +41,36 @@ function ratingClass(rating: string | null | undefined) {
 
 function aiStatusClass(status: string) {
   switch (status) {
+    case "Generating":
+      return "bg-warning/80 text-warning-foreground border-warning/20";
     case "AI Generated":
-      return "bg-primary/10 text-primary border-primary/20";
+      return "bg-accent/80 text-accent-foreground border-accent/20";
     default:
-      return "bg-secondary text-muted-foreground border-border";
+      return "bg-secondary/80 text-secondary-foreground border-secondary/20";
   }
 }
 
 function publishStatusClass(status: string) {
   switch (status) {
     case "Published":
-      return "bg-success/10 text-success border-success/20";
+      return "bg-success/80 text-success-foreground border-success/20";
+    case "Approved":
     case "Queued":
     case "Publishing":
-      return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+      return "bg-blue-500/80 text-white border-blue-500/20";
     case "Failed":
     case "Retry":
-      return "bg-destructive/10 text-destructive border-destructive/20";
+      return "bg-destructive/80 text-destructive-foreground border-destructive/20";
     default:
-      return "bg-secondary text-muted-foreground border-border";
+      return "bg-secondary/80 text-secondary-foreground border-secondary/20";
   }
 }
 
 export function ListingsWorkspace() {
   const [activeTab, setActiveTab] = useState(() => {
-    if (typeof window === "undefined") return "workspaces";
+    if (typeof window === "undefined") return "ready";
     const tab = new URLSearchParams(window.location.search).get("tab");
-    return tab === "publishing" ? "publishing" : "workspaces";
+    return tab || "ready";
   });
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -86,62 +89,80 @@ export function ListingsWorkspace() {
   );
 
   const workspaces = workspacesData?.workspaces ?? [];
-  const generatedCount = workspaces.filter((w) => w.aiStatus === "AI Generated").length;
+  const generatingCount = workspaces.filter((w) => w.aiStatus === "Generating").length;
   const readyCount = workspaces.filter(
-    (w) => w.publishStatus === "Queued" || w.publishStatus === "Approved",
+    (w) => w.publishStatus === "Approved" || w.publishStatus === "Queued",
   ).length;
   const publishedWorkspacesCount = workspaces.filter((w) => w.publishStatus === "Published").length;
+  const allCount = workspaces.length;
 
   const jobs = jobsData?.jobs ?? [];
   const queuedJobs = jobs.filter((j) => j.status === "Queued").length;
   const publishingJobs = jobs.filter((j) => j.status === "Publishing").length;
   const failedJobs = jobs.filter((j) => j.status === "Failed" || j.status === "Retry").length;
 
+  const filteredWorkspaces = workspaces.filter((w) => {
+    if (activeTab === "ready") return w.publishStatus === "Approved" || w.publishStatus === "Queued";
+    if (activeTab === "generating") return w.aiStatus === "Generating";
+    if (activeTab === "published") return w.publishStatus === "Published";
+    return true; // "all" tab
+  });
+
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto bg-background/50">
         <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
           <PageHeader 
+            eyebrow="AI Listing Generator"
             title="Marketplace AI" 
-            description="Generate AI-optimized listings and orchestrate publishing across platforms."
+            description="DealerPilot AI handles generating optimized descriptions and coordinating your multi-platform strategy."
             action={
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-[300px]">
-                <TabsList className="grid w-full grid-cols-2 bg-secondary/50 border border-border/50">
-                  <TabsTrigger value="workspaces" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    Workspaces
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+                <TabsList className="bg-secondary/50 border border-border/50">
+                  <TabsTrigger value="ready" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex gap-2">
+                    Ready {readyCount > 0 && <Badge variant="secondary" className="bg-black/20 text-white border-0 px-1.5 py-0">{readyCount}</Badge>}
                   </TabsTrigger>
-                  <TabsTrigger value="publishing" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    Queue {queuedJobs > 0 && <Badge variant="secondary" className="ml-2 bg-black/20 text-white border-0 px-1.5 py-0">{queuedJobs}</Badge>}
+                  <TabsTrigger value="generating" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex gap-2">
+                    Generating {generatingCount > 0 && <Badge variant="secondary" className="bg-black/20 text-white border-0 px-1.5 py-0">{generatingCount}</Badge>}
+                  </TabsTrigger>
+                  <TabsTrigger value="published" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex gap-2">
+                    Published {publishedWorkspacesCount > 0 && <Badge variant="secondary" className="bg-black/20 text-white border-0 px-1.5 py-0">{publishedWorkspacesCount}</Badge>}
+                  </TabsTrigger>
+                  <TabsTrigger value="queue" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex gap-2">
+                    Queue {queuedJobs > 0 && <Badge variant="secondary" className="bg-black/20 text-white border-0 px-1.5 py-0">{queuedJobs}</Badge>}
+                  </TabsTrigger>
+                  <TabsTrigger value="all" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex gap-2">
+                    All {allCount > 0 && <Badge variant="secondary" className="bg-black/20 text-white border-0 px-1.5 py-0">{allCount}</Badge>}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
             }
           />
 
-          {activeTab === "workspaces" && (
+          {["ready", "generating", "published", "all"].includes(activeTab) && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
               {/* Stats Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <KpiCard 
-                  title="Total Vehicles"
-                  value={workspaces.length}
+                  title="Total Workspaces"
+                  value={allCount}
                   icon={<Car className="w-4 h-4 text-muted-foreground" />}
                   isLoading={workspacesLoading}
                 />
                 <KpiCard 
-                  title="AI Generated"
-                  value={generatedCount}
+                  title="Actively Generating"
+                  value={generatingCount}
                   icon={<Sparkles className="w-4 h-4 text-primary" />}
                   isLoading={workspacesLoading}
                 />
                 <KpiCard 
-                  title="Ready to Publish"
+                  title="AI Ready to Publish"
                   value={readyCount}
                   icon={<FileText className="w-4 h-4 text-blue-400" />}
                   isLoading={workspacesLoading}
                 />
                 <KpiCard 
-                  title="Published Live"
+                  title="DealerPilot Live"
                   value={publishedWorkspacesCount}
                   icon={<CheckCircle2 className="w-4 h-4 text-success" />}
                   isLoading={workspacesLoading}
@@ -190,15 +211,15 @@ export function ListingsWorkspace() {
                     </div>
                   ))}
                 </div>
-              ) : workspaces.length === 0 ? (
+              ) : filteredWorkspaces.length === 0 ? (
                 <EmptyState 
                   icon={<Sparkles className="w-8 h-8" />}
                   title="No workspaces found"
-                  description="Try adjusting your search or filters to find what you're looking for."
+                  description="DealerPilot hasn't identified any listings matching this view."
                 />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {workspaces.map((w, i) => (
+                  {filteredWorkspaces.map((w, i) => (
                     <Link key={w.vehicleId} href={`/listings/${w.vehicleId}`}>
                       <Card className="overflow-hidden hover-lift cursor-pointer group bg-card border-border/40 hover:border-primary/30 transition-all duration-500 h-full flex flex-col" style={{ animationDelay: `${i * 50}ms` }}>
                         <div className="aspect-[4/3] bg-secondary/30 relative overflow-hidden">
@@ -216,20 +237,20 @@ export function ListingsWorkspace() {
                           
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
                           
-                          <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
-                            <Badge variant="outline" className={cn("backdrop-blur-xl font-medium px-2 py-0.5", aiStatusClass(w.aiStatus))}>
+                          <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-10">
+                            <Badge variant="outline" className={cn("backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border", aiStatusClass(w.aiStatus))}>
                               <Sparkles className="w-3 h-3 mr-1.5" />
                               {w.aiStatus}
                             </Badge>
                             
                             {w.publishStatus !== "Not Queued" && (
-                              <Badge variant="outline" className={cn("backdrop-blur-xl font-medium px-2 py-0.5", publishStatusClass(w.publishStatus))}>
+                              <Badge variant="outline" className={cn("backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border", publishStatusClass(w.publishStatus))}>
                                 {w.publishStatus}
                               </Badge>
                             )}
                           </div>
                           
-                          <div className="absolute bottom-3 left-3 right-3">
+                          <div className="absolute bottom-3 left-3 right-3 z-10">
                             <div className="font-bold text-xl text-white drop-shadow-md">{formatCurrency(w.price)}</div>
                           </div>
                         </div>
@@ -261,7 +282,7 @@ export function ListingsWorkspace() {
             </div>
           )}
 
-          {activeTab === "publishing" && (
+          {activeTab === "queue" && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
               {/* Stats Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
