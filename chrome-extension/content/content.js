@@ -22,15 +22,52 @@
       .catch(() => {});
   }
 
+  // ---- Context invalidation guard ----
+  // Shown when the extension is reloaded/updated while a Facebook tab still
+  // has the old content script alive.  Renders a top-of-page banner AND
+  // updates the floating panel status so the user knows to refresh.
+  function showContextInvalidated() {
+    try { setStatus("⚠️ DealerPilot extension was updated. Please refresh this tab.", "err"); } catch (_) {}
+    try {
+      if (!document.getElementById("mai-ctx-banner")) {
+        const b = document.createElement("div");
+        b.id = "mai-ctx-banner";
+        b.style.cssText =
+          "position:fixed;top:0;left:0;right:0;z-index:2147483647;" +
+          "background:#c0392b;color:#fff;font:bold 13px/38px sans-serif;" +
+          "text-align:center;padding:0 12px;letter-spacing:.01em;";
+        b.textContent =
+          "DealerPilot extension updated — refresh this Facebook tab to continue.";
+        document.documentElement.appendChild(b);
+      }
+    } catch (_) {}
+  }
+
   function send(message) {
+    // If the extension was reloaded/updated the runtime context is gone.
+    // chrome.runtime.id becomes undefined — catch this before calling sendMessage
+    // so we never throw an uncaught promise rejection into Facebook's page.
+    if (!chrome.runtime?.id) {
+      showContextInvalidated();
+      return Promise.resolve({ ok: false, error: "Extension context invalidated" });
+    }
+
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage(message, (response) => {
-        if (chrome.runtime.lastError) {
-          resolve({ ok: false, error: chrome.runtime.lastError.message });
-          return;
-        }
-        resolve(response);
-      });
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (chrome.runtime.lastError) {
+            const msg = chrome.runtime.lastError.message || "";
+            if (msg.includes("Extension context invalidated")) showContextInvalidated();
+            resolve({ ok: false, error: msg });
+            return;
+          }
+          resolve(response);
+        });
+      } catch (err) {
+        const msg = err.message || String(err);
+        if (msg.includes("Extension context invalidated")) showContextInvalidated();
+        resolve({ ok: false, error: msg });
+      }
     });
   }
 
