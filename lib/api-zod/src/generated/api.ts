@@ -1381,6 +1381,162 @@ export const ListPublishPriorityScoresResponse = zod.object({
 
 
 /**
+ * @summary Get feed quality analysis for a dealer
+ */
+export const GetFeedQualityQueryParams = zod.object({
+  "dealerId": zod.coerce.number()
+})
+
+export const GetFeedQualityResponse = zod.object({
+  "quality": zod.object({
+  "total": zod.number(),
+  "withFiveOrMorePhotos": zod.number(),
+  "missingVin": zod.number(),
+  "missingPrice": zod.number(),
+  "missingMileage": zod.number(),
+  "alreadyPublished": zod.number(),
+  "readyForBatch": zod.number(),
+  "listingGenerated": zod.number(),
+  "photoAnalyzed": zod.number(),
+  "feedUrl": zod.string().nullish(),
+  "lastFeedRunAt": zod.string().nullish(),
+  "lastFeedStatus": zod.string().nullish()
+})
+})
+
+
+/**
+ * @summary Preview vehicle selection without creating jobs
+ */
+export const runPublishDryRunBodyCountMax = 20;
+
+
+
+export const RunPublishDryRunBody = zod.object({
+  "dealerId": zod.number(),
+  "count": zod.number().min(1).max(runPublishDryRunBodyCountMax).optional()
+})
+
+export const RunPublishDryRunResponse = zod.object({
+  "selected": zod.array(zod.object({
+  "vehicleId": zod.number(),
+  "label": zod.string(),
+  "vin": zod.string(),
+  "price": zod.number().nullish(),
+  "mileage": zod.number().nullish(),
+  "photoCount": zod.number(),
+  "photoScore": zod.number(),
+  "photoDecision": zod.string(),
+  "priorityScore": zod.number(),
+  "eligible": zod.boolean(),
+  "skipReason": zod.string().nullish()
+})),
+  "skipped": zod.array(zod.object({
+  "vehicleId": zod.number(),
+  "label": zod.string(),
+  "vin": zod.string(),
+  "price": zod.number().nullish(),
+  "mileage": zod.number().nullish(),
+  "photoCount": zod.number(),
+  "photoScore": zod.number(),
+  "photoDecision": zod.string(),
+  "priorityScore": zod.number(),
+  "eligible": zod.boolean(),
+  "skipReason": zod.string().nullish()
+})),
+  "totalEligible": zod.number()
+})
+
+
+/**
+ * @summary Extension health and diagnostics
+ */
+export const GetExtensionDiagnosticsQueryParams = zod.object({
+  "dealerId": zod.coerce.number()
+})
+
+export const GetExtensionDiagnosticsResponse = zod.object({
+  "diagnostics": zod.object({
+  "extensionOnline": zod.boolean(),
+  "connectionCount": zod.number(),
+  "onlineCount": zod.number(),
+  "lastHeartbeatAt": zod.string().nullish(),
+  "backendReachable": zod.boolean(),
+  "facebookSessionVisible": zod.boolean(),
+  "marketplacePageReachable": zod.boolean(),
+  "lastJobClaimAt": zod.string().nullish(),
+  "lastJobClaimExtensionId": zod.string().nullish(),
+  "lastEventAt": zod.string().nullish(),
+  "lastEventType": zod.string().nullish(),
+  "publishedJobsCount": zod.number().optional(),
+  "connections": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "backendUrl": zod.string().nullish(),
+  "status": zod.string(),
+  "lastHeartbeatAt": zod.string().nullable()
+})).optional()
+})
+})
+
+
+/**
+ * @summary Facebook field validation report
+ */
+export const GetFieldValidationQueryParams = zod.object({
+  "dealerId": zod.coerce.number()
+})
+
+export const GetFieldValidationResponse = zod.object({
+  "reports": zod.array(zod.object({
+  "jobId": zod.number(),
+  "vehicleId": zod.number(),
+  "eventType": zod.string(),
+  "testedAt": zod.string(),
+  "titleFound": zod.boolean().nullish(),
+  "priceFound": zod.boolean().nullish(),
+  "descriptionFound": zod.boolean().nullish(),
+  "mileageFound": zod.boolean().nullish(),
+  "imageUploadFound": zod.boolean().nullish(),
+  "publishButtonDetected": zod.boolean().nullish(),
+  "rawDetails": zod.string().nullish()
+})),
+  "aggregated": zod.union([zod.object({
+  "titleFound": zod.boolean().nullish(),
+  "priceFound": zod.boolean().nullish(),
+  "descriptionFound": zod.boolean().nullish(),
+  "mileageFound": zod.boolean().nullish(),
+  "imageUploadFound": zod.boolean().nullish(),
+  "publishButtonDetected": zod.boolean().nullish(),
+  "lastTestedAt": zod.string().nullish(),
+  "totalReports": zod.number().optional()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Alpha launch readiness checklist
+ */
+export const GetLaunchChecklistQueryParams = zod.object({
+  "dealerId": zod.coerce.number()
+})
+
+export const GetLaunchChecklistResponse = zod.object({
+  "checklist": zod.object({
+  "items": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "passed": zod.boolean(),
+  "detail": zod.string()
+})),
+  "passedCount": zod.number(),
+  "totalCount": zod.number(),
+  "allPassed": zod.boolean()
+})
+})
+
+
+/**
  * @summary List one creative workspace per vehicle
  */
 export const ListCreativeStudioQueryParams = zod.object({

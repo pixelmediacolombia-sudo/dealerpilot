@@ -884,6 +884,147 @@ export interface PublishPriorityScoreList {
   scores: PublishPriorityScore[];
 }
 
+export interface FeedQualityReport {
+  total: number;
+  withFiveOrMorePhotos: number;
+  missingVin: number;
+  missingPrice: number;
+  missingMileage: number;
+  alreadyPublished: number;
+  readyForBatch: number;
+  listingGenerated: number;
+  photoAnalyzed: number;
+  /** @nullable */
+  feedUrl?: string | null;
+  /** @nullable */
+  lastFeedRunAt?: string | null;
+  /** @nullable */
+  lastFeedStatus?: string | null;
+}
+
+export interface FeedQualityResponse {
+  quality: FeedQualityReport;
+}
+
+export interface DryRunVehicle {
+  vehicleId: number;
+  label: string;
+  vin: string;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  mileage?: number | null;
+  photoCount: number;
+  photoScore: number;
+  photoDecision: string;
+  priorityScore: number;
+  eligible: boolean;
+  /** @nullable */
+  skipReason?: string | null;
+}
+
+export interface DryRunInput {
+  dealerId: number;
+  /**
+     * @minimum 1
+     * @maximum 20
+     */
+  count?: number;
+}
+
+export interface DryRunResponse {
+  selected: DryRunVehicle[];
+  skipped: DryRunVehicle[];
+  totalEligible: number;
+}
+
+export interface ExtensionDiagnostics {
+  extensionOnline: boolean;
+  connectionCount: number;
+  onlineCount: number;
+  /** @nullable */
+  lastHeartbeatAt?: string | null;
+  backendReachable: boolean;
+  facebookSessionVisible: boolean;
+  marketplacePageReachable: boolean;
+  /** @nullable */
+  lastJobClaimAt?: string | null;
+  /** @nullable */
+  lastJobClaimExtensionId?: string | null;
+  /** @nullable */
+  lastEventAt?: string | null;
+  /** @nullable */
+  lastEventType?: string | null;
+  publishedJobsCount?: number;
+  connections?: ExtensionConnection[];
+}
+
+export interface ExtensionDiagnosticsResponse {
+  diagnostics: ExtensionDiagnostics;
+}
+
+export interface FieldReport {
+  jobId: number;
+  vehicleId: number;
+  eventType: string;
+  testedAt: string;
+  /** @nullable */
+  titleFound?: boolean | null;
+  /** @nullable */
+  priceFound?: boolean | null;
+  /** @nullable */
+  descriptionFound?: boolean | null;
+  /** @nullable */
+  mileageFound?: boolean | null;
+  /** @nullable */
+  imageUploadFound?: boolean | null;
+  /** @nullable */
+  publishButtonDetected?: boolean | null;
+  /** @nullable */
+  rawDetails?: string | null;
+}
+
+export interface FieldValidationAggregated {
+  /** @nullable */
+  titleFound?: boolean | null;
+  /** @nullable */
+  priceFound?: boolean | null;
+  /** @nullable */
+  descriptionFound?: boolean | null;
+  /** @nullable */
+  mileageFound?: boolean | null;
+  /** @nullable */
+  imageUploadFound?: boolean | null;
+  /** @nullable */
+  publishButtonDetected?: boolean | null;
+  /** @nullable */
+  lastTestedAt?: string | null;
+  totalReports?: number;
+}
+
+export interface FieldValidationResponse {
+  reports: FieldReport[];
+  aggregated?: FieldValidationAggregated | null;
+}
+
+export interface LaunchChecklistItem {
+  key: string;
+  label: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface LaunchChecklist {
+  items: LaunchChecklistItem[];
+  passedCount: number;
+  totalCount: number;
+  allPassed: boolean;
+}
+
+export interface LaunchChecklistResponse {
+  checklist: LaunchChecklist;
+}
+
 export type ListVehiclesParams = {
 /**
  * Search by VIN, stock number, make, or model
@@ -934,6 +1075,22 @@ dealerId?: number;
 
 export type ListPublishPriorityScoresParams = {
 dealerId?: number;
+};
+
+export type GetFeedQualityParams = {
+dealerId: number;
+};
+
+export type GetExtensionDiagnosticsParams = {
+dealerId: number;
+};
+
+export type GetFieldValidationParams = {
+dealerId: number;
+};
+
+export type GetLaunchChecklistParams = {
+dealerId: number;
 };
 
 export type ListCreativeStudioParams = {

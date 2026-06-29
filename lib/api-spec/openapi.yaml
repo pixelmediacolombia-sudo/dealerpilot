@@ -873,6 +873,97 @@ paths:
               schema:
                 $ref: "#/components/schemas/PublishPriorityScoreList"
 
+  /auto-publish/feed-quality:
+    get:
+      operationId: getFeedQuality
+      tags: [publishing]
+      summary: Get feed quality analysis for a dealer
+      parameters:
+        - name: dealerId
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Feed quality report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedQualityResponse"
+
+  /auto-publish/dry-run:
+    post:
+      operationId: runPublishDryRun
+      tags: [publishing]
+      summary: Preview vehicle selection without creating jobs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DryRunInput"
+      responses:
+        "200":
+          description: Dry run results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DryRunResponse"
+
+  /auto-publish/extension-diagnostics:
+    get:
+      operationId: getExtensionDiagnostics
+      tags: [publishing]
+      summary: Extension health and diagnostics
+      parameters:
+        - name: dealerId
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Diagnostics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionDiagnosticsResponse"
+
+  /auto-publish/field-validation:
+    get:
+      operationId: getFieldValidation
+      tags: [publishing]
+      summary: Facebook field validation report
+      parameters:
+        - name: dealerId
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Field validation report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FieldValidationResponse"
+
+  /auto-publish/launch-checklist:
+    get:
+      operationId: getLaunchChecklist
+      tags: [publishing]
+      summary: Alpha launch readiness checklist
+      parameters:
+        - name: dealerId
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Launch checklist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaunchChecklistResponse"
+
   /creative/studio:
     get:
       operationId: listCreativeStudio
@@ -2219,3 +2310,148 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PublishPriorityScore"
+
+    FeedQualityReport:
+      type: object
+      required: [total, withFiveOrMorePhotos, missingVin, missingPrice, missingMileage, alreadyPublished, readyForBatch, listingGenerated, photoAnalyzed]
+      properties:
+        total: { type: integer }
+        withFiveOrMorePhotos: { type: integer }
+        missingVin: { type: integer }
+        missingPrice: { type: integer }
+        missingMileage: { type: integer }
+        alreadyPublished: { type: integer }
+        readyForBatch: { type: integer }
+        listingGenerated: { type: integer }
+        photoAnalyzed: { type: integer }
+        feedUrl: { type: ["string", "null"] }
+        lastFeedRunAt: { type: ["string", "null"] }
+        lastFeedStatus: { type: ["string", "null"] }
+    FeedQualityResponse:
+      type: object
+      required: [quality]
+      properties:
+        quality:
+          $ref: "#/components/schemas/FeedQualityReport"
+
+    DryRunVehicle:
+      type: object
+      required: [vehicleId, label, vin, photoCount, photoScore, photoDecision, priorityScore, eligible]
+      properties:
+        vehicleId: { type: integer }
+        label: { type: string }
+        vin: { type: string }
+        price: { type: ["number", "null"] }
+        mileage: { type: ["number", "null"] }
+        photoCount: { type: integer }
+        photoScore: { type: integer }
+        photoDecision: { type: string }
+        priorityScore: { type: integer }
+        eligible: { type: boolean }
+        skipReason: { type: ["string", "null"] }
+    DryRunInput:
+      type: object
+      required: [dealerId]
+      properties:
+        dealerId: { type: integer }
+        count: { type: integer, minimum: 1, maximum: 20 }
+    DryRunResponse:
+      type: object
+      required: [selected, skipped, totalEligible]
+      properties:
+        selected:
+          type: array
+          items: { $ref: "#/components/schemas/DryRunVehicle" }
+        skipped:
+          type: array
+          items: { $ref: "#/components/schemas/DryRunVehicle" }
+        totalEligible: { type: integer }
+
+    ExtensionDiagnostics:
+      type: object
+      required: [extensionOnline, connectionCount, onlineCount, backendReachable, facebookSessionVisible, marketplacePageReachable]
+      properties:
+        extensionOnline: { type: boolean }
+        connectionCount: { type: integer }
+        onlineCount: { type: integer }
+        lastHeartbeatAt: { type: ["string", "null"] }
+        backendReachable: { type: boolean }
+        facebookSessionVisible: { type: boolean }
+        marketplacePageReachable: { type: boolean }
+        lastJobClaimAt: { type: ["string", "null"] }
+        lastJobClaimExtensionId: { type: ["string", "null"] }
+        lastEventAt: { type: ["string", "null"] }
+        lastEventType: { type: ["string", "null"] }
+        publishedJobsCount: { type: integer }
+        connections:
+          type: array
+          items: { $ref: "#/components/schemas/ExtensionConnection" }
+    ExtensionDiagnosticsResponse:
+      type: object
+      required: [diagnostics]
+      properties:
+        diagnostics:
+          $ref: "#/components/schemas/ExtensionDiagnostics"
+
+    FieldReport:
+      type: object
+      required: [jobId, vehicleId, eventType, testedAt]
+      properties:
+        jobId: { type: integer }
+        vehicleId: { type: integer }
+        eventType: { type: string }
+        testedAt: { type: string }
+        titleFound: { type: ["boolean", "null"] }
+        priceFound: { type: ["boolean", "null"] }
+        descriptionFound: { type: ["boolean", "null"] }
+        mileageFound: { type: ["boolean", "null"] }
+        imageUploadFound: { type: ["boolean", "null"] }
+        publishButtonDetected: { type: ["boolean", "null"] }
+        rawDetails: { type: ["string", "null"] }
+    FieldValidationAggregated:
+      type: object
+      properties:
+        titleFound: { type: ["boolean", "null"] }
+        priceFound: { type: ["boolean", "null"] }
+        descriptionFound: { type: ["boolean", "null"] }
+        mileageFound: { type: ["boolean", "null"] }
+        imageUploadFound: { type: ["boolean", "null"] }
+        publishButtonDetected: { type: ["boolean", "null"] }
+        lastTestedAt: { type: ["string", "null"] }
+        totalReports: { type: integer }
+    FieldValidationResponse:
+      type: object
+      required: [reports]
+      properties:
+        reports:
+          type: array
+          items: { $ref: "#/components/schemas/FieldReport" }
+        aggregated:
+          oneOf:
+            - $ref: "#/components/schemas/FieldValidationAggregated"
+            - type: "null"
+
+    LaunchChecklistItem:
+      type: object
+      required: [key, label, passed, detail]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        passed: { type: boolean }
+        detail: { type: string }
+    LaunchChecklist:
+      type: object
+      required: [items, passedCount, totalCount, allPassed]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LaunchChecklistItem" }
+        passedCount: { type: integer }
+        totalCount: { type: integer }
+        allPassed: { type: boolean }
+    LaunchChecklistResponse:
+      type: object
+      required: [checklist]
+      properties:
+        checklist:
+          $ref: "#/components/schemas/LaunchChecklist"

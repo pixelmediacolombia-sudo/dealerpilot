@@ -4,3 +4,4 @@
 - [Dashboard design system](dashboard-design-system.md) — premium dark theme tokens/utilities + shared component vocabulary; make shared components flexible supersets when parallel DESIGN subagents consume them.
 - [Sprint 4.6 UX patterns](sprint46-ux-patterns.md) — AI voice copy, global header hook signatures, sidebar 6-item structure, ReactNode title props on shared components.
 - [Sprint 4.8 publishing engine](sprint48-publishing-engine.md) — 5 new tables, photo quality scoring (0/<60/60-79/80-100), vehicle selection validation, batch API, extension SEND_JOB_EVENT; seed vehicles only 3 photos (batch creation validation will always reject them as designed).
+- [Sprint 4.9 production readiness](sprint49-production-readiness.md) — 5 new API endpoints added to autoPublish.ts; ExtensionConnection schema pre-existed (don't re-add); ProductionReadiness.tsx is a standalone route at /listings/readiness.

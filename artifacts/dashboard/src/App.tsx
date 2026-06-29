@@ -10,6 +10,7 @@ import { InventoryDashboard } from "@/pages/Inventory";
 import { VehicleDetail } from "@/pages/Inventory/VehicleDetail";
 import { ListingsWorkspace } from "@/pages/Listings";
 import { ListingDetail } from "@/pages/Listings/ListingDetail";
+import { ProductionReadiness } from "@/pages/Listings/ProductionReadiness";
 import { PublishingQueue } from "@/pages/Publishing";
 import { CreativeStudio } from "@/pages/CreativeStudio";
 import { CreativeDetail } from "@/pages/CreativeStudio/CreativeDetail";
@@ -38,6 +39,7 @@ function Router() {
       <Route path="/inventory/:id" component={VehicleDetail} />
       
       <Route path="/listings" component={ListingsWorkspace} />
+      <Route path="/listings/readiness" component={ProductionReadiness} />
       <Route path="/listings/:id" component={ListingDetail} />
       <Route path="/publishing" component={PublishingQueue} /> {/* Merged into Marketplace AI visually, keeping route for deep links */}
       

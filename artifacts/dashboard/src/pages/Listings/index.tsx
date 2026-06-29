@@ -42,6 +42,7 @@ import {
   Wand2,
   Eye,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { PageHeader, EmptyState, SectionCard } from "@/components/shared";
 import { AutoPublishPlan } from "./AutoPublishPlan";
 import { BatchProgressCard } from "./BatchProgressCard";
@@ -291,7 +292,14 @@ export function ListingsWorkspace() {
               </div>
             }
             action={
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+              <div className="flex flex-col gap-3 items-end">
+                <Link href="/listings/readiness">
+                  <Button variant="outline" size="sm" className="gap-2 border-border/50 text-muted-foreground hover:text-primary hover:border-primary/40">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Production Readiness
+                  </Button>
+                </Link>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
                 <TabsList className="bg-transparent border-0 gap-1.5 flex-wrap justify-end">
                   <TabsTrigger value="ready" className={tabClass}>
                     Ready {countBadge(readyCount)}
@@ -322,6 +330,7 @@ export function ListingsWorkspace() {
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
+              </div>
             }
           />
 

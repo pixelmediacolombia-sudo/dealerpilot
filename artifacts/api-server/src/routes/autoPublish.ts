@@ -12,6 +12,9 @@ import {
   autoPublishSettingsTable,
   vehiclePhotoScoresTable,
   publishPriorityScoresTable,
+  extensionConnectionsTable,
+  feedsTable,
+  feedRunsTable,
   type AutoPublishSettings,
   type PublishingBatch,
 } from "@workspace/db";
@@ -741,6 +744,533 @@ router.get("/auto-publish/photo-scores", async (req, res) => {
     .where(dealerId ? eq(vehiclePhotoScoresTable.dealerId, dealerId) : undefined)
     .orderBy(desc(vehiclePhotoScoresTable.photoScore));
   res.json({ scores: rows });
+});
+
+// ─── Feed Quality ─────────────────────────────────────────────────────────────
+
+// GET /auto-publish/feed-quality?dealerId=1
+router.get("/auto-publish/feed-quality", async (req, res) => {
+  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : null;
+  if (!dealerId || Number.isNaN(dealerId)) {
+    res.status(400).json({ error: "dealerId required" });
+    return;
+  }
+
+  // Total active vehicles
+  const allVehicles = await db
+    .select()
+    .from(vehiclesTable)
+    .where(
+      and(
+        eq(vehiclesTable.dealerId, dealerId),
+        ne(vehiclesTable.status, "Removed"),
+      ),
+    );
+  const total = allVehicles.length;
+  const vehicleIds = allVehicles.map((v) => v.id);
+
+  // Photos per vehicle
+  const allImages =
+    vehicleIds.length > 0
+      ? await db.select().from(vehicleImagesTable).where(inArray(vehicleImagesTable.vehicleId, vehicleIds))
+      : [];
+  const photoCountByVehicle = new Map<number, number>();
+  for (const img of allImages) {
+    photoCountByVehicle.set(img.vehicleId, (photoCountByVehicle.get(img.vehicleId) ?? 0) + 1);
+  }
+
+  // Listings
+  const allListings =
+    vehicleIds.length > 0
+      ? await db.select().from(listingsTable).where(inArray(listingsTable.vehicleId, vehicleIds))
+      : [];
+  const listingByVehicle = new Map(allListings.map((l) => [l.vehicleId, l]));
+
+  // Listing versions (to check if a listing was generated)
+  const allVersions =
+    vehicleIds.length > 0
+      ? await db
+          .select({ vehicleId: listingVersionsTable.vehicleId })
+          .from(listingVersionsTable)
+          .where(inArray(listingVersionsTable.vehicleId, vehicleIds))
+      : [];
+  const vehiclesWithListing = new Set(allVersions.map((v) => v.vehicleId));
+
+  let withFiveOrMorePhotos = 0;
+  let missingVin = 0;
+  let missingPrice = 0;
+  let missingMileage = 0;
+  let alreadyPublished = 0;
+  let readyForBatch = 0;
+  let listingGenerated = 0;
+  let photoAnalyzed = 0;
+
+  // Photo scores
+  const photoScores =
+    vehicleIds.length > 0
+      ? await db.select().from(vehiclePhotoScoresTable).where(inArray(vehiclePhotoScoresTable.vehicleId, vehicleIds))
+      : [];
+  const photoScoreByVehicle = new Map(photoScores.map((s) => [s.vehicleId, s]));
+
+  for (const v of allVehicles) {
+    const photoCount = photoCountByVehicle.get(v.id) ?? 0;
+    const listing = listingByVehicle.get(v.id);
+    const hasListing = vehiclesWithListing.has(v.id);
+    const isPublished = listing?.status === "Published" || v.status === "Published";
+
+    if (!v.vin) missingVin++;
+    if (!v.price) missingPrice++;
+    if (!v.mileage) missingMileage++;
+    if (photoCount >= 5) withFiveOrMorePhotos++;
+    if (isPublished) alreadyPublished++;
+    if (hasListing) listingGenerated++;
+    if (photoScoreByVehicle.has(v.id)) photoAnalyzed++;
+
+    // Ready for batch: not published, has VIN/price/mileage/year, 5+ photos, has listing, not already queued
+    if (
+      !isPublished &&
+      v.vin &&
+      v.price &&
+      v.mileage &&
+      v.year &&
+      photoCount >= 5 &&
+      hasListing
+    ) {
+      readyForBatch++;
+    }
+  }
+
+  // Feed info
+  const [feed] = await db.select().from(feedsTable).where(eq(feedsTable.dealerId, dealerId));
+  const [lastRun] = await db
+    .select()
+    .from(feedRunsTable)
+    .where(eq(feedRunsTable.dealerId, dealerId))
+    .orderBy(desc(feedRunsTable.startedAt))
+    .limit(1);
+
+  res.json({
+    quality: {
+      total,
+      withFiveOrMorePhotos,
+      missingVin,
+      missingPrice,
+      missingMileage,
+      alreadyPublished,
+      readyForBatch,
+      listingGenerated,
+      photoAnalyzed,
+      feedUrl: feed?.url ?? null,
+      lastFeedRunAt: lastRun?.startedAt ?? null,
+      lastFeedStatus: lastRun?.status ?? null,
+    },
+  });
+});
+
+// ─── Batch Dry Run ────────────────────────────────────────────────────────────
+
+const DryRunBody = z.object({
+  dealerId: z.number().int(),
+  count: z.number().int().min(1).max(20).optional().default(4),
+});
+
+// POST /auto-publish/dry-run
+router.post("/auto-publish/dry-run", async (req, res) => {
+  const parsed = DryRunBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid dry run request" });
+    return;
+  }
+  const { dealerId, count } = parsed.data;
+
+  // Same vehicle selection as batch — but no DB writes (no jobs, no batch row)
+  const vehicles = await db
+    .select()
+    .from(vehiclesTable)
+    .where(
+      and(
+        eq(vehiclesTable.dealerId, dealerId),
+        ne(vehiclesTable.status, "Published"),
+        ne(vehiclesTable.status, "Sold"),
+        ne(vehiclesTable.status, "Removed"),
+      ),
+    );
+
+  if (vehicles.length === 0) {
+    res.json({ selected: [], skipped: [], totalEligible: 0 });
+    return;
+  }
+
+  const vehicleIds = vehicles.map((v) => v.id);
+
+  const allImages = await db
+    .select()
+    .from(vehicleImagesTable)
+    .where(inArray(vehicleImagesTable.vehicleId, vehicleIds))
+    .orderBy(asc(vehicleImagesTable.position));
+  const allListings = await db
+    .select()
+    .from(listingsTable)
+    .where(inArray(listingsTable.vehicleId, vehicleIds));
+  const allVersions = await db
+    .select()
+    .from(listingVersionsTable)
+    .where(inArray(listingVersionsTable.vehicleId, vehicleIds))
+    .orderBy(desc(listingVersionsTable.createdAt));
+  const activeJobs = await db
+    .select({ vehicleId: publishingJobsTable.vehicleId })
+    .from(publishingJobsTable)
+    .where(
+      and(
+        inArray(publishingJobsTable.vehicleId, vehicleIds),
+        inArray(publishingJobsTable.status, ["Queued", "Publishing", "Scheduled"]),
+      ),
+    );
+  const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
+
+  const imagesByVehicle = new Map<number, typeof allImages>();
+  for (const img of allImages) {
+    const arr = imagesByVehicle.get(img.vehicleId) ?? [];
+    arr.push(img);
+    imagesByVehicle.set(img.vehicleId, arr);
+  }
+  const listingByVehicle = new Map(allListings.map((l) => [l.vehicleId, l]));
+  const versionByVehicle = new Map<number, typeof allVersions[0]>();
+  for (const v of allVersions) {
+    if (!versionByVehicle.has(v.vehicleId)) versionByVehicle.set(v.vehicleId, v);
+  }
+
+  type ScoredEntry = {
+    vehicleId: number;
+    label: string;
+    vin: string;
+    price: number | null;
+    mileage: number | null;
+    photoCount: number;
+    photoScore: number;
+    photoDecision: string;
+    priorityScore: number;
+    eligible: boolean;
+    skipReason: string | null;
+  };
+
+  const scored: ScoredEntry[] = [];
+
+  for (const v of vehicles) {
+    const label = `${v.year ?? ""} ${v.make} ${v.model}${v.trim ? ` ${v.trim}` : ""}`.trim();
+
+    if (alreadyQueued.has(v.id)) {
+      scored.push({ vehicleId: v.id, label, vin: v.vin, price: v.price, mileage: v.mileage, photoCount: 0, photoScore: 0, photoDecision: "needs_review", priorityScore: 0, eligible: false, skipReason: "Already in queue" });
+      continue;
+    }
+
+    const imgs = imagesByVehicle.get(v.id) ?? [];
+    const listing = listingByVehicle.get(v.id);
+    if (listing?.status === "Published") {
+      scored.push({ vehicleId: v.id, label, vin: v.vin, price: v.price, mileage: v.mileage, photoCount: imgs.length, photoScore: 0, photoDecision: "needs_review", priorityScore: 0, eligible: false, skipReason: "Already published" });
+      continue;
+    }
+
+    const bestVersion = versionByVehicle.get(v.id);
+    const hasListing = !!bestVersion;
+    const photoAnalysis = analyzePhotos(imgs);
+    const validation = validateVehicleForPublish(v, imgs.length, hasListing);
+    const neverPublished = !listing || listing.status !== "Published";
+    const { priorityScore } = computePriorityScore(v, photoAnalysis.photoScore, neverPublished);
+
+    scored.push({
+      vehicleId: v.id,
+      label,
+      vin: v.vin,
+      price: v.price,
+      mileage: v.mileage,
+      photoCount: imgs.length,
+      photoScore: photoAnalysis.photoScore,
+      photoDecision: photoAnalysis.photoDecision,
+      priorityScore,
+      eligible: validation.eligible,
+      skipReason: validation.reason,
+    });
+  }
+
+  const eligible = scored
+    .filter((s) => s.eligible)
+    .sort((a, b) => b.priorityScore - a.priorityScore);
+  const selected = eligible.slice(0, count);
+  const skipped = scored.filter((s) => !s.eligible);
+
+  res.json({
+    selected,
+    skipped,
+    totalEligible: eligible.length,
+  });
+});
+
+// ─── Extension Diagnostics ────────────────────────────────────────────────────
+
+// GET /auto-publish/extension-diagnostics?dealerId=1
+router.get("/auto-publish/extension-diagnostics", async (req, res) => {
+  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : null;
+  if (!dealerId || Number.isNaN(dealerId)) {
+    res.status(400).json({ error: "dealerId required" });
+    return;
+  }
+
+  // All extension connections
+  const connections = await db.select().from(extensionConnectionsTable).orderBy(desc(extensionConnectionsTable.lastHeartbeatAt));
+  const onlineConnections = connections.filter((c) => c.status === "online");
+  const latestConnection = connections[0] ?? null;
+
+  // 5-minute window for "online"
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  const extensionOnline =
+    onlineConnections.length > 0 ||
+    (latestConnection?.lastHeartbeatAt != null && latestConnection.lastHeartbeatAt > fiveMinutesAgo);
+
+  // Last events for this dealer
+  const recentEvents = await db
+    .select()
+    .from(publishingEventsTable)
+    .where(eq(publishingEventsTable.dealerId, dealerId))
+    .orderBy(desc(publishingEventsTable.createdAt))
+    .limit(20);
+
+  const lastJobClaim = recentEvents.find((e) => e.event === "job_claimed");
+  const lastMarketplaceOpen = recentEvents.find((e) => e.event === "marketplace_opened");
+  const lastPublished = recentEvents.find((e) => e.event === "published");
+  const lastEvent = recentEvents[0] ?? null;
+
+  // Check if there are any publishing jobs that succeeded (as a proxy for "publish tested")
+  const publishedJobsCount = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(publishingJobsTable)
+    .where(and(eq(publishingJobsTable.dealerId, dealerId), eq(publishingJobsTable.status, "Published")));
+
+  res.json({
+    diagnostics: {
+      extensionOnline,
+      connectionCount: connections.length,
+      onlineCount: onlineConnections.length,
+      lastHeartbeatAt: latestConnection?.lastHeartbeatAt ?? null,
+      backendReachable: connections.length > 0,
+      facebookSessionVisible: lastMarketplaceOpen != null,
+      marketplacePageReachable: lastMarketplaceOpen != null,
+      lastJobClaimAt: lastJobClaim?.createdAt ?? null,
+      lastJobClaimExtensionId: lastJobClaim?.extensionId ?? null,
+      lastEventAt: lastEvent?.createdAt ?? null,
+      lastEventType: lastEvent?.event ?? null,
+      publishedJobsCount: Number(publishedJobsCount[0]?.count ?? 0),
+      connections: connections.map((c) => ({
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        lastHeartbeatAt: c.lastHeartbeatAt,
+      })),
+    },
+  });
+});
+
+// ─── Facebook Field Validation Report ─────────────────────────────────────────
+
+// GET /auto-publish/field-validation?dealerId=1
+router.get("/auto-publish/field-validation", async (req, res) => {
+  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : null;
+  if (!dealerId || Number.isNaN(dealerId)) {
+    res.status(400).json({ error: "dealerId required" });
+    return;
+  }
+
+  // Get recent validation events (fields_filled or validation_passed)
+  const events = await db
+    .select()
+    .from(publishingEventsTable)
+    .where(
+      and(
+        eq(publishingEventsTable.dealerId, dealerId),
+        inArray(publishingEventsTable.event, ["fields_filled", "validation_passed", "field_validation"]),
+      ),
+    )
+    .orderBy(desc(publishingEventsTable.createdAt))
+    .limit(50);
+
+  // Parse details JSON to extract field validation data
+  type FieldReport = {
+    jobId: number;
+    vehicleId: number;
+    eventType: string;
+    testedAt: Date;
+    titleFound: boolean | null;
+    priceFound: boolean | null;
+    descriptionFound: boolean | null;
+    mileageFound: boolean | null;
+    imageUploadFound: boolean | null;
+    publishButtonDetected: boolean | null;
+    rawDetails: string | null;
+  };
+
+  const reports: FieldReport[] = events.map((ev) => {
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = ev.details ? (JSON.parse(ev.details) as Record<string, unknown>) : {};
+    } catch {
+      // ok
+    }
+    return {
+      jobId: ev.jobId,
+      vehicleId: ev.vehicleId,
+      eventType: ev.event,
+      testedAt: ev.createdAt,
+      titleFound: (parsed.titleFound as boolean | null) ?? null,
+      priceFound: (parsed.priceFound as boolean | null) ?? null,
+      descriptionFound: (parsed.descriptionFound as boolean | null) ?? null,
+      mileageFound: (parsed.mileageFound as boolean | null) ?? null,
+      imageUploadFound: (parsed.imageUploadFound as boolean | null) ?? null,
+      publishButtonDetected: (parsed.publishButtonDetected as boolean | null) ?? null,
+      rawDetails: ev.details ?? null,
+    };
+  });
+
+  // Aggregate latest per field (most recent wins)
+  const latest = reports[0] ?? null;
+  const aggregated = latest
+    ? {
+        titleFound: latest.titleFound,
+        priceFound: latest.priceFound,
+        descriptionFound: latest.descriptionFound,
+        mileageFound: latest.mileageFound,
+        imageUploadFound: latest.imageUploadFound,
+        publishButtonDetected: latest.publishButtonDetected,
+        lastTestedAt: latest.testedAt,
+        totalReports: reports.length,
+      }
+    : null;
+
+  res.json({ reports, aggregated });
+});
+
+// ─── Launch Checklist ─────────────────────────────────────────────────────────
+
+// GET /auto-publish/launch-checklist?dealerId=1
+router.get("/auto-publish/launch-checklist", async (req, res) => {
+  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : null;
+  if (!dealerId || Number.isNaN(dealerId)) {
+    res.status(400).json({ error: "dealerId required" });
+    return;
+  }
+
+  // 1. XML feed connected
+  const [feed] = await db.select().from(feedsTable).where(eq(feedsTable.dealerId, dealerId));
+  const feedConnected = !!(feed?.url);
+  const [lastSuccessfulRun] = await db
+    .select()
+    .from(feedRunsTable)
+    .where(and(eq(feedRunsTable.dealerId, dealerId), eq(feedRunsTable.status, "success")))
+    .orderBy(desc(feedRunsTable.startedAt))
+    .limit(1);
+
+  // 2. Extension installed (any connection ever seen)
+  const connections = await db.select().from(extensionConnectionsTable);
+  const extensionInstalled = connections.length > 0;
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  const extensionOnline =
+    connections.some(
+      (c) => c.status === "online" || (c.lastHeartbeatAt != null && c.lastHeartbeatAt > fiveMinutesAgo),
+    );
+
+  // 3. Facebook logged in (marketplace_opened event seen)
+  const [facebookEvent] = await db
+    .select()
+    .from(publishingEventsTable)
+    .where(and(eq(publishingEventsTable.dealerId, dealerId), eq(publishingEventsTable.event, "marketplace_opened")))
+    .orderBy(desc(publishingEventsTable.createdAt))
+    .limit(1);
+  const facebookLoggedIn = !!facebookEvent;
+
+  // 4. At least 5 photos per selected vehicle
+  const vehicles = await db
+    .select()
+    .from(vehiclesTable)
+    .where(
+      and(
+        eq(vehiclesTable.dealerId, dealerId),
+        ne(vehiclesTable.status, "Published"),
+        ne(vehiclesTable.status, "Sold"),
+        ne(vehiclesTable.status, "Removed"),
+      ),
+    );
+  const vIds = vehicles.map((v) => v.id);
+  let vehiclesWithFivePhotos = 0;
+  if (vIds.length > 0) {
+    const imgs = await db.select().from(vehicleImagesTable).where(inArray(vehicleImagesTable.vehicleId, vIds));
+    const counts = new Map<number, number>();
+    for (const img of imgs) counts.set(img.vehicleId, (counts.get(img.vehicleId) ?? 0) + 1);
+    vehiclesWithFivePhotos = [...counts.values()].filter((c) => c >= 5).length;
+  }
+  const hasEnoughPhotos = vehiclesWithFivePhotos > 0;
+
+  // 5. Listing generated for at least one vehicle
+  let listingGenerated = false;
+  if (vIds.length > 0) {
+    const [anyVersion] = await db
+      .select()
+      .from(listingVersionsTable)
+      .where(inArray(listingVersionsTable.vehicleId, vIds))
+      .limit(1);
+    listingGenerated = !!anyVersion;
+  }
+
+  // 6. Photo quality analyzed for at least one vehicle
+  let photoAnalyzed = false;
+  if (vIds.length > 0) {
+    const [anyScore] = await db
+      .select()
+      .from(vehiclePhotoScoresTable)
+      .where(inArray(vehiclePhotoScoresTable.vehicleId, vIds))
+      .limit(1);
+    photoAnalyzed = !!anyScore;
+  }
+
+  // 7. Batch dry run passed — proxy: at least one eligible vehicle exists
+  // We compute eligibility inline (lightweight version)
+  let dryRunPassed = false;
+  if (vIds.length > 0) {
+    const imgs = await db.select().from(vehicleImagesTable).where(inArray(vehicleImagesTable.vehicleId, vIds));
+    const counts = new Map<number, number>();
+    for (const img of imgs) counts.set(img.vehicleId, (counts.get(img.vehicleId) ?? 0) + 1);
+    const versions = await db
+      .select({ vehicleId: listingVersionsTable.vehicleId })
+      .from(listingVersionsTable)
+      .where(inArray(listingVersionsTable.vehicleId, vIds));
+    const withVersion = new Set(versions.map((v) => v.vehicleId));
+    dryRunPassed = vehicles.some(
+      (v) =>
+        v.vin && v.price && v.mileage && v.year && (counts.get(v.id) ?? 0) >= 5 && withVersion.has(v.id),
+    );
+  }
+
+  // 8. Assisted publish test passed — any published job for dealer
+  const [publishedJob] = await db
+    .select()
+    .from(publishingJobsTable)
+    .where(and(eq(publishingJobsTable.dealerId, dealerId), eq(publishingJobsTable.status, "Published")))
+    .limit(1);
+  const assistedPublishTested = !!publishedJob;
+
+  const items = [
+    { key: "feedConnected", label: "XML feed connected", passed: feedConnected, detail: feedConnected ? (lastSuccessfulRun ? `Last sync: ${lastSuccessfulRun.startedAt.toISOString()}` : "Feed URL set — not yet synced") : "No feed URL configured" },
+    { key: "extensionInstalled", label: "Extension installed & online", passed: extensionOnline, detail: extensionInstalled ? (extensionOnline ? "Extension is online" : "Extension seen but not currently online") : "Extension has never connected" },
+    { key: "facebookLoggedIn", label: "Facebook session active", passed: facebookLoggedIn, detail: facebookLoggedIn ? `Last seen: ${facebookEvent!.createdAt.toISOString()}` : "No Marketplace page activity detected" },
+    { key: "hasEnoughPhotos", label: "At least 5 photos per vehicle", passed: hasEnoughPhotos, detail: hasEnoughPhotos ? `${vehiclesWithFivePhotos} vehicle(s) have 5+ photos` : "No vehicles have 5+ photos — upload more" },
+    { key: "listingGenerated", label: "AI listing generated", passed: listingGenerated, detail: listingGenerated ? "At least one listing version generated" : "No listings generated yet — run AI generation" },
+    { key: "photoAnalyzed", label: "Photo quality analyzed", passed: photoAnalyzed, detail: photoAnalyzed ? "Photo quality scores available" : "Run photo quality analysis first" },
+    { key: "dryRunPassed", label: "Batch dry run passed", passed: dryRunPassed, detail: dryRunPassed ? "At least one vehicle passes all validation checks" : "No vehicles eligible — check photo count and listing data" },
+    { key: "assistedPublishTested", label: "Assisted publish test passed", passed: assistedPublishTested, detail: assistedPublishTested ? "At least one job successfully published" : "No successful publishes yet" },
+  ];
+
+  const passedCount = items.filter((i) => i.passed).length;
+  const allPassed = passedCount === items.length;
+
+  res.json({ checklist: { items, passedCount, totalCount: items.length, allPassed } });
 });
 
 // PATCH /auto-publish/batches/:id — update batch status

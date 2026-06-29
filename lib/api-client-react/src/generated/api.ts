@@ -38,14 +38,24 @@ import type {
   DealerBrandDnaUpdate,
   DealerList,
   DealerUpdate,
+  DryRunInput,
+  DryRunResponse,
   ErrorResponse,
   ExtensionConnection,
+  ExtensionDiagnosticsResponse,
   FailJobInput,
+  FeedQualityResponse,
   FeedRun,
   FeedRunList,
+  FieldValidationResponse,
   GenerateCreativeInput,
+  GetExtensionDiagnosticsParams,
+  GetFeedQualityParams,
+  GetFieldValidationParams,
+  GetLaunchChecklistParams,
   HealthStatus,
   HeartbeatInput,
+  LaunchChecklistResponse,
   LeadList,
   ListCreativeJobsParams,
   ListCreativeStudioParams,
@@ -3041,6 +3051,412 @@ export function useListPublishPriorityScores<TData = Awaited<ReturnType<typeof l
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListPublishPriorityScoresQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetFeedQualityUrl = (params: GetFeedQualityParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/auto-publish/feed-quality?${stringifiedParams}` : `/api/auto-publish/feed-quality`
+}
+
+/**
+ * @summary Get feed quality analysis for a dealer
+ */
+export const getFeedQuality = async (params: GetFeedQualityParams, options?: RequestInit): Promise<FeedQualityResponse> => {
+
+  return customFetch<FeedQualityResponse>(getGetFeedQualityUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFeedQualityQueryKey = (params?: GetFeedQualityParams,) => {
+    return [
+    `/api/auto-publish/feed-quality`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetFeedQualityQueryOptions = <TData = Awaited<ReturnType<typeof getFeedQuality>>, TError = ErrorType<unknown>>(params: GetFeedQualityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFeedQuality>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFeedQualityQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFeedQuality>>> = ({ signal }) => getFeedQuality(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFeedQuality>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFeedQualityQueryResult = NonNullable<Awaited<ReturnType<typeof getFeedQuality>>>
+export type GetFeedQualityQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get feed quality analysis for a dealer
+ */
+
+export function useGetFeedQuality<TData = Awaited<ReturnType<typeof getFeedQuality>>, TError = ErrorType<unknown>>(
+ params: GetFeedQualityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFeedQuality>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFeedQualityQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRunPublishDryRunUrl = () => {
+
+
+
+
+  return `/api/auto-publish/dry-run`
+}
+
+/**
+ * @summary Preview vehicle selection without creating jobs
+ */
+export const runPublishDryRun = async (dryRunInput: DryRunInput, options?: RequestInit): Promise<DryRunResponse> => {
+
+  return customFetch<DryRunResponse>(getRunPublishDryRunUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(dryRunInput)
+  }
+);}
+
+
+
+
+export const getRunPublishDryRunMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runPublishDryRun>>, TError,{data: BodyType<DryRunInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runPublishDryRun>>, TError,{data: BodyType<DryRunInput>}, TContext> => {
+
+const mutationKey = ['runPublishDryRun'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runPublishDryRun>>, {data: BodyType<DryRunInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  runPublishDryRun(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunPublishDryRunMutationResult = NonNullable<Awaited<ReturnType<typeof runPublishDryRun>>>
+    export type RunPublishDryRunMutationBody = BodyType<DryRunInput>
+    export type RunPublishDryRunMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Preview vehicle selection without creating jobs
+ */
+export const useRunPublishDryRun = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runPublishDryRun>>, TError,{data: BodyType<DryRunInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runPublishDryRun>>,
+        TError,
+        {data: BodyType<DryRunInput>},
+        TContext
+      > => {
+      return useMutation(getRunPublishDryRunMutationOptions(options));
+    }
+
+export const getGetExtensionDiagnosticsUrl = (params: GetExtensionDiagnosticsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/auto-publish/extension-diagnostics?${stringifiedParams}` : `/api/auto-publish/extension-diagnostics`
+}
+
+/**
+ * @summary Extension health and diagnostics
+ */
+export const getExtensionDiagnostics = async (params: GetExtensionDiagnosticsParams, options?: RequestInit): Promise<ExtensionDiagnosticsResponse> => {
+
+  return customFetch<ExtensionDiagnosticsResponse>(getGetExtensionDiagnosticsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetExtensionDiagnosticsQueryKey = (params?: GetExtensionDiagnosticsParams,) => {
+    return [
+    `/api/auto-publish/extension-diagnostics`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetExtensionDiagnosticsQueryOptions = <TData = Awaited<ReturnType<typeof getExtensionDiagnostics>>, TError = ErrorType<unknown>>(params: GetExtensionDiagnosticsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExtensionDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetExtensionDiagnosticsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExtensionDiagnostics>>> = ({ signal }) => getExtensionDiagnostics(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExtensionDiagnostics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetExtensionDiagnosticsQueryResult = NonNullable<Awaited<ReturnType<typeof getExtensionDiagnostics>>>
+export type GetExtensionDiagnosticsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Extension health and diagnostics
+ */
+
+export function useGetExtensionDiagnostics<TData = Awaited<ReturnType<typeof getExtensionDiagnostics>>, TError = ErrorType<unknown>>(
+ params: GetExtensionDiagnosticsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExtensionDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetExtensionDiagnosticsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetFieldValidationUrl = (params: GetFieldValidationParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/auto-publish/field-validation?${stringifiedParams}` : `/api/auto-publish/field-validation`
+}
+
+/**
+ * @summary Facebook field validation report
+ */
+export const getFieldValidation = async (params: GetFieldValidationParams, options?: RequestInit): Promise<FieldValidationResponse> => {
+
+  return customFetch<FieldValidationResponse>(getGetFieldValidationUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFieldValidationQueryKey = (params?: GetFieldValidationParams,) => {
+    return [
+    `/api/auto-publish/field-validation`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetFieldValidationQueryOptions = <TData = Awaited<ReturnType<typeof getFieldValidation>>, TError = ErrorType<unknown>>(params: GetFieldValidationParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFieldValidation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFieldValidationQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFieldValidation>>> = ({ signal }) => getFieldValidation(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFieldValidation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFieldValidationQueryResult = NonNullable<Awaited<ReturnType<typeof getFieldValidation>>>
+export type GetFieldValidationQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Facebook field validation report
+ */
+
+export function useGetFieldValidation<TData = Awaited<ReturnType<typeof getFieldValidation>>, TError = ErrorType<unknown>>(
+ params: GetFieldValidationParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFieldValidation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFieldValidationQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetLaunchChecklistUrl = (params: GetLaunchChecklistParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/auto-publish/launch-checklist?${stringifiedParams}` : `/api/auto-publish/launch-checklist`
+}
+
+/**
+ * @summary Alpha launch readiness checklist
+ */
+export const getLaunchChecklist = async (params: GetLaunchChecklistParams, options?: RequestInit): Promise<LaunchChecklistResponse> => {
+
+  return customFetch<LaunchChecklistResponse>(getGetLaunchChecklistUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLaunchChecklistQueryKey = (params?: GetLaunchChecklistParams,) => {
+    return [
+    `/api/auto-publish/launch-checklist`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetLaunchChecklistQueryOptions = <TData = Awaited<ReturnType<typeof getLaunchChecklist>>, TError = ErrorType<unknown>>(params: GetLaunchChecklistParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLaunchChecklist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLaunchChecklistQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLaunchChecklist>>> = ({ signal }) => getLaunchChecklist(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLaunchChecklist>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLaunchChecklistQueryResult = NonNullable<Awaited<ReturnType<typeof getLaunchChecklist>>>
+export type GetLaunchChecklistQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Alpha launch readiness checklist
+ */
+
+export function useGetLaunchChecklist<TData = Awaited<ReturnType<typeof getLaunchChecklist>>, TError = ErrorType<unknown>>(
+ params: GetLaunchChecklistParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLaunchChecklist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLaunchChecklistQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

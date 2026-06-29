@@ -23,7 +23,7 @@ const NAV_ITEMS = [
 // Routes that belong to each nav item (for active state)
 const ACTIVE_PATHS: Record<string, string[]> = {
   "/": ["/"],
-  "/listings": ["/listings", "/inventory", "/publishing"],
+  "/listings": ["/listings", "/inventory", "/publishing", "/listings/readiness"],
   "/creative-studio": ["/creative-studio"],
   "/leads": ["/leads"],
   "/dealer-dna": ["/dealer-dna"],
