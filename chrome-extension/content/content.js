@@ -652,6 +652,172 @@
     );
   }
 
+  // ==================================================================
+  // DEBUG: Vehicle Type only — stops after selecting Vehicle Type.
+  // Logs every step and every dropdown found on the page.
+  // ==================================================================
+  async function debugVehicleType() {
+    const TARGET_VALUE = "Car/Truck";
+
+    console.log("[STEP 1] Waiting for Vehicle Type dropdown");
+    setStatus("[DEBUG] Step 1: Scanning page for Vehicle Type dropdown…");
+    await sleep(400);
+
+    // ---- Scan ALL potential dropdown elements ----
+    const nativeSelects = Array.from(document.querySelectorAll("select"));
+    const ariaDropdowns = Array.from(document.querySelectorAll(
+      '[role="combobox"], [role="listbox"], [role="option"], [role="menu"]'
+    ));
+
+    // Log every native <select>
+    console.log(`[STEP 1] Native <select> elements found: ${nativeSelects.length}`);
+    nativeSelects.forEach((el, i) => {
+      const opts = Array.from(el.options).map(o => o.text).join(" | ").slice(0, 120);
+      console.log(
+        `  [select][${i}]` +
+        ` aria-label="${el.getAttribute("aria-label") || ""}"` +
+        ` placeholder="${el.getAttribute("placeholder") || ""}"` +
+        ` role="${el.getAttribute("role") || ""}"` +
+        ` id="${el.id}"` +
+        ` options: ${opts || "(none)"}`
+      );
+      el.style.outline = "2px dashed orange";
+    });
+
+    // Log every ARIA dropdown
+    console.log(`[STEP 1] ARIA combobox/listbox elements found: ${ariaDropdowns.length}`);
+    ariaDropdowns.forEach((el, i) => {
+      console.log(
+        `  [aria][${i}]` +
+        ` role="${el.getAttribute("role") || ""}"` +
+        ` aria-label="${el.getAttribute("aria-label") || ""}"` +
+        ` aria-expanded="${el.getAttribute("aria-expanded") || ""}"` +
+        ` placeholder="${el.getAttribute("placeholder") || ""}"` +
+        ` text="${(el.textContent || "").trim().slice(0, 80)}"`
+      );
+    });
+
+    // ---- Try to identify the Vehicle Type dropdown ----
+    const VT_KEYWORDS = [
+      "vehicle type", "type of vehicle", "category", "vehicle category",
+      "listing type", "item type", "type",
+    ];
+
+    // Strategy A: native <select> whose aria-label / placeholder matches keywords
+    //             OR whose options mention "car", "truck", "vehicle"
+    let targetEl = null;
+    for (const sel of nativeSelects) {
+      const lbl = [
+        sel.getAttribute("aria-label"),
+        sel.getAttribute("placeholder"),
+        sel.id,
+        sel.name,
+      ].filter(Boolean).join(" ").toLowerCase();
+      const optText = Array.from(sel.options).map(o => o.text.toLowerCase()).join(" ");
+      if (VT_KEYWORDS.some(k => lbl.includes(k)) ||
+          optText.includes("car/truck") ||
+          (optText.includes("car") && optText.includes("truck"))) {
+        targetEl = sel;
+        break;
+      }
+    }
+
+    // Strategy B: look for a <label> or visible text containing vehicle type keywords,
+    //             then find its associated <select>
+    if (!targetEl) {
+      const labelEls = Array.from(document.querySelectorAll("label, [class*='label'], [class*='Label'], span, div"))
+        .filter(el => el.children.length === 0); // leaf text nodes only
+      for (const lEl of labelEls) {
+        const txt = (lEl.textContent || "").toLowerCase().trim();
+        if (VT_KEYWORDS.some(k => txt === k || txt.startsWith(k))) {
+          const form = lEl.closest("form") || lEl.parentElement?.parentElement;
+          if (form) targetEl = form.querySelector("select");
+          if (!targetEl && lEl.htmlFor) targetEl = document.getElementById(lEl.htmlFor);
+          if (targetEl) {
+            console.log(`[STEP 1] Found via label text: "${lEl.textContent.trim()}"`);
+            break;
+          }
+        }
+      }
+    }
+
+    if (!targetEl) {
+      console.log("[ERROR] [STEP 2] Vehicle Type dropdown NOT FOUND in DOM");
+      console.log("[DEBUG] All <select> elements:");
+      nativeSelects.forEach((el, i) =>
+        console.log(`  [${i}] id="${el.id}" name="${el.name}" ` +
+          `aria-label="${el.getAttribute("aria-label") || ""}" ` +
+          `class="${el.className.slice(0, 60)}"`)
+      );
+      console.log("[DEBUG] All ARIA comboboxes:");
+      ariaDropdowns.forEach((el, i) =>
+        console.log(`  [${i}] role="${el.getAttribute("role")}" ` +
+          `aria-label="${el.getAttribute("aria-label") || ""}" ` +
+          `aria-expanded="${el.getAttribute("aria-expanded") || ""}" ` +
+          `text="${(el.textContent || "").trim().slice(0, 100)}"`)
+      );
+      setStatus(
+        `[DEBUG] Vehicle Type dropdown NOT FOUND. Check console (F12) for details.`, "err"
+      );
+      return;
+    }
+
+    // ---- Found it ----
+    console.log("[STEP 2] Dropdown FOUND:", targetEl);
+    targetEl.style.outline    = "4px solid red";
+    targetEl.style.outlineOffset = "2px";
+    setStatus("[DEBUG] Step 2: Dropdown found — highlighted in RED");
+
+    console.log("[STEP 3] Opening dropdown / reading options");
+    setStatus("[DEBUG] Step 3: Reading available options…");
+
+    const options = Array.from(targetEl.options || []).filter(o => o.value !== "");
+    console.log(`[STEP 4] Available options (${options.length}):`);
+    options.forEach((o, i) => console.log(`  [${i}] "${o.text}"  value="${o.value}"`));
+
+    if (!options.length) {
+      console.log("[ERROR] Dropdown found but has NO OPTIONS");
+      setStatus("[DEBUG] Dropdown found but has NO OPTIONS. See console.", "err");
+      return;
+    }
+
+    const needle = TARGET_VALUE.toLowerCase().trim();
+    const pick =
+      options.find(o => o.text.toLowerCase().trim() === needle) ||
+      options.find(o => o.text.toLowerCase().includes(needle))  ||
+      options.find(o => needle.includes(o.text.toLowerCase().trim()) && o.text.trim().length > 2);
+
+    if (!pick) {
+      console.log(`[ERROR] [STEP 5] No option matching "${TARGET_VALUE}"`);
+      console.log("[DEBUG] Available option texts:", options.map(o => o.text));
+      setStatus(`[DEBUG] No match for "${TARGET_VALUE}". See console for actual option texts.`, "err");
+      return;
+    }
+
+    console.log(`[STEP 5] Selecting: ${pick.text}  (value="${pick.value}")`);
+    setStatus(`[DEBUG] Step 5: Selecting "${pick.text}"…`);
+
+    try {
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLSelectElement.prototype, "value"
+      ).set;
+      nativeSetter.call(targetEl, pick.value);
+      targetEl.dispatchEvent(new Event("change", { bubbles: true }));
+      targetEl.dispatchEvent(new Event("input",  { bubbles: true }));
+      targetEl.dispatchEvent(new Event("blur",   { bubbles: true }));
+
+      console.log(`[STEP 6] Selection success: "${pick.text}" dispatched`);
+      setStatus(
+        `[DEBUG] Step 6: Selected "${pick.text}". ` +
+        `Watch if Year / Make / Model appear. WORKFLOW STOPPED.`, "ok"
+      );
+    } catch (err) {
+      console.log(`[ERROR] [STEP 6] Selection threw: ${err.message}`, err);
+      setStatus(`[DEBUG] Selection threw: ${err.message}`, "err");
+    }
+    // STOP — do not continue to Year, Make, Model, or any other field.
+  }
+
   if (isMarketplaceCreate) {
     chrome.storage.local.get("activeJob").then(({ activeJob }) => {
       if (activeJob) {
@@ -705,6 +871,11 @@
           }),
         );
       }
+
+      // ---- Always-visible debug button (Vehicle Type only) ----
+      const dbgBtn = button("🔍 DEBUG VEHICLE TYPE", () => debugVehicleType(), "mai-btn-secondary");
+      dbgBtn.style.cssText += ";margin-top:6px;border:2px dashed #e74c3c;color:#e74c3c;font-weight:700;";
+      actionsEl.appendChild(dbgBtn);
     });
   }
 
