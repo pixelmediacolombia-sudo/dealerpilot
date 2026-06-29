@@ -81,6 +81,8 @@ import type {
   ListingVersionStatusUpdate,
   ListingVersionUpdate,
   ListingWorkspaceList,
+  MarketplaceDashboardResponse,
+  MarketplaceRecommendationsResponse,
   MessageContextInput,
   MessageContextResult,
   NextPublishingJob,
@@ -104,6 +106,7 @@ import type {
   UpdateConversationStatusBody,
   Vehicle,
   VehicleDetail,
+  VehicleIntelligenceResponse,
   VehicleList,
   VehiclePhotoScoreList,
   VehiclePhotoScoreResponse,
@@ -4930,4 +4933,235 @@ export const useRunSimulator = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getRunSimulatorMutationOptions(options));
     }
+
+export const getGetMarketplaceDashboardUrl = () => {
+
+
+
+
+  return `/api/marketplace-intelligence/dashboard`
+}
+
+/**
+ * @summary Marketplace Intelligence dashboard aggregations
+ */
+export const getMarketplaceDashboard = async ( options?: RequestInit): Promise<MarketplaceDashboardResponse> => {
+
+  return customFetch<MarketplaceDashboardResponse>(getGetMarketplaceDashboardUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMarketplaceDashboardQueryKey = () => {
+    return [
+    `/api/marketplace-intelligence/dashboard`
+    ] as const;
+    }
+
+
+export const getGetMarketplaceDashboardQueryOptions = <TData = Awaited<ReturnType<typeof getMarketplaceDashboard>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMarketplaceDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMarketplaceDashboardQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMarketplaceDashboard>>> = ({ signal }) => getMarketplaceDashboard({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMarketplaceDashboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMarketplaceDashboardQueryResult = NonNullable<Awaited<ReturnType<typeof getMarketplaceDashboard>>>
+export type GetMarketplaceDashboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Marketplace Intelligence dashboard aggregations
+ */
+
+export function useGetMarketplaceDashboard<TData = Awaited<ReturnType<typeof getMarketplaceDashboard>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMarketplaceDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMarketplaceDashboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListMarketplaceRecommendationsUrl = () => {
+
+
+
+
+  return `/api/marketplace-intelligence/recommendations`
+}
+
+/**
+ * @summary Per-vehicle strategy recommendations
+ */
+export const listMarketplaceRecommendations = async ( options?: RequestInit): Promise<MarketplaceRecommendationsResponse> => {
+
+  return customFetch<MarketplaceRecommendationsResponse>(getListMarketplaceRecommendationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMarketplaceRecommendationsQueryKey = () => {
+    return [
+    `/api/marketplace-intelligence/recommendations`
+    ] as const;
+    }
+
+
+export const getListMarketplaceRecommendationsQueryOptions = <TData = Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMarketplaceRecommendationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMarketplaceRecommendations>>> = ({ signal }) => listMarketplaceRecommendations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMarketplaceRecommendationsQueryResult = NonNullable<Awaited<ReturnType<typeof listMarketplaceRecommendations>>>
+export type ListMarketplaceRecommendationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Per-vehicle strategy recommendations
+ */
+
+export function useListMarketplaceRecommendations<TData = Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMarketplaceRecommendationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetVehicleIntelligenceUrl = (vehicleId: number,) => {
+
+
+
+
+  return `/api/marketplace-intelligence/vehicles/${vehicleId}`
+}
+
+/**
+ * @summary Intelligence for a single vehicle
+ */
+export const getVehicleIntelligence = async (vehicleId: number, options?: RequestInit): Promise<VehicleIntelligenceResponse> => {
+
+  return customFetch<VehicleIntelligenceResponse>(getGetVehicleIntelligenceUrl(vehicleId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVehicleIntelligenceQueryKey = (vehicleId: number,) => {
+    return [
+    `/api/marketplace-intelligence/vehicles/${vehicleId}`
+    ] as const;
+    }
+
+
+export const getGetVehicleIntelligenceQueryOptions = <TData = Awaited<ReturnType<typeof getVehicleIntelligence>>, TError = ErrorType<unknown>>(vehicleId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVehicleIntelligence>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVehicleIntelligenceQueryKey(vehicleId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVehicleIntelligence>>> = ({ signal }) => getVehicleIntelligence(vehicleId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: vehicleId !== null && vehicleId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVehicleIntelligence>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVehicleIntelligenceQueryResult = NonNullable<Awaited<ReturnType<typeof getVehicleIntelligence>>>
+export type GetVehicleIntelligenceQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Intelligence for a single vehicle
+ */
+
+export function useGetVehicleIntelligence<TData = Awaited<ReturnType<typeof getVehicleIntelligence>>, TError = ErrorType<unknown>>(
+ vehicleId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVehicleIntelligence>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVehicleIntelligenceQueryOptions(vehicleId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 

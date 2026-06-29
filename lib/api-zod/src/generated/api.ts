@@ -2332,3 +2332,174 @@ export const RunSimulatorResponse = zod.object({
 })
 
 
+/**
+ * @summary Marketplace Intelligence dashboard aggregations
+ */
+export const GetMarketplaceDashboardResponse = zod.object({
+  "summary": zod.object({
+  "totalListings": zod.number(),
+  "avgOutcomeScore": zod.number(),
+  "totalConversations": zod.number(),
+  "totalHotLeads": zod.number()
+}),
+  "postingTimePerformance": zod.array(zod.object({
+  "dayOfWeek": zod.number(),
+  "dayLabel": zod.string(),
+  "avgOutcomeScore": zod.number(),
+  "totalListings": zod.number(),
+  "totalHotLeads": zod.number(),
+  "totalConversations": zod.number()
+})),
+  "downPaymentPerformance": zod.array(zod.object({
+  "vehicleType": zod.string(),
+  "bestDownPayment": zod.number(),
+  "variants": zod.array(zod.object({
+  "publishedDownPayment": zod.number(),
+  "avgOutcomeScore": zod.number(),
+  "totalListings": zod.number(),
+  "hotLeads": zod.number()
+}))
+})),
+  "creativePerformance": zod.record(zod.string(), zod.object({
+  "avgOutcomeScore": zod.number(),
+  "totalListings": zod.number(),
+  "hotLeads": zod.number(),
+  "conversationsCount": zod.number()
+})),
+  "vehicleTypePerformance": zod.array(zod.object({
+  "vehicleType": zod.string(),
+  "avgOutcomeScore": zod.number(),
+  "totalListings": zod.number(),
+  "totalHotLeads": zod.number(),
+  "totalConversations": zod.number()
+})),
+  "weakListings": zod.array(zod.object({
+  "vehicleId": zod.number(),
+  "year": zod.number().nullish(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "outcomeScore": zod.number(),
+  "conversationsCount": zod.number(),
+  "daysSincePublished": zod.number()
+})),
+  "highViewsLowQuality": zod.array(zod.object({
+  "vehicleId": zod.number(),
+  "year": zod.number().nullish(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "outcomeScore": zod.number(),
+  "conversationsCount": zod.number(),
+  "daysSincePublished": zod.number()
+})),
+  "lowEngagement": zod.array(zod.object({
+  "vehicleId": zod.number(),
+  "year": zod.number().nullish(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "outcomeScore": zod.number(),
+  "conversationsCount": zod.number(),
+  "daysSincePublished": zod.number()
+})),
+  "nextBatchRecommendation": zod.object({
+  "vehicles": zod.array(zod.object({
+  "vehicleId": zod.number(),
+  "year": zod.number().nullish(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "price": zod.number().nullish(),
+  "vehicleType": zod.string().nullish(),
+  "confidenceScore": zod.number(),
+  "recommendedPriceStrategy": zod.string(),
+  "recommendedDownPayment": zod.number().nullish(),
+  "expectedLeadQuality": zod.string().nullable()
+})),
+  "recommendedDayOfWeek": zod.number(),
+  "recommendedDayLabel": zod.string(),
+  "recommendedTimeOfDay": zod.number(),
+  "recommendedTimeLabel": zod.string(),
+  "estimatedHotLeads": zod.number()
+})
+})
+
+
+/**
+ * @summary Per-vehicle strategy recommendations
+ */
+export const ListMarketplaceRecommendationsResponse = zod.object({
+  "recommendations": zod.array(zod.object({
+  "vehicleId": zod.number(),
+  "year": zod.number().nullish(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "price": zod.number().nullish(),
+  "bodyStyle": zod.string().nullish(),
+  "recommendedPriceStrategy": zod.string(),
+  "recommendedDownPayment": zod.number().nullish(),
+  "recommendedPhotoStrategy": zod.string(),
+  "recommendedTemplateKey": zod.string().nullish(),
+  "recommendedDayOfWeek": zod.number().nullish(),
+  "recommendedDayLabel": zod.string().nullish(),
+  "recommendedTimeOfDay": zod.number().nullish(),
+  "recommendedTimeLabel": zod.string().nullish(),
+  "confidenceScore": zod.number(),
+  "explanation": zod.string().nullish(),
+  "expectedLeadQuality": zod.string().nullish(),
+  "generatedAt": zod.coerce.date().optional()
+}))
+})
+
+
+/**
+ * @summary Intelligence for a single vehicle
+ */
+export const GetVehicleIntelligenceParams = zod.object({
+  "vehicleId": zod.coerce.number()
+})
+
+export const GetVehicleIntelligenceResponse = zod.object({
+  "vehicle": zod.object({
+  "id": zod.number(),
+  "year": zod.number().nullish(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "trim": zod.string().nullish(),
+  "price": zod.number().nullish(),
+  "bodyStyle": zod.string().nullish(),
+  "mileage": zod.number().nullish(),
+  "status": zod.string().optional()
+}),
+  "intelligence": zod.object({
+  "recommendedPriceStrategy": zod.string(),
+  "recommendedDownPayment": zod.number().nullish(),
+  "recommendedPhotoStrategy": zod.string(),
+  "recommendedTemplateKey": zod.string().nullish(),
+  "recommendedDayOfWeek": zod.number().nullish(),
+  "recommendedDayLabel": zod.string().nullish(),
+  "recommendedTimeOfDay": zod.number().nullish(),
+  "recommendedTimeLabel": zod.string().nullish(),
+  "confidenceScore": zod.number(),
+  "explanation": zod.string().nullish(),
+  "expectedLeadQuality": zod.string().nullish(),
+  "generatedAt": zod.coerce.date().optional()
+}).optional(),
+  "performanceHistory": zod.array(zod.object({
+  "id": zod.number(),
+  "publishedAt": zod.coerce.date(),
+  "dayOfWeek": zod.number(),
+  "dayLabel": zod.string(),
+  "timeOfDay": zod.number(),
+  "timeLabel": zod.string(),
+  "displayedPriceStrategy": zod.string(),
+  "publishedDownPayment": zod.number().nullish(),
+  "photoStrategy": zod.string(),
+  "conversationsCount": zod.number(),
+  "hotLeadsCount": zod.number(),
+  "warmLeadsCount": zod.number(),
+  "coldLeadsCount": zod.number(),
+  "appointmentReadyCount": zod.number(),
+  "soldCount": zod.number(),
+  "outcomeScore": zod.number()
+}))
+})
+
+

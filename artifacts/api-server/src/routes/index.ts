@@ -12,6 +12,7 @@ import creativeRouter from "./creative";
 import conversationsRouter from "./conversations";
 import leadsRouter from "./leads";
 import simulatorRouter from "./simulator";
+import marketplaceIntelligenceRouter from "./marketplaceIntelligence";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(creativeRouter);
 router.use(conversationsRouter);
 router.use(leadsRouter);
 router.use(simulatorRouter);
+router.use(marketplaceIntelligenceRouter);
 
 export default router;

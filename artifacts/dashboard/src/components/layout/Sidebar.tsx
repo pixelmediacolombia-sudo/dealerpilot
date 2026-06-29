@@ -7,6 +7,7 @@ import {
   Dna,
   Settings,
   ChevronRight,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGetDealer, useListDealers, getGetDealerQueryKey } from "@workspace/api-client-react";
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
   { name: "Marketplace AI", path: "/listings", icon: Sparkles },
   { name: "Creative AI", path: "/creative-studio", icon: Wand2 },
   { name: "Sales AI", path: "/sales-ai", icon: MessageSquare },
+  { name: "Intelligence", path: "/marketplace-intelligence", icon: BarChart3 },
   { name: "Dealer DNA", path: "/dealer-dna", icon: Dna },
   { name: "Settings", path: "/settings", icon: Settings },
 ];
@@ -25,6 +27,7 @@ const ACTIVE_PATHS: Record<string, string[]> = {
   "/listings": ["/listings", "/inventory", "/publishing"],
   "/creative-studio": ["/creative-studio"],
   "/sales-ai": ["/sales-ai", "/conversations", "/leads"],
+  "/marketplace-intelligence": ["/marketplace-intelligence"],
   "/dealer-dna": ["/dealer-dna"],
   "/settings": ["/settings", "/connection-center"],
 };

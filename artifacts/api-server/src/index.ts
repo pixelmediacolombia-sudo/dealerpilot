@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { seedDealerAndInventory } from "./inventory/seed";
 import { seedCreative } from "./creative/seed";
 import { startCreativeWorker } from "./creative/worker";
+import { seedMarketplaceIntelligence } from "./intelligence/seed";
 
 const rawPort = process.env["PORT"];
 
@@ -29,7 +30,8 @@ app.listen(port, (err) => {
   void seedDealerAndInventory(logger)
     .then(() => seedCreative(logger))
     .then(() => startCreativeWorker(logger))
+    .then(() => seedMarketplaceIntelligence(logger))
     .catch((seedErr) => {
-      logger.error({ err: seedErr }, "Failed to seed/start creative engine");
+      logger.error({ err: seedErr }, "Failed to seed/start engines");
     });
 });

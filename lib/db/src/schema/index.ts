@@ -25,3 +25,5 @@ export * from "./creativeJobs";
 export * from "./conversations";
 export * from "./conversationMessages";
 export * from "./downPaymentIntelligence";
+export * from "./listingPerformance";
+export * from "./vehicleIntelligence";

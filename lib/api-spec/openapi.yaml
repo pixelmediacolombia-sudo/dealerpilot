@@ -1383,6 +1383,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SimulatorRunResponse"
+
+  /marketplace-intelligence/dashboard:
+    get:
+      operationId: getMarketplaceDashboard
+      summary: Marketplace Intelligence dashboard aggregations
+      tags: [MarketplaceIntelligence]
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketplaceDashboardResponse"
+
+  /marketplace-intelligence/recommendations:
+    get:
+      operationId: listMarketplaceRecommendations
+      summary: Per-vehicle strategy recommendations
+      tags: [MarketplaceIntelligence]
+      responses:
+        "200":
+          description: Vehicle recommendations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketplaceRecommendationsResponse"
+
+  /marketplace-intelligence/vehicles/{vehicleId}:
+    get:
+      operationId: getVehicleIntelligence
+      summary: Intelligence for a single vehicle
+      tags: [MarketplaceIntelligence]
+      parameters:
+        - in: path
+          name: vehicleId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Vehicle intelligence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleIntelligenceResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -2837,3 +2882,220 @@ components:
         messages:
           type: array
           items: { type: string }
+
+    PostingTimeSlot:
+      type: object
+      required: [dayOfWeek, dayLabel, avgOutcomeScore, totalListings, totalHotLeads, totalConversations]
+      properties:
+        dayOfWeek: { type: integer }
+        dayLabel: { type: string }
+        avgOutcomeScore: { type: integer }
+        totalListings: { type: integer }
+        totalHotLeads: { type: integer }
+        totalConversations: { type: integer }
+
+    DownPaymentVariantPerf:
+      type: object
+      required: [publishedDownPayment, avgOutcomeScore, totalListings, hotLeads]
+      properties:
+        publishedDownPayment: { type: integer }
+        avgOutcomeScore: { type: integer }
+        totalListings: { type: integer }
+        hotLeads: { type: integer }
+
+    DownPaymentTypePerf:
+      type: object
+      required: [vehicleType, variants, bestDownPayment]
+      properties:
+        vehicleType: { type: string }
+        bestDownPayment: { type: integer }
+        variants:
+          type: array
+          items: { $ref: "#/components/schemas/DownPaymentVariantPerf" }
+
+    CreativeStratPerf:
+      type: object
+      required: [avgOutcomeScore, totalListings, hotLeads, conversationsCount]
+      properties:
+        avgOutcomeScore: { type: integer }
+        totalListings: { type: integer }
+        hotLeads: { type: integer }
+        conversationsCount: { type: integer }
+
+    VehicleTypePerf:
+      type: object
+      required: [vehicleType, avgOutcomeScore, totalListings, totalHotLeads, totalConversations]
+      properties:
+        vehicleType: { type: string }
+        avgOutcomeScore: { type: integer }
+        totalListings: { type: integer }
+        totalHotLeads: { type: integer }
+        totalConversations: { type: integer }
+
+    WeakListing:
+      type: object
+      required: [vehicleId, make, model, outcomeScore, conversationsCount, daysSincePublished]
+      properties:
+        vehicleId: { type: integer }
+        year: { type: ["integer", "null"] }
+        make: { type: string }
+        model: { type: string }
+        outcomeScore: { type: integer }
+        conversationsCount: { type: integer }
+        daysSincePublished: { type: integer }
+
+    NextBatchVehicle:
+      type: object
+      required: [vehicleId, make, model, confidenceScore, recommendedPriceStrategy, expectedLeadQuality]
+      properties:
+        vehicleId: { type: integer }
+        year: { type: ["integer", "null"] }
+        make: { type: string }
+        model: { type: string }
+        price: { type: ["integer", "null"] }
+        vehicleType: { type: ["string", "null"] }
+        confidenceScore: { type: integer }
+        recommendedPriceStrategy: { type: string }
+        recommendedDownPayment: { type: ["integer", "null"] }
+        expectedLeadQuality: { type: ["string", "null"] }
+
+    NextBatchRecommendation:
+      type: object
+      required: [vehicles, recommendedDayOfWeek, recommendedDayLabel, recommendedTimeOfDay, recommendedTimeLabel, estimatedHotLeads]
+      properties:
+        vehicles:
+          type: array
+          items: { $ref: "#/components/schemas/NextBatchVehicle" }
+        recommendedDayOfWeek: { type: integer }
+        recommendedDayLabel: { type: string }
+        recommendedTimeOfDay: { type: integer }
+        recommendedTimeLabel: { type: string }
+        estimatedHotLeads: { type: integer }
+
+    MarketplaceDashboardSummary:
+      type: object
+      required: [totalListings, avgOutcomeScore, totalConversations, totalHotLeads]
+      properties:
+        totalListings: { type: integer }
+        avgOutcomeScore: { type: integer }
+        totalConversations: { type: integer }
+        totalHotLeads: { type: integer }
+
+    MarketplaceDashboardResponse:
+      type: object
+      required: [summary, postingTimePerformance, downPaymentPerformance, creativePerformance, vehicleTypePerformance, weakListings, highViewsLowQuality, lowEngagement, nextBatchRecommendation]
+      properties:
+        summary: { $ref: "#/components/schemas/MarketplaceDashboardSummary" }
+        postingTimePerformance:
+          type: array
+          items: { $ref: "#/components/schemas/PostingTimeSlot" }
+        downPaymentPerformance:
+          type: array
+          items: { $ref: "#/components/schemas/DownPaymentTypePerf" }
+        creativePerformance:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/CreativeStratPerf" }
+        vehicleTypePerformance:
+          type: array
+          items: { $ref: "#/components/schemas/VehicleTypePerf" }
+        weakListings:
+          type: array
+          items: { $ref: "#/components/schemas/WeakListing" }
+        highViewsLowQuality:
+          type: array
+          items: { $ref: "#/components/schemas/WeakListing" }
+        lowEngagement:
+          type: array
+          items: { $ref: "#/components/schemas/WeakListing" }
+        nextBatchRecommendation: { $ref: "#/components/schemas/NextBatchRecommendation" }
+
+    VehicleRecommendation:
+      type: object
+      required: [vehicleId, make, model, recommendedPriceStrategy, recommendedPhotoStrategy, confidenceScore]
+      properties:
+        vehicleId: { type: integer }
+        year: { type: ["integer", "null"] }
+        make: { type: string }
+        model: { type: string }
+        price: { type: ["integer", "null"] }
+        bodyStyle: { type: ["string", "null"] }
+        recommendedPriceStrategy: { type: string }
+        recommendedDownPayment: { type: ["integer", "null"] }
+        recommendedPhotoStrategy: { type: string }
+        recommendedTemplateKey: { type: ["string", "null"] }
+        recommendedDayOfWeek: { type: ["integer", "null"] }
+        recommendedDayLabel: { type: ["string", "null"] }
+        recommendedTimeOfDay: { type: ["integer", "null"] }
+        recommendedTimeLabel: { type: ["string", "null"] }
+        confidenceScore: { type: integer }
+        explanation: { type: ["string", "null"] }
+        expectedLeadQuality: { type: ["string", "null"] }
+        generatedAt: { type: string, format: date-time }
+
+    MarketplaceRecommendationsResponse:
+      type: object
+      required: [recommendations]
+      properties:
+        recommendations:
+          type: array
+          items: { $ref: "#/components/schemas/VehicleRecommendation" }
+
+    VehicleIntelligenceDetail:
+      type: object
+      required: [recommendedPriceStrategy, recommendedPhotoStrategy, confidenceScore]
+      properties:
+        recommendedPriceStrategy: { type: string }
+        recommendedDownPayment: { type: ["integer", "null"] }
+        recommendedPhotoStrategy: { type: string }
+        recommendedTemplateKey: { type: ["string", "null"] }
+        recommendedDayOfWeek: { type: ["integer", "null"] }
+        recommendedDayLabel: { type: ["string", "null"] }
+        recommendedTimeOfDay: { type: ["integer", "null"] }
+        recommendedTimeLabel: { type: ["string", "null"] }
+        confidenceScore: { type: integer }
+        explanation: { type: ["string", "null"] }
+        expectedLeadQuality: { type: ["string", "null"] }
+        generatedAt: { type: string, format: date-time }
+
+    ListingPerformanceRecord:
+      type: object
+      required: [id, publishedAt, dayOfWeek, dayLabel, timeOfDay, timeLabel, displayedPriceStrategy, photoStrategy, conversationsCount, hotLeadsCount, warmLeadsCount, coldLeadsCount, appointmentReadyCount, soldCount, outcomeScore]
+      properties:
+        id: { type: integer }
+        publishedAt: { type: string, format: date-time }
+        dayOfWeek: { type: integer }
+        dayLabel: { type: string }
+        timeOfDay: { type: integer }
+        timeLabel: { type: string }
+        displayedPriceStrategy: { type: string }
+        publishedDownPayment: { type: ["integer", "null"] }
+        photoStrategy: { type: string }
+        conversationsCount: { type: integer }
+        hotLeadsCount: { type: integer }
+        warmLeadsCount: { type: integer }
+        coldLeadsCount: { type: integer }
+        appointmentReadyCount: { type: integer }
+        soldCount: { type: integer }
+        outcomeScore: { type: integer }
+
+    VehicleIntelligenceResponse:
+      type: object
+      required: [vehicle, performanceHistory]
+      properties:
+        vehicle:
+          type: object
+          required: [id, make, model]
+          properties:
+            id: { type: integer }
+            year: { type: ["integer", "null"] }
+            make: { type: string }
+            model: { type: string }
+            trim: { type: ["string", "null"] }
+            price: { type: ["integer", "null"] }
+            bodyStyle: { type: ["string", "null"] }
+            mileage: { type: ["integer", "null"] }
+            status: { type: string }
+        intelligence: { $ref: "#/components/schemas/VehicleIntelligenceDetail" }
+        performanceHistory:
+          type: array
+          items: { $ref: "#/components/schemas/ListingPerformanceRecord" }

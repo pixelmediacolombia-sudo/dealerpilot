@@ -3,7 +3,9 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { 
   useGetVehicle, 
   useUpdateVehicleStatus,
+  useGetVehicleIntelligence,
   getGetVehicleQueryKey,
+  getGetVehicleIntelligenceQueryKey,
   getGetVehicleStatsQueryKey,
   getListVehiclesQueryKey
 } from "@workspace/api-client-react";
@@ -26,7 +28,8 @@ import {
   Calendar,
   Settings2,
   Tag,
-  Palette
+  Palette,
+  Brain,
 } from "lucide-react";
 import {
   Collapsible,
@@ -48,6 +51,11 @@ export function VehicleDetail() {
   });
 
   const updateStatus = useUpdateVehicleStatus();
+
+  const { data: intelData } = useGetVehicleIntelligence(id, {
+    query: { enabled: !!id, queryKey: getGetVehicleIntelligenceQueryKey(id) },
+  });
+  const intel = intelData?.intelligence;
 
   const handleStatusUpdate = (status: string) => {
     updateStatus.mutate({ id, data: { status } }, {
@@ -294,6 +302,106 @@ export function VehicleDetail() {
             {/* Right Column - Meta & History */}
             <div className="space-y-8">
               
+              {/* AI Strategy Intelligence */}
+              {intel && (
+                <SectionCard
+                  title="AI Strategy Intelligence"
+                  icon={<Brain className="w-4 h-4 text-primary" />}
+                >
+                  <div className="space-y-4">
+                    {/* Confidence */}
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Confidence</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full",
+                              intel.confidenceScore >= 80
+                                ? "bg-success"
+                                : intel.confidenceScore >= 60
+                                  ? "bg-yellow-400"
+                                  : "bg-muted-foreground",
+                            )}
+                            style={{ width: `${intel.confidenceScore}%` }}
+                          />
+                        </div>
+                        <span
+                          className={cn(
+                            "font-medium text-xs",
+                            intel.confidenceScore >= 80
+                              ? "text-success"
+                              : intel.confidenceScore >= 60
+                                ? "text-yellow-400"
+                                : "text-muted-foreground",
+                          )}
+                        >
+                          {intel.confidenceScore}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Strategy rows */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Price Strategy</div>
+                        <div className="text-sm font-medium text-white capitalize">
+                          {intel.recommendedPriceStrategy.replace(/_/g, " ")}
+                        </div>
+                      </div>
+                      {intel.recommendedDownPayment != null && (
+                        <div className="p-3 rounded-lg bg-primary/5 border border-primary/15">
+                          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Rec. Down</div>
+                          <div className="text-sm font-medium text-primary">
+                            {formatCurrency(intel.recommendedDownPayment)}
+                          </div>
+                        </div>
+                      )}
+                      <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Photo Strategy</div>
+                        <div className="text-sm font-medium text-white capitalize">
+                          {intel.recommendedPhotoStrategy.replace(/_/g, " ")}
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Post When</div>
+                        <div className="text-sm font-medium text-white">
+                          {intel.recommendedDayLabel} {intel.recommendedTimeLabel}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expected lead quality */}
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Expected Lead Quality</span>
+                      <Badge
+                        className={cn(
+                          "text-xs",
+                          intel.expectedLeadQuality === "hot"
+                            ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
+                            : intel.expectedLeadQuality === "warm"
+                              ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+                              : "bg-white/5 text-muted-foreground border-white/10",
+                        )}
+                      >
+                        {intel.expectedLeadQuality === "hot"
+                          ? "🔥 Hot"
+                          : intel.expectedLeadQuality === "warm"
+                            ? "🌡 Warm"
+                            : "❄ Cold"}
+                      </Badge>
+                    </div>
+
+                    {/* Explanation */}
+                    {intel.explanation && (
+                      <div className="text-xs text-muted-foreground p-3 bg-white/[0.02] border border-white/[0.05] rounded-lg leading-relaxed">
+                        {intel.explanation}
+                      </div>
+                    )}
+                  </div>
+                </SectionCard>
+              )}
+
               <SectionCard title="Sync Information">
                 <div className="space-y-6">
                   {vehicle.vdpUrl ? (

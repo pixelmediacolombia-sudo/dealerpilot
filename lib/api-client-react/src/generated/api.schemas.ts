@@ -1234,6 +1234,204 @@ export interface SimulatorRunResponse {
   messages: string[];
 }
 
+export interface PostingTimeSlot {
+  dayOfWeek: number;
+  dayLabel: string;
+  avgOutcomeScore: number;
+  totalListings: number;
+  totalHotLeads: number;
+  totalConversations: number;
+}
+
+export interface DownPaymentVariantPerf {
+  publishedDownPayment: number;
+  avgOutcomeScore: number;
+  totalListings: number;
+  hotLeads: number;
+}
+
+export interface DownPaymentTypePerf {
+  vehicleType: string;
+  bestDownPayment: number;
+  variants: DownPaymentVariantPerf[];
+}
+
+export interface CreativeStratPerf {
+  avgOutcomeScore: number;
+  totalListings: number;
+  hotLeads: number;
+  conversationsCount: number;
+}
+
+export interface VehicleTypePerf {
+  vehicleType: string;
+  avgOutcomeScore: number;
+  totalListings: number;
+  totalHotLeads: number;
+  totalConversations: number;
+}
+
+export interface WeakListing {
+  vehicleId: number;
+  /** @nullable */
+  year?: number | null;
+  make: string;
+  model: string;
+  outcomeScore: number;
+  conversationsCount: number;
+  daysSincePublished: number;
+}
+
+export interface NextBatchVehicle {
+  vehicleId: number;
+  /** @nullable */
+  year?: number | null;
+  make: string;
+  model: string;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  vehicleType?: string | null;
+  confidenceScore: number;
+  recommendedPriceStrategy: string;
+  /** @nullable */
+  recommendedDownPayment?: number | null;
+  /** @nullable */
+  expectedLeadQuality: string | null;
+}
+
+export interface NextBatchRecommendation {
+  vehicles: NextBatchVehicle[];
+  recommendedDayOfWeek: number;
+  recommendedDayLabel: string;
+  recommendedTimeOfDay: number;
+  recommendedTimeLabel: string;
+  estimatedHotLeads: number;
+}
+
+export interface MarketplaceDashboardSummary {
+  totalListings: number;
+  avgOutcomeScore: number;
+  totalConversations: number;
+  totalHotLeads: number;
+}
+
+export type MarketplaceDashboardResponseCreativePerformance = {[key: string]: CreativeStratPerf};
+
+export interface MarketplaceDashboardResponse {
+  summary: MarketplaceDashboardSummary;
+  postingTimePerformance: PostingTimeSlot[];
+  downPaymentPerformance: DownPaymentTypePerf[];
+  creativePerformance: MarketplaceDashboardResponseCreativePerformance;
+  vehicleTypePerformance: VehicleTypePerf[];
+  weakListings: WeakListing[];
+  highViewsLowQuality: WeakListing[];
+  lowEngagement: WeakListing[];
+  nextBatchRecommendation: NextBatchRecommendation;
+}
+
+export interface VehicleRecommendation {
+  vehicleId: number;
+  /** @nullable */
+  year?: number | null;
+  make: string;
+  model: string;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  bodyStyle?: string | null;
+  recommendedPriceStrategy: string;
+  /** @nullable */
+  recommendedDownPayment?: number | null;
+  recommendedPhotoStrategy: string;
+  /** @nullable */
+  recommendedTemplateKey?: string | null;
+  /** @nullable */
+  recommendedDayOfWeek?: number | null;
+  /** @nullable */
+  recommendedDayLabel?: string | null;
+  /** @nullable */
+  recommendedTimeOfDay?: number | null;
+  /** @nullable */
+  recommendedTimeLabel?: string | null;
+  confidenceScore: number;
+  /** @nullable */
+  explanation?: string | null;
+  /** @nullable */
+  expectedLeadQuality?: string | null;
+  generatedAt?: string;
+}
+
+export interface MarketplaceRecommendationsResponse {
+  recommendations: VehicleRecommendation[];
+}
+
+export interface VehicleIntelligenceDetail {
+  recommendedPriceStrategy: string;
+  /** @nullable */
+  recommendedDownPayment?: number | null;
+  recommendedPhotoStrategy: string;
+  /** @nullable */
+  recommendedTemplateKey?: string | null;
+  /** @nullable */
+  recommendedDayOfWeek?: number | null;
+  /** @nullable */
+  recommendedDayLabel?: string | null;
+  /** @nullable */
+  recommendedTimeOfDay?: number | null;
+  /** @nullable */
+  recommendedTimeLabel?: string | null;
+  confidenceScore: number;
+  /** @nullable */
+  explanation?: string | null;
+  /** @nullable */
+  expectedLeadQuality?: string | null;
+  generatedAt?: string;
+}
+
+export interface ListingPerformanceRecord {
+  id: number;
+  publishedAt: string;
+  dayOfWeek: number;
+  dayLabel: string;
+  timeOfDay: number;
+  timeLabel: string;
+  displayedPriceStrategy: string;
+  /** @nullable */
+  publishedDownPayment?: number | null;
+  photoStrategy: string;
+  conversationsCount: number;
+  hotLeadsCount: number;
+  warmLeadsCount: number;
+  coldLeadsCount: number;
+  appointmentReadyCount: number;
+  soldCount: number;
+  outcomeScore: number;
+}
+
+export type VehicleIntelligenceResponseVehicle = {
+  id: number;
+  /** @nullable */
+  year?: number | null;
+  make: string;
+  model: string;
+  /** @nullable */
+  trim?: string | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  bodyStyle?: string | null;
+  /** @nullable */
+  mileage?: number | null;
+  status?: string;
+};
+
+export interface VehicleIntelligenceResponse {
+  vehicle: VehicleIntelligenceResponseVehicle;
+  intelligence?: VehicleIntelligenceDetail;
+  performanceHistory: ListingPerformanceRecord[];
+}
+
 export type ListVehiclesParams = {
 /**
  * Search by VIN, stock number, make, or model

@@ -1,0 +1,88 @@
+Start Sprint 6: Marketplace Intelligence Engine.
+
+Sprint 5 is complete.
+
+Goal:
+DealerPilot should learn from every Marketplace listing, conversation, lead, down payment, creative, and publishing batch.
+
+Build a new module called Marketplace Intelligence.
+
+Do NOT modify existing engines unless required to connect data.
+
+Track for every published listing:
+- vehicle_id
+- listing_id
+- marketplace_url
+- published_at
+- day_of_week
+- time_of_day
+- vehicle_type
+- year/make/model
+- retail_price
+- displayed_price_strategy
+- published_down_payment
+- listing_version
+- creative_version
+- photo_strategy: original / AI creative / mixed
+- publishing_batch_id
+- extension_id
+- conversations_count
+- hot_leads_count
+- warm_leads_count
+- cold_leads_count
+- appointment_ready_count
+- sold_count
+- outcome_score
+
+Create Intelligence Dashboard:
+- best down payment by vehicle type
+- best posting day/time
+- original photos vs AI creative performance
+- best listing templates
+- best vehicle types
+- weak listings needing renewal
+- vehicles with high views but low lead quality
+- vehicles with low engagement
+- recommended next batch
+
+Create Strategy Engine:
+For every ready vehicle, generate:
+- recommended price display strategy: full price / down payment / starting down
+- recommended down payment
+- recommended photo strategy
+- recommended listing version/template
+- recommended posting day/time
+- confidence score
+- short explanation
+
+Important rules:
+- Vehicles under $16,000 should usually show full price unless data suggests otherwise.
+- Trucks/SUVs/luxury can use down payment strategy to generate conversations.
+- Never recommend unrealistic low downs for expensive luxury vehicles.
+- Learn from actual lead quality, not just message volume.
+
+Add page:
+/marketplace-intelligence
+
+Show:
+- Strategic Recommendations
+- Down Payment Performance
+- Posting Time Performance
+- Creative Performance
+- Listing Performance
+- Next Batch Recommendation
+
+Add vehicle-level intelligence on vehicle detail:
+- why this vehicle should be posted
+- recommended down
+- recommended photo strategy
+- confidence
+- expected lead quality
+
+Deliver:
+- database tables if needed
+- APIs
+- UI
+- Strategy Engine
+- Test data/simulator if real data is limited
+- typecheck clean

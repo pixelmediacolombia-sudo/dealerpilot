@@ -20,6 +20,7 @@ import { SalesAIWorkspace } from "@/pages/SalesAI";
 import { ConversationDetail } from "@/pages/SalesAI/ConversationDetail";
 import { LeadsCRM } from "@/pages/SalesAI/LeadsCRM";
 import { LeadDetail } from "@/pages/SalesAI/LeadDetail";
+import { MarketplaceIntelligence } from "@/pages/MarketplaceIntelligence";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,6 +53,9 @@ function Router() {
       <Route path="/conversations/:id" component={ConversationDetail} />
       <Route path="/leads" component={LeadsCRM} />
       <Route path="/leads/:id" component={LeadDetail} />
+
+      {/* Marketplace Intelligence */}
+      <Route path="/marketplace-intelligence" component={MarketplaceIntelligence} />
 
       <Route path="/dealer-dna" component={DealerDna} />
       <Route path="/connection-center" component={ConnectionCenter} />
