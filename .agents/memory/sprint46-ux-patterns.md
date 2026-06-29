@@ -21,6 +21,14 @@ useListCreativeJobs(undefined, { query: { queryKey: getListCreativeJobsQueryKey(
 
 Sidebar uses a `ACTIVE_PATHS` record to map each nav item path → list of route prefixes that should light it up (e.g. `/listings` lights up for `/listings`, `/inventory`, `/publishing`). Without this, Vehicle Intelligence appears unselected even though it's part of the Marketplace AI workflow.
 
+## PageHeader description/subtitle must be `<div>` not `<p>`
+
+PageHeader renders `sub` inside a `<div>` (changed from `<p>`). If `description` contains JSX with block elements (Badges, divs), a `<p>` wrapper causes a React hydration warning (`<div>` cannot be a descendant of `<p>`). Always render the description wrapper as `<div>`.
+
+## useListFeedRuns requires queryKey in options
+
+Pattern: `useListFeedRuns(dealerId, { query: { enabled: !!dealerId, queryKey: getListFeedRunsQueryKey(dealerId) } })`. Missing `queryKey` is a TS error that shows up immediately in typecheck. Import `getListFeedRunsQueryKey` alongside `useListFeedRuns`.
+
 ## AI voice copy rule
 
 Every KPI/metric label must read as an AI statement, not a raw number:

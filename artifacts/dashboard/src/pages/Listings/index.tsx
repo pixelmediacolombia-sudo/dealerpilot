@@ -5,7 +5,7 @@ import { useListListingWorkspaces, useListPublishingJobs } from "@workspace/api-
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -23,8 +23,8 @@ import {
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Search, Car, Sparkles, Loader2, Gauge, FileText, CheckCircle2, Share, Clock, Send, AlertTriangle, PenTool } from "lucide-react";
-import { PageHeader, KpiCard, EmptyState, SectionCard } from "@/components/shared";
+import { Search, Car, Sparkles, Loader2, Gauge, CheckCircle2, Share, AlertTriangle, PenTool } from "lucide-react";
+import { PageHeader, EmptyState, SectionCard } from "@/components/shared";
 
 function ratingClass(rating: string | null | undefined) {
   switch (rating) {
@@ -36,17 +36,6 @@ function ratingClass(rating: string | null | undefined) {
       return "bg-warning/10 text-warning border-warning/20";
     default:
       return "bg-secondary text-muted-foreground border-border";
-  }
-}
-
-function aiStatusClass(status: string) {
-  switch (status) {
-    case "Generating":
-      return "bg-warning/80 text-warning-foreground border-warning/20";
-    case "AI Generated":
-      return "bg-accent/80 text-accent-foreground border-accent/20";
-    default:
-      return "bg-secondary/80 text-secondary-foreground border-secondary/20";
   }
 }
 
@@ -64,6 +53,23 @@ function publishStatusClass(status: string) {
     default:
       return "bg-secondary/80 text-secondary-foreground border-secondary/20";
   }
+}
+
+function getStatusBadge(w: any) {
+  if (w.publishStatus === "Published") {
+    return <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md uppercase text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full text-white bg-success/90 border-0 hover:bg-success/90">LIVE</Badge>;
+  }
+  if (w.aiStatus === "Generating") {
+    return (
+      <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md uppercase text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full text-white bg-warning/80 border-0 hover:bg-warning/80 flex items-center gap-1.5">
+        <Loader2 className="w-3 h-3 animate-spin" /> GENERATING
+      </Badge>
+    );
+  }
+  if (w.publishStatus === "Approved" || w.publishStatus === "Queued") {
+    return <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md uppercase text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full text-white bg-primary/90 border-0 hover:bg-primary/90">READY</Badge>;
+  }
+  return null;
 }
 
 export function ListingsWorkspace() {
@@ -98,8 +104,6 @@ export function ListingsWorkspace() {
 
   const jobs = jobsData?.jobs ?? [];
   const queuedJobs = jobs.filter((j) => j.status === "Queued").length;
-  const publishingJobs = jobs.filter((j) => j.status === "Publishing").length;
-  const failedJobs = jobs.filter((j) => j.status === "Failed" || j.status === "Retry").length;
 
   const filteredWorkspaces = workspaces.filter((w) => {
     if (activeTab === "ready") return w.publishStatus === "Approved" || w.publishStatus === "Queued";
@@ -115,24 +119,33 @@ export function ListingsWorkspace() {
           <PageHeader 
             eyebrow="AI Listing Generator"
             title="Marketplace AI" 
-            description="DealerPilot AI handles generating optimized descriptions and coordinating your multi-platform strategy."
+            description={
+              <div className="flex flex-col gap-3">
+                <span className="text-muted-foreground text-sm">DealerPilot is managing {allCount} AI listing workspaces.</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary" className="bg-secondary/50 text-secondary-foreground border-white/5">{publishedWorkspacesCount} Published</Badge>
+                  <Badge variant="secondary" className="bg-secondary/50 text-secondary-foreground border-white/5">{generatingCount} Generating</Badge>
+                  <Badge variant="secondary" className="bg-secondary/50 text-secondary-foreground border-white/5">{readyCount} Ready</Badge>
+                </div>
+              </div>
+            }
             action={
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-                <TabsList className="bg-secondary/50 border border-border/50">
-                  <TabsTrigger value="ready" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex gap-2">
-                    Ready {readyCount > 0 && <Badge variant="secondary" className="bg-black/20 text-white border-0 px-1.5 py-0">{readyCount}</Badge>}
+                <TabsList className="bg-transparent border-0 gap-2">
+                  <TabsTrigger value="ready" className="rounded-full px-4 data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border-primary/30 border border-transparent flex gap-2 transition-all">
+                    Ready {readyCount > 0 && <Badge variant="secondary" className="bg-background/50 text-foreground border-0 px-1.5 py-0">{readyCount}</Badge>}
                   </TabsTrigger>
-                  <TabsTrigger value="generating" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex gap-2">
-                    Generating {generatingCount > 0 && <Badge variant="secondary" className="bg-black/20 text-white border-0 px-1.5 py-0">{generatingCount}</Badge>}
+                  <TabsTrigger value="generating" className="rounded-full px-4 data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border-primary/30 border border-transparent flex gap-2 transition-all">
+                    Generating {generatingCount > 0 && <Badge variant="secondary" className="bg-background/50 text-foreground border-0 px-1.5 py-0">{generatingCount}</Badge>}
                   </TabsTrigger>
-                  <TabsTrigger value="published" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex gap-2">
-                    Published {publishedWorkspacesCount > 0 && <Badge variant="secondary" className="bg-black/20 text-white border-0 px-1.5 py-0">{publishedWorkspacesCount}</Badge>}
+                  <TabsTrigger value="published" className="rounded-full px-4 data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border-primary/30 border border-transparent flex gap-2 transition-all">
+                    Published {publishedWorkspacesCount > 0 && <Badge variant="secondary" className="bg-background/50 text-foreground border-0 px-1.5 py-0">{publishedWorkspacesCount}</Badge>}
                   </TabsTrigger>
-                  <TabsTrigger value="queue" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex gap-2">
-                    Queue {queuedJobs > 0 && <Badge variant="secondary" className="bg-black/20 text-white border-0 px-1.5 py-0">{queuedJobs}</Badge>}
+                  <TabsTrigger value="queue" className="rounded-full px-4 data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border-primary/30 border border-transparent flex gap-2 transition-all">
+                    Queue {queuedJobs > 0 && <Badge variant="secondary" className="bg-background/50 text-foreground border-0 px-1.5 py-0">{queuedJobs}</Badge>}
                   </TabsTrigger>
-                  <TabsTrigger value="all" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex gap-2">
-                    All {allCount > 0 && <Badge variant="secondary" className="bg-black/20 text-white border-0 px-1.5 py-0">{allCount}</Badge>}
+                  <TabsTrigger value="all" className="rounded-full px-4 data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border-primary/30 border border-transparent flex gap-2 transition-all">
+                    All {allCount > 0 && <Badge variant="secondary" className="bg-background/50 text-foreground border-0 px-1.5 py-0">{allCount}</Badge>}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -141,34 +154,6 @@ export function ListingsWorkspace() {
 
           {["ready", "generating", "published", "all"].includes(activeTab) && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-              {/* Stats Row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <KpiCard 
-                  title="Total Workspaces"
-                  value={allCount}
-                  icon={<Car className="w-4 h-4 text-muted-foreground" />}
-                  isLoading={workspacesLoading}
-                />
-                <KpiCard 
-                  title="Actively Generating"
-                  value={generatingCount}
-                  icon={<Sparkles className="w-4 h-4 text-primary" />}
-                  isLoading={workspacesLoading}
-                />
-                <KpiCard 
-                  title="AI Ready to Publish"
-                  value={readyCount}
-                  icon={<FileText className="w-4 h-4 text-blue-400" />}
-                  isLoading={workspacesLoading}
-                />
-                <KpiCard 
-                  title="DealerPilot Live"
-                  value={publishedWorkspacesCount}
-                  icon={<CheckCircle2 className="w-4 h-4 text-success" />}
-                  isLoading={workspacesLoading}
-                />
-              </div>
-
               {/* Filters */}
               <div className="glass-panel p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-center border border-border/50 z-10 sticky top-0">
                 <div className="relative flex-1 w-full max-w-md">
@@ -196,16 +181,16 @@ export function ListingsWorkspace() {
 
               {/* Grid */}
               {workspacesLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {[1,2,3,4,5,6,7,8].map(i => (
-                    <div key={i} className="rounded-xl bg-card border border-border/50 h-[340px] animate-pulse">
-                      <div className="h-[200px] bg-secondary/50 rounded-t-xl" />
-                      <div className="p-5 space-y-3">
-                        <div className="h-5 bg-secondary/80 rounded w-3/4" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {[1,2,3,4,5,6].map(i => (
+                    <div key={i} className="rounded-xl bg-card border border-border/50 h-[400px] animate-pulse">
+                      <div className="h-[250px] bg-secondary/50 rounded-t-xl" />
+                      <div className="p-6 space-y-3">
+                        <div className="h-6 bg-secondary/80 rounded w-3/4" />
                         <div className="h-4 bg-secondary/50 rounded w-1/2" />
-                        <div className="pt-2 flex justify-between">
-                          <div className="h-6 bg-secondary/80 rounded w-1/3" />
-                          <div className="h-6 bg-secondary/50 rounded w-1/4" />
+                        <div className="pt-4 flex justify-between">
+                          <div className="h-8 bg-secondary/80 rounded w-1/3" />
+                          <div className="h-8 bg-secondary/50 rounded w-1/4" />
                         </div>
                       </div>
                     </div>
@@ -218,16 +203,16 @@ export function ListingsWorkspace() {
                   description="DealerPilot hasn't identified any listings matching this view."
                 />
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                   {filteredWorkspaces.map((w, i) => (
                     <Link key={w.vehicleId} href={`/listings/${w.vehicleId}`}>
-                      <Card className="overflow-hidden hover-lift cursor-pointer group bg-card border-border/40 hover:border-primary/30 transition-all duration-500 h-full flex flex-col" style={{ animationDelay: `${i * 50}ms` }}>
-                        <div className="aspect-[4/3] bg-secondary/30 relative overflow-hidden">
+                      <Card className="overflow-hidden hover-lift cursor-pointer group bg-card border-border/40 hover:border-primary/30 transition-all duration-500 h-full flex flex-col relative" style={{ animationDelay: `${i * 50}ms` }}>
+                        <div className="aspect-[16/10] bg-secondary/30 relative overflow-hidden">
                           {w.primaryImageUrl ? (
                             <img
                               src={w.primaryImageUrl}
                               alt={w.label}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/50 to-background">
@@ -237,41 +222,30 @@ export function ListingsWorkspace() {
                           
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
                           
-                          <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-10">
-                            <Badge variant="outline" className={cn("backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border", aiStatusClass(w.aiStatus))}>
-                              <Sparkles className="w-3 h-3 mr-1.5" />
-                              {w.aiStatus}
-                            </Badge>
-                            
-                            {w.publishStatus !== "Not Queued" && (
-                              <Badge variant="outline" className={cn("backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border", publishStatusClass(w.publishStatus))}>
-                                {w.publishStatus}
+                          {getStatusBadge(w)}
+                          
+                          <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+                             {w.listingScore != null && (
+                              <Badge variant="outline" className={cn("backdrop-blur-md px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border", ratingClass(w.listingRating))}>
+                                <Gauge className="w-3.5 h-3.5 mr-1.5" />
+                                {w.listingScore} SCORE
                               </Badge>
                             )}
                           </div>
-                          
-                          <div className="absolute bottom-3 left-3 right-3 z-10">
-                            <div className="font-bold text-xl text-white drop-shadow-md">{formatCurrency(w.price)}</div>
-                          </div>
                         </div>
-                        <CardContent className="p-5 flex-1 flex flex-col">
-                          <div className="font-bold text-lg leading-tight mb-1 group-hover:text-primary transition-colors">{w.label}</div>
-                          <div className="text-muted-foreground text-sm flex items-center gap-2 mb-5">
+                        <CardContent className="p-6 flex-1 flex flex-col">
+                          <div className="font-bold text-xl leading-tight mb-2 group-hover:text-primary transition-colors">{w.label}</div>
+                          <div className="text-muted-foreground text-sm flex items-center gap-2 mb-6">
                             <span className="truncate">{w.bodyStyle || "Vehicle"}</span>
                             <span className="w-1 h-1 rounded-full bg-border" />
                             <span className="flex items-center gap-1"><PenTool className="w-3 h-3" /> {w.versionCount} version{w.versionCount === 1 ? "" : "s"}</span>
                           </div>
                           
-                          <div className="mt-auto pt-4 border-t border-border/50 flex items-center justify-between">
-                            <div className="text-sm font-medium text-muted-foreground">Listing Score</div>
-                            {w.listingScore != null ? (
-                              <Badge variant="outline" className={cn("px-2 py-0.5 text-xs", ratingClass(w.listingRating))}>
-                                <Gauge className="w-3.5 h-3.5 mr-1" />
-                                {w.listingScore}
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground bg-secondary/50 px-2 py-1 rounded-md">Not scored</span>
-                            )}
+                          <div className="mt-auto pt-4 border-t border-border/30 flex items-center justify-between">
+                            <div className="font-bold text-xl text-foreground">{formatCurrency(w.price)}</div>
+                            <div className="text-xs font-semibold text-primary/80 group-hover:text-primary flex items-center gap-1 uppercase tracking-widest transition-colors">
+                              View Listing &rarr;
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
@@ -284,35 +258,6 @@ export function ListingsWorkspace() {
 
           {activeTab === "queue" && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-              {/* Stats Row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <KpiCard 
-                  title="Queued"
-                  value={queuedJobs}
-                  icon={<Clock className="w-4 h-4 text-warning" />}
-                  isLoading={jobsLoading}
-                />
-                <KpiCard 
-                  title="Publishing Now"
-                  value={publishingJobs}
-                  icon={<Send className="w-4 h-4 text-blue-400" />}
-                  isLoading={jobsLoading}
-                />
-                <KpiCard 
-                  title="Successfully Published"
-                  value={jobs.filter((j) => j.status === "Published").length}
-                  icon={<CheckCircle2 className="w-4 h-4 text-success" />}
-                  isLoading={jobsLoading}
-                />
-                <KpiCard 
-                  title="Needs Attention"
-                  value={failedJobs}
-                  icon={<AlertTriangle className="w-4 h-4 text-destructive" />}
-                  trend={failedJobs > 0 ? { value: failedJobs, isPositive: false } : undefined}
-                  isLoading={jobsLoading}
-                />
-              </div>
-
               {/* Filter */}
               <div className="glass-panel p-4 rounded-xl flex items-center justify-between border border-border/50">
                 <div className="font-medium px-2">Job Queue</div>

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { 
   CarFront, 
@@ -9,7 +10,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Activity,
-  Server, Database, Rss, Puzzle, Facebook, Store, Bot, Settings
+  Server, Database, Rss, Puzzle, Facebook, Store, Bot, Settings,
+  Clock, Play
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -29,8 +31,12 @@ import {
   useListPublishingJobs,
   useListCreativeStudio,
   useGetLeads,
-  useGetConnectionStatus
+  useGetConnectionStatus,
+  useListFeedRuns,
+  getListFeedRunsQueryKey,
+  useListCreativeJobs
 } from "@workspace/api-client-react";
+import { cn } from "@/lib/utils";
 
 export function SalesHub() {
   const [, setLocation] = useLocation();
@@ -47,6 +53,14 @@ export function SalesHub() {
   const { data: creativeStudio, isLoading: isLoadingCreative } = useListCreativeStudio();
   const { data: leads, isLoading: isLoadingLeads } = useGetLeads();
   const { data: connections, isLoading: isLoadingConnections } = useGetConnectionStatus();
+  
+  // Additional for pipeline and feed
+  const { data: feedRuns } = useListFeedRuns(dealerId!, {
+    query: { enabled: !!dealerId, queryKey: getListFeedRunsQueryKey(dealerId!) }
+  });
+  const { data: creativeJobs } = useListCreativeJobs();
+  const { data: publishingJobs } = useListPublishingJobs();
+  const { data: workspacesData } = useListListingWorkspaces();
 
   // Loading state
   const isLoading = isLoadingDealers || isLoadingDealer || isLoadingStats || 
@@ -60,8 +74,67 @@ export function SalesHub() {
   const newVehicles = vehicleStats?.new || 0;
   const pendingLeads = leads?.leads.filter(l => l.status === 'new').length || 0;
   const priceChanges = vehicleStats?.priceChanged || 0;
+  
+  // mock renewal count since we can't fully derive it
+  const renewalCount = workspacesData?.workspaces?.filter(w => w.publishStatus === 'Approved').length || 0;
 
   const aiActivityTotal = (vehicleStats?.published || 0) + (creativeStudio?.vehicles.reduce((acc, v) => acc + (v.versionCount || 0), 0) || 0) + (leads?.leads.length || 0);
+  const estimatedMinutes = (vehiclesReady * 0.75 + pendingLeads * 1.5 + newVehicles * 0.5).toFixed(0);
+
+  // Live Activity Feed
+  const activityItems = useMemo(() => {
+    type ActivityItem = { id: string; type: string; label: string; date: Date; color: string };
+    const items: ActivityItem[] = [];
+    
+    feedRuns?.feedRuns?.forEach(run => {
+      if (run.finishedAt) {
+        items.push({
+          id: `feed-${run.id}`,
+          type: 'feed',
+          label: `Inventory Sync · ${run.vehiclesNew} new vehicles`,
+          date: new Date(run.finishedAt),
+          color: 'bg-primary'
+        });
+      }
+    });
+
+    creativeJobs?.jobs?.forEach(job => {
+      if (job.completedAt) {
+        items.push({
+          id: `creative-${job.id}`,
+          type: 'creative',
+          label: `Creative Generated · ${job.vehicleLabel || 'Vehicle'}`,
+          date: new Date(job.completedAt),
+          color: 'bg-accent'
+        });
+      }
+    });
+
+    publishingJobs?.jobs?.forEach(job => {
+      if (job.completedAt) {
+        items.push({
+          id: `publishing-${job.id}`,
+          type: 'publishing',
+          label: `Listing Published · ${job.vehicleLabel || 'Vehicle'}`,
+          date: new Date(job.completedAt),
+          color: 'bg-success'
+        });
+      }
+    });
+
+    leads?.leads?.forEach(lead => {
+      items.push({
+        id: `lead-${lead.id}`,
+        type: 'lead',
+        label: `Buyer Message`,
+        date: new Date(lead.createdAt),
+        color: 'bg-warning'
+      });
+    });
+
+    return items.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 12);
+  }, [feedRuns, creativeJobs, publishingJobs, leads]);
+
 
   const getServiceColor = (serviceStatus?: string) => {
     switch (serviceStatus?.toLowerCase()) {
@@ -76,35 +149,23 @@ export function SalesHub() {
     }
   };
 
+  // Pipeline Counts
+  const pipelineCounts = {
+    inventory: vehicleStats?.total || 0,
+    analysis: vehicleStats?.active || 0,
+    creative: creativeStudio?.vehicles.filter(v => v.creativeStatus === "Generating").length || 0,
+    listing: workspacesData?.workspaces.length || 0,
+    publishing: publishingJobs?.jobs.filter(j => j.status === "Publishing").length || 0,
+    live: vehicleStats?.published || 0
+  };
+
   return (
     <AppLayout>
-      <div className="p-6 md:p-10 max-w-[1400px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="p-6 md:p-10 max-w-[1400px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
         
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/5">
-          <div className="flex flex-col gap-2">
-            {isLoading ? (
-              <Skeleton className="h-12 w-64 bg-white/5" />
-            ) : (
-              <h1 className="text-4xl font-bold tracking-tight text-white">
-                {greeting}, {dealer?.name || "Operator"}
-              </h1>
-            )}
-            
-            <div className="flex items-center gap-2 text-sm text-primary/80 bg-primary/10 w-fit px-4 py-2 rounded-full border border-primary/20">
-              <StatusPulse color="primary" />
-              {isLoading ? (
-                <Skeleton className="h-4 w-48 bg-white/5" />
-              ) : (
-                <span>
-                  DealerPilot processed <strong className="text-primary font-semibold">{aiActivityTotal} actions</strong> today.
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Compact System Pulse */}
-          <div className="flex flex-col items-start md:items-end gap-2">
+        {/* System Pulse Header (keeps the top bar) */}
+        <div className="flex justify-end pb-4 mb-6 border-b border-white/5 shrink-0">
+          <div className="flex flex-col items-end gap-2">
             <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
               <Activity className="w-3 h-3" /> System Pulse
             </h3>
@@ -127,111 +188,183 @@ export function SalesHub() {
           </div>
         </div>
 
-        {/* Mission Control Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="flex flex-col xl:flex-row gap-8 flex-1 min-h-0">
           
-          {/* Card 1: MARKETPLACE */}
-          <div className="glass-panel p-8 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-primary/30 transition-all duration-500 hover:shadow-[0_0_40px_-15px_rgba(var(--primary),0.3)]">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-            <div className="flex flex-col h-full">
-              <span className="text-primary text-[10px] font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                <Store className="w-3.5 h-3.5" /> Marketplace
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-4">
-                DealerPilot found <strong className="font-bold">{vehiclesReady}</strong> vehicles ready to publish.
-              </h2>
-              <p className="text-muted-foreground mb-8 max-w-md">
-                Your inventory has been synced and AI has generated optimized listings. Review and push them live to Facebook Marketplace.
-              </p>
-              <div className="mt-auto">
+          {/* LEFT COLUMN */}
+          <div className="flex-1 flex flex-col gap-8 overflow-y-auto pr-2 pb-10">
+            
+            {/* 1. Morning Brief Hero */}
+            <div className="glass-panel p-8 rounded-2xl border border-white/5 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-50 -z-10" />
+              
+              <div className="flex flex-col gap-6">
+                <div>
+                  <div className="text-sm font-medium text-primary uppercase tracking-wider mb-2">
+                    DealerPilot — {greeting}
+                  </div>
+                  <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white mb-1">
+                    {dealer?.name || "Alpha Motorsport"}
+                  </h1>
+                  <p className="text-xl text-muted-foreground">
+                    DealerPilot completed <span className="text-white font-medium">{aiActivityTotal}</span> overnight actions.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 rounded-full bg-success flex-shrink-0" />
+                    <span className="text-white">Publish <strong className="font-bold">{vehiclesReady}</strong> Marketplace listings</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 rounded-full bg-warning flex-shrink-0" />
+                    <span className="text-white">Renew <strong className="font-bold">{renewalCount}</strong> expired ads</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 rounded-full bg-destructive flex-shrink-0" />
+                    <span className="text-white">Reply to <strong className="font-bold">{pendingLeads}</strong> Marketplace buyers</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 rounded-full bg-success flex-shrink-0" />
+                    <span className="text-white">Generate creatives for <strong className="font-bold">{newVehicles}</strong> new vehicles</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Clock className="w-4 h-4" />
+                  Estimated work: ~{estimatedMinutes} minutes
+                </div>
+
                 <Button 
-                  size="lg" 
-                  className="w-full sm:w-auto premium-gradient-btn gap-2"
-                  onClick={() => setLocation("/publishing")}
+                  className="w-full premium-gradient-btn h-14 text-lg font-medium mt-2 gap-2"
+                  onClick={() => setLocation("/listings")}
                 >
-                  Publish Now <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <Play className="w-5 h-5 fill-current" /> Start AI Workflow <ArrowRight className="w-5 h-5 ml-1" />
                 </Button>
               </div>
             </div>
-          </div>
 
-          {/* Card 2: CREATIVES */}
-          <div className="glass-panel p-8 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-accent/30 transition-all duration-500 hover:shadow-[0_0_40px_-15px_rgba(var(--accent),0.3)]">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-accent/10 rounded-full blur-3xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-            <div className="flex flex-col h-full">
-              <span className="text-accent text-[10px] font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                <ImageIcon className="w-3.5 h-3.5" /> Creatives
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-4">
-                DealerPilot queued <strong className="font-bold">{newVehicles}</strong> vehicles for design generation.
-              </h2>
-              <p className="text-muted-foreground mb-8 max-w-md">
-                AI is ready to generate high-converting composite images and branded templates for your newly imported inventory.
-              </p>
-              <div className="mt-auto">
-                <Button 
-                  size="lg" 
-                  className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-white gap-2"
-                  onClick={() => setLocation("/creative-studio")}
-                >
-                  Generate Creatives <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            {/* 2. Mission Cards */}
+            <div className="flex flex-col gap-4">
+              
+              <div className="glass-panel p-5 rounded-xl border border-white/5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between group hover:border-success/30 transition-colors">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-success">Mission</span>
+                  <h3 className="text-lg font-semibold text-white">Publish {vehiclesReady} Vehicles</h3>
+                  <p className="text-sm text-muted-foreground">Estimated · {(vehiclesReady * 0.75).toFixed(0)} min | Priority: High</p>
+                </div>
+                <Button className="w-full sm:w-auto bg-success hover:bg-success/90 text-white gap-2" onClick={() => setLocation("/publishing")}>
+                  Start Publishing <ArrowRight className="w-4 h-4" />
                 </Button>
               </div>
-            </div>
-          </div>
 
-          {/* Card 3: LEADS */}
-          <div className="glass-panel p-8 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-success/30 transition-all duration-500 hover:shadow-[0_0_40px_-15px_rgba(var(--success),0.3)]">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-success/10 rounded-full blur-3xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-            <div className="flex flex-col h-full">
-              <span className="text-success text-[10px] font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                <MessageSquare className="w-3.5 h-3.5" /> Leads
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-4">
-                DealerPilot captured <strong className="font-bold">{pendingLeads}</strong> new buyer messages.
-              </h2>
-              <p className="text-muted-foreground mb-8 max-w-md">
-                AI has analyzed buyer intent and drafted suggested replies based on listing context. Review and send to potential buyers.
-              </p>
-              <div className="mt-auto">
-                <Button 
-                  size="lg" 
-                  className="w-full sm:w-auto bg-success hover:bg-success/90 text-white gap-2"
-                  onClick={() => setLocation("/sales-ai")}
-                >
-                  Review Leads <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <div className="glass-panel p-5 rounded-xl border border-white/5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between group hover:border-accent/30 transition-colors">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-accent">Mission</span>
+                  <h3 className="text-lg font-semibold text-white">Generate Creatives</h3>
+                  <p className="text-sm text-muted-foreground">Estimated · {(newVehicles * 0.5).toFixed(0)} min | Priority: Medium</p>
+                </div>
+                <Button className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-white gap-2" onClick={() => setLocation("/creative-studio")}>
+                  Start Generation <ArrowRight className="w-4 h-4" />
                 </Button>
               </div>
+
+              <div className="glass-panel p-5 rounded-xl border border-white/5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between group hover:border-destructive/30 transition-colors">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-destructive">Mission</span>
+                  <h3 className="text-lg font-semibold text-white">Reply to {pendingLeads} Buyers</h3>
+                  <p className="text-sm text-muted-foreground">Estimated · {(pendingLeads * 1.5).toFixed(0)} min | Priority: High</p>
+                </div>
+                <Button className="w-full sm:w-auto bg-destructive hover:bg-destructive/90 text-white gap-2" onClick={() => setLocation("/sales-ai")}>
+                  Review Replies <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="glass-panel p-5 rounded-xl border border-white/5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between group hover:border-warning/30 transition-colors">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-warning">Mission</span>
+                  <h3 className="text-lg font-semibold text-white">Update Inventory ({priceChanges})</h3>
+                  <p className="text-sm text-muted-foreground">Estimated · 1 min | Priority: Low</p>
+                </div>
+                <Button className="w-full sm:w-auto bg-warning hover:bg-warning/90 text-black font-medium gap-2" onClick={() => setLocation("/inventory")}>
+                  Review Changes <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+
             </div>
+
+            {/* 4. AI Workflow Pipeline */}
+            <div className="glass-panel p-6 rounded-2xl border border-white/5 mt-4">
+              <h3 className="text-sm font-semibold text-white mb-6 uppercase tracking-wider">AI Workflow Pipeline</h3>
+              
+              <div className="flex items-center justify-between relative">
+                {/* Connecting Line */}
+                <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/20 via-accent/20 to-success/20 -translate-y-1/2 -z-10 hidden sm:block" />
+                
+                {[
+                  { label: "Inventory", count: pipelineCounts.inventory },
+                  { label: "AI Analysis", count: pipelineCounts.analysis },
+                  { label: "Creative", count: pipelineCounts.creative },
+                  { label: "Listing", count: pipelineCounts.listing },
+                  { label: "Publishing", count: pipelineCounts.publishing },
+                  { label: "Facebook Live", count: pipelineCounts.live },
+                ].map((stage, i, arr) => (
+                  <div key={stage.label} className="flex flex-col items-center gap-3 bg-card/80 px-2 sm:px-4 py-2 rounded-lg">
+                    <span className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap">{stage.label}</span>
+                    <div className="bg-white/10 text-white px-3 py-1 rounded-full text-sm font-bold min-w-[3rem] text-center border border-white/5">
+                      {stage.count}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
 
-          {/* Card 4: INVENTORY */}
-          <div className="glass-panel p-8 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-warning/30 transition-all duration-500 hover:shadow-[0_0_40px_-15px_rgba(var(--warning),0.3)]">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-warning/10 rounded-full blur-3xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-            <div className="flex flex-col h-full">
-              <span className="text-warning text-[10px] font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                <Rss className="w-3.5 h-3.5" /> Inventory
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-4">
-                DealerPilot detected <strong className="font-bold">{priceChanges}</strong> pricing updates.
+          {/* RIGHT COLUMN - Live Activity Feed */}
+          <div className="w-full xl:w-80 shrink-0 flex flex-col gap-4 sticky top-6 self-start max-h-[calc(100vh-120px)]">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
+                </span>
+                DealerPilot Live
               </h2>
-              <p className="text-muted-foreground mb-8 max-w-md">
-                The latest inventory feed sync discovered price drops or updates. Allow AI to revise existing listing strategies automatically.
-              </p>
-              <div className="mt-auto">
-                <Button 
-                  size="lg" 
-                  className="w-full sm:w-auto bg-warning hover:bg-warning/90 text-black font-semibold gap-2"
-                  onClick={() => setLocation("/inventory")}
-                >
-                  Update Inventory <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
+            </div>
+            
+            <div className="glass-panel rounded-2xl border border-white/5 flex-1 overflow-y-auto p-1">
+              <div className="flex flex-col">
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="p-4 border-b border-white/5 flex gap-3">
+                      <Skeleton className="w-2 h-2 rounded-full mt-1.5 shrink-0" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-3 w-12" />
+                        <Skeleton className="h-4 w-full" />
+                      </div>
+                    </div>
+                  ))
+                ) : activityItems.length > 0 ? (
+                  activityItems.map((item, index) => (
+                    <div key={item.id} className="p-4 border-b border-white/5 last:border-0 flex gap-3 group hover:bg-white/[0.02] transition-colors relative">
+                      {index === 0 && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary rounded-r" />}
+                      <span className={cn("w-2 h-2 rounded-full mt-1.5 shrink-0", item.color)} />
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <span className="text-xs text-muted-foreground font-mono">{format(item.date, 'HH:mm')}</span>
+                        <span className="text-sm text-white/90 truncate">{item.label}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-muted-foreground text-sm">
+                    No recent activity
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
         </div>
-
       </div>
     </AppLayout>
   );

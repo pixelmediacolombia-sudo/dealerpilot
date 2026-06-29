@@ -4,8 +4,8 @@ import { renderIcon, type IconLike } from "./renderIcon";
 
 interface PageHeaderProps {
   title: ReactNode;
-  subtitle?: string;
-  description?: string;
+  subtitle?: ReactNode;
+  description?: ReactNode;
   eyebrow?: string;
   icon?: IconLike;
   action?: ReactNode;
@@ -44,7 +44,7 @@ export function PageHeader({
             </div>
           )}
           <h1 className="text-3xl font-bold tracking-tight text-white">{title}</h1>
-          {sub && <p className="text-muted-foreground text-sm max-w-2xl">{sub}</p>}
+          {sub && <div className="text-muted-foreground text-sm max-w-2xl">{sub}</div>}
         </div>
       </div>
       {(children || action) && (

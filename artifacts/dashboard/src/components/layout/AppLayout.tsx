@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { GlobalHeader } from "./GlobalHeader";
+import { FloatingAssistant } from "./FloatingAssistant";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -23,6 +24,8 @@ export function AppLayout({ children }: AppLayoutProps) {
           {children}
         </div>
       </main>
+
+      <FloatingAssistant />
     </div>
   );
 }

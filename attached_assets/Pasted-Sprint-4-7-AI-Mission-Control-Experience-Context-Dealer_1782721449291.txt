@@ -1,0 +1,405 @@
+Sprint 4.7 — AI Mission Control Experience
+Context
+
+DealerPilot AI ya cuenta con:
+
+XML Engine
+Inventory Intelligence
+Marketplace AI
+Chrome Extension Publisher
+Creative Studio
+Sales AI
+Dealer DNA
+Settings
+Dark UI Design System
+
+No quiero agregar nuevas funcionalidades backend.
+
+No quiero modificar la base de datos.
+
+No quiero modificar APIs.
+
+No quiero cambiar OpenAPI.
+
+No quiero tocar el Publishing Engine.
+
+No quiero tocar el XML Engine.
+
+No quiero tocar la Chrome Extension.
+
+Este sprint es 100% UX/UI.
+
+El objetivo es que DealerPilot deje de sentirse como un dashboard y se convierta en un verdadero AI Mission Control.
+
+Toda la información ya existe.
+
+Solo cambiaremos cómo se presenta.
+
+Objetivos
+
+El operador nunca debe preguntarse:
+
+"¿Qué hago ahora?"
+
+DealerPilot debe responder esa pregunta automáticamente.
+
+Cada pantalla debe decirle al usuario exactamente cuál es el siguiente paso.
+
+1. AI Morning Brief
+
+Eliminar el concepto clásico de Dashboard.
+
+En su lugar crear un briefing diario.
+
+Ejemplo:
+
+Good Morning,
+
+Alpha Motorsport
+
+DealerPilot completed 7 overnight tasks.
+
+Today's priorities
+
+🟢 Publish 4 Marketplace listings
+
+🟡 Renew 6 expired Marketplace ads
+
+🔴 Reply to 3 Marketplace buyers
+
+🟢 Generate creatives for 8 new vehicles
+
+Estimated work
+
+12 minutes
+
+[ Start AI Workflow ]
+
+Este bloque debe ocupar casi todo el hero principal.
+
+No usar KPIs tradicionales.
+
+Debe sentirse como Jarvis.
+
+2. Live Activity Feed
+
+Agregar una columna permanente (desktop).
+
+DealerPilot Live
+
+09:21
+
+Marketplace Sync Completed
+
+09:24
+
+Price Change Detected
+
+09:27
+
+Creative Generated
+
+09:30
+
+Vehicle Published
+
+09:33
+
+Buyer Message Received
+
+09:36
+
+AI Suggested Reply Ready
+
+No usar tablas.
+
+Cada actividad debe tener:
+
+ícono
+
+timestamp
+
+status color
+
+texto corto
+
+Las actividades deben verse vivas.
+
+3. AI Workflow Timeline
+
+Agregar un workflow visual.
+
+Cada vehículo debe recorrer etapas.
+
+Inventory
+
+↓
+
+AI Analysis
+
+↓
+
+Creative
+
+↓
+
+Listing
+
+↓
+
+Publishing
+
+↓
+
+Facebook Live
+
+Cada etapa debe mostrar cuántos vehículos están ahí.
+
+Debe verse como un pipeline.
+
+No como una tabla.
+
+4. Marketplace AI
+
+Eliminar la sensación de "lista".
+
+Las cards deben ocupar mucho más espacio.
+
+Cada vehículo debe mostrar inmediatamente:
+
+imagen
+
+badge sobre la imagen
+
+READY
+
+LIVE
+
+PRICE CHANGE
+
+RENEW
+
+AI GENERATED
+
+Luego
+
+nombre
+
+precio
+
+CTA principal
+
+No esconder estados debajo.
+
+5. Creative Studio
+
+Debe sentirse como un estudio creativo.
+
+No como un inventario.
+
+Agregar una sección superior:
+
+AI Generation Queue
+
+Generating...
+
+■■■■□□□□
+
+Vehicle
+
+3 of 8
+
+ETA
+
+18 sec
+
+Debajo
+
+las imágenes.
+
+Cada imagen debe respirar más.
+
+Mayor tamaño.
+
+Menos texto.
+
+6. Sales Hub
+
+Eliminar las tarjetas de números.
+
+Cada acción debe convertirse en una misión.
+
+Ejemplo
+
+Mission
+
+Publish 4 Vehicles
+
+Estimated Time
+
+3 min
+
+CTA
+
+Start Publishing
+
+Luego
+
+Mission
+
+Reply to 3 Buyers
+
+Estimated Time
+
+4 min
+
+CTA
+
+Open Sales AI
+
+Luego
+
+Mission
+
+Generate Creatives
+
+Estimated Time
+
+5 min
+
+CTA
+
+Generate Now
+
+No mostrar simplemente KPIs.
+
+7. AI Voice
+
+Toda la aplicación debe hablar como DealerPilot.
+
+Eliminar textos tipo
+
+15 Vehicles
+
+2 Listings
+
+4 Creatives
+
+Reemplazar por frases como
+
+DealerPilot found 4 vehicles ready to publish.
+
+DealerPilot generated 8 optimized listings overnight.
+
+DealerPilot detected 3 pricing opportunities.
+
+DealerPilot recommends renewing 6 Marketplace listings.
+
+8. Bigger Images
+
+Las imágenes deben dominar.
+
+Reducir texto.
+
+Más aire.
+
+Más impacto.
+
+Las imágenes venden.
+
+No las tablas.
+
+9. Floating AI Assistant
+
+Agregar un botón flotante permanente.
+
+Ask DealerPilot
+
+Con ejemplos:
+
+Publish everything ready.
+
+Generate creatives for trucks.
+
+Show vehicles needing attention.
+
+What should I work on first?
+
+No implementar IA todavía.
+
+Solo la experiencia visual.
+
+10. Reduce Visual Noise
+
+Reducir:
+
+bordes
+
+líneas
+
+divisiones
+
+botones secundarios
+
+Eliminar cualquier elemento que no ayude a completar una tarea.
+
+Cada pantalla debe tener un único CTA principal.
+
+11. Motion
+
+Agregar microanimaciones.
+
+DealerPilot debe sentirse vivo.
+
+Ejemplos:
+
+Activity Feed actualizándose.
+
+AI pulse.
+
+Progress bars.
+
+Status dots.
+
+Hover elegante.
+
+Animated counters.
+
+Subtle fades.
+
+Nada exagerado.
+
+Restricciones
+
+NO modificar:
+
+backend
+workers
+database
+routes
+APIs
+OpenAPI
+Chrome Extension
+Publishing Engine
+XML Engine
+Dealer DNA logic
+
+Solo frontend.
+
+Calidad esperada
+
+Antes de escribir código:
+
+Analiza completamente el diseño actual.
+
+Busca inconsistencias.
+
+Propón mejoras si encuentras oportunidades.
+
+No copies Autolander.
+
+Úsalo únicamente como referencia de simplicidad.
+
+DealerPilot debe sentirse como un producto de IA de próxima generación, más cercano a Linear, Notion AI, Vercel o Stripe que a un CRM tradicional.
+
+No des el sprint por terminado hasta que todas las pantallas se sientan como un único producto coherente, con una identidad visual consistente, un flujo de trabajo guiado y una experiencia donde el operador siempre sepa cuál es la siguiente acción recomendada por la IA.
