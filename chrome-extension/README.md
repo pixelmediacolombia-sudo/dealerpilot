@@ -1,12 +1,24 @@
-# DealerPilot AI — Chrome Extension (Sprint 0 Spike)
+# DealerPilot AI — Chrome Extension (Publisher)
 
-This is a **proof of concept**, not the finished product. It validates that a Replit web app can communicate with a Chrome Extension running on Facebook Marketplace and Messenger.
+This extension connects the DealerPilot AI dashboard's **Publishing Queue** to
+Facebook Marketplace. It claims queued publishing jobs, opens the Marketplace
+create-listing page, fills the listing form from real inventory data, and lets the
+operator review and report the outcome back to the backend.
 
-The extension:
+**Safety first:** the extension **never** auto-clicks Publish, never stores a
+Facebook password, and stops if Facebook shows a login / checkpoint / captcha /
+security screen.
 
-- Shows a floating **"DealerPilot AI Connected"** panel on Facebook and Messenger pages.
-- On the Marketplace **create listing** page, adds a **"Fill Test Listing"** button that pulls the test vehicle from the backend and fills the form fields. **It never clicks Publish.**
-- On **Messenger**, adds a **"Read Chat & Suggest Reply"** button that reads the visible conversation, asks the backend for a suggested reply, and saves a test lead to the CRM. An **"Insert Reply"** button drops the reply into the message box. **It never clicks Send.**
+The extension provides:
+
+- A floating **"DealerPilot AI Connected"** panel on Facebook and Messenger pages.
+- A popup with an **Extension Status** panel (Online, Backend connected, Jobs
+  available, Current job, Last sync) and a **Start Publishing Job** button.
+- On the Marketplace **create listing** page: automatic form fill from the claimed
+  job plus an **operator review** panel (filled / missing / warnings, **Mark
+  Published**, **Mark Failed**). **It never clicks Publish.**
+- On **Messenger** (Sprint 0 helper, unchanged): a **"Read Chat & Suggest Reply"**
+  button. **It never clicks Send.**
 
 ## Install (Load Unpacked)
 
@@ -14,58 +26,97 @@ The extension:
 2. Turn on **Developer Mode** (top-right toggle).
 3. Click **Load unpacked**.
 4. Select this `chrome-extension/` folder.
-5. The "DealerPilot AI (Spike)" extension appears in your list.
+5. The "DealerPilot AI Publisher" extension appears in your list.
 
 ## Configure the Backend URL
 
-The extension ships with a default backend URL, but you should confirm it points at your running Replit web app.
-
 1. Click the extension icon in the Chrome toolbar to open the popup.
-2. Paste your backend URL (e.g. `https://your-app.replit.dev`) — no trailing slash needed.
-3. Click **Save & Test Connection**. You should see "Connected. Backend is reachable."
+2. Expand **Backend settings**, paste your backend URL (e.g.
+   `https://your-app.replit.dev`) — no trailing slash needed.
+3. Click **Save & Test Connection**. The status panel should show
+   **Backend connected: Connected**.
 
-The URL is stored in `chrome.storage.local`. All API calls go through the background service worker (so Facebook's page CSP does not block them).
+The URL is stored in `chrome.storage.local`. All API calls go through the
+background service worker (so Facebook's page CSP does not block them). The
+extension also generates a random `extensionId` (stored locally) used to claim
+jobs — it contains no Facebook credentials.
+
+## Publishing flow
+
+1. In the dashboard, queue a generated listing — it appears on **/publishing** as
+   **Queued**.
+2. Open the extension popup. **Jobs available** shows `1+ ready` and **Start
+   Publishing Job** becomes enabled.
+3. Click **Start Publishing Job**. The extension claims the job (`POST
+   /api/publishing/jobs/:id/claim`) and opens
+   `https://www.facebook.com/marketplace/create/vehicle`. If the claim loses a
+   race (HTTP 409) it surfaces the conflict and refreshes for another job.
+4. On the create page, the panel auto-fills the form from the job payload (title,
+   price, description, mileage, year, make, model, VIN, location). A **Fill
+   Marketplace Fields** button re-runs the fill on demand.
+5. Review the **Filled successfully / Fields missing / Warnings** chips.
+6. Click **Mark Published** → paste the Marketplace listing URL (optional) →
+   `POST /api/publishing/jobs/:id/complete`. The job → **Published** and the
+   vehicle's Marketplace listing is recorded as **Published**.
+7. Or click **Mark Failed** → enter a reason → `POST /api/publishing/jobs/:id/fail`.
+   The job → **Failed/Retry** with the reason stored.
 
 ## Test Checklist
 
 ### Connection
-- [ ] Open `https://www.facebook.com`. The floating panel appears bottom-right.
-- [ ] The status dot is green and reads "Connected to backend". (If red, set the URL in the popup.)
+- [ ] Open `https://www.facebook.com`. The floating panel appears bottom-right with
+      a green dot reading "Connected to backend".
+- [ ] Open the popup. **Online** = Yes, **Backend connected** = Connected, **Last
+      sync** updates on **Refresh**.
 
-### Web dashboard
-- [ ] Open the Replit web app dashboard.
-- [ ] The Test Vehicle card shows the 2021 Toyota Tacoma (price $28,995, down payment $2,500, mileage 45,000).
-- [ ] Clicking **"Send Test Listing to Extension"** shows the JSON payload the extension will receive.
+### Queue + claim
+- [ ] In the dashboard, queue a listing. It shows as **Queued** on **/publishing**.
+- [ ] Popup shows **Jobs available: 1+ ready** and enables **Start Publishing Job**.
+- [ ] Click **Start Publishing Job**. The job is claimed and a Marketplace
+      create-listing tab opens. **/publishing** shows the job **Publishing** with the
+      extension id, **Started** timestamp.
+- [ ] Claiming the same job from a second extension returns **HTTP 409** and the
+      popup refreshes for another job.
 
-### Marketplace fill
-- [ ] Go to `https://www.facebook.com/marketplace/create/vehicle` (or any `/marketplace/create` page).
-- [ ] The panel shows a **"Fill Test Listing"** button.
-- [ ] Click it. The status reads "Listing data received. Publish was NOT clicked."
-- [ ] The output panel lists which fields were filled and shows the listing JSON.
-- [ ] Visible form fields (title / price / mileage / description) that the page exposes are populated.
+### Marketplace fill + review
+- [ ] On the create page the panel shows the job and auto-fills the form. Status
+      reads "Fields filled… Publish was NOT clicked."
+- [ ] The review panel lists filled fields, missing fields, and warnings (e.g.
+      "N photo(s) available — add manually").
 - [ ] **Publish is never clicked.**
 
-### Messenger reply
-- [ ] Open `https://www.messenger.com` (or Facebook messages) and open any conversation.
-- [ ] The panel shows a **"Read Chat & Suggest Reply"** button.
-- [ ] Click it. A suggested reply appears and the status reads "Suggested reply ready. Lead saved to CRM."
-- [ ] Click **"Insert Reply"**. The reply text appears in the message box.
-- [ ] **Send is never clicked.**
+### Complete
+- [ ] Click **Mark Published**, paste a listing URL. Status reads "Job marked
+      Published."
+- [ ] **/publishing** shows the job **Published** with a **Completed** timestamp;
+      the listing is recorded as Published with the URL.
 
-### CRM
-- [ ] Back on the dashboard, the new lead appears in the Test Leads list (status "Test Lead").
-- [ ] The lead shows the message text and the suggested reply.
+### Fail
+- [ ] Queue + claim another job, click **Mark Failed**, enter a reason.
+- [ ] **/publishing** shows the job **Failed/Retry** with the reason and an
+      incremented retry count.
 
-## Notes & Limitations (spike scope)
+### Safety
+- [ ] If Facebook shows a login / checkpoint / captcha screen on the create page,
+      the panel stops and shows a "Stopped for safety" banner. No fields are filled.
 
-- Facebook's DOM is obfuscated and changes frequently. Field/box detection is **best-effort** by label, placeholder, and aria-label keywords. If a field isn't found, the panel reports it under "Not found on page" — the data still arrives from the backend, proving the round trip works.
-- This spike proves the communication channel and DOM interaction. Hardening the selectors for production is a follow-up.
-- Safety guardrails are intentional: the extension fills and suggests but never submits (no Publish, no Send).
+## Notes & Limitations
+
+- Facebook's DOM is obfuscated and changes frequently. Field detection is
+  **best-effort** by label, placeholder, and aria-label keywords. Unfound fields
+  are reported under **Fields missing** — the data still arrives from the backend.
+- Image upload is **not automated**: available photo count is surfaced as a warning
+  so the operator can drag-drop them manually.
+- Safety guardrails are intentional: the extension fills and reports but never
+  submits (no Publish, no Send) and never stores Facebook credentials.
 
 ## Files
 
 - `manifest.json` — MV3 manifest (matches `facebook.com` and `messenger.com`).
-- `background.js` — service worker; makes all backend `fetch` calls.
-- `content/content.js` — injects the panel and handles Marketplace fill + Messenger reply.
+- `background.js` — service worker; all backend `fetch` calls + job lifecycle
+  message handlers (`GET_NEXT_JOB`, `CLAIM_JOB`, `GET_JOB_PAYLOAD`, `COMPLETE_JOB`,
+  `FAIL_JOB`, `OPEN_MARKETPLACE`).
+- `content/content.js` — injects the panel; Marketplace publishing flow (fill,
+  review, safety stops) + Messenger reply helper.
 - `content/panel.css` — panel styling.
-- `popup/` — backend URL configuration UI.
+- `popup/` — status panel, Start Publishing Job, and backend URL configuration.

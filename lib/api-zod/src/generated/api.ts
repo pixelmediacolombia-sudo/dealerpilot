@@ -815,6 +815,56 @@ export const GetNextPublishingJobResponse = zod.object({
 
 
 /**
+ * @summary Full Marketplace form-fill data for a job (for the Chrome extension)
+ */
+export const GetPublishingJobPayloadParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPublishingJobPayloadResponse = zod.object({
+  "job": zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+}),
+  "fill": zod.object({
+  "title": zod.string(),
+  "price": zod.number().nullish(),
+  "description": zod.string().optional(),
+  "descriptionEs": zod.string().nullish(),
+  "mileage": zod.number().nullish(),
+  "year": zod.number().nullish(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "trim": zod.string().nullish(),
+  "vin": zod.string(),
+  "bodyStyle": zod.string().nullish(),
+  "exteriorColor": zod.string().nullish(),
+  "fuelType": zod.string().nullish(),
+  "transmission": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "category": zod.string(),
+  "downPayment": zod.number().nullish()
+}),
+  "images": zod.array(zod.string())
+})
+
+
+/**
  * @summary Claim a job for an extension instance
  */
 export const ClaimPublishingJobParams = zod.object({
@@ -856,6 +906,14 @@ export const CompletePublishingJobParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
+export const CompletePublishingJobBody = zod.object({
+  "extensionId": zod.string().min(1),
+  "listingUrl": zod.string().url().optional()
+})
+
 export const CompletePublishingJobResponse = zod.object({
   "id": zod.number(),
   "listingVersionId": zod.number(),
@@ -884,7 +942,11 @@ export const FailPublishingJobParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
 export const FailPublishingJobBody = zod.object({
+  "extensionId": zod.string().min(1),
   "reason": zod.string().optional()
 })
 

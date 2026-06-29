@@ -6,16 +6,80 @@
     <title>DealerPilot AI</title>
     <style>
       body {
-        width: 300px;
+        width: 320px;
         margin: 0;
         padding: 16px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
         background: #0b1f3a;
         color: #f2f5fa;
       }
-      h1 { font-size: 15px; margin: 0 0 4px; }
-      p { font-size: 12px; color: #9fb3cc; margin: 0 0 12px; }
-      label { display: block; font-size: 12px; margin-bottom: 4px; color: #cdd9ea; }
+      h1 {
+        font-size: 15px;
+        margin: 0 0 2px;
+      }
+      .sub {
+        font-size: 12px;
+        color: #9fb3cc;
+        margin: 0 0 12px;
+      }
+      .card {
+        background: #08182d;
+        border: 1px solid #1c3a63;
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+      .card h2 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #9fb3cc;
+        margin: 0 0 8px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        padding: 3px 0;
+      }
+      .row .label {
+        color: #cdd9ea;
+      }
+      .row .value {
+        font-weight: 600;
+        text-align: right;
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #5a6b82;
+      }
+      .dot.on {
+        background: #6fe39f;
+      }
+      .dot.off {
+        background: #ff8a7a;
+      }
+      .dot.warn {
+        background: #ffce6b;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 4px;
+        color: #cdd9ea;
+      }
       input {
         width: 100%;
         box-sizing: border-box;
@@ -38,18 +102,75 @@
         font-size: 13px;
         cursor: pointer;
       }
-      #status { margin-top: 10px; font-size: 12px; min-height: 16px; }
-      .ok { color: #6fe39f; }
-      .err { color: #ff8a7a; }
+      button.secondary {
+        background: #1c3a63;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      #status {
+        margin-top: 10px;
+        font-size: 12px;
+        min-height: 16px;
+      }
+      .ok {
+        color: #6fe39f;
+      }
+      .err {
+        color: #ff8a7a;
+      }
+      details {
+        margin-top: 4px;
+      }
+      summary {
+        font-size: 12px;
+        color: #9fb3cc;
+        cursor: pointer;
+      }
     </style>
   </head>
   <body>
     <h1>DealerPilot AI</h1>
-    <p>Backend URL the extension talks to.</p>
-    <label for="url">Backend URL</label>
-    <input id="url" type="url" placeholder="https://your-app.replit.dev" />
-    <button id="save">Save & Test Connection</button>
+    <p class="sub">Publishing assistant — fills listings, never auto-publishes.</p>
+
+    <div class="card">
+      <h2>Extension Status</h2>
+      <div class="row">
+        <span class="label">Online</span>
+        <span class="value pill"><span id="dot-online" class="dot"></span><span id="v-online">—</span></span>
+      </div>
+      <div class="row">
+        <span class="label">Backend connected</span>
+        <span class="value pill"><span id="dot-backend" class="dot"></span><span id="v-backend">Checking…</span></span>
+      </div>
+      <div class="row">
+        <span class="label">Jobs available</span>
+        <span class="value" id="v-jobs">—</span>
+      </div>
+      <div class="row">
+        <span class="label">Current job</span>
+        <span class="value" id="v-current">None</span>
+      </div>
+      <div class="row">
+        <span class="label">Last sync</span>
+        <span class="value" id="v-sync">—</span>
+      </div>
+    </div>
+
+    <button id="start" disabled>Start Publishing Job</button>
+    <button id="refresh" class="secondary">Refresh</button>
     <div id="status"></div>
+
+    <details>
+      <summary>Backend settings</summary>
+      <div style="margin-top: 10px">
+        <label for="url">Backend URL</label>
+        <input id="url" type="url" placeholder="https://your-app.replit.dev" />
+        <button id="save" class="secondary">Save &amp; Test Connection</button>
+      </div>
+    </details>
+
     <script src="popup.js"></script>
   </body>
 </html>

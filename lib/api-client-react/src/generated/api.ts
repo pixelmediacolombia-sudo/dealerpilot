@@ -21,6 +21,7 @@ import type {
 
 import type {
   ClaimJobInput,
+  CompleteJobInput,
   ConnectionStatus,
   Dealer,
   DealerList,
@@ -46,6 +47,7 @@ import type {
   NextPublishingJob,
   PublishingJob,
   PublishingJobList,
+  PublishingJobPayload,
   QueueListingInput,
   TestListing,
   Vehicle,
@@ -1820,6 +1822,83 @@ export function useGetNextPublishingJob<TData = Awaited<ReturnType<typeof getNex
 
 
 
+export const getGetPublishingJobPayloadUrl = (id: number,) => {
+
+
+
+
+  return `/api/publishing/jobs/${id}/payload`
+}
+
+/**
+ * @summary Full Marketplace form-fill data for a job (for the Chrome extension)
+ */
+export const getPublishingJobPayload = async (id: number, options?: RequestInit): Promise<PublishingJobPayload> => {
+
+  return customFetch<PublishingJobPayload>(getGetPublishingJobPayloadUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublishingJobPayloadQueryKey = (id: number,) => {
+    return [
+    `/api/publishing/jobs/${id}/payload`
+    ] as const;
+    }
+
+
+export const getGetPublishingJobPayloadQueryOptions = <TData = Awaited<ReturnType<typeof getPublishingJobPayload>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublishingJobPayload>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublishingJobPayloadQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublishingJobPayload>>> = ({ signal }) => getPublishingJobPayload(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublishingJobPayload>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublishingJobPayloadQueryResult = NonNullable<Awaited<ReturnType<typeof getPublishingJobPayload>>>
+export type GetPublishingJobPayloadQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Full Marketplace form-fill data for a job (for the Chrome extension)
+ */
+
+export function useGetPublishingJobPayload<TData = Awaited<ReturnType<typeof getPublishingJobPayload>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublishingJobPayload>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublishingJobPayloadQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getClaimPublishingJobUrl = (id: number,) => {
 
 
@@ -1902,14 +1981,15 @@ export const getCompletePublishingJobUrl = (id: number,) => {
 /**
  * @summary Mark a job published
  */
-export const completePublishingJob = async (id: number, options?: RequestInit): Promise<PublishingJob> => {
+export const completePublishingJob = async (id: number,
+    completeJobInput: CompleteJobInput, options?: RequestInit): Promise<PublishingJob> => {
 
   return customFetch<PublishingJob>(getCompletePublishingJobUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(completeJobInput)
   }
 );}
 
@@ -1917,8 +1997,8 @@ export const completePublishingJob = async (id: number, options?: RequestInit): 
 
 
 export const getCompletePublishingJobMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completePublishingJob>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof completePublishingJob>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completePublishingJob>>, TError,{id: number;data: BodyType<CompleteJobInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completePublishingJob>>, TError,{id: number;data: BodyType<CompleteJobInput>}, TContext> => {
 
 const mutationKey = ['completePublishingJob'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -1930,10 +2010,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completePublishingJob>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completePublishingJob>>, {id: number;data: BodyType<CompleteJobInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  completePublishingJob(id,requestOptions)
+          return  completePublishingJob(id,data,requestOptions)
         }
 
 
@@ -1944,18 +2024,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CompletePublishingJobMutationResult = NonNullable<Awaited<ReturnType<typeof completePublishingJob>>>
-
+    export type CompletePublishingJobMutationBody = BodyType<CompleteJobInput>
     export type CompletePublishingJobMutationError = ErrorType<ErrorResponse>
 
     /**
  * @summary Mark a job published
  */
 export const useCompletePublishingJob = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completePublishingJob>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completePublishingJob>>, TError,{id: number;data: BodyType<CompleteJobInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof completePublishingJob>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<CompleteJobInput>},
         TContext
       > => {
       return useMutation(getCompletePublishingJobMutationOptions(options));

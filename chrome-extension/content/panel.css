@@ -115,3 +115,42 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ---- Sprint 3: Publishing review ---- */
+.mai-job {
+  background: #08182d;
+  border: 1px solid #1c3a63;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.mai-job-title { font-weight: 600; margin-bottom: 2px; }
+.mai-job-meta { font-size: 11px; color: #9fb3cc; }
+
+.mai-section-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9fb3cc;
+  margin: 8px 0 4px;
+}
+.mai-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.mai-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #11305a;
+}
+.mai-chip.ok { background: #11402a; color: #6fe39f; }
+.mai-chip.miss { background: #4a1f1a; color: #ff8a7a; }
+.mai-chip.warn { background: #463408; color: #ffce6b; }
+
+.mai-banner {
+  background: #4a1f1a;
+  border: 1px solid #7a2a22;
+  color: #ffd0c8;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}

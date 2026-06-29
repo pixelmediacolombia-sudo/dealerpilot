@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "DealerPilot AI (Spike)",
-  "version": "0.1.0",
-  "description": "Sprint 0 proof of concept: connects a Replit web app to Facebook Marketplace and Messenger for assisted listing and replies.",
+  "name": "DealerPilot AI Publisher",
+  "version": "0.3.0",
+  "description": "Connects the DealerPilot AI dashboard to Facebook Marketplace: claims publishing jobs from the queue and fills listing forms for operator review. Never auto-clicks Publish.",
   "permissions": ["storage", "scripting", "activeTab"],
   "host_permissions": [
     "https://*.replit.dev/*",

@@ -498,6 +498,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/NextPublishingJob"
+  /publishing/jobs/{id}/payload:
+    get:
+      operationId: getPublishingJobPayload
+      tags: [publishing]
+      summary: Full Marketplace form-fill data for a job (for the Chrome extension)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Job plus the data needed to fill the Marketplace listing form
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishingJobPayload"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /publishing/jobs/{id}/claim:
     post:
       operationId: claimPublishingJob
@@ -543,6 +566,12 @@ paths:
           in: path
           required: true
           schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteJobInput"
       responses:
         "200":
           description: Completed job
@@ -1049,6 +1078,38 @@ components:
           oneOf:
             - $ref: "#/components/schemas/PublishingJob"
             - type: "null"
+    PublishingJobFill:
+      type: object
+      required: [title, make, model, vin, category]
+      properties:
+        title: { type: string }
+        price: { type: ["integer", "null"] }
+        description: { type: string }
+        descriptionEs: { type: ["string", "null"] }
+        mileage: { type: ["integer", "null"] }
+        year: { type: ["integer", "null"] }
+        make: { type: string }
+        model: { type: string }
+        trim: { type: ["string", "null"] }
+        vin: { type: string }
+        bodyStyle: { type: ["string", "null"] }
+        exteriorColor: { type: ["string", "null"] }
+        fuelType: { type: ["string", "null"] }
+        transmission: { type: ["string", "null"] }
+        location: { type: ["string", "null"] }
+        category: { type: string }
+        downPayment: { type: ["integer", "null"] }
+    PublishingJobPayload:
+      type: object
+      required: [job, fill, images]
+      properties:
+        job:
+          $ref: "#/components/schemas/PublishingJob"
+        fill:
+          $ref: "#/components/schemas/PublishingJobFill"
+        images:
+          type: array
+          items: { type: string }
     QueueListingInput:
       type: object
       properties:
@@ -1059,7 +1120,15 @@ components:
       required: [extensionId]
       properties:
         extensionId: { type: string, minLength: 1 }
+    CompleteJobInput:
+      type: object
+      required: [extensionId]
+      properties:
+        extensionId: { type: string, minLength: 1 }
+        listingUrl: { type: string, format: uri }
     FailJobInput:
       type: object
+      required: [extensionId]
       properties:
+        extensionId: { type: string, minLength: 1 }
         reason: { type: string }

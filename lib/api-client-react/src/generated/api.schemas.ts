@@ -371,6 +371,43 @@ export interface NextPublishingJob {
   job: PublishingJob | null;
 }
 
+export interface PublishingJobFill {
+  title: string;
+  /** @nullable */
+  price?: number | null;
+  description?: string;
+  /** @nullable */
+  descriptionEs?: string | null;
+  /** @nullable */
+  mileage?: number | null;
+  /** @nullable */
+  year?: number | null;
+  make: string;
+  model: string;
+  /** @nullable */
+  trim?: string | null;
+  vin: string;
+  /** @nullable */
+  bodyStyle?: string | null;
+  /** @nullable */
+  exteriorColor?: string | null;
+  /** @nullable */
+  fuelType?: string | null;
+  /** @nullable */
+  transmission?: string | null;
+  /** @nullable */
+  location?: string | null;
+  category: string;
+  /** @nullable */
+  downPayment?: number | null;
+}
+
+export interface PublishingJobPayload {
+  job: PublishingJob;
+  fill: PublishingJobFill;
+  images: string[];
+}
+
 export interface QueueListingInput {
   scheduledAt?: string;
   priority?: number;
@@ -381,7 +418,15 @@ export interface ClaimJobInput {
   extensionId: string;
 }
 
+export interface CompleteJobInput {
+  /** @minLength 1 */
+  extensionId: string;
+  listingUrl?: string;
+}
+
 export interface FailJobInput {
+  /** @minLength 1 */
+  extensionId: string;
   reason?: string;
 }
 

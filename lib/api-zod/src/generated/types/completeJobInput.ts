@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface FailJobInput {
+export interface CompleteJobInput {
   /** @minLength 1 */
   extensionId: string;
-  reason?: string;
+  listingUrl?: string;
 }

@@ -43,9 +43,12 @@ function statusClass(status: string) {
 export function PublishingQueue() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const { data, isLoading } = useListPublishingJobs({
-    status: statusFilter === "all" ? undefined : statusFilter,
-  });
+  const { data, isLoading } = useListPublishingJobs(
+    {
+      status: statusFilter === "all" ? undefined : statusFilter,
+    },
+    { query: { refetchInterval: 5000 } as never },
+  );
 
   const jobs = data?.jobs ?? [];
   const queued = jobs.filter((j) => j.status === "Queued").length;
@@ -158,10 +161,11 @@ export function PublishingQueue() {
                     <TableHead>Vehicle</TableHead>
                     <TableHead>Listing Title</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Extension</TableHead>
+                    <TableHead>Started</TableHead>
+                    <TableHead>Completed</TableHead>
+                    <TableHead>Retries</TableHead>
                     <TableHead>Priority</TableHead>
-                    <TableHead>Attempts</TableHead>
-                    <TableHead>Claimed By</TableHead>
-                    <TableHead>Updated</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -179,14 +183,23 @@ export function PublishingQueue() {
                         <Badge variant="secondary" className={cn(statusClass(job.status))}>
                           {job.status}
                         </Badge>
-                        {job.status === "Failed" && job.failedReason && (
-                          <div className="text-xs text-muted-foreground mt-1 max-w-xs truncate">{job.failedReason}</div>
+                        {(job.status === "Failed" || job.status === "Retry") && job.failedReason && (
+                          <div className="text-xs text-destructive/80 mt-1 max-w-xs truncate" title={job.failedReason}>
+                            {job.failedReason}
+                          </div>
                         )}
                       </TableCell>
-                      <TableCell>{job.priority}</TableCell>
-                      <TableCell>{job.attempts}</TableCell>
                       <TableCell className="text-muted-foreground">{job.claimedByExtension || "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{formatDate(job.updatedAt)}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {job.startedAt ? formatDate(job.startedAt) : "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {job.completedAt ? formatDate(job.completedAt) : "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {Math.max(0, (job.attempts ?? 0) - 1)}
+                      </TableCell>
+                      <TableCell>{job.priority}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

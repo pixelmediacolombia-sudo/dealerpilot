@@ -8,7 +8,7 @@ description: Durable design decisions for Sprint 2 (AI listing generation + publ
 All job transitions (`claim`, `complete`, `fail`) MUST use a single atomic conditional
 UPDATE whose WHERE clause includes the required current status, not read-then-write.
 - claim: `WHERE id = ? AND status IN ('Queued','Retry') AND claimed_by_extension IS NULL`; 0 rows updated → 409.
-- complete / fail: `WHERE id = ? AND status = 'Publishing'`; 0 rows → 409.
+- complete / fail: `WHERE id = ? AND status = 'Publishing' AND claimed_by_extension = ?`; 0 rows → 409.
 
 **Why:** the Chrome extension polls `/publishing/jobs/next` and can call claim concurrently;
 read-then-write let two extensions double-claim the same job, and unguarded complete/fail
@@ -16,6 +16,28 @@ allowed out-of-order / illegal transitions on any job id.
 **How to apply:** any new transition endpoint must encode its legal predecessor states in the
 UPDATE WHERE and return 409 when no row matches. Lifecycle: Queued → Publishing → Published,
 with Publishing → Retry (attempts < MAX_ATTEMPTS=3) or → Failed.
+
+# Finalize endpoints are ownership-scoped (complete / fail)
+
+`complete` and `fail` require an `extensionId` body and only act on a job the SAME extension
+claimed. Enforced two ways: an explicit `claimed_by_extension !== extensionId` check → 403,
+AND `claimed_by_extension = ?` folded into the atomic UPDATE WHERE.
+**Why:** without it any caller who knows a job id could finalize another extension's in-flight
+job (takeover). The 403 vs 409 split tells the caller "not yours" vs "wrong state".
+**How to apply:** mirror `ClaimJobInput`/`CompleteJobInput`/`FailJobInput` — all carry required
+`extensionId`. The dashboard never calls claim/complete/fail (extension-only), so requiring it
+there is safe.
+
+# Listing write on publish = atomic upsert keyed by (vehicle_id, channel)
+
+Completing a job upserts a `listings` row via `ON CONFLICT (vehicle_id, channel) DO UPDATE`,
+backed by a real `uniqueIndex("listings_vehicle_channel_idx")` in the schema — not read-then-
+insert. Omit `externalUrl` from the conflict-update set when no `listingUrl` is provided so a
+re-publish without a URL keeps the previously stored one.
+**Why:** read-then-write under concurrent completions created duplicate listings; the DB unique
+constraint is what actually prevents duplicates, the upsert just makes it graceful.
+**How to apply:** any per-(vehicle,channel) write must rely on that unique index, not app-level
+existence checks.
 
 # Deterministic vs AI split
 

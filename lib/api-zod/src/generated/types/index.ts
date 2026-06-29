@@ -7,6 +7,7 @@
  */
 
 export * from './claimJobInput';
+export * from './completeJobInput';
 export * from './connectionStatus';
 export * from './dealer';
 export * from './dealerList';
@@ -35,7 +36,9 @@ export * from './messageContextInput';
 export * from './messageContextResult';
 export * from './nextPublishingJob';
 export * from './publishingJob';
+export * from './publishingJobFill';
 export * from './publishingJobList';
+export * from './publishingJobPayload';
 export * from './queueListingInput';
 export * from './serviceStatus';
 export * from './testListing';

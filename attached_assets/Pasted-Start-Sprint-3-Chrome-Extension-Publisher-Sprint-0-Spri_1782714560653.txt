@@ -1,0 +1,98 @@
+Start Sprint 3: Chrome Extension Publisher.
+
+Sprint 0, Sprint 1, and Sprint 2 are complete.
+Do not rebuild the Inventory Engine.
+Do not rebuild the Listing Intelligence Engine.
+Do not change publishing job lifecycle unless required.
+
+Goal:
+Connect the existing Chrome Extension to the real Publishing Queue.
+
+Requirements:
+
+1. Extension Job Polling
+- Chrome extension should poll the backend for pending publishing jobs.
+- Add extension status panel:
+  Online
+  Backend connected
+  Jobs available
+  Current job
+  Last sync
+
+2. Claim Job
+- Extension calls:
+  POST /api/publishing/jobs/:id/claim
+- Respect existing 409 conflict behavior.
+- If claim fails, fetch another job.
+
+3. Open Marketplace
+- Add button in extension:
+  Start Publishing Job
+- When clicked, open Facebook Marketplace create listing page.
+
+4. Fill Marketplace Form
+Use claimed job data to fill:
+- title
+- asking price
+- description
+- mileage
+- year
+- make
+- model
+- VIN if field exists
+- location if field exists
+- category vehicle/car if possible
+- images if supported by current extension implementation
+
+Do not click final Publish automatically yet.
+
+5. Operator Review
+After fields are filled, show:
+- Filled successfully
+- Fields missing
+- Warnings
+- Button: Mark Published
+- Button: Mark Failed
+
+6. Complete Job
+When operator clicks Mark Published:
+- prompt for Marketplace listing URL if available
+- call complete endpoint
+- update job to Published
+- update listing status to Published
+
+7. Fail Job
+When operator clicks Mark Failed:
+- ask for failure reason
+- call fail endpoint
+- update job to Failed
+
+8. Safety
+- Never store Facebook password.
+- Do not bypass Facebook security.
+- Do not auto-click final Publish in this sprint.
+- Stop if Facebook shows login/checkpoint/captcha/security warning.
+- Log field-filling results.
+
+9. Web App Updates
+On /publishing:
+- show claimed job
+- show extension assigned
+- show started_at
+- show completed_at
+- show failed reason
+- show retry count
+- refresh status live or via polling
+
+10. Test Checklist
+- queue listing
+- extension sees job
+- extension claims job
+- extension opens Marketplace
+- extension fills fields
+- operator marks published
+- backend updates job/listing
+- operator marks failed
+- backend stores failed reason
+- double claim still returns 409
+- typecheck clean

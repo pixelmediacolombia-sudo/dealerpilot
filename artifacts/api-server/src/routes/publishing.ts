@@ -3,7 +3,9 @@ import { z } from "zod/v4";
 import {
   db,
   vehiclesTable,
+  vehicleImagesTable,
   dealersTable,
+  listingsTable,
   listingVersionsTable,
   publishingJobsTable,
   type PublishingJob,
@@ -111,6 +113,69 @@ router.get("/publishing/jobs/next", async (req, res) => {
   res.json({ job: enriched });
 });
 
+// GET /publishing/jobs/:id/payload — full data the extension needs to fill the
+// Marketplace form for a (claimed) job. Grounded entirely in inventory + the
+// specific listing version this job references.
+router.get("/publishing/jobs/:id/payload", async (req, res) => {
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Invalid job id" });
+    return;
+  }
+
+  const [job] = await db.select().from(publishingJobsTable).where(eq(publishingJobsTable.id, id));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  const [version] = await db
+    .select()
+    .from(listingVersionsTable)
+    .where(eq(listingVersionsTable.id, job.listingVersionId));
+  const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
+  const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, job.dealerId));
+  const images = await db
+    .select()
+    .from(vehicleImagesTable)
+    .where(eq(vehicleImagesTable.vehicleId, job.vehicleId))
+    .orderBy(asc(vehicleImagesTable.position));
+
+  if (!version || !vehicle) {
+    res.status(404).json({ error: "Listing data not found for job" });
+    return;
+  }
+
+  const descriptionParts = [version.descriptionEn?.trim(), version.callToAction?.trim()].filter(
+    (p): p is string => !!p,
+  );
+
+  const [enriched] = await enrich([job]);
+  res.json({
+    job: enriched,
+    fill: {
+      title: version.title,
+      price: version.askingPrice ?? vehicle.price ?? null,
+      description: descriptionParts.join("\n\n"),
+      descriptionEs: version.descriptionEs ?? null,
+      mileage: vehicle.mileage ?? null,
+      year: vehicle.year ?? null,
+      make: vehicle.make,
+      model: vehicle.model,
+      trim: vehicle.trim ?? null,
+      vin: vehicle.vin,
+      bodyStyle: vehicle.bodyStyle ?? null,
+      exteriorColor: vehicle.exteriorColor ?? null,
+      fuelType: vehicle.fuelType ?? null,
+      transmission: vehicle.transmission ?? null,
+      location: dealer?.name ?? null,
+      category: "Vehicle",
+      downPayment: version.downPayment ?? null,
+    },
+    images: images.map((img) => img.url),
+  });
+});
+
 const ClaimBody = z.object({ extensionId: z.string().min(1) });
 
 // POST /publishing/jobs/:id/claim — extension takes ownership of a job.
@@ -165,9 +230,21 @@ router.post("/publishing/jobs/:id/claim", async (req, res) => {
   res.json(enriched);
 });
 
+const CompleteBody = z.object({
+  extensionId: z.string().min(1),
+  listingUrl: z.string().url().optional(),
+});
+
 // POST /publishing/jobs/:id/complete — extension reports success.
 router.post("/publishing/jobs/:id/complete", async (req, res) => {
   const id = Number(req.params.id);
+  const parsed = CompleteBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "extensionId is required; listingUrl must be a valid URL" });
+    return;
+  }
+  const { extensionId, listingUrl } = parsed.data;
+
   const [job] = await db
     .select()
     .from(publishingJobsTable)
@@ -177,11 +254,24 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
     return;
   }
 
-  // Only a job that is currently being published can be completed.
+  // Ownership: only the extension that claimed the job may finalize it.
+  if (job.claimedByExtension && job.claimedByExtension !== extensionId) {
+    res.status(403).json({ error: "Job is claimed by another extension" });
+    return;
+  }
+
+  // Atomic, ownership-scoped transition: only a Publishing job claimed by this
+  // extension can be completed.
   const [updated] = await db
     .update(publishingJobsTable)
     .set({ status: "Published", completedAt: new Date(), failedReason: null })
-    .where(and(eq(publishingJobsTable.id, id), eq(publishingJobsTable.status, "Publishing")))
+    .where(
+      and(
+        eq(publishingJobsTable.id, id),
+        eq(publishingJobsTable.status, "Publishing"),
+        eq(publishingJobsTable.claimedByExtension, extensionId),
+      ),
+    )
     .returning();
 
   if (!updated) {
@@ -194,19 +284,46 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
     .set({ status: "Published" })
     .where(eq(vehiclesTable.id, updated.vehicleId));
 
-  req.log.info({ jobId: id }, "Publishing job completed");
+  // Record the published Marketplace listing. Atomic upsert keyed by the
+  // (vehicle_id, channel) unique constraint so concurrent completions cannot
+  // create duplicates; omit externalUrl from the conflict update so a re-publish
+  // without a URL keeps the previously stored one.
+  const conflictSet: { status: string; externalUrl?: string } = { status: "Published" };
+  if (listingUrl) conflictSet.externalUrl = listingUrl;
+  await db
+    .insert(listingsTable)
+    .values({
+      vehicleId: updated.vehicleId,
+      channel: "marketplace",
+      status: "Published",
+      externalUrl: listingUrl ?? null,
+    })
+    .onConflictDoUpdate({
+      target: [listingsTable.vehicleId, listingsTable.channel],
+      set: conflictSet,
+    });
+
+  req.log.info({ jobId: id, listingUrl }, "Publishing job completed");
   const [enriched] = await enrich([updated]);
   res.json(enriched);
 });
 
-const FailBody = z.object({ reason: z.string().optional() });
+const FailBody = z.object({
+  extensionId: z.string().min(1),
+  reason: z.string().optional(),
+});
 const MAX_ATTEMPTS = 3;
 
 // POST /publishing/jobs/:id/fail — extension reports failure (eligible for retry).
 router.post("/publishing/jobs/:id/fail", async (req, res) => {
   const id = Number(req.params.id);
-  const parsed = FailBody.safeParse(req.body);
-  const reason = parsed.success ? (parsed.data.reason ?? null) : null;
+  const parsed = FailBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "extensionId is required" });
+    return;
+  }
+  const { extensionId } = parsed.data;
+  const reason = parsed.data.reason ?? null;
 
   const [job] = await db
     .select()
@@ -217,8 +334,15 @@ router.post("/publishing/jobs/:id/fail", async (req, res) => {
     return;
   }
 
+  // Ownership: only the extension that claimed the job may fail it.
+  if (job.claimedByExtension && job.claimedByExtension !== extensionId) {
+    res.status(403).json({ error: "Job is claimed by another extension" });
+    return;
+  }
+
   const nextStatus = job.attempts >= MAX_ATTEMPTS ? "Failed" : "Retry";
-  // Only a job that is currently being published can be failed/retried.
+  // Atomic, ownership-scoped transition: only a Publishing job claimed by this
+  // extension can be failed/retried.
   const [updated] = await db
     .update(publishingJobsTable)
     .set({
@@ -226,7 +350,13 @@ router.post("/publishing/jobs/:id/fail", async (req, res) => {
       failedReason: reason,
       claimedByExtension: null,
     })
-    .where(and(eq(publishingJobsTable.id, id), eq(publishingJobsTable.status, "Publishing")))
+    .where(
+      and(
+        eq(publishingJobsTable.id, id),
+        eq(publishingJobsTable.status, "Publishing"),
+        eq(publishingJobsTable.claimedByExtension, extensionId),
+      ),
+    )
     .returning();
 
   if (!updated) {
