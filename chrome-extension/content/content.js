@@ -73,6 +73,42 @@
     });
   }
 
+  // ---- Select-field helpers (Facebook progressive dropdowns) ----
+
+  // Simple delay — used between state-machine steps.
+  function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+  // Pause for React to commit its state update and re-render new fields.
+  function waitForReactRender(ms) { return sleep(ms === undefined ? 900 : ms); }
+
+  // Find a visible <select> element by aria-label / label text keywords.
+  function findSelect(keywords) {
+    const selects = Array.from(document.querySelectorAll("select"))
+      .filter((el) => el.offsetParent !== null);
+    for (const kw of keywords) {
+      const match = selects.find((el) => labelText(el).includes(kw));
+      if (match) return match;
+    }
+    return null;
+  }
+
+  // Poll for a <select> element (it may not exist until a prior step completes).
+  function waitForSelect(keywords, maxWaitMs) {
+    const limit = maxWaitMs === undefined ? 10000 : maxWaitMs;
+    return new Promise((resolve) => {
+      const interval = 400;
+      let elapsed = 0;
+      const tick = () => {
+        const el = findSelect(keywords);
+        if (el) { resolve(el); return; }
+        elapsed += interval;
+        if (elapsed >= limit) { resolve(null); return; }
+        setTimeout(tick, interval);
+      };
+      tick();
+    });
+  }
+
   // ---- Page detection (SPA-aware) ----
   //
   // Facebook is a single-page app. The content script only loads once per tab
@@ -261,17 +297,71 @@
     }
     const { fill, images } = res.data;
 
-    const filled = [];
-    const missed = [];
+    const filled   = [];
+    const missed   = [];
     const warnings = [];
 
-    // tryFill uses waitForField so React re-renders don't cause false misses.
-    async function tryFill(label, keywords, value) {
+    // ------------------------------------------------------------------
+    // selectStep — wait for a <select>, choose the best matching option,
+    // then pause for React to re-render the next group of fields.
+    // ------------------------------------------------------------------
+    async function selectStep(label, keywords, targetValue, waitAfterMs) {
+      const settle = waitAfterMs === undefined ? 900 : waitAfterMs;
+
+      // Skip entirely when the job data has no value for this field.
+      if (targetValue === null || targetValue === undefined || targetValue === "") {
+        warnings.push(`${label}: no value in listing data — skipped`);
+        return false;
+      }
+
+      setStatus(`Waiting for "${label}" field…`);
+      const selectEl = await waitForSelect(keywords);
+      if (!selectEl) {
+        missed.push(label);
+        warnings.push(`${label}: field did not appear (form may have changed)`);
+        return false;
+      }
+
+      const target  = String(targetValue).toLowerCase().trim();
+      const options = Array.from(selectEl.options).filter((o) => o.value !== "");
+
+      // Match priority: exact text → target contains option → option contains target
+      const pick =
+        options.find((o) => o.text.toLowerCase().trim() === target) ||
+        options.find((o) => o.text.toLowerCase().includes(target))  ||
+        options.find((o) => target.includes(o.text.toLowerCase().trim()) && o.text.trim().length > 2);
+
+      if (!pick) {
+        missed.push(label);
+        const sample = options.slice(0, 6).map((o) => `"${o.text}"`).join(", ");
+        warnings.push(`${label}: no option matching "${targetValue}" — available: ${sample}`);
+        return false;
+      }
+
+      // Use the native HTMLSelectElement setter so React's synthetic onChange fires.
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLSelectElement.prototype, "value",
+      ).set;
+      nativeSetter.call(selectEl, pick.value);
+      selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+      selectEl.dispatchEvent(new Event("input",  { bubbles: true }));
+
+      filled.push(label);
+      log(`${label} → "${pick.text}"`);
+      await waitForReactRender(settle);
+      return true;
+    }
+
+    // ------------------------------------------------------------------
+    // fillStep — wait for a text input / textarea, write the value, and
+    // fire the full event trio so React validates the field.
+    // ------------------------------------------------------------------
+    async function fillStep(label, keywords, value) {
       if (value === null || value === undefined || value === "") {
-        warnings.push(`${label} has no data in the listing`);
+        warnings.push(`${label}: no value in listing data — skipped`);
         return;
       }
-      const el = await waitForField(keywords);
+      const el = await waitForField(keywords, 6000);
       if (el) {
         setNativeValue(el, String(value));
         filled.push(label);
@@ -280,37 +370,92 @@
       }
     }
 
-    // Title — Facebook vehicle form uses many different labels for this field.
-    // Cast a wide net: any of these substrings (case-insensitive) will match.
-    await tryFill("title", [
-      "title",
-      "listing title",
-      "what are you selling",
-      "vehicle name",
-      "add a title",
-      "item title",
-      "name",
-    ], fill.title);
+    // ==================================================================
+    // STATE MACHINE — sequential progressive form fill
+    //
+    // Phase 1: Dropdown cascade.  Facebook only renders Year after Vehicle
+    // Type is chosen, Make after Year, Model after Make, and the remaining
+    // text fields only after Model.  Never proceed to the next step until
+    // the current one resolves.
+    //
+    // Phase 2: Text fields that appear after the dropdown cascade.
+    //
+    // Phase 3: Optional dropdowns (may or may not appear).
+    // ==================================================================
 
-    await tryFill("price", ["price", "listing price", "asking price"], fill.price);
-    await tryFill("description", ["description", "describe", "details"], fill.description);
+    // ---- Phase 1: Dropdown cascade ----
 
-    // Mileage — Facebook has used "Mileage", "Odometer", "Miles", and locale variants.
-    await tryFill("mileage", [
-      "mileage",
-      "odometer",
-      "miles",
-      "vehicle mileage",
-      "number of miles",
-      "mileage (optional)",
-      "odometer reading",
+    setStatus("Step 1 of 4: Selecting vehicle type…");
+    await selectStep(
+      "vehicle type",
+      ["vehicle type", "type of vehicle", "category", "vehicle category", "listing type"],
+      fill.vehicleType || "Car/Truck",
+      1200,
+    );
+
+    setStatus("Step 2 of 4: Selecting year…");
+    await selectStep(
+      "year",
+      ["year", "vehicle year", "model year"],
+      fill.year ? String(fill.year) : null,
+      900,
+    );
+
+    setStatus("Step 3 of 4: Selecting make…");
+    await selectStep(
+      "make",
+      ["make", "vehicle make", "brand", "manufacturer"],
+      fill.make,
+      900,
+    );
+
+    setStatus("Step 4 of 4: Selecting model — waiting for remaining fields…");
+    await selectStep(
+      "model",
+      ["model", "vehicle model"],
+      fill.model,
+      2000, // Longer settle: title, mileage, price, description all render after this
+    );
+
+    // ---- Phase 2: Text fields ----
+
+    setStatus("Filling mileage, price, title, description…");
+
+    await fillStep("mileage", [
+      "mileage", "odometer", "miles", "vehicle mileage",
+      "number of miles", "mileage (optional)", "odometer reading",
     ], fill.mileage);
 
-    await tryFill("year",     ["year", "vehicle year"],                        fill.year);
-    await tryFill("make",     ["make", "vehicle make", "manufacturer"],        fill.make);
-    await tryFill("model",    ["model", "vehicle model"],                      fill.model);
-    await tryFill("vin",      ["vin", "vin number", "vehicle identification"], fill.vin);
-    await tryFill("location", ["location", "city", "where"],                   fill.location);
+    await fillStep("price", [
+      "price", "listing price", "asking price",
+    ], fill.price);
+
+    await fillStep("title", [
+      "title", "listing title", "what are you selling",
+      "vehicle name", "add a title", "item title",
+    ], fill.title);
+
+    await fillStep("description", [
+      "description", "describe", "details",
+    ], fill.description);
+
+    await fillStep("vin", [
+      "vin", "vin number", "vehicle identification number",
+    ], fill.vin);
+
+    await fillStep("location", [
+      "location", "city", "where",
+    ], fill.location);
+
+    // ---- Phase 3: Optional dropdowns (silently skip if no data or field absent) ----
+
+    await selectStep("condition",     ["condition", "vehicle condition"],       fill.condition,    300);
+    await selectStep("transmission",  ["transmission", "transmission type"],    fill.transmission, 300);
+    await selectStep("fuel type",     ["fuel", "fuel type"],                    fill.fuelType,     300);
+    await selectStep("color",         ["color", "exterior color"],              fill.color,        300);
+    await selectStep("body style",    ["body style", "body type"],              fill.bodyStyle,    300);
+
+    // ---- Done ----
 
     if (images && images.length) {
       warnings.push(
