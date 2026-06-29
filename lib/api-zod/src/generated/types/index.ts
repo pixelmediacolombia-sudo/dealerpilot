@@ -6,9 +6,28 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './connectionStatus';
+export * from './dealer';
+export * from './dealerList';
+export * from './dealerUpdate';
+export * from './errorResponse';
+export * from './extensionConnection';
+export * from './feedRun';
+export * from './feedRunList';
 export * from './healthStatus';
+export * from './heartbeatInput';
 export * from './lead';
 export * from './leadList';
+export * from './listVehiclesParams';
+export * from './listVehiclesSort';
 export * from './messageContextInput';
 export * from './messageContextResult';
+export * from './serviceStatus';
 export * from './testListing';
+export * from './vehicle';
+export * from './vehicleChange';
+export * from './vehicleDetail';
+export * from './vehicleImage';
+export * from './vehicleList';
+export * from './vehicleStats';
+export * from './vehicleStatusUpdate';

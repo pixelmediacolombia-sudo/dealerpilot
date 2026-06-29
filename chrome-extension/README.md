@@ -1,10 +1,10 @@
-# Marketplace AI — Chrome Extension (Sprint 0 Spike)
+# DealerPilot AI — Chrome Extension (Sprint 0 Spike)
 
 This is a **proof of concept**, not the finished product. It validates that a Replit web app can communicate with a Chrome Extension running on Facebook Marketplace and Messenger.
 
 The extension:
 
-- Shows a floating **"Marketplace AI Connected"** panel on Facebook and Messenger pages.
+- Shows a floating **"DealerPilot AI Connected"** panel on Facebook and Messenger pages.
 - On the Marketplace **create listing** page, adds a **"Fill Test Listing"** button that pulls the test vehicle from the backend and fills the form fields. **It never clicks Publish.**
 - On **Messenger**, adds a **"Read Chat & Suggest Reply"** button that reads the visible conversation, asks the backend for a suggested reply, and saves a test lead to the CRM. An **"Insert Reply"** button drops the reply into the message box. **It never clicks Send.**
 
@@ -14,7 +14,7 @@ The extension:
 2. Turn on **Developer Mode** (top-right toggle).
 3. Click **Load unpacked**.
 4. Select this `chrome-extension/` folder.
-5. The "Marketplace AI (Spike)" extension appears in your list.
+5. The "DealerPilot AI (Spike)" extension appears in your list.
 
 ## Configure the Backend URL
 

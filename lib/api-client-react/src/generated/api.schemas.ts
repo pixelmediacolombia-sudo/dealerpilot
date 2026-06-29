@@ -9,6 +9,185 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface ErrorResponse {
+  error: string;
+}
+
+export interface Dealer {
+  id: number;
+  name: string;
+  /** @nullable */
+  websiteUrl?: string | null;
+  /** @nullable */
+  xmlFeedUrl?: string | null;
+  status: string;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  lastSyncAt?: string | null;
+  /** @nullable */
+  lastSyncStatus?: string | null;
+  totalVehiclesImported: number;
+  /** @nullable */
+  lastError?: string | null;
+  createdAt: string;
+}
+
+export interface DealerList {
+  dealers: Dealer[];
+}
+
+export interface DealerUpdate {
+  /** @minLength 1 */
+  name?: string;
+  websiteUrl?: string;
+  xmlFeedUrl?: string;
+  status?: string;
+  notes?: string;
+}
+
+export interface FeedRun {
+  id: number;
+  dealerId: number;
+  status: string;
+  startedAt: string;
+  /** @nullable */
+  finishedAt?: string | null;
+  vehiclesImported: number;
+  vehiclesNew: number;
+  vehiclesUpdated: number;
+  vehiclesRemoved: number;
+  vehiclesActive: number;
+  errorCount: number;
+  /** @nullable */
+  errorMessage?: string | null;
+}
+
+export interface FeedRunList {
+  feedRuns: FeedRun[];
+}
+
+export interface Vehicle {
+  id: number;
+  dealerId: number;
+  vin: string;
+  /** @nullable */
+  stockNumber?: string | null;
+  /** @nullable */
+  year: number | null;
+  make: string;
+  model: string;
+  /** @nullable */
+  trim?: string | null;
+  /** @nullable */
+  mileage?: number | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  exteriorColor?: string | null;
+  /** @nullable */
+  interiorColor?: string | null;
+  /** @nullable */
+  bodyStyle?: string | null;
+  /** @nullable */
+  transmission?: string | null;
+  /** @nullable */
+  fuelType?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  vdpUrl?: string | null;
+  status: string;
+  /** @nullable */
+  primaryImageUrl?: string | null;
+  imageCount: number;
+  /** @nullable */
+  lastSyncAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VehicleList {
+  vehicles: Vehicle[];
+}
+
+export interface VehicleImage {
+  id: number;
+  url: string;
+  position: number;
+}
+
+export interface VehicleChange {
+  id: number;
+  changeType: string;
+  /** @nullable */
+  field?: string | null;
+  /** @nullable */
+  oldValue?: string | null;
+  /** @nullable */
+  newValue?: string | null;
+  createdAt: string;
+}
+
+export interface VehicleDetail {
+  vehicle: Vehicle;
+  images: VehicleImage[];
+  changes: VehicleChange[];
+  /** @nullable */
+  sourceRaw?: string | null;
+}
+
+export interface VehicleStatusUpdate {
+  /** @minLength 1 */
+  status: string;
+}
+
+export interface VehicleStats {
+  total: number;
+  active: number;
+  new: number;
+  readyToPublish: number;
+  published: number;
+  soldRemoved: number;
+  priceChanged: number;
+}
+
+export interface ServiceStatus {
+  status: string;
+  /** @nullable */
+  detail?: string | null;
+  /** @nullable */
+  lastHeartbeatAt?: string | null;
+  /** @nullable */
+  backendUrl?: string | null;
+}
+
+export interface ConnectionStatus {
+  backend: ServiceStatus;
+  database: ServiceStatus;
+  xmlFeed: ServiceStatus;
+  chromeExtension: ServiceStatus;
+  facebookSession: ServiceStatus;
+  marketplace: ServiceStatus;
+  messenger: ServiceStatus;
+  openai: ServiceStatus;
+}
+
+export interface ExtensionConnection {
+  id: number;
+  name: string;
+  /** @nullable */
+  backendUrl?: string | null;
+  status: string;
+  /** @nullable */
+  lastHeartbeatAt: string | null;
+}
+
+export interface HeartbeatInput {
+  backendUrl?: string;
+  status?: string;
+}
+
 export interface TestListing {
   title: string;
   year: number;
@@ -48,4 +227,26 @@ export interface MessageContextResult {
 export interface LeadList {
   leads: Lead[];
 }
+
+export type ListVehiclesParams = {
+/**
+ * Search by VIN, stock number, make, or model
+ */
+q?: string;
+/**
+ * Filter by vehicle status
+ */
+status?: string;
+sort?: ListVehiclesSort;
+};
+
+export type ListVehiclesSort = typeof ListVehiclesSort[keyof typeof ListVehiclesSort];
+
+
+export const ListVehiclesSort = {
+  newest: 'newest',
+  price_high: 'price_high',
+  price_low: 'price_low',
+  mileage_low: 'mileage_low',
+} as const;
 

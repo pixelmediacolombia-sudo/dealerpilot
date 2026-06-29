@@ -1,7 +1,9 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
-import { db, leadsTable } from "@workspace/db";
-import { desc } from "drizzle-orm";
+import { db, leadsTable, extensionConnectionsTable } from "@workspace/db";
+import { desc, eq } from "drizzle-orm";
+
+const EXTENSION_NAME = "Chrome Extension";
 
 const router: IRouter = Router();
 
@@ -89,6 +91,58 @@ router.post("/extension/message-context", async (req, res) => {
   req.log.info({ leadId: lead?.id }, "Saved test lead from message context");
 
   res.json({ suggestedReply, lead });
+});
+
+const HeartbeatBody = z.object({
+  backendUrl: z.string().optional(),
+  status: z.string().optional(),
+});
+
+router.post("/extension/heartbeat", async (req, res) => {
+  const parsed = HeartbeatBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid heartbeat" });
+    return;
+  }
+  const now = new Date();
+  const status = parsed.data.status ?? "online";
+
+  const [existing] = await db
+    .select()
+    .from(extensionConnectionsTable)
+    .where(eq(extensionConnectionsTable.name, EXTENSION_NAME));
+
+  let row;
+  if (existing) {
+    [row] = await db
+      .update(extensionConnectionsTable)
+      .set({
+        status,
+        backendUrl: parsed.data.backendUrl ?? existing.backendUrl,
+        lastHeartbeatAt: now,
+      })
+      .where(eq(extensionConnectionsTable.id, existing.id))
+      .returning();
+  } else {
+    [row] = await db
+      .insert(extensionConnectionsTable)
+      .values({
+        name: EXTENSION_NAME,
+        status,
+        backendUrl: parsed.data.backendUrl ?? null,
+        lastHeartbeatAt: now,
+      })
+      .returning();
+  }
+
+  req.log.info("Recorded extension heartbeat");
+  res.json({
+    id: row!.id,
+    name: row!.name,
+    backendUrl: row!.backendUrl ?? null,
+    status: row!.status,
+    lastHeartbeatAt: row!.lastHeartbeatAt ? row!.lastHeartbeatAt.toISOString() : null,
+  });
 });
 
 router.get("/extension/leads", async (req, res) => {

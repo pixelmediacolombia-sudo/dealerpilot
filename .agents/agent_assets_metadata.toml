@@ -1,5 +1,88 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "RvnZCPeia8VVEjpWoicYN"
+uri = "file://artifacts/dashboard/public/sample-vehicles/wrangler.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "e_z92W3t1Z0-zzwizRsnO"
+uri = "file://artifacts/dashboard/public/sample-vehicles/raptor.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "XBUJgzQdnUc4FQKV7_Qtn"
+uri = "file://artifacts/dashboard/public/sample-vehicles/civic-typer.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "uUM1K_KzTbScITlScZ6Ny"
+uri = "file://artifacts/dashboard/public/sample-vehicles/nissan-z.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "xkMYR7GGbxMH3JnmYCgwJ"
+uri = "file://artifacts/dashboard/public/sample-vehicles/mustang-gt.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "36bH19tKoaUXkKtVgAb3k"
+uri = "file://artifacts/dashboard/public/sample-vehicles/camaro-ss.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "4urfgt_iWiHq4r8CXafr7"
+uri = "file://artifacts/dashboard/public/sample-vehicles/challenger-rt.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "NTKaocOWh1YnUC2pYjoj8"
+uri = "file://artifacts/dashboard/public/sample-vehicles/bmw-m4.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "U4gbwx5sSdwyjq28uTAYF"
+uri = "file://artifacts/dashboard/public/sample-vehicles/audi-s5.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "bNuu9_RtWsXuFONppMFdH"
+uri = "file://artifacts/dashboard/public/sample-vehicles/porsche-911.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "I135pwJN9KmBIkDnoW8YE"
+uri = "file://artifacts/dashboard/public/sample-vehicles/supra.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "zEO-mEcfRTejgVJmefncf"
+uri = "file://artifacts/dashboard/public/sample-vehicles/wrx.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "6Dm1a_ZjnW16Uede6PIIz"
+uri = "file://artifacts/dashboard/public/sample-vehicles/model3.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "XAx6ZreHWAMWZl5oCHA5C"
+uri = "file://artifacts/dashboard/public/sample-vehicles/corvette.png"
+type = "image"
+title = "generated_image"
 
 [[outputs]]
 id = "hi0KuSiqDficWIkqQJEwv"

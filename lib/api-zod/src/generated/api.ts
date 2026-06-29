@@ -18,6 +18,344 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary List dealers
+ */
+export const ListDealersResponse = zod.object({
+  "dealers": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "websiteUrl": zod.string().nullish(),
+  "xmlFeedUrl": zod.string().nullish(),
+  "status": zod.string(),
+  "notes": zod.string().nullish(),
+  "lastSyncAt": zod.string().nullish(),
+  "lastSyncStatus": zod.string().nullish(),
+  "totalVehiclesImported": zod.number(),
+  "lastError": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Get a dealer with feed summary
+ */
+export const GetDealerParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetDealerResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "websiteUrl": zod.string().nullish(),
+  "xmlFeedUrl": zod.string().nullish(),
+  "status": zod.string(),
+  "notes": zod.string().nullish(),
+  "lastSyncAt": zod.string().nullish(),
+  "lastSyncStatus": zod.string().nullish(),
+  "totalVehiclesImported": zod.number(),
+  "lastError": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update dealer fields (incl. XML feed URL)
+ */
+export const UpdateDealerParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateDealerBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "websiteUrl": zod.string().optional(),
+  "xmlFeedUrl": zod.string().optional(),
+  "status": zod.string().optional(),
+  "notes": zod.string().optional()
+})
+
+export const UpdateDealerResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "websiteUrl": zod.string().nullish(),
+  "xmlFeedUrl": zod.string().nullish(),
+  "status": zod.string(),
+  "notes": zod.string().nullish(),
+  "lastSyncAt": zod.string().nullish(),
+  "lastSyncStatus": zod.string().nullish(),
+  "totalVehiclesImported": zod.number(),
+  "lastError": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Sync the dealer's XML feed (parse, import, delta-detect)
+ */
+export const SyncDealerFeedParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SyncDealerFeedResponse = zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "startedAt": zod.string(),
+  "finishedAt": zod.string().nullish(),
+  "vehiclesImported": zod.number(),
+  "vehiclesNew": zod.number(),
+  "vehiclesUpdated": zod.number(),
+  "vehiclesRemoved": zod.number(),
+  "vehiclesActive": zod.number(),
+  "errorCount": zod.number(),
+  "errorMessage": zod.string().nullish()
+})
+
+
+/**
+ * @summary List recent feed runs for a dealer
+ */
+export const ListFeedRunsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListFeedRunsResponse = zod.object({
+  "feedRuns": zod.array(zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "startedAt": zod.string(),
+  "finishedAt": zod.string().nullish(),
+  "vehiclesImported": zod.number(),
+  "vehiclesNew": zod.number(),
+  "vehiclesUpdated": zod.number(),
+  "vehiclesRemoved": zod.number(),
+  "vehiclesActive": zod.number(),
+  "errorCount": zod.number(),
+  "errorMessage": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary List vehicles with search, filter, and sort
+ */
+export const ListVehiclesQueryParams = zod.object({
+  "q": zod.coerce.string().optional().describe('Search by VIN, stock number, make, or model'),
+  "status": zod.coerce.string().optional().describe('Filter by vehicle status'),
+  "sort": zod.enum(['newest', 'price_high', 'price_low', 'mileage_low']).optional()
+})
+
+export const ListVehiclesResponse = zod.object({
+  "vehicles": zod.array(zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "vin": zod.string(),
+  "stockNumber": zod.string().nullish(),
+  "year": zod.number().nullable(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "trim": zod.string().nullish(),
+  "mileage": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "exteriorColor": zod.string().nullish(),
+  "interiorColor": zod.string().nullish(),
+  "bodyStyle": zod.string().nullish(),
+  "transmission": zod.string().nullish(),
+  "fuelType": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "vdpUrl": zod.string().nullish(),
+  "status": zod.string(),
+  "primaryImageUrl": zod.string().nullish(),
+  "imageCount": zod.number(),
+  "lastSyncAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Inventory counts by status
+ */
+export const GetVehicleStatsResponse = zod.object({
+  "total": zod.number(),
+  "active": zod.number(),
+  "new": zod.number(),
+  "readyToPublish": zod.number(),
+  "published": zod.number(),
+  "soldRemoved": zod.number(),
+  "priceChanged": zod.number()
+})
+
+
+/**
+ * @summary Vehicle detail with images, changes, and raw data
+ */
+export const GetVehicleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetVehicleResponse = zod.object({
+  "vehicle": zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "vin": zod.string(),
+  "stockNumber": zod.string().nullish(),
+  "year": zod.number().nullable(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "trim": zod.string().nullish(),
+  "mileage": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "exteriorColor": zod.string().nullish(),
+  "interiorColor": zod.string().nullish(),
+  "bodyStyle": zod.string().nullish(),
+  "transmission": zod.string().nullish(),
+  "fuelType": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "vdpUrl": zod.string().nullish(),
+  "status": zod.string(),
+  "primaryImageUrl": zod.string().nullish(),
+  "imageCount": zod.number(),
+  "lastSyncAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}),
+  "images": zod.array(zod.object({
+  "id": zod.number(),
+  "url": zod.string(),
+  "position": zod.number()
+})),
+  "changes": zod.array(zod.object({
+  "id": zod.number(),
+  "changeType": zod.string(),
+  "field": zod.string().nullish(),
+  "oldValue": zod.string().nullish(),
+  "newValue": zod.string().nullish(),
+  "createdAt": zod.string()
+})),
+  "sourceRaw": zod.string().nullish()
+})
+
+
+/**
+ * @summary Update a vehicle's status (e.g. Ready to Publish, Archived)
+ */
+export const UpdateVehicleStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateVehicleStatusBody = zod.object({
+  "status": zod.string().min(1)
+})
+
+export const UpdateVehicleStatusResponse = zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "vin": zod.string(),
+  "stockNumber": zod.string().nullish(),
+  "year": zod.number().nullable(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "trim": zod.string().nullish(),
+  "mileage": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "exteriorColor": zod.string().nullish(),
+  "interiorColor": zod.string().nullish(),
+  "bodyStyle": zod.string().nullish(),
+  "transmission": zod.string().nullish(),
+  "fuelType": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "vdpUrl": zod.string().nullish(),
+  "status": zod.string(),
+  "primaryImageUrl": zod.string().nullish(),
+  "imageCount": zod.number(),
+  "lastSyncAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Status of all integrations and services
+ */
+export const GetConnectionStatusResponse = zod.object({
+  "backend": zod.object({
+  "status": zod.string(),
+  "detail": zod.string().nullish(),
+  "lastHeartbeatAt": zod.string().nullish(),
+  "backendUrl": zod.string().nullish()
+}),
+  "database": zod.object({
+  "status": zod.string(),
+  "detail": zod.string().nullish(),
+  "lastHeartbeatAt": zod.string().nullish(),
+  "backendUrl": zod.string().nullish()
+}),
+  "xmlFeed": zod.object({
+  "status": zod.string(),
+  "detail": zod.string().nullish(),
+  "lastHeartbeatAt": zod.string().nullish(),
+  "backendUrl": zod.string().nullish()
+}),
+  "chromeExtension": zod.object({
+  "status": zod.string(),
+  "detail": zod.string().nullish(),
+  "lastHeartbeatAt": zod.string().nullish(),
+  "backendUrl": zod.string().nullish()
+}),
+  "facebookSession": zod.object({
+  "status": zod.string(),
+  "detail": zod.string().nullish(),
+  "lastHeartbeatAt": zod.string().nullish(),
+  "backendUrl": zod.string().nullish()
+}),
+  "marketplace": zod.object({
+  "status": zod.string(),
+  "detail": zod.string().nullish(),
+  "lastHeartbeatAt": zod.string().nullish(),
+  "backendUrl": zod.string().nullish()
+}),
+  "messenger": zod.object({
+  "status": zod.string(),
+  "detail": zod.string().nullish(),
+  "lastHeartbeatAt": zod.string().nullish(),
+  "backendUrl": zod.string().nullish()
+}),
+  "openai": zod.object({
+  "status": zod.string(),
+  "detail": zod.string().nullish(),
+  "lastHeartbeatAt": zod.string().nullish(),
+  "backendUrl": zod.string().nullish()
+})
+})
+
+
+/**
+ * @summary Record an extension heartbeat
+ */
+export const RecordHeartbeatBody = zod.object({
+  "backendUrl": zod.string().optional(),
+  "status": zod.string().optional()
+})
+
+export const RecordHeartbeatResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "backendUrl": zod.string().nullish(),
+  "status": zod.string(),
+  "lastHeartbeatAt": zod.string().nullable()
+})
+
+
+/**
  * Returns the static test listing the Chrome extension fills into Marketplace.
  * @summary Get the test vehicle listing
  */

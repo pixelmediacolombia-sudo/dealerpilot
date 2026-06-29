@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Marketplace AI (Spike)",
+  "name": "DealerPilot AI (Spike)",
   "version": "0.1.0",
   "description": "Sprint 0 proof of concept: connects a Replit web app to Facebook Marketplace and Messenger for assisted listing and replies.",
   "permissions": ["storage", "scripting", "activeTab"],
@@ -28,6 +28,6 @@
   ],
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Marketplace AI"
+    "default_title": "DealerPilot AI"
   }
 }

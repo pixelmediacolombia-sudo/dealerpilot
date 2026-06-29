@@ -33,6 +33,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message.type === "PING") {
         const base = await getBackendUrl();
         await apiGet("/api/healthz");
+        // Report a heartbeat so the dashboard Connection Center can show the
+        // extension as online. Best-effort: never fail the PING over this.
+        try {
+          await apiPost("/api/extension/heartbeat", {
+            backendUrl: base,
+            status: "online",
+          });
+        } catch (heartbeatErr) {
+          console.warn("[DealerPilot AI] heartbeat failed", heartbeatErr);
+        }
         sendResponse({ ok: true, data: { backendUrl: base } });
         return;
       }

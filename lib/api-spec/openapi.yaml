@@ -12,6 +12,12 @@ tags:
     description: Health operations
   - name: extension
     description: Chrome extension spike endpoints
+  - name: dealers
+    description: Dealer setup and feed configuration
+  - name: inventory
+    description: Vehicle inventory
+  - name: connection
+    description: Connection center status
 paths:
   /healthz:
     get:
@@ -26,6 +32,224 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /dealers:
+    get:
+      operationId: listDealers
+      tags: [dealers]
+      summary: List dealers
+      responses:
+        "200":
+          description: List of dealers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DealerList"
+  /dealers/{id}:
+    get:
+      operationId: getDealer
+      tags: [dealers]
+      summary: Get a dealer with feed summary
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The dealer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dealer"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateDealer
+      tags: [dealers]
+      summary: Update dealer fields (incl. XML feed URL)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DealerUpdate"
+      responses:
+        "200":
+          description: Updated dealer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dealer"
+  /dealers/{id}/sync:
+    post:
+      operationId: syncDealerFeed
+      tags: [dealers]
+      summary: Sync the dealer's XML feed (parse, import, delta-detect)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Feed run result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedRun"
+        "400":
+          description: Sync failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedRun"
+  /dealers/{id}/feed-runs:
+    get:
+      operationId: listFeedRuns
+      tags: [dealers]
+      summary: List recent feed runs for a dealer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Feed runs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedRunList"
+
+  /vehicles:
+    get:
+      operationId: listVehicles
+      tags: [inventory]
+      summary: List vehicles with search, filter, and sort
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Search by VIN, stock number, make, or model
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by vehicle status
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [newest, price_high, price_low, mileage_low]
+      responses:
+        "200":
+          description: Vehicle list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleList"
+  /vehicles/stats:
+    get:
+      operationId: getVehicleStats
+      tags: [inventory]
+      summary: Inventory counts by status
+      responses:
+        "200":
+          description: Inventory stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleStats"
+  /vehicles/{id}:
+    get:
+      operationId: getVehicle
+      tags: [inventory]
+      summary: Vehicle detail with images, changes, and raw data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Vehicle detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /vehicles/{id}/status:
+    patch:
+      operationId: updateVehicleStatus
+      tags: [inventory]
+      summary: Update a vehicle's status (e.g. Ready to Publish, Archived)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleStatusUpdate"
+      responses:
+        "200":
+          description: Updated vehicle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+
+  /connection-center:
+    get:
+      operationId: getConnectionStatus
+      tags: [connection]
+      summary: Status of all integrations and services
+      responses:
+        "200":
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionStatus"
+
+  /extension/heartbeat:
+    post:
+      operationId: recordHeartbeat
+      tags: [extension]
+      summary: Record an extension heartbeat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HeartbeatInput"
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionConnection"
   /extension/test-listing:
     get:
       operationId: getTestListing
@@ -71,6 +295,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeadList"
+
 components:
   schemas:
     HealthStatus:
@@ -80,6 +305,213 @@ components:
           type: string
       required:
         - status
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    Dealer:
+      type: object
+      required: [id, name, status, totalVehiclesImported, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        websiteUrl: { type: ["string", "null"] }
+        xmlFeedUrl: { type: ["string", "null"] }
+        status: { type: string }
+        notes: { type: ["string", "null"] }
+        lastSyncAt: { type: ["string", "null"] }
+        lastSyncStatus: { type: ["string", "null"] }
+        totalVehiclesImported: { type: integer }
+        lastError: { type: ["string", "null"] }
+        createdAt: { type: string }
+    DealerList:
+      type: object
+      required: [dealers]
+      properties:
+        dealers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dealer"
+    DealerUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        websiteUrl: { type: string }
+        xmlFeedUrl: { type: string }
+        status: { type: string }
+        notes: { type: string }
+
+    FeedRun:
+      type: object
+      required:
+        [
+          id,
+          dealerId,
+          status,
+          startedAt,
+          vehiclesImported,
+          vehiclesNew,
+          vehiclesUpdated,
+          vehiclesRemoved,
+          vehiclesActive,
+          errorCount,
+        ]
+      properties:
+        id: { type: integer }
+        dealerId: { type: integer }
+        status: { type: string }
+        startedAt: { type: string }
+        finishedAt: { type: ["string", "null"] }
+        vehiclesImported: { type: integer }
+        vehiclesNew: { type: integer }
+        vehiclesUpdated: { type: integer }
+        vehiclesRemoved: { type: integer }
+        vehiclesActive: { type: integer }
+        errorCount: { type: integer }
+        errorMessage: { type: ["string", "null"] }
+    FeedRunList:
+      type: object
+      required: [feedRuns]
+      properties:
+        feedRuns:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedRun"
+
+    Vehicle:
+      type: object
+      required:
+        [id, dealerId, vin, year, make, model, status, imageCount, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        dealerId: { type: integer }
+        vin: { type: string }
+        stockNumber: { type: ["string", "null"] }
+        year: { type: ["integer", "null"] }
+        make: { type: string }
+        model: { type: string }
+        trim: { type: ["string", "null"] }
+        mileage: { type: ["integer", "null"] }
+        price: { type: ["integer", "null"] }
+        exteriorColor: { type: ["string", "null"] }
+        interiorColor: { type: ["string", "null"] }
+        bodyStyle: { type: ["string", "null"] }
+        transmission: { type: ["string", "null"] }
+        fuelType: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        vdpUrl: { type: ["string", "null"] }
+        status: { type: string }
+        primaryImageUrl: { type: ["string", "null"] }
+        imageCount: { type: integer }
+        lastSyncAt: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    VehicleList:
+      type: object
+      required: [vehicles]
+      properties:
+        vehicles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Vehicle"
+    VehicleImage:
+      type: object
+      required: [id, url, position]
+      properties:
+        id: { type: integer }
+        url: { type: string }
+        position: { type: integer }
+    VehicleChange:
+      type: object
+      required: [id, changeType, createdAt]
+      properties:
+        id: { type: integer }
+        changeType: { type: string }
+        field: { type: ["string", "null"] }
+        oldValue: { type: ["string", "null"] }
+        newValue: { type: ["string", "null"] }
+        createdAt: { type: string }
+    VehicleDetail:
+      type: object
+      required: [vehicle, images, changes]
+      properties:
+        vehicle:
+          $ref: "#/components/schemas/Vehicle"
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/VehicleImage"
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/VehicleChange"
+        sourceRaw: { type: ["string", "null"] }
+    VehicleStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, minLength: 1 }
+    VehicleStats:
+      type: object
+      required:
+        [total, active, new, readyToPublish, published, soldRemoved, priceChanged]
+      properties:
+        total: { type: integer }
+        active: { type: integer }
+        new: { type: integer }
+        readyToPublish: { type: integer }
+        published: { type: integer }
+        soldRemoved: { type: integer }
+        priceChanged: { type: integer }
+
+    ServiceStatus:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+        detail: { type: ["string", "null"] }
+        lastHeartbeatAt: { type: ["string", "null"] }
+        backendUrl: { type: ["string", "null"] }
+    ConnectionStatus:
+      type: object
+      required:
+        [
+          backend,
+          database,
+          xmlFeed,
+          chromeExtension,
+          facebookSession,
+          marketplace,
+          messenger,
+          openai,
+        ]
+      properties:
+        backend: { $ref: "#/components/schemas/ServiceStatus" }
+        database: { $ref: "#/components/schemas/ServiceStatus" }
+        xmlFeed: { $ref: "#/components/schemas/ServiceStatus" }
+        chromeExtension: { $ref: "#/components/schemas/ServiceStatus" }
+        facebookSession: { $ref: "#/components/schemas/ServiceStatus" }
+        marketplace: { $ref: "#/components/schemas/ServiceStatus" }
+        messenger: { $ref: "#/components/schemas/ServiceStatus" }
+        openai: { $ref: "#/components/schemas/ServiceStatus" }
+
+    ExtensionConnection:
+      type: object
+      required: [id, name, status, lastHeartbeatAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        backendUrl: { type: ["string", "null"] }
+        status: { type: string }
+        lastHeartbeatAt: { type: ["string", "null"] }
+    HeartbeatInput:
+      type: object
+      properties:
+        backendUrl: { type: string }
+        status: { type: string }
+
     TestListing:
       type: object
       required: [title, year, make, model, price, downPayment, mileage, description]
@@ -124,4 +556,3 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Lead"
-

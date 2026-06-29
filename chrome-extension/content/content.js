@@ -2,7 +2,7 @@
   if (window.__marketplaceAiPanelLoaded) return;
   window.__marketplaceAiPanelLoaded = true;
 
-  const log = (...args) => console.log("[Marketplace AI]", ...args);
+  const log = (...args) => console.log("[DealerPilot AI]", ...args);
 
   function send(message) {
     return new Promise((resolve) => {
@@ -59,7 +59,7 @@
   panel.innerHTML = `
     <div id="mai-header">
       <span id="mai-dot"></span>
-      <span id="mai-title">Marketplace AI Connected</span>
+      <span id="mai-title">DealerPilot AI Connected</span>
       <button id="mai-toggle" title="Collapse">_</button>
     </div>
     <div id="mai-body">

@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { seedDealerAndInventory } from "./inventory/seed";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,8 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  void seedDealerAndInventory(logger).catch((seedErr) => {
+    logger.error({ err: seedErr }, "Failed to seed dealer and inventory");
+  });
 });

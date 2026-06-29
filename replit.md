@@ -30,11 +30,15 @@ _Populate as you build — non-obvious choices a reader couldn't infer from the 
 
 ## Product
 
-Marketplace AI — a standalone SaaS for an agency that manages Facebook Marketplace
+DealerPilot AI — a standalone SaaS for an agency that manages Facebook Marketplace
 listings and buyer conversations for car dealerships (first dealer: Alpha Motorsport).
-Sprint 0 is a Chrome-extension technical spike: a web dashboard + a Chrome MV3
+Sprint 0 was a Chrome-extension technical spike: a web dashboard + a Chrome MV3
 extension that fills test vehicle listings on Marketplace and suggests Messenger
 replies, saving leads to a CRM. The extension never clicks Publish or Send.
+Sprint 1 builds the XML inventory foundation: a flexible XML feed engine, delta
+detection on sync, the Inventory Dashboard, Vehicle Detail, Connection Center, and
+Settings (editable feed URL). Marketplace Publisher, Messenger AI, Dealer Brand DNA,
+and AI Studio are intentionally "Coming Soon".
 
 ### Where things live (Sprint 0)
 - Architecture doc: `docs/marketplace-ai-architecture.md`
@@ -42,6 +46,14 @@ replies, saving leads to a CRM. The extension never clicks Publish or Send.
 - Backend spike routes: `artifacts/api-server/src/routes/extension.ts`
 - Leads (CRM) schema: `lib/db/src/schema/leads.ts`
 - Chrome extension (load-unpacked): `chrome-extension/` (see its README for install + test checklist)
+
+### Where things live (Sprint 1)
+- XML inventory engine + delta detection: `artifacts/api-server/src/inventory/` (`xmlEngine.ts`, `importFeed.ts`, `sampleFeed.ts`, `feedSource.ts`, `seed.ts`)
+- Inventory/feed/connection routes: `artifacts/api-server/src/routes/{dealers,vehicles,connection,feed}.ts`
+- Inventory schema: `lib/db/src/schema/` (dealers, feeds, feed_runs, vehicles, vehicle_images, vehicle_changes, listings, extension_connections)
+- Inventory UI: `artifacts/dashboard/src/pages/{Inventory,Settings,ConnectionCenter}/`
+- Dealer inventory is seeded on API-server startup via `seedDealerAndInventory` (two-pass import for realistic change history)
+- Sample feed is served at `GET /api/sample-feed`; the dealer's feed URL is editable in Settings
 
 ## User preferences
 
