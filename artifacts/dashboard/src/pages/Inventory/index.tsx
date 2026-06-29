@@ -5,28 +5,22 @@ import {
   useListVehicles, 
   ListVehiclesSort 
 } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCurrency, formatMileage, formatDate } from "@/lib/format";
+import { formatCurrency, formatMileage } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
-import { Search, Car, Tag, Clock, Activity, Loader2, Share } from "lucide-react";
+import { Search, Car, Tag, Activity, Loader2, Share, Filter, LayoutGrid } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader, KpiCard, AnimatedCounter, EmptyState } from "@/components/shared";
 
 export function InventoryDashboard() {
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortOrder, setSortOrder] = useState<ListVehiclesSort>(ListVehiclesSort.newest);
 
-  // Stats
   const { data: stats, isLoading: statsLoading } = useGetVehicleStats();
-
-  // Search debounce
-  // Basic implementation to avoid extra hook
-  // In a real app we'd use useDebounce
-  
   const { data: vehiclesData, isLoading: vehiclesLoading } = useListVehicles({
     q: search || undefined,
     status: statusFilter === "all" ? undefined : statusFilter,
@@ -35,97 +29,80 @@ export function InventoryDashboard() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Active": return "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20";
-      case "Ready to Publish": return "bg-primary/10 text-primary hover:bg-primary/20";
-      case "Published": return "bg-green-500/10 text-green-500 hover:bg-green-500/20";
+      case "Active": return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+      case "Ready to Publish": return "bg-primary/10 text-primary border-primary/20";
+      case "Published": return "bg-success/10 text-success border-success/20";
       case "Archived":
-      case "Sold/Removed": return "bg-muted text-muted-foreground";
-      default: return "bg-secondary text-secondary-foreground";
+      case "Sold/Removed": return "bg-muted text-muted-foreground border-border";
+      default: return "bg-secondary text-secondary-foreground border-border";
     }
   };
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-7xl mx-auto space-y-8">
+      <div className="flex-1 overflow-y-auto bg-background/50">
+        <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
           
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
-              <p className="text-muted-foreground mt-1">Manage and track your vehicle catalog.</p>
-            </div>
-          </div>
+          <PageHeader 
+            title="Vehicle Intelligence" 
+            description="Manage and track your vehicle catalog with AI insights."
+            action={
+              <div className="flex items-center gap-2">
+                <div className="bg-secondary/50 rounded-lg p-1 border border-border/50 flex">
+                  <div className="px-3 py-1.5 bg-card rounded-md shadow-sm border border-border text-sm font-medium flex items-center gap-2">
+                    <LayoutGrid className="w-4 h-4 text-primary" /> Grid
+                  </div>
+                </div>
+              </div>
+            }
+          />
 
           {/* Stats Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="bg-card/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Total Vehicles</p>
-                    <h3 className="text-2xl font-bold">{stats?.total || 0}</h3>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                    <Car className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-card/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Active</p>
-                    <h3 className="text-2xl font-bold text-blue-500">{stats?.active || 0}</h3>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                    <Activity className="w-5 h-5 text-blue-500" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-card/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Ready to Publish</p>
-                    <h3 className="text-2xl font-bold text-primary">{stats?.readyToPublish || 0}</h3>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Tag className="w-5 h-5 text-primary" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-card/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Published</p>
-                    <h3 className="text-2xl font-bold text-green-500">{stats?.published || 0}</h3>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                    <Share className="w-5 h-5 text-green-500" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <KpiCard 
+              title="Total Vehicles"
+              value={stats?.total || 0}
+              icon={<Car className="w-4 h-4" />}
+              isLoading={statsLoading}
+            />
+            <KpiCard 
+              title="Active Inventory"
+              value={stats?.active || 0}
+              icon={<Activity className="w-4 h-4" />}
+              trend={{ value: 12, isPositive: true }}
+              isLoading={statsLoading}
+            />
+            <KpiCard 
+              title="Ready to Publish"
+              value={stats?.readyToPublish || 0}
+              icon={<Tag className="w-4 h-4 text-primary" />}
+              isLoading={statsLoading}
+            />
+            <KpiCard 
+              title="Published"
+              value={stats?.published || 0}
+              icon={<Share className="w-4 h-4 text-success" />}
+              isLoading={statsLoading}
+            />
           </div>
 
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 items-center bg-card p-4 rounded-lg border border-border">
-            <div className="relative flex-1 w-full">
+          <div className="glass-panel p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between z-10 sticky top-0">
+            <div className="relative flex-1 max-w-md w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
                 placeholder="Search VIN, stock, make, model..." 
-                className="pl-9 bg-background/50 border-0"
+                className="pl-9 bg-background/50 border-border/50 focus-visible:ring-primary/30"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <div className="flex gap-4 w-full sm:w-auto">
+            <div className="flex gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground px-2">
+                <Filter className="w-4 h-4" /> Filters:
+              </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px] bg-background/50 border-0">
+                <SelectTrigger className="w-[160px] bg-background/50 border-border/50">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -137,7 +114,7 @@ export function InventoryDashboard() {
                 </SelectContent>
               </Select>
               <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as ListVehiclesSort)}>
-                <SelectTrigger className="w-[180px] bg-background/50 border-0">
+                <SelectTrigger className="w-[160px] bg-background/50 border-border/50">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
@@ -152,51 +129,82 @@ export function InventoryDashboard() {
 
           {/* List */}
           {vehiclesLoading ? (
-            <div className="py-20 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[1,2,3,4,5,6,7,8].map(i => (
+                <div key={i} className="rounded-xl bg-card border border-border/50 h-[320px] animate-pulse">
+                  <div className="h-[200px] bg-secondary/50 rounded-t-xl" />
+                  <div className="p-4 space-y-3">
+                    <div className="h-5 bg-secondary/80 rounded w-2/3" />
+                    <div className="h-4 bg-secondary/50 rounded w-1/3" />
+                    <div className="flex justify-between pt-2">
+                      <div className="h-5 bg-secondary/80 rounded w-1/4" />
+                      <div className="h-5 bg-secondary/50 rounded w-1/4" />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : vehiclesData?.vehicles.length === 0 ? (
-            <div className="text-center py-20 bg-card rounded-lg border border-border">
-              <Car className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium">No vehicles found</h3>
-              <p className="text-muted-foreground mt-1">Try adjusting your search or filters.</p>
-            </div>
+            <EmptyState 
+              icon={<Car className="w-8 h-8" />}
+              title="No vehicles found"
+              description="Try adjusting your search or filters to find what you're looking for."
+            />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {vehiclesData?.vehicles.map((vehicle) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {vehiclesData?.vehicles.map((vehicle, index) => (
                 <Link key={vehicle.id} href={`/inventory/${vehicle.id}`}>
-                  <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group bg-card border-border">
-                    <div className="aspect-[4/3] bg-secondary relative">
+                  <Card className="overflow-hidden hover-lift cursor-pointer group bg-card border-border/40 hover:border-primary/30 transition-all duration-500 h-full flex flex-col"
+                    style={{ animationDelay: `${index * 50}ms` }}>
+                    <div className="aspect-[4/3] bg-secondary/30 relative overflow-hidden">
                       {vehicle.primaryImageUrl ? (
                         <img 
                           src={vehicle.primaryImageUrl} 
                           alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Car className="w-12 h-12 text-muted-foreground/30" />
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/50 to-background">
+                          <Car className="w-12 h-12 text-muted-foreground/20" />
                         </div>
                       )}
-                      <div className="absolute top-2 right-2">
-                        <Badge variant="secondary" className={cn("backdrop-blur-md", getStatusColor(vehicle.status))}>
+                      
+                      {/* Gradient Overlay for bottom of image */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
+                      
+                      <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
+                        <Badge variant="outline" className={cn("backdrop-blur-xl font-medium px-2.5 py-1", getStatusColor(vehicle.status))}>
                           {vehicle.status}
                         </Badge>
                       </div>
-                    </div>
-                    <CardContent className="p-4">
-                      <div className="font-semibold text-lg truncate mb-1">
-                        {vehicle.year} {vehicle.make} {vehicle.model}
-                      </div>
-                      <div className="text-muted-foreground text-sm truncate mb-4">
-                        {vehicle.trim || "Base"} • {vehicle.stockNumber ? `#${vehicle.stockNumber}` : "No Stock #"}
-                      </div>
-                      <div className="flex items-end justify-between">
-                        <div className="font-bold text-primary">
+                      
+                      <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end text-white">
+                         <div className="font-bold text-xl drop-shadow-md">
                           {formatCurrency(vehicle.price)}
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs font-medium bg-black/40 backdrop-blur-md px-2 py-1 rounded-md border border-white/10">
                           {formatMileage(vehicle.mileage)}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <CardContent className="p-5 flex-1 flex flex-col">
+                      <div className="font-bold text-lg leading-tight mb-1 group-hover:text-primary transition-colors">
+                        {vehicle.year} {vehicle.make} {vehicle.model}
+                      </div>
+                      <div className="text-muted-foreground text-sm flex items-center gap-2 mb-4">
+                        <span className="truncate max-w-[120px]">{vehicle.trim || "Base"}</span>
+                        <span className="w-1 h-1 rounded-full bg-border" />
+                        <span className="font-mono text-xs">{vehicle.stockNumber ? `#${vehicle.stockNumber}` : "No Stock #"}</span>
+                      </div>
+                      
+                      <div className="mt-auto pt-4 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <div className={cn("w-2 h-2 rounded-full", vehicle.imageCount > 0 ? "bg-primary" : "bg-muted")} />
+                          {vehicle.imageCount} Photos
+                        </div>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity text-primary font-medium flex items-center gap-1">
+                          View Details &rarr;
                         </div>
                       </div>
                     </CardContent>

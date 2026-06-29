@@ -29,33 +29,36 @@ import {
   Megaphone,
   Globe,
   Flag,
+  FileText,
+  Activity
 } from "lucide-react";
+import { PageHeader, SectionCard, StatusPulse } from "@/components/shared";
 
 function ratingClass(rating: string | null | undefined) {
   switch (rating) {
     case "Excellent":
-      return "bg-green-500/10 text-green-500";
+      return "bg-success/10 text-success border-success/20";
     case "Good":
-      return "bg-blue-500/10 text-blue-500";
+      return "bg-blue-500/10 text-blue-400 border-blue-500/20";
     case "Needs Improvement":
-      return "bg-amber-500/10 text-amber-500";
+      return "bg-warning/10 text-warning border-warning/20";
     default:
-      return "bg-secondary text-muted-foreground";
+      return "bg-secondary text-muted-foreground border-border";
   }
 }
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
-    <div>
-      <div className="flex justify-between text-sm mb-1">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{value}</span>
+    <div className="bg-secondary/30 p-3 rounded-lg border border-border/50">
+      <div className="flex justify-between text-sm mb-2">
+        <span className="text-muted-foreground font-medium">{label}</span>
+        <span className="font-bold text-foreground">{value}</span>
       </div>
-      <div className="h-2 rounded-full bg-secondary overflow-hidden">
+      <div className="h-2 rounded-full bg-secondary overflow-hidden shadow-inner">
         <div
           className={cn(
-            "h-full rounded-full",
-            value >= 80 ? "bg-green-500" : value >= 60 ? "bg-blue-500" : "bg-amber-500",
+            "h-full rounded-full transition-all duration-1000 ease-out",
+            value >= 80 ? "bg-success" : value >= 60 ? "bg-blue-500" : "bg-warning"
           )}
           style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
         />
@@ -66,110 +69,106 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 
 function VersionView({ version }: { version: ListingVersion }) {
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-card/50">
-          <CardContent className="p-4 flex items-center gap-3">
-            <Target className="w-5 h-5 text-muted-foreground shrink-0" />
-            <div>
-              <div className="text-xs text-muted-foreground">Buyer Profile</div>
-              <div className="font-medium">{version.buyerProfile || "N/A"}</div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/50">
-          <CardContent className="p-4 flex items-center gap-3">
-            <DollarSign className="w-5 h-5 text-muted-foreground shrink-0" />
-            <div>
-              <div className="text-xs text-muted-foreground">Suggested Down Payment</div>
-              <div className="font-medium">{formatCurrency(version.downPayment)}</div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/50">
-          <CardContent className="p-4 flex items-center gap-3">
-            <Flag className="w-5 h-5 text-muted-foreground shrink-0" />
-            <div>
-              <div className="text-xs text-muted-foreground">Priority</div>
-              <div className="font-medium">{version.priority || "N/A"}</div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/50">
-          <CardContent className="p-4 flex items-center gap-3">
-            <Globe className="w-5 h-5 text-muted-foreground shrink-0" />
-            <div>
-              <div className="text-xs text-muted-foreground">Language</div>
-              <div className="font-medium">{version.language}</div>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Target className="w-4 h-4 text-primary" />
+            <span className="text-xs font-medium uppercase tracking-wider">Buyer Profile</span>
+          </div>
+          <div className="font-semibold">{version.buyerProfile || "N/A"}</div>
+        </div>
+        <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <DollarSign className="w-4 h-4 text-success" />
+            <span className="text-xs font-medium uppercase tracking-wider">Down Payment</span>
+          </div>
+          <div className="font-semibold">{formatCurrency(version.downPayment)}</div>
+        </div>
+        <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Flag className="w-4 h-4 text-warning" />
+            <span className="text-xs font-medium uppercase tracking-wider">Priority</span>
+          </div>
+          <div className="font-semibold">{version.priority || "N/A"}</div>
+        </div>
+        <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Globe className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-medium uppercase tracking-wider">Language</span>
+          </div>
+          <div className="font-semibold">{version.language}</div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Title</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="font-medium">{version.title}</p>
-          <p className="text-xs text-muted-foreground mt-2">{version.title.length} / 100 characters</p>
-        </CardContent>
-      </Card>
+      <SectionCard title="Generated Content" icon={<FileText className="w-5 h-5 text-primary" />}>
+        <div className="space-y-6 p-2">
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+              <span>Title</span>
+              <Badge variant="outline" className={cn(
+                "bg-secondary/50",
+                version.title.length > 80 ? "text-warning border-warning/30" : "text-success border-success/30"
+              )}>
+                {version.title.length} / 100 chars
+              </Badge>
+            </div>
+            <div className="text-xl font-bold bg-secondary/20 p-4 rounded-lg border border-border/50">
+              {version.title}
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              English Description
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed">
-              {version.descriptionEn || "N/A"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Descripción en Español</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed">
-              {version.descriptionEs || "N/A"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div className="text-sm font-medium text-muted-foreground">English Description</div>
+              <div className="bg-secondary/20 p-4 rounded-lg border border-border/50 h-full">
+                <p className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed font-medium">
+                  {version.descriptionEn || "N/A"}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="text-sm font-medium text-muted-foreground">Descripción en Español</div>
+              <div className="bg-secondary/20 p-4 rounded-lg border border-border/50 h-full">
+                <p className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed font-medium">
+                  {version.descriptionEs || "N/A"}
+                </p>
+              </div>
+            </div>
+          </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Megaphone className="w-4 h-4" /> Call to Action
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm">{version.callToAction || "N/A"}</p>
-        </CardContent>
-      </Card>
+          <div className="pt-4 border-t border-border/50">
+            <div className="flex items-start gap-4 bg-primary/5 p-4 rounded-lg border border-primary/20">
+              <div className="mt-1 bg-primary/20 p-2 rounded-full">
+                <Megaphone className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-primary mb-1">Call to Action</div>
+                <p className="text-sm font-medium">{version.callToAction || "N/A"}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
 
       {version.score && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Gauge className="w-4 h-4" /> Listing Score
-              <Badge variant="secondary" className={cn("ml-2", ratingClass(version.score.rating))}>
-                {version.score.overall} · {version.score.rating}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <SectionCard 
+          title="Listing Performance Score" 
+          icon={<Activity className="w-5 h-5 text-primary" />}
+          action={
+            <Badge variant="outline" className={cn("px-3 py-1 font-bold text-sm", ratingClass(version.score.rating))}>
+              {version.score.overall} / 100 · {version.score.rating}
+            </Badge>
+          }
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-2">
             <ScoreBar label="Title Quality" value={version.score.titleQuality} />
             <ScoreBar label="Description Quality" value={version.score.descriptionQuality} />
             <ScoreBar label="Price Strategy" value={version.score.priceStrategy} />
             <ScoreBar label="Down Payment Strategy" value={version.score.downPaymentStrategy} />
-            <ScoreBar label="Photos" value={version.score.photoScore} />
-          </CardContent>
-        </Card>
+            <ScoreBar label="Photos & Visuals" value={version.score.photoScore} />
+          </div>
+        </SectionCard>
       )}
     </div>
   );
@@ -193,7 +192,7 @@ export function ListingDetail() {
       onSuccess: (v) => {
         setActiveVersionId(v.id);
         invalidate();
-        toast({ title: "Listing generated", description: `Version ${v.version} created.` });
+        toast({ title: "Listing generated", description: `Version ${v.version} created successfully.` });
       },
       onError: (err) => toast({ title: "Generation failed", description: err.message, variant: "destructive" }),
     },
@@ -212,8 +211,14 @@ export function ListingDetail() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        <div className="flex-1 flex items-center justify-center bg-background/50">
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative">
+              <div className="w-12 h-12 border-4 border-secondary rounded-full" />
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin absolute inset-0" />
+            </div>
+            <p className="text-muted-foreground font-medium animate-pulse">Loading workspace...</p>
+          </div>
         </div>
       </AppLayout>
     );
@@ -222,11 +227,15 @@ export function ListingDetail() {
   if (!data) {
     return (
       <AppLayout>
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-muted-foreground">Listing not found.</p>
-          <Link href="/listings">
-            <Button variant="outline">Back to Listings</Button>
-          </Link>
+        <div className="flex-1 flex flex-col items-center justify-center bg-background/50 h-full p-8">
+          <div className="glass-panel p-12 rounded-2xl flex flex-col items-center text-center max-w-md">
+            <FileText className="w-16 h-16 text-muted-foreground/50 mb-6" />
+            <h2 className="text-2xl font-bold tracking-tight mb-2">Workspace Not Found</h2>
+            <p className="text-muted-foreground mb-8">This listing workspace doesn't exist or you don't have access.</p>
+            <Link href="/listings">
+              <Button className="premium-gradient-btn px-8">Back to Marketplace AI</Button>
+            </Link>
+          </div>
         </div>
       </AppLayout>
     );
@@ -243,104 +252,204 @@ export function ListingDetail() {
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-6xl mx-auto space-y-6">
-          <Link href="/listings">
-            <Button variant="ghost" size="sm" className="gap-2 -ml-2">
-              <ArrowLeft className="w-4 h-4" /> Back to Listings
-            </Button>
-          </Link>
+      <div className="flex-1 overflow-y-auto bg-background/50">
+        <div className="p-8 max-w-[1200px] mx-auto space-y-8 animate-in fade-in duration-500">
+          
+          <div>
+            <Link href="/listings" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors font-medium mb-6">
+              <ArrowLeft className="w-4 h-4 mr-1.5" /> Back to Marketplace AI
+            </Link>
 
-          {/* Header */}
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="w-full md:w-64 aspect-[4/3] bg-secondary rounded-lg overflow-hidden shrink-0">
-              {primaryImage ? (
-                <img src={primaryImage} alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Car className="w-12 h-12 text-muted-foreground/30" />
+            {/* Header Card */}
+            <div className="glass-panel rounded-2xl overflow-hidden border border-border/50">
+              <div className="flex flex-col md:flex-row">
+                <div className="w-full md:w-80 aspect-[4/3] md:aspect-auto bg-secondary relative overflow-hidden shrink-0">
+                  {primaryImage ? (
+                    <img 
+                      src={primaryImage} 
+                      alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`} 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary to-background">
+                      <Car className="w-16 h-16 text-muted-foreground/20" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent md:bg-gradient-to-r" />
+                  <div className="absolute bottom-4 left-4 right-4 md:hidden">
+                    <Badge variant="outline" className="bg-black/40 backdrop-blur-md text-white border-white/20 mb-2">
+                      <StatusPulse color="blue" className="mr-2" />
+                      {vehicle.status}
+                    </Badge>
+                  </div>
                 </div>
-              )}
-            </div>
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {vehicle.year} {vehicle.make} {vehicle.model}
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                {vehicle.trim || "Base"} • {vehicle.bodyStyle || "Vehicle"} • VIN {vehicle.vin}
-              </p>
-              <div className="flex flex-wrap gap-4 mt-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Price: </span>
-                  <span className="font-semibold text-primary">{formatCurrency(vehicle.price)}</span>
+                
+                <div className="p-6 md:p-8 flex-1 flex flex-col justify-center bg-card/40">
+                  <div className="hidden md:flex mb-3">
+                    <Badge variant="outline" className="bg-secondary/50 text-foreground border-border">
+                      <StatusPulse color={vehicle.status === 'Active' ? 'blue' : 'primary'} className="mr-2" />
+                      {vehicle.status}
+                    </Badge>
+                  </div>
+                  
+                  <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
+                    {vehicle.year} {vehicle.make} {vehicle.model}
+                  </h1>
+                  
+                  <div className="flex items-center gap-3 text-muted-foreground font-medium mb-6">
+                    <span className="text-foreground">{vehicle.trim || "Base"}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-border" />
+                    <span>{vehicle.bodyStyle || "Vehicle"}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-border" />
+                    <span className="font-mono text-sm">VIN: {vehicle.vin}</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:flex md:flex-wrap gap-4 md:gap-8 mb-8">
+                    <div>
+                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Asking Price</div>
+                      <div className="text-2xl font-bold text-primary">{formatCurrency(vehicle.price)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Mileage</div>
+                      <div className="text-xl font-semibold">{formatMileage(vehicle.mileage)}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3 mt-auto">
+                    <Button 
+                      onClick={() => generate.mutate({ id: vehicle.id })} 
+                      disabled={generate.isPending} 
+                      className={cn(
+                        "gap-2 px-6",
+                        versions.length === 0 ? "premium-gradient-btn" : "bg-primary text-primary-foreground hover:bg-primary/90"
+                      )}
+                    >
+                      {generate.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-4 h-4" />
+                      )}
+                      {versions.length === 0 ? "Generate AI Listing" : "Regenerate Listing"}
+                    </Button>
+                    
+                    {selectedVersion && (
+                      <Button
+                        variant="outline"
+                        className="gap-2 px-6 border-success/30 text-success hover:bg-success hover:text-success-foreground"
+                        onClick={() => queue.mutate({ id: selectedVersion.id, data: { priority: 5 } })}
+                        disabled={queue.isPending}
+                      >
+                        {queue.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                        Queue for Publishing
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Mileage: </span>
-                  <span className="font-medium">{formatMileage(vehicle.mileage)}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Status: </span>
-                  <span className="font-medium">{vehicle.status}</span>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-3 mt-6">
-                <Button onClick={() => generate.mutate({ id: vehicle.id })} disabled={generate.isPending} className="gap-2">
-                  {generate.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  {versions.length === 0 ? "Generate Listing" : "Regenerate"}
-                </Button>
-                {selectedVersion && (
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => queue.mutate({ id: selectedVersion.id, data: { priority: 5 } })}
-                    disabled={queue.isPending}
-                  >
-                    {queue.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    Queue for Publishing
-                  </Button>
-                )}
               </div>
             </div>
           </div>
 
-          {/* Versions */}
+          {/* Versions Area */}
           {sortedVersions.length === 0 ? (
-            <Card>
-              <CardContent className="py-16 text-center">
-                <Sparkles className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
-                <h3 className="text-lg font-medium">No listing generated yet</h3>
-                <p className="text-muted-foreground mt-1 max-w-md mx-auto">
-                  Generate an AI-optimized, bilingual Marketplace listing grounded entirely in this vehicle's
-                  inventory data.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <History className="w-4 h-4" />
-                Version history (latest never overwrites earlier versions)
+            <div className="glass-panel border-border/50 rounded-2xl p-12 text-center max-w-2xl mx-auto mt-12 animate-in fade-in duration-700 delay-200 fill-mode-both">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Sparkles className="w-8 h-8 text-primary" />
               </div>
+              <h3 className="text-2xl font-bold mb-3">No listing generated yet</h3>
+              <p className="text-muted-foreground font-medium mb-8 leading-relaxed">
+                Generate an AI-optimized, bilingual Marketplace listing grounded entirely in this vehicle's 
+                inventory data, market comparables, and your dealership's DNA.
+              </p>
+              <Button 
+                onClick={() => generate.mutate({ id: vehicle.id })} 
+                disabled={generate.isPending} 
+                className="premium-gradient-btn px-8 py-6 text-lg"
+              >
+                {generate.isPending ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    Generating Magic...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    Generate First Listing
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <History className="w-5 h-5 text-primary" />
+                  Listing Versions
+                </h3>
+                <p className="text-sm text-muted-foreground font-medium hidden sm:block">
+                  Latest generations never overwrite previous work
+                </p>
+              </div>
+              
               <Tabs
                 value={String(selectedVersion?.id)}
                 onValueChange={(v) => setActiveVersionId(Number(v))}
+                className="w-full"
               >
-                <TabsList className="flex-wrap h-auto">
+                <div className="overflow-x-auto pb-2 -mx-2 px-2 scrollbar-none">
+                  <TabsList className="bg-secondary/50 border border-border/50 p-1 inline-flex h-auto w-auto min-w-full sm:min-w-0">
+                    {sortedVersions.map((v) => (
+                      <TabsTrigger 
+                        key={v.id} 
+                        value={String(v.id)} 
+                        className="gap-2 px-4 py-2 rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all whitespace-nowrap"
+                      >
+                        <span className="font-semibold">v{v.version}</span>
+                        {v.isCurrent && (
+                          <Badge variant="secondary" className="bg-primary/10 text-primary border-0 text-[10px] px-1.5 py-0 uppercase tracking-wider font-bold">
+                            Active
+                          </Badge>
+                        )}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
+                
+                <div className="mt-6 bg-card border border-border/40 rounded-2xl p-6 md:p-8 shadow-sm">
                   {sortedVersions.map((v) => (
-                    <TabsTrigger key={v.id} value={String(v.id)} className="gap-2">
-                      v{v.version}
-                      {v.isCurrent && <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] px-1.5">current</Badge>}
-                    </TabsTrigger>
+                    <TabsContent key={v.id} value={String(v.id)} className="m-0 focus-visible:outline-none focus-visible:ring-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-border/50">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="font-bold text-primary">v{v.version}</span>
+                          </div>
+                          <div>
+                            <div className="font-bold text-lg">Listing Version {v.version}</div>
+                            <div className="text-sm text-muted-foreground font-medium">
+                              Generated by {v.generatedBy} • {formatDate(v.createdAt)}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {v.id === selectedVersion?.id && (
+                          <Button
+                            variant="outline"
+                            className="gap-2 border-success/30 text-success hover:bg-success hover:text-success-foreground self-start sm:self-auto"
+                            onClick={() => queue.mutate({ id: v.id, data: { priority: 5 } })}
+                            disabled={queue.isPending}
+                          >
+                            {queue.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                            Publish This Version
+                          </Button>
+                        )}
+                      </div>
+                      <VersionView version={v} />
+                    </TabsContent>
                   ))}
-                </TabsList>
-                {sortedVersions.map((v) => (
-                  <TabsContent key={v.id} value={String(v.id)} className="mt-6">
-                    <div className="text-xs text-muted-foreground mb-4">
-                      Generated by {v.generatedBy} • {formatDate(v.createdAt)}
-                    </div>
-                    <VersionView version={v} />
-                  </TabsContent>
-                ))}
+                </div>
               </Tabs>
             </div>
           )}

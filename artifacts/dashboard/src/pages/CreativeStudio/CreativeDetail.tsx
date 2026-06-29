@@ -11,7 +11,6 @@ import {
   useListCreativeTemplates,
   type CreativeVersion,
 } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,32 +35,34 @@ import {
   CheckCircle2,
   Star,
   ImageIcon,
+  LayoutTemplate
 } from "lucide-react";
+import { SectionCard, EmptyState, StatusPulse } from "@/components/shared";
 
 function ratingClass(rating: string | null | undefined) {
   switch (rating) {
     case "Excellent":
-      return "bg-green-500/10 text-green-500";
+      return "bg-green-500/10 text-green-500 border-green-500/20";
     case "Good":
-      return "bg-blue-500/10 text-blue-500";
+      return "bg-blue-500/10 text-blue-500 border-blue-500/20";
     case "Needs Improvement":
-      return "bg-amber-500/10 text-amber-500";
+      return "bg-amber-500/10 text-amber-500 border-amber-500/20";
     default:
-      return "bg-secondary text-muted-foreground";
+      return "bg-secondary text-muted-foreground border-border";
   }
 }
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="flex justify-between text-sm mb-1">
+      <div className="flex justify-between text-xs font-medium uppercase tracking-wider mb-2">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{value}</span>
+        <span className="text-foreground">{value}</span>
       </div>
-      <div className="h-2 rounded-full bg-secondary overflow-hidden">
+      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
         <div
           className={cn(
-            "h-full rounded-full",
+            "h-full rounded-full transition-all duration-1000",
             value >= 80 ? "bg-green-500" : value >= 60 ? "bg-blue-500" : "bg-amber-500",
           )}
           style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
@@ -85,100 +86,114 @@ function VersionView({
   settingDefault: boolean;
 }) {
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <Badge variant="secondary" className="bg-secondary text-muted-foreground">
-          {version.templateKey}
-        </Badge>
-        <Badge variant="secondary" className="bg-secondary text-muted-foreground">
-          {version.brandStyle}
-        </Badge>
-        <Badge variant="secondary" className="bg-secondary text-muted-foreground">
-          {version.backgroundStyle}
-        </Badge>
-        <Badge
-          variant="secondary"
-          className={cn(
-            version.status === "Approved"
-              ? "bg-green-500/10 text-green-500"
-              : "bg-secondary text-muted-foreground",
-          )}
-        >
-          {version.status}
-        </Badge>
-        {version.isDefault && (
-          <Badge variant="secondary" className="bg-primary/10 text-primary">
-            <Star className="w-3 h-3 mr-1" /> Default
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl glass-panel">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="bg-secondary/50 text-muted-foreground uppercase text-[10px] tracking-wider">
+            {version.templateKey}
           </Badge>
-        )}
+          <Badge variant="outline" className="bg-secondary/50 text-muted-foreground uppercase text-[10px] tracking-wider">
+            {version.brandStyle}
+          </Badge>
+          <Badge variant="outline" className="bg-secondary/50 text-muted-foreground uppercase text-[10px] tracking-wider">
+            {version.backgroundStyle}
+          </Badge>
+          <Badge
+            variant="outline"
+            className={cn(
+              "uppercase text-[10px] tracking-wider",
+              version.status === "Approved"
+                ? "bg-green-500/10 text-green-500 border-green-500/20"
+                : "bg-secondary/50 text-muted-foreground",
+            )}
+          >
+            {version.status}
+          </Badge>
+          {version.isDefault && (
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 uppercase text-[10px] tracking-wider">
+              <Star className="w-3 h-3 mr-1 fill-primary" /> Default
+            </Badge>
+          )}
+        </div>
+        
         <div className="flex-1" />
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={onSetDefault}
-          disabled={settingDefault || version.isDefault}
-        >
-          {settingDefault ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
-          {version.isDefault ? "Default" : "Set as Default"}
-        </Button>
-        <Button
-          size="sm"
-          className="gap-2"
-          onClick={onApprove}
-          disabled={approving || version.status === "Approved"}
-        >
-          {approving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-          {version.status === "Approved" ? "Approved" : "Approve"}
-        </Button>
+        
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 border-border/50 hover:bg-secondary"
+            onClick={onSetDefault}
+            disabled={settingDefault || version.isDefault}
+          >
+            {settingDefault ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
+            {version.isDefault ? "Default" : "Set as Default"}
+          </Button>
+          <Button
+            size="sm"
+            className={cn(
+              "gap-2", 
+              version.status === "Approved" ? "bg-green-500/10 text-green-500 hover:bg-green-500/20 hover:text-green-500 border border-green-500/20" : ""
+            )}
+            onClick={onApprove}
+            disabled={approving || version.status === "Approved"}
+            variant={version.status === "Approved" ? "outline" : "default"}
+          >
+            {approving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            {version.status === "Approved" ? "Approved" : "Approve"}
+          </Button>
+        </div>
       </div>
 
       {/* Creative previews */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <CreativePreviewCard spec={version.renderSpec} format="cover" />
-        <CreativePreviewCard spec={version.renderSpec} format="story" />
-        <CreativePreviewCard spec={version.renderSpec} format="feed" />
+        <div className="animate-in slide-in-from-bottom-4" style={{ animationDelay: "100ms" }}>
+          <CreativePreviewCard spec={version.renderSpec} format="cover" />
+        </div>
+        <div className="animate-in slide-in-from-bottom-4" style={{ animationDelay: "200ms" }}>
+          <CreativePreviewCard spec={version.renderSpec} format="story" />
+        </div>
+        <div className="animate-in slide-in-from-bottom-4" style={{ animationDelay: "300ms" }}>
+          <CreativePreviewCard spec={version.renderSpec} format="feed" />
+        </div>
       </div>
 
-      {/* Export outputs */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <ImageIcon className="w-4 h-4" /> Export Outputs
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {version.outputs.map((o) => (
-            <div key={o.format} className="rounded-lg border border-border bg-card/50 p-3">
-              <div className="font-medium text-sm">{o.label}</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {o.format} · {o.width}×{o.height}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Export outputs */}
+        <SectionCard title="Export Outputs" icon={ImageIcon}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {version.outputs.map((o) => (
+              <div key={o.format} className="rounded-lg border border-border/50 bg-secondary/30 p-4 hover:bg-secondary/50 transition-colors">
+                <div className="font-semibold tracking-tight">{o.label}</div>
+                <div className="text-xs font-medium text-muted-foreground/80 mt-1 uppercase tracking-wider">
+                  {o.format} · {o.width}×{o.height}
+                </div>
               </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+            ))}
+          </div>
+        </SectionCard>
 
-      {/* Score */}
-      {version.score && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Gauge className="w-4 h-4" /> Creative Score
-              <Badge variant="secondary" className={cn("ml-2", ratingClass(version.score.rating))}>
+        {/* Score */}
+        {version.score && (
+          <SectionCard 
+            title="Creative Score" 
+            icon={Gauge}
+            action={
+              <Badge variant="outline" className={cn("ml-2 font-bold px-3 py-1", ratingClass(version.score.rating))}>
                 {version.score.overall} · {version.score.rating}
               </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <ScoreBar label="Brand Consistency" value={version.score.brandConsistency} />
-            <ScoreBar label="Vehicle Visibility" value={version.score.vehicleVisibility} />
-            <ScoreBar label="Lighting" value={version.score.lighting} />
-            <ScoreBar label="Composition" value={version.score.composition} />
-            <ScoreBar label="CTR Prediction" value={version.score.ctrPrediction} />
-          </CardContent>
-        </Card>
-      )}
+            }
+          >
+            <div className="space-y-5">
+              <ScoreBar label="Brand Consistency" value={version.score.brandConsistency} />
+              <ScoreBar label="Vehicle Visibility" value={version.score.vehicleVisibility} />
+              <ScoreBar label="Lighting" value={version.score.lighting} />
+              <ScoreBar label="Composition" value={version.score.composition} />
+              <ScoreBar label="CTR Prediction" value={version.score.ctrPrediction} />
+            </div>
+          </SectionCard>
+        )}
+      </div>
     </div>
   );
 }
@@ -253,7 +268,7 @@ export function CreativeDetail() {
     return (
       <AppLayout>
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       </AppLayout>
     );
@@ -262,11 +277,13 @@ export function CreativeDetail() {
   if (!data) {
     return (
       <AppLayout>
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-muted-foreground">Vehicle not found.</p>
-          <Link href="/creative-studio">
-            <Button variant="outline">Back to Creative Studio</Button>
-          </Link>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <EmptyState
+            icon={Car}
+            title="Vehicle not found"
+            description="The requested vehicle could not be found or has been removed."
+            action={<Link href="/creative-studio"><Button>Back to Creative Studio</Button></Link>}
+          />
         </div>
       </AppLayout>
     );
@@ -284,52 +301,58 @@ export function CreativeDetail() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-6xl mx-auto space-y-6">
+        <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
           <Link href="/creative-studio">
-            <Button variant="ghost" size="sm" className="gap-2 -ml-2">
-              <ArrowLeft className="w-4 h-4" /> Back to Creative Studio
+            <Button variant="ghost" size="sm" className="gap-2 -ml-3 text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="w-4 h-4" /> Back to Studio
             </Button>
           </Link>
 
           {/* Header */}
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="w-full md:w-64 aspect-[4/3] bg-secondary rounded-lg overflow-hidden shrink-0">
+          <div className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-8">
+            <div className="w-full md:w-72 aspect-[4/3] bg-muted/30 rounded-xl overflow-hidden shrink-0 relative group">
               {primaryImage ? (
-                <img
-                  src={primaryImage}
-                  alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                  className="w-full h-full object-cover"
-                />
+                <>
+                  <img
+                    src={primaryImage}
+                    alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Car className="w-12 h-12 text-muted-foreground/30" />
                 </div>
               )}
             </div>
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold tracking-tight">
+            
+            <div className="flex-1 flex flex-col">
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground/90">
                 {vehicle.year} {vehicle.make} {vehicle.model}
               </h1>
-              <p className="text-muted-foreground mt-1">
-                {vehicle.trim || "Base"} • {vehicle.bodyStyle || "Vehicle"} • VIN {vehicle.vin}
+              <p className="text-muted-foreground mt-2 text-lg">
+                {vehicle.trim || "Base"} • {vehicle.bodyStyle || "Vehicle"}
               </p>
-              <div className="flex flex-wrap gap-4 mt-4 text-sm">
+              
+              <div className="flex flex-wrap gap-x-8 gap-y-4 mt-6">
                 <div>
-                  <span className="text-muted-foreground">Price: </span>
-                  <span className="font-semibold text-primary">{formatCurrency(vehicle.price)}</span>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Price</p>
+                  <p className="text-xl font-bold text-primary">{formatCurrency(vehicle.price)}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Mileage: </span>
-                  <span className="font-medium">{formatMileage(vehicle.mileage)}</span>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Mileage</p>
+                  <p className="text-xl font-semibold text-foreground/80">{formatMileage(vehicle.mileage)}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Photos: </span>
-                  <span className="font-medium">{vehicle.imageCount}</span>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">VIN</p>
+                  <p className="text-xl font-semibold text-foreground/80">{vehicle.vin.slice(-8)}</p>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-3 mt-6">
+              
+              <div className="mt-auto pt-8 flex flex-wrap items-center gap-3">
                 <Select value={effectiveTemplateKey} onValueChange={setTemplateKey}>
-                  <SelectTrigger className="w-[220px]">
+                  <SelectTrigger className="w-[220px] bg-secondary/50 border-border/50">
                     <SelectValue placeholder="Select template" />
                   </SelectTrigger>
                   <SelectContent>
@@ -348,7 +371,7 @@ export function CreativeDetail() {
                     })
                   }
                   disabled={generate.isPending || activeJobs.length > 0}
-                  className="gap-2"
+                  className="gap-2 premium-gradient-btn"
                 >
                   {generate.isPending || activeJobs.length > 0 ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -366,67 +389,70 @@ export function CreativeDetail() {
           </div>
 
           {/* Active job progress */}
-          {activeJobs.map((job) => (
-            <Card key={job.id} className="border-blue-500/30">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                    {job.status === "Generating" && job.step ? job.step : "Queued"}
-                  </span>
-                  <span className="text-sm text-muted-foreground">{job.progress}%</span>
+          {activeJobs.length > 0 && (
+            <div className="space-y-3">
+              {activeJobs.map((job) => (
+                <div key={job.id} className="glass-panel p-4 rounded-xl border border-primary/20 bg-primary/5">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium flex items-center gap-2 text-primary">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {job.status === "Generating" && job.step ? job.step : "Queued"}
+                    </span>
+                    <span className="text-sm font-bold text-primary">{job.progress}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-500 relative"
+                      style={{ width: `${job.progress}%` }}
+                    >
+                      <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                    </div>
+                  </div>
                 </div>
-                <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-500"
-                    style={{ width: `${job.progress}%` }}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+              ))}
+            </div>
+          )}
 
           {/* Versions */}
           {sortedVersions.length === 0 ? (
-            <Card>
-              <CardContent className="py-16 text-center">
-                <Wand2 className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
-                <h3 className="text-lg font-medium">No creative generated yet</h3>
-                <p className="text-muted-foreground mt-1 max-w-md mx-auto">
-                  Pick a template and generate an on-brand Marketplace creative built from your
-                  Dealer Brand DNA and this vehicle's photos.
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={LayoutTemplate}
+              title="No creative generated yet"
+              description="Pick a template and generate an on-brand Marketplace creative built from your Dealer Brand DNA and this vehicle's photos."
+            />
           ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground uppercase tracking-wider">
                 <History className="w-4 h-4" />
-                Version history (new creatives never overwrite earlier ones)
+                Version History
               </div>
+              
               <Tabs
                 value={String(selectedVersion?.id)}
                 onValueChange={(v) => setActiveVersionId(Number(v))}
+                className="w-full"
               >
-                <TabsList className="flex-wrap h-auto">
+                <TabsList className="flex-wrap h-auto bg-card/60 p-1 border border-border/50">
                   {sortedVersions.map((v) => (
-                    <TabsTrigger key={v.id} value={String(v.id)} className="gap-2">
+                    <TabsTrigger 
+                      key={v.id} 
+                      value={String(v.id)} 
+                      className="gap-2 px-4 py-2 data-[state=active]:bg-secondary data-[state=active]:text-foreground"
+                    >
                       v{v.version}
                       {v.isDefault && (
-                        <Badge
-                          variant="secondary"
-                          className="bg-primary/10 text-primary text-[10px] px-1.5"
-                        >
-                          default
-                        </Badge>
+                        <Star className="w-3 h-3 fill-primary text-primary" />
                       )}
                     </TabsTrigger>
                   ))}
                 </TabsList>
+                
                 {sortedVersions.map((v) => (
-                  <TabsContent key={v.id} value={String(v.id)} className="mt-6">
-                    <div className="text-xs text-muted-foreground mb-4">
-                      {v.templateKey} • {formatDate(v.createdAt)}
+                  <TabsContent key={v.id} value={String(v.id)} className="mt-8 outline-none">
+                    <div className="text-xs font-medium text-muted-foreground/60 uppercase tracking-widest mb-6 flex items-center gap-2">
+                      <span className="text-foreground/80">{v.templateKey}</span> 
+                      <span>•</span> 
+                      <span>{formatDate(v.createdAt)}</span>
                     </div>
                     <VersionView
                       version={v}

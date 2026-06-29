@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useGetConnectionStatus } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader, StatusPulse } from "@/components/shared";
 import { 
   Server, 
   Database, 
@@ -11,11 +11,7 @@ import {
   Store, 
   MessageCircle, 
   Bot,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Clock,
-  HelpCircle,
+  Activity,
   Loader2
 } from "lucide-react";
 import { formatDate } from "@/lib/format";
@@ -28,40 +24,41 @@ export function ConnectionCenter() {
     switch (serviceStatus?.toLowerCase()) {
       case "connected":
       case "online":
-        return { color: "text-green-500", bg: "bg-green-500/10", border: "border-green-500/20", icon: CheckCircle2 };
+        return { color: "success", label: "Online" } as const;
       case "offline":
       case "error":
-        return { color: "text-destructive", bg: "bg-destructive/10", border: "border-destructive/20", icon: XCircle };
+        return { color: "destructive", label: "Offline" } as const;
       case "not_synced":
       case "warning":
-        return { color: "text-yellow-500", bg: "bg-yellow-500/10", border: "border-yellow-500/20", icon: AlertCircle };
+        return { color: "warning", label: "Degraded" } as const;
       case "coming_soon":
-        return { color: "text-primary", bg: "bg-primary/10", border: "border-primary/20", icon: Clock };
+        return { color: "info", label: "Pending" } as const;
       default:
-        return { color: "text-muted-foreground", bg: "bg-muted", border: "border-border", icon: HelpCircle };
+        return { color: "muted", label: "Unknown" } as const;
     }
   };
 
   const services = [
-    { key: 'backend', name: 'Core Backend', icon: Server, description: 'Main API server and task runner' },
-    { key: 'database', name: 'Database', icon: Database, description: 'Primary PostgreSQL storage' },
-    { key: 'xmlFeed', name: 'XML Feed Parser', icon: Rss, description: 'Ingestion engine for dealer inventory feeds' },
-    { key: 'chromeExtension', name: 'Chrome Extension', icon: Puzzle, description: 'Bridge to Marketplace for automation' },
-    { key: 'facebookSession', name: 'Facebook Session', icon: Facebook, description: 'Authentication token for the connected account' },
-    { key: 'marketplace', name: 'FB Marketplace API', icon: Store, description: 'Listing management and status syncing' },
-    { key: 'messenger', name: 'FB Messenger API', icon: MessageCircle, description: 'Lead reception and automated replies' },
-    { key: 'openai', name: 'OpenAI API', icon: Bot, description: 'AI generation for listings and conversations' },
+    { key: 'backend', name: 'Core API Server', icon: Server, description: 'Main orchestration and task runner' },
+    { key: 'database', name: 'Primary Database', icon: Database, description: 'Persistent state storage' },
+    { key: 'xmlFeed', name: 'Inventory Sync', icon: Rss, description: 'Nightly dealer feed ingestion' },
+    { key: 'chromeExtension', name: 'Publishing Agent', icon: Puzzle, description: 'Browser automation bridge' },
+    { key: 'facebookSession', name: 'FB Auth Token', icon: Facebook, description: 'Marketplace session state' },
+    { key: 'marketplace', name: 'Marketplace API', icon: Store, description: 'Listing publication endpoints' },
+    { key: 'messenger', name: 'Messenger Graph', icon: MessageCircle, description: 'Lead interception' },
+    { key: 'openai', name: 'Intelligence Engine', icon: Bot, description: 'AI generation and natural language' },
   ] as const;
 
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-7xl mx-auto space-y-8">
+        <div className="p-8 max-w-7xl mx-auto space-y-8 pb-20">
           
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Connection Center</h1>
-            <p className="text-muted-foreground mt-1">Monitor the health and status of all connected services and integrations.</p>
-          </div>
+          <PageHeader 
+            title="Mission Control"
+            description="Real-time health telemetry for the DealerPilot operating system."
+            icon={Activity}
+          />
 
           {isLoading ? (
             <div className="py-20 flex justify-center">
@@ -72,42 +69,44 @@ export function ConnectionCenter() {
               {services.map(({ key, name, icon: Icon, description }) => {
                 const svc = status?.[key];
                 const config = getStatusConfig(svc?.status || "unknown");
-                const StatusIcon = config.icon;
 
                 return (
-                  <Card key={key} className={cn("border transition-colors", config.border)}>
-                    <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Icon className="w-5 h-5 text-muted-foreground" />
-                          <CardTitle className="text-lg">{name}</CardTitle>
+                  <Card key={key} className="glass-panel overflow-hidden border-white/5 transition-all hover:border-white/10 hover-lift relative group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    
+                    <CardHeader className="pb-4 flex flex-row items-start justify-between space-y-0 relative z-10">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2.5 text-foreground">
+                          <Icon className="w-5 h-5 opacity-80" />
+                          <CardTitle className="text-lg font-semibold tracking-tight">{name}</CardTitle>
                         </div>
-                        <CardDescription className="text-xs">{description}</CardDescription>
+                        <CardDescription className="text-sm text-muted-foreground line-clamp-1">{description}</CardDescription>
                       </div>
-                      <Badge variant="outline" className={cn("uppercase text-[10px] px-2 py-0.5 border-transparent font-bold tracking-wider", config.bg, config.color)}>
-                        {svc?.status || "Unknown"}
-                      </Badge>
+                      <div className="pl-4 pt-1">
+                        <StatusPulse status={config.color} label={config.label} />
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3 mt-2">
+                    
+                    <CardContent className="relative z-10">
+                      <div className="space-y-4 pt-2">
                         {svc?.detail && (
-                          <div className="text-sm bg-secondary/50 p-3 rounded-md text-foreground/80 border border-border/50">
+                          <div className="text-sm px-3 py-2 bg-black/40 rounded border border-white/5 text-foreground/80 leading-relaxed font-mono">
                             {svc.detail}
                           </div>
                         )}
                         
                         {(svc?.lastHeartbeatAt || svc?.backendUrl) && (
-                          <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="grid grid-cols-2 gap-3 text-sm">
                             {svc.lastHeartbeatAt && (
-                              <div className="bg-background rounded p-2 border border-border">
-                                <span className="text-muted-foreground block mb-0.5">Last Heartbeat</span>
-                                <span className="font-medium text-foreground">{formatDate(svc.lastHeartbeatAt)}</span>
+                              <div className="space-y-1">
+                                <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Heartbeat</span>
+                                <span className="block font-medium text-foreground">{formatDate(svc.lastHeartbeatAt)}</span>
                               </div>
                             )}
                             {svc.backendUrl && (
-                              <div className="bg-background rounded p-2 border border-border col-span-2 sm:col-span-1">
-                                <span className="text-muted-foreground block mb-0.5">Connected Target</span>
-                                <span className="font-mono text-[10px] text-primary truncate block w-full" title={svc.backendUrl}>
+                              <div className="space-y-1 col-span-2 sm:col-span-1">
+                                <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Target</span>
+                                <span className="block font-mono text-xs text-primary/90 truncate bg-primary/10 px-2 py-1 rounded inline-block" title={svc.backendUrl}>
                                   {svc.backendUrl}
                                 </span>
                               </div>
@@ -115,11 +114,9 @@ export function ConnectionCenter() {
                           </div>
                         )}
                         
-                        {/* Empty state filler for consistent card height if no details */}
                         {!svc?.detail && !svc?.lastHeartbeatAt && !svc?.backendUrl && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <StatusIcon className="w-4 h-4" />
-                            <span>System is reporting as {svc?.status || "unknown"}</span>
+                          <div className="flex items-center justify-center py-4 text-sm text-muted-foreground bg-black/20 rounded border border-white/5 border-dashed">
+                            Awaiting telemetry...
                           </div>
                         )}
                       </div>

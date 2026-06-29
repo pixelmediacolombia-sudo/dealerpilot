@@ -1,0 +1,201 @@
+# IMPORTANT — UI/UX Design Audit (Analyze Attached Images Before Coding)
+
+I am attaching several screenshots of **Autolander**.
+
+These screenshots are **reference material only**.
+
+## IMPORTANT
+
+Do NOT copy Autolander.
+
+Do NOT recreate their layouts.
+
+Do NOT duplicate their branding.
+
+Instead, act like a Senior Product Designer and perform a complete UX audit.
+
+I want you to understand **why** their product feels premium and what principles make it easy to use.
+
+Our goal is to build something even better.
+
+---
+
+# STEP 1 — Analyze the attached screenshots
+
+Study every image carefully.
+
+Evaluate:
+
+* Information hierarchy
+* Navigation
+* White space
+* Card design
+* Typography
+* Visual density
+* User flow
+* Color usage
+* Button placement
+* Progressive disclosure
+* Dashboard organization
+* Image-first layouts
+* Decision flow
+* Overall product feel
+
+---
+
+# STEP 2 — Compare against DealerPilot AI
+
+Compare the current DealerPilot interface against the attached references.
+
+Create a UX review explaining:
+
+## What Autolander does better
+
+Examples:
+
+* Better spacing
+* Cleaner navigation
+* Less visual noise
+* Better card hierarchy
+* Fewer buttons
+* Better use of whitespace
+* Better grouping of actions
+* Better information architecture
+
+## What DealerPilot already does better
+
+Examples:
+
+* Better architecture
+* More scalable
+* Better AI vision
+* Better module separation
+* Better long-term roadmap
+
+## What should change
+
+List every recommendation.
+
+Be brutally honest.
+
+Think as if this product will compete with Autolander.
+
+---
+
+# STEP 3 — Redesign Philosophy
+
+DealerPilot must NOT become a copy of Autolander.
+
+DealerPilot should become a next-generation AI platform.
+
+The experience should feel closer to:
+
+Apple
+
+Linear
+
+Stripe
+
+Vercel
+
+Notion AI
+
+Tesla
+
+Arc Browser
+
+The product should feel:
+
+Minimal
+
+Premium
+
+Modern
+
+Elegant
+
+Fast
+
+AI-first
+
+---
+
+# UX Rules
+
+Reduce buttons dramatically.
+
+One primary action per screen.
+
+Hide secondary actions inside:
+
+• Context menus
+
+• Hover menus
+
+• Dropdowns
+
+• Slide panels
+
+• Right-click menus
+
+• Expandable cards
+
+Avoid visual overload.
+
+---
+
+Increase whitespace significantly.
+
+Cards should breathe.
+
+Sections should breathe.
+
+Nothing should feel crowded.
+
+---
+
+Replace tables with beautiful cards whenever possible.
+
+Image-first layouts.
+
+Status badges.
+
+Large typography.
+
+Minimal text.
+
+---
+
+The dashboard should communicate decisions, not data.
+
+Instead of showing:
+
+53 Vehicles
+
+Show:
+
+AI recommends publishing 53 vehicles.
+
+Instead of:
+
+12 Messages
+
+Show:
+
+12 Marketplace buyers are waiting for a reply.
+
+DealerPilot should feel like an AI employee, not a database.
+
+---
+
+# IMPORTANT
+
+Do NOT start redesigning immediately.
+
+First deliver a UX Audit.
+
+Only after the audit is complete should you begin implementing the redesign.
+
+Think like a Product Design Lead at Apple or Linear, not just a frontend engineer.
+
+The attached images are inspiration for UX principles only—not a template to copy.

@@ -19,34 +19,35 @@ import {
 } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Search, Car, Image as ImageIcon, Loader2, Gauge, Wand2, Clock } from "lucide-react";
+import { Search, Car, Image as ImageIcon, Loader2, Gauge, Wand2, Clock, Sparkles } from "lucide-react";
+import { PageHeader, KpiCard, AnimatedCounter, EmptyState, StatusPulse, SectionCard } from "@/components/shared";
 
 function ratingClass(rating: string | null | undefined) {
   switch (rating) {
     case "Excellent":
-      return "bg-green-500/10 text-green-500";
+      return "bg-green-500/10 text-green-500 border-green-500/20";
     case "Good":
-      return "bg-blue-500/10 text-blue-500";
+      return "bg-blue-500/10 text-blue-500 border-blue-500/20";
     case "Needs Improvement":
-      return "bg-amber-500/10 text-amber-500";
+      return "bg-amber-500/10 text-amber-500 border-amber-500/20";
     default:
-      return "bg-secondary text-muted-foreground";
+      return "bg-secondary text-muted-foreground border-border";
   }
 }
 
 function creativeStatusClass(status: string) {
   switch (status) {
     case "Approved":
-      return "bg-green-500/10 text-green-500";
+      return "bg-green-500/10 text-green-500 border-green-500/20";
     case "Generated":
-      return "bg-primary/10 text-primary";
+      return "bg-primary/10 text-primary border-primary/20";
     case "Generating":
     case "Queued":
-      return "bg-blue-500/10 text-blue-500";
+      return "bg-blue-500/10 text-blue-500 border-blue-500/20";
     case "Failed":
-      return "bg-destructive/10 text-destructive";
+      return "bg-destructive/10 text-destructive border-destructive/20";
     default:
-      return "bg-secondary text-muted-foreground";
+      return "bg-secondary text-muted-foreground border-border";
   }
 }
 
@@ -104,131 +105,94 @@ export function CreativeStudio() {
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto animate-in fade-in duration-500">
         <div className="p-8 max-w-7xl mx-auto space-y-8">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Creative Studio</h1>
-            <p className="text-muted-foreground mt-1">
-              Generate on-brand Marketplace creatives from your Dealer Brand DNA.
-            </p>
-          </div>
+          <PageHeader 
+            title="Creative Studio"
+            description="Generate on-brand Marketplace creatives from your Dealer Brand DNA."
+            icon={Sparkles}
+          />
 
           {/* Stats Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="bg-card/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Vehicles</p>
-                    <h3 className="text-2xl font-bold">{vehicles.length}</h3>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                    <Car className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-card/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Creatives</p>
-                    <h3 className="text-2xl font-bold text-primary">{totalCreatives}</h3>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <ImageIcon className="w-5 h-5 text-primary" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-card/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Ready</p>
-                    <h3 className="text-2xl font-bold text-green-500">{readyCount}</h3>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                    <Gauge className="w-5 h-5 text-green-500" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-card/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">In Queue</p>
-                    <h3 className="text-2xl font-bold text-blue-500">{activeJobs.length}</h3>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                    <Loader2
-                      className={cn(
-                        "w-5 h-5 text-blue-500",
-                        activeJobs.length > 0 && "animate-spin",
-                      )}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <KpiCard 
+              label="Vehicles"
+              value={vehicles.length}
+              icon={Car}
+            />
+            <KpiCard 
+              label="Creatives"
+              value={totalCreatives}
+              icon={ImageIcon}
+              valueColor="text-primary"
+            />
+            <KpiCard 
+              label="Ready"
+              value={readyCount}
+              icon={Gauge}
+              valueColor="text-green-500"
+            />
+            <KpiCard 
+              label="In Queue"
+              value={activeJobs.length}
+              icon={Loader2}
+              valueColor="text-blue-500"
+              iconClassName={activeJobs.length > 0 ? "animate-spin" : ""}
+            />
           </div>
 
           {/* Generation Queue */}
           {recentJobs.length > 0 && (
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <h3 className="font-semibold">Generation Queue</h3>
-                </div>
-                <div className="space-y-3">
-                  {recentJobs.map((job) => (
-                    <div key={job.id} className="flex items-center gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium truncate">
-                            {job.vehicleLabel || `Vehicle #${job.vehicleId}`}
-                          </span>
-                          <Badge
-                            variant="secondary"
-                            className={cn("ml-2 shrink-0", jobStatusClass(job.status))}
-                          >
-                            {job.status === "Generating" && job.step
-                              ? `${job.step} · ${job.progress}%`
-                              : job.status}
-                          </Badge>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all duration-500",
-                              job.status === "Failed" ? "bg-destructive" : "bg-primary",
-                            )}
-                            style={{ width: `${job.status === "Completed" ? 100 : job.progress}%` }}
+            <SectionCard title="Generation Queue" icon={Clock} className="border-border">
+              <div className="space-y-4">
+                {recentJobs.map((job) => (
+                  <div key={job.id} className="flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium truncate flex items-center gap-2">
+                          <StatusPulse 
+                            status={job.status === "Completed" ? "success" : job.status === "Failed" ? "error" : "warning"}
                           />
-                        </div>
+                          {job.vehicleLabel || `Vehicle #${job.vehicleId}`}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn("ml-2 shrink-0 font-normal uppercase text-[10px] tracking-wider", jobStatusClass(job.status))}
+                        >
+                          {job.status === "Generating" && job.step
+                            ? `${job.step} · ${job.progress}%`
+                            : job.status}
+                        </Badge>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all duration-500",
+                            job.status === "Failed" ? "bg-destructive" : "bg-primary",
+                          )}
+                          style={{ width: `${job.status === "Completed" ? 100 : job.progress}%` }}
+                        />
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
           )}
 
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 items-center bg-card p-4 rounded-lg border border-border">
+          <div className="flex flex-col sm:flex-row gap-4 items-center p-1">
             <div className="relative flex-1 w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search VIN, make, model..."
-                className="pl-9 bg-background/50 border-0"
+                className="pl-9 bg-card/60 backdrop-blur-xl border-border/50 focus-visible:ring-primary/50"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[200px] bg-background/50 border-0">
+              <SelectTrigger className="w-full sm:w-[200px] bg-card/60 backdrop-blur-xl border-border/50 focus:ring-primary/50">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
@@ -244,62 +208,75 @@ export function CreativeStudio() {
           {/* Grid */}
           {isLoading ? (
             <div className="py-20 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : vehicles.length === 0 ? (
-            <div className="text-center py-20 bg-card rounded-lg border border-border">
-              <Wand2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium">No vehicles found</h3>
-              <p className="text-muted-foreground mt-1">Try adjusting your search or filters.</p>
-            </div>
+            <EmptyState
+              icon={Wand2}
+              title="No vehicles found"
+              description="Try adjusting your search or filters to find what you're looking for."
+            />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {vehicles.map((v) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {vehicles.map((v, i) => (
                 <Link key={v.vehicleId} href={`/creative-studio/${v.vehicleId}`}>
-                  <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group bg-card border-border">
-                    <div className="aspect-[4/3] bg-secondary relative">
+                  <div 
+                    className="group glass-panel rounded-xl overflow-hidden hover-lift cursor-pointer flex flex-col h-full animate-in fade-in slide-in-from-bottom-4"
+                    style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}
+                  >
+                    <div className="aspect-[4/3] bg-secondary relative overflow-hidden">
                       {v.primaryImageUrl ? (
                         <img
                           src={v.primaryImageUrl}
                           alt={v.label}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">
+                        <div className="w-full h-full flex items-center justify-center bg-muted/50">
                           <Car className="w-12 h-12 text-muted-foreground/30" />
                         </div>
                       )}
-                      <div className="absolute top-2 left-2 flex gap-2">
+                      
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+                      
+                      <div className="absolute top-3 left-3 flex flex-wrap gap-2">
                         <Badge
-                          variant="secondary"
-                          className={cn("backdrop-blur-md", creativeStatusClass(v.creativeStatus))}
+                          variant="outline"
+                          className={cn("backdrop-blur-md font-medium uppercase text-[10px] tracking-wider", creativeStatusClass(v.creativeStatus))}
                         >
                           {(v.creativeStatus === "Generating" || v.creativeStatus === "Queued") && (
-                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
                           )}
                           {creativeStatusLabel(v.creativeStatus)}
                         </Badge>
                       </div>
+                      
+                      <div className="absolute bottom-3 right-3">
+                         {v.creativeScore != null && (
+                          <Badge variant="outline" className={cn("backdrop-blur-md font-bold text-xs", ratingClass(v.creativeRating))}>
+                            <Gauge className="w-3 h-3 mr-1" />
+                            {v.creativeScore}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <CardContent className="p-4">
-                      <div className="font-semibold text-lg truncate mb-1">{v.label}</div>
+                    
+                    <div className="p-5 flex flex-col flex-1">
+                      <div className="font-semibold tracking-tight text-lg truncate mb-1 text-foreground/90 group-hover:text-primary transition-colors">
+                        {v.label}
+                      </div>
                       <div className="text-muted-foreground text-sm truncate mb-4">
                         {v.bodyStyle || "Vehicle"} • {v.versionCount} creative
                         {v.versionCount === 1 ? "" : "s"}
                       </div>
-                      <div className="flex items-end justify-between">
-                        <div className="font-bold text-primary">{formatCurrency(v.price)}</div>
-                        {v.creativeScore != null ? (
-                          <Badge variant="secondary" className={cn(ratingClass(v.creativeRating))}>
-                            <Gauge className="w-3 h-3 mr-1" />
-                            {v.creativeScore}
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">No score yet</span>
-                        )}
+                      <div className="mt-auto pt-2 border-t border-border/40 flex items-center justify-between">
+                        <div className="font-bold text-foreground/80">{formatCurrency(v.price)}</div>
+                        <span className="text-xs font-medium text-muted-foreground/60 uppercase tracking-widest">
+                          {v.vin.slice(-6)}
+                        </span>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 </Link>
               ))}
             </div>
