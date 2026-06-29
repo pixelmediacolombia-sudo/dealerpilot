@@ -22,51 +22,81 @@
       .catch(() => {});
   }
 
-  // ---- Context invalidation guard ----
-  // Shown when the extension is reloaded/updated while a Facebook tab still
-  // has the old content script alive.  Renders a top-of-page banner AND
-  // updates the floating panel status so the user knows to refresh.
+  // ---- Safe runtime communication ----
+  // Sentinel returned (never thrown) when Chrome invalidates the extension context.
+  const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
+  const BUILD_LABEL = "SAFE_RUNTIME_1.0.3";
+
+  function _runtimeAlive() {
+    try {
+      const id = (typeof chrome !== "undefined") && chrome.runtime && chrome.runtime.id;
+      console.log(`[DealerPilot] Runtime ID: ${id || "missing"}`);
+      return !!id;
+    } catch (_) {
+      console.log("[DealerPilot] Runtime ID: missing (threw during check)");
+      return false;
+    }
+  }
+
   function showContextInvalidated() {
-    try { setStatus("⚠️ DealerPilot extension was updated. Please refresh this tab.", "err"); } catch (_) {}
+    console.log("[DealerPilot] Extension context invalidated. Refresh Facebook tab.");
+    // Update the floating panel status if it is already in the DOM.
+    try {
+      setStatus(
+        "DealerPilot extension was updated. Please fully refresh this Facebook tab and try again.",
+        "err",
+      );
+    } catch (_) {}
+    // Inject a persistent top-of-page banner so the user cannot miss it.
     try {
       if (!document.getElementById("mai-ctx-banner")) {
         const b = document.createElement("div");
         b.id = "mai-ctx-banner";
         b.style.cssText =
           "position:fixed;top:0;left:0;right:0;z-index:2147483647;" +
-          "background:#c0392b;color:#fff;font:bold 13px/38px sans-serif;" +
-          "text-align:center;padding:0 12px;letter-spacing:.01em;";
+          "background:#c0392b;color:#fff;font:bold 13px/42px sans-serif;" +
+          "text-align:center;padding:0 16px;letter-spacing:.01em;box-shadow:0 2px 8px rgba(0,0,0,.4);";
         b.textContent =
-          "DealerPilot extension updated — refresh this Facebook tab to continue.";
+          "⚠ DealerPilot extension was updated — fully refresh this Facebook tab to continue.";
         document.documentElement.appendChild(b);
       }
     } catch (_) {}
   }
 
+  // Every chrome.runtime.sendMessage call in this script goes through here.
+  // It NEVER throws — always resolves, so callers can simply check res.ok.
   function send(message) {
-    // If the extension was reloaded/updated the runtime context is gone.
-    // chrome.runtime.id becomes undefined — catch this before calling sendMessage
-    // so we never throw an uncaught promise rejection into Facebook's page.
-    if (!chrome.runtime?.id) {
+    if (!_runtimeAlive()) {
       showContextInvalidated();
-      return Promise.resolve({ ok: false, error: "Extension context invalidated" });
+      return Promise.resolve({ ok: false, error: CTXI });
     }
-
     return new Promise((resolve) => {
       try {
         chrome.runtime.sendMessage(message, (response) => {
-          if (chrome.runtime.lastError) {
-            const msg = chrome.runtime.lastError.message || "";
-            if (msg.includes("Extension context invalidated")) showContextInvalidated();
-            resolve({ ok: false, error: msg });
+          // Must read lastError synchronously inside the callback.
+          const lastErr = chrome.runtime && chrome.runtime.lastError;
+          if (lastErr) {
+            const msg = lastErr.message || "";
+            console.log(`[DealerPilot] sendMessage lastError: ${msg}`);
+            if (msg.toLowerCase().includes("context invalidated")) {
+              showContextInvalidated();
+              resolve({ ok: false, error: CTXI });
+            } else {
+              resolve({ ok: false, error: msg });
+            }
             return;
           }
           resolve(response);
         });
       } catch (err) {
-        const msg = err.message || String(err);
-        if (msg.includes("Extension context invalidated")) showContextInvalidated();
-        resolve({ ok: false, error: msg });
+        const msg = (err && err.message) ? err.message : String(err);
+        console.log(`[DealerPilot] sendMessage threw: ${msg}`);
+        if (msg.toLowerCase().includes("context invalidated")) {
+          showContextInvalidated();
+          resolve({ ok: false, error: CTXI });
+        } else {
+          resolve({ ok: false, error: msg });
+        }
       }
     });
   }
@@ -238,7 +268,8 @@
   panel.innerHTML = `
     <div id="mai-header">
       <span id="mai-dot"></span>
-      <span id="mai-title">DealerPilot AI Connected</span>
+      <span id="mai-title">DealerPilot AI</span>
+      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">BUILD: ${BUILD_LABEL}</span>
       <button id="mai-toggle" title="Collapse">_</button>
     </div>
     <div id="mai-body">
@@ -290,6 +321,7 @@
 
   // ---- Connection check ----
   send({ type: "PING" }).then((res) => {
+    if (res && res.error === CTXI) return; // context invalidated — banner already shown
     if (res && res.ok) {
       dotEl.classList.add("mai-on");
       setStatus("Connected to backend", "ok");
@@ -347,6 +379,7 @@
     setStatus("Loading listing data…");
     const res = await send({ type: "GET_JOB_PAYLOAD", jobId: job.id });
     if (!res || !res.ok) {
+      if (res?.error === CTXI) return; // context invalidated — do not continue workflow
       setStatus("Could not load job data: " + (res && res.error), "err");
       return;
     }
@@ -577,6 +610,7 @@
           listingUrl: listingUrl.trim() || undefined,
         });
         if (!r || !r.ok) {
+          if (r?.error === CTXI) return;
           setStatus("Failed to complete job: " + (r && r.error), "err");
           return;
         }
@@ -602,6 +636,7 @@
           setStatus("Marking job as failed…");
           const r = await send({ type: "FAIL_JOB", jobId: job.id, reason: reason.trim() });
           if (!r || !r.ok) {
+            if (r?.error === CTXI) return;
             setStatus("Failed to update job: " + (r && r.error), "err");
             return;
           }
@@ -630,6 +665,7 @@
             setStatus("Fetching test listing…");
             const res = await send({ type: "GET_TEST_LISTING" });
             if (!res || !res.ok) {
+              if (res?.error === CTXI) return;
               setStatus("Failed: " + (res && res.error), "err");
               return;
             }
@@ -692,6 +728,7 @@
         payload: { chatText, buyerName: buyerName || undefined, sourceUrl: href },
       });
       if (!res || !res.ok) {
+        if (res?.error === CTXI) return;
         setStatus("Failed: " + (res && res.error), "err");
         return;
       }

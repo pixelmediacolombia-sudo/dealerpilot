@@ -113,3 +113,9 @@ id = "3dFAcqY8lqM1sHG9Im3UC"
 uri = "file://DealerPilot-Extension-v1.0.2-20260629-140933.zip"
 type = "unspecified"
 title = "DealerPilot Extension v1.0.2 — 20260629-140933"
+
+[[outputs]]
+id = "E9_X3yXcWTYvVyo9wGpwo"
+uri = "file://DealerPilot-Extension-v1.0.3-SAFE_RUNTIME-20260629-141732.zip"
+type = "unspecified"
+title = "DealerPilot Extension v1.0.3-SAFE_RUNTIME — 20260629-141732"
