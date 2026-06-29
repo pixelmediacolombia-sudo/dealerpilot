@@ -95,3 +95,9 @@ id = "Q2BGBNlrIN9E1KXHaUZdW"
 uri = "file://DealerPilot-Extension-v1.zip"
 type = "unspecified"
 title = "DealerPilot Extension v1.0.1"
+
+[[outputs]]
+id = "G0ntykraLBRjzlFS8i2Tp"
+uri = "file://DealerPilot-Extension-v1.0.1-FIXED.zip"
+type = "unspecified"
+title = "DealerPilot Extension v1.0.1 FIXED"
