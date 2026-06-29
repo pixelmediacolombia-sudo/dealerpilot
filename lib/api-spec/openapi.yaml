@@ -22,6 +22,8 @@ tags:
     description: Listing Intelligence Engine
   - name: publishing
     description: Publishing queue and jobs
+  - name: creative
+    description: Creative Intelligence Engine
 paths:
   /healthz:
     get:
@@ -615,6 +617,227 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /creative/studio:
+    get:
+      operationId: listCreativeStudio
+      tags: [creative]
+      summary: List one creative workspace per vehicle
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Search by VIN, stock number, make, or model
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by creative status
+      responses:
+        "200":
+          description: Creative workspaces
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreativeStudioList"
+  /creative/vehicles/{id}:
+    get:
+      operationId: getCreativeVehicleDetail
+      tags: [creative]
+      summary: Creative detail for a vehicle (versions, default, jobs)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Vehicle id
+      responses:
+        "200":
+          description: Creative detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreativeVehicleDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /creative/vehicles/{id}/generate:
+    post:
+      operationId: generateCreative
+      tags: [creative]
+      summary: Enqueue a background creative-generation job for a vehicle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Vehicle id
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateCreativeInput"
+      responses:
+        "202":
+          description: Job enqueued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreativeJob"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Vehicle not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /creative/jobs:
+    get:
+      operationId: listCreativeJobs
+      tags: [creative]
+      summary: The creative generation queue
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by job status
+      responses:
+        "200":
+          description: Creative jobs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreativeJobList"
+  /creative/templates:
+    get:
+      operationId: listCreativeTemplates
+      tags: [creative]
+      summary: Active creative template catalog
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreativeTemplateList"
+  /creative/versions/{id}/approve:
+    post:
+      operationId: approveCreativeVersion
+      tags: [creative]
+      summary: Approve a creative version
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Creative version id
+      responses:
+        "200":
+          description: Updated version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreativeVersion"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /creative/versions/{id}/default:
+    post:
+      operationId: setDefaultCreativeVersion
+      tags: [creative]
+      summary: Mark a creative version as the vehicle default
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Creative version id
+      responses:
+        "200":
+          description: Updated version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreativeVersion"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /creative/dna/{dealerId}:
+    get:
+      operationId: getDealerBrandDna
+      tags: [creative]
+      summary: Get dealer Brand DNA
+      parameters:
+        - name: dealerId
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Dealer id
+      responses:
+        "200":
+          description: Brand DNA
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DealerBrandDna"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateDealerBrandDna
+      tags: [creative]
+      summary: Create or update dealer Brand DNA
+      parameters:
+        - name: dealerId
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Dealer id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DealerBrandDnaUpdate"
+      responses:
+        "200":
+          description: Updated Brand DNA
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DealerBrandDna"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Dealer not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -1132,3 +1355,308 @@ components:
       properties:
         extensionId: { type: string, minLength: 1 }
         reason: { type: string }
+
+    CreativeOutput:
+      type: object
+      required: [format, label, width, height, url]
+      properties:
+        format: { type: string }
+        label: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        url: { type: string }
+    CreativeRenderSpec:
+      type: object
+      required:
+        [
+          template,
+          brandStyle,
+          backgroundStyle,
+          colors,
+          font,
+          dealerName,
+          headline,
+          subline,
+          price,
+          cta,
+          steps,
+        ]
+      properties:
+        template: { type: string }
+        brandStyle: { type: string }
+        backgroundStyle: { type: string }
+        colors:
+          type: object
+          required: [primary, secondary, accent]
+          properties:
+            primary: { type: string }
+            secondary: { type: string }
+            accent: { type: string }
+        font: { type: string }
+        dealerName: { type: string }
+        logoUrl: { type: ["string", "null"] }
+        vehicleImageUrl: { type: ["string", "null"] }
+        headline: { type: string }
+        subline: { type: string }
+        price: { type: string }
+        cta: { type: string }
+        steps:
+          type: array
+          items: { type: string }
+    CreativeScore:
+      type: object
+      required:
+        [
+          id,
+          creativeVersionId,
+          vehicleId,
+          brandConsistency,
+          vehicleVisibility,
+          lighting,
+          composition,
+          ctrPrediction,
+          overall,
+          rating,
+          createdAt,
+        ]
+      properties:
+        id: { type: integer }
+        creativeVersionId: { type: integer }
+        vehicleId: { type: integer }
+        brandConsistency: { type: integer }
+        vehicleVisibility: { type: integer }
+        lighting: { type: integer }
+        composition: { type: integer }
+        ctrPrediction: { type: integer }
+        overall: { type: integer }
+        rating: { type: string }
+        createdAt: { type: string }
+    CreativeVersion:
+      type: object
+      required:
+        [
+          id,
+          vehicleId,
+          dealerId,
+          version,
+          templateKey,
+          brandStyle,
+          backgroundStyle,
+          status,
+          isDefault,
+          renderSpec,
+          outputs,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: integer }
+        vehicleId: { type: integer }
+        dealerId: { type: integer }
+        version: { type: integer }
+        templateKey: { type: string }
+        brandStyle: { type: string }
+        backgroundStyle: { type: string }
+        status: { type: string }
+        isDefault: { type: boolean }
+        renderSpec:
+          $ref: "#/components/schemas/CreativeRenderSpec"
+        outputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreativeOutput"
+        score:
+          oneOf:
+            - $ref: "#/components/schemas/CreativeScore"
+            - type: "null"
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    CreativeJob:
+      type: object
+      required:
+        [id, vehicleId, dealerId, templateKey, status, progress, attempts, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        vehicleId: { type: integer }
+        dealerId: { type: integer }
+        templateKey: { type: string }
+        status: { type: string }
+        step: { type: ["string", "null"] }
+        progress: { type: integer }
+        creativeVersionId: { type: ["integer", "null"] }
+        failedReason: { type: ["string", "null"] }
+        attempts: { type: integer }
+        startedAt: { type: ["string", "null"] }
+        completedAt: { type: ["string", "null"] }
+        vehicleLabel: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    CreativeJobList:
+      type: object
+      required: [jobs]
+      properties:
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreativeJob"
+    CreativeTemplate:
+      type: object
+      required: [id, key, name, category, isActive, sortOrder]
+      properties:
+        id: { type: integer }
+        key: { type: string }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        category: { type: string }
+        recommendedBrandStyle: { type: ["string", "null"] }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+    CreativeTemplateList:
+      type: object
+      required: [templates]
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreativeTemplate"
+    CreativeVehicleImage:
+      type: object
+      required: [id, url, position]
+      properties:
+        id: { type: integer }
+        url: { type: string }
+        position: { type: integer }
+    CreativeVehicleSummary:
+      type: object
+      required: [id, dealerId, vin, make, model, status, imageCount]
+      properties:
+        id: { type: integer }
+        dealerId: { type: integer }
+        vin: { type: string }
+        stockNumber: { type: ["string", "null"] }
+        year: { type: ["integer", "null"] }
+        make: { type: string }
+        model: { type: string }
+        trim: { type: ["string", "null"] }
+        mileage: { type: ["integer", "null"] }
+        price: { type: ["integer", "null"] }
+        exteriorColor: { type: ["string", "null"] }
+        bodyStyle: { type: ["string", "null"] }
+        fuelType: { type: ["string", "null"] }
+        status: { type: string }
+        primaryImageUrl: { type: ["string", "null"] }
+        imageCount: { type: integer }
+    CreativeStudioItem:
+      type: object
+      required:
+        [vehicleId, dealerId, label, vin, make, model, creativeStatus, versionCount, imageCount]
+      properties:
+        vehicleId: { type: integer }
+        dealerId: { type: integer }
+        label: { type: string }
+        vin: { type: string }
+        year: { type: ["integer", "null"] }
+        make: { type: string }
+        model: { type: string }
+        trim: { type: ["string", "null"] }
+        bodyStyle: { type: ["string", "null"] }
+        price: { type: ["integer", "null"] }
+        primaryImageUrl: { type: ["string", "null"] }
+        imageCount: { type: integer }
+        creativeStatus: { type: string }
+        versionCount: { type: integer }
+        latestVersion: { type: ["integer", "null"] }
+        defaultVersionId: { type: ["integer", "null"] }
+        creativeScore: { type: ["integer", "null"] }
+        creativeRating: { type: ["string", "null"] }
+        activeJobId: { type: ["integer", "null"] }
+        activeJobStatus: { type: ["string", "null"] }
+        activeJobStep: { type: ["string", "null"] }
+        activeJobProgress: { type: ["integer", "null"] }
+        updatedAt: { type: string }
+    CreativeStudioList:
+      type: object
+      required: [vehicles]
+      properties:
+        vehicles:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreativeStudioItem"
+    CreativeVehicleDetail:
+      type: object
+      required: [vehicle, images, versions, jobs]
+      properties:
+        vehicle:
+          $ref: "#/components/schemas/CreativeVehicleSummary"
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreativeVehicleImage"
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreativeVersion"
+        defaultVersion:
+          oneOf:
+            - $ref: "#/components/schemas/CreativeVersion"
+            - type: "null"
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreativeJob"
+    GenerateCreativeInput:
+      type: object
+      properties:
+        templateKey: { type: string, minLength: 1 }
+    DealerBrandDna:
+      type: object
+      required:
+        [
+          id,
+          dealerId,
+          primaryColors,
+          secondaryColors,
+          accentColors,
+          preferredFont,
+          brandStyle,
+          backgroundStyle,
+          defaultTemplateKey,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: integer }
+        dealerId: { type: integer }
+        primaryColors:
+          type: array
+          items: { type: string }
+        secondaryColors:
+          type: array
+          items: { type: string }
+        accentColors:
+          type: array
+          items: { type: string }
+        logoUrl: { type: ["string", "null"] }
+        preferredFont: { type: string }
+        brandStyle: { type: string }
+        backgroundStyle: { type: string }
+        defaultTemplateKey: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    DealerBrandDnaUpdate:
+      type: object
+      properties:
+        primaryColors:
+          type: array
+          items: { type: string }
+        secondaryColors:
+          type: array
+          items: { type: string }
+        accentColors:
+          type: array
+          items: { type: string }
+        logoUrl: { type: ["string", "null"] }
+        preferredFont: { type: string, minLength: 1 }
+        brandStyle: { type: string, minLength: 1 }
+        backgroundStyle: { type: string, minLength: 1 }
+        defaultTemplateKey: { type: string, minLength: 1 }

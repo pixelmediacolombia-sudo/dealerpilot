@@ -971,3 +971,458 @@ export const FailPublishingJobResponse = zod.object({
 })
 
 
+/**
+ * @summary List one creative workspace per vehicle
+ */
+export const ListCreativeStudioQueryParams = zod.object({
+  "q": zod.coerce.string().optional().describe('Search by VIN, stock number, make, or model'),
+  "status": zod.coerce.string().optional().describe('Filter by creative status')
+})
+
+export const ListCreativeStudioResponse = zod.object({
+  "vehicles": zod.array(zod.object({
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "label": zod.string(),
+  "vin": zod.string(),
+  "year": zod.number().nullish(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "trim": zod.string().nullish(),
+  "bodyStyle": zod.string().nullish(),
+  "price": zod.number().nullish(),
+  "primaryImageUrl": zod.string().nullish(),
+  "imageCount": zod.number(),
+  "creativeStatus": zod.string(),
+  "versionCount": zod.number(),
+  "latestVersion": zod.number().nullish(),
+  "defaultVersionId": zod.number().nullish(),
+  "creativeScore": zod.number().nullish(),
+  "creativeRating": zod.string().nullish(),
+  "activeJobId": zod.number().nullish(),
+  "activeJobStatus": zod.string().nullish(),
+  "activeJobStep": zod.string().nullish(),
+  "activeJobProgress": zod.number().nullish(),
+  "updatedAt": zod.string().optional()
+}))
+})
+
+
+/**
+ * @summary Creative detail for a vehicle (versions, default, jobs)
+ */
+export const GetCreativeVehicleDetailParams = zod.object({
+  "id": zod.coerce.number().describe('Vehicle id')
+})
+
+export const GetCreativeVehicleDetailResponse = zod.object({
+  "vehicle": zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "vin": zod.string(),
+  "stockNumber": zod.string().nullish(),
+  "year": zod.number().nullish(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "trim": zod.string().nullish(),
+  "mileage": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "exteriorColor": zod.string().nullish(),
+  "bodyStyle": zod.string().nullish(),
+  "fuelType": zod.string().nullish(),
+  "status": zod.string(),
+  "primaryImageUrl": zod.string().nullish(),
+  "imageCount": zod.number()
+}),
+  "images": zod.array(zod.object({
+  "id": zod.number(),
+  "url": zod.string(),
+  "position": zod.number()
+})),
+  "versions": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "version": zod.number(),
+  "templateKey": zod.string(),
+  "brandStyle": zod.string(),
+  "backgroundStyle": zod.string(),
+  "status": zod.string(),
+  "isDefault": zod.boolean(),
+  "renderSpec": zod.object({
+  "template": zod.string(),
+  "brandStyle": zod.string(),
+  "backgroundStyle": zod.string(),
+  "colors": zod.object({
+  "primary": zod.string(),
+  "secondary": zod.string(),
+  "accent": zod.string()
+}),
+  "font": zod.string(),
+  "dealerName": zod.string(),
+  "logoUrl": zod.string().nullish(),
+  "vehicleImageUrl": zod.string().nullish(),
+  "headline": zod.string(),
+  "subline": zod.string(),
+  "price": zod.string(),
+  "cta": zod.string(),
+  "steps": zod.array(zod.string())
+}),
+  "outputs": zod.array(zod.object({
+  "format": zod.string(),
+  "label": zod.string(),
+  "width": zod.number(),
+  "height": zod.number(),
+  "url": zod.string()
+})),
+  "score": zod.union([zod.object({
+  "id": zod.number(),
+  "creativeVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "brandConsistency": zod.number(),
+  "vehicleVisibility": zod.number(),
+  "lighting": zod.number(),
+  "composition": zod.number(),
+  "ctrPrediction": zod.number(),
+  "overall": zod.number(),
+  "rating": zod.string(),
+  "createdAt": zod.string()
+}),zod.null()]).optional(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})),
+  "defaultVersion": zod.union([zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "version": zod.number(),
+  "templateKey": zod.string(),
+  "brandStyle": zod.string(),
+  "backgroundStyle": zod.string(),
+  "status": zod.string(),
+  "isDefault": zod.boolean(),
+  "renderSpec": zod.object({
+  "template": zod.string(),
+  "brandStyle": zod.string(),
+  "backgroundStyle": zod.string(),
+  "colors": zod.object({
+  "primary": zod.string(),
+  "secondary": zod.string(),
+  "accent": zod.string()
+}),
+  "font": zod.string(),
+  "dealerName": zod.string(),
+  "logoUrl": zod.string().nullish(),
+  "vehicleImageUrl": zod.string().nullish(),
+  "headline": zod.string(),
+  "subline": zod.string(),
+  "price": zod.string(),
+  "cta": zod.string(),
+  "steps": zod.array(zod.string())
+}),
+  "outputs": zod.array(zod.object({
+  "format": zod.string(),
+  "label": zod.string(),
+  "width": zod.number(),
+  "height": zod.number(),
+  "url": zod.string()
+})),
+  "score": zod.union([zod.object({
+  "id": zod.number(),
+  "creativeVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "brandConsistency": zod.number(),
+  "vehicleVisibility": zod.number(),
+  "lighting": zod.number(),
+  "composition": zod.number(),
+  "ctrPrediction": zod.number(),
+  "overall": zod.number(),
+  "rating": zod.string(),
+  "createdAt": zod.string()
+}),zod.null()]).optional(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}),zod.null()]).optional(),
+  "jobs": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "templateKey": zod.string(),
+  "status": zod.string(),
+  "step": zod.string().nullish(),
+  "progress": zod.number(),
+  "creativeVersionId": zod.number().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "vehicleLabel": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Enqueue a background creative-generation job for a vehicle
+ */
+export const GenerateCreativeParams = zod.object({
+  "id": zod.coerce.number().describe('Vehicle id')
+})
+
+
+
+
+export const GenerateCreativeBody = zod.object({
+  "templateKey": zod.string().min(1).optional()
+})
+
+export const GenerateCreativeResponse = zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "templateKey": zod.string(),
+  "status": zod.string(),
+  "step": zod.string().nullish(),
+  "progress": zod.number(),
+  "creativeVersionId": zod.number().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "vehicleLabel": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary The creative generation queue
+ */
+export const ListCreativeJobsQueryParams = zod.object({
+  "status": zod.coerce.string().optional().describe('Filter by job status')
+})
+
+export const ListCreativeJobsResponse = zod.object({
+  "jobs": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "templateKey": zod.string(),
+  "status": zod.string(),
+  "step": zod.string().nullish(),
+  "progress": zod.number(),
+  "creativeVersionId": zod.number().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "vehicleLabel": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Active creative template catalog
+ */
+export const ListCreativeTemplatesResponse = zod.object({
+  "templates": zod.array(zod.object({
+  "id": zod.number(),
+  "key": zod.string(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "category": zod.string(),
+  "recommendedBrandStyle": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "sortOrder": zod.number()
+}))
+})
+
+
+/**
+ * @summary Approve a creative version
+ */
+export const ApproveCreativeVersionParams = zod.object({
+  "id": zod.coerce.number().describe('Creative version id')
+})
+
+export const ApproveCreativeVersionResponse = zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "version": zod.number(),
+  "templateKey": zod.string(),
+  "brandStyle": zod.string(),
+  "backgroundStyle": zod.string(),
+  "status": zod.string(),
+  "isDefault": zod.boolean(),
+  "renderSpec": zod.object({
+  "template": zod.string(),
+  "brandStyle": zod.string(),
+  "backgroundStyle": zod.string(),
+  "colors": zod.object({
+  "primary": zod.string(),
+  "secondary": zod.string(),
+  "accent": zod.string()
+}),
+  "font": zod.string(),
+  "dealerName": zod.string(),
+  "logoUrl": zod.string().nullish(),
+  "vehicleImageUrl": zod.string().nullish(),
+  "headline": zod.string(),
+  "subline": zod.string(),
+  "price": zod.string(),
+  "cta": zod.string(),
+  "steps": zod.array(zod.string())
+}),
+  "outputs": zod.array(zod.object({
+  "format": zod.string(),
+  "label": zod.string(),
+  "width": zod.number(),
+  "height": zod.number(),
+  "url": zod.string()
+})),
+  "score": zod.union([zod.object({
+  "id": zod.number(),
+  "creativeVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "brandConsistency": zod.number(),
+  "vehicleVisibility": zod.number(),
+  "lighting": zod.number(),
+  "composition": zod.number(),
+  "ctrPrediction": zod.number(),
+  "overall": zod.number(),
+  "rating": zod.string(),
+  "createdAt": zod.string()
+}),zod.null()]).optional(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Mark a creative version as the vehicle default
+ */
+export const SetDefaultCreativeVersionParams = zod.object({
+  "id": zod.coerce.number().describe('Creative version id')
+})
+
+export const SetDefaultCreativeVersionResponse = zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "version": zod.number(),
+  "templateKey": zod.string(),
+  "brandStyle": zod.string(),
+  "backgroundStyle": zod.string(),
+  "status": zod.string(),
+  "isDefault": zod.boolean(),
+  "renderSpec": zod.object({
+  "template": zod.string(),
+  "brandStyle": zod.string(),
+  "backgroundStyle": zod.string(),
+  "colors": zod.object({
+  "primary": zod.string(),
+  "secondary": zod.string(),
+  "accent": zod.string()
+}),
+  "font": zod.string(),
+  "dealerName": zod.string(),
+  "logoUrl": zod.string().nullish(),
+  "vehicleImageUrl": zod.string().nullish(),
+  "headline": zod.string(),
+  "subline": zod.string(),
+  "price": zod.string(),
+  "cta": zod.string(),
+  "steps": zod.array(zod.string())
+}),
+  "outputs": zod.array(zod.object({
+  "format": zod.string(),
+  "label": zod.string(),
+  "width": zod.number(),
+  "height": zod.number(),
+  "url": zod.string()
+})),
+  "score": zod.union([zod.object({
+  "id": zod.number(),
+  "creativeVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "brandConsistency": zod.number(),
+  "vehicleVisibility": zod.number(),
+  "lighting": zod.number(),
+  "composition": zod.number(),
+  "ctrPrediction": zod.number(),
+  "overall": zod.number(),
+  "rating": zod.string(),
+  "createdAt": zod.string()
+}),zod.null()]).optional(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Get dealer Brand DNA
+ */
+export const GetDealerBrandDnaParams = zod.object({
+  "dealerId": zod.coerce.number().describe('Dealer id')
+})
+
+export const GetDealerBrandDnaResponse = zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "primaryColors": zod.array(zod.string()),
+  "secondaryColors": zod.array(zod.string()),
+  "accentColors": zod.array(zod.string()),
+  "logoUrl": zod.string().nullish(),
+  "preferredFont": zod.string(),
+  "brandStyle": zod.string(),
+  "backgroundStyle": zod.string(),
+  "defaultTemplateKey": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Create or update dealer Brand DNA
+ */
+export const UpdateDealerBrandDnaParams = zod.object({
+  "dealerId": zod.coerce.number().describe('Dealer id')
+})
+
+
+
+
+
+
+
+export const UpdateDealerBrandDnaBody = zod.object({
+  "primaryColors": zod.array(zod.string()).optional(),
+  "secondaryColors": zod.array(zod.string()).optional(),
+  "accentColors": zod.array(zod.string()).optional(),
+  "logoUrl": zod.string().nullish(),
+  "preferredFont": zod.string().min(1).optional(),
+  "brandStyle": zod.string().min(1).optional(),
+  "backgroundStyle": zod.string().min(1).optional(),
+  "defaultTemplateKey": zod.string().min(1).optional()
+})
+
+export const UpdateDealerBrandDnaResponse = zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "primaryColors": zod.array(zod.string()),
+  "secondaryColors": zod.array(zod.string()),
+  "accentColors": zod.array(zod.string()),
+  "logoUrl": zod.string().nullish(),
+  "preferredFont": zod.string(),
+  "brandStyle": zod.string(),
+  "backgroundStyle": zod.string(),
+  "defaultTemplateKey": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+

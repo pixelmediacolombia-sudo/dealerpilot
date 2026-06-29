@@ -1,2 +1,3 @@
 - [Chrome extension ↔ backend](chrome-extension-backend.md) — do backend fetches in the MV3 service worker, not content scripts, or Facebook's CSP blocks them.
 - [Feed import safety](feed-import-safety.md) — zero-parse feeds must abort (else inventory is wiped to Sold/Removed); dealer feed URLs are SSRF-guarded.
+- [Creative Intelligence Engine](creative-engine.md) — pluggable image pipeline: keep renderSpec+outputs contract stable so a real provider swaps in with no DB/UI changes; versioning + worker invariants.

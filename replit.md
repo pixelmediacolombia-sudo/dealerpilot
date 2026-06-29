@@ -55,6 +55,14 @@ and AI Studio are intentionally "Coming Soon".
 - Dealer inventory is seeded on API-server startup via `seedDealerAndInventory` (two-pass import for realistic change history)
 - Sample feed is served at `GET /api/sample-feed`; the dealer's feed URL is editable in Settings
 
+### Where things live (Sprint 4 — Creative Intelligence Engine)
+- Creative engine: `artifacts/api-server/src/creative/` (`pipeline.ts`, `scoring.ts`, `worker.ts`, `templates.ts`, `seed.ts`)
+- Creative routes: `artifacts/api-server/src/routes/creative.ts`
+- Creative schema: `lib/db/src/schema/` (dealer_brand_dna, creative_templates, creative_versions, creative_scores, creative_jobs)
+- Creative UI: `artifacts/dashboard/src/pages/{CreativeStudio,DealerDna}/` + shared `components/CreativePreview.tsx`
+- In-process background worker started in `index.ts`; generates versioned, scored creatives from Dealer Brand DNA
+- Image transforms are PLACEHOLDER/pluggable: a real provider fills `outputs[].url` from `renderSpec` with no DB/UI change (previews render from `renderSpec` via CSS)
+
 ## User preferences
 
 _Populate as you build — explicit user instructions worth remembering across sessions._

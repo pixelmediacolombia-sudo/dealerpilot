@@ -12,3 +12,8 @@ export * from "./extensionConnections";
 export * from "./listingVersions";
 export * from "./listingScores";
 export * from "./publishingJobs";
+export * from "./dealerBrandDna";
+export * from "./creativeTemplates";
+export * from "./creativeVersions";
+export * from "./creativeScores";
+export * from "./creativeJobs";

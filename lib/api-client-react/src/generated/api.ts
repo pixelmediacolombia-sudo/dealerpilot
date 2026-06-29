@@ -23,7 +23,15 @@ import type {
   ClaimJobInput,
   CompleteJobInput,
   ConnectionStatus,
+  CreativeJob,
+  CreativeJobList,
+  CreativeStudioList,
+  CreativeTemplateList,
+  CreativeVehicleDetail,
+  CreativeVersion,
   Dealer,
+  DealerBrandDna,
+  DealerBrandDnaUpdate,
   DealerList,
   DealerUpdate,
   ErrorResponse,
@@ -31,9 +39,12 @@ import type {
   FailJobInput,
   FeedRun,
   FeedRunList,
+  GenerateCreativeInput,
   HealthStatus,
   HeartbeatInput,
   LeadList,
+  ListCreativeJobsParams,
+  ListCreativeStudioParams,
   ListListingWorkspacesParams,
   ListPublishingJobsParams,
   ListVehiclesParams,
@@ -2110,5 +2121,686 @@ export const useFailPublishingJob = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getFailPublishingJobMutationOptions(options));
+    }
+
+export const getListCreativeStudioUrl = (params?: ListCreativeStudioParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/creative/studio?${stringifiedParams}` : `/api/creative/studio`
+}
+
+/**
+ * @summary List one creative workspace per vehicle
+ */
+export const listCreativeStudio = async (params?: ListCreativeStudioParams, options?: RequestInit): Promise<CreativeStudioList> => {
+
+  return customFetch<CreativeStudioList>(getListCreativeStudioUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCreativeStudioQueryKey = (params?: ListCreativeStudioParams,) => {
+    return [
+    `/api/creative/studio`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCreativeStudioQueryOptions = <TData = Awaited<ReturnType<typeof listCreativeStudio>>, TError = ErrorType<unknown>>(params?: ListCreativeStudioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCreativeStudio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCreativeStudioQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCreativeStudio>>> = ({ signal }) => listCreativeStudio(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCreativeStudio>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCreativeStudioQueryResult = NonNullable<Awaited<ReturnType<typeof listCreativeStudio>>>
+export type ListCreativeStudioQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List one creative workspace per vehicle
+ */
+
+export function useListCreativeStudio<TData = Awaited<ReturnType<typeof listCreativeStudio>>, TError = ErrorType<unknown>>(
+ params?: ListCreativeStudioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCreativeStudio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCreativeStudioQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCreativeVehicleDetailUrl = (id: number,) => {
+
+
+
+
+  return `/api/creative/vehicles/${id}`
+}
+
+/**
+ * @summary Creative detail for a vehicle (versions, default, jobs)
+ */
+export const getCreativeVehicleDetail = async (id: number, options?: RequestInit): Promise<CreativeVehicleDetail> => {
+
+  return customFetch<CreativeVehicleDetail>(getGetCreativeVehicleDetailUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCreativeVehicleDetailQueryKey = (id: number,) => {
+    return [
+    `/api/creative/vehicles/${id}`
+    ] as const;
+    }
+
+
+export const getGetCreativeVehicleDetailQueryOptions = <TData = Awaited<ReturnType<typeof getCreativeVehicleDetail>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCreativeVehicleDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCreativeVehicleDetailQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCreativeVehicleDetail>>> = ({ signal }) => getCreativeVehicleDetail(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCreativeVehicleDetail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCreativeVehicleDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getCreativeVehicleDetail>>>
+export type GetCreativeVehicleDetailQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Creative detail for a vehicle (versions, default, jobs)
+ */
+
+export function useGetCreativeVehicleDetail<TData = Awaited<ReturnType<typeof getCreativeVehicleDetail>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCreativeVehicleDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCreativeVehicleDetailQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGenerateCreativeUrl = (id: number,) => {
+
+
+
+
+  return `/api/creative/vehicles/${id}/generate`
+}
+
+/**
+ * @summary Enqueue a background creative-generation job for a vehicle
+ */
+export const generateCreative = async (id: number,
+    generateCreativeInput?: GenerateCreativeInput, options?: RequestInit): Promise<CreativeJob> => {
+
+  return customFetch<CreativeJob>(getGenerateCreativeUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(generateCreativeInput)
+  }
+);}
+
+
+
+
+export const getGenerateCreativeMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateCreative>>, TError,{id: number;data?: BodyType<GenerateCreativeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateCreative>>, TError,{id: number;data?: BodyType<GenerateCreativeInput>}, TContext> => {
+
+const mutationKey = ['generateCreative'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateCreative>>, {id: number;data?: BodyType<GenerateCreativeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  generateCreative(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateCreativeMutationResult = NonNullable<Awaited<ReturnType<typeof generateCreative>>>
+    export type GenerateCreativeMutationBody = BodyType<GenerateCreativeInput> | undefined
+    export type GenerateCreativeMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Enqueue a background creative-generation job for a vehicle
+ */
+export const useGenerateCreative = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateCreative>>, TError,{id: number;data?: BodyType<GenerateCreativeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateCreative>>,
+        TError,
+        {id: number;data?: BodyType<GenerateCreativeInput>},
+        TContext
+      > => {
+      return useMutation(getGenerateCreativeMutationOptions(options));
+    }
+
+export const getListCreativeJobsUrl = (params?: ListCreativeJobsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/creative/jobs?${stringifiedParams}` : `/api/creative/jobs`
+}
+
+/**
+ * @summary The creative generation queue
+ */
+export const listCreativeJobs = async (params?: ListCreativeJobsParams, options?: RequestInit): Promise<CreativeJobList> => {
+
+  return customFetch<CreativeJobList>(getListCreativeJobsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCreativeJobsQueryKey = (params?: ListCreativeJobsParams,) => {
+    return [
+    `/api/creative/jobs`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCreativeJobsQueryOptions = <TData = Awaited<ReturnType<typeof listCreativeJobs>>, TError = ErrorType<unknown>>(params?: ListCreativeJobsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCreativeJobs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCreativeJobsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCreativeJobs>>> = ({ signal }) => listCreativeJobs(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCreativeJobs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCreativeJobsQueryResult = NonNullable<Awaited<ReturnType<typeof listCreativeJobs>>>
+export type ListCreativeJobsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary The creative generation queue
+ */
+
+export function useListCreativeJobs<TData = Awaited<ReturnType<typeof listCreativeJobs>>, TError = ErrorType<unknown>>(
+ params?: ListCreativeJobsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCreativeJobs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCreativeJobsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListCreativeTemplatesUrl = () => {
+
+
+
+
+  return `/api/creative/templates`
+}
+
+/**
+ * @summary Active creative template catalog
+ */
+export const listCreativeTemplates = async ( options?: RequestInit): Promise<CreativeTemplateList> => {
+
+  return customFetch<CreativeTemplateList>(getListCreativeTemplatesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCreativeTemplatesQueryKey = () => {
+    return [
+    `/api/creative/templates`
+    ] as const;
+    }
+
+
+export const getListCreativeTemplatesQueryOptions = <TData = Awaited<ReturnType<typeof listCreativeTemplates>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCreativeTemplates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCreativeTemplatesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCreativeTemplates>>> = ({ signal }) => listCreativeTemplates({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCreativeTemplates>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCreativeTemplatesQueryResult = NonNullable<Awaited<ReturnType<typeof listCreativeTemplates>>>
+export type ListCreativeTemplatesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Active creative template catalog
+ */
+
+export function useListCreativeTemplates<TData = Awaited<ReturnType<typeof listCreativeTemplates>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCreativeTemplates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCreativeTemplatesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getApproveCreativeVersionUrl = (id: number,) => {
+
+
+
+
+  return `/api/creative/versions/${id}/approve`
+}
+
+/**
+ * @summary Approve a creative version
+ */
+export const approveCreativeVersion = async (id: number, options?: RequestInit): Promise<CreativeVersion> => {
+
+  return customFetch<CreativeVersion>(getApproveCreativeVersionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getApproveCreativeVersionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveCreativeVersion>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveCreativeVersion>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['approveCreativeVersion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveCreativeVersion>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  approveCreativeVersion(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveCreativeVersionMutationResult = NonNullable<Awaited<ReturnType<typeof approveCreativeVersion>>>
+
+    export type ApproveCreativeVersionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Approve a creative version
+ */
+export const useApproveCreativeVersion = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveCreativeVersion>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveCreativeVersion>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getApproveCreativeVersionMutationOptions(options));
+    }
+
+export const getSetDefaultCreativeVersionUrl = (id: number,) => {
+
+
+
+
+  return `/api/creative/versions/${id}/default`
+}
+
+/**
+ * @summary Mark a creative version as the vehicle default
+ */
+export const setDefaultCreativeVersion = async (id: number, options?: RequestInit): Promise<CreativeVersion> => {
+
+  return customFetch<CreativeVersion>(getSetDefaultCreativeVersionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSetDefaultCreativeVersionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setDefaultCreativeVersion>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setDefaultCreativeVersion>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['setDefaultCreativeVersion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setDefaultCreativeVersion>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  setDefaultCreativeVersion(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetDefaultCreativeVersionMutationResult = NonNullable<Awaited<ReturnType<typeof setDefaultCreativeVersion>>>
+
+    export type SetDefaultCreativeVersionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Mark a creative version as the vehicle default
+ */
+export const useSetDefaultCreativeVersion = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setDefaultCreativeVersion>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setDefaultCreativeVersion>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getSetDefaultCreativeVersionMutationOptions(options));
+    }
+
+export const getGetDealerBrandDnaUrl = (dealerId: number,) => {
+
+
+
+
+  return `/api/creative/dna/${dealerId}`
+}
+
+/**
+ * @summary Get dealer Brand DNA
+ */
+export const getDealerBrandDna = async (dealerId: number, options?: RequestInit): Promise<DealerBrandDna> => {
+
+  return customFetch<DealerBrandDna>(getGetDealerBrandDnaUrl(dealerId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDealerBrandDnaQueryKey = (dealerId: number,) => {
+    return [
+    `/api/creative/dna/${dealerId}`
+    ] as const;
+    }
+
+
+export const getGetDealerBrandDnaQueryOptions = <TData = Awaited<ReturnType<typeof getDealerBrandDna>>, TError = ErrorType<ErrorResponse>>(dealerId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDealerBrandDna>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDealerBrandDnaQueryKey(dealerId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDealerBrandDna>>> = ({ signal }) => getDealerBrandDna(dealerId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: dealerId !== null && dealerId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDealerBrandDna>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDealerBrandDnaQueryResult = NonNullable<Awaited<ReturnType<typeof getDealerBrandDna>>>
+export type GetDealerBrandDnaQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get dealer Brand DNA
+ */
+
+export function useGetDealerBrandDna<TData = Awaited<ReturnType<typeof getDealerBrandDna>>, TError = ErrorType<ErrorResponse>>(
+ dealerId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDealerBrandDna>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDealerBrandDnaQueryOptions(dealerId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateDealerBrandDnaUrl = (dealerId: number,) => {
+
+
+
+
+  return `/api/creative/dna/${dealerId}`
+}
+
+/**
+ * @summary Create or update dealer Brand DNA
+ */
+export const updateDealerBrandDna = async (dealerId: number,
+    dealerBrandDnaUpdate: DealerBrandDnaUpdate, options?: RequestInit): Promise<DealerBrandDna> => {
+
+  return customFetch<DealerBrandDna>(getUpdateDealerBrandDnaUrl(dealerId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(dealerBrandDnaUpdate)
+  }
+);}
+
+
+
+
+export const getUpdateDealerBrandDnaMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDealerBrandDna>>, TError,{dealerId: number;data: BodyType<DealerBrandDnaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDealerBrandDna>>, TError,{dealerId: number;data: BodyType<DealerBrandDnaUpdate>}, TContext> => {
+
+const mutationKey = ['updateDealerBrandDna'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDealerBrandDna>>, {dealerId: number;data: BodyType<DealerBrandDnaUpdate>}> = (props) => {
+          const {dealerId,data} = props ?? {};
+
+          return  updateDealerBrandDna(dealerId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDealerBrandDnaMutationResult = NonNullable<Awaited<ReturnType<typeof updateDealerBrandDna>>>
+    export type UpdateDealerBrandDnaMutationBody = BodyType<DealerBrandDnaUpdate>
+    export type UpdateDealerBrandDnaMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Create or update dealer Brand DNA
+ */
+export const useUpdateDealerBrandDna = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDealerBrandDna>>, TError,{dealerId: number;data: BodyType<DealerBrandDnaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDealerBrandDna>>,
+        TError,
+        {dealerId: number;data: BodyType<DealerBrandDnaUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateDealerBrandDnaMutationOptions(options));
     }
 

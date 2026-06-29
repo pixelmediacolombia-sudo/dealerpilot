@@ -430,6 +430,236 @@ export interface FailJobInput {
   reason?: string;
 }
 
+export interface CreativeOutput {
+  format: string;
+  label: string;
+  width: number;
+  height: number;
+  url: string;
+}
+
+export type CreativeRenderSpecColors = {
+  primary: string;
+  secondary: string;
+  accent: string;
+};
+
+export interface CreativeRenderSpec {
+  template: string;
+  brandStyle: string;
+  backgroundStyle: string;
+  colors: CreativeRenderSpecColors;
+  font: string;
+  dealerName: string;
+  /** @nullable */
+  logoUrl?: string | null;
+  /** @nullable */
+  vehicleImageUrl?: string | null;
+  headline: string;
+  subline: string;
+  price: string;
+  cta: string;
+  steps: string[];
+}
+
+export interface CreativeScore {
+  id: number;
+  creativeVersionId: number;
+  vehicleId: number;
+  brandConsistency: number;
+  vehicleVisibility: number;
+  lighting: number;
+  composition: number;
+  ctrPrediction: number;
+  overall: number;
+  rating: string;
+  createdAt: string;
+}
+
+export interface CreativeVersion {
+  id: number;
+  vehicleId: number;
+  dealerId: number;
+  version: number;
+  templateKey: string;
+  brandStyle: string;
+  backgroundStyle: string;
+  status: string;
+  isDefault: boolean;
+  renderSpec: CreativeRenderSpec;
+  outputs: CreativeOutput[];
+  score?: CreativeScore | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreativeJob {
+  id: number;
+  vehicleId: number;
+  dealerId: number;
+  templateKey: string;
+  status: string;
+  /** @nullable */
+  step?: string | null;
+  progress: number;
+  /** @nullable */
+  creativeVersionId?: number | null;
+  /** @nullable */
+  failedReason?: string | null;
+  attempts: number;
+  /** @nullable */
+  startedAt?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  /** @nullable */
+  vehicleLabel?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreativeJobList {
+  jobs: CreativeJob[];
+}
+
+export interface CreativeTemplate {
+  id: number;
+  key: string;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  category: string;
+  /** @nullable */
+  recommendedBrandStyle?: string | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface CreativeTemplateList {
+  templates: CreativeTemplate[];
+}
+
+export interface CreativeVehicleImage {
+  id: number;
+  url: string;
+  position: number;
+}
+
+export interface CreativeVehicleSummary {
+  id: number;
+  dealerId: number;
+  vin: string;
+  /** @nullable */
+  stockNumber?: string | null;
+  /** @nullable */
+  year?: number | null;
+  make: string;
+  model: string;
+  /** @nullable */
+  trim?: string | null;
+  /** @nullable */
+  mileage?: number | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  exteriorColor?: string | null;
+  /** @nullable */
+  bodyStyle?: string | null;
+  /** @nullable */
+  fuelType?: string | null;
+  status: string;
+  /** @nullable */
+  primaryImageUrl?: string | null;
+  imageCount: number;
+}
+
+export interface CreativeStudioItem {
+  vehicleId: number;
+  dealerId: number;
+  label: string;
+  vin: string;
+  /** @nullable */
+  year?: number | null;
+  make: string;
+  model: string;
+  /** @nullable */
+  trim?: string | null;
+  /** @nullable */
+  bodyStyle?: string | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  primaryImageUrl?: string | null;
+  imageCount: number;
+  creativeStatus: string;
+  versionCount: number;
+  /** @nullable */
+  latestVersion?: number | null;
+  /** @nullable */
+  defaultVersionId?: number | null;
+  /** @nullable */
+  creativeScore?: number | null;
+  /** @nullable */
+  creativeRating?: string | null;
+  /** @nullable */
+  activeJobId?: number | null;
+  /** @nullable */
+  activeJobStatus?: string | null;
+  /** @nullable */
+  activeJobStep?: string | null;
+  /** @nullable */
+  activeJobProgress?: number | null;
+  updatedAt?: string;
+}
+
+export interface CreativeStudioList {
+  vehicles: CreativeStudioItem[];
+}
+
+export interface CreativeVehicleDetail {
+  vehicle: CreativeVehicleSummary;
+  images: CreativeVehicleImage[];
+  versions: CreativeVersion[];
+  defaultVersion?: CreativeVersion | null;
+  jobs: CreativeJob[];
+}
+
+export interface GenerateCreativeInput {
+  /** @minLength 1 */
+  templateKey?: string;
+}
+
+export interface DealerBrandDna {
+  id: number;
+  dealerId: number;
+  primaryColors: string[];
+  secondaryColors: string[];
+  accentColors: string[];
+  /** @nullable */
+  logoUrl?: string | null;
+  preferredFont: string;
+  brandStyle: string;
+  backgroundStyle: string;
+  defaultTemplateKey: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DealerBrandDnaUpdate {
+  primaryColors?: string[];
+  secondaryColors?: string[];
+  accentColors?: string[];
+  /** @nullable */
+  logoUrl?: string | null;
+  /** @minLength 1 */
+  preferredFont?: string;
+  /** @minLength 1 */
+  brandStyle?: string;
+  /** @minLength 1 */
+  backgroundStyle?: string;
+  /** @minLength 1 */
+  defaultTemplateKey?: string;
+}
+
 export type ListVehiclesParams = {
 /**
  * Search by VIN, stock number, make, or model
@@ -464,6 +694,24 @@ status?: string;
 };
 
 export type ListPublishingJobsParams = {
+/**
+ * Filter by job status
+ */
+status?: string;
+};
+
+export type ListCreativeStudioParams = {
+/**
+ * Search by VIN, stock number, make, or model
+ */
+q?: string;
+/**
+ * Filter by creative status
+ */
+status?: string;
+};
+
+export type ListCreativeJobsParams = {
 /**
  * Filter by job status
  */

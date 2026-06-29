@@ -10,6 +10,9 @@ import { VehicleDetail } from "@/pages/Inventory/VehicleDetail";
 import { ListingsWorkspace } from "@/pages/Listings";
 import { ListingDetail } from "@/pages/Listings/ListingDetail";
 import { PublishingQueue } from "@/pages/Publishing";
+import { CreativeStudio } from "@/pages/CreativeStudio";
+import { CreativeDetail } from "@/pages/CreativeStudio/CreativeDetail";
+import { DealerDna } from "@/pages/DealerDna";
 import { ConnectionCenter } from "@/pages/ConnectionCenter";
 import { Settings } from "@/pages/Settings";
 
@@ -24,14 +27,15 @@ function Router() {
       <Route path="/listings" component={ListingsWorkspace} />
       <Route path="/listings/:id" component={ListingDetail} />
       <Route path="/publishing" component={PublishingQueue} />
+      <Route path="/creative-studio" component={CreativeStudio} />
+      <Route path="/creative-studio/:id" component={CreativeDetail} />
+      <Route path="/dealer-dna" component={DealerDna} />
       <Route path="/connection-center" component={ConnectionCenter} />
       <Route path="/settings" component={Settings} />
 
       {/* Coming Soon Routes */}
       <Route path="/" component={ComingSoon} />
       <Route path="/leads" component={ComingSoon} />
-      <Route path="/ai-studio" component={ComingSoon} />
-      <Route path="/dealer-dna" component={ComingSoon} />
 
       {/* Fallback */}
       <Route component={NotFound} />

@@ -1,0 +1,381 @@
+DealerPilot AI - Sprint 4
+
+Creative Intelligence Engine
+
+Sprint 3 is complete.
+
+Do NOT modify the Inventory Engine.
+
+Do NOT modify the Listing Intelligence Engine.
+
+Do NOT modify the Publishing Queue.
+
+Do NOT modify the Chrome Extension.
+
+Build a completely new module called:
+
+Creative Intelligence Engine.
+
+⸻
+
+GOAL
+
+Automatically generate professional Marketplace marketing images using Dealer Brand DNA.
+
+The generated creative should be better than a normal dealer inventory photo.
+
+The system should create Marketplace-ready images that increase CTR.
+
+⸻
+
+NEW SIDEBAR
+
+Sales Hub
+
+Inventory
+
+Listings
+
+Publishing
+
+Creative Studio
+
+Connection Center
+
+Leads
+
+Dealer DNA
+
+Settings
+
+⸻
+
+MODULE 1
+
+Creative Studio
+
+Create page:
+
+/creative-studio
+
+Display all inventory vehicles.
+
+Each vehicle card shows:
+
+Original Thumbnail
+
+Creative Status
+
+Generate Creative
+
+Preview
+
+Download
+
+History
+
+⸻
+
+MODULE 2
+
+Creative Generator
+
+When Generate Creative is pressed:
+
+Create one Marketplace Cover.
+
+Workflow:
+
+Original Vehicle Images
+
+↓
+
+Remove Background
+
+↓
+
+Vehicle Segmentation
+
+↓
+
+AI Enhancement
+
+↓
+
+Dealer Background
+
+↓
+
+Professional Shadow
+
+↓
+
+Professional Reflection
+
+↓
+
+Lighting Enhancement
+
+↓
+
+Export
+
+⸻
+
+MODULE 3
+
+Dealer Brand DNA
+
+Create page:
+
+/dealer-dna
+
+Dealer fields
+
+Primary Colors
+
+Secondary Colors
+
+Accent Colors
+
+Logo
+
+Preferred Font
+
+Brand Style
+
+Luxury
+
+Sport
+
+Modern
+
+Minimal
+
+Urban
+
+Aggressive
+
+Premium
+
+Background Style
+
+Dark Studio
+
+Showroom
+
+Modern Garage
+
+Outdoor
+
+Luxury Showroom
+
+Night Lights
+
+Industrial
+
+Display a live preview.
+
+⸻
+
+MODULE 4
+
+Creative Templates
+
+Support multiple templates.
+
+Marketplace Standard
+
+Marketplace Premium
+
+Luxury Vehicle
+
+Truck
+
+SUV
+
+Sedan
+
+Sport
+
+Electric
+
+Dealer chooses default template.
+
+⸻
+
+MODULE 5
+
+Image Outputs
+
+Generate:
+
+Marketplace Cover
+
+1080x1080
+
+Marketplace Story
+
+1080x1920
+
+Facebook Feed
+
+1200x1200
+
+Future support:
+
+Instagram
+
+Google Vehicle Ads
+
+Craigslist
+
+⸻
+
+MODULE 6
+
+Creative Score
+
+Score every generated image.
+
+0-100
+
+Metrics:
+
+Brand Consistency
+
+Vehicle Visibility
+
+Lighting
+
+Composition
+
+CTR Prediction
+
+Overall Score
+
+Display:
+
+Excellent
+
+Good
+
+Needs Improvement
+
+⸻
+
+MODULE 7
+
+Creative History
+
+Every generated creative is versioned.
+
+Never overwrite.
+
+Creative Version 1
+
+Creative Version 2
+
+Creative Version 3
+
+Allow comparison.
+
+⸻
+
+MODULE 8
+
+Vehicle Creative Detail
+
+Each vehicle has:
+
+Original Photos
+
+Generated Creatives
+
+Creative History
+
+Generate Again
+
+Approve Creative
+
+Set Default Creative
+
+⸻
+
+MODULE 9
+
+Database
+
+Create:
+
+dealer_brand_dna
+
+creative_templates
+
+creative_versions
+
+creative_scores
+
+creative_jobs
+
+Keep normalized.
+
+⸻
+
+MODULE 10
+
+Architecture
+
+Creative generation must run as background jobs.
+
+Never block the UI.
+
+Show:
+
+Queued
+
+Generating
+
+Completed
+
+Failed
+
+⸻
+
+IMPORTANT
+
+Do NOT call image generation APIs yet.
+
+Create the entire architecture.
+
+Use placeholder image transformations.
+
+Design the pipeline so OpenAI Images, Flux, Ideogram or future providers can be plugged in later without changing the database or UI.
+
+⸻
+
+DELIVERABLES
+
+Creative Studio
+
+Dealer Brand DNA
+
+Creative History
+
+Creative Queue
+
+Creative Score
+
+Creative Templates
+
+Database
+
+Background Jobs
+
+API
+
+UI
+
+Everything production-ready.
+
+Typecheck clean.
