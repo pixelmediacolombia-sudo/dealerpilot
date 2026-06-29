@@ -25,7 +25,7 @@
   // ---- Safe runtime communication ----
   // Sentinel returned (never thrown) when Chrome invalidates the extension context.
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "STATE_MACHINE_WIRED_1.0.4";
+  const BUILD_LABEL = "DOM_WAIT_1.0.5";
 
   function _runtimeAlive() {
     try {
@@ -191,16 +191,27 @@
   }
 
   // Poll until a matching [role="combobox"] appears in the DOM.
+  // Logs every poll cycle and every timeout.
   function waitForCombobox(keywords, maxWaitMs) {
     const limit = maxWaitMs === undefined ? 10000 : maxWaitMs;
+    const kwStr = keywords.join("/");
     return new Promise((resolve) => {
       const interval = 300;
       let elapsed = 0;
       const tick = () => {
         const el = findCombobox(keywords);
-        if (el) { resolve(el); return; }
+        if (el) {
+          console.log(`[WAIT] combobox(${kwStr}) FOUND at ${elapsed}ms`);
+          resolve(el);
+          return;
+        }
+        console.log(`[WAIT] combobox(${kwStr}) not in DOM — ${elapsed}ms / ${limit}ms`);
         elapsed += interval;
-        if (elapsed >= limit) { resolve(null); return; }
+        if (elapsed >= limit) {
+          console.log(`[TIMEOUT] combobox(${kwStr}) not found after ${limit}ms`);
+          resolve(null);
+          return;
+        }
         setTimeout(tick, interval);
       };
       tick();
@@ -208,34 +219,85 @@
   }
 
   // After clicking a combobox, poll until [role="option"] items appear.
-  function waitForOptions(maxWaitMs) {
+  // Logs every poll cycle and every timeout.
+  function waitForOptions(label, maxWaitMs) {
     const limit = maxWaitMs === undefined ? 8000 : maxWaitMs;
+    const tag   = label || "options";
     return new Promise((resolve) => {
       const interval = 150;
       let elapsed = 0;
       const tick = () => {
         const opts = Array.from(document.querySelectorAll('[role="option"]'))
           .filter((el) => el.offsetParent !== null);
-        if (opts.length > 0) { resolve(opts); return; }
+        if (opts.length > 0) {
+          console.log(`[WAIT] ${tag} options FOUND: ${opts.length} items at ${elapsed}ms`);
+          resolve(opts);
+          return;
+        }
+        console.log(`[WAIT] ${tag} options not visible — ${elapsed}ms / ${limit}ms`);
         elapsed += interval;
-        if (elapsed >= limit) { resolve([]); return; }
+        if (elapsed >= limit) {
+          console.log(`[TIMEOUT] ${tag} options not found after ${limit}ms`);
+          resolve([]);
+          return;
+        }
         setTimeout(tick, interval);
       };
       tick();
     });
   }
 
-  // After selecting an option, wait for more comboboxes to appear (React cascade).
-  function waitForMoreComboboxes(countBefore, maxWaitMs) {
-    const limit = maxWaitMs === undefined ? 6000 : maxWaitMs;
+  // After clicking an option in a dropdown, wait until a SPECIFIC named combobox
+  // appears in the DOM (e.g. wait for "model" after selecting a make).
+  // Uses the full findCombobox keyword match, logs every cycle and timeout.
+  function waitForNamedCombobox(label, keywords, maxWaitMs) {
+    const limit = maxWaitMs === undefined ? 20000 : maxWaitMs;
+    const kwStr = keywords.join("/");
     return new Promise((resolve) => {
       const interval = 300;
       let elapsed = 0;
       const tick = () => {
-        const count = document.querySelectorAll('[role="combobox"]').length;
-        if (count > countBefore) { resolve(true); return; }
+        const el = findCombobox(keywords);
+        if (el) {
+          console.log(`[WAIT] next combobox "${label}" (${kwStr}) APPEARED at ${elapsed}ms`);
+          resolve(el);
+          return;
+        }
+        console.log(`[WAIT] waiting for "${label}" combobox — ${elapsed}ms / ${limit}ms`);
         elapsed += interval;
-        if (elapsed >= limit) { resolve(false); return; }
+        if (elapsed >= limit) {
+          console.log(`[TIMEOUT] "${label}" combobox (${kwStr}) did not appear after ${limit}ms`);
+          resolve(null);
+          return;
+        }
+        setTimeout(tick, interval);
+      };
+      tick();
+    });
+  }
+
+  // After the dropdown cascade, wait until a specific text input appears in the DOM
+  // (e.g. wait for the Title field after selecting Model).
+  // Logs every cycle and timeout.
+  function waitForNamedField(label, keywords, maxWaitMs) {
+    const limit = maxWaitMs === undefined ? 20000 : maxWaitMs;
+    return new Promise((resolve) => {
+      const interval = 300;
+      let elapsed = 0;
+      const tick = () => {
+        const el = findField(keywords);
+        if (el) {
+          console.log(`[WAIT] field "${label}" APPEARED at ${elapsed}ms`);
+          resolve(el);
+          return;
+        }
+        console.log(`[WAIT] waiting for "${label}" field — ${elapsed}ms / ${limit}ms`);
+        elapsed += interval;
+        if (elapsed >= limit) {
+          console.log(`[TIMEOUT] field "${label}" did not appear after ${limit}ms`);
+          resolve(null);
+          return;
+        }
         setTimeout(tick, interval);
       };
       tick();
@@ -450,9 +512,11 @@
     // Clicks to open, waits for [role="option"] items, clicks the match,
     // then waits for new comboboxes to appear (React cascade signal).
     // ------------------------------------------------------------------
-    async function selectComboboxStep(label, keywords, targetValue, waitForMore) {
-      const shouldWaitForMore = waitForMore !== false; // default true
-
+    // nextComboboxLabel / nextComboboxKeywords: when set, the step DOM-polls for that
+    // specific combobox (up to 20 s) after clicking an option rather than using a
+    // generic count-based wait or a fixed sleep.  Pass null / null when no further
+    // combobox is expected (e.g. after selecting Model).
+    async function selectComboboxStep(label, keywords, targetValue, nextComboboxLabel, nextComboboxKeywords) {
       if (targetValue === null || targetValue === undefined || targetValue === "") {
         stateLog(`Skipping "${label}" — no value in listing data`);
         warnings.push(`${label}: no value in listing data — skipped`);
@@ -468,17 +532,15 @@
         warnings.push(`${label}: combobox did not appear`);
         return false;
       }
-      console.log("FOUND COMBOBOX", label, combobox);
+      console.log("[STEP] FOUND COMBOBOX", label);
       stateLog(`${label} found`);
 
-      const countBefore = document.querySelectorAll('[role="combobox"]').length;
-
       combobox.click();
-      console.log("OPENED COMBOBOX", label);
+      console.log("[STEP] OPENED COMBOBOX", label, "— waiting for options");
       stateLog(`Selecting ${label} — opened combobox, waiting for options`);
       setStatus(`Opened "${label}" — waiting for options…`);
 
-      const options = await waitForOptions();
+      const options = await waitForOptions(label);
       if (!options.length) {
         stateError(`No [role="option"] elements appeared for ${label}`);
         missed.push(label);
@@ -486,7 +548,7 @@
         return false;
       }
 
-      console.log("OPTIONS FOUND", label, options.length);
+      console.log("[STEP] OPTIONS FOUND", label, options.length);
       options.forEach((o, i) =>
         console.log(`  [${i}] "${(o.innerText || o.textContent || "").trim()}"`)
       );
@@ -508,17 +570,19 @@
       }
 
       const pickedText = (pick.innerText || pick.textContent || "").trim();
-      console.log("OPTION CLICKED", label, pickedText);
+      console.log("[STEP] CLICKING OPTION", label, "→", pickedText);
       stateLog(`Selecting ${label} → "${pickedText}"`);
       pick.click();
       filled.push(label);
       log(`${label} → "${pickedText}"`);
 
-      if (shouldWaitForMore) {
-        console.log("WAITING FOR NEW FIELDS");
-        stateLog(`Waiting for React render after ${label}`);
-        const appeared = await waitForMoreComboboxes(countBefore);
-        console.log(appeared ? "NEW FIELDS DETECTED" : `[WARN] No new comboboxes after ${label}`);
+      if (nextComboboxKeywords && nextComboboxKeywords.length) {
+        console.log(`[STEP] Waiting for next combobox "${nextComboboxLabel}" after ${label}…`);
+        stateLog(`Waiting for "${nextComboboxLabel}" combobox after ${label}`);
+        const appeared = await waitForNamedCombobox(nextComboboxLabel, nextComboboxKeywords, 20000);
+        if (!appeared) {
+          console.log(`[WARN] "${nextComboboxLabel}" combobox did not appear after selecting ${label}`);
+        }
       } else {
         await sleep(400);
       }
@@ -571,7 +635,8 @@
         "vehicle type",
         ["vehicle type", "type of vehicle", "category"],
         fill.vehicleType || "Car/Truck",
-        true, // wait for Year combobox to appear
+        "year",   // DOM-poll: wait for Year combobox to appear (up to 20 s)
+        ["year"],
       );
 
       setStatus("Step 2 of 4: Selecting year…");
@@ -579,7 +644,8 @@
         "year",
         ["year"],
         fill.year ? String(fill.year) : null,
-        true, // wait for Make combobox to appear
+        "make",   // DOM-poll: wait for Make combobox to appear (up to 20 s)
+        ["make"],
       );
 
       setStatus("Step 3 of 4: Selecting make…");
@@ -587,17 +653,28 @@
         "make",
         ["make"],
         fill.make,
-        true, // wait for Model combobox to appear
+        "model",  // DOM-poll: wait for Model combobox to appear (up to 20 s)
+        ["model"],
       );
 
-      setStatus("Step 4 of 4: Selecting model — waiting for text fields…");
+      setStatus("Step 4 of 4: Selecting model — waiting for title field…");
       await selectComboboxStep(
         "model",
         ["model"],
         fill.model,
-        false, // model triggers text fields, not more comboboxes
+        null,  // no further combobox expected after model
+        null,
       );
-      await sleep(1500); // give React time to render mileage/price/title/description
+
+      // DOM-poll: block until the Title input appears (React renders text fields
+      // asynchronously after the final dropdown selection — no fixed sleep).
+      stateLog("Waiting for title field after model selection");
+      console.log("[STEP] Model selected — polling for title field (up to 20 s)");
+      await waitForNamedField(
+        "title",
+        ["title", "listing title", "what are you selling", "vehicle name", "add a title", "item title"],
+        20000,
+      );
 
       // ---- Phase 2: Text fields ----
 

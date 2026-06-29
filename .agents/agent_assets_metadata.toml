@@ -131,3 +131,9 @@ id = "fhM70yboEINGd9v_vml9V"
 uri = "file://DealerPilot-Extension-v1.0.4-STATE_MACHINE_WIRED_20260629-143830.zip"
 type = "unspecified"
 title = "DealerPilot Extension v1.0.4 — STATE_MACHINE_WIRED"
+
+[[outputs]]
+id = "xG0T2NvXfiQJ1HcxKF8d9"
+uri = "file://DealerPilot-Extension-v1.0.5-DOM_WAIT_20260629-144813.zip"
+type = "unspecified"
+title = "DealerPilot Extension v1.0.5 — DOM_WAIT"
