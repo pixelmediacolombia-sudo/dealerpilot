@@ -9,6 +9,9 @@ import listingsRouter from "./listings";
 import publishingRouter from "./publishing";
 import autoPublishRouter from "./autoPublish";
 import creativeRouter from "./creative";
+import conversationsRouter from "./conversations";
+import leadsRouter from "./leads";
+import simulatorRouter from "./simulator";
 
 const router: IRouter = Router();
 
@@ -22,5 +25,8 @@ router.use(listingsRouter);
 router.use(publishingRouter);
 router.use(autoPublishRouter);
 router.use(creativeRouter);
+router.use(conversationsRouter);
+router.use(leadsRouter);
+router.use(simulatorRouter);
 
 export default router;

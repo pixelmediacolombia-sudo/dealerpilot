@@ -22,3 +22,6 @@ export * from "./creativeTemplates";
 export * from "./creativeVersions";
 export * from "./creativeScores";
 export * from "./creativeJobs";
+export * from "./conversations";
+export * from "./conversationMessages";
+export * from "./downPaymentIntelligence";

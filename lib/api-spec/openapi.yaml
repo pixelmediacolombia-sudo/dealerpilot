@@ -2455,3 +2455,396 @@ components:
       properties:
         checklist:
           $ref: "#/components/schemas/LaunchChecklist"
+
+  /conversations/intake:
+    post:
+      operationId: conversationIntake
+      tags: [sales-ai]
+      summary: Ingest a Messenger conversation and generate AI reply
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationIntakeBody"
+      responses:
+        "200":
+          description: Intake result with suggested reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationIntakeResponse"
+
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [sales-ai]
+      summary: List all conversations for a dealer
+      parameters:
+        - in: query
+          name: dealerId
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationListResponse"
+
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      tags: [sales-ai]
+      summary: Get a conversation with messages and lead
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Conversation detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetailResponse"
+
+  /conversations/{id}/status:
+    patch:
+      operationId: updateConversationStatus
+      tags: [sales-ai]
+      summary: Update conversation status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  /leads:
+    get:
+      operationId: listLeads
+      tags: [sales-ai]
+      summary: List leads for a dealer
+      parameters:
+        - in: query
+          name: dealerId
+          schema: { type: integer }
+        - in: query
+          name: temperature
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of leads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadListResponse"
+
+  /leads/{id}:
+    get:
+      operationId: getLead
+      tags: [sales-ai]
+      summary: Get a single lead
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Lead detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadDetailResponse"
+    patch:
+      operationId: updateLead
+      tags: [sales-ai]
+      summary: Update a lead
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLeadBody"
+      responses:
+        "200":
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadDetailResponse"
+
+  /down-payment-intelligence:
+    get:
+      operationId: getDownPaymentIntelligence
+      tags: [sales-ai]
+      summary: Get down payment performance by vehicle type
+      parameters:
+        - in: query
+          name: dealerId
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Down payment intelligence summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownPaymentIntelligenceResponse"
+
+  /simulator/scenarios:
+    get:
+      operationId: listSimulatorScenarios
+      tags: [sales-ai]
+      summary: List available simulator scenarios
+      responses:
+        "200":
+          description: Scenarios list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulatorScenariosResponse"
+
+  /simulator/run:
+    post:
+      operationId: runSimulator
+      tags: [sales-ai]
+      summary: Run a simulator scenario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulatorRunBody"
+      responses:
+        "200":
+          description: Simulator result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulatorRunResponse"
+
+    ConversationIntakeBody:
+      type: object
+      required: [externalThreadRef]
+      properties:
+        extensionId: { type: string }
+        externalThreadRef: { type: string }
+        sourceUrl: { type: ["string", "null"] }
+        buyerName: { type: ["string", "null"] }
+        visibleMessages:
+          type: array
+          items: { type: string }
+        currentMessage: { type: ["string", "null"] }
+        detectedMarketplaceListingUrl: { type: ["string", "null"] }
+        detectedVehicleTitle: { type: ["string", "null"] }
+        marketplaceDownPayment: { type: ["integer", "null"] }
+        marketplaceAskingPrice: { type: ["integer", "null"] }
+        vehicleType: { type: ["string", "null"] }
+        timestamp: { type: ["string", "null"] }
+    ConversationIntakeResponse:
+      type: object
+      required: [conversationId, leadId, language]
+      properties:
+        conversationId: { type: integer }
+        leadId: { type: integer }
+        suggestedReply: { type: ["string", "null"] }
+        language: { type: string }
+
+    ConversationSummary:
+      type: object
+      required: [id, dealerId, externalThreadRef, language, status, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        dealerId: { type: integer }
+        externalThreadRef: { type: string }
+        buyerName: { type: ["string", "null"] }
+        language: { type: string }
+        sourceUrl: { type: ["string", "null"] }
+        detectedListingUrl: { type: ["string", "null"] }
+        detectedVehicleTitle: { type: ["string", "null"] }
+        vehicleId: { type: ["integer", "null"] }
+        listingId: { type: ["integer", "null"] }
+        marketplaceDownPayment: { type: ["integer", "null"] }
+        marketplaceAskingPrice: { type: ["integer", "null"] }
+        vehicleType: { type: ["string", "null"] }
+        status: { type: string }
+        lastMessageAt: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        lead: { type: ["object", "null"] }
+        lastMessage: { type: ["object", "null"] }
+    ConversationListResponse:
+      type: object
+      required: [conversations]
+      properties:
+        conversations:
+          type: array
+          items: { $ref: "#/components/schemas/ConversationSummary" }
+
+    ConversationMessage:
+      type: object
+      required: [id, conversationId, role, content, createdAt]
+      properties:
+        id: { type: integer }
+        conversationId: { type: integer }
+        role: { type: string }
+        content: { type: string }
+        suggestedReply: { type: ["string", "null"] }
+        createdAt: { type: string }
+    ConversationDetailResponse:
+      type: object
+      required: [conversation, messages]
+      properties:
+        conversation: { $ref: "#/components/schemas/ConversationSummary" }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/ConversationMessage" }
+        lead: { type: ["object", "null"] }
+
+    Lead:
+      type: object
+      required: [id, status, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        conversationId: { type: ["integer", "null"] }
+        dealerId: { type: ["integer", "null"] }
+        buyerName: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        language: { type: ["string", "null"] }
+        vehicleId: { type: ["integer", "null"] }
+        listingId: { type: ["integer", "null"] }
+        sourceUrl: { type: ["string", "null"] }
+        messageText: { type: ["string", "null"] }
+        suggestedReply: { type: ["string", "null"] }
+        publishedDownPayment: { type: ["integer", "null"] }
+        buyerAvailableDownPayment: { type: ["integer", "null"] }
+        buyerTimeline: { type: ["string", "null"] }
+        hasId: { type: ["boolean", "null"] }
+        hasProofOfIncome: { type: ["boolean", "null"] }
+        appointmentIntent: { type: ["boolean", "null"] }
+        leadScore: { type: ["integer", "null"] }
+        temperature: { type: ["string", "null"] }
+        status: { type: string }
+        conversationSummary: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    LeadListResponse:
+      type: object
+      required: [leads]
+      properties:
+        leads:
+          type: array
+          items: { $ref: "#/components/schemas/Lead" }
+    LeadDetailResponse:
+      type: object
+      required: [lead]
+      properties:
+        lead: { $ref: "#/components/schemas/Lead" }
+    UpdateLeadBody:
+      type: object
+      properties:
+        status: { type: string }
+        temperature: { type: string }
+        phone: { type: ["string", "null"] }
+        buyerTimeline: { type: ["string", "null"] }
+        hasId: { type: ["boolean", "null"] }
+        hasProofOfIncome: { type: ["boolean", "null"] }
+        appointmentIntent: { type: ["boolean", "null"] }
+        notes: { type: ["string", "null"] }
+        leadScore: { type: ["integer", "null"] }
+
+    DownPaymentVariant:
+      type: object
+      required: [publishedDownPayment, totalConversations, hotLeads, appointmentReady]
+      properties:
+        publishedDownPayment: { type: integer }
+        totalConversations: { type: integer }
+        hotLeads: { type: integer }
+        appointmentReady: { type: integer }
+    DownPaymentGroup:
+      type: object
+      required: [vehicleType, variants]
+      properties:
+        vehicleType: { type: string }
+        variants:
+          type: array
+          items: { $ref: "#/components/schemas/DownPaymentVariant" }
+    DownPaymentIntelligenceResponse:
+      type: object
+      required: [summary, total]
+      properties:
+        summary:
+          type: array
+          items: { $ref: "#/components/schemas/DownPaymentGroup" }
+        total: { type: integer }
+
+    SimulatorScenario:
+      type: object
+      required: [key, label, language, vehicleType, downPayment, messageCount]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        language: { type: string }
+        vehicleType: { type: string }
+        downPayment: { type: integer }
+        messageCount: { type: integer }
+    SimulatorScenariosResponse:
+      type: object
+      required: [scenarios]
+      properties:
+        scenarios:
+          type: array
+          items: { $ref: "#/components/schemas/SimulatorScenario" }
+    SimulatorRunBody:
+      type: object
+      properties:
+        scenarioKey: { type: string }
+        customMessages:
+          type: array
+          items: { type: string }
+        buyerName: { type: string }
+    SimulatorRunResponse:
+      type: object
+      required: [conversationId, leadId, suggestedReply, language, leadScore, temperature, messages]
+      properties:
+        conversationId: { type: integer }
+        leadId: { type: integer }
+        suggestedReply: { type: string }
+        language: { type: string }
+        leadScore: { type: integer }
+        temperature: { type: string }
+        messages:
+          type: array
+          items: { type: string }

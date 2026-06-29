@@ -15,17 +15,16 @@ const NAV_ITEMS = [
   { name: "Sales Hub", path: "/", icon: LayoutDashboard },
   { name: "Marketplace AI", path: "/listings", icon: Sparkles },
   { name: "Creative AI", path: "/creative-studio", icon: Wand2 },
-  { name: "Sales AI", path: "/leads", icon: MessageSquare },
+  { name: "Sales AI", path: "/sales-ai", icon: MessageSquare },
   { name: "Dealer DNA", path: "/dealer-dna", icon: Dna },
   { name: "Settings", path: "/settings", icon: Settings },
 ];
 
-// Routes that belong to each nav item (for active state)
 const ACTIVE_PATHS: Record<string, string[]> = {
   "/": ["/"],
-  "/listings": ["/listings", "/inventory", "/publishing", "/listings/readiness"],
+  "/listings": ["/listings", "/inventory", "/publishing"],
   "/creative-studio": ["/creative-studio"],
-  "/leads": ["/leads"],
+  "/sales-ai": ["/sales-ai", "/conversations", "/leads"],
   "/dealer-dna": ["/dealer-dna"],
   "/settings": ["/settings", "/connection-center"],
 };
@@ -47,10 +46,8 @@ export function Sidebar() {
 
   return (
     <aside className="w-60 border-r border-white/5 bg-background flex flex-col h-[100dvh] sticky top-0 relative z-20 shrink-0">
-      {/* ambient glow */}
       <div className="absolute top-0 left-0 w-full h-32 bg-primary/5 blur-3xl -z-10 pointer-events-none" />
 
-      {/* Logo */}
       <div className="h-16 flex items-center px-5 border-b border-white/5 relative z-10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
@@ -67,7 +64,6 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Dealer pill */}
       <div className="px-5 pt-4 pb-3">
         <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1.5">
           Active Dealer
@@ -85,10 +81,8 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Divider */}
       <div className="mx-5 mb-3 h-px bg-white/5" />
 
-      {/* Nav */}
       <div className="flex-1 overflow-y-auto py-1 px-3">
         <nav className="space-y-0.5">
           {NAV_ITEMS.map((item) => {
@@ -125,7 +119,6 @@ export function Sidebar() {
         </nav>
       </div>
 
-      {/* User */}
       <div className="p-4 border-t border-white/5">
         <div className="flex items-center gap-3 px-2">
           <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0">
