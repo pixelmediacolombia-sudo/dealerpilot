@@ -1,0 +1,85 @@
+BUG FIX — Chrome Extension Marketplace Detection
+
+The Chrome Extension is installed and connected correctly.
+
+Evidence:
+- Popup shows Backend connected: Connected
+- Heartbeat works
+- Jobs available: 1+ ready
+- Floating panel appears on Facebook
+- User is on Facebook Marketplace vehicle creation page
+- URL/page is Marketplace create vehicle listing
+- But Debug Mode still shows:
+  Marketplace Detected: No
+
+This means the content script is running, but marketplace detection logic is wrong.
+
+Fix only detection logic.
+
+Do NOT modify:
+- backend
+- APIs
+- database
+- publishing jobs
+- claim/complete/fail lifecycle
+- form filling logic
+- Chrome extension popup design
+
+Required fix:
+
+1. Detect Marketplace by URL first, not DOM.
+
+Use:
+
+window.location.hostname.includes("facebook.com")
+AND
+window.location.pathname.includes("/marketplace")
+
+This must return true for:
+- /marketplace
+- /marketplace/
+- /marketplace/create
+- /marketplace/create/item
+- /marketplace/create/vehicle
+- /marketplace/item/...
+- any marketplace SPA route
+
+2. Facebook is a single-page app.
+Detection must update when navigation changes without full page reload.
+
+Patch:
+- history.pushState
+- history.replaceState
+- popstate
+- use MutationObserver fallback
+- run detection immediately on script load
+- run detection again after a short delay: 500ms, 1500ms, 3000ms
+
+3. Persist detection state to chrome.storage.local:
+
+marketplaceDetected: true/false
+marketplacePath: window.location.pathname
+marketplaceUrl: window.location.href
+marketplaceDetectedAt: timestamp
+
+4. Add debug console logs when debug mode is enabled:
+
+[DealerPilot] Marketplace detection updated: true/false + current URL
+
+5. Debug Mode popup must read the latest chrome.storage.local marketplaceDetected value.
+
+6. If the content script is visible on Facebook Marketplace, Marketplace Detected should show YES.
+
+Acceptance test:
+- Open facebook.com/marketplace
+- Popup Debug Mode shows Marketplace Detected: Yes
+- Open facebook.com/marketplace/create
+- Shows Yes
+- Open facebook.com/marketplace/create/vehicle
+- Shows Yes
+- Navigate inside Facebook without reload
+- Detection updates correctly
+- Open facebook.com homepage
+- Shows Marketplace Detected: No
+
+After the fix, bump extension version to 1.0.1 and rebuild the zip.

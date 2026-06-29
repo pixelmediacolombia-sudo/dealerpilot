@@ -55,16 +55,73 @@
     return null;
   }
 
-  // ---- Page detection ----
-  const href = window.location.href;
-  const isMessenger =
-    location.hostname.includes("messenger.com") || /\/messages\b/.test(href);
-  const isMarketplaceCreate = /\/marketplace\/create/.test(href);
+  // ---- Page detection (SPA-aware) ----
+  //
+  // Facebook is a single-page app. The content script only loads once per tab
+  // even as the user navigates to /marketplace, /marketplace/create/vehicle, etc.
+  // We must re-check the URL on every navigation event and persist the result.
 
-  // Persist detection state for Debug Mode in the popup
-  chrome.storage.local
-    .set({ marketplaceDetected: isMarketplaceCreate, messengerDetected: isMessenger })
-    .catch(() => {});
+  function detectPageState() {
+    const hostname = location.hostname;
+    const pathname = location.pathname;
+    const href     = location.href;
+    const now      = new Date().toISOString();
+
+    // Marketplace: any facebook.com URL containing /marketplace in the path
+    const isMarketplaceNow =
+      hostname.includes("facebook.com") && pathname.includes("/marketplace");
+
+    // Messenger: messenger.com host OR facebook.com/messages
+    const isMessengerNow =
+      hostname.includes("messenger.com") || /\/messages\b/.test(pathname);
+
+    chrome.storage.local
+      .set({
+        marketplaceDetected:   isMarketplaceNow,
+        marketplacePath:       isMarketplaceNow ? pathname : null,
+        marketplaceUrl:        isMarketplaceNow ? href : null,
+        marketplaceDetectedAt: now,
+        messengerDetected:     isMessengerNow,
+      })
+      .catch(() => {});
+
+    log("Marketplace detection updated:", isMarketplaceNow, "|", href);
+
+    return { isMarketplaceNow, isMessengerNow };
+  }
+
+  // Run immediately, then again at delays to catch late SPA renders
+  const _initial = detectPageState();
+  [500, 1500, 3000].forEach((ms) => setTimeout(detectPageState, ms));
+
+  // Patch history API so pushState/replaceState SPA navigation is caught
+  (function patchHistory() {
+    function wrap(origFn) {
+      return function (...args) {
+        const result = origFn.apply(this, args);
+        setTimeout(detectPageState, 0);
+        return result;
+      };
+    }
+    history.pushState    = wrap(history.pushState);
+    history.replaceState = wrap(history.replaceState);
+  })();
+  window.addEventListener("popstate", detectPageState);
+
+  // MutationObserver fallback: catches URL changes that bypass history API
+  let _lastUrl = location.href;
+  new MutationObserver(() => {
+    if (location.href !== _lastUrl) {
+      _lastUrl = location.href;
+      detectPageState();
+    }
+  }).observe(document.documentElement, { subtree: true, childList: true });
+
+  // Stable variables used by the rest of this script (evaluated once at load time)
+  const href        = location.href;
+  const isMessenger = _initial.isMessengerNow;
+  // Show the fill/publish panel only on the create form, not on browse pages
+  const isMarketplaceCreate = /\/marketplace\/create/.test(location.pathname);
 
   // ---- Panel UI ----
   const panel = document.createElement("div");
