@@ -7,6 +7,7 @@ import {
   vehicleIntelligenceTable,
   type ListingPerformance,
 } from "@workspace/db";
+import { seedMarketplaceIntelligence } from "../intelligence/seed";
 
 const router = Router();
 
@@ -359,6 +360,20 @@ router.get("/marketplace-intelligence/vehicles/:vehicleId", async (req, res) => 
       outcomeScore: p.outcomeScore,
     })),
   });
+});
+
+// POST /api/marketplace-intelligence/seed — force re-seed (clears and regenerates)
+router.post("/marketplace-intelligence/seed", async (req, res) => {
+  try {
+    // Clear existing data so seedMarketplaceIntelligence will run again
+    await db.delete(listingPerformanceTable).where(eq(listingPerformanceTable.dealerId, DEALER_ID));
+    await db.delete(vehicleIntelligenceTable).where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID));
+    await seedMarketplaceIntelligence(req.log);
+    res.json({ ok: true, message: "Marketplace intelligence re-seeded successfully" });
+  } catch (err) {
+    req.log.error({ err }, "Seed failed");
+    res.status(500).json({ error: "Seed failed", detail: String(err) });
+  }
 });
 
 export default router;

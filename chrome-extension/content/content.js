@@ -166,28 +166,76 @@
   // Pause for React to commit its state update and re-render new fields.
   function waitForReactRender(ms) { return sleep(ms === undefined ? 900 : ms); }
 
-  // Find a visible <select> element by aria-label / label text keywords.
-  function findSelect(keywords) {
-    const selects = Array.from(document.querySelectorAll("select"))
+  // ---- ARIA combobox helpers ----
+  // Facebook Marketplace renders dropdowns as [role="combobox"], NOT <select>.
+  // All dropdown interaction goes through these helpers exclusively.
+
+  // Find a visible [role="combobox"] whose innerText, aria-label, or resolved
+  // aria-labelledby label text contains any of the given keywords.
+  function findCombobox(keywords) {
+    const boxes = Array.from(document.querySelectorAll('[role="combobox"]'))
       .filter((el) => el.offsetParent !== null);
-    for (const kw of keywords) {
-      const match = selects.find((el) => labelText(el).includes(kw));
-      if (match) return match;
+    for (const el of boxes) {
+      const inner      = (el.innerText || el.textContent || "").toLowerCase().trim();
+      const ariaLabel  = (el.getAttribute("aria-label") || "").toLowerCase();
+      const labelledBy = el.getAttribute("aria-labelledby");
+      let   labelTxt   = "";
+      if (labelledBy) {
+        const lbEl = document.getElementById(labelledBy);
+        if (lbEl) labelTxt = (lbEl.innerText || lbEl.textContent || "").toLowerCase().trim();
+      }
+      const combined = `${inner} ${labelTxt} ${ariaLabel}`;
+      if (keywords.some((k) => combined.includes(k.toLowerCase()))) return el;
     }
     return null;
   }
 
-  // Poll for a <select> element (it may not exist until a prior step completes).
-  function waitForSelect(keywords, maxWaitMs) {
+  // Poll until a matching [role="combobox"] appears in the DOM.
+  function waitForCombobox(keywords, maxWaitMs) {
     const limit = maxWaitMs === undefined ? 10000 : maxWaitMs;
     return new Promise((resolve) => {
-      const interval = 400;
+      const interval = 300;
       let elapsed = 0;
       const tick = () => {
-        const el = findSelect(keywords);
+        const el = findCombobox(keywords);
         if (el) { resolve(el); return; }
         elapsed += interval;
         if (elapsed >= limit) { resolve(null); return; }
+        setTimeout(tick, interval);
+      };
+      tick();
+    });
+  }
+
+  // After clicking a combobox, poll until [role="option"] items appear.
+  function waitForOptions(maxWaitMs) {
+    const limit = maxWaitMs === undefined ? 8000 : maxWaitMs;
+    return new Promise((resolve) => {
+      const interval = 150;
+      let elapsed = 0;
+      const tick = () => {
+        const opts = Array.from(document.querySelectorAll('[role="option"]'))
+          .filter((el) => el.offsetParent !== null);
+        if (opts.length > 0) { resolve(opts); return; }
+        elapsed += interval;
+        if (elapsed >= limit) { resolve([]); return; }
+        setTimeout(tick, interval);
+      };
+      tick();
+    });
+  }
+
+  // After selecting an option, wait for more comboboxes to appear (React cascade).
+  function waitForMoreComboboxes(countBefore, maxWaitMs) {
+    const limit = maxWaitMs === undefined ? 6000 : maxWaitMs;
+    return new Promise((resolve) => {
+      const interval = 300;
+      let elapsed = 0;
+      const tick = () => {
+        const count = document.querySelectorAll('[role="combobox"]').length;
+        if (count > countBefore) { resolve(true); return; }
+        elapsed += interval;
+        if (elapsed >= limit) { resolve(false); return; }
         setTimeout(tick, interval);
       };
       tick();
@@ -390,11 +438,12 @@
     const warnings = [];
 
     // ------------------------------------------------------------------
-    // selectStep — wait for a <select>, choose the best matching option,
-    // then pause for React to re-render the next group of fields.
+    // selectComboboxStep — interact with a Facebook [role="combobox"].
+    // Clicks to open, waits for [role="option"] items, clicks the match,
+    // then waits for new comboboxes to appear (React cascade signal).
     // ------------------------------------------------------------------
-    async function selectStep(label, keywords, targetValue, waitAfterMs) {
-      const settle = waitAfterMs === undefined ? 900 : waitAfterMs;
+    async function selectComboboxStep(label, keywords, targetValue, waitForMore) {
+      const shouldWaitForMore = waitForMore !== false; // default true
 
       if (targetValue === null || targetValue === undefined || targetValue === "") {
         stateLog(`Skipping "${label}" — no value in listing data`);
@@ -403,46 +452,69 @@
       }
 
       stateLog(`Waiting for ${label}`);
-      setStatus(`Waiting for "${label}" field…`);
-      const selectEl = await waitForSelect(keywords);
-      if (!selectEl) {
-        stateError(`Could not find ${label} dropdown`);
+      setStatus(`Waiting for "${label}" combobox…`);
+      const combobox = await waitForCombobox(keywords);
+      if (!combobox) {
+        stateError(`Could not find ${label} combobox`);
         missed.push(label);
-        warnings.push(`${label}: field did not appear (form may have changed)`);
+        warnings.push(`${label}: combobox did not appear`);
         return false;
       }
+      console.log("FOUND COMBOBOX", label, combobox);
       stateLog(`${label} found`);
 
-      const target  = String(targetValue).toLowerCase().trim();
-      const options = Array.from(selectEl.options).filter((o) => o.value !== "");
+      const countBefore = document.querySelectorAll('[role="combobox"]').length;
 
-      // Match priority: exact text → target contains option → option contains target
-      const pick =
-        options.find((o) => o.text.toLowerCase().trim() === target) ||
-        options.find((o) => o.text.toLowerCase().includes(target))  ||
-        options.find((o) => target.includes(o.text.toLowerCase().trim()) && o.text.trim().length > 2);
+      combobox.click();
+      console.log("OPENED COMBOBOX", label);
+      stateLog(`Selecting ${label} — opened combobox, waiting for options`);
+      setStatus(`Opened "${label}" — waiting for options…`);
 
-      if (!pick) {
-        const sample = options.slice(0, 6).map((o) => `"${o.text}"`).join(", ");
-        stateError(`No option matching "${targetValue}" in ${label} — available: ${sample}`);
+      const options = await waitForOptions();
+      if (!options.length) {
+        stateError(`No [role="option"] elements appeared for ${label}`);
         missed.push(label);
-        warnings.push(`${label}: no option matching "${targetValue}" — available: ${sample}`);
+        warnings.push(`${label}: no options appeared after clicking combobox`);
         return false;
       }
 
-      stateLog(`Selecting ${label} → "${pick.text}"`);
-      // Use the native HTMLSelectElement setter so React's synthetic onChange fires.
-      const nativeSetter = Object.getOwnPropertyDescriptor(
-        window.HTMLSelectElement.prototype, "value",
-      ).set;
-      nativeSetter.call(selectEl, pick.value);
-      selectEl.dispatchEvent(new Event("change", { bubbles: true }));
-      selectEl.dispatchEvent(new Event("input",  { bubbles: true }));
+      console.log("OPTIONS FOUND", label, options.length);
+      options.forEach((o, i) =>
+        console.log(`  [${i}] "${(o.innerText || o.textContent || "").trim()}"`)
+      );
 
+      const needle  = String(targetValue).toLowerCase().trim();
+      const getText = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
+      const pick =
+        options.find((o) => getText(o) === needle) ||
+        options.find((o) => getText(o).includes(needle)) ||
+        options.find((o) => needle.includes(getText(o)) && getText(o).length > 2);
+
+      if (!pick) {
+        const sample = options.slice(0, 8).map((o) => `"${(o.innerText || o.textContent || "").trim()}"`).join(", ");
+        stateError(`No option matching "${targetValue}" in ${label} — available: ${sample}`);
+        missed.push(label);
+        warnings.push(`${label}: no match for "${targetValue}" — available: ${sample}`);
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        return false;
+      }
+
+      const pickedText = (pick.innerText || pick.textContent || "").trim();
+      console.log("OPTION CLICKED", label, pickedText);
+      stateLog(`Selecting ${label} → "${pickedText}"`);
+      pick.click();
       filled.push(label);
-      log(`${label} → "${pick.text}"`);
-      stateLog(`Waiting for React render after ${label}`);
-      await waitForReactRender(settle);
+      log(`${label} → "${pickedText}"`);
+
+      if (shouldWaitForMore) {
+        console.log("WAITING FOR NEW FIELDS");
+        stateLog(`Waiting for React render after ${label}`);
+        const appeared = await waitForMoreComboboxes(countBefore);
+        console.log(appeared ? "NEW FIELDS DETECTED" : `[WARN] No new comboboxes after ${label}`);
+      } else {
+        await sleep(400);
+      }
+
       return true;
     }
 
@@ -487,36 +559,37 @@
 
       stateLog("Phase 1 starting — dropdown cascade");
       setStatus("Step 1 of 4: Selecting vehicle type…");
-      await selectStep(
+      await selectComboboxStep(
         "vehicle type",
-        ["vehicle type", "type of vehicle", "category", "vehicle category", "listing type"],
+        ["vehicle type", "type of vehicle", "category"],
         fill.vehicleType || "Car/Truck",
-        1200,
+        true, // wait for Year combobox to appear
       );
 
       setStatus("Step 2 of 4: Selecting year…");
-      await selectStep(
+      await selectComboboxStep(
         "year",
-        ["year", "vehicle year", "model year"],
+        ["year"],
         fill.year ? String(fill.year) : null,
-        900,
+        true, // wait for Make combobox to appear
       );
 
       setStatus("Step 3 of 4: Selecting make…");
-      await selectStep(
+      await selectComboboxStep(
         "make",
-        ["make", "vehicle make", "brand", "manufacturer"],
+        ["make"],
         fill.make,
-        900,
+        true, // wait for Model combobox to appear
       );
 
-      setStatus("Step 4 of 4: Selecting model — waiting for remaining fields…");
-      await selectStep(
+      setStatus("Step 4 of 4: Selecting model — waiting for text fields…");
+      await selectComboboxStep(
         "model",
-        ["model", "vehicle model"],
+        ["model"],
         fill.model,
-        2000, // Longer settle: title, mileage, price, description all render after this
+        false, // model triggers text fields, not more comboboxes
       );
+      await sleep(1500); // give React time to render mileage/price/title/description
 
       // ---- Phase 2: Text fields ----
 
@@ -552,11 +625,11 @@
       // ---- Phase 3: Optional dropdowns (silently skip if no data or field absent) ----
 
       stateLog("Phase 3 starting — optional dropdowns");
-      await selectStep("condition",     ["condition", "vehicle condition"],       fill.condition,    300);
-      await selectStep("transmission",  ["transmission", "transmission type"],    fill.transmission, 300);
-      await selectStep("fuel type",     ["fuel", "fuel type"],                    fill.fuelType,     300);
-      await selectStep("color",         ["color", "exterior color"],              fill.color,        300);
-      await selectStep("body style",    ["body style", "body type"],              fill.bodyStyle,    300);
+      await selectComboboxStep("condition",    ["condition"],    fill.condition,    false);
+      await selectComboboxStep("transmission", ["transmission"], fill.transmission, false);
+      await selectComboboxStep("fuel type",    ["fuel"],         fill.fuelType,     false);
+      await selectComboboxStep("color",        ["color"],        fill.color,        false);
+      await selectComboboxStep("body style",   ["body style"],   fill.bodyStyle,    false);
 
       stateLog("Workflow Complete");
 
@@ -659,162 +732,96 @@
   async function debugVehicleType() {
     const TARGET_VALUE = "Car/Truck";
 
+    // ── STEP 1: enumerate every [role="combobox"] on the page ──────────
     console.log("[STEP 1] Waiting for Vehicle Type dropdown");
-    setStatus("[DEBUG] Step 1: Scanning page for Vehicle Type dropdown…");
+    setStatus("[DEBUG] Step 1: Scanning for [role=\"combobox\"] elements…");
     await sleep(400);
 
-    // ---- Scan ALL potential dropdown elements ----
-    const nativeSelects = Array.from(document.querySelectorAll("select"));
-    const ariaDropdowns = Array.from(document.querySelectorAll(
-      '[role="combobox"], [role="listbox"], [role="option"], [role="menu"]'
-    ));
-
-    // Log every native <select>
-    console.log(`[STEP 1] Native <select> elements found: ${nativeSelects.length}`);
-    nativeSelects.forEach((el, i) => {
-      const opts = Array.from(el.options).map(o => o.text).join(" | ").slice(0, 120);
+    const allBoxes = Array.from(document.querySelectorAll('[role="combobox"]'));
+    console.log(`[STEP 1] Total [role="combobox"] found: ${allBoxes.length}`);
+    allBoxes.forEach((el, i) => {
+      const labelledBy = el.getAttribute("aria-labelledby");
+      let resolvedLabel = "";
+      if (labelledBy) {
+        const lbEl = document.getElementById(labelledBy);
+        if (lbEl) resolvedLabel = (lbEl.innerText || lbEl.textContent || "").trim();
+      }
       console.log(
-        `  [select][${i}]` +
+        `  [${i}]` +
+        ` text="${(el.innerText || el.textContent || "").trim().slice(0, 60)}"` +
         ` aria-label="${el.getAttribute("aria-label") || ""}"` +
+        ` aria-labelledby="${labelledBy || ""}" → "${resolvedLabel}"` +
         ` placeholder="${el.getAttribute("placeholder") || ""}"` +
         ` role="${el.getAttribute("role") || ""}"` +
-        ` id="${el.id}"` +
-        ` options: ${opts || "(none)"}`
+        ` aria-expanded="${el.getAttribute("aria-expanded") || ""}"`,
       );
       el.style.outline = "2px dashed orange";
     });
 
-    // Log every ARIA dropdown
-    console.log(`[STEP 1] ARIA combobox/listbox elements found: ${ariaDropdowns.length}`);
-    ariaDropdowns.forEach((el, i) => {
-      console.log(
-        `  [aria][${i}]` +
-        ` role="${el.getAttribute("role") || ""}"` +
-        ` aria-label="${el.getAttribute("aria-label") || ""}"` +
-        ` aria-expanded="${el.getAttribute("aria-expanded") || ""}"` +
-        ` placeholder="${el.getAttribute("placeholder") || ""}"` +
-        ` text="${(el.textContent || "").trim().slice(0, 80)}"`
-      );
-    });
-
-    // ---- Try to identify the Vehicle Type dropdown ----
-    const VT_KEYWORDS = [
-      "vehicle type", "type of vehicle", "category", "vehicle category",
-      "listing type", "item type", "type",
-    ];
-
-    // Strategy A: native <select> whose aria-label / placeholder matches keywords
-    //             OR whose options mention "car", "truck", "vehicle"
-    let targetEl = null;
-    for (const sel of nativeSelects) {
-      const lbl = [
-        sel.getAttribute("aria-label"),
-        sel.getAttribute("placeholder"),
-        sel.id,
-        sel.name,
-      ].filter(Boolean).join(" ").toLowerCase();
-      const optText = Array.from(sel.options).map(o => o.text.toLowerCase()).join(" ");
-      if (VT_KEYWORDS.some(k => lbl.includes(k)) ||
-          optText.includes("car/truck") ||
-          (optText.includes("car") && optText.includes("truck"))) {
-        targetEl = sel;
-        break;
-      }
-    }
-
-    // Strategy B: look for a <label> or visible text containing vehicle type keywords,
-    //             then find its associated <select>
-    if (!targetEl) {
-      const labelEls = Array.from(document.querySelectorAll("label, [class*='label'], [class*='Label'], span, div"))
-        .filter(el => el.children.length === 0); // leaf text nodes only
-      for (const lEl of labelEls) {
-        const txt = (lEl.textContent || "").toLowerCase().trim();
-        if (VT_KEYWORDS.some(k => txt === k || txt.startsWith(k))) {
-          const form = lEl.closest("form") || lEl.parentElement?.parentElement;
-          if (form) targetEl = form.querySelector("select");
-          if (!targetEl && lEl.htmlFor) targetEl = document.getElementById(lEl.htmlFor);
-          if (targetEl) {
-            console.log(`[STEP 1] Found via label text: "${lEl.textContent.trim()}"`);
-            break;
-          }
-        }
-      }
-    }
+    // ── STEP 2: locate the Vehicle Type combobox ────────────────────────
+    const VT_KEYWORDS = ["vehicle type", "type of vehicle", "category"];
+    const targetEl = findCombobox(VT_KEYWORDS);
 
     if (!targetEl) {
-      console.log("[ERROR] [STEP 2] Vehicle Type dropdown NOT FOUND in DOM");
-      console.log("[DEBUG] All <select> elements:");
-      nativeSelects.forEach((el, i) =>
-        console.log(`  [${i}] id="${el.id}" name="${el.name}" ` +
-          `aria-label="${el.getAttribute("aria-label") || ""}" ` +
-          `class="${el.className.slice(0, 60)}"`)
-      );
-      console.log("[DEBUG] All ARIA comboboxes:");
-      ariaDropdowns.forEach((el, i) =>
-        console.log(`  [${i}] role="${el.getAttribute("role")}" ` +
-          `aria-label="${el.getAttribute("aria-label") || ""}" ` +
-          `aria-expanded="${el.getAttribute("aria-expanded") || ""}" ` +
-          `text="${(el.textContent || "").trim().slice(0, 100)}"`)
-      );
-      setStatus(
-        `[DEBUG] Vehicle Type dropdown NOT FOUND. Check console (F12) for details.`, "err"
-      );
+      console.log("[ERROR] [STEP 2] Vehicle Type combobox NOT FOUND");
+      console.log("[DEBUG] All combobox texts:", allBoxes.map((el) =>
+        (el.innerText || el.textContent || "").trim().slice(0, 60)
+      ));
+      setStatus("[ERROR] Vehicle Type combobox NOT FOUND. Check console (F12).", "err");
       return;
     }
 
-    // ---- Found it ----
-    console.log("[STEP 2] Dropdown FOUND:", targetEl);
-    targetEl.style.outline    = "4px solid red";
+    console.log("[STEP 2] Vehicle Type combobox FOUND:", targetEl);
+    targetEl.style.outline      = "4px solid red";
     targetEl.style.outlineOffset = "2px";
-    setStatus("[DEBUG] Step 2: Dropdown found — highlighted in RED");
+    setStatus("[DEBUG] Step 2: Combobox found — highlighted RED");
 
-    console.log("[STEP 3] Opening dropdown / reading options");
-    setStatus("[DEBUG] Step 3: Reading available options…");
+    // ── STEP 3: click to open ───────────────────────────────────────────
+    console.log("[STEP 3] Opening combobox — calling .click()");
+    setStatus("[DEBUG] Step 3: Opening combobox…");
+    targetEl.click();
 
-    const options = Array.from(targetEl.options || []).filter(o => o.value !== "");
+    // ── STEP 4: wait for [role="option"] to appear ──────────────────────
+    const options = await waitForOptions(8000);
     console.log(`[STEP 4] Available options (${options.length}):`);
-    options.forEach((o, i) => console.log(`  [${i}] "${o.text}"  value="${o.value}"`));
+    options.forEach((o, i) =>
+      console.log(`  [${i}] "${(o.innerText || o.textContent || "").trim()}"`)
+    );
 
     if (!options.length) {
-      console.log("[ERROR] Dropdown found but has NO OPTIONS");
-      setStatus("[DEBUG] Dropdown found but has NO OPTIONS. See console.", "err");
+      console.log("[ERROR] [STEP 4] No [role=\"option\"] appeared after clicking");
+      setStatus("[ERROR] No options appeared. Combobox may use a different interaction.", "err");
       return;
     }
 
-    const needle = TARGET_VALUE.toLowerCase().trim();
+    // ── STEP 5: find and click Car/Truck ────────────────────────────────
+    const needle  = TARGET_VALUE.toLowerCase().trim();
+    const getText = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
     const pick =
-      options.find(o => o.text.toLowerCase().trim() === needle) ||
-      options.find(o => o.text.toLowerCase().includes(needle))  ||
-      options.find(o => needle.includes(o.text.toLowerCase().trim()) && o.text.trim().length > 2);
+      options.find((o) => getText(o) === needle) ||
+      options.find((o) => getText(o).includes(needle)) ||
+      options.find((o) => needle.includes(getText(o)) && getText(o).length > 2);
 
     if (!pick) {
       console.log(`[ERROR] [STEP 5] No option matching "${TARGET_VALUE}"`);
-      console.log("[DEBUG] Available option texts:", options.map(o => o.text));
-      setStatus(`[DEBUG] No match for "${TARGET_VALUE}". See console for actual option texts.`, "err");
+      console.log("[DEBUG] Option texts:", options.map((o) => (o.innerText || o.textContent || "").trim()));
+      setStatus(`[ERROR] No match for "${TARGET_VALUE}". Check console for actual option texts.`, "err");
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       return;
     }
 
-    console.log(`[STEP 5] Selecting: ${pick.text}  (value="${pick.value}")`);
-    setStatus(`[DEBUG] Step 5: Selecting "${pick.text}"…`);
+    const pickedText = (pick.innerText || pick.textContent || "").trim();
+    console.log(`[STEP 5] Selecting: ${pickedText}`);
+    setStatus(`[DEBUG] Step 5: Clicking "${pickedText}"…`);
+    pick.click();
 
-    try {
-      const nativeSetter = Object.getOwnPropertyDescriptor(
-        window.HTMLSelectElement.prototype, "value"
-      ).set;
-      nativeSetter.call(targetEl, pick.value);
-      targetEl.dispatchEvent(new Event("change", { bubbles: true }));
-      targetEl.dispatchEvent(new Event("input",  { bubbles: true }));
-      targetEl.dispatchEvent(new Event("blur",   { bubbles: true }));
-
-      console.log(`[STEP 6] Selection success: "${pick.text}" dispatched`);
-      setStatus(
-        `[DEBUG] Step 6: Selected "${pick.text}". ` +
-        `Watch if Year / Make / Model appear. WORKFLOW STOPPED.`, "ok"
-      );
-    } catch (err) {
-      console.log(`[ERROR] [STEP 6] Selection threw: ${err.message}`, err);
-      setStatus(`[DEBUG] Selection threw: ${err.message}`, "err");
-    }
+    // ── STEP 6: confirm ─────────────────────────────────────────────────
+    console.log(`[STEP 6] Selection success — clicked "${pickedText}"`);
+    setStatus(
+      `[DEBUG] Step 6: Selected "${pickedText}". ` +
+      `Watch if Year / Make / Model appear. WORKFLOW STOPPED.`,
+      "ok",
+    );
     // STOP — do not continue to Year, Make, Model, or any other field.
   }
 

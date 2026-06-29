@@ -1541,3 +1541,8 @@ export type GetDownPaymentIntelligenceParams = {
 dealerId?: number;
 };
 
+export type SeedMarketplaceIntelligence200 = {
+  ok: boolean;
+  message: string;
+};
+

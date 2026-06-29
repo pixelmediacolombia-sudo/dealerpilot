@@ -24,6 +24,8 @@ tags:
     description: Publishing queue and jobs
   - name: creative
     description: Creative Intelligence Engine
+  - name: MarketplaceIntelligence
+    description: Marketplace Intelligence Engine — listing performance and strategy
 paths:
   /healthz:
     get:
@@ -1409,6 +1411,28 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MarketplaceRecommendationsResponse"
+
+  /marketplace-intelligence/seed:
+    post:
+      operationId: seedMarketplaceIntelligence
+      summary: Force re-seed marketplace intelligence data
+      tags: [MarketplaceIntelligence]
+      responses:
+        "200":
+          description: Seed successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, message]
+                properties:
+                  ok: { type: boolean }
+                  message: { type: string }
+        "500":
+          description: Seed failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   /marketplace-intelligence/vehicles/{vehicleId}:
     get:

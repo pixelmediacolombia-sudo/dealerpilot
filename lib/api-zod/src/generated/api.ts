@@ -2450,6 +2450,15 @@ export const ListMarketplaceRecommendationsResponse = zod.object({
 
 
 /**
+ * @summary Force re-seed marketplace intelligence data
+ */
+export const SeedMarketplaceIntelligenceResponse = zod.object({
+  "ok": zod.boolean(),
+  "message": zod.string()
+})
+
+
+/**
  * @summary Intelligence for a single vehicle
  */
 export const GetVehicleIntelligenceParams = zod.object({

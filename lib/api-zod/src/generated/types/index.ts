@@ -127,6 +127,7 @@ export * from './publishingJobPayload';
 export * from './publishPriorityScore';
 export * from './publishPriorityScoreList';
 export * from './queueListingInput';
+export * from './seedMarketplaceIntelligence200';
 export * from './serviceStatus';
 export * from './simulatorRunBody';
 export * from './simulatorRunResponse';

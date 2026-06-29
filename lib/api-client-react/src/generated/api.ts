@@ -98,6 +98,7 @@ import type {
   PublishingJobList,
   PublishingJobPayload,
   QueueListingInput,
+  SeedMarketplaceIntelligence200,
   SimulatorRunBody,
   SimulatorRunResponse,
   SimulatorScenariosResponse,
@@ -5087,6 +5088,76 @@ export function useListMarketplaceRecommendations<TData = Awaited<ReturnType<typ
 
 
 
+
+export const getSeedMarketplaceIntelligenceUrl = () => {
+
+
+
+
+  return `/api/marketplace-intelligence/seed`
+}
+
+/**
+ * @summary Force re-seed marketplace intelligence data
+ */
+export const seedMarketplaceIntelligence = async ( options?: RequestInit): Promise<SeedMarketplaceIntelligence200> => {
+
+  return customFetch<SeedMarketplaceIntelligence200>(getSeedMarketplaceIntelligenceUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSeedMarketplaceIntelligenceMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof seedMarketplaceIntelligence>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof seedMarketplaceIntelligence>>, TError,void, TContext> => {
+
+const mutationKey = ['seedMarketplaceIntelligence'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof seedMarketplaceIntelligence>>, void> = () => {
+
+
+          return  seedMarketplaceIntelligence(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SeedMarketplaceIntelligenceMutationResult = NonNullable<Awaited<ReturnType<typeof seedMarketplaceIntelligence>>>
+
+    export type SeedMarketplaceIntelligenceMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Force re-seed marketplace intelligence data
+ */
+export const useSeedMarketplaceIntelligence = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof seedMarketplaceIntelligence>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof seedMarketplaceIntelligence>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getSeedMarketplaceIntelligenceMutationOptions(options));
+    }
 
 export const getGetVehicleIntelligenceUrl = (vehicleId: number,) => {
 
