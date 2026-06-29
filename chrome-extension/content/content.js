@@ -23,8 +23,9 @@
         : window.HTMLInputElement.prototype;
     const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
     setter.call(el, value);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("input",  { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("blur",   { bubbles: true }));
   }
 
   function labelText(el) {
@@ -53,6 +54,23 @@
       if (match) return match;
     }
     return null;
+  }
+
+  // Wait for a field to appear in the DOM (React may render it after the initial
+  // page settle). Polls every 300 ms for up to maxWaitMs before giving up.
+  function waitForField(keywords, maxWaitMs = 5000) {
+    return new Promise((resolve) => {
+      const interval = 300;
+      let elapsed = 0;
+      const tick = () => {
+        const field = findField(keywords);
+        if (field) { resolve(field); return; }
+        elapsed += interval;
+        if (elapsed >= maxWaitMs) { resolve(null); return; }
+        setTimeout(tick, interval);
+      };
+      tick();
+    });
   }
 
   // ---- Page detection (SPA-aware) ----
@@ -247,12 +265,13 @@
     const missed = [];
     const warnings = [];
 
-    function tryFill(label, keywords, value) {
+    // tryFill uses waitForField so React re-renders don't cause false misses.
+    async function tryFill(label, keywords, value) {
       if (value === null || value === undefined || value === "") {
         warnings.push(`${label} has no data in the listing`);
         return;
       }
-      const el = findField(keywords);
+      const el = await waitForField(keywords);
       if (el) {
         setNativeValue(el, String(value));
         filled.push(label);
@@ -261,15 +280,37 @@
       }
     }
 
-    tryFill("title", ["title", "what are you selling", "vehicle name"], fill.title);
-    tryFill("price", ["price"], fill.price);
-    tryFill("description", ["description", "describe"], fill.description);
-    tryFill("mileage", ["mileage", "odometer"], fill.mileage);
-    tryFill("year", ["year"], fill.year);
-    tryFill("make", ["make"], fill.make);
-    tryFill("model", ["model"], fill.model);
-    tryFill("vin", ["vin"], fill.vin);
-    tryFill("location", ["location", "city"], fill.location);
+    // Title — Facebook vehicle form uses many different labels for this field.
+    // Cast a wide net: any of these substrings (case-insensitive) will match.
+    await tryFill("title", [
+      "title",
+      "listing title",
+      "what are you selling",
+      "vehicle name",
+      "add a title",
+      "item title",
+      "name",
+    ], fill.title);
+
+    await tryFill("price", ["price", "listing price", "asking price"], fill.price);
+    await tryFill("description", ["description", "describe", "details"], fill.description);
+
+    // Mileage — Facebook has used "Mileage", "Odometer", "Miles", and locale variants.
+    await tryFill("mileage", [
+      "mileage",
+      "odometer",
+      "miles",
+      "vehicle mileage",
+      "number of miles",
+      "mileage (optional)",
+      "odometer reading",
+    ], fill.mileage);
+
+    await tryFill("year",     ["year", "vehicle year"],                        fill.year);
+    await tryFill("make",     ["make", "vehicle make", "manufacturer"],        fill.make);
+    await tryFill("model",    ["model", "vehicle model"],                      fill.model);
+    await tryFill("vin",      ["vin", "vin number", "vehicle identification"], fill.vin);
+    await tryFill("location", ["location", "city", "where"],                   fill.location);
 
     if (images && images.length) {
       warnings.push(
@@ -373,19 +414,25 @@
             const filled = [];
             const missed = [];
 
-            const titleEl = findField(["title", "what are you selling", "vehicle name"]);
+            const titleEl = await waitForField([
+              "title", "listing title", "what are you selling",
+              "vehicle name", "add a title", "item title", "name",
+            ]);
             if (titleEl) { setNativeValue(titleEl, listing.title); filled.push("title"); }
             else missed.push("title");
 
-            const priceEl = findField(["price"]);
+            const priceEl = await waitForField(["price", "listing price", "asking price"]);
             if (priceEl) { setNativeValue(priceEl, String(listing.price)); filled.push("price"); }
             else missed.push("price");
 
-            const mileageEl = findField(["mileage", "odometer"]);
+            const mileageEl = await waitForField([
+              "mileage", "odometer", "miles", "vehicle mileage",
+              "number of miles", "mileage (optional)", "odometer reading",
+            ]);
             if (mileageEl) { setNativeValue(mileageEl, String(listing.mileage)); filled.push("mileage"); }
             else missed.push("mileage");
 
-            const descEl = findField(["description", "describe"]);
+            const descEl = await waitForField(["description", "describe", "details"]);
             if (descEl) { setNativeValue(descEl, listing.description); filled.push("description"); }
             else missed.push("description");
 
