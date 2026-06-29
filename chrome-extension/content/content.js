@@ -55,6 +55,17 @@
     return null;
   }
 
+  // ---- Page detection ----
+  const href = window.location.href;
+  const isMessenger =
+    location.hostname.includes("messenger.com") || /\/messages\b/.test(href);
+  const isMarketplaceCreate = /\/marketplace\/create/.test(href);
+
+  // Persist detection state for Debug Mode in the popup
+  chrome.storage.local
+    .set({ marketplaceDetected: isMarketplaceCreate, messengerDetected: isMessenger })
+    .catch(() => {});
+
   // ---- Panel UI ----
   const panel = document.createElement("div");
   panel.id = "mai-panel";
@@ -122,14 +133,7 @@
     }
   });
 
-  // ---- Context detection ----
-  const href = window.location.href;
-  const isMessenger =
-    location.hostname.includes("messenger.com") || /\/messages\b/.test(href);
-  const isMarketplaceCreate = /\/marketplace\/create/.test(href);
-
   // ---- Safety: stop on Facebook login / checkpoint / captcha ----
-  // We never store FB credentials and must not proceed through any security gate.
   function detectSecurityGate() {
     const url = location.href;
     if (/\/login|\/checkpoint|\/recover|\/two_step_verification|\/captcha/i.test(url)) {
@@ -153,7 +157,7 @@
   }
 
   // =====================================================================
-  // Sprint 3: Real publishing-queue flow on the Marketplace create page.
+  // Publishing-queue flow on the Marketplace create page.
   // =====================================================================
   async function runPublishingFlow(job) {
     const securityIssue = detectSecurityGate();
@@ -171,7 +175,7 @@
         <div class="mai-job-title">${escapeHtml(job.listingTitle || "Publishing job")}</div>
         <div class="mai-job-meta">${escapeHtml(job.vehicleLabel || "")}${
           job.dealerName ? " · " + escapeHtml(job.dealerName) : ""
-        } · Job #${escapeHtml(job.id)}</div>
+        } · Job #${escapeHtml(String(job.id))}</div>
       </div>`;
 
     setStatus("Loading listing data…");
@@ -244,7 +248,6 @@
           "Paste the Marketplace listing URL (optional, leave blank to skip):",
           "",
         );
-        // null => user cancelled the prompt entirely; abort.
         if (listingUrl === null) return;
         setStatus("Marking job as published…");
         const r = await send({
@@ -260,7 +263,7 @@
         setStatus("Job marked Published. Listing updated to Published.", "ok");
         clearOutput();
         jobBoxEl.innerHTML = `<div class="mai-job"><div class="mai-job-title">Done ✓</div><div class="mai-job-meta">Job #${escapeHtml(
-          job.id,
+          String(job.id),
         )} published. Open the popup to claim the next job.</div></div>`;
       }),
     );
@@ -285,7 +288,7 @@
           setStatus("Job marked Failed. Reason saved.", "err");
           clearOutput();
           jobBoxEl.innerHTML = `<div class="mai-job"><div class="mai-job-title">Marked failed</div><div class="mai-job-meta">Job #${escapeHtml(
-            job.id,
+            String(job.id),
           )} · reason recorded.</div></div>`;
         },
         "mai-btn-secondary",
@@ -294,16 +297,13 @@
   }
 
   if (isMarketplaceCreate) {
-    // If a job was claimed from the popup, drive the real publishing flow.
     chrome.storage.local.get("activeJob").then(({ activeJob }) => {
       if (activeJob) {
         actionsEl.appendChild(
           button("Fill Marketplace Fields", () => runPublishingFlow(activeJob)),
         );
-        // Auto-run once the page has settled.
         setTimeout(() => runPublishingFlow(activeJob), 1200);
       } else {
-        // No claimed job — keep the Sprint 0 test-listing helper available.
         actionsEl.appendChild(
           button("Fill Test Listing", async () => {
             setStatus("Fetching test listing…");
@@ -317,36 +317,26 @@
             const missed = [];
 
             const titleEl = findField(["title", "what are you selling", "vehicle name"]);
-            if (titleEl) {
-              setNativeValue(titleEl, listing.title);
-              filled.push("title");
-            } else missed.push("title");
+            if (titleEl) { setNativeValue(titleEl, listing.title); filled.push("title"); }
+            else missed.push("title");
 
             const priceEl = findField(["price"]);
-            if (priceEl) {
-              setNativeValue(priceEl, String(listing.price));
-              filled.push("price");
-            } else missed.push("price");
+            if (priceEl) { setNativeValue(priceEl, String(listing.price)); filled.push("price"); }
+            else missed.push("price");
 
             const mileageEl = findField(["mileage", "odometer"]);
-            if (mileageEl) {
-              setNativeValue(mileageEl, String(listing.mileage));
-              filled.push("mileage");
-            } else missed.push("mileage");
+            if (mileageEl) { setNativeValue(mileageEl, String(listing.mileage)); filled.push("mileage"); }
+            else missed.push("mileage");
 
             const descEl = findField(["description", "describe"]);
-            if (descEl) {
-              setNativeValue(descEl, listing.description);
-              filled.push("description");
-            } else missed.push("description");
+            if (descEl) { setNativeValue(descEl, listing.description); filled.push("description"); }
+            else missed.push("description");
 
             setStatus("Listing data received. Publish was NOT clicked.", "ok");
             showOutput(
               `<div class="mai-line"><strong>Filled:</strong> ${filled.join(", ") || "none"}</div>` +
-                `<div class="mai-line"><strong>Not found on page:</strong> ${
-                  missed.join(", ") || "none"
-                }</div>` +
-                `<pre class="mai-pre">${escapeHtml(JSON.stringify(listing, null, 2))}</pre>`,
+              `<div class="mai-line"><strong>Not found on page:</strong> ${missed.join(", ") || "none"}</div>` +
+              `<pre class="mai-pre">${escapeHtml(JSON.stringify(listing, null, 2))}</pre>`,
             );
             log("Test listing", listing, { filled, missed });
           }),
@@ -382,8 +372,8 @@
       setStatus("Suggested reply ready. Lead saved to CRM.", "ok");
       showOutput(
         `<div class="mai-line"><strong>Suggested reply:</strong></div>` +
-          `<div class="mai-reply">${escapeHtml(lastReply)}</div>` +
-          `<button class="mai-btn mai-btn-secondary" id="mai-insert">Insert Reply</button>`,
+        `<div class="mai-reply">${escapeHtml(lastReply)}</div>` +
+        `<button class="mai-btn mai-btn-secondary" id="mai-insert">Insert Reply</button>`,
       );
       const insertBtn = outputEl.querySelector("#mai-insert");
       insertBtn.addEventListener("click", () => insertReply(lastReply));

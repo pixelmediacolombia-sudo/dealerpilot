@@ -5,34 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DealerPilot AI</title>
     <style>
+      * { box-sizing: border-box; }
       body {
-        width: 320px;
+        width: 340px;
         margin: 0;
-        padding: 16px;
+        padding: 14px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
         background: #0b1f3a;
         color: #f2f5fa;
       }
-      h1 {
-        font-size: 15px;
-        margin: 0 0 2px;
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
       }
-      .sub {
-        font-size: 12px;
-        color: #9fb3cc;
-        margin: 0 0 12px;
+      .header-logo {
+        width: 32px;
+        height: 32px;
+        background: #1c3a63;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+        color: #e10600;
+        flex-shrink: 0;
+        letter-spacing: -0.5px;
       }
+      h1 { font-size: 15px; margin: 0 0 1px; }
+      .sub { font-size: 11px; color: #9fb3cc; margin: 0; }
       .card {
         background: #08182d;
         border: 1px solid #1c3a63;
         border-radius: 10px;
-        padding: 12px;
-        margin-bottom: 12px;
+        padding: 10px 12px;
+        margin-bottom: 10px;
       }
       .card h2 {
-        font-size: 12px;
+        font-size: 11px;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.05em;
         color: #9fb3cc;
         margin: 0 0 8px;
       }
@@ -41,48 +55,30 @@
         align-items: center;
         justify-content: space-between;
         font-size: 12px;
-        padding: 3px 0;
+        padding: 2.5px 0;
       }
-      .row .label {
-        color: #cdd9ea;
-      }
+      .row .label { color: #9fb3cc; }
       .row .value {
         font-weight: 600;
         text-align: right;
-        max-width: 180px;
+        max-width: 190px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-      }
+      .pill { display: inline-flex; align-items: center; gap: 5px; }
       .dot {
-        width: 8px;
-        height: 8px;
+        width: 8px; height: 8px;
         border-radius: 50%;
         background: #5a6b82;
+        flex-shrink: 0;
       }
-      .dot.on {
-        background: #6fe39f;
-      }
-      .dot.off {
-        background: #ff8a7a;
-      }
-      .dot.warn {
-        background: #ffce6b;
-      }
-      label {
-        display: block;
-        font-size: 12px;
-        margin-bottom: 4px;
-        color: #cdd9ea;
-      }
+      .dot.on  { background: #6fe39f; box-shadow: 0 0 6px #6fe39f55; }
+      .dot.off { background: #ff8a7a; }
+      .dot.warn { background: #ffce6b; }
+      label { display: block; font-size: 12px; margin-bottom: 4px; color: #cdd9ea; }
       input {
         width: 100%;
-        box-sizing: border-box;
         padding: 8px 10px;
         border-radius: 8px;
         border: 1px solid #1c3a63;
@@ -98,51 +94,87 @@
         border-radius: 8px;
         background: #e10600;
         color: #fff;
-        font-weight: 600;
+        font-weight: 700;
         font-size: 13px;
         cursor: pointer;
+        transition: opacity 0.15s;
       }
-      button.secondary {
-        background: #1c3a63;
+      button.secondary { background: #1c3a63; font-weight: 600; }
+      button.ghost {
+        background: transparent;
+        border: 1px solid #1c3a63;
+        color: #9fb3cc;
+        font-weight: 500;
+        font-size: 11px;
+        padding: 5px;
+        margin-top: 6px;
       }
-      button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-      #status {
-        margin-top: 10px;
-        font-size: 12px;
-        min-height: 16px;
-      }
-      .ok {
-        color: #6fe39f;
-      }
-      .err {
-        color: #ff8a7a;
-      }
-      details {
-        margin-top: 4px;
-      }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      button:not(:disabled):hover { opacity: 0.88; }
+      #status { margin-top: 8px; font-size: 12px; min-height: 14px; }
+      .ok  { color: #6fe39f; }
+      .err { color: #ff8a7a; }
+      .warn-text { color: #ffce6b; }
+      details { margin-top: 8px; }
       summary {
         font-size: 12px;
         color: #9fb3cc;
         cursor: pointer;
+        user-select: none;
+        padding: 2px 0;
+      }
+      summary:hover { color: #cdd9ea; }
+      .details-inner { margin-top: 10px; }
+
+      /* ---- Debug panel ---- */
+      #debug-card {
+        background: #050f1e;
+        border: 1px solid #122544;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-top: 4px;
+      }
+      #debug-card h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6b87a8;
+        margin: 0 0 8px;
+      }
+      #debug-card .row .label { color: #6b87a8; font-size: 11px; }
+      #debug-card .row .value { font-size: 11px; font-weight: 500; }
+      .divider {
+        height: 1px;
+        background: #122544;
+        margin: 6px 0;
       }
     </style>
   </head>
   <body>
-    <h1>DealerPilot AI</h1>
-    <p class="sub">Publishing assistant — fills listings, never auto-publishes.</p>
+    <div class="header">
+      <div class="header-logo">DP</div>
+      <div>
+        <h1>DealerPilot AI</h1>
+        <p class="sub">Publishing assistant — fills listings, never auto-publishes.</p>
+      </div>
+    </div>
 
+    <!-- Extension Status -->
     <div class="card">
       <h2>Extension Status</h2>
       <div class="row">
         <span class="label">Online</span>
-        <span class="value pill"><span id="dot-online" class="dot"></span><span id="v-online">—</span></span>
+        <span class="value pill">
+          <span id="dot-online" class="dot"></span>
+          <span id="v-online">—</span>
+        </span>
       </div>
       <div class="row">
         <span class="label">Backend connected</span>
-        <span class="value pill"><span id="dot-backend" class="dot"></span><span id="v-backend">Checking…</span></span>
+        <span class="value pill">
+          <span id="dot-backend" class="dot"></span>
+          <span id="v-backend">Checking…</span>
+        </span>
       </div>
       <div class="row">
         <span class="label">Jobs available</span>
@@ -159,15 +191,82 @@
     </div>
 
     <button id="start" disabled>Start Publishing Job</button>
-    <button id="refresh" class="secondary">Refresh</button>
+    <button id="refresh" class="secondary">Refresh Status</button>
     <div id="status"></div>
 
+    <!-- Backend Settings -->
     <details>
-      <summary>Backend settings</summary>
-      <div style="margin-top: 10px">
+      <summary>⚙ Backend settings</summary>
+      <div class="details-inner">
         <label for="url">Backend URL</label>
         <input id="url" type="url" placeholder="https://your-app.replit.dev" />
         <button id="save" class="secondary">Save &amp; Test Connection</button>
+      </div>
+    </details>
+
+    <!-- Debug Mode -->
+    <details id="debug-details">
+      <summary>🔧 Debug Mode</summary>
+      <div class="details-inner">
+        <div id="debug-card">
+          <h2>System Info</h2>
+          <div class="row">
+            <span class="label">Extension Version</span>
+            <span class="value" id="d-version">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Extension ID</span>
+            <span class="value" id="d-chrome-id" title="">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Dealer ID</span>
+            <span class="value" id="d-dealer-id">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Backend URL</span>
+            <span class="value" id="d-backend-url">—</span>
+          </div>
+
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Connection</h2>
+          <div class="row">
+            <span class="label">Connection Status</span>
+            <span class="value" id="d-conn-status">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Heartbeat</span>
+            <span class="value" id="d-heartbeat">Never</span>
+          </div>
+
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Job History</h2>
+          <div class="row">
+            <span class="label">Last Claimed Job</span>
+            <span class="value" id="d-claimed">None</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Published Job</span>
+            <span class="value" id="d-published">None</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Error</span>
+            <span class="value ok" id="d-error">None</span>
+          </div>
+
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Page Detection</h2>
+          <div class="row">
+            <span class="label">Marketplace Detected</span>
+            <span class="value" id="d-marketplace">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Messenger Detected</span>
+            <span class="value" id="d-messenger">—</span>
+          </div>
+
+          <button id="clear-error" class="ghost">Clear Last Error</button>
+          <button id="reload-debug" class="ghost">Reload Debug State</button>
+        </div>
       </div>
     </details>
 

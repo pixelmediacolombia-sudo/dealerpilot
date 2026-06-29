@@ -51,12 +51,25 @@ async function apiPost(path, body) {
   return data;
 }
 
+// ---- Debug state helpers ----
+
+function saveLastError(err) {
+  const message = err instanceof Error ? err.message : String(err);
+  chrome.storage.local
+    .set({ lastError: { message, at: new Date().toISOString() } })
+    .catch(() => {});
+}
+
+// ---- Message handlers ----
+
 const handlers = {
   async PING() {
     const base = await getBackendUrl();
     await apiGet("/api/healthz");
+    const now = new Date().toISOString();
     try {
       await apiPost("/api/extension/heartbeat", { backendUrl: base, status: "online" });
+      await chrome.storage.local.set({ lastHeartbeat: now });
     } catch (heartbeatErr) {
       console.warn("[DealerPilot AI] heartbeat failed", heartbeatErr);
     }
@@ -79,6 +92,13 @@ const handlers = {
   async CLAIM_JOB(message) {
     const extensionId = await getExtensionId();
     const job = await apiPost(`/api/publishing/jobs/${message.jobId}/claim`, { extensionId });
+    await chrome.storage.local.set({
+      lastClaimedJob: {
+        id: job.id,
+        title: job.listingTitle || job.vehicleLabel || `Job #${job.id}`,
+        claimedAt: new Date().toISOString(),
+      },
+    });
     return { job };
   },
 
@@ -90,7 +110,15 @@ const handlers = {
     const extensionId = await getExtensionId();
     const body = { extensionId };
     if (message.listingUrl) body.listingUrl = message.listingUrl;
-    return apiPost(`/api/publishing/jobs/${message.jobId}/complete`, body);
+    const result = await apiPost(`/api/publishing/jobs/${message.jobId}/complete`, body);
+    await chrome.storage.local.set({
+      lastPublishedJob: {
+        id: message.jobId,
+        completedAt: new Date().toISOString(),
+        listingUrl: message.listingUrl || null,
+      },
+    });
+    return result;
   },
 
   async FAIL_JOB(message) {
@@ -119,10 +147,42 @@ const handlers = {
     return { tabId: tab.id };
   },
 
+  // ---- Debug state ----
+  async GET_DEBUG_STATE() {
+    const keys = [
+      "backendUrl",
+      "extensionId",
+      "lastHeartbeat",
+      "lastClaimedJob",
+      "lastPublishedJob",
+      "lastError",
+      "marketplaceDetected",
+      "messengerDetected",
+    ];
+    const stored = await chrome.storage.local.get(keys);
+    const base = await getBackendUrl();
+    const manifest = chrome.runtime.getManifest();
+    return {
+      version: manifest.version,
+      extensionId: stored.extensionId || null,
+      backendUrl: base,
+      dealerId: 1,
+      dealerName: "Alpha Motorsport",
+      lastHeartbeat: stored.lastHeartbeat || null,
+      lastClaimedJob: stored.lastClaimedJob || null,
+      lastPublishedJob: stored.lastPublishedJob || null,
+      lastError: stored.lastError || null,
+      marketplaceDetected: stored.marketplaceDetected || false,
+      messengerDetected: stored.messengerDetected || false,
+    };
+  },
+
+  async CLEAR_LAST_ERROR() {
+    await chrome.storage.local.remove("lastError");
+    return { ok: true };
+  },
+
   // ---- Sales AI: Conversation Intake ----
-  // Called by the Messenger content script when a buyer message is detected.
-  // Sends conversation context to the backend, receives an AI suggested reply.
-  // Does NOT auto-send the reply — operator must click "Insert Reply".
   async CONVERSATION_INTAKE(message) {
     const extensionId = await getExtensionId();
     return apiPost("/api/conversations/intake", {
@@ -141,7 +201,6 @@ const handlers = {
     });
   },
 
-  // Fetch lead status for a conversation thread
   async GET_CONVERSATION_LEAD(message) {
     return apiGet(`/api/conversations?dealerId=1`).then((data) => {
       const conv = (data.conversations || []).find(
@@ -163,6 +222,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const data = await handler(message);
       sendResponse({ ok: true, data });
     } catch (err) {
+      saveLastError(err);
       sendResponse({
         ok: false,
         error: err instanceof Error ? err.message : String(err),
