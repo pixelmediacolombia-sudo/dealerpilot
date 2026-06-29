@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "hi0KuSiqDficWIkqQJEwv"
+uri = "file://docs/marketplace-ai-architecture.md"
+type = "text"
+title = "Marketplace AI — Technical Architecture (Phase 1)"

@@ -1,0 +1,226 @@
+# Marketplace AI for Dealers
+
+You are a Senior Software Architect and CTO.
+
+We are building a SaaS platform called Marketplace AI.
+
+This system is designed for a marketing agency that manages Facebook Marketplace for multiple car dealerships.
+
+The first dealership is Alpha Motorsport.
+
+This platform is NOT part of AdBrain.
+
+It is a completely separate SaaS product.
+
+Do not start coding immediately.
+
+First, design the entire architecture of the project.
+
+The goal is to build a scalable system similar to products like:
+
+* Social Vehicle Lister
+* MRKTLISTER
+* AutoLander
+* Glo3D
+
+But significantly better by adding AI, Dealer Branding and Lead CRM.
+
+---
+
+MAIN GOAL
+
+The platform will automatically import dealer inventory from an XML Feed.
+
+It will generate optimized Marketplace listings.
+
+It will manage AI conversations.
+
+It will create a CRM automatically.
+
+It will eventually support Marketplace publishing through a Chrome Extension.
+
+---
+
+PHASE 1 ONLY
+
+For this first phase I DO NOT want implementation.
+
+I want architecture.
+
+Design the entire project.
+
+---
+
+Deliver:
+
+1. Folder Structure
+
+2. Backend Architecture
+
+3. Frontend Architecture
+
+4. Database Design
+
+5. User Roles
+
+6. Inventory Flow
+
+7. Lead Flow
+
+8. Chrome Extension Architecture
+
+9. AI Architecture
+
+10. API Structure
+
+11. Background Jobs
+
+12. Security
+
+13. Authentication
+
+14. Scalability
+
+15. Future Modules
+
+---
+
+SYSTEM MODULES
+
+The platform will eventually contain:
+
+Dashboard
+
+Dealers
+
+Inventory
+
+Marketplace Listings
+
+Dealer Brand DNA
+
+AI Photo Studio
+
+Messenger AI
+
+Lead CRM
+
+Chrome Extension
+
+Publishing Queue
+
+Reports
+
+Settings
+
+---
+
+INVENTORY
+
+Inventory source is XML Feed.
+
+NOT website scraping.
+
+The XML feed contains:
+
+VIN
+
+Stock Number
+
+Vehicle URL
+
+Images
+
+Description
+
+Price
+
+Mileage
+
+Year
+
+Make
+
+Model
+
+Trim
+
+Color
+
+The system must:
+
+Import XML
+
+Detect new vehicles
+
+Detect sold vehicles
+
+Detect price changes
+
+Detect image changes
+
+Store every vehicle locally.
+
+---
+
+DATABASE
+
+Design a professional PostgreSQL database.
+
+Include every table.
+
+Relationships.
+
+Indexes.
+
+Scalability.
+
+---
+
+CHROME EXTENSION
+
+Do not build it yet.
+
+Only design the architecture.
+
+Explain:
+
+How it communicates with the web app.
+
+How authentication works.
+
+How Marketplace communication works.
+
+How Messenger communication works.
+
+---
+
+AI
+
+Eventually AI will:
+
+Generate titles.
+
+Generate descriptions.
+
+Generate Marketplace pricing.
+
+Suggest down payment.
+
+Generate Dealer Brand DNA.
+
+Generate Studio Backgrounds.
+
+Generate Messenger replies.
+
+Score leads.
+
+---
+
+DO NOT IMPLEMENT.
+
+Act as the CTO.
+
+Produce a complete technical architecture document.
+
+At the end, recommend improvements before development begins.
