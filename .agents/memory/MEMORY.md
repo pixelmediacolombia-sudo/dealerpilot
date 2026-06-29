@@ -1,0 +1,1 @@
+- [Chrome extension ↔ backend](chrome-extension-backend.md) — do backend fetches in the MV3 service worker, not content scripts, or Facebook's CSP blocks them.

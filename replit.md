@@ -30,7 +30,18 @@ _Populate as you build — non-obvious choices a reader couldn't infer from the 
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Marketplace AI — a standalone SaaS for an agency that manages Facebook Marketplace
+listings and buyer conversations for car dealerships (first dealer: Alpha Motorsport).
+Sprint 0 is a Chrome-extension technical spike: a web dashboard + a Chrome MV3
+extension that fills test vehicle listings on Marketplace and suggests Messenger
+replies, saving leads to a CRM. The extension never clicks Publish or Send.
+
+### Where things live (Sprint 0)
+- Architecture doc: `docs/marketplace-ai-architecture.md`
+- Dashboard (web artifact): `artifacts/dashboard/` (previewPath `/`)
+- Backend spike routes: `artifacts/api-server/src/routes/extension.ts`
+- Leads (CRM) schema: `lib/db/src/schema/leads.ts`
+- Chrome extension (load-unpacked): `chrome-extension/` (see its README for install + test checklist)
 
 ## User preferences
 

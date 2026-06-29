@@ -1,0 +1,117 @@
+#mai-panel {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  width: 320px;
+  z-index: 2147483647;
+  background: #0b1f3a;
+  color: #f2f5fa;
+  border: 1px solid #1c3a63;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow: hidden;
+}
+
+#mai-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #08182d;
+  border-bottom: 1px solid #1c3a63;
+}
+
+#mai-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #c9a227;
+  flex: 0 0 auto;
+}
+#mai-dot.mai-on { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
+#mai-dot.mai-off { background: #e74c3c; }
+
+#mai-title {
+  flex: 1;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+#mai-toggle {
+  background: transparent;
+  border: none;
+  color: #9fb3cc;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+#mai-body { padding: 12px; }
+
+.mai-status {
+  font-size: 12px;
+  margin-bottom: 10px;
+  color: #9fb3cc;
+}
+.mai-status.mai-ok { color: #6fe39f; }
+.mai-status.mai-err { color: #ff8a7a; }
+
+#mai-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mai-btn {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  background: #e10600;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.05s ease;
+}
+.mai-btn:hover { filter: brightness(1.08); }
+.mai-btn:active { transform: translateY(1px); }
+.mai-btn-secondary {
+  background: #1c3a63;
+  margin-top: 8px;
+}
+
+.mai-output {
+  margin-top: 12px;
+  border-top: 1px solid #1c3a63;
+  padding-top: 10px;
+}
+
+.mai-line { margin-bottom: 6px; }
+
+.mai-reply {
+  background: #08182d;
+  border: 1px solid #1c3a63;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 6px 0;
+  white-space: pre-wrap;
+}
+
+.mai-pre {
+  background: #08182d;
+  border: 1px solid #1c3a63;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 6px 0 0;
+  font-size: 11px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

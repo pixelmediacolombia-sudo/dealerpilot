@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: extension
+    description: Chrome extension spike endpoints
 paths:
   /healthz:
     get:
@@ -24,6 +26,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /extension/test-listing:
+    get:
+      operationId: getTestListing
+      tags: [extension]
+      summary: Get the test vehicle listing
+      description: Returns the static test listing the Chrome extension fills into Marketplace.
+      responses:
+        "200":
+          description: The test listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestListing"
+  /extension/message-context:
+    post:
+      operationId: createMessageContext
+      tags: [extension]
+      summary: Submit Messenger chat text and get an AI-style reply
+      description: Receives visible Messenger chat text, returns a suggested reply, and saves a test lead.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageContextInput"
+      responses:
+        "200":
+          description: Suggested reply and saved lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageContextResult"
+  /extension/leads:
+    get:
+      operationId: getLeads
+      tags: [extension]
+      summary: List saved test leads
+      description: Returns all saved test leads, newest first.
+      responses:
+        "200":
+          description: List of leads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadList"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +80,48 @@ components:
           type: string
       required:
         - status
+    TestListing:
+      type: object
+      required: [title, year, make, model, price, downPayment, mileage, description]
+      properties:
+        title: { type: string }
+        year: { type: integer }
+        make: { type: string }
+        model: { type: string }
+        price: { type: integer }
+        downPayment: { type: integer }
+        mileage: { type: integer }
+        description: { type: string }
+    MessageContextInput:
+      type: object
+      required: [chatText]
+      properties:
+        chatText: { type: string, minLength: 1 }
+        buyerName: { type: string }
+        sourceUrl: { type: string }
+    Lead:
+      type: object
+      required: [id, messageText, status, createdAt]
+      properties:
+        id: { type: integer }
+        buyerName: { type: ["string", "null"] }
+        messageText: { type: string }
+        suggestedReply: { type: ["string", "null"] }
+        sourceUrl: { type: ["string", "null"] }
+        status: { type: string }
+        createdAt: { type: string }
+    MessageContextResult:
+      type: object
+      required: [suggestedReply, lead]
+      properties:
+        suggestedReply: { type: string }
+        lead: { $ref: "#/components/schemas/Lead" }
+    LeadList:
+      type: object
+      required: [leads]
+      properties:
+        leads:
+          type: array
+          items:
+            $ref: "#/components/schemas/Lead"
 
