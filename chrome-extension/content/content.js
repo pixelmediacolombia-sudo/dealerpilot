@@ -25,7 +25,7 @@
   // ---- Safe runtime communication ----
   // Sentinel returned (never thrown) when Chrome invalidates the extension context.
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "SAFE_RUNTIME_1.0.3";
+  const BUILD_LABEL = "STATE_MACHINE_WIRED_1.0.4";
 
   function _runtimeAlive() {
     try {
@@ -424,14 +424,22 @@
         } · Job #${escapeHtml(String(job.id))}</div>
       </div>`;
 
-    setStatus("Loading listing data…");
-    const res = await send({ type: "GET_JOB_PAYLOAD", jobId: job.id });
-    if (!res || !res.ok) {
-      if (res?.error === CTXI) return; // context invalidated — do not continue workflow
-      setStatus("Could not load job data: " + (res && res.error), "err");
-      return;
+    let fill, images;
+    if (job._prefetchedPayload) {
+      // Pre-fetched path: called from "Fill Test Listing" with data already in hand
+      fill   = job._prefetchedPayload.fill;
+      images = job._prefetchedPayload.images ?? [];
+    } else {
+      setStatus("Loading listing data…");
+      const res = await send({ type: "GET_JOB_PAYLOAD", jobId: job.id });
+      if (!res || !res.ok) {
+        if (res?.error === CTXI) return; // context invalidated — do not continue workflow
+        setStatus("Could not load job data: " + (res && res.error), "err");
+        return;
+      }
+      fill   = res.data.fill;
+      images = res.data.images;
     }
-    const { fill, images } = res.data;
 
     const filled   = [];
     const missed   = [];
@@ -835,46 +843,47 @@
       } else {
         actionsEl.appendChild(
           button("Fill Test Listing", async () => {
-            setStatus("Fetching test listing…");
+            console.log("[DealerPilot] Fill button clicked — starting state machine");
+            setStatus("State Machine Running...");
+
             const res = await send({ type: "GET_TEST_LISTING" });
             if (!res || !res.ok) {
               if (res?.error === CTXI) return;
-              setStatus("Failed: " + (res && res.error), "err");
+              setStatus("Failed to fetch test listing: " + (res && res.error), "err");
               return;
             }
+
             const listing = res.data;
-            const filled = [];
-            const missed = [];
+            console.log("[DealerPilot] Test listing received:", listing);
 
-            const titleEl = await waitForField([
-              "title", "listing title", "what are you selling",
-              "vehicle name", "add a title", "item title", "name",
-            ]);
-            if (titleEl) { setNativeValue(titleEl, listing.title); filled.push("title"); }
-            else missed.push("title");
+            // Shape the flat test-listing into the fill envelope the state machine expects
+            const fill = {
+              vehicleType: listing.vehicleType || "Car/Truck",
+              year:         listing.year        ?? null,
+              make:         listing.make        ?? "",
+              model:        listing.model       ?? "",
+              mileage:      listing.mileage     != null ? String(listing.mileage) : null,
+              price:        listing.price       != null ? String(listing.price)   : null,
+              title:        listing.title       ?? "",
+              description:  listing.description ?? "",
+              location:     listing.location    ?? null,
+              condition:    listing.condition   ?? null,
+              transmission: listing.transmission ?? null,
+              fuelType:     listing.fuelType    ?? null,
+              color:        listing.color       ?? null,
+              bodyStyle:    listing.bodyStyle   ?? null,
+            };
 
-            const priceEl = await waitForField(["price", "listing price", "asking price"]);
-            if (priceEl) { setNativeValue(priceEl, String(listing.price)); filled.push("price"); }
-            else missed.push("price");
+            // Synthetic job that carries the pre-fetched payload
+            const syntheticJob = {
+              id:            0,
+              listingTitle:  listing.title || "Test Listing",
+              vehicleLabel:  `${listing.year || ""} ${listing.make || ""} ${listing.model || ""}`.trim(),
+              dealerName:    "Test Mode",
+              _prefetchedPayload: { fill, images: [] },
+            };
 
-            const mileageEl = await waitForField([
-              "mileage", "odometer", "miles", "vehicle mileage",
-              "number of miles", "mileage (optional)", "odometer reading",
-            ]);
-            if (mileageEl) { setNativeValue(mileageEl, String(listing.mileage)); filled.push("mileage"); }
-            else missed.push("mileage");
-
-            const descEl = await waitForField(["description", "describe", "details"]);
-            if (descEl) { setNativeValue(descEl, listing.description); filled.push("description"); }
-            else missed.push("description");
-
-            setStatus("Listing data received. Publish was NOT clicked.", "ok");
-            showOutput(
-              `<div class="mai-line"><strong>Filled:</strong> ${filled.join(", ") || "none"}</div>` +
-              `<div class="mai-line"><strong>Not found on page:</strong> ${missed.join(", ") || "none"}</div>` +
-              `<pre class="mai-pre">${escapeHtml(JSON.stringify(listing, null, 2))}</pre>`,
-            );
-            log("Test listing", listing, { filled, missed });
+            await runPublishingFlow(syntheticJob);
           }),
         );
       }

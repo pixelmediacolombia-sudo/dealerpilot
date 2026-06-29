@@ -125,3 +125,9 @@ id = "67BCUJDdiyzScD5bpKr3b"
 uri = "file://DealerPilot-Extension-v1.0.3-SAFE_RUNTIME-20260629-142415.zip"
 type = "unspecified"
 title = "DealerPilot Extension v1.0.3 — Debug Vehicle Type Build"
+
+[[outputs]]
+id = "fhM70yboEINGd9v_vml9V"
+uri = "file://DealerPilot-Extension-v1.0.4-STATE_MACHINE_WIRED_20260629-143830.zip"
+type = "unspecified"
+title = "DealerPilot Extension v1.0.4 — STATE_MACHINE_WIRED"
