@@ -158,6 +158,8 @@ const handlers = {
       "lastError",
       "marketplaceDetected",
       "messengerDetected",
+      "workflowStep",
+      "workflowStepAt",
     ];
     const stored = await chrome.storage.local.get(keys);
     const base = await getBackendUrl();
@@ -174,6 +176,8 @@ const handlers = {
       lastError: stored.lastError || null,
       marketplaceDetected: stored.marketplaceDetected || false,
       messengerDetected: stored.messengerDetected || false,
+      workflowStep: stored.workflowStep || null,
+      workflowStepAt: stored.workflowStepAt || null,
     };
   },
 

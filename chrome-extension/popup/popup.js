@@ -27,9 +27,11 @@ const dbg = {
   heartbeat:  document.getElementById("d-heartbeat"),
   claimed:    document.getElementById("d-claimed"),
   published:  document.getElementById("d-published"),
-  error:      document.getElementById("d-error"),
-  marketplace:document.getElementById("d-marketplace"),
-  messenger:  document.getElementById("d-messenger"),
+  error:          document.getElementById("d-error"),
+  marketplace:    document.getElementById("d-marketplace"),
+  messenger:      document.getElementById("d-messenger"),
+  workflowStep:   document.getElementById("d-workflow-step"),
+  workflowStepAt: document.getElementById("d-workflow-step-at"),
 };
 
 let nextJob   = null;
@@ -144,6 +146,17 @@ async function loadDebugState() {
   const msgYes = d.messengerDetected;
   dbg.messenger.textContent = msgYes ? "Yes ✓" : "No";
   dbg.messenger.className   = "value " + (msgYes ? "ok" : "");
+
+  if (d.workflowStep) {
+    const isErr = d.workflowStep.startsWith("❌");
+    dbg.workflowStep.textContent = d.workflowStep;
+    dbg.workflowStep.className   = "value " + (isErr ? "err" : "ok");
+    dbg.workflowStepAt.textContent = fmtTime(d.workflowStepAt);
+  } else {
+    dbg.workflowStep.textContent   = "—";
+    dbg.workflowStep.className     = "value";
+    dbg.workflowStepAt.textContent = "—";
+  }
 }
 
 // ---- Main refresh ----

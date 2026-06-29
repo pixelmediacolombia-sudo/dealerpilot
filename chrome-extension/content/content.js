@@ -4,6 +4,24 @@
 
   const log = (...args) => console.log("[DealerPilot AI]", ...args);
 
+  // ---- Workflow step instrumentation ----
+  // Logs [STATE] / [ERROR] to the console and writes the current step to
+  // chrome.storage.local so Debug Mode in the popup shows it in real time.
+  function stateLog(msg) {
+    console.log(`[DealerPilot AI][STATE] ${msg}`);
+    chrome.storage.local
+      .set({ workflowStep: msg, workflowStepAt: new Date().toISOString() })
+      .catch(() => {});
+  }
+
+  function stateError(context, err) {
+    const detail = err ? `: ${err.message || String(err)}` : "";
+    console.error(`[DealerPilot AI][ERROR] ${context}${detail}`, err || "");
+    chrome.storage.local
+      .set({ workflowStep: `\u274C ${context}`, workflowStepAt: new Date().toISOString() })
+      .catch(() => {});
+  }
+
   function send(message) {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(message, (response) => {
@@ -308,19 +326,22 @@
     async function selectStep(label, keywords, targetValue, waitAfterMs) {
       const settle = waitAfterMs === undefined ? 900 : waitAfterMs;
 
-      // Skip entirely when the job data has no value for this field.
       if (targetValue === null || targetValue === undefined || targetValue === "") {
+        stateLog(`Skipping "${label}" — no value in listing data`);
         warnings.push(`${label}: no value in listing data — skipped`);
         return false;
       }
 
+      stateLog(`Waiting for ${label}`);
       setStatus(`Waiting for "${label}" field…`);
       const selectEl = await waitForSelect(keywords);
       if (!selectEl) {
+        stateError(`Could not find ${label} dropdown`);
         missed.push(label);
         warnings.push(`${label}: field did not appear (form may have changed)`);
         return false;
       }
+      stateLog(`${label} found`);
 
       const target  = String(targetValue).toLowerCase().trim();
       const options = Array.from(selectEl.options).filter((o) => o.value !== "");
@@ -332,12 +353,14 @@
         options.find((o) => target.includes(o.text.toLowerCase().trim()) && o.text.trim().length > 2);
 
       if (!pick) {
-        missed.push(label);
         const sample = options.slice(0, 6).map((o) => `"${o.text}"`).join(", ");
+        stateError(`No option matching "${targetValue}" in ${label} — available: ${sample}`);
+        missed.push(label);
         warnings.push(`${label}: no option matching "${targetValue}" — available: ${sample}`);
         return false;
       }
 
+      stateLog(`Selecting ${label} → "${pick.text}"`);
       // Use the native HTMLSelectElement setter so React's synthetic onChange fires.
       const nativeSetter = Object.getOwnPropertyDescriptor(
         window.HTMLSelectElement.prototype, "value",
@@ -348,6 +371,7 @@
 
       filled.push(label);
       log(`${label} → "${pick.text}"`);
+      stateLog(`Waiting for React render after ${label}`);
       await waitForReactRender(settle);
       return true;
     }
@@ -358,14 +382,18 @@
     // ------------------------------------------------------------------
     async function fillStep(label, keywords, value) {
       if (value === null || value === undefined || value === "") {
+        stateLog(`Skipping "${label}" — no value in listing data`);
         warnings.push(`${label}: no value in listing data — skipped`);
         return;
       }
+      stateLog(`Filling ${label}`);
       const el = await waitForField(keywords, 6000);
       if (el) {
         setNativeValue(el, String(value));
         filled.push(label);
+        log(`${label} filled`);
       } else {
+        stateError(`Could not find ${label} field`);
         missed.push(label);
       }
     }
@@ -383,77 +411,90 @@
     // Phase 3: Optional dropdowns (may or may not appear).
     // ==================================================================
 
-    // ---- Phase 1: Dropdown cascade ----
+    try {
 
-    setStatus("Step 1 of 4: Selecting vehicle type…");
-    await selectStep(
-      "vehicle type",
-      ["vehicle type", "type of vehicle", "category", "vehicle category", "listing type"],
-      fill.vehicleType || "Car/Truck",
-      1200,
-    );
+      // ---- Phase 1: Dropdown cascade ----
 
-    setStatus("Step 2 of 4: Selecting year…");
-    await selectStep(
-      "year",
-      ["year", "vehicle year", "model year"],
-      fill.year ? String(fill.year) : null,
-      900,
-    );
+      stateLog("Phase 1 starting — dropdown cascade");
+      setStatus("Step 1 of 4: Selecting vehicle type…");
+      await selectStep(
+        "vehicle type",
+        ["vehicle type", "type of vehicle", "category", "vehicle category", "listing type"],
+        fill.vehicleType || "Car/Truck",
+        1200,
+      );
 
-    setStatus("Step 3 of 4: Selecting make…");
-    await selectStep(
-      "make",
-      ["make", "vehicle make", "brand", "manufacturer"],
-      fill.make,
-      900,
-    );
+      setStatus("Step 2 of 4: Selecting year…");
+      await selectStep(
+        "year",
+        ["year", "vehicle year", "model year"],
+        fill.year ? String(fill.year) : null,
+        900,
+      );
 
-    setStatus("Step 4 of 4: Selecting model — waiting for remaining fields…");
-    await selectStep(
-      "model",
-      ["model", "vehicle model"],
-      fill.model,
-      2000, // Longer settle: title, mileage, price, description all render after this
-    );
+      setStatus("Step 3 of 4: Selecting make…");
+      await selectStep(
+        "make",
+        ["make", "vehicle make", "brand", "manufacturer"],
+        fill.make,
+        900,
+      );
 
-    // ---- Phase 2: Text fields ----
+      setStatus("Step 4 of 4: Selecting model — waiting for remaining fields…");
+      await selectStep(
+        "model",
+        ["model", "vehicle model"],
+        fill.model,
+        2000, // Longer settle: title, mileage, price, description all render after this
+      );
 
-    setStatus("Filling mileage, price, title, description…");
+      // ---- Phase 2: Text fields ----
 
-    await fillStep("mileage", [
-      "mileage", "odometer", "miles", "vehicle mileage",
-      "number of miles", "mileage (optional)", "odometer reading",
-    ], fill.mileage);
+      stateLog("Phase 2 starting — text fields");
+      setStatus("Filling mileage, price, title, description…");
 
-    await fillStep("price", [
-      "price", "listing price", "asking price",
-    ], fill.price);
+      await fillStep("mileage", [
+        "mileage", "odometer", "miles", "vehicle mileage",
+        "number of miles", "mileage (optional)", "odometer reading",
+      ], fill.mileage);
 
-    await fillStep("title", [
-      "title", "listing title", "what are you selling",
-      "vehicle name", "add a title", "item title",
-    ], fill.title);
+      await fillStep("price", [
+        "price", "listing price", "asking price",
+      ], fill.price);
 
-    await fillStep("description", [
-      "description", "describe", "details",
-    ], fill.description);
+      await fillStep("title", [
+        "title", "listing title", "what are you selling",
+        "vehicle name", "add a title", "item title",
+      ], fill.title);
 
-    await fillStep("vin", [
-      "vin", "vin number", "vehicle identification number",
-    ], fill.vin);
+      await fillStep("description", [
+        "description", "describe", "details",
+      ], fill.description);
 
-    await fillStep("location", [
-      "location", "city", "where",
-    ], fill.location);
+      await fillStep("vin", [
+        "vin", "vin number", "vehicle identification number",
+      ], fill.vin);
 
-    // ---- Phase 3: Optional dropdowns (silently skip if no data or field absent) ----
+      await fillStep("location", [
+        "location", "city", "where",
+      ], fill.location);
 
-    await selectStep("condition",     ["condition", "vehicle condition"],       fill.condition,    300);
-    await selectStep("transmission",  ["transmission", "transmission type"],    fill.transmission, 300);
-    await selectStep("fuel type",     ["fuel", "fuel type"],                    fill.fuelType,     300);
-    await selectStep("color",         ["color", "exterior color"],              fill.color,        300);
-    await selectStep("body style",    ["body style", "body type"],              fill.bodyStyle,    300);
+      // ---- Phase 3: Optional dropdowns (silently skip if no data or field absent) ----
+
+      stateLog("Phase 3 starting — optional dropdowns");
+      await selectStep("condition",     ["condition", "vehicle condition"],       fill.condition,    300);
+      await selectStep("transmission",  ["transmission", "transmission type"],    fill.transmission, 300);
+      await selectStep("fuel type",     ["fuel", "fuel type"],                    fill.fuelType,     300);
+      await selectStep("color",         ["color", "exterior color"],              fill.color,        300);
+      await selectStep("body style",    ["body style", "body type"],              fill.bodyStyle,    300);
+
+      stateLog("Workflow Complete");
+
+    } catch (err) {
+      stateError("Unexpected error in publishing workflow", err);
+      setStatus("Workflow error: " + ((err && err.message) || String(err)), "err");
+      log("Publishing flow crashed", err);
+    }
 
     // ---- Done ----
 
