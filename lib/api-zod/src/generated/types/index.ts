@@ -6,22 +6,37 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './claimJobInput';
 export * from './connectionStatus';
 export * from './dealer';
 export * from './dealerList';
 export * from './dealerUpdate';
 export * from './errorResponse';
 export * from './extensionConnection';
+export * from './failJobInput';
 export * from './feedRun';
 export * from './feedRunList';
 export * from './healthStatus';
 export * from './heartbeatInput';
 export * from './lead';
 export * from './leadList';
+export * from './listingDetail';
+export * from './listingScore';
+export * from './listingVersion';
+export * from './listingVersionStatusUpdate';
+export * from './listingVersionUpdate';
+export * from './listingWorkspace';
+export * from './listingWorkspaceList';
+export * from './listListingWorkspacesParams';
+export * from './listPublishingJobsParams';
 export * from './listVehiclesParams';
 export * from './listVehiclesSort';
 export * from './messageContextInput';
 export * from './messageContextResult';
+export * from './nextPublishingJob';
+export * from './publishingJob';
+export * from './publishingJobList';
+export * from './queueListingInput';
 export * from './serviceStatus';
 export * from './testListing';
 export * from './vehicle';

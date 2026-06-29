@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, 
   CarFront, 
+  Sparkles,
   Share, 
   Users, 
   Bot, 
@@ -16,6 +17,7 @@ import { useGetDealer, useListDealers, getGetDealerQueryKey } from "@workspace/a
 const NAV_ITEMS = [
   { name: "Sales Hub", path: "/", icon: LayoutDashboard },
   { name: "Inventory", path: "/inventory", icon: CarFront },
+  { name: "Listings", path: "/listings", icon: Sparkles },
   { name: "Publishing", path: "/publishing", icon: Share },
   { name: "Leads", path: "/leads", icon: Users },
   { name: "AI Studio", path: "/ai-studio", icon: Bot },

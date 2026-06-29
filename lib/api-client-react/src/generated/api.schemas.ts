@@ -228,6 +228,163 @@ export interface LeadList {
   leads: Lead[];
 }
 
+export interface ListingScore {
+  id: number;
+  listingVersionId: number;
+  vehicleId: number;
+  titleQuality: number;
+  descriptionQuality: number;
+  priceStrategy: number;
+  downPaymentStrategy: number;
+  photoScore: number;
+  overall: number;
+  rating: string;
+  createdAt: string;
+}
+
+export interface ListingVersion {
+  id: number;
+  vehicleId: number;
+  dealerId: number;
+  version: number;
+  title: string;
+  /** @nullable */
+  descriptionEn?: string | null;
+  /** @nullable */
+  descriptionEs?: string | null;
+  language: string;
+  /** @nullable */
+  askingPrice?: number | null;
+  /** @nullable */
+  downPayment?: number | null;
+  /** @nullable */
+  callToAction?: string | null;
+  /** @nullable */
+  buyerProfile?: string | null;
+  /** @nullable */
+  priority?: string | null;
+  status: string;
+  generatedBy: string;
+  isCurrent: boolean;
+  createdAt: string;
+  updatedAt: string;
+  score?: ListingScore | null;
+}
+
+export interface ListingVersionUpdate {
+  /** @minLength 1 */
+  title?: string;
+  descriptionEn?: string;
+  descriptionEs?: string;
+  language?: string;
+  askingPrice?: number;
+  downPayment?: number;
+  callToAction?: string;
+  buyerProfile?: string;
+  priority?: string;
+}
+
+export interface ListingVersionStatusUpdate {
+  /** @minLength 1 */
+  status: string;
+}
+
+export interface ListingWorkspace {
+  vehicleId: number;
+  dealerId: number;
+  label: string;
+  vin?: string;
+  /** @nullable */
+  year?: number | null;
+  make: string;
+  model: string;
+  /** @nullable */
+  trim?: string | null;
+  /** @nullable */
+  bodyStyle?: string | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  primaryImageUrl?: string | null;
+  imageCount: number;
+  status: string;
+  versionCount: number;
+  /** @nullable */
+  currentVersion?: number | null;
+  aiStatus: string;
+  publishStatus: string;
+  priorityScore: number;
+  /** @nullable */
+  listingScore?: number | null;
+  /** @nullable */
+  listingRating?: string | null;
+  /** @nullable */
+  updatedAt?: string | null;
+}
+
+export interface ListingWorkspaceList {
+  workspaces: ListingWorkspace[];
+}
+
+export interface PublishingJob {
+  id: number;
+  listingVersionId: number;
+  vehicleId: number;
+  dealerId: number;
+  status: string;
+  priority: number;
+  /** @nullable */
+  scheduledAt?: string | null;
+  /** @nullable */
+  claimedByExtension?: string | null;
+  /** @nullable */
+  startedAt?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  /** @nullable */
+  failedReason?: string | null;
+  attempts: number;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  vehicleLabel?: string | null;
+  /** @nullable */
+  dealerName?: string | null;
+  /** @nullable */
+  listingTitle?: string | null;
+}
+
+export interface ListingDetail {
+  vehicle: Vehicle;
+  images?: VehicleImage[];
+  currentVersion?: ListingVersion | null;
+  versions: ListingVersion[];
+  jobs: PublishingJob[];
+  priorityScore?: number;
+}
+
+export interface PublishingJobList {
+  jobs: PublishingJob[];
+}
+
+export interface NextPublishingJob {
+  job: PublishingJob | null;
+}
+
+export interface QueueListingInput {
+  scheduledAt?: string;
+  priority?: number;
+}
+
+export interface ClaimJobInput {
+  /** @minLength 1 */
+  extensionId: string;
+}
+
+export interface FailJobInput {
+  reason?: string;
+}
+
 export type ListVehiclesParams = {
 /**
  * Search by VIN, stock number, make, or model
@@ -249,4 +406,22 @@ export const ListVehiclesSort = {
   price_low: 'price_low',
   mileage_low: 'mileage_low',
 } as const;
+
+export type ListListingWorkspacesParams = {
+/**
+ * Search by VIN, stock number, make, or model
+ */
+q?: string;
+/**
+ * Filter by draft/listing status
+ */
+status?: string;
+};
+
+export type ListPublishingJobsParams = {
+/**
+ * Filter by job status
+ */
+status?: string;
+};
 

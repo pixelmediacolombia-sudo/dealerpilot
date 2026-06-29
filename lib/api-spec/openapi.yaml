@@ -18,6 +18,10 @@ tags:
     description: Vehicle inventory
   - name: connection
     description: Connection center status
+  - name: listings
+    description: Listing Intelligence Engine
+  - name: publishing
+    description: Publishing queue and jobs
 paths:
   /healthz:
     get:
@@ -296,6 +300,292 @@ paths:
               schema:
                 $ref: "#/components/schemas/LeadList"
 
+  /listings:
+    get:
+      operationId: listListingWorkspaces
+      tags: [listings]
+      summary: List one Listing Workspace per vehicle
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Search by VIN, stock number, make, or model
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by draft/listing status
+      responses:
+        "200":
+          description: Listing workspaces
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingWorkspaceList"
+  /listings/{id}:
+    get:
+      operationId: getListingDetail
+      tags: [listings]
+      summary: Listing detail for a vehicle (current version, all versions, history)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Vehicle id
+      responses:
+        "200":
+          description: Listing detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /listings/{id}/generate:
+    post:
+      operationId: generateListing
+      tags: [listings]
+      summary: Generate a new AI listing version for a vehicle (never overwrites)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Vehicle id
+      responses:
+        "200":
+          description: Newly generated version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingVersion"
+        "404":
+          description: Vehicle not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: AI generation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /listing-versions/{id}:
+    patch:
+      operationId: updateListingVersion
+      tags: [listings]
+      summary: Edit fields of a listing version
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Listing version id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListingVersionUpdate"
+      responses:
+        "200":
+          description: Updated version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingVersion"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /listing-versions/{id}/status:
+    patch:
+      operationId: updateListingVersionStatus
+      tags: [listings]
+      summary: Move a listing version through its lifecycle (Draft, Ready for Review, Approved)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Listing version id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListingVersionStatusUpdate"
+      responses:
+        "200":
+          description: Updated version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingVersion"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /listing-versions/{id}/queue:
+    post:
+      operationId: queueListingVersion
+      tags: [publishing]
+      summary: Approve and queue a listing version for publishing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Listing version id
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QueueListingInput"
+      responses:
+        "200":
+          description: Created publishing job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishingJob"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /publishing/jobs:
+    get:
+      operationId: listPublishingJobs
+      tags: [publishing]
+      summary: List publishing jobs for the queue UI
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by job status
+      responses:
+        "200":
+          description: Publishing jobs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishingJobList"
+  /publishing/jobs/next:
+    get:
+      operationId: getNextPublishingJob
+      tags: [publishing]
+      summary: Get the next claimable publishing job (for the Chrome extension)
+      responses:
+        "200":
+          description: Next job, or null when the queue is empty
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NextPublishingJob"
+  /publishing/jobs/{id}/claim:
+    post:
+      operationId: claimPublishingJob
+      tags: [publishing]
+      summary: Claim a job for an extension instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaimJobInput"
+      responses:
+        "200":
+          description: Claimed job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishingJob"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Job already claimed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /publishing/jobs/{id}/complete:
+    post:
+      operationId: completePublishingJob
+      tags: [publishing]
+      summary: Mark a job published
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Completed job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishingJob"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /publishing/jobs/{id}/fail:
+    post:
+      operationId: failPublishingJob
+      tags: [publishing]
+      summary: Mark a job failed (eligible for retry)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FailJobInput"
+      responses:
+        "200":
+          description: Failed job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishingJob"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -556,3 +846,220 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Lead"
+
+    ListingScore:
+      type: object
+      required:
+        [
+          id,
+          listingVersionId,
+          vehicleId,
+          titleQuality,
+          descriptionQuality,
+          priceStrategy,
+          downPaymentStrategy,
+          photoScore,
+          overall,
+          rating,
+          createdAt,
+        ]
+      properties:
+        id: { type: integer }
+        listingVersionId: { type: integer }
+        vehicleId: { type: integer }
+        titleQuality: { type: integer }
+        descriptionQuality: { type: integer }
+        priceStrategy: { type: integer }
+        downPaymentStrategy: { type: integer }
+        photoScore: { type: integer }
+        overall: { type: integer }
+        rating: { type: string }
+        createdAt: { type: string }
+    ListingVersion:
+      type: object
+      required:
+        [
+          id,
+          vehicleId,
+          dealerId,
+          version,
+          title,
+          language,
+          status,
+          generatedBy,
+          isCurrent,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: integer }
+        vehicleId: { type: integer }
+        dealerId: { type: integer }
+        version: { type: integer }
+        title: { type: string }
+        descriptionEn: { type: ["string", "null"] }
+        descriptionEs: { type: ["string", "null"] }
+        language: { type: string }
+        askingPrice: { type: ["integer", "null"] }
+        downPayment: { type: ["integer", "null"] }
+        callToAction: { type: ["string", "null"] }
+        buyerProfile: { type: ["string", "null"] }
+        priority: { type: ["string", "null"] }
+        status: { type: string }
+        generatedBy: { type: string }
+        isCurrent: { type: boolean }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        score:
+          oneOf:
+            - $ref: "#/components/schemas/ListingScore"
+            - type: "null"
+    ListingVersionUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 1 }
+        descriptionEn: { type: string }
+        descriptionEs: { type: string }
+        language: { type: string }
+        askingPrice: { type: integer }
+        downPayment: { type: integer }
+        callToAction: { type: string }
+        buyerProfile: { type: string }
+        priority: { type: string }
+    ListingVersionStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, minLength: 1 }
+    ListingWorkspace:
+      type: object
+      required:
+        [
+          vehicleId,
+          dealerId,
+          label,
+          make,
+          model,
+          status,
+          versionCount,
+          aiStatus,
+          publishStatus,
+          priorityScore,
+          imageCount,
+        ]
+      properties:
+        vehicleId: { type: integer }
+        dealerId: { type: integer }
+        label: { type: string }
+        vin: { type: string }
+        year: { type: ["integer", "null"] }
+        make: { type: string }
+        model: { type: string }
+        trim: { type: ["string", "null"] }
+        bodyStyle: { type: ["string", "null"] }
+        price: { type: ["integer", "null"] }
+        primaryImageUrl: { type: ["string", "null"] }
+        imageCount: { type: integer }
+        status: { type: string }
+        versionCount: { type: integer }
+        currentVersion: { type: ["integer", "null"] }
+        aiStatus: { type: string }
+        publishStatus: { type: string }
+        priorityScore: { type: integer }
+        listingScore: { type: ["integer", "null"] }
+        listingRating: { type: ["string", "null"] }
+        updatedAt: { type: ["string", "null"] }
+    ListingWorkspaceList:
+      type: object
+      required: [workspaces]
+      properties:
+        workspaces:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListingWorkspace"
+    ListingDetail:
+      type: object
+      required: [vehicle, versions, jobs]
+      properties:
+        vehicle:
+          $ref: "#/components/schemas/Vehicle"
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/VehicleImage"
+        currentVersion:
+          oneOf:
+            - $ref: "#/components/schemas/ListingVersion"
+            - type: "null"
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListingVersion"
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublishingJob"
+        priorityScore: { type: integer }
+
+    PublishingJob:
+      type: object
+      required:
+        [
+          id,
+          listingVersionId,
+          vehicleId,
+          dealerId,
+          status,
+          priority,
+          attempts,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: integer }
+        listingVersionId: { type: integer }
+        vehicleId: { type: integer }
+        dealerId: { type: integer }
+        status: { type: string }
+        priority: { type: integer }
+        scheduledAt: { type: ["string", "null"] }
+        claimedByExtension: { type: ["string", "null"] }
+        startedAt: { type: ["string", "null"] }
+        completedAt: { type: ["string", "null"] }
+        failedReason: { type: ["string", "null"] }
+        attempts: { type: integer }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        vehicleLabel: { type: ["string", "null"] }
+        dealerName: { type: ["string", "null"] }
+        listingTitle: { type: ["string", "null"] }
+    PublishingJobList:
+      type: object
+      required: [jobs]
+      properties:
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublishingJob"
+    NextPublishingJob:
+      type: object
+      required: [job]
+      properties:
+        job:
+          oneOf:
+            - $ref: "#/components/schemas/PublishingJob"
+            - type: "null"
+    QueueListingInput:
+      type: object
+      properties:
+        scheduledAt: { type: string }
+        priority: { type: integer }
+    ClaimJobInput:
+      type: object
+      required: [extensionId]
+      properties:
+        extensionId: { type: string, minLength: 1 }
+    FailJobInput:
+      type: object
+      properties:
+        reason: { type: string }

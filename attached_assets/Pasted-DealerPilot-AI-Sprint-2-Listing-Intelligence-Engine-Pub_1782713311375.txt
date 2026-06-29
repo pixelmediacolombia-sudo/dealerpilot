@@ -1,0 +1,458 @@
+DealerPilot AI - Sprint 2
+
+Listing Intelligence Engine + Publishing Engine
+
+Sprint 1 is complete.
+
+Do NOT modify or rebuild the Inventory Engine.
+
+Use Sprint 1 as the foundation.
+
+The XML Inventory Engine is now the single source of truth.
+
+⸻
+
+GOAL
+
+Build the Listing Intelligence Engine.
+
+This module converts inventory into optimized Marketplace listings ready to publish.
+
+Do NOT build Messenger AI yet.
+
+Do NOT build AI Studio yet.
+
+Focus only on the listing generation pipeline.
+
+⸻
+
+ARCHITECTURE
+
+Inventory Engine
+↓
+
+Listing Intelligence Engine
+↓
+
+Publishing Queue
+↓
+
+Chrome Extension
+
+⸻
+
+MODULE 1
+
+Listing Intelligence Engine
+
+Every vehicle should have its own Listing Workspace.
+
+Create a new page:
+
+/listings
+
+Each vehicle should have:
+
+Draft Status
+
+Listing Version
+
+AI Status
+
+Publish Status
+
+Priority Score
+
+Listing Score
+
+⸻
+
+MODULE 2
+
+Generate Listing
+
+Each vehicle can generate one or multiple versions.
+
+Never overwrite.
+
+Store versions.
+
+Listing Version 1
+
+Listing Version 2
+
+Listing Version 3
+
+Database:
+
+listing_versions
+
+Fields:
+
+vehicle_id
+
+title
+
+description
+
+down_payment
+
+asking_price
+
+language
+
+version
+
+generated_by
+
+created_at
+
+⸻
+
+MODULE 3
+
+AI Listing Generator
+
+Add button:
+
+Generate Listing
+
+When clicked:
+
+Generate:
+
+Marketplace Title
+
+Marketplace Description
+
+Suggested Down Payment
+
+Call To Action
+
+Buyer Profile
+
+Language
+
+Priority
+
+Use Dealer rules.
+
+Do NOT hallucinate vehicle specs.
+
+Only use XML data.
+
+⸻
+
+Marketplace Title Rules
+
+Maximum 100 characters.
+
+High CTR.
+
+No emojis.
+
+Natural language.
+
+SEO friendly.
+
+⸻
+
+Marketplace Description
+
+Generate:
+
+Spanish
+
+English
+
+Store both.
+
+Allow editing.
+
+⸻
+
+Suggested Down Payment
+
+Do NOT use AI only.
+
+Use rule engine.
+
+Example:
+
+Sedan
+
+$1000-$1500
+
+SUV
+
+$2000+
+
+Truck
+
+$2500+
+
+Luxury
+
+$3000+
+
+Rules should be configurable later.
+
+⸻
+
+MODULE 4
+
+Listing Score
+
+Create AI score.
+
+0-100
+
+Example
+
+Title Quality
+
+Description Quality
+
+Price Strategy
+
+Down Payment Strategy
+
+Photo Count
+
+Overall Score
+
+Display:
+
+Excellent
+
+Good
+
+Needs Improvement
+
+⸻
+
+MODULE 5
+
+Publishing Queue
+
+New page:
+
+/publishing
+
+Statuses
+
+Draft
+
+AI Generated
+
+Ready for Review
+
+Approved
+
+Queued
+
+Publishing
+
+Published
+
+Failed
+
+Retry
+
+Cancelled
+
+Each listing should move through these stages.
+
+⸻
+
+Publishing Queue UI
+
+Show
+
+Vehicle
+
+Dealer
+
+Status
+
+Priority
+
+Scheduled Time
+
+Assigned Extension
+
+Retry Count
+
+⸻
+
+MODULE 6
+
+Publishing Jobs
+
+Database
+
+publishing_jobs
+
+Fields
+
+listing_id
+
+dealer_id
+
+status
+
+priority
+
+scheduled_at
+
+claimed_by_extension
+
+started_at
+
+completed_at
+
+failed_reason
+
+attempts
+
+⸻
+
+MODULE 7
+
+Chrome Extension Integration
+
+Do NOT rebuild the extension.
+
+Do NOT modify the publishing logic.
+
+Instead
+
+Create backend endpoints.
+
+GET
+
+/api/publishing/jobs
+
+Returns next job.
+
+POST
+
+/api/publishing/jobs/:id/claim
+
+POST
+
+/api/publishing/jobs/:id/complete
+
+POST
+
+/api/publishing/jobs/:id/fail
+
+This prepares Sprint 3.
+
+⸻
+
+MODULE 8
+
+Listing Detail
+
+Create
+
+/listings/:id
+
+Show
+
+Vehicle Information
+
+Current Listing
+
+All Versions
+
+Generate New Version
+
+Approve Version
+
+Queue for Publishing
+
+History
+
+Listing Score
+
+⸻
+
+MODULE 9
+
+Database
+
+Create
+
+listing_versions
+
+publishing_jobs
+
+listing_scores
+
+Keep everything normalized.
+
+⸻
+
+MODULE 10
+
+Sidebar
+
+Inventory
+
+Listings
+
+Publishing
+
+Connection Center
+
+Leads
+
+AI Studio
+
+Dealer DNA
+
+Settings
+
+⸻
+
+REMOVE
+
+Do not generate Messenger replies.
+
+Do not create CRM features.
+
+Do not create AI images.
+
+Those belong to later sprints.
+
+⸻
+
+DELIVERABLES
+
+Working Listings page
+
+Working Listing Detail page
+
+AI Listing Generator
+
+Version history
+
+Listing Score
+
+Publishing Queue
+
+Publishing Jobs API
+
+Database migrations
+
+Backend endpoints
+
+UI completed
+
+Typecheck clean
+
+No placeholder code.
+
+Everything production-ready.

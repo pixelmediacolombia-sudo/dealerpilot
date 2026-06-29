@@ -9,3 +9,6 @@ export * from "./vehicleImages";
 export * from "./vehicleChanges";
 export * from "./listings";
 export * from "./extensionConnections";
+export * from "./listingVersions";
+export * from "./listingScores";
+export * from "./publishingJobs";

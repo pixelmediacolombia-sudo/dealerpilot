@@ -415,3 +415,497 @@ export const GetLeadsResponse = zod.object({
 })
 
 
+/**
+ * @summary List one Listing Workspace per vehicle
+ */
+export const ListListingWorkspacesQueryParams = zod.object({
+  "q": zod.coerce.string().optional().describe('Search by VIN, stock number, make, or model'),
+  "status": zod.coerce.string().optional().describe('Filter by draft\/listing status')
+})
+
+export const ListListingWorkspacesResponse = zod.object({
+  "workspaces": zod.array(zod.object({
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "label": zod.string(),
+  "vin": zod.string().optional(),
+  "year": zod.number().nullish(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "trim": zod.string().nullish(),
+  "bodyStyle": zod.string().nullish(),
+  "price": zod.number().nullish(),
+  "primaryImageUrl": zod.string().nullish(),
+  "imageCount": zod.number(),
+  "status": zod.string(),
+  "versionCount": zod.number(),
+  "currentVersion": zod.number().nullish(),
+  "aiStatus": zod.string(),
+  "publishStatus": zod.string(),
+  "priorityScore": zod.number(),
+  "listingScore": zod.number().nullish(),
+  "listingRating": zod.string().nullish(),
+  "updatedAt": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Listing detail for a vehicle (current version, all versions, history)
+ */
+export const GetListingDetailParams = zod.object({
+  "id": zod.coerce.number().describe('Vehicle id')
+})
+
+export const GetListingDetailResponse = zod.object({
+  "vehicle": zod.object({
+  "id": zod.number(),
+  "dealerId": zod.number(),
+  "vin": zod.string(),
+  "stockNumber": zod.string().nullish(),
+  "year": zod.number().nullable(),
+  "make": zod.string(),
+  "model": zod.string(),
+  "trim": zod.string().nullish(),
+  "mileage": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "exteriorColor": zod.string().nullish(),
+  "interiorColor": zod.string().nullish(),
+  "bodyStyle": zod.string().nullish(),
+  "transmission": zod.string().nullish(),
+  "fuelType": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "vdpUrl": zod.string().nullish(),
+  "status": zod.string(),
+  "primaryImageUrl": zod.string().nullish(),
+  "imageCount": zod.number(),
+  "lastSyncAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}),
+  "images": zod.array(zod.object({
+  "id": zod.number(),
+  "url": zod.string(),
+  "position": zod.number()
+})).optional(),
+  "currentVersion": zod.union([zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "version": zod.number(),
+  "title": zod.string(),
+  "descriptionEn": zod.string().nullish(),
+  "descriptionEs": zod.string().nullish(),
+  "language": zod.string(),
+  "askingPrice": zod.number().nullish(),
+  "downPayment": zod.number().nullish(),
+  "callToAction": zod.string().nullish(),
+  "buyerProfile": zod.string().nullish(),
+  "priority": zod.string().nullish(),
+  "status": zod.string(),
+  "generatedBy": zod.string(),
+  "isCurrent": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "score": zod.union([zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "titleQuality": zod.number(),
+  "descriptionQuality": zod.number(),
+  "priceStrategy": zod.number(),
+  "downPaymentStrategy": zod.number(),
+  "photoScore": zod.number(),
+  "overall": zod.number(),
+  "rating": zod.string(),
+  "createdAt": zod.string()
+}),zod.null()]).optional()
+}),zod.null()]).optional(),
+  "versions": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "version": zod.number(),
+  "title": zod.string(),
+  "descriptionEn": zod.string().nullish(),
+  "descriptionEs": zod.string().nullish(),
+  "language": zod.string(),
+  "askingPrice": zod.number().nullish(),
+  "downPayment": zod.number().nullish(),
+  "callToAction": zod.string().nullish(),
+  "buyerProfile": zod.string().nullish(),
+  "priority": zod.string().nullish(),
+  "status": zod.string(),
+  "generatedBy": zod.string(),
+  "isCurrent": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "score": zod.union([zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "titleQuality": zod.number(),
+  "descriptionQuality": zod.number(),
+  "priceStrategy": zod.number(),
+  "downPaymentStrategy": zod.number(),
+  "photoScore": zod.number(),
+  "overall": zod.number(),
+  "rating": zod.string(),
+  "createdAt": zod.string()
+}),zod.null()]).optional()
+})),
+  "jobs": zod.array(zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+})),
+  "priorityScore": zod.number().optional()
+})
+
+
+/**
+ * @summary Generate a new AI listing version for a vehicle (never overwrites)
+ */
+export const GenerateListingParams = zod.object({
+  "id": zod.coerce.number().describe('Vehicle id')
+})
+
+export const GenerateListingResponse = zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "version": zod.number(),
+  "title": zod.string(),
+  "descriptionEn": zod.string().nullish(),
+  "descriptionEs": zod.string().nullish(),
+  "language": zod.string(),
+  "askingPrice": zod.number().nullish(),
+  "downPayment": zod.number().nullish(),
+  "callToAction": zod.string().nullish(),
+  "buyerProfile": zod.string().nullish(),
+  "priority": zod.string().nullish(),
+  "status": zod.string(),
+  "generatedBy": zod.string(),
+  "isCurrent": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "score": zod.union([zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "titleQuality": zod.number(),
+  "descriptionQuality": zod.number(),
+  "priceStrategy": zod.number(),
+  "downPaymentStrategy": zod.number(),
+  "photoScore": zod.number(),
+  "overall": zod.number(),
+  "rating": zod.string(),
+  "createdAt": zod.string()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Edit fields of a listing version
+ */
+export const UpdateListingVersionParams = zod.object({
+  "id": zod.coerce.number().describe('Listing version id')
+})
+
+
+
+
+export const UpdateListingVersionBody = zod.object({
+  "title": zod.string().min(1).optional(),
+  "descriptionEn": zod.string().optional(),
+  "descriptionEs": zod.string().optional(),
+  "language": zod.string().optional(),
+  "askingPrice": zod.number().optional(),
+  "downPayment": zod.number().optional(),
+  "callToAction": zod.string().optional(),
+  "buyerProfile": zod.string().optional(),
+  "priority": zod.string().optional()
+})
+
+export const UpdateListingVersionResponse = zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "version": zod.number(),
+  "title": zod.string(),
+  "descriptionEn": zod.string().nullish(),
+  "descriptionEs": zod.string().nullish(),
+  "language": zod.string(),
+  "askingPrice": zod.number().nullish(),
+  "downPayment": zod.number().nullish(),
+  "callToAction": zod.string().nullish(),
+  "buyerProfile": zod.string().nullish(),
+  "priority": zod.string().nullish(),
+  "status": zod.string(),
+  "generatedBy": zod.string(),
+  "isCurrent": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "score": zod.union([zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "titleQuality": zod.number(),
+  "descriptionQuality": zod.number(),
+  "priceStrategy": zod.number(),
+  "downPaymentStrategy": zod.number(),
+  "photoScore": zod.number(),
+  "overall": zod.number(),
+  "rating": zod.string(),
+  "createdAt": zod.string()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Move a listing version through its lifecycle (Draft, Ready for Review, Approved)
+ */
+export const UpdateListingVersionStatusParams = zod.object({
+  "id": zod.coerce.number().describe('Listing version id')
+})
+
+
+
+
+export const UpdateListingVersionStatusBody = zod.object({
+  "status": zod.string().min(1)
+})
+
+export const UpdateListingVersionStatusResponse = zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "version": zod.number(),
+  "title": zod.string(),
+  "descriptionEn": zod.string().nullish(),
+  "descriptionEs": zod.string().nullish(),
+  "language": zod.string(),
+  "askingPrice": zod.number().nullish(),
+  "downPayment": zod.number().nullish(),
+  "callToAction": zod.string().nullish(),
+  "buyerProfile": zod.string().nullish(),
+  "priority": zod.string().nullish(),
+  "status": zod.string(),
+  "generatedBy": zod.string(),
+  "isCurrent": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "score": zod.union([zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "titleQuality": zod.number(),
+  "descriptionQuality": zod.number(),
+  "priceStrategy": zod.number(),
+  "downPaymentStrategy": zod.number(),
+  "photoScore": zod.number(),
+  "overall": zod.number(),
+  "rating": zod.string(),
+  "createdAt": zod.string()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Approve and queue a listing version for publishing
+ */
+export const QueueListingVersionParams = zod.object({
+  "id": zod.coerce.number().describe('Listing version id')
+})
+
+export const QueueListingVersionBody = zod.object({
+  "scheduledAt": zod.string().optional(),
+  "priority": zod.number().optional()
+})
+
+export const QueueListingVersionResponse = zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+})
+
+
+/**
+ * @summary List publishing jobs for the queue UI
+ */
+export const ListPublishingJobsQueryParams = zod.object({
+  "status": zod.coerce.string().optional().describe('Filter by job status')
+})
+
+export const ListPublishingJobsResponse = zod.object({
+  "jobs": zod.array(zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Get the next claimable publishing job (for the Chrome extension)
+ */
+export const GetNextPublishingJobResponse = zod.object({
+  "job": zod.union([zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+}),zod.null()])
+})
+
+
+/**
+ * @summary Claim a job for an extension instance
+ */
+export const ClaimPublishingJobParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const ClaimPublishingJobBody = zod.object({
+  "extensionId": zod.string().min(1)
+})
+
+export const ClaimPublishingJobResponse = zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+})
+
+
+/**
+ * @summary Mark a job published
+ */
+export const CompletePublishingJobParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CompletePublishingJobResponse = zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+})
+
+
+/**
+ * @summary Mark a job failed (eligible for retry)
+ */
+export const FailPublishingJobParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const FailPublishingJobBody = zod.object({
+  "reason": zod.string().optional()
+})
+
+export const FailPublishingJobResponse = zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+})
+
+
