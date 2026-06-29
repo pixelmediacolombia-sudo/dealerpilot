@@ -1,0 +1,221 @@
+Start Sprint 1 for DealerPilot AI.
+
+Sprint 0 Chrome Extension Technical Spike is complete and verified. Do not rebuild the extension yet. Keep the existing extension working.
+
+We are now turning the proof of concept into the real Alpha Motorsport product.
+
+Product name:
+DealerPilot AI
+
+Marketplace is only the first channel. The product should be designed to support future channels like Craigslist, Google Vehicle Ads, Instagram, WhatsApp, SMS, and email.
+
+Sprint 1 Goal:
+Build the real inventory foundation using Alpha Motorsport XML feed as the source of truth, plus a basic Connection Center.
+
+Do not build Marketplace Publisher yet.
+Do not build Messenger AI yet.
+Do not build Dealer Brand DNA yet.
+Do not build AI Studio yet.
+
+Build only:
+
+1. XML Engine
+2. Inventory Dashboard
+3. Vehicle Detail Page
+4. Delta Detection
+5. Connection Center
+6. Keep current Chrome Extension available
+
+Requirements:
+
+1. Product Rename
+
+* Rename the app from Marketplace AI to DealerPilot AI.
+* Update sidebar, page titles, dashboard header, and branding text.
+* Use a dark automotive SaaS style.
+
+2. Navigation
+   Use this sidebar:
+
+* Sales Hub
+* Inventory
+* Publishing
+* Leads
+* AI Studio
+* Connection Center
+* Dealer DNA
+* Settings
+
+Only Inventory, Connection Center, and Settings need to be functional in Sprint 1.
+Other sections can show “Coming Soon”.
+
+3. Dealer Setup
+   Create Alpha Motorsport as the first dealer.
+   Dealer fields:
+
+* dealer name
+* website URL
+* XML feed URL
+* status
+* notes
+
+4. XML Feed Settings
+   In Settings, add Alpha XML Feed section:
+
+* XML feed URL input
+* Save button
+* Sync Inventory button
+* Last sync date
+* Last sync status
+* Total vehicles imported
+* Errors if any
+
+5. Inventory Import
+   Parse the XML feed and normalize vehicles into the database.
+
+Vehicle fields:
+
+* VIN
+* stock number
+* year
+* make
+* model
+* trim
+* mileage
+* price
+* exterior color
+* interior color if available
+* body style if available
+* transmission if available
+* fuel type if available
+* description
+* VDP URL
+* image URLs
+* source raw data
+* status
+
+6. Delta Detection
+   On every XML sync, detect:
+
+* new vehicles
+* active vehicles
+* removed/sold vehicles
+* price changes
+* mileage changes
+* image changes
+* description changes
+
+Create change history records.
+
+7. Vehicle Statuses
+   Use these statuses:
+
+* New
+* Active
+* Ready to Publish
+* Published
+* Price Changed
+* Sold/Removed
+* Error
+* Archived
+
+8. Inventory Dashboard
+   Create /inventory page.
+
+Show:
+
+* vehicle count
+* active count
+* new count
+* ready to publish count
+* published count
+* sold/removed count
+* price changed count
+
+Add:
+
+* search by VIN, stock, make, model
+* filter by status
+* sort by newest, price high, price low, mileage low
+* vehicle table or cards
+* thumbnail
+* year/make/model/trim
+* VIN
+* stock number
+* price
+* mileage
+* status badge
+* last sync date
+
+9. Vehicle Detail Page
+   Create /inventory/:id.
+
+Show:
+
+* vehicle information
+* all photos
+* VDP URL
+* raw XML data view
+* change history timeline
+* status
+* buttons:
+
+  * Generate Listing Coming Soon
+  * Queue for Publishing Coming Soon
+  * Mark Ready to Publish
+  * Archive
+
+10. Database
+    Create or update tables:
+
+* dealers
+* feeds
+* feed_runs
+* vehicles
+* vehicle_images
+* vehicle_changes
+* listings placeholder table for future sprint
+* extension_connections
+
+11. Connection Center
+    Create /connection-center page.
+
+Show cards:
+
+* Backend: Connected
+* Database: Connected
+* XML Feed: Connected / Not Synced / Error
+* Chrome Extension: Online / Offline
+* Facebook Session: Unknown in Sprint 1
+* Marketplace: Coming Soon
+* Messenger: Coming Soon
+* OpenAI: Coming Soon
+
+For Chrome Extension:
+
+* show last heartbeat if available
+* show backend URL
+* show extension status from existing Sprint 0 extension if possible
+
+12. Extension
+    Do not rebuild the Chrome extension in Sprint 1.
+    Only make sure the current Sprint 0 extension can still connect to the backend after product rename.
+    If needed, update text labels from Marketplace AI Connected to DealerPilot AI Connected.
+
+13. Remove Demo Dependency
+    Remove the test Tacoma as the main data source.
+    It can remain only in a hidden dev/demo page if useful.
+    The real app must use Alpha XML inventory.
+
+14. Test Checklist
+    Provide a Sprint 1 checklist:
+
+* save XML URL
+* run sync
+* verify vehicles imported
+* verify vehicle counts
+* verify status badges
+* verify vehicle detail page
+* verify change history
+* verify Connection Center
+* verify extension still connects
