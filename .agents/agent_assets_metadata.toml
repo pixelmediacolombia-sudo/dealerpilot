@@ -89,3 +89,9 @@ id = "hi0KuSiqDficWIkqQJEwv"
 uri = "file://docs/marketplace-ai-architecture.md"
 type = "text"
 title = "Marketplace AI — Technical Architecture (Phase 1)"
+
+[[outputs]]
+id = "Q2BGBNlrIN9E1KXHaUZdW"
+uri = "file://DealerPilot-Extension-v1.zip"
+type = "unspecified"
+title = "DealerPilot Extension v1.0.0"
