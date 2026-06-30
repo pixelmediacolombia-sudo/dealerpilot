@@ -17,7 +17,7 @@ export const publishingJobsTable = pgTable(
   "publishing_jobs",
   {
     id: serial("id").primaryKey(),
-    listingVersionId: integer("listing_version_id").notNull(),
+    listingVersionId: integer("listing_version_id"),
     vehicleId: integer("vehicle_id").notNull(),
     dealerId: integer("dealer_id").notNull(),
     batchId: integer("batch_id"),

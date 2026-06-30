@@ -24,6 +24,12 @@ import type {
   AssignPublishingJobBody,
   AutoPublishSettingsInput,
   AutoPublishSettingsResponse,
+  BulkCreativeGenerateRequest,
+  BulkGenerateCreative202,
+  BulkSchedulePublishing202,
+  BulkScheduleRequest,
+  BulkVehicleAction200,
+  BulkVehicleActionRequest,
   CancelPublishingJob200,
   CancelPublishingJobBody,
   ClaimJobInput,
@@ -905,6 +911,76 @@ export const useUpdateVehicleStatus = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateVehicleStatusMutationOptions(options));
+    }
+
+export const getBulkVehicleActionUrl = () => {
+
+
+
+
+  return `/api/vehicles/bulk`
+}
+
+/**
+ * @summary Bulk status update for multiple vehicles
+ */
+export const bulkVehicleAction = async (bulkVehicleActionRequest: BulkVehicleActionRequest, options?: RequestInit): Promise<BulkVehicleAction200> => {
+
+  return customFetch<BulkVehicleAction200>(getBulkVehicleActionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(bulkVehicleActionRequest)
+  }
+);}
+
+
+
+
+export const getBulkVehicleActionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkVehicleAction>>, TError,{data: BodyType<BulkVehicleActionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkVehicleAction>>, TError,{data: BodyType<BulkVehicleActionRequest>}, TContext> => {
+
+const mutationKey = ['bulkVehicleAction'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkVehicleAction>>, {data: BodyType<BulkVehicleActionRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkVehicleAction(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkVehicleActionMutationResult = NonNullable<Awaited<ReturnType<typeof bulkVehicleAction>>>
+    export type BulkVehicleActionMutationBody = BodyType<BulkVehicleActionRequest>
+    export type BulkVehicleActionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Bulk status update for multiple vehicles
+ */
+export const useBulkVehicleAction = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkVehicleAction>>, TError,{data: BodyType<BulkVehicleActionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkVehicleAction>>,
+        TError,
+        {data: BodyType<BulkVehicleActionRequest>},
+        TContext
+      > => {
+      return useMutation(getBulkVehicleActionMutationOptions(options));
     }
 
 export const getGetConnectionStatusUrl = () => {
@@ -2550,6 +2626,76 @@ export const useCancelPublishingJob = <TError = ErrorType<void>,
       return useMutation(getCancelPublishingJobMutationOptions(options));
     }
 
+export const getBulkSchedulePublishingUrl = () => {
+
+
+
+
+  return `/api/publishing/bulk-schedule`
+}
+
+/**
+ * @summary Schedule publishing jobs for multiple vehicles
+ */
+export const bulkSchedulePublishing = async (bulkScheduleRequest: BulkScheduleRequest, options?: RequestInit): Promise<BulkSchedulePublishing202> => {
+
+  return customFetch<BulkSchedulePublishing202>(getBulkSchedulePublishingUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(bulkScheduleRequest)
+  }
+);}
+
+
+
+
+export const getBulkSchedulePublishingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkSchedulePublishing>>, TError,{data: BodyType<BulkScheduleRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkSchedulePublishing>>, TError,{data: BodyType<BulkScheduleRequest>}, TContext> => {
+
+const mutationKey = ['bulkSchedulePublishing'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkSchedulePublishing>>, {data: BodyType<BulkScheduleRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkSchedulePublishing(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkSchedulePublishingMutationResult = NonNullable<Awaited<ReturnType<typeof bulkSchedulePublishing>>>
+    export type BulkSchedulePublishingMutationBody = BodyType<BulkScheduleRequest>
+    export type BulkSchedulePublishingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Schedule publishing jobs for multiple vehicles
+ */
+export const useBulkSchedulePublishing = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkSchedulePublishing>>, TError,{data: BodyType<BulkScheduleRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkSchedulePublishing>>,
+        TError,
+        {data: BodyType<BulkScheduleRequest>},
+        TContext
+      > => {
+      return useMutation(getBulkSchedulePublishingMutationOptions(options));
+    }
+
 export const getGetAutoPublishSettingsUrl = (dealerId: number,) => {
 
 
@@ -4113,6 +4259,76 @@ export function useListCreativeTemplates<TData = Awaited<ReturnType<typeof listC
 
 
 
+
+export const getBulkGenerateCreativeUrl = () => {
+
+
+
+
+  return `/api/creative/bulk-generate`
+}
+
+/**
+ * @summary Enqueue creative generation jobs for multiple vehicles
+ */
+export const bulkGenerateCreative = async (bulkCreativeGenerateRequest: BulkCreativeGenerateRequest, options?: RequestInit): Promise<BulkGenerateCreative202> => {
+
+  return customFetch<BulkGenerateCreative202>(getBulkGenerateCreativeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(bulkCreativeGenerateRequest)
+  }
+);}
+
+
+
+
+export const getBulkGenerateCreativeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkGenerateCreative>>, TError,{data: BodyType<BulkCreativeGenerateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkGenerateCreative>>, TError,{data: BodyType<BulkCreativeGenerateRequest>}, TContext> => {
+
+const mutationKey = ['bulkGenerateCreative'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkGenerateCreative>>, {data: BodyType<BulkCreativeGenerateRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkGenerateCreative(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkGenerateCreativeMutationResult = NonNullable<Awaited<ReturnType<typeof bulkGenerateCreative>>>
+    export type BulkGenerateCreativeMutationBody = BodyType<BulkCreativeGenerateRequest>
+    export type BulkGenerateCreativeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enqueue creative generation jobs for multiple vehicles
+ */
+export const useBulkGenerateCreative = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkGenerateCreative>>, TError,{data: BodyType<BulkCreativeGenerateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkGenerateCreative>>,
+        TError,
+        {data: BodyType<BulkCreativeGenerateRequest>},
+        TContext
+      > => {
+      return useMutation(getBulkGenerateCreativeMutationOptions(options));
+    }
 
 export const getApproveCreativeVersionUrl = (id: number,) => {
 

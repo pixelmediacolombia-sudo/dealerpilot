@@ -286,6 +286,19 @@ export const UpdateVehicleStatusResponse = zod.object({
 
 
 /**
+ * @summary Bulk status update for multiple vehicles
+ */
+export const BulkVehicleActionBody = zod.object({
+  "vehicleIds": zod.array(zod.number()),
+  "action": zod.enum(['mark_ready', 'mark_sold', 'archive', 'mark_new'])
+})
+
+export const BulkVehicleActionResponse = zod.object({
+  "updated": zod.number()
+})
+
+
+/**
  * @summary Status of all integrations and services
  */
 export const GetConnectionStatusResponse = zod.object({
@@ -1162,6 +1175,23 @@ export const CancelPublishingJobResponse = zod.object({
 
 
 /**
+ * @summary Schedule publishing jobs for multiple vehicles
+ */
+export const BulkSchedulePublishingBody = zod.object({
+  "vehicleIds": zod.array(zod.number()),
+  "scheduledAt": zod.string().optional(),
+  "spacingMinutes": zod.number().optional(),
+  "priority": zod.number().optional(),
+  "notes": zod.string().optional()
+})
+
+export const BulkSchedulePublishingResponse = zod.object({
+  "enqueued": zod.number(),
+  "skipped": zod.number()
+})
+
+
+/**
  * @summary Get auto-publish schedule settings for a dealer
  */
 export const GetAutoPublishSettingsParams = zod.object({
@@ -1941,6 +1971,37 @@ export const ListCreativeTemplatesResponse = zod.object({
   "isActive": zod.boolean(),
   "sortOrder": zod.number()
 }))
+})
+
+
+/**
+ * @summary Enqueue creative generation jobs for multiple vehicles
+ */
+export const BulkGenerateCreativeBody = zod.object({
+  "vehicleIds": zod.array(zod.number()),
+  "templateKey": zod.string().optional()
+})
+
+export const BulkGenerateCreativeResponse = zod.object({
+  "enqueued": zod.number(),
+  "skipped": zod.number(),
+  "jobs": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "templateKey": zod.string(),
+  "status": zod.string(),
+  "step": zod.string().nullish(),
+  "progress": zod.number(),
+  "creativeVersionId": zod.number().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "vehicleLabel": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})).optional()
 })
 
 

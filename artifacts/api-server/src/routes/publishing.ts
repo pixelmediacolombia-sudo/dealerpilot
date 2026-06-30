@@ -50,7 +50,7 @@ async function enrich(jobs: PublishingJob[]) {
   if (jobs.length === 0) return [];
   const vehicleIds = [...new Set(jobs.map((j) => j.vehicleId))];
   const dealerIds = [...new Set(jobs.map((j) => j.dealerId))];
-  const versionIds = [...new Set(jobs.map((j) => j.listingVersionId))];
+  const versionIds = [...new Set(jobs.map((j) => j.listingVersionId).filter((id): id is number => id !== null))];
 
   const vehicles = await db
     .select()
@@ -60,10 +60,13 @@ async function enrich(jobs: PublishingJob[]) {
     .select()
     .from(dealersTable)
     .where(inArray(dealersTable.id, dealerIds));
-  const versions = await db
-    .select()
-    .from(listingVersionsTable)
-    .where(inArray(listingVersionsTable.id, versionIds));
+  const versions =
+    versionIds.length > 0
+      ? await db
+          .select()
+          .from(listingVersionsTable)
+          .where(inArray(listingVersionsTable.id, versionIds))
+      : [];
 
   const vMap = new Map(vehicles.map((v) => [v.id, v]));
   const dMap = new Map(dealers.map((d) => [d.id, d]));
@@ -72,7 +75,7 @@ async function enrich(jobs: PublishingJob[]) {
   return jobs.map((j) => {
     const v = vMap.get(j.vehicleId);
     const d = dMap.get(j.dealerId);
-    const ver = verMap.get(j.listingVersionId);
+    const ver = j.listingVersionId != null ? verMap.get(j.listingVersionId) : undefined;
     return toJob(j, {
       vehicleLabel: v
         ? `${v.year ?? ""} ${v.make} ${v.model}${v.trim ? ` ${v.trim}` : ""}`.trim()
@@ -215,10 +218,12 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     return;
   }
 
-  const [version] = await db
-    .select()
-    .from(listingVersionsTable)
-    .where(eq(listingVersionsTable.id, job.listingVersionId));
+  const [version] = job.listingVersionId
+    ? await db
+        .select()
+        .from(listingVersionsTable)
+        .where(eq(listingVersionsTable.id, job.listingVersionId))
+    : [];
   const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
   const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, job.dealerId));
   const images = await db
@@ -310,10 +315,12 @@ router.post("/publishing/jobs/:id/claim", async (req, res) => {
     return;
   }
 
-  await db
-    .update(listingVersionsTable)
-    .set({ status: "Approved" })
-    .where(eq(listingVersionsTable.id, updated.listingVersionId));
+  if (updated.listingVersionId) {
+    await db
+      .update(listingVersionsTable)
+      .set({ status: "Approved" })
+      .where(eq(listingVersionsTable.id, updated.listingVersionId));
+  }
 
   req.log.info({ jobId: id, extensionId: parsed.data.extensionId }, "Publishing job claimed");
   const [enriched] = await enrich([updated]);
@@ -557,6 +564,84 @@ router.post("/listing-versions/:id/queue", async (req, res) => {
   req.log.info({ versionId, jobId: job.id }, "Listing version queued for publishing");
   const [enriched] = await enrich([job]);
   res.json(enriched);
+});
+
+// ── Bulk Schedule ─────────────────────────────────────────────────────────────
+
+const BulkScheduleBody = z.object({
+  vehicleIds: z.array(z.number().int().positive()).min(1).max(100),
+  scheduledAt: z.string().optional(),
+  spacingMinutes: z.number().int().min(0).max(120).optional().default(30),
+  priority: z.number().int().min(0).max(100).optional().default(50),
+  notes: z.string().optional(),
+});
+
+router.post("/publishing/bulk-schedule", async (req, res) => {
+  const parsed = BulkScheduleBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid bulk-schedule request" });
+    return;
+  }
+  const { vehicleIds, scheduledAt: scheduledAtStr, spacingMinutes, priority, notes: _notes } = parsed.data;
+
+  const vehicles = await db
+    .select()
+    .from(vehiclesTable)
+    .where(inArray(vehiclesTable.id, vehicleIds));
+
+  if (vehicles.length === 0) {
+    res.status(404).json({ error: "No matching vehicles found" });
+    return;
+  }
+
+  // Skip vehicles that already have an active publishing job
+  const activeJobs = await db
+    .select({ vehicleId: publishingJobsTable.vehicleId })
+    .from(publishingJobsTable)
+    .where(
+      and(
+        inArray(publishingJobsTable.vehicleId, vehicleIds),
+        inArray(publishingJobsTable.status, ["Queued", "Scheduled", "Publishing"]),
+      ),
+    );
+  const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
+
+  const eligible = vehicles.filter((v) => !alreadyQueued.has(v.id));
+  const skipped = vehicles.length - eligible.length;
+
+  if (eligible.length === 0) {
+    res.status(202).json({ enqueued: 0, skipped });
+    return;
+  }
+
+  const baseTime = scheduledAtStr ? new Date(scheduledAtStr) : new Date();
+  const enqueued: number[] = [];
+
+  for (let i = 0; i < eligible.length; i++) {
+    const vehicle = eligible[i]!;
+    const scheduledAt = new Date(baseTime.getTime() + i * spacingMinutes * 60_000);
+
+    const [job] = await db
+      .insert(publishingJobsTable)
+      .values({
+        vehicleId: vehicle.id,
+        dealerId: vehicle.dealerId,
+        listingVersionId: null,
+        mode: "Assisted",
+        status: scheduledAtStr ? "Scheduled" : "Queued",
+        priority,
+        scheduledAt,
+      })
+      .returning({ id: publishingJobsTable.id });
+
+    enqueued.push(job!.id);
+  }
+
+  req.log.info(
+    { vehicleIds: eligible.map((v) => v.id), enqueued: enqueued.length, skipped },
+    "Bulk publishing jobs scheduled",
+  );
+  res.status(202).json({ enqueued: enqueued.length, skipped });
 });
 
 export default router;

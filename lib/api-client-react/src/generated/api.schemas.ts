@@ -140,6 +140,34 @@ export interface VehicleDetail {
   sourceRaw?: string | null;
 }
 
+export type BulkVehicleActionRequestAction = typeof BulkVehicleActionRequestAction[keyof typeof BulkVehicleActionRequestAction];
+
+
+export const BulkVehicleActionRequestAction = {
+  mark_ready: 'mark_ready',
+  mark_sold: 'mark_sold',
+  archive: 'archive',
+  mark_new: 'mark_new',
+} as const;
+
+export interface BulkVehicleActionRequest {
+  vehicleIds: number[];
+  action: BulkVehicleActionRequestAction;
+}
+
+export interface BulkScheduleRequest {
+  vehicleIds: number[];
+  scheduledAt?: string;
+  spacingMinutes?: number;
+  priority?: number;
+  notes?: string;
+}
+
+export interface BulkCreativeGenerateRequest {
+  vehicleIds: number[];
+  templateKey?: string;
+}
+
 export interface VehicleStatusUpdate {
   /** @minLength 1 */
   status: string;
@@ -1460,6 +1488,10 @@ export const ListVehiclesSort = {
   mileage_low: 'mileage_low',
 } as const;
 
+export type BulkVehicleAction200 = {
+  updated: number;
+};
+
 export type ListListingWorkspacesParams = {
 /**
  * Search by VIN, stock number, make, or model
@@ -1500,6 +1532,11 @@ export type CancelPublishingJobBody = {
 
 export type CancelPublishingJob200 = {
   job?: PublishingJob;
+};
+
+export type BulkSchedulePublishing202 = {
+  enqueued: number;
+  skipped: number;
 };
 
 export type ListPublishingBatchesParams = {
@@ -1546,6 +1583,12 @@ export type ListCreativeJobsParams = {
  * Filter by job status
  */
 status?: string;
+};
+
+export type BulkGenerateCreative202 = {
+  enqueued: number;
+  skipped: number;
+  jobs?: CreativeJob[];
 };
 
 export type ListConversationsParams = {

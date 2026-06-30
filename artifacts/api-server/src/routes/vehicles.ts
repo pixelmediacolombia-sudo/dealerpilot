@@ -166,6 +166,49 @@ router.get("/vehicles/:id", async (req, res) => {
   });
 });
 
+const BulkActionBody = z.object({
+  vehicleIds: z.array(z.number().int().positive()).min(1).max(100),
+  action: z.enum(["mark_ready", "mark_sold", "archive", "mark_new"]),
+});
+
+const STATUS_MAP: Record<string, string> = {
+  mark_ready: "Ready to Publish",
+  mark_sold: "Sold/Removed",
+  archive: "Archived",
+  mark_new: "New",
+};
+
+router.post("/vehicles/bulk", async (req, res) => {
+  const parsed = BulkActionBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid bulk action request" });
+    return;
+  }
+  const { vehicleIds, action } = parsed.data;
+  const status = STATUS_MAP[action]!;
+
+  const updated = await db
+    .update(vehiclesTable)
+    .set({ status })
+    .where(inArray(vehiclesTable.id, vehicleIds))
+    .returning({ id: vehiclesTable.id });
+
+  if (updated.length > 0) {
+    await db.insert(vehicleChangesTable).values(
+      updated.map((v) => ({
+        vehicleId: v.id,
+        changeType: "status_change",
+        field: "status",
+        oldValue: null,
+        newValue: status,
+      })),
+    );
+  }
+
+  req.log.info({ vehicleIds, action, status, updated: updated.length }, "Bulk vehicle action");
+  res.json({ updated: updated.length });
+});
+
 const StatusBody = z.object({ status: z.string().min(1) });
 
 router.patch("/vehicles/:id/status", async (req, res) => {

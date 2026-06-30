@@ -227,6 +227,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/Vehicle"
 
+  /vehicles/bulk:
+    post:
+      operationId: bulkVehicleAction
+      tags: [inventory]
+      summary: Bulk status update for multiple vehicles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkVehicleActionRequest"
+      responses:
+        "200":
+          description: Number of updated vehicles
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [updated]
+                properties:
+                  updated: { type: integer }
+
   /connection-center:
     get:
       operationId: getConnectionStatus
@@ -755,6 +777,29 @@ paths:
         "409":
           description: Cannot cancel a Published or Failed job
 
+  /publishing/bulk-schedule:
+    post:
+      operationId: bulkSchedulePublishing
+      tags: [publishing]
+      summary: Schedule publishing jobs for multiple vehicles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkScheduleRequest"
+      responses:
+        "202":
+          description: Jobs enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enqueued, skipped]
+                properties:
+                  enqueued: { type: integer }
+                  skipped: { type: integer }
+
   /auto-publish/settings/{dealerId}:
     get:
       operationId: getAutoPublishSettings
@@ -1168,6 +1213,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreativeTemplateList"
+  /creative/bulk-generate:
+    post:
+      operationId: bulkGenerateCreative
+      tags: [creative]
+      summary: Enqueue creative generation jobs for multiple vehicles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkCreativeGenerateRequest"
+      responses:
+        "202":
+          description: Jobs enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enqueued, skipped]
+                properties:
+                  enqueued: { type: integer }
+                  skipped: { type: integer }
+                  jobs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CreativeJob"
+
   /creative/versions/{id}/approve:
     post:
       operationId: approveCreativeVersion
@@ -1695,6 +1767,35 @@ components:
           items:
             $ref: "#/components/schemas/VehicleChange"
         sourceRaw: { type: ["string", "null"] }
+    BulkVehicleActionRequest:
+      type: object
+      required: [vehicleIds, action]
+      properties:
+        vehicleIds:
+          type: array
+          items: { type: integer }
+        action:
+          type: string
+          enum: [mark_ready, mark_sold, archive, mark_new]
+    BulkScheduleRequest:
+      type: object
+      required: [vehicleIds]
+      properties:
+        vehicleIds:
+          type: array
+          items: { type: integer }
+        scheduledAt: { type: string }
+        spacingMinutes: { type: integer }
+        priority: { type: integer }
+        notes: { type: string }
+    BulkCreativeGenerateRequest:
+      type: object
+      required: [vehicleIds]
+      properties:
+        vehicleIds:
+          type: array
+          items: { type: integer }
+        templateKey: { type: string }
     VehicleStatusUpdate:
       type: object
       required: [status]

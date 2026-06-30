@@ -323,6 +323,69 @@ router.get("/creative/vehicles/:id", async (req, res) => {
   });
 });
 
+const BulkGenerateBody = z.object({
+  vehicleIds: z.array(z.number().int().positive()).min(1).max(100),
+  templateKey: z.string().min(1).optional(),
+});
+
+// POST /creative/bulk-generate — enqueue creative jobs for multiple vehicles.
+router.post("/creative/bulk-generate", async (req, res) => {
+  const parsed = BulkGenerateBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid bulk-generate request" });
+    return;
+  }
+  const { vehicleIds, templateKey: reqTemplateKey } = parsed.data;
+
+  const vehicles = await db
+    .select()
+    .from(vehiclesTable)
+    .where(inArray(vehiclesTable.id, vehicleIds));
+
+  if (vehicles.length === 0) {
+    res.status(404).json({ error: "No matching vehicles found" });
+    return;
+  }
+
+  const dealerId = vehicles[0]!.dealerId;
+  const [dna] = await db
+    .select()
+    .from(dealerBrandDnaTable)
+    .where(eq(dealerBrandDnaTable.dealerId, dealerId));
+  const defaultTemplateKey = dna?.defaultTemplateKey ?? "marketplace-premium";
+
+  const templates = await db
+    .select()
+    .from(creativeTemplatesTable)
+    .where(eq(creativeTemplatesTable.isActive, true));
+  const validKeys = new Set(templates.map((t) => t.key));
+
+  const resolvedKey = reqTemplateKey && validKeys.has(reqTemplateKey) ? reqTemplateKey : defaultTemplateKey;
+  if (!validKeys.has(resolvedKey)) {
+    res.status(400).json({ error: "No active templates found" });
+    return;
+  }
+
+  const enqueued: ReturnType<typeof toJob>[] = [];
+  for (const vehicle of vehicles) {
+    const [job] = await db
+      .insert(creativeJobsTable)
+      .values({
+        vehicleId: vehicle.id,
+        dealerId: vehicle.dealerId,
+        templateKey: resolvedKey,
+        status: "Queued",
+        progress: 0,
+      })
+      .returning();
+    enqueued.push(toJob(job!, vehicleLabel(vehicle)));
+  }
+
+  const skipped = vehicleIds.length - vehicles.length;
+  req.log.info({ count: enqueued.length, skipped, templateKey: resolvedKey }, "Bulk creative jobs enqueued");
+  res.status(202).json({ enqueued: enqueued.length, skipped, jobs: enqueued });
+});
+
 const GenerateBody = z.object({ templateKey: z.string().min(1).optional() });
 
 // POST /creative/vehicles/:id/generate — enqueue a background creative job.
