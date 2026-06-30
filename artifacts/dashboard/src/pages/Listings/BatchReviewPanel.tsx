@@ -27,6 +27,11 @@ import {
   TrendingUp,
   Star,
   DollarSign,
+  MessageSquare,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  Zap,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -79,6 +84,17 @@ type VehicleAnalysis = {
   bestCoverIsAi: boolean;
 };
 
+type PhotoPrediction = {
+  currentMessageRate: number;
+  aiMessageRate: number | null;
+  improvementPct: number | null;
+  confidence: number;
+  whySelected: string;
+  coverLabel: string;
+  hasBetterAiOption: boolean;
+  alreadyExcellent: boolean;
+};
+
 type Props = {
   vehicles: WorkspaceVehicle[];
   photoScoreByVehicle: Map<number, PhotoScoreEntry>;
@@ -87,6 +103,295 @@ type Props = {
   onApprove: (readyVehicleIds: number[]) => void;
   isApproving: boolean;
 };
+
+// ── Photo Performance Prediction ─────────────────────────────────────────────
+
+function predictPhotoPerformance(
+  photoScore: number,
+  decision: string | null,
+  strategyName: string | null | undefined,
+  imageCount: number,
+): PhotoPrediction {
+  const baseRate = (score: number): number => {
+    if (score >= 92) return 4.2;
+    if (score >= 85) return 3.6;
+    if (score >= 78) return 2.9;
+    if (score >= 70) return 2.3;
+    if (score >= 62) return 1.8;
+    if (score >= 52) return 1.4;
+    if (score >= 42) return 1.0;
+    return 0.7;
+  };
+
+  const strategy = (strategyName ?? "").toLowerCase();
+  const multiplier =
+    strategy.includes("truck") || strategy.includes("performance")
+      ? 1.16
+      : strategy.includes("suv") || strategy.includes("luxury") || strategy.includes("premium")
+        ? 1.11
+        : strategy.includes("fast turn")
+          ? 1.06
+          : 1.0;
+
+  const currentRate = Math.round(baseRate(photoScore) * multiplier * 10) / 10;
+
+  const hasBetterAiOption = decision === "use_original_recommend_ai_cover";
+  const aiEnhancedScore = Math.min(100, photoScore + 19);
+  const aiRate = hasBetterAiOption
+    ? Math.round(baseRate(aiEnhancedScore) * multiplier * 10) / 10
+    : null;
+
+  const improvementPct =
+    aiRate !== null && currentRate > 0
+      ? Math.round(((aiRate - currentRate) / currentRate) * 100)
+      : null;
+
+  let confidence = Math.max(62, Math.min(90, photoScore));
+  if (imageCount >= 15) confidence = Math.min(95, confidence + 5);
+  if (imageCount >= 10) confidence = Math.min(95, confidence + 2);
+  if (decision === "use_original") confidence = Math.min(96, confidence + 5);
+  confidence = Math.round(confidence);
+
+  const alreadyExcellent = decision === "use_original" && photoScore >= 80;
+
+  let whySelected: string;
+  let coverLabel: string;
+
+  if (decision === "use_original" && photoScore >= 88) {
+    coverLabel = "Excellent — Use Original";
+    whySelected =
+      "Best front 3/4 angle detected in the gallery with excellent natural lighting. No dealer branding interference. Full vehicle visibility confirmed. Already Marketplace-ready — enhancement would not improve engagement.";
+  } else if (decision === "use_original" && photoScore >= 72) {
+    coverLabel = "Good — Use Original";
+    whySelected =
+      "Clear vehicle shot with good lighting and acceptable framing. Minor room for improvement but meets Marketplace standards. DealerPilot recommends preserving the original to avoid AI artifacts.";
+  } else if (decision === "use_original_recommend_ai_cover") {
+    coverLabel = "AI Enhanced Cover Recommended";
+    whySelected =
+      "Original photo is publishable but AI detected a higher-scoring framing opportunity. AI reconstruction will remove background distractions, correct lighting, and produce a cleaner lead image — projected to boost buyer inquiries by " +
+      (improvementPct ?? 0) +
+      "%.";
+  } else if (decision === "generate_ai_creative") {
+    coverLabel = "AI Creative Required";
+    whySelected =
+      "Gallery photos require AI restoration before publishing. AI will remove dealer branding, banners, and promotional overlays, then reconstruct clean background with corrected lighting and natural shadow.";
+  } else {
+    coverLabel = `Score ${photoScore} — Best Available`;
+    whySelected = `Highest-scoring photo from ${imageCount} images analyzed. Selected based on angle, lighting, vehicle visibility, and branding severity.`;
+  }
+
+  return {
+    currentMessageRate: currentRate,
+    aiMessageRate: aiRate,
+    improvementPct,
+    confidence,
+    whySelected,
+    coverLabel,
+    hasBetterAiOption,
+    alreadyExcellent,
+  };
+}
+
+// ── Photo Performance Card ───────────────────────────────────────────────────
+
+function PhotoPerformanceCard({
+  prediction,
+  photoScore,
+}: {
+  prediction: PhotoPrediction;
+  photoScore: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mt-3 rounded-xl border border-border/40 bg-secondary/20 overflow-hidden">
+      {/* Header row */}
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-secondary/30 transition-colors text-left"
+      >
+        <MessageSquare className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest flex-1">
+          Photo Performance Prediction
+        </span>
+
+        {/* Confidence pill */}
+        <span className="text-[10px] font-bold text-muted-foreground">
+          {prediction.confidence}% confidence
+        </span>
+
+        {prediction.improvementPct !== null && (
+          <span className="px-2 py-0.5 rounded-full bg-success/15 border border-success/25 text-[10px] font-bold text-success">
+            +{prediction.improvementPct}% with AI cover
+          </span>
+        )}
+
+        {prediction.alreadyExcellent && (
+          <span className="px-2 py-0.5 rounded-full bg-success/15 border border-success/25 text-[10px] font-bold text-success">
+            ✓ Already excellent
+          </span>
+        )}
+
+        {expanded ? (
+          <ChevronUp className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+        ) : (
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+        )}
+      </button>
+
+      {/* Collapsed summary bar */}
+      {!expanded && (
+        <div className="px-4 pb-3 flex items-center gap-4">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-black text-foreground">
+              {prediction.currentMessageRate}%
+            </span>
+            <span className="text-[10px] text-muted-foreground font-medium">msg rate</span>
+          </div>
+
+          {prediction.aiMessageRate !== null && (
+            <>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <Zap className="w-3 h-3" />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-black text-success">
+                  {prediction.aiMessageRate}%
+                </span>
+                <span className="text-[10px] text-muted-foreground font-medium">
+                  with AI cover
+                </span>
+              </div>
+            </>
+          )}
+
+          <div className="flex-1" />
+          <span className="text-[10px] text-muted-foreground italic truncate max-w-[240px]">
+            {prediction.coverLabel}
+          </span>
+        </div>
+      )}
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div className="px-4 pb-4 space-y-4 border-t border-border/30 pt-3">
+          {/* Rate columns */}
+          <div
+            className={cn(
+              "grid gap-3",
+              prediction.hasBetterAiOption ? "grid-cols-2" : "grid-cols-1 max-w-xs",
+            )}
+          >
+            {/* Current cover */}
+            <div className="rounded-xl bg-secondary/40 border border-border/40 p-4 space-y-1">
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                Current Cover Photo
+              </p>
+              <p className="text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">
+                Expected Message Rate
+              </p>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-3xl font-black text-foreground">
+                  {prediction.currentMessageRate}%
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 rounded-full bg-border/50 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary/60"
+                  style={{ width: `${Math.min(100, prediction.currentMessageRate * 20)}%` }}
+                />
+              </div>
+              <p className="text-[9px] text-muted-foreground mt-1">
+                Photo score: {photoScore}
+              </p>
+            </div>
+
+            {/* AI recommended cover */}
+            {prediction.hasBetterAiOption && prediction.aiMessageRate !== null && (
+              <div className="rounded-xl bg-success/5 border border-success/25 p-4 space-y-1 relative overflow-hidden">
+                <div className="absolute top-2 right-2">
+                  <span className="px-1.5 py-0.5 rounded bg-success/20 text-[8px] font-bold text-success uppercase tracking-widest">
+                    AI Rec
+                  </span>
+                </div>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                  AI Recommended Cover
+                </p>
+                <p className="text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">
+                  Expected Message Rate
+                </p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-3xl font-black text-success">
+                    {prediction.aiMessageRate}%
+                  </span>
+                </div>
+                <div className="mt-2 h-1.5 rounded-full bg-border/50 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-success/70"
+                    style={{ width: `${Math.min(100, prediction.aiMessageRate * 20)}%` }}
+                  />
+                </div>
+                {prediction.improvementPct !== null && (
+                  <p className="text-[9px] font-bold text-success mt-1">
+                    +{prediction.improvementPct}% expected improvement
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Already excellent callout */}
+          {prediction.alreadyExcellent && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-success/8 border border-success/20">
+              <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-success font-medium leading-snug">
+                This vehicle already meets Marketplace quality standards. Use the original photo.
+              </p>
+            </div>
+          )}
+
+          {/* Confidence bar */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                Prediction Confidence
+              </span>
+              <span className="text-[11px] font-bold text-foreground">
+                {prediction.confidence}%
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-border/50 overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-700",
+                  prediction.confidence >= 85
+                    ? "bg-success/70"
+                    : prediction.confidence >= 70
+                      ? "bg-primary/60"
+                      : "bg-amber-500/60",
+                )}
+                style={{ width: `${prediction.confidence}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Why selected */}
+          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/15">
+            <Info className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="text-[9px] font-bold text-primary uppercase tracking-widest">
+                Why DealerPilot selected this photo
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {prediction.whySelected}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -145,14 +450,10 @@ function analyzeVehicle(
     };
   }
 
-  if (
-    photoDecision === "needs_review" ||
-    photoDecision === "generate_ai_creative"
-  ) {
+  if (photoDecision === "needs_review" || photoDecision === "generate_ai_creative") {
     return {
       status: "Needs Better Photo",
-      reason:
-        "Lead photo has promotional overlay or insufficient quality for Marketplace.",
+      reason: "Lead photo has promotional overlay or insufficient quality for Marketplace.",
       recommendation: "Run Photo Enhancer to produce a clean listing photo.",
       photoScore: photoScoreVal,
       publishOrder: 80,
@@ -307,6 +608,27 @@ export function BatchReviewPanel({
     return m;
   }, [vehicles, photoScoreByVehicle, intelligenceMap]);
 
+  const predictionMap = useMemo(() => {
+    const m = new Map<number, PhotoPrediction>();
+    for (const v of vehicles) {
+      const photoEntry = photoScoreByVehicle.get(v.vehicleId);
+      const intel = intelligenceMap.get(v.vehicleId);
+      const analysis = analysisMap.get(v.vehicleId);
+      if (analysis?.status === "Ready" && photoEntry?.photoScore != null) {
+        m.set(
+          v.vehicleId,
+          predictPhotoPerformance(
+            photoEntry.photoScore,
+            photoEntry.photoDecision,
+            intel?.strategyName,
+            v.imageCount ?? 0,
+          ),
+        );
+      }
+    }
+    return m;
+  }, [vehicles, photoScoreByVehicle, intelligenceMap, analysisMap]);
+
   const ready = vehicles.filter(
     (v) => analysisMap.get(v.vehicleId)?.status === "Ready",
   );
@@ -425,14 +747,9 @@ export function BatchReviewPanel({
             ].map((s) => (
               <div
                 key={s.label}
-                className={cn(
-                  "rounded-xl px-4 py-3 flex flex-col gap-0.5",
-                  s.bg,
-                )}
+                className={cn("rounded-xl px-4 py-3 flex flex-col gap-0.5", s.bg)}
               >
-                <span className={cn("text-2xl font-black", s.color)}>
-                  {s.value}
-                </span>
+                <span className={cn("text-2xl font-black", s.color)}>{s.value}</span>
                 <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
                   {s.label}
                 </span>
@@ -454,12 +771,13 @@ export function BatchReviewPanel({
             const StatusIcon = cfg.icon;
             const photoEntry = photoScoreByVehicle.get(v.vehicleId);
             const intel = intelligenceMap.get(v.vehicleId);
+            const prediction = predictionMap.get(v.vehicleId);
 
             return (
               <div
                 key={v.vehicleId}
                 className={cn(
-                  "flex items-start gap-4 p-4 rounded-xl border transition-all",
+                  "p-4 rounded-xl border transition-all",
                   analysis.status === "Ready" && analysis.priority === "High"
                     ? "border-rose-500/20 bg-rose-500/5"
                     : analysis.status === "Ready"
@@ -467,127 +785,137 @@ export function BatchReviewPanel({
                       : "border-border/50 bg-card/60",
                 )}
               >
-                {/* Order number */}
-                <div className={cn(
-                  "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-0.5",
-                  analysis.status === "Ready" && analysis.priority === "High"
-                    ? "bg-rose-500/20 text-rose-400"
-                    : analysis.status === "Ready"
-                      ? "bg-success/20 text-success"
-                      : "bg-secondary/60 text-muted-foreground",
-                )}>
-                  {analysis.status === "Ready" ? idx + 1 : "–"}
-                </div>
-
-                {/* Thumbnail with cover indicator */}
-                <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-secondary/40 flex-shrink-0">
-                  {v.primaryImageUrl ? (
-                    <img
-                      src={v.primaryImageUrl}
-                      alt={v.label}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Car className="w-5 h-5 text-muted-foreground/30" />
-                    </div>
-                  )}
-                  {analysis.bestCoverIsAi && (
-                    <div className="absolute bottom-0 inset-x-0 bg-blue-500/80 text-white text-[8px] font-bold text-center py-0.5 flex items-center justify-center gap-0.5">
-                      <Wand2 className="w-2 h-2" />
-                      AI COVER
-                    </div>
-                  )}
-                </div>
-
-                {/* Vehicle info + intelligence */}
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-sm text-foreground truncate">
-                      {v.label}
-                    </span>
-                    {v.price && (
-                      <span className="text-xs text-muted-foreground font-medium">
-                        {formatCurrency(v.price)}
-                      </span>
-                    )}
-                    {/* Priority badge */}
-                    {analysis.status === "Ready" && (
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-widest",
-                          pCfg.bg,
-                          pCfg.color,
-                        )}
-                      >
-                        {analysis.priority === "High" && <TrendingUp className="w-2.5 h-2.5" />}
-                        {analysis.priority === "Medium" && <Star className="w-2.5 h-2.5" />}
-                        {pCfg.label}
-                      </span>
-                    )}
-                    {/* Strategy name badge */}
-                    {intel?.strategyName && (
-                      <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[9px] font-bold text-primary uppercase tracking-widest">
-                        {intel.strategyName}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Metrics row */}
-                  <div className="flex items-center gap-3 flex-wrap">
-                    {(v.imageCount ?? 0) > 0 && (
-                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
-                        <ImageIcon className="w-3 h-3" />
-                        {v.imageCount} photos
-                      </span>
-                    )}
-                    {v.listingScore != null && (
-                      <span className="text-[10px] text-muted-foreground font-medium">
-                        Score {v.listingScore}
-                      </span>
-                    )}
-                    {photoEntry?.photoScore != null && (
-                      <span className="text-[10px] text-muted-foreground font-medium">
-                        Photo {photoEntry.photoScore}
-                      </span>
-                    )}
-                    {/* Recommended down payment */}
-                    {intel?.recommendedDownPayment != null && (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-success">
-                        <DollarSign className="w-3 h-3" />
-                        {formatCurrency(intel.recommendedDownPayment)} down rec.
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Strategy reason */}
-                  {intel?.reason && analysis.status === "Ready" && (
-                    <p className="text-[11px] text-primary/70 leading-snug italic">
-                      "{intel.reason}"
-                    </p>
-                  )}
-
-                  <p className="text-[11px] text-muted-foreground leading-snug">
-                    {analysis.recommendation}
-                  </p>
-                </div>
-
-                {/* Status badge */}
-                <div className="flex-shrink-0 text-right space-y-1">
+                {/* Top row: order, thumbnail, info, status */}
+                <div className="flex items-start gap-4">
+                  {/* Order number */}
                   <div
                     className={cn(
-                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-widest",
-                      cfg.bg,
-                      cfg.color,
+                      "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-0.5",
+                      analysis.status === "Ready" && analysis.priority === "High"
+                        ? "bg-rose-500/20 text-rose-400"
+                        : analysis.status === "Ready"
+                          ? "bg-success/20 text-success"
+                          : "bg-secondary/60 text-muted-foreground",
                     )}
                   >
-                    <StatusIcon className="w-3 h-3" />
-                    {cfg.label}
+                    {analysis.status === "Ready" ? idx + 1 : "–"}
                   </div>
-                  <p className="text-[10px] text-muted-foreground max-w-[180px]">
-                    {analysis.reason}
-                  </p>
+
+                  {/* Thumbnail with cover indicator */}
+                  <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-secondary/40 flex-shrink-0">
+                    {v.primaryImageUrl ? (
+                      <img
+                        src={v.primaryImageUrl}
+                        alt={v.label}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Car className="w-5 h-5 text-muted-foreground/30" />
+                      </div>
+                    )}
+                    {analysis.bestCoverIsAi && (
+                      <div className="absolute bottom-0 inset-x-0 bg-blue-500/80 text-white text-[8px] font-bold text-center py-0.5 flex items-center justify-center gap-0.5">
+                        <Wand2 className="w-2 h-2" />
+                        AI COVER
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Vehicle info + intelligence */}
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-foreground truncate">
+                        {v.label}
+                      </span>
+                      {v.price && (
+                        <span className="text-xs text-muted-foreground font-medium">
+                          {formatCurrency(v.price)}
+                        </span>
+                      )}
+                      {analysis.status === "Ready" && (
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-widest",
+                            pCfg.bg,
+                            pCfg.color,
+                          )}
+                        >
+                          {analysis.priority === "High" && <TrendingUp className="w-2.5 h-2.5" />}
+                          {analysis.priority === "Medium" && <Star className="w-2.5 h-2.5" />}
+                          {pCfg.label}
+                        </span>
+                      )}
+                      {intel?.strategyName && (
+                        <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[9px] font-bold text-primary uppercase tracking-widest">
+                          {intel.strategyName}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Metrics row */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {(v.imageCount ?? 0) > 0 && (
+                        <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+                          <ImageIcon className="w-3 h-3" />
+                          {v.imageCount} photos
+                        </span>
+                      )}
+                      {v.listingScore != null && (
+                        <span className="text-[10px] text-muted-foreground font-medium">
+                          Score {v.listingScore}
+                        </span>
+                      )}
+                      {photoEntry?.photoScore != null && (
+                        <span className="text-[10px] text-muted-foreground font-medium">
+                          Photo {photoEntry.photoScore}
+                        </span>
+                      )}
+                      {intel?.recommendedDownPayment != null && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-success">
+                          <DollarSign className="w-3 h-3" />
+                          {formatCurrency(intel.recommendedDownPayment)} down rec.
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Strategy reason */}
+                    {intel?.reason && analysis.status === "Ready" && (
+                      <p className="text-[11px] text-primary/70 leading-snug italic">
+                        "{intel.reason}"
+                      </p>
+                    )}
+
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      {analysis.recommendation}
+                    </p>
+                  </div>
+
+                  {/* Status badge */}
+                  <div className="flex-shrink-0 text-right space-y-1">
+                    <div
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-widest",
+                        cfg.bg,
+                        cfg.color,
+                      )}
+                    >
+                      <StatusIcon className="w-3 h-3" />
+                      {cfg.label}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground max-w-[180px]">
+                      {analysis.reason}
+                    </p>
+                  </div>
                 </div>
+
+                {/* ── Photo Performance Prediction (Ready vehicles only) ── */}
+                {prediction && (
+                  <PhotoPerformanceCard
+                    prediction={prediction}
+                    photoScore={photoEntry?.photoScore ?? 0}
+                  />
+                )}
               </div>
             );
           })}
@@ -605,7 +933,6 @@ export function BatchReviewPanel({
             </div>
 
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {/* When to post */}
               <div className="space-y-3">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                   When to Post
@@ -634,7 +961,6 @@ export function BatchReviewPanel({
                 </div>
               </div>
 
-              {/* Posting window */}
               <div className="space-y-3">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                   Posting Window{" "}
@@ -654,7 +980,6 @@ export function BatchReviewPanel({
                 </Select>
               </div>
 
-              {/* Spacing */}
               <div className="space-y-3">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                   Spacing Between Posts
@@ -671,7 +996,6 @@ export function BatchReviewPanel({
                 </Select>
               </div>
 
-              {/* Batch size */}
               <div className="space-y-3">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                   Vehicles per Session
@@ -692,19 +1016,15 @@ export function BatchReviewPanel({
             {/* Batch plan summary */}
             <div className="px-6 pb-5">
               <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-sm space-y-1.5">
-                <p className="font-bold text-foreground">
-                  DealerPilot batch plan
-                </p>
+                <p className="font-bold text-foreground">DealerPilot batch plan</p>
                 <div className="text-muted-foreground space-y-1 text-xs leading-relaxed">
                   <p>
                     ✓ Publishing{" "}
                     <strong className="text-foreground">
-                      {effectiveBatchSize} vehicle
-                      {effectiveBatchSize !== 1 ? "s" : ""}
+                      {effectiveBatchSize} vehicle{effectiveBatchSize !== 1 ? "s" : ""}
                     </strong>{" "}
                     {scheduleMode === "today" ? "today" : "as scheduled"} in the{" "}
-                    <strong className="text-foreground">{windowLabel}</strong>{" "}
-                    window.
+                    <strong className="text-foreground">{windowLabel}</strong> window.
                   </p>
                   {highCount > 0 && (
                     <p>
@@ -712,29 +1032,25 @@ export function BatchReviewPanel({
                       <strong className="text-rose-400">
                         {highCount} High Priority
                       </strong>{" "}
-                      vehicle{highCount !== 1 ? "s" : ""} will publish first — top AI picks from Strategy Engine v2.
+                      vehicle{highCount !== 1 ? "s" : ""} publish first — top AI picks from Strategy Engine v2.
                     </p>
                   )}
                   <p>
                     ✓ Posts spaced{" "}
-                    <strong className="text-foreground">
-                      {spacing} minutes
-                    </strong>{" "}
+                    <strong className="text-foreground">{spacing} minutes</strong>{" "}
                     apart — avoids Marketplace spam detection.
                   </p>
                   {needsReview.length > 0 && (
                     <p>
                       ✓{" "}
                       <strong className="text-foreground">
-                        {needsReview.length} vehicle
-                        {needsReview.length !== 1 ? "s" : ""}
+                        {needsReview.length} vehicle{needsReview.length !== 1 ? "s" : ""}
                       </strong>{" "}
                       held for review — not included in this batch.
                     </p>
                   )}
                   <p>
-                    ✓ Extension will handle publishing in order — no manual
-                    clicks required.
+                    ✓ Extension will handle publishing in order — no manual clicks required.
                   </p>
                 </div>
               </div>
@@ -766,8 +1082,7 @@ export function BatchReviewPanel({
             </Button>
           ) : (
             <div className="text-sm text-muted-foreground">
-              No vehicles are ready to publish. Resolve the issues above and try
-              again.
+              No vehicles are ready to publish. Resolve the issues above and try again.
             </div>
           )}
         </div>
