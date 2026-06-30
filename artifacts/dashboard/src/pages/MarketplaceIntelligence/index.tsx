@@ -191,11 +191,21 @@ function StrategyCard({
             {rec.year} {rec.make} {rec.model}
           </div>
           <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
-            {rec.price != null && <span>{formatCurrency(rec.price)}</span>}
-            {rec.bodyStyle && <span>· {rec.bodyStyle}</span>}
-            {rec.recommendedDownPayment != null && (
-              <span className="text-primary font-medium">· {formatCurrency(rec.recommendedDownPayment)} down</span>
+            {rec.price != null && (
+              <span className={(rec.price >= 16000 && rec.recommendedDownPayment != null) ? "line-through opacity-50" : ""}>
+                {formatCurrency(rec.price)}
+              </span>
             )}
+            {rec.bodyStyle && <span>· {rec.bodyStyle}</span>}
+            {rec.price != null && rec.price >= 16000 && rec.recommendedDownPayment != null ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold">
+                Marketplace: {formatCurrency(rec.recommendedDownPayment)} down
+              </span>
+            ) : rec.price != null && rec.price < 16000 ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-success/10 border border-success/20 text-success text-[10px] font-bold uppercase tracking-widest">
+                Full price
+              </span>
+            ) : null}
           </div>
         </div>
 

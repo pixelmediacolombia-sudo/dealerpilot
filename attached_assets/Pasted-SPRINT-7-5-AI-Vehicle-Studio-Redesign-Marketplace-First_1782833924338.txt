@@ -1,0 +1,394 @@
+SPRINT 7.5 — AI Vehicle Studio Redesign (Marketplace First)
+
+DealerPilot is NOT an image generator.
+
+DealerPilot is an AI Marketplace publishing assistant.
+
+The current AI Vehicle Studio is wrong because it generates multiple fake versions (Luxury, Studio, White Background, Transparent PNG, etc.).
+
+Marketplace users do not need multiple creative versions.
+
+They need ONE optimized Marketplace-ready photo.
+
+Rebuild the AI Vehicle Studio around that philosophy.
+
+OBJECTIVE
+
+Redesign the entire Photo AI workflow.
+
+The AI must analyze all source photos, choose the best cover automatically, decide if enhancement is actually needed, and generate only ONE enhanced version when required.
+
+The UI must look like an enterprise AI auditing platform, not an image generator.
+
+REMOVE COMPLETELY
+
+Delete the following concepts from the UI and logic:
+
+Ad Creative Generator
+Luxury Studio
+White Catalog
+Outdoor Premium
+Black Studio
+Gray Studio
+Transparent PNG
+Multiple generated versions
+Seven output cards
+"Generate multiple styles"
+
+DealerPilot should never generate multiple Marketplace images.
+
+NEW AI DECISION ENGINE
+
+For every vehicle:
+
+Analyze ALL XML photos.
+
+Do not analyze only the cover photo.
+
+The AI must inspect every available image.
+
+Example:
+
+Vehicle
+
+20 Photos
+
+↓
+
+DealerPilot analyzes all 20
+
+↓
+
+Ranks every photo
+
+↓
+
+Chooses Best Cover
+
+↓
+
+Decides:
+
+USE ORIGINAL
+
+or
+
+ENHANCE PHOTO
+
+PHOTO RANKING
+
+Every source photo receives an AI score.
+
+Criteria:
+
+angle
+
+vehicle visibility
+
+front 3/4 preference
+
+wheel visibility
+
+cropping
+
+lighting
+
+sharpness
+
+dealer overlay
+
+reflections
+
+background distraction
+
+sky quality
+
+vehicle centered
+
+distance
+
+image resolution
+
+compression artifacts
+
+motion blur
+
+window reflections
+
+license plate obstruction
+
+people visible
+
+other vehicles blocking
+
+The highest scoring photo becomes the Marketplace cover automatically.
+
+AI OUTPUT
+
+Instead of generating 7 images:
+
+Generate ONLY ONE.
+
+Example:
+
+Original
+
+↓
+
+DealerPilot AI
+
+↓
+
+Marketplace Ready
+
+That's it.
+
+No alternative styles.
+
+No studio backgrounds.
+
+No catalog backgrounds.
+
+No fake variants.
+
+EXTERIOR PHOTOS
+
+If AI determines enhancement is required:
+
+Remove dealer branding
+
+Remove promotional banners
+
+Remove phone numbers
+
+Remove watermarks
+
+Improve lighting
+
+Improve exposure
+
+Correct white balance
+
+Increase sharpness
+
+Improve reflections
+
+Optionally replace distracting background with a clean outdoor environment ONLY if confidence is high.
+
+Never create unrealistic scenes.
+
+Never alter the vehicle.
+
+INTERIOR PHOTOS
+
+Interior photos NEVER replace backgrounds.
+
+Allowed operations:
+
+HDR
+
+Contrast
+
+Exposure
+
+White balance
+
+Noise reduction
+
+Sharpness
+
+Lens correction
+
+Window highlight recovery
+
+Nothing else.
+
+NEW UI
+
+Replace the current card layout with an audit layout.
+
+Vehicle
+
+Original Photo
+
+↓
+
+Marketplace Ready Photo
+
+↓
+
+AI Report
+
+Only ONE enhanced result should exist.
+
+AI REPORT
+
+Display:
+
+Overall Score
+
+Best Cover Selected
+
+Photo #
+
+Confidence
+
+Recommendation
+
+Reasoning
+
+Example:
+
+Overall Score
+
+91
+
+Best Cover
+
+Photo 7
+
+Recommendation
+
+Use Original
+
+Reason
+
+Excellent lighting
+
+Front 3/4 angle
+
+No reflections
+
+Highest Marketplace CTR prediction
+
+If enhancement is required:
+
+Overall Score
+
+72
+
+Recommendation
+
+Enhance
+
+Reason
+
+Dealer overlay detected
+
+Background distracting
+
+Low contrast
+
+Expected Score
+
+92
+
+Expected CTR Improvement
+
++24%
+
+PHOTO GALLERY
+
+Display every XML photo.
+
+Horizontal strip.
+
+Each thumbnail shows:
+
+Score
+
+Recommendation
+
+Example:
+
+Photo 1
+
+91
+
+Best Cover
+
+Photo 2
+
+87
+
+Good
+
+Photo 3
+
+81
+
+Good
+
+Photo 4
+
+55
+
+Don't Use
+
+Photo 5
+
+49
+
+Don't Use
+
+Clicking a thumbnail changes the preview.
+
+AI DECISION
+
+The AI decides automatically.
+
+If score >=90
+
+Use Original
+
+If score 75–89
+
+Recommend Original
+
+If score <75
+
+Recommend Enhancement
+
+If score <60
+
+Reject as Cover
+
+INTERFACE
+
+Compact professional SaaS layout.
+
+Fit many vehicles on screen.
+
+Avoid oversized cards.
+
+Show:
+
+Vehicle thumbnail
+
+Original
+
+Enhanced
+
+Score
+
+Recommendation
+
+Action
+
+Large galleries are unnecessary.
+
+Everything should feel like a photo auditing dashboard.
+
+FINAL GOAL
+
+DealerPilot should feel like an automotive AI specialist.
+
+The user should think:
+
+"The AI already analyzed every photo, chose the best one, decided whether enhancement is necessary, generated one optimized Marketplace image, and explained why."
+
+Not:
+
+"I have seven random image versions to choose from."
+
+The AI should reduce decisions, not create more.

@@ -64,6 +64,12 @@ ABSOLUTE RULES:
 - buyerProfile: one or two sentences describing the most likely buyer for this specific vehicle.
 - priority: exactly one of "High", "Medium", or "Low" based on how desirable/fast-moving this vehicle likely is.
 
+PRICING COPY RULES (strictly enforced):
+- If priceMode is DOWN_PAYMENT: frame the entire offer around the down payment. Use phrasing like "Down payment starting at $X" or "Available with $X down for qualified buyers". DO NOT use the full vehicle price as the Marketplace price in the copy.
+- If priceMode is FULL_PRICE: the listing copy may mention the full price directly.
+- NEVER use the phrases "guaranteed approval", "everyone approved", "no credit check guaranteed", or any variant implying unconditional financing.
+- NEVER say a buyer is guaranteed to qualify. Use "for qualified buyers" or "financing available" instead.
+
 Respond with a single JSON object and nothing else, with keys: title, descriptionEn, descriptionEs, callToAction, buyerProfile, priority.`;
 
 /**
@@ -75,12 +81,21 @@ export async function generateListing(vehicle: Vehicle): Promise<GeneratedListin
   const suggestion = suggestDownPayment(vehicle);
   const facts = buildVehicleFacts(vehicle);
 
+  const FULL_PRICE_THRESHOLD = 16_000;
+  const price = vehicle.price ?? 0;
+  const priceMode = price < FULL_PRICE_THRESHOLD ? "FULL_PRICE" : "DOWN_PAYMENT";
+
   const userMessage = `Vehicle facts (the ONLY information you may use):
 ${JSON.stringify(facts, null, 2)}
 
-Financing offer to feature:
-- Suggested down payment: $${suggestion.downPayment} (category: ${suggestion.category}, typical range ${suggestion.rangeLabel})
-${vehicle.price != null ? `- Asking price: $${vehicle.price}` : "- Asking price: not provided"}
+Pricing mode: ${priceMode}
+${priceMode === "DOWN_PAYMENT"
+  ? `- Marketplace display price: $${suggestion.downPayment} down payment
+- Actual vehicle price: $${price} (DO NOT use this as the Marketplace price)
+- Frame the listing around the down payment offer: "Down payment starting at $${suggestion.downPayment}" or "Available with $${suggestion.downPayment} down for qualified buyers"
+- Down payment category: ${suggestion.category} (typical range ${suggestion.rangeLabel})`
+  : `- Full asking price: $${price}
+- Listing copy may reference the full price directly`}
 
 Generate the JSON listing now.`;
 

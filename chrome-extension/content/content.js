@@ -784,6 +784,13 @@
         "number of miles", "mileage (optional)", "odometer reading",
       ], fill.mileage);
 
+      // Price field: always use fill.price (= marketplaceDisplayedPrice from the server).
+      // For DOWN_PAYMENT vehicles this is the down payment, NOT the full vehicle price.
+      if (fill.priceMode === "DOWN_PAYMENT") {
+        log(`pricing mode: DOWN_PAYMENT — posting $${fill.marketplaceDisplayedPrice ?? fill.price} (down payment), NOT full price $${fill.actualVehiclePrice ?? "?"}`);
+      } else {
+        log(`pricing mode: FULL_PRICE — posting $${fill.price}`);
+      }
       await fillStep("price", [
         "price", "listing price", "asking price",
       ], fill.price);

@@ -450,6 +450,18 @@ export interface NextPublishingJob {
   job: PublishingJob | null;
 }
 
+/**
+ * @nullable
+ */
+export type PublishingJobFillPriceMode = typeof PublishingJobFillPriceMode[keyof typeof PublishingJobFillPriceMode] | null;
+
+
+export const PublishingJobFillPriceMode = {
+  FULL_PRICE: 'FULL_PRICE',
+  DOWN_PAYMENT: 'DOWN_PAYMENT',
+  null: 'null',
+} as const;
+
 export interface PublishingJobFill {
   title: string;
   /** @nullable */
@@ -479,6 +491,16 @@ export interface PublishingJobFill {
   category: string;
   /** @nullable */
   downPayment?: number | null;
+  /** @nullable */
+  actualVehiclePrice?: number | null;
+  /** @nullable */
+  marketplaceDisplayedPrice?: number | null;
+  /** @nullable */
+  priceMode?: PublishingJobFillPriceMode;
+  /** @nullable */
+  recommendedDownPayment?: number | null;
+  /** @nullable */
+  pricingReason?: string | null;
 }
 
 export interface PublishingJobPayload {

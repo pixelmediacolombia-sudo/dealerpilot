@@ -1,0 +1,188 @@
+CRITICAL FIX — Photo Score Explainability + Precision
+
+The AI photo scores look too generic and not trustworthy.
+
+Many photos look similar but receive very different scores:
+- some get 95 “Use Original”
+- some get 50 “Do Not Use”
+- some get 83 “Enhance Recommended”
+without a clear visual explanation.
+
+This makes the AI feel fake.
+
+Goal:
+Every photo score must be explainable, specific, and based on visible image quality signals.
+
+====================================================
+PHOTO SCORE MUST SHOW BREAKDOWN
+====================================================
+
+Each vehicle/photo card must show a score breakdown:
+
+Overall Photo Score: 83/100
+
+Breakdown:
+- Vehicle visibility: 18/20
+- Angle quality: 17/20
+- Lighting: 13/15
+- Sharpness: 12/15
+- Background cleanliness: 8/15
+- Branding / overlays: 5/10
+- Crop / framing: 7/10
+- Marketplace trust: 8/10
+
+Total = 88/100
+
+Do not show a score without the breakdown.
+
+====================================================
+SCORING RULES
+====================================================
+
+1. Vehicle Visibility
+High score if full vehicle is visible.
+Low score if:
+- vehicle is cropped
+- only partial front/back visible
+- vehicle too far away
+- vehicle blocked
+
+2. Angle Quality
+Best:
+- front 3/4
+- rear 3/4
+- clean side angle
+Worst:
+- straight front too close
+- roof-only
+- interior-only as cover
+- awkward crop
+
+3. Lighting
+Penalize:
+- too dark
+- blown out highlights
+- strong reflections
+- poor white balance
+- heavy shadows
+
+4. Sharpness
+Penalize:
+- blurry
+- low resolution
+- compression artifacts
+- motion blur
+
+5. Background Cleanliness
+Penalize:
+- busy dealer wall
+- visible phone numbers
+- promo banners
+- clutter
+- people
+- other cars blocking view
+
+6. Branding / Overlays
+Penalize heavily if:
+- Alpha banner is visible
+- phone number is visible
+- financing text is visible
+- big dealer logo is visible
+- promotional text blocks the vehicle
+
+7. Crop / Framing
+Penalize:
+- vehicle cut off
+- too much empty space
+- bad perspective
+- not centered
+
+8. Marketplace Trust
+High score if photo looks like a real clean vehicle photo.
+Low score if it looks like a flyer, promo image, or over-branded dealer graphic.
+
+====================================================
+DECISION LOGIC
+====================================================
+
+Do not label “Use Original” just because score is high.
+
+Decision must be:
+
+90–100:
+Use Original only if branding/overlay penalty is low.
+
+75–89:
+Enhance Recommended if branding is visible or background is messy.
+
+60–74:
+Enhance Recommended or Review Photo.
+
+Under 60:
+Do Not Use only if crop/visibility/sharpness is bad.
+
+Important:
+A photo with strong dealer branding should NOT be “Use Original” even if lighting and angle are good.
+It should be:
+Enhance Recommended
+Reason:
+Excellent angle, but dealer branding and financing banners reduce Marketplace trust.
+
+====================================================
+CARD UI
+====================================================
+
+On every photo/vehicle card show:
+- Overall score
+- Decision badge
+- top 2 reasons
+
+Examples:
+
+Score 83
+Enhance Recommended
+Reason:
+Good angle, but heavy dealer branding.
+
+Score 95
+Use Original
+Reason:
+Clean angle, strong lighting, minimal distractions.
+
+Score 50
+Do Not Use
+Reason:
+Vehicle cropped and low visibility.
+
+====================================================
+AUDIT MODAL
+====================================================
+
+When clicking Open Audit:
+Show the full explanation.
+
+Include:
+- selected cover photo
+- score breakdown
+- reason for decision
+- what caused penalties
+- whether enhancement is needed
+- whether original should be preserved
+
+====================================================
+IMPORTANT
+====================================================
+
+If the scoring is currently simulated or heuristic, label it as:
+“AI-estimated photo score”
+
+Do not pretend it is true computer vision unless actual image analysis is being performed.
+
+If possible, upgrade the logic to inspect image dimensions, brightness, contrast, blur, and OCR/text detection.
+
+But even if still heuristic, the output must explain itself.
+
+Acceptance:
+Every score must have a visible reason.
+Similar-looking photos should not receive wildly different labels unless the explanation justifies it.
+Photos with large Alpha promotional banners should usually be “Enhance Recommended,” not “Use Original.”

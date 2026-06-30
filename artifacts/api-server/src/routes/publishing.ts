@@ -8,9 +8,11 @@ import {
   listingsTable,
   listingVersionsTable,
   publishingJobsTable,
+  vehicleIntelligenceTable,
   type PublishingJob,
 } from "@workspace/db";
 import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { getMarketplacePricing } from "../listings/pricing";
 
 const router: IRouter = Router();
 
@@ -226,6 +228,12 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     : [];
   const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
   const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, job.dealerId));
+  const [intel] = await db
+    .select()
+    .from(vehicleIntelligenceTable)
+    .where(eq(vehicleIntelligenceTable.vehicleId, job.vehicleId))
+    .orderBy(desc(vehicleIntelligenceTable.generatedAt))
+    .limit(1);
   const images = await db
     .select()
     .from(vehicleImagesTable)
@@ -237,6 +245,8 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     return;
   }
 
+  const pricing = getMarketplacePricing(vehicle, intel?.recommendedDownPayment ?? null);
+
   const descriptionParts = [version.descriptionEn?.trim(), version.callToAction?.trim()].filter(
     (p): p is string => !!p,
   );
@@ -246,7 +256,7 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     job: enriched,
     fill: {
       title: version.title,
-      price: version.askingPrice ?? vehicle.price ?? null,
+      price: pricing.marketplaceDisplayedPrice,
       description: descriptionParts.join("\n\n"),
       descriptionEs: version.descriptionEs ?? null,
       mileage: vehicle.mileage ?? null,
@@ -262,6 +272,11 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       location: dealer?.name ?? null,
       category: "Vehicle",
       downPayment: version.downPayment ?? null,
+      actualVehiclePrice: pricing.actualVehiclePrice,
+      marketplaceDisplayedPrice: pricing.marketplaceDisplayedPrice,
+      priceMode: pricing.priceMode,
+      recommendedDownPayment: pricing.recommendedDownPayment,
+      pricingReason: pricing.pricingReason,
     },
     images: images.map((img) => img.url),
   });

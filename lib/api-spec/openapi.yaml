@@ -2171,6 +2171,11 @@ components:
         location: { type: ["string", "null"] }
         category: { type: string }
         downPayment: { type: ["integer", "null"] }
+        actualVehiclePrice: { type: ["integer", "null"] }
+        marketplaceDisplayedPrice: { type: ["integer", "null"] }
+        priceMode: { type: ["string", "null"], enum: [FULL_PRICE, DOWN_PAYMENT, "null"] }
+        recommendedDownPayment: { type: ["integer", "null"] }
+        pricingReason: { type: ["string", "null"] }
     PublishingJobPayload:
       type: object
       required: [job, fill, images]

@@ -138,6 +138,7 @@ export * from './publishingEventList';
 export * from './publishingEventResponse';
 export * from './publishingJob';
 export * from './publishingJobFill';
+export * from './publishingJobFillPriceMode';
 export * from './publishingJobList';
 export * from './publishingJobPayload';
 export * from './publishPriorityScore';

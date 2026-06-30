@@ -937,7 +937,12 @@ export const GetPublishingJobPayloadResponse = zod.object({
   "transmission": zod.string().nullish(),
   "location": zod.string().nullish(),
   "category": zod.string(),
-  "downPayment": zod.number().nullish()
+  "downPayment": zod.number().nullish(),
+  "actualVehiclePrice": zod.number().nullish(),
+  "marketplaceDisplayedPrice": zod.number().nullish(),
+  "priceMode": zod.enum(['FULL_PRICE', 'DOWN_PAYMENT', 'null']).nullish(),
+  "recommendedDownPayment": zod.number().nullish(),
+  "pricingReason": zod.string().nullish()
 }),
   "images": zod.array(zod.string())
 })

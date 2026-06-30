@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { PublishingJobFillPriceMode } from './publishingJobFillPriceMode';
 
 export interface PublishingJobFill {
   title: string;
@@ -35,4 +36,14 @@ export interface PublishingJobFill {
   category: string;
   /** @nullable */
   downPayment?: number | null;
+  /** @nullable */
+  actualVehiclePrice?: number | null;
+  /** @nullable */
+  marketplaceDisplayedPrice?: number | null;
+  /** @nullable */
+  priceMode?: PublishingJobFillPriceMode;
+  /** @nullable */
+  recommendedDownPayment?: number | null;
+  /** @nullable */
+  pricingReason?: string | null;
 }

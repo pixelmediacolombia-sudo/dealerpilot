@@ -829,9 +829,23 @@ export function BatchReviewPanel({
                         {v.label}
                       </span>
                       {v.price && (
-                        <span className="text-xs text-muted-foreground font-medium">
-                          {formatCurrency(v.price)}
-                        </span>
+                        <>
+                          {/* Actual sticker price — always show */}
+                          <span className="text-xs text-muted-foreground font-medium">
+                            {formatCurrency(v.price)}
+                          </span>
+                          {/* Marketplace price mode badge */}
+                          {v.price >= 16000 ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[9px] font-bold text-amber-400 uppercase tracking-widest">
+                              <DollarSign className="w-2.5 h-2.5" />
+                              Down payment
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 border border-success/20 text-[9px] font-bold text-success uppercase tracking-widest">
+                              Full price
+                            </span>
+                          )}
+                        </>
                       )}
                       {analysis.status === "Ready" && (
                         <span
@@ -871,10 +885,16 @@ export function BatchReviewPanel({
                           Photo {photoEntry.photoScore}
                         </span>
                       )}
-                      {intel?.recommendedDownPayment != null && (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-success">
+                      {intel?.recommendedDownPayment != null && (v.price ?? 0) >= 16000 && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-amber-400">
                           <DollarSign className="w-3 h-3" />
-                          {formatCurrency(intel.recommendedDownPayment)} down rec.
+                          Marketplace: {formatCurrency(intel.recommendedDownPayment)} down
+                        </span>
+                      )}
+                      {intel?.recommendedDownPayment == null && (v.price ?? 0) >= 16000 && (
+                        <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                          <DollarSign className="w-3 h-3" />
+                          Down payment pending
                         </span>
                       )}
                     </div>
