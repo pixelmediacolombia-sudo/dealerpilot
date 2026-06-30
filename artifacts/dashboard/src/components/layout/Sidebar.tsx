@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import {
-  LayoutDashboard,
+  Command,
   Sparkles,
   Wand2,
   MessageSquare,
@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { useGetDealer, useListDealers, getGetDealerQueryKey } from "@workspace/api-client-react";
 
 const NAV_ITEMS = [
-  { name: "Sales Hub", path: "/", icon: LayoutDashboard },
+  { name: "Command Center", path: "/", icon: Command },
   { name: "Marketplace AI", path: "/listings", icon: Sparkles },
   { name: "AI Vehicle Studio", path: "/creative-studio", icon: Wand2 },
   { name: "Sales AI", path: "/sales-ai", icon: MessageSquare },
@@ -61,7 +61,7 @@ export function Sidebar() {
               DealerPilot
             </div>
             <div className="text-[10px] text-primary font-medium tracking-widest uppercase mt-0.5">
-              AI Copilot
+              AI Operator
             </div>
           </div>
         </div>

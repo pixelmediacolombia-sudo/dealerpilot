@@ -53,12 +53,9 @@ import {
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { key: "recommendations", label: "Strategic Recommendations", icon: Lightbulb },
-  { key: "downpayment", label: "Down Payment", icon: TrendingUp },
-  { key: "posting", label: "Posting Time", icon: Clock },
-  { key: "creative", label: "Creative Performance", icon: Camera },
-  { key: "weak", label: "Weak Listings", icon: AlertTriangle },
-  { key: "nextbatch", label: "Next Batch", icon: CalendarCheck },
+  { key: "recommendations", label: "Recommendations", icon: Lightbulb },
+  { key: "performance", label: "Performance", icon: BarChart3 },
+  { key: "opportunities", label: "Opportunities", icon: AlertTriangle },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -811,192 +808,148 @@ export function MarketplaceIntelligence() {
             </SectionCard>
           )}
 
-          {/* ── Down Payment Performance ── */}
-          {activeTab === "downpayment" && (
-            <div className="space-y-4">
-              {(summary?.hasMockPerformanceData ?? false) && (
+          {/* ── Performance tab: posting time + down payment + creative ── */}
+          {activeTab === "performance" && (
+            <div className="space-y-6">
+              {(summary?.hasMockPerformanceData ?? false) ? (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-500/25 bg-amber-500/5 text-xs text-amber-400">
                   <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span><span className="font-bold">Demo Data</span> — Down payment performance is based on seeded model data, not real Marketplace engagement.</span>
+                  <span><span className="font-bold">Demo Data</span> — Performance analytics are based on seeded model data. No real Marketplace performance yet.</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-success/25 bg-success/5 text-xs text-success">
+                  <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>Real Marketplace performance data from published listings.</span>
                 </div>
               )}
-              {dashLoading ? (
-                <div className="text-muted-foreground text-sm py-8 text-center">Loading…</div>
-              ) : (dash?.downPaymentPerformance ?? []).length === 0 ? (
-                <div className="text-muted-foreground text-sm py-8 text-center">No down payment performance data yet.</div>
-              ) : (
-                (dash?.downPaymentPerformance ?? []).map((typeGroup) => (
-                  <SectionCard
-                    key={typeGroup.vehicleType}
-                    icon={<TrendingUp className="w-4 h-4 text-primary" />}
-                    title={`${typeGroup.vehicleType} — Best Down: ${formatCurrency(typeGroup.bestDownPayment)}`}
-                  >
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-left text-xs text-muted-foreground border-b border-white/5">
-                            <th className="pb-2 pr-4 font-medium">Published Down</th>
-                            <th className="pb-2 pr-4 font-medium">Listings</th>
-                            <th className="pb-2 pr-4 font-medium">Hot Leads</th>
-                            <th className="pb-2 font-medium">Outcome Score</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/[0.03]">
-                          {typeGroup.variants.map((v) => (
-                            <tr key={v.publishedDownPayment} className={cn(v.publishedDownPayment === typeGroup.bestDownPayment && "bg-primary/5")}>
-                              <td className="py-2.5 pr-4">
-                                <span className={cn("font-medium", v.publishedDownPayment === typeGroup.bestDownPayment ? "text-primary" : "text-white")}>
-                                  {formatCurrency(v.publishedDownPayment)}
-                                </span>
-                                {v.publishedDownPayment === typeGroup.bestDownPayment && (
-                                  <Badge className="ml-2 bg-primary/20 text-primary border-primary/30 text-[10px] py-0">Best</Badge>
-                                )}
-                              </td>
-                              <td className="py-2.5 pr-4 text-muted-foreground">{v.totalListings}</td>
-                              <td className="py-2.5 pr-4">
-                                <span className="text-orange-400 font-medium">{v.hotLeads}</span>
-                              </td>
-                              <td className="py-2.5 w-40">
-                                <ScoreBar score={v.avgOutcomeScore} />
-                              </td>
+
+              {/* Posting Time */}
+              <SectionCard icon={<Clock className="w-4 h-4 text-primary" />} title="Best Posting Days">
+                {dashLoading ? (
+                  <div className="text-muted-foreground text-sm py-8 text-center">Loading…</div>
+                ) : (
+                  <div className="space-y-3">
+                    {(dash?.postingTimePerformance ?? []).map((slot, i) => (
+                      <div key={slot.dayOfWeek} className="flex items-center gap-4">
+                        <div className="w-24 text-sm text-right text-muted-foreground shrink-0">{slot.dayLabel}</div>
+                        <div className="flex-1 relative h-7 bg-white/[0.03] rounded overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded transition-all",
+                              i === 0 ? "bg-primary/50" : i === 1 ? "bg-primary/35" : "bg-white/[0.08]",
+                            )}
+                            style={{ width: `${slot.avgOutcomeScore}%` }}
+                          />
+                          <div className="absolute inset-0 flex items-center px-3 gap-4">
+                            <span className="text-xs font-medium text-white">{slot.avgOutcomeScore} avg score</span>
+                            <span className="text-xs text-muted-foreground">{slot.totalHotLeads} hot leads · {slot.totalConversations} convos</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {dash?.nextBatchRecommendation && (
+                      <div className="mt-2 p-3 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-muted-foreground">
+                        <Zap className="w-3.5 h-3.5 text-primary inline mr-1.5" />
+                        Best posting: <span className="text-white font-medium">{dash.nextBatchRecommendation.recommendedDayLabel} at {dash.nextBatchRecommendation.recommendedTimeLabel}</span> — based on {summary?.totalListings} tracked listings.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </SectionCard>
+
+              {/* Down Payment Performance */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-white/80 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-primary" /> Down Payment Performance by Vehicle Type</h3>
+                {dashLoading ? (
+                  <div className="text-muted-foreground text-sm py-4 text-center">Loading…</div>
+                ) : (dash?.downPaymentPerformance ?? []).length === 0 ? (
+                  <div className="text-muted-foreground text-sm py-4 text-center">No down payment performance data yet.</div>
+                ) : (
+                  (dash?.downPaymentPerformance ?? []).map((typeGroup) => (
+                    <SectionCard key={typeGroup.vehicleType} icon={<TrendingUp className="w-4 h-4 text-primary" />} title={`${typeGroup.vehicleType} — Best Down: ${formatCurrency(typeGroup.bestDownPayment)}`}>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-left text-xs text-muted-foreground border-b border-white/5">
+                              <th className="pb-2 pr-4 font-medium">Published Down</th>
+                              <th className="pb-2 pr-4 font-medium">Listings</th>
+                              <th className="pb-2 pr-4 font-medium">Hot Leads</th>
+                              <th className="pb-2 font-medium">Outcome Score</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </SectionCard>
-                ))
-              )}
+                          </thead>
+                          <tbody className="divide-y divide-white/[0.03]">
+                            {typeGroup.variants.map((v) => (
+                              <tr key={v.publishedDownPayment} className={cn(v.publishedDownPayment === typeGroup.bestDownPayment && "bg-primary/5")}>
+                                <td className="py-2.5 pr-4">
+                                  <span className={cn("font-medium", v.publishedDownPayment === typeGroup.bestDownPayment ? "text-primary" : "text-white")}>{formatCurrency(v.publishedDownPayment)}</span>
+                                  {v.publishedDownPayment === typeGroup.bestDownPayment && <Badge className="ml-2 bg-primary/20 text-primary border-primary/30 text-[10px] py-0">Best</Badge>}
+                                </td>
+                                <td className="py-2.5 pr-4 text-muted-foreground">{v.totalListings}</td>
+                                <td className="py-2.5 pr-4 text-orange-400 font-medium">{v.hotLeads}</td>
+                                <td className="py-2.5 w-40"><ScoreBar score={v.avgOutcomeScore} /></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </SectionCard>
+                  ))
+                )}
+              </div>
             </div>
           )}
 
-          {/* ── Posting Time Performance ── */}
-          {activeTab === "posting" && (
-            <SectionCard icon={<Clock className="w-4 h-4 text-primary" />} title="Best Posting Days">
-              {(summary?.hasMockPerformanceData ?? false) && (
-                <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg border border-amber-500/25 bg-amber-500/5 text-xs text-amber-400">
-                  <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span><span className="font-bold">Demo Data</span> — Posting time performance is based on seeded model data, not real Marketplace engagement.</span>
-                </div>
-              )}
-              {dashLoading ? (
-                <div className="text-muted-foreground text-sm py-8 text-center">Loading…</div>
-              ) : (
-                <div className="space-y-3">
-                  {(dash?.postingTimePerformance ?? []).map((slot, i) => (
-                    <div key={slot.dayOfWeek} className="flex items-center gap-4">
-                      <div className="w-24 text-sm text-right text-muted-foreground shrink-0">{slot.dayLabel}</div>
-                      <div className="flex-1 relative h-7 bg-white/[0.03] rounded overflow-hidden">
-                        <div
-                          className={cn(
-                            "h-full rounded transition-all",
-                            i === 0 ? "bg-primary/50" : i === 1 ? "bg-primary/35" : "bg-white/[0.08]",
-                          )}
-                          style={{ width: `${slot.avgOutcomeScore}%` }}
-                        />
-                        <div className="absolute inset-0 flex items-center px-3 gap-4">
-                          <span className="text-xs font-medium text-white">{slot.avgOutcomeScore} avg score</span>
-                          <span className="text-xs text-muted-foreground">{slot.totalHotLeads} hot leads · {slot.totalConversations} convos · {slot.totalListings} listings</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="mt-4 p-3 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-muted-foreground">
-                    <Zap className="w-3.5 h-3.5 text-primary inline mr-1.5" />
-                    Best posting time: <span className="text-white font-medium">
-                      {dash?.nextBatchRecommendation.recommendedDayLabel} at {dash?.nextBatchRecommendation.recommendedTimeLabel}
-                    </span> — based on {summary?.totalListings} tracked listings.
-                  </div>
-                </div>
-              )}
-            </SectionCard>
-          )}
-
-          {/* ── Creative Performance ── */}
-          {activeTab === "creative" && (
-            <div className="space-y-4">
+          {/* ── Opportunities tab: weak listings + next batch ── */}
+          {activeTab === "opportunities" && (
+            <div className="space-y-6">
               {(summary?.hasMockPerformanceData ?? false) && (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-500/25 bg-amber-500/5 text-xs text-amber-400">
                   <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span><span className="font-bold">Demo Data</span> — Creative performance scores are based on seeded model data, not real Marketplace engagement.</span>
+                  <span><span className="font-bold">Demo Data</span> — Opportunity scores are based on seeded model data, not real Marketplace engagement.</span>
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-4">
-                {(["original", "ai_creative", "mixed"] as const).map((strat) => {
-                  const perf = dash?.creativePerformance?.[strat];
-                  if (!perf) return null;
-                  const labels: Record<string, string> = { original: "Original Photos", ai_creative: "AI Creative", mixed: "Mixed" };
-                  return (
-                    <Card key={strat} className="bg-white/[0.02] border-white/[0.06]">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <Camera className="w-4 h-4 text-primary" />
-                          {labels[strat]}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div>
-                          <div className="text-2xl font-bold text-white">{perf.avgOutcomeScore}</div>
-                          <div className="text-xs text-muted-foreground">Avg Outcome Score</div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 text-center">
-                          <div>
-                            <div className="text-sm font-medium text-white">{perf.totalListings}</div>
-                            <div className="text-[10px] text-muted-foreground">Listings</div>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-orange-400">{perf.hotLeads}</div>
-                            <div className="text-[10px] text-muted-foreground">Hot Leads</div>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-white">{perf.conversationsCount}</div>
-                            <div className="text-[10px] text-muted-foreground">Convos</div>
-                          </div>
-                        </div>
-                        <ScoreBar score={perf.avgOutcomeScore} />
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
 
-              <SectionCard icon={<BarChart3 className="w-4 h-4 text-primary" />} title="Performance by Vehicle Type">
+              {/* Next Batch Recommendation */}
+              {dash?.nextBatchRecommendation && (
+                <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-4">
+                  <div className="p-3 rounded-lg bg-primary/20">
+                    <CalendarCheck className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-white font-semibold">Post on {dash.nextBatchRecommendation.recommendedDayLabel} at {dash.nextBatchRecommendation.recommendedTimeLabel}</div>
+                    <div className="text-sm text-muted-foreground mt-0.5">Based on {summary?.totalListings} tracked listings — estimated {dash.nextBatchRecommendation.estimatedHotLeads} hot leads expected</div>
+                  </div>
+                  <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[9px] uppercase tracking-widest">Estimated Strategy</Badge>
+                </div>
+              )}
+
+              {/* Vehicles for next batch */}
+              <SectionCard icon={<Zap className="w-4 h-4 text-primary" />} title="Ready to Publish — Not Yet Queued">
                 {dashLoading ? (
-                  <div className="text-muted-foreground text-sm py-4 text-center">Loading…</div>
+                  <div className="text-muted-foreground text-sm py-8 text-center">Loading…</div>
+                ) : (dash?.nextBatchRecommendation?.vehicles ?? []).length === 0 ? (
+                  <div className="text-muted-foreground text-sm py-8 text-center">No unqueued vehicles found.</div>
                 ) : (
-                  <div className="space-y-2">
-                    {(dash?.vehicleTypePerformance ?? []).map((vt) => (
-                      <div key={vt.vehicleType} className="flex items-center gap-4">
-                        <div className="w-24 text-sm text-muted-foreground shrink-0">{vt.vehicleType}</div>
-                        <div className="flex-1 relative h-7 bg-white/[0.03] rounded overflow-hidden">
-                          <div
-                            className="h-full bg-primary/30 rounded"
-                            style={{ width: `${vt.avgOutcomeScore}%` }}
-                          />
-                          <div className="absolute inset-0 flex items-center px-3 gap-4">
-                            <span className="text-xs font-medium text-white">{vt.avgOutcomeScore} score</span>
-                            <span className="text-xs text-muted-foreground">
-                              {vt.totalHotLeads} hot · {vt.totalConversations} convos · {vt.totalListings} listings
-                            </span>
-                          </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    {(dash?.nextBatchRecommendation?.vehicles ?? []).map((v) => (
+                      <div key={v.vehicleId} className="flex items-center gap-4 p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                        <div className="flex-1">
+                          <div className="font-medium text-white">{v.year} {v.make} {v.model}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">{v.vehicleType} · {v.price != null ? formatCurrency(v.price) : "—"}</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {strategyBadge(v.recommendedPriceStrategy)}
+                          {v.recommendedDownPayment != null && <span className="text-xs text-muted-foreground">{formatCurrency(v.recommendedDownPayment)} down</span>}
+                          {qualityBadge(v.expectedLeadQuality)}
+                          <div className="w-20"><ConfidenceBar score={v.confidenceScore} /></div>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
               </SectionCard>
-            </div>
-          )}
 
-          {/* ── Weak Listings ── */}
-          {activeTab === "weak" && (
-            <div className="space-y-4">
-              {(summary?.hasMockPerformanceData ?? false) && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-500/25 bg-amber-500/5 text-xs text-amber-400">
-                  <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span><span className="font-bold">Demo Data</span> — Weak listing scores are based on seeded model data, not real Marketplace engagement.</span>
-                </div>
-              )}
+              {/* Weak listings */}
               <SectionCard icon={<AlertTriangle className="w-4 h-4 text-destructive" />} title="Low Outcome — Needs Renewal">
                 {dashLoading ? (
                   <div className="text-muted-foreground text-sm py-4 text-center">Loading…</div>
@@ -1019,9 +972,7 @@ export function MarketplaceIntelligence() {
                             <td className="py-2.5 pr-4 font-medium text-white">{w.year} {w.make} {w.model}</td>
                             <td className="py-2.5 pr-4 text-muted-foreground">{w.conversationsCount}</td>
                             <td className="py-2.5 pr-4 text-muted-foreground">{w.daysSincePublished}d</td>
-                            <td className="py-2.5 w-40">
-                              <ScoreBar score={w.outcomeScore} />
-                            </td>
+                            <td className="py-2.5 w-40"><ScoreBar score={w.outcomeScore} /></td>
                           </tr>
                         ))}
                       </tbody>
@@ -1030,10 +981,9 @@ export function MarketplaceIntelligence() {
                 )}
               </SectionCard>
 
-              <SectionCard icon={<MessageSquare className="w-4 h-4 text-yellow-400" />} title="High Views, Low Lead Quality">
-                {(dash?.highViewsLowQuality ?? []).length === 0 ? (
-                  <div className="text-muted-foreground text-sm py-4 text-center">No high-view / low-quality listings.</div>
-                ) : (
+              {/* High views, low quality */}
+              {(dash?.highViewsLowQuality ?? []).length > 0 && (
+                <SectionCard icon={<MessageSquare className="w-4 h-4 text-yellow-400" />} title="High Views, Low Lead Quality">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -1048,76 +998,14 @@ export function MarketplaceIntelligence() {
                           <tr key={`hv-${w.vehicleId}`}>
                             <td className="py-2.5 pr-4 font-medium text-white">{w.year} {w.make} {w.model}</td>
                             <td className="py-2.5 pr-4 text-blue-400">{w.conversationsCount}</td>
-                            <td className="py-2.5 w-40">
-                              <ScoreBar score={w.outcomeScore} />
-                            </td>
+                            <td className="py-2.5 w-40"><ScoreBar score={w.outcomeScore} /></td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                )}
-              </SectionCard>
-            </div>
-          )}
-
-          {/* ── Next Batch ── */}
-          {activeTab === "nextbatch" && (
-            <div className="space-y-4">
-              {dash?.nextBatchRecommendation && (
-                <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-4">
-                  <div className="p-3 rounded-lg bg-primary/20">
-                    <CalendarCheck className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-white font-semibold">
-                      Post on {dash.nextBatchRecommendation.recommendedDayLabel} at {dash.nextBatchRecommendation.recommendedTimeLabel}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-0.5">
-                      Based on {summary?.totalListings} tracked listings — estimated {dash.nextBatchRecommendation.estimatedHotLeads} hot leads expected
-                    </div>
-                  </div>
-                  <Badge className="bg-primary/20 text-primary border-primary/30">
-                    {dash.nextBatchRecommendation.recommendedDayLabel}s at {dash.nextBatchRecommendation.recommendedTimeLabel}
-                  </Badge>
-                </div>
+                </SectionCard>
               )}
-
-              <SectionCard icon={<Zap className="w-4 h-4 text-primary" />} title="Recommended Vehicles for Next Batch">
-                {dashLoading ? (
-                  <div className="text-muted-foreground text-sm py-8 text-center">Loading…</div>
-                ) : (dash?.nextBatchRecommendation?.vehicles ?? []).length === 0 ? (
-                  <div className="text-muted-foreground text-sm py-8 text-center">No vehicle recommendations available yet.</div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-3">
-                    {(dash?.nextBatchRecommendation?.vehicles ?? []).map((v) => (
-                      <div
-                        key={v.vehicleId}
-                        className="flex items-center gap-4 p-3 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.05] transition-colors"
-                      >
-                        <div className="flex-1">
-                          <div className="font-medium text-white">
-                            {v.year} {v.make} {v.model}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            {v.vehicleType} · {v.price != null ? formatCurrency(v.price) : "—"}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {strategyBadge(v.recommendedPriceStrategy)}
-                          {v.recommendedDownPayment != null && (
-                            <span className="text-xs text-muted-foreground">{formatCurrency(v.recommendedDownPayment)} down</span>
-                          )}
-                          {qualityBadge(v.expectedLeadQuality)}
-                          <div className="w-20">
-                            <ConfidenceBar score={v.confidenceScore} />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </SectionCard>
             </div>
           )}
         </div>

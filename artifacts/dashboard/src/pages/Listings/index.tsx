@@ -82,6 +82,7 @@ import { BatchProgressCard } from "./BatchProgressCard";
 import { PublishedCard } from "./PublishedCard";
 import { MarkPublishedModal } from "./MarkPublishedModal";
 import { BatchReviewPanel } from "./BatchReviewPanel";
+import { DailyOperatorPanel } from "./DailyOperatorPanel";
 import { toast } from "@/hooks/use-toast";
 
 const DEALER_ID = 1;
@@ -248,7 +249,8 @@ export function ListingsWorkspace() {
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<Set<number>>(new Set());
   const [showBatchReview, setShowBatchReview] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
-  const [sortBy, setSortBy] = useState<"priority" | "ai_score" | "photo_count" | "price" | "newest" | "needs_review">("priority");
+  const [sortBy, setSortBy] = useState<"priority" | "photo_count" | "price" | "newest" | "needs_review">("priority");
+  const [publishingId, setPublishingId] = useState<number | null>(null);
   const [photoFilter, setPhotoFilter] = useState<string | null>(null);
 
   const toggleSelected = (id: number) => {
@@ -418,9 +420,6 @@ export function ListingsWorkspace() {
       });
     }
     switch (sortBy) {
-      case "ai_score":
-        list.sort((a, b) => (photoScoreByVehicle.get(b.vehicleId)?.photoScore ?? 0) - (photoScoreByVehicle.get(a.vehicleId)?.photoScore ?? 0));
-        break;
       case "photo_count":
         list.sort((a, b) => (b.imageCount ?? 0) - (a.imageCount ?? 0));
         break;
@@ -591,6 +590,29 @@ export function ListingsWorkspace() {
             }
           />
 
+          {/* AI Daily Operator Panel */}
+          {activeTab !== "published" && activeTab !== "needs-update" && activeTab !== "sold" && activeTab !== "queue" && (
+            <DailyOperatorPanel
+              workspaces={workspacesData?.workspaces ?? []}
+              recommendations={(intelligenceData?.recommendations ?? []) as never}
+              activeJobs={jobsData?.jobs ?? []}
+              onPublish={(vehicleId) => {
+                setPublishingId(vehicleId);
+                bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } }, {
+                  onSuccess: () => { setPublishingId(null); toast({ title: "Publishing queued", description: "Vehicle added to the publishing queue." }); invalidateWorkspaces(); },
+                  onError: () => { setPublishingId(null); toast({ title: "Error", description: "Failed to queue vehicle.", variant: "destructive" }); },
+                });
+              }}
+              onAddToBatch={(vehicleId) => {
+                bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } }, {
+                  onSuccess: () => { toast({ title: "Added to batch", description: "Vehicle added to publishing queue." }); invalidateWorkspaces(); },
+                });
+              }}
+              publishingId={publishingId}
+              isPending={bulkSchedule.isPending}
+            />
+          )}
+
           {/* Auto Publish Plan */}
           <AutoPublishPlan
             dealerId={DEALER_ID}
@@ -716,7 +738,6 @@ export function ListingsWorkspace() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="priority">Priority Score</SelectItem>
-                    <SelectItem value="ai_score">AI Photo Score</SelectItem>
                     <SelectItem value="photo_count">Photo Count</SelectItem>
                     <SelectItem value="price">Price</SelectItem>
                     <SelectItem value="newest">Newest</SelectItem>
@@ -750,35 +771,8 @@ export function ListingsWorkspace() {
                 </div>
               </div>
 
-              {/* Toolbar row 2: photo recommendation filter pills */}
+              {/* Toolbar row 2: vehicle count */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex-shrink-0 mr-1">Filter:</span>
-                {([
-                  { key: null, label: "All" },
-                  { key: "use_original", label: "Use Original" },
-                  { key: "enhance", label: "Enhance Recommended" },
-                  { key: "review", label: "Needs Review" },
-                ] as const).map(({ key, label }) => (
-                  <button
-                    key={String(key)}
-                    onClick={() => setPhotoFilter(key)}
-                    className={cn(
-                      "px-3 py-1 rounded-full text-[11px] font-semibold border transition-colors",
-                      photoFilter === key
-                        ? key === null
-                          ? "bg-muted text-foreground border-border"
-                          : key === "use_original"
-                            ? "bg-success/20 text-success border-success/40"
-                            : key === "enhance"
-                              ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
-                              : "bg-red-500/20 text-red-400 border-red-500/40"
-                        : "bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground"
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-                <div className="w-px h-4 bg-border/40 mx-1" />
                 <span className="text-[11px] text-muted-foreground">
                   {filteredSortedWorkspaces.length} vehicle{filteredSortedWorkspaces.length !== 1 ? "s" : ""}
                 </span>

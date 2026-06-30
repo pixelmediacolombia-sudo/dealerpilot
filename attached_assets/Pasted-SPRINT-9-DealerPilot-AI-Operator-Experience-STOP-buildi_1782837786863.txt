@@ -1,0 +1,466 @@
+SPRINT 9 — DealerPilot AI Operator Experience
+
+STOP building more dashboard features.
+
+DealerPilot currently looks premium, but it still feels like a manual dashboard.
+
+The product vision is different:
+
+DealerPilot should feel like an AI Marketplace Operator that works for the dealer every day.
+
+The user should not have to think:
+“What should I publish?”
+“What photo should I use?”
+“What down payment should I post?”
+“Which vehicles should I skip?”
+“What should I do next?”
+
+DealerPilot must answer those questions automatically.
+
+====================================================
+MAIN GOAL
+====================================================
+
+Transform the app from a dashboard into an AI operator.
+
+Every major screen should answer:
+
+“What should I do right now?”
+
+The AI should:
+- recommend vehicles to publish today
+- explain why
+- choose which vehicles NOT to publish
+- avoid publishing duplicate similar vehicles together
+- recommend Marketplace price/down payment
+- recommend photo action
+- create publishing jobs
+- reduce buttons
+- show one clear next action
+
+====================================================
+PART 1 — SALES HUB → COMMAND CENTER
+====================================================
+
+Sales Hub is currently too generic.
+
+Rename or reposition Sales Hub as:
+
+Command Center
+
+The first screen must show:
+
+DealerPilot Morning Brief
+
+Example:
+
+Good afternoon, Andrés.
+
+DealerPilot found 3 opportunities today.
+
+1. Publish 2022 Toyota Tacoma
+Reason:
+- Truck demand is strong
+- High buyer intent segment
+- 20 photos available
+- Good Marketplace price
+- Recommended down payment: $4,000
+- Best posting window: 10:00 AM – 12:00 PM
+
+Primary button:
+Post to Marketplace
+
+2. Publish 2020 Honda Accord
+Reason:
+- Affordable sedan
+- Strong entry-level buyer demand
+- Good price point
+- Marketplace price should be down payment, not full price
+
+Primary button:
+Post to Marketplace
+
+3. Hold 2025 Ford Mustang
+Reason:
+- High ticket performance car
+- Better for weekend posting
+- Needs stronger cover photo
+
+Primary button:
+Review Strategy
+
+Do not show only:
+Publish 0 Vehicles
+Reply 0 Buyers
+Update Inventory
+
+Those are status cards, not AI guidance.
+
+Command Center should include:
+- Today’s top 3 publish recommendations
+- Vehicles to avoid today
+- Listings needing update
+- Buyers needing reply
+- Inventory changes
+- One primary action per card
+
+Data label:
+Estimated Strategy until real Marketplace engagement exists.
+
+====================================================
+PART 2 — MARKETPLACE AI → MARKETPLACE OPERATOR
+====================================================
+
+Marketplace AI should not feel like a vehicle list.
+
+It should feel like the AI is operating Marketplace.
+
+At the top, add:
+
+DealerPilot recommends publishing X vehicles today.
+
+Show:
+- top 3 vehicles
+- why each one was chosen
+- Marketplace price to post
+- recommended down payment
+- best photo status
+- strategy label
+- confidence/estimated priority
+- button: Publish Now
+- button: Add to Batch
+
+Then show:
+- Ready to publish
+- Needs review
+- Not recommended today
+- Already published
+
+For duplicate vehicles:
+Example:
+Honda Accord — 3 ready
+
+DealerPilot should explain:
+- publish only 1 today
+- hold the other 2
+- avoid competing against yourself
+- rotate the others tomorrow or later
+
+Requirements:
+- If multiple same make/model are ready, group them.
+- Show “Duplicate group detected.”
+- AI should recommend which one to publish first.
+- AI should explain why that unit wins:
+  price, mileage, year, photo count, listing readiness, affordability.
+
+====================================================
+PART 3 — AI PUBLISHING DECISION ENGINE
+====================================================
+
+Create a centralized decision function/service.
+
+Name it something like:
+
+buildDailyMarketplacePlan()
+
+Inputs:
+- inventory vehicles
+- vehicle price
+- body style
+- year
+- mileage
+- stock/VIN
+- photo count
+- listing status
+- publishing status
+- sold/removed status
+- price changes
+- Strategy Engine v2 recommendation
+- down payment rule
+- duplicate model groups
+- pending jobs
+- published listings
+- available real engagement if any
+
+Output:
+{
+  recommendedToday: [],
+  holdToday: [],
+  needsReview: [],
+  duplicateGroups: [],
+  publishOrder: [],
+  summary: "",
+  estimatedImpact: "",
+  dataSource: "Estimated Strategy"
+}
+
+Do NOT use random numbers.
+Do NOT use Math.sin.
+Do NOT use list position.
+Do NOT use seeded performance as real.
+
+====================================================
+PART 4 — MARKETPLACE PRICE RULE
+====================================================
+
+Apply this globally.
+
+If vehicle actual price < $16,000:
+- Marketplace displayed price = actual price
+- priceMode = FULL_PRICE
+
+If vehicle actual price >= $16,000:
+- Marketplace displayed price = recommended down payment
+- priceMode = DOWN_PAYMENT
+
+The UI must show both:
+Actual vehicle price
+Marketplace price to post
+
+Example:
+Actual Price: $28,995
+Marketplace Price: $3,000 down
+Reason: Higher-ticket truck should be framed as down payment.
+
+Chrome extension payload must use:
+marketplaceDisplayedPrice
+
+NOT actualVehiclePrice unless priceMode = FULL_PRICE.
+
+====================================================
+PART 5 — AI VEHICLE STUDIO → VISION AI
+====================================================
+
+AI Vehicle Studio should not be a placeholder page.
+
+Until real computer vision exists, it must be honest.
+
+Do not show fake photo scores.
+
+Do not show fake confidence.
+
+Do not say AI reviewed the photo if it did not.
+
+Current state should say:
+AI Photo Review Pending
+Real computer vision required.
+
+However, the page should still be useful.
+
+Show:
+- all photos
+- photo count
+- manual cover selection
+- current cover
+- selected cover
+- image gallery
+- interior/exterior filter if available
+- “Use as Marketplace Cover”
+- “Send to Publishing Batch”
+
+Important:
+Do NOT generate 7 outputs.
+Do NOT show fake enhanced photos.
+Do NOT say overlays were removed unless real image processing happened.
+
+Future-ready copy:
+“DealerPilot will analyze angle, lighting, sharpness, crop, and background once Vision AI is connected.”
+
+====================================================
+PART 6 — PHOTO STRATEGY WITHOUT FAKE AI
+====================================================
+
+Until real Vision AI is connected:
+
+Use objective photo rules only:
+- Photo count available
+- Cover selected or not selected
+- Original image exists
+- Gallery exists
+- Operator-selected cover
+
+Do not score image quality.
+
+Use labels:
+- Cover selected
+- Needs cover selection
+- Gallery ready
+- Pending Vision AI
+
+Do not use:
+- AI Score
+- Photo Score
+- Use Original
+- Enhance Recommended
+- Do Not Use
+
+Unless real computer vision/image analysis is integrated.
+
+====================================================
+PART 7 — MARKETPLACE INTELLIGENCE SIMPLIFICATION
+====================================================
+
+Marketplace Intelligence has too many tabs.
+
+Simplify into:
+
+1. Recommendations
+2. Performance
+3. Opportunities
+
+Recommendations:
+- Estimated strategies based on real inventory rules
+- Publish Now
+- Add to Batch
+- Schedule
+
+Performance:
+- Only real published listing data
+- If none, show “No real Marketplace performance yet.”
+
+Opportunities:
+- price changes
+- stale listings
+- vehicles ready but not published
+- duplicate model groups
+- sold vehicles still published
+- listings needing update
+
+Keep clear banner:
+“Demo intelligence — not real Marketplace performance yet”
+when seeded analytics are visible.
+
+====================================================
+PART 8 — DEALERPILOT LIVE
+====================================================
+
+DealerPilot Live currently looks like a raw log.
+
+Make it useful.
+
+Instead of only:
+Creative Generated
+Inventory Sync
+
+Show operator-friendly activity:
+- Inventory synced: 324 vehicles found
+- 5 vehicles ready to publish
+- 3 vehicles added to publishing queue
+- Listing published
+- Vehicle marked sold
+- Buyer reply suggested
+- Marketplace job failed
+
+Each item should be readable and actionable.
+
+If action is possible:
+- View
+- Retry
+- Open Vehicle
+- Open Batch
+
+====================================================
+PART 9 — REDUCE BUTTON CLUTTER
+====================================================
+
+Every card should have ONE primary action.
+
+Examples:
+Vehicle recommendation:
+Primary: Publish Now
+Secondary actions in overflow:
+- Add to Batch
+- Review Strategy
+- Open Vehicle
+- Mark Sold
+
+Photo vehicle row:
+Primary: Review
+Secondary:
+- Select cover
+- Open gallery
+
+Batch card:
+Primary: Continue Batch
+Secondary:
+- Cancel
+- Delete
+- Clear
+
+Manual admin actions should not dominate the product.
+
+====================================================
+PART 10 — FIX EMPTY / ZERO STATES
+====================================================
+
+Do not show:
+Publish 0 Vehicles
+Reply to 0 Buyers
+
+Show useful empty states:
+
+Example:
+No vehicles recommended right now.
+Reason:
+All ready vehicles are already queued or need review.
+
+CTA:
+Review Marketplace Queue
+
+Example:
+No buyers waiting.
+DealerPilot will surface conversations when Messenger is connected.
+
+CTA:
+Connect Messenger
+
+====================================================
+PART 11 — REALITY LABELS
+====================================================
+
+Every metric/recommendation must clearly show source:
+
+Real Data
+Estimated Strategy
+Pending AI
+Demo Data
+No Data
+
+No fake intelligence.
+
+No fake photo analysis.
+
+No fake Marketplace performance.
+
+====================================================
+PART 12 — ACCEPTANCE TESTS
+====================================================
+
+1. Command Center opens with a real AI-style daily brief.
+2. It recommends 3 vehicles when available.
+3. Each recommendation explains why.
+4. Each recommendation has one clear action.
+5. Marketplace AI groups duplicate models like Honda Accord — 3 ready.
+6. DealerPilot chooses which duplicate to publish first and explains why.
+7. Publish Now creates a real publishing job.
+8. Vehicles already queued do not appear as recommended again.
+9. AI Vehicle Studio shows no fake scores.
+10. No 7-output image generation exists anywhere.
+11. Marketplace Intelligence is simplified and clearly labeled.
+12. DealerPilot Live reads like an operator activity feed, not raw logs.
+13. Sidebar remains fixed.
+14. Compact list view remains default for 100+ vehicles.
+15. Typecheck clean.
+16. No backend/API/schema changes unless required for buildDailyMarketplacePlan.
+
+====================================================
+PRODUCT PRINCIPLE
+====================================================
+
+DealerPilot must decide more and ask less.
+
+The operator should feel:
+“DealerPilot already knows what I should do today.”
+
+Not:
+“I have to inspect every page manually.”
