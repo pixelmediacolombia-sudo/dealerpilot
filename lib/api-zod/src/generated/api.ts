@@ -228,7 +228,9 @@ export const GetVehicleResponse = zod.object({
   "images": zod.array(zod.object({
   "id": zod.number(),
   "url": zod.string(),
-  "position": zod.number()
+  "position": zod.number(),
+  "category": zod.string().nullish(),
+  "isPrimary": zod.boolean()
 })),
   "changes": zod.array(zod.object({
   "id": zod.number(),
@@ -520,7 +522,9 @@ export const GetListingDetailResponse = zod.object({
   "images": zod.array(zod.object({
   "id": zod.number(),
   "url": zod.string(),
-  "position": zod.number()
+  "position": zod.number(),
+  "category": zod.string().nullish(),
+  "isPrimary": zod.boolean()
 })).optional(),
   "currentVersion": zod.union([zod.object({
   "id": zod.number(),
@@ -1734,7 +1738,9 @@ export const GetCreativeVehicleDetailResponse = zod.object({
   "images": zod.array(zod.object({
   "id": zod.number(),
   "url": zod.string(),
-  "position": zod.number()
+  "position": zod.number(),
+  "category": zod.string().nullish(),
+  "isPrimary": zod.boolean()
 })),
   "versions": zod.array(zod.object({
   "id": zod.number(),

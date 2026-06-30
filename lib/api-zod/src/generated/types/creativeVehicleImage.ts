@@ -10,4 +10,7 @@ export interface CreativeVehicleImage {
   id: number;
   url: string;
   position: number;
+  /** @nullable */
+  category?: string | null;
+  isPrimary: boolean;
 }

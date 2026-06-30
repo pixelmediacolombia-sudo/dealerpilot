@@ -1,5 +1,10 @@
 import { XMLParser } from "fast-xml-parser";
 
+export type FeedImage = {
+  url: string;
+  category?: string; // e.g. "exterior", "other" from Google Base <g:tag>
+};
+
 export type NormalizedVehicle = {
   vin: string;
   stockNumber: string | null;
@@ -16,13 +21,11 @@ export type NormalizedVehicle = {
   fuelType: string | null;
   description: string | null;
   vdpUrl: string | null;
-  images: string[];
+  images: FeedImage[];
   sourceRaw: string;
 };
 
-// Repeated element tag names — both bare and Google Base namespaced variants.
-// This ensures <g:image>…</g:image> appearing multiple times is parsed as an
-// array rather than the last-wins scalar fast-xml-parser default.
+// Repeated element tag names — bare and Google Base namespaced variants.
 const ARRAY_TAG_LOCALS = new Set(["image", "photo", "picture", "item"]);
 
 const parser = new XMLParser({
@@ -31,7 +34,6 @@ const parser = new XMLParser({
   trimValues: true,
   parseTagValue: true,
   isArray: (tagName: string) => {
-    // tagName may be namespace-prefixed ("g:image"); extract the local part.
     const local = tagName.includes(":") ? tagName.split(":").pop()! : tagName;
     return ARRAY_TAG_LOCALS.has(local.toLowerCase());
   },
@@ -45,7 +47,6 @@ function normalizeKey(key: string): string {
   return localName.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-// Build a flat lookup of normalizedKey → value for one vehicle node.
 function buildLookup(node: Record<string, unknown>): Map<string, unknown> {
   const lookup = new Map<string, unknown>();
   for (const [rawKey, value] of Object.entries(node)) {
@@ -61,13 +62,11 @@ function firstString(lookup: Map<string, unknown>, keys: string[]): string | nul
     if (v === undefined || v === null) continue;
     if (typeof v === "object") {
       const obj = v as Record<string, unknown>;
-      // Standard fast-xml-parser text node
       const text = obj["#text"];
       if (text !== undefined && text !== null && String(text).trim() !== "") {
         return String(text).trim();
       }
       // Nested value field: handles Google Base <g:mileage><g:value>N</g:value></g:mileage>
-      // After namespace stripping the inner key becomes "value".
       for (const [ck, cv] of Object.entries(obj)) {
         const nk = normalizeKey(ck);
         if (nk === "value" || nk === "text") {
@@ -93,108 +92,113 @@ function firstNumber(lookup: Map<string, unknown>, keys: string[]): number | nul
   return Number.isFinite(n) ? n : null;
 }
 
-function extractImages(node: Record<string, unknown>): string[] {
-  const lookup = buildLookup(node);
-  const urls: string[] = [];
-
-  const pushUrl = (val: unknown) => {
-    if (val === undefined || val === null) return;
-    if (typeof val === "string") {
-      val
-        .split(/[,\s]+/)
-        .map((u) => u.trim())
-        .filter((u) => u.length > 0)
-        .forEach((u) => urls.push(u));
-      return;
-    }
-    if (typeof val === "number") return;
-    if (Array.isArray(val)) {
-      val.forEach(pushUrl);
-      return;
-    }
-    if (typeof val === "object") {
-      const obj = val as Record<string, unknown>;
-      // Try direct bare keys first
-      let text: unknown =
-        obj["#text"] ?? obj.url ?? obj.href ?? obj.src ?? obj.value ?? obj.image;
-      // Namespace-prefixed fallback: "g:url" normalizes to "url"
-      if (text === undefined) {
-        for (const [k, v] of Object.entries(obj)) {
-          const nk = normalizeKey(k);
-          if (nk === "url" || nk === "href" || nk === "src") {
-            text = v;
-            break;
-          }
+// Collect URL strings from arbitrary nested structures (generic fallback).
+function collectUrls(val: unknown): string[] {
+  if (val === null || val === undefined) return [];
+  if (typeof val === "string") {
+    return val
+      .split(/[,\s]+/)
+      .map((u) => u.trim())
+      .filter((u) => u.length > 0);
+  }
+  if (typeof val === "number") return [];
+  if (Array.isArray(val)) return val.flatMap(collectUrls);
+  if (typeof val === "object") {
+    const obj = val as Record<string, unknown>;
+    let text: unknown =
+      obj["#text"] ?? obj.url ?? obj.href ?? obj.src ?? obj.value ?? obj.image;
+    if (text === undefined) {
+      for (const [k, v] of Object.entries(obj)) {
+        const nk = normalizeKey(k);
+        if (nk === "url" || nk === "href" || nk === "src") {
+          text = v;
+          break;
         }
       }
-      if (text !== undefined) pushUrl(text);
     }
+    if (text !== undefined) return collectUrls(text);
+  }
+  return [];
+}
+
+function extractImages(node: Record<string, unknown>): FeedImage[] {
+  const lookup = buildLookup(node);
+  const results: FeedImage[] = [];
+  const seen = new Set<string>();
+
+  const addUrl = (url: string, category?: string) => {
+    if (seen.has(url)) return;
+    if (!/^(https?:\/\/|\/)/.test(url)) return;
+    seen.add(url);
+    results.push(category ? { url, category } : { url });
   };
 
-  // Container shapes: <images><image>…</image></images> etc.
-  const containerKeys = ["images", "photos", "pictures", "imageurls", "photourls"];
-  const itemKeys = ["image", "photo", "picture", "img", "url", "href"];
+  // --- Google Base structured image array (primary path) ---
+  // After namespace stripping: lookup.get("image") = [{url:…, tag:…}, …]
+  const imageVal = lookup.get("image");
+  if (Array.isArray(imageVal)) {
+    for (const item of imageVal) {
+      if (typeof item !== "object" || item === null) continue;
+      const obj = item as Record<string, unknown>;
+      let url: string | undefined;
+      let category: string | undefined;
+      for (const [k, v] of Object.entries(obj)) {
+        const nk = normalizeKey(k);
+        if (nk === "url" && typeof v === "string" && v.trim()) url = v.trim();
+        if (nk === "tag" && typeof v === "string" && v.trim())
+          category = v.trim().toLowerCase();
+      }
+      if (url) addUrl(url, category);
+    }
+    if (results.length > 0) return results;
+  }
 
+  // --- Generic fallback: container shapes ---
+  const containerKeys = ["images", "photos", "pictures", "imageurls", "photourls"];
   for (const ck of containerKeys) {
     const container = lookup.get(ck);
     if (container === undefined || container === null) continue;
     if (typeof container === "string") {
-      pushUrl(container);
+      collectUrls(container).forEach((u) => addUrl(u));
       continue;
     }
     if (Array.isArray(container)) {
-      pushUrl(container);
+      collectUrls(container).forEach((u) => addUrl(u));
       continue;
     }
     if (typeof container === "object") {
       const inner = container as Record<string, unknown>;
+      const itemKeys = ["image", "photo", "picture", "img", "url", "href"];
       let matched = false;
       for (const ik of itemKeys) {
         for (const [rk, rv] of Object.entries(inner)) {
           if (normalizeKey(rk) === ik) {
-            pushUrl(rv);
+            collectUrls(rv).forEach((u) => addUrl(u));
             matched = true;
           }
         }
       }
-      if (!matched) pushUrl(Object.values(inner));
+      if (!matched) collectUrls(Object.values(inner)).forEach((u) => addUrl(u));
     }
   }
 
-  // Flat repeated/single keys: <image>, <g:image> (after normalization → "image"), etc.
+  // --- Generic fallback: flat repeated/single keys ---
   const flatKeys = [
-    "imageurl",
-    "photourl",
-    "image",
-    "photo",
-    "picture",
-    "thumbnail",
-    "mainimage",
+    "imageurl", "photourl", "image", "photo", "picture", "thumbnail", "mainimage",
   ];
   for (const fk of flatKeys) {
-    if (lookup.has(fk)) pushUrl(lookup.get(fk));
+    if (lookup.has(fk)) collectUrls(lookup.get(fk)).forEach((u) => addUrl(u));
   }
 
-  // De-duplicate, preserve order, keep only plausible URLs/paths.
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const u of urls) {
-    if (seen.has(u)) continue;
-    if (!/^(https?:\/\/|\/)/.test(u)) continue;
-    seen.add(u);
-    result.push(u);
-  }
-  return result;
+  return results;
 }
 
-// Recursively find the largest array of nodes that look like vehicles.
 function findVehicleNodes(value: unknown): Record<string, unknown>[] {
   let best: Record<string, unknown>[] = [];
 
   const looksLikeVehicle = (node: unknown): boolean => {
     if (typeof node !== "object" || node === null || Array.isArray(node)) return false;
     const lookup = buildLookup(node as Record<string, unknown>);
-    // After namespace stripping, "g:make" → "make", "g:vin" → "vin", etc.
     const signals = ["vin", "make", "model", "year", "stocknumber", "stockno", "stock", "price", "vehicleid"];
     let hits = 0;
     for (const s of signals) if (lookup.has(s)) hits++;
@@ -225,20 +229,14 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
 
   const make = firstString(lookup, ["make", "manufacturer", "brand", "makename"]);
   const model = firstString(lookup, ["model", "modelname"]);
-  // "g:vin" → "vin" after namespace strip; "g:vehicle_id" → "vehicleid" (stock number, VIN fallback).
   let vin = firstString(lookup, ["vin", "vinnumber", "vehicleidnumber"]);
   const stockNumber = firstString(lookup, [
-    "stocknumber",
-    "stockno",
-    "stock",
-    "stockid",
-    "dealerstocknumber",
-    "vehicleid",   // Google Base: g:vehicle_id is the stock/dealer number
+    "stocknumber", "stockno", "stock", "stockid", "dealerstocknumber",
+    "vehicleid", // Google Base: g:vehicle_id is the stock/dealer number
   ]);
 
   if (!make || !model) return null;
   if (!vin) {
-    // Last-resort: use vehicleid as surrogate VIN (feeds that have no vin field)
     const vid = firstString(lookup, ["vehicleid"]);
     if (vid) vin = `VID-${vid}`;
     else if (stockNumber) vin = `STOCK-${stockNumber}`;
@@ -252,45 +250,21 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
     make,
     model,
     trim: firstString(lookup, ["trim", "trimlevel", "series", "subseries"]),
-    // Google Base mileage: <g:mileage><g:value>N</g:value></g:mileage>
-    // firstString handles the nested "value" child automatically.
     mileage: firstNumber(lookup, ["mileage", "miles", "odometer", "kilometers"]),
     price: firstNumber(lookup, [
-      "price",
-      "sellingprice",
-      "askingprice",
-      "internetprice",
-      "saleprice",
-      "listprice",
-      "msrp",
+      "price", "sellingprice", "askingprice", "internetprice",
+      "saleprice", "listprice", "msrp",
     ]),
-    exteriorColor: firstString(lookup, [
-      "exteriorcolor",
-      "extcolor",
-      "color",
-      "colour",
-      "exterior",
-    ]),
+    exteriorColor: firstString(lookup, ["exteriorcolor", "extcolor", "color", "colour", "exterior"]),
     interiorColor: firstString(lookup, ["interiorcolor", "intcolor", "interior"]),
     bodyStyle: firstString(lookup, ["bodystyle", "body", "bodytype", "style"]),
     transmission: firstString(lookup, ["transmission", "trans", "gearbox"]),
     fuelType: firstString(lookup, ["fueltype", "fuel", "enginefuel"]),
     description: firstString(lookup, [
-      "description",
-      "comments",
-      "sellercomments",
-      "dealercomments",
-      "details",
-      "vehiclecomments",
+      "description", "comments", "sellercomments", "dealercomments",
+      "details", "vehiclecomments",
     ]),
-    vdpUrl: firstString(lookup, [
-      "vdpurl",
-      "vdp",
-      "detailurl",
-      "detailspageurl",
-      "link",
-      "url",
-    ]),
+    vdpUrl: firstString(lookup, ["vdpurl", "vdp", "detailurl", "detailspageurl", "link", "url"]),
     images: extractImages(node),
     sourceRaw: JSON.stringify(node),
   };

@@ -147,7 +147,13 @@ router.get("/vehicles/:id", async (req, res) => {
 
   res.json({
     vehicle: withImages,
-    images: images.map((im) => ({ id: im.id, url: im.url, position: im.position })),
+    images: images.map((im) => ({
+      id: im.id,
+      url: im.url,
+      position: im.position,
+      category: im.category ?? null,
+      isPrimary: im.isPrimary,
+    })),
     changes: changes.map((c) => ({
       id: c.id,
       changeType: c.changeType,

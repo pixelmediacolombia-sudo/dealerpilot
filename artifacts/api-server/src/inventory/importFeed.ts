@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import type { Logger } from "pino";
-import { parseInventoryXml } from "./xmlEngine";
+import { parseInventoryXml, type FeedImage } from "./xmlEngine";
 
 const ACTIVE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish", "Published"];
 
@@ -19,12 +19,18 @@ type ChangeDraft = {
   newValue: string | null;
 };
 
-function replaceImages(vehicleId: number, urls: string[]) {
+function replaceImages(vehicleId: number, images: FeedImage[]) {
   return (async () => {
     await db.delete(vehicleImagesTable).where(eq(vehicleImagesTable.vehicleId, vehicleId));
-    if (urls.length > 0) {
+    if (images.length > 0) {
       await db.insert(vehicleImagesTable).values(
-        urls.map((url, position) => ({ vehicleId, url, position })),
+        images.map(({ url, category }, position) => ({
+          vehicleId,
+          url,
+          position,
+          category: category ?? null,
+          isPrimary: position === 0,
+        })),
       );
     }
   })();
@@ -58,6 +64,7 @@ export type ImportSummary = {
   updated: number;
   removed: number;
   active: number;
+  totalImages: number;
 };
 
 export async function importFeed(
@@ -74,11 +81,6 @@ export async function importFeed(
     .returning();
   const feedRunId = run!.id;
 
-  // Safety guard: a feed that parses to zero vehicles is almost always a broken
-  // or shape-drifted response (vendor outage, HTML error page, schema change),
-  // NOT a dealer who genuinely sold every car. Importing it would mark the
-  // entire active inventory as Sold/Removed. Abort without mutating vehicles and
-  // record the run as a failure so the Connection Center surfaces it.
   if (parsed.length === 0) {
     const message =
       rawCount > 0
@@ -110,6 +112,7 @@ export async function importFeed(
   let created = 0;
   let updated = 0;
   let removed = 0;
+  let totalImages = 0;
 
   for (const n of parsed) {
     seenVins.add(n.vin);
@@ -143,6 +146,7 @@ export async function importFeed(
         })
         .returning();
       await replaceImages(inserted!.id, n.images);
+      totalImages += n.images.length;
       await db.insert(vehicleChangesTable).values({
         vehicleId: inserted!.id,
         feedRunId,
@@ -155,7 +159,7 @@ export async function importFeed(
       continue;
     }
 
-    // Existing vehicle still in feed — detect field-level changes.
+    // Existing vehicle — detect field-level changes.
     const drafts: ChangeDraft[] = [];
     const priceDraft = diffField("price", prior.price, n.price);
     if (priceDraft) drafts.push(priceDraft);
@@ -164,16 +168,17 @@ export async function importFeed(
     const descDraft = diffField("description", prior.description, n.description);
     if (descDraft) drafts.push(descDraft);
 
-    const priorImages = await getImageUrls(prior.id);
+    const priorImageUrls = await getImageUrls(prior.id);
+    const newImageUrls = n.images.map((i) => i.url);
     const imagesChanged =
-      priorImages.length !== n.images.length ||
-      priorImages.some((u, i) => u !== n.images[i]);
+      priorImageUrls.length !== newImageUrls.length ||
+      priorImageUrls.some((u, i) => u !== newImageUrls[i]);
     if (imagesChanged) {
       drafts.push({
         changeType: "image_change",
         field: "images",
-        oldValue: `${priorImages.length} photos`,
-        newValue: `${n.images.length} photos`,
+        oldValue: `${priorImageUrls.length} photos`,
+        newValue: `${newImageUrls.length} photos`,
       });
     }
 
@@ -222,7 +227,12 @@ export async function importFeed(
       })
       .where(eq(vehiclesTable.id, prior.id));
 
-    if (imagesChanged) await replaceImages(prior.id, n.images);
+    if (imagesChanged) {
+      await replaceImages(prior.id, n.images);
+      totalImages += n.images.length;
+    } else {
+      totalImages += priorImageUrls.length;
+    }
 
     if (drafts.length > 0) {
       await db.insert(vehicleChangesTable).values(
@@ -239,7 +249,7 @@ export async function importFeed(
     }
   }
 
-  // Vehicles previously present but missing from this feed -> Sold/Removed.
+  // Vehicles missing from this feed → Sold/Removed.
   const missing = existing.filter(
     (v) =>
       !seenVins.has(v.vin) &&
@@ -283,9 +293,19 @@ export async function importFeed(
     .where(eq(feedRunsTable.id, feedRunId));
 
   log.info(
-    { dealerId, feedRunId, rawCount, parseErrors, created, updated, removed, active },
-    "Feed import complete",
+    { dealerId, feedRunId, rawCount, parseErrors, created, updated, removed, active, totalImages },
+    `Feed import complete — imported ${parsed.length} vehicles and ${totalImages} total images`,
   );
 
-  return { feedRunId, rawCount, imported: parsed.length, errors: parseErrors, created, updated, removed, active };
+  return {
+    feedRunId,
+    rawCount,
+    imported: parsed.length,
+    errors: parseErrors,
+    created,
+    updated,
+    removed,
+    active,
+    totalImages,
+  };
 }

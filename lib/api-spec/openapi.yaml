@@ -1663,11 +1663,13 @@ components:
             $ref: "#/components/schemas/Vehicle"
     VehicleImage:
       type: object
-      required: [id, url, position]
+      required: [id, url, position, isPrimary]
       properties:
         id: { type: integer }
         url: { type: string }
         position: { type: integer }
+        category: { type: ["string", "null"] }
+        isPrimary: { type: boolean }
     VehicleChange:
       type: object
       required: [id, changeType, createdAt]
@@ -2213,11 +2215,13 @@ components:
             $ref: "#/components/schemas/CreativeTemplate"
     CreativeVehicleImage:
       type: object
-      required: [id, url, position]
+      required: [id, url, position, isPrimary]
       properties:
         id: { type: integer }
         url: { type: string }
         position: { type: integer }
+        category: { type: ["string", "null"] }
+        isPrimary: { type: boolean }
     CreativeVehicleSummary:
       type: object
       required: [id, dealerId, vin, make, model, status, imageCount]

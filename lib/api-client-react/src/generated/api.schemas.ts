@@ -115,6 +115,9 @@ export interface VehicleImage {
   id: number;
   url: string;
   position: number;
+  /** @nullable */
+  category?: string | null;
+  isPrimary: boolean;
 }
 
 export interface VehicleChange {
@@ -576,6 +579,9 @@ export interface CreativeVehicleImage {
   id: number;
   url: string;
   position: number;
+  /** @nullable */
+  category?: string | null;
+  isPrimary: boolean;
 }
 
 export interface CreativeVehicleSummary {
