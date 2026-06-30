@@ -29,26 +29,10 @@ import {
   LayoutGrid,
   List,
   ArrowUpDown,
+  AlertTriangle,
 } from "lucide-react";
 import { PageHeader, EmptyState } from "@/components/shared";
-
-function ratingClass(rating: string | null | undefined) {
-  switch (rating) {
-    case "Excellent":
-      return "bg-green-500/10 text-green-500 border-green-500/20";
-    case "Good":
-      return "bg-blue-500/10 text-blue-500 border-blue-500/20";
-    case "Needs Improvement":
-      return "bg-amber-500/10 text-amber-500 border-amber-500/20";
-    default:
-      return "bg-secondary text-muted-foreground border-border";
-  }
-}
-
-function vehicleAuditScore(vehicleId: number): number {
-  const v = Math.abs(Math.sin(vehicleId * 0.073 + 0.29 + 1.73)) * 100;
-  return Math.round(Math.max(50, Math.min(95, v)));
-}
+import { vehicleAuditBreakdown, decisionBadgeClass, scoreBadgeClass, scoreTextClass } from "./vehicleAudit";
 
 export function CreativeStudio() {
   const [search, setSearch] = useState("");
@@ -66,24 +50,31 @@ export function CreativeStudio() {
   });
 
   const vehicles = data?.vehicles ?? [];
-  const auditScores = vehicles.map((v) => vehicleAuditScore(v.vehicleId));
-  const useOriginalCount = auditScores.filter((s) => s >= 88).length;
-  const enhanceCount = auditScores.filter((s) => s >= 60 && s < 88).length;
+
+  // Pre-compute audits so filter/sort and render are consistent
+  const audits = useMemo(
+    () => new Map(vehicles.map((v) => [v.vehicleId, vehicleAuditBreakdown(v.vehicleId)])),
+    [vehicles],
+  );
+
+  const useOriginalCount = [...audits.values()].filter((a) => a.decision === "Use Original").length;
+  const enhanceCount = [...audits.values()].filter((a) => a.decision === "Enhance Recommended").length;
 
   const filteredSortedVehicles = useMemo(() => {
     let list = [...vehicles];
     if (photoFilter) {
       list = list.filter((v) => {
-        const score = vehicleAuditScore(v.vehicleId);
-        if (photoFilter === "use_original") return score >= 88;
-        if (photoFilter === "enhance") return score >= 60 && score < 88;
-        if (photoFilter === "review") return score < 60;
+        const audit = audits.get(v.vehicleId);
+        if (!audit) return true;
+        if (photoFilter === "use_original") return audit.decision === "Use Original";
+        if (photoFilter === "enhance") return audit.decision === "Enhance Recommended";
+        if (photoFilter === "review") return audit.decision === "Do Not Use";
         return true;
       });
     }
     switch (sortBy) {
       case "ai_score":
-        list.sort((a, b) => vehicleAuditScore(b.vehicleId) - vehicleAuditScore(a.vehicleId));
+        list.sort((a, b) => (audits.get(b.vehicleId)?.total ?? 0) - (audits.get(a.vehicleId)?.total ?? 0));
         break;
       case "photo_count":
         list.sort((a, b) => (b.imageCount ?? 0) - (a.imageCount ?? 0));
@@ -95,7 +86,7 @@ export function CreativeStudio() {
         break;
     }
     return list;
-  }, [vehicles, sortBy, photoFilter]);
+  }, [vehicles, sortBy, photoFilter, audits]);
 
   const toggleSelected = (id: number) => {
     setSelectedIds((prev) => {
@@ -162,7 +153,6 @@ export function CreativeStudio() {
               />
             </div>
 
-            {/* Selection info */}
             {selectedIds.size > 0 && (
               <div className="flex items-center gap-2 flex-shrink-0">
                 <Badge className="bg-primary/20 text-primary border-primary/30 gap-1.5 text-xs">
@@ -171,13 +161,10 @@ export function CreativeStudio() {
                 <Button size="sm" variant="ghost" onClick={selectAll} className="h-7 text-xs px-2">
                   All {filteredSortedVehicles.length}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 text-xs px-2">
-                  ×
-                </Button>
+                <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 text-xs px-2">×</Button>
               </div>
             )}
 
-            {/* Sort */}
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
               <SelectTrigger className="w-full sm:w-[150px] bg-background/50 border-border/50 gap-1.5 h-10">
                 <ArrowUpDown className="w-3 h-3 text-muted-foreground flex-shrink-0" />
@@ -191,7 +178,6 @@ export function CreativeStudio() {
               </SelectContent>
             </Select>
 
-            {/* View toggle */}
             <div className="flex items-center rounded-lg border border-border/50 overflow-hidden flex-shrink-0 h-10">
               <button
                 onClick={() => setViewMode("list")}
@@ -200,8 +186,7 @@ export function CreativeStudio() {
                   viewMode === "list" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <List className="w-3.5 h-3.5" />
-                List
+                <List className="w-3.5 h-3.5" /> List
               </button>
               <div className="w-px h-5 bg-border/60" />
               <button
@@ -211,8 +196,7 @@ export function CreativeStudio() {
                   viewMode === "grid" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                Grid
+                <LayoutGrid className="w-3.5 h-3.5" /> Grid
               </button>
             </div>
           </div>
@@ -267,7 +251,6 @@ export function CreativeStudio() {
           ) : viewMode === "list" ? (
             /* ── Compact List View ── */
             <div className="rounded-xl border border-border/40 overflow-hidden">
-              {/* Header */}
               <div className="flex items-center gap-3 px-4 py-2.5 bg-muted/30 border-b border-border/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 <div className="w-5 flex-shrink-0">
                   <Checkbox
@@ -277,24 +260,18 @@ export function CreativeStudio() {
                 </div>
                 <div className="w-[72px] flex-shrink-0">Photo</div>
                 <div className="flex-1 min-w-0">Vehicle</div>
-                <div className="w-[100px] text-center flex-shrink-0 hidden lg:block">AI Score</div>
+                <div className="w-[110px] text-center flex-shrink-0 hidden lg:block">AI Score</div>
                 <div className="w-[120px] flex-shrink-0 hidden md:block">Price</div>
                 <div className="w-[100px] flex-shrink-0 text-right">Action</div>
               </div>
               {filteredSortedVehicles.map((v) => {
-                const auditScore = vehicleAuditScore(v.vehicleId);
-                const recommendation = auditScore >= 88 ? "Use Original" : auditScore >= 60 ? "Enhance Recommended" : "Do Not Use";
-                const recColor = auditScore >= 88
-                  ? "text-success bg-success/10"
-                  : auditScore >= 60
-                    ? "text-amber-400 bg-amber-500/10"
-                    : "text-red-400 bg-red-500/10";
+                const audit = audits.get(v.vehicleId)!;
                 const isSelected = selectedIds.has(v.vehicleId);
                 return (
                   <div
                     key={v.vehicleId}
                     className={cn(
-                      "flex items-center gap-3 px-4 py-2 min-h-[80px] border-b border-border/20 last:border-b-0 transition-colors hover:bg-muted/10",
+                      "flex items-center gap-3 px-4 py-2 min-h-[82px] border-b border-border/20 last:border-b-0 transition-colors hover:bg-muted/10",
                       isSelected && "bg-primary/5 border-l-2 border-l-primary"
                     )}
                   >
@@ -316,7 +293,7 @@ export function CreativeStudio() {
                         </div>
                       )}
                     </div>
-                    {/* Vehicle info */}
+                    {/* Vehicle info + decision + top reasons */}
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm text-foreground truncate">{v.label}</div>
                       <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
@@ -324,20 +301,32 @@ export function CreativeStudio() {
                         <span className="text-border/80">·</span>
                         <span>{v.imageCount} photo{v.imageCount === 1 ? "" : "s"}</span>
                       </div>
-                      <span className={cn("inline-flex items-center text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded mt-0.5", recColor)}>
-                        {recommendation}
-                      </span>
-                    </div>
-                    {/* AI score */}
-                    <div className="w-[100px] flex-shrink-0 text-center hidden lg:block">
-                      <div className={cn(
-                        "inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold",
-                        auditScore >= 88 ? "bg-success/15 text-success" :
-                        auditScore >= 65 ? "bg-amber-500/15 text-amber-400" :
-                        "bg-red-500/15 text-red-400"
-                      )}>
-                        <Gauge className="w-3 h-3" />{auditScore}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <span className={cn(
+                          "inline-flex items-center text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded",
+                          audit.decision === "Use Original" ? "text-success bg-success/10" :
+                          audit.decision === "Enhance Recommended" ? "text-amber-400 bg-amber-500/10" :
+                          "text-red-400 bg-red-500/10"
+                        )}>
+                          {audit.decision}
+                        </span>
+                        {audit.topReasons[0] && (
+                          <span className="text-[9px] text-muted-foreground/70 flex items-center gap-0.5 hidden sm:flex">
+                            <AlertTriangle className="w-2.5 h-2.5 text-amber-400/60 flex-shrink-0" />
+                            {audit.topReasons[0]}
+                          </span>
+                        )}
                       </div>
+                    </div>
+                    {/* AI score — labeled "AI-estimated" on hover */}
+                    <div className="w-[110px] flex-shrink-0 text-center hidden lg:flex flex-col items-center gap-1">
+                      <div className={cn(
+                        "inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border",
+                        scoreBadgeClass(audit.total)
+                      )}>
+                        <Gauge className="w-3 h-3" />{audit.total}
+                      </div>
+                      <span className="text-[8px] text-muted-foreground/50 uppercase tracking-widest">AI-estimated</span>
                     </div>
                     {/* Price */}
                     <div className="w-[120px] flex-shrink-0 hidden md:block">
@@ -360,18 +349,11 @@ export function CreativeStudio() {
             /* ── Grid View ── */
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
               {filteredSortedVehicles.map((v, i) => {
-                const auditScore = vehicleAuditScore(v.vehicleId);
-                const recommendation = auditScore >= 88 ? "Use Original" : auditScore >= 60 ? "Enhance Recommended" : "Do Not Use";
-                const recBadgeClass = auditScore >= 88
-                  ? "bg-success/90 text-white"
-                  : auditScore >= 60
-                    ? "bg-amber-500/90 text-black"
-                    : "bg-red-500/80 text-white";
+                const audit = audits.get(v.vehicleId)!;
                 const isSelected = selectedIds.has(v.vehicleId);
 
                 return (
                   <div key={v.vehicleId} className="relative">
-                    {/* Select checkbox */}
                     <div
                       className="absolute top-3 left-3 z-30"
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSelected(v.vehicleId); }}
@@ -388,6 +370,7 @@ export function CreativeStudio() {
                         className="group glass-panel rounded-2xl overflow-hidden hover-lift cursor-pointer flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 shadow-sm hover:shadow-primary/5 border border-white/5 hover:border-primary/30 transition-all duration-500 relative"
                         style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}
                       >
+                        {/* Image area */}
                         <div className="aspect-[4/3] bg-secondary relative overflow-hidden">
                           {v.primaryImageUrl ? (
                             <img
@@ -401,28 +384,29 @@ export function CreativeStudio() {
                             </div>
                           )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/30" />
-                          <Badge
-                            className={cn(
-                              "absolute top-4 right-4 z-10 backdrop-blur-md uppercase text-[9px] font-bold tracking-widest px-2 py-0.5 rounded-full border-0",
-                              recBadgeClass,
-                            )}
-                          >
-                            {recommendation}
+
+                          {/* Decision badge — top right */}
+                          <Badge className={cn(
+                            "absolute top-4 right-4 z-10 backdrop-blur-md uppercase text-[9px] font-bold tracking-widest px-2 py-0.5 rounded-full border-0",
+                            decisionBadgeClass(audit.decision),
+                          )}>
+                            {audit.decision}
                           </Badge>
+
+                          {/* Score badge — top left */}
                           <div className="absolute top-4 left-4 z-10">
                             <Badge
                               variant="outline"
                               className={cn(
                                 "backdrop-blur-md font-bold text-[10px] uppercase tracking-widest px-2.5 py-1 border-white/10",
-                                auditScore >= 88 ? "bg-success/20 text-success border-success/30" :
-                                auditScore >= 65 ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
-                                "bg-red-500/20 text-red-400 border-red-500/30",
+                                scoreBadgeClass(audit.total),
                               )}
                             >
                               <Gauge className="w-3 h-3 mr-1" />
-                              {auditScore}
+                              {audit.total}
                             </Badge>
                           </div>
+
                           {v.imageCount > 0 && (
                             <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-lg backdrop-blur-sm">
                               <ImageIcon className="w-3 h-3" />
@@ -430,16 +414,31 @@ export function CreativeStudio() {
                             </div>
                           )}
                         </div>
-                        <div className="p-6 flex flex-col flex-1 bg-card/40 backdrop-blur-xl">
-                          <div className="text-primary text-[10px] font-bold uppercase tracking-widest mb-2">
+
+                        {/* Card body */}
+                        <div className="p-5 flex flex-col flex-1 bg-card/40 backdrop-blur-xl">
+                          <div className="text-primary text-[10px] font-bold uppercase tracking-widest mb-1.5">
                             {v.vin.slice(-6)}
                           </div>
                           <div className="font-bold tracking-tight text-xl truncate mb-1 text-foreground/90 group-hover:text-primary transition-colors">
                             {v.label}
                           </div>
-                          <div className="text-muted-foreground text-xs mb-6">
-                            {v.imageCount} source photo{v.imageCount === 1 ? "" : "s"} · AI audit score {auditScore}
+                          <div className="text-muted-foreground text-xs mb-2">
+                            {v.imageCount} photo{v.imageCount === 1 ? "" : "s"} · <span className="text-muted-foreground/60">AI-estimated score</span>
                           </div>
+
+                          {/* Top 2 reasons */}
+                          {audit.topReasons.length > 0 && (
+                            <div className="space-y-1 mb-4">
+                              {audit.topReasons.slice(0, 2).map((reason, ri) => (
+                                <div key={ri} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                                  <AlertTriangle className={cn("w-3 h-3 flex-shrink-0 mt-0.5", ri === 0 ? "text-amber-400/80" : "text-muted-foreground/50")} />
+                                  {reason}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between">
                             <div className="font-bold text-foreground/90 text-xl">
                               {formatCurrency(v.price)}

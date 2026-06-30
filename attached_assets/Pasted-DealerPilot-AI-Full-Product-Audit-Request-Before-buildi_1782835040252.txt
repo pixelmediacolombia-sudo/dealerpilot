@@ -1,0 +1,210 @@
+DealerPilot AI — Full Product Audit Request
+
+Before building more features, I need a complete audit report of the current app.
+
+Do NOT implement changes.
+Do NOT refactor.
+Do NOT redesign.
+Do NOT modify backend, database, APIs, UI, extension, or workers.
+
+Your job is to inspect the current product and deliver a detailed audit report.
+
+Context:
+DealerPilot AI should become a semi-automatic AI operator for car dealers.
+The app should use AI strategically to:
+- decide which vehicles to publish
+- choose the best photos
+- recommend pricing/down payment strategy
+- create publishing batches
+- reduce manual decisions
+- assist Marketplace publishing
+- learn from engagement and leads
+
+I need the audit to evaluate whether the current app actually supports that vision.
+
+Audit sections required:
+
+1. Executive Summary
+- What is the current state of the app?
+- Is it closer to an AI operator, a dashboard, or a manual admin tool?
+- Biggest strengths
+- Biggest weaknesses
+- Biggest risks
+
+2. Feature Inventory
+List every built module and current status:
+- XML Inventory Engine
+- Vehicle Intelligence
+- Marketplace AI
+- Listing Intelligence
+- Publishing Queue
+- Chrome Extension Publisher
+- Creative / AI Vehicle Studio
+- Marketplace Intelligence
+- Batch Publishing
+- Sales Hub
+- Sales AI / Leads
+- Dealer DNA
+- Settings / Connections
+
+For each:
+- what works
+- what is incomplete
+- what feels fake/simulated
+- what is production-ready
+- what needs rework
+
+3. AI Quality Audit
+Evaluate all AI-related parts:
+- Strategy Engine v2
+- Marketplace Intelligence
+- Photo scoring
+- Photo performance prediction
+- AI Vehicle Studio
+- Batch recommendations
+- Sales Hub recommendations
+- Listing generator
+
+For each, answer:
+- Is the AI actually making strategic decisions?
+- Is it based on real data or heuristics?
+- Are recommendations explainable?
+- Are scores trustworthy?
+- Are outputs useful to an operator?
+- Where does the app still feel like fake AI?
+
+4. Marketplace Publishing Workflow Audit
+Evaluate the full publishing flow:
+Inventory → Listing → Photo → Batch → Queue → Extension → Facebook → Published → Engagement
+
+Answer:
+- Where does the flow work?
+- Where is it still manual?
+- Where does it break?
+- What are the biggest blockers for real daily operation?
+- Can an operator publish 20 vehicles efficiently today?
+- What prevents this from being semi-automatic?
+
+5. Photo / AI Vehicle Studio Audit
+This is critical.
+
+Evaluate:
+- Are all XML photos visible?
+- Are all photos scored?
+- Does the app choose the best cover?
+- Does it decide Use Original vs Enhance vs Do Not Use?
+- Is the enhancement workflow realistic?
+- Are interior and exterior photos handled differently?
+- Is it still generating fake variants?
+- Does it reduce work or create more work?
+- What should be removed?
+
+6. Marketplace Intelligence Audit
+Evaluate:
+- Are KPIs real, seeded, estimated, or fake?
+- Are metrics clearly labeled?
+- Are down payment recommendations coherent?
+- Are strategy labels useful?
+- Is Strategy Engine v2 really driving publishing decisions?
+- Are publish recommendations actionable?
+- Is there a Publish Now / Add to Batch / Schedule action from Intelligence?
+- Does the Intelligence module feel trustworthy?
+
+7. UI/UX Audit
+Evaluate the graphical interface.
+
+Include:
+- sidebar
+- Sales Hub
+- Marketplace AI
+- AI Vehicle Studio
+- Marketplace Intelligence
+- Batch Review
+- Vehicle Detail
+- Publishing Queue
+- Settings / Connections
+
+Answer:
+- Is the app visually premium?
+- Is it too manual?
+- Are there too many buttons?
+- Are cards too large?
+- Is compact list needed?
+- Is the sidebar sticky?
+- Are actions clear?
+- Does the UI guide the operator to the next action?
+- Where does the UX still feel confusing?
+
+8. Data Integrity Audit
+Evaluate:
+- sample vs real data separation
+- Alpha XML data
+- photo counts
+- duplicate listings
+- fake conversations
+- fake leads
+- inflated KPIs
+- seeded Marketplace Intelligence data
+- whether any displayed numbers cannot be trusted
+
+Every metric shown in the app should be classified:
+- Real
+- Estimated
+- Seeded
+- Mock
+- Unknown
+
+9. Chrome Extension Audit
+Evaluate:
+- current installed version expectations
+- publishing job contract
+- app-controlled publishing status
+- field filling reliability
+- current known issues
+- whether popup is still required
+- whether the app can control the extension properly
+- what is needed for production use
+
+10. Business Value Audit
+Evaluate from the dealer perspective:
+- What would impress Alpha Motorsport today?
+- What would disappoint them?
+- What would make them pay monthly?
+- What features are real value vs distractions?
+- What must be fixed before showing this to another dealer?
+
+11. Top 20 Problems Ranked
+Create a ranked list:
+Priority
+Problem
+Impact
+Where it appears
+Recommended fix
+Difficulty
+Expected business value
+
+12. Recommended Roadmap
+Create:
+- Must fix before demo
+- Must fix before daily use
+- Must fix before selling to other dealers
+- Nice to have later
+
+13. Final Verdict
+Give a brutally honest score from 1–10 for:
+- Product vision
+- Technical foundation
+- AI usefulness
+- Marketplace publishing readiness
+- Photo AI readiness
+- UI/UX
+- Data trust
+- Dealer value
+- Overall MVP readiness
+
+Important:
+Be honest.
+Do not defend previous work.
+Do not say everything is good.
+Point out fake AI, weak logic, manual workflows, UI clutter, and data issues.
+This audit will be reviewed by a product strategist before deciding the next sprint.
