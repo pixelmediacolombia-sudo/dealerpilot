@@ -1,0 +1,264 @@
+Regression fix only. Do NOT rewrite the extension or the state machine.
+
+Current build:
+DOM_WAIT_1.0.5
+
+Observed behavior:
+
+Version 1.0.4 successfully filled:
+
+- Vehicle Type
+- Year
+- Make
+- Mileage
+- Price
+- Description
+
+Only Model and Title were missing.
+
+After the DOM_WAIT_1.0.5 changes, Vehicle Type itself stopped working.
+
+Current debug output:
+
+vehicle type: no options appeared after clicking combobox
+model: combobox did not appear
+
+This is a regression introduced in the latest changes.
+
+====================================================
+GOAL
+====================================================
+
+Restore the Vehicle Type behavior from v1.0.4 while keeping ONLY the improvements that wait for the Model combobox to appear.
+
+Do NOT redesign the state machine.
+
+Do NOT change backend communication.
+
+Do NOT change job handling.
+
+Do NOT change payload format.
+
+Only fix the combobox interaction.
+
+====================================================
+STEP 1
+====================================================
+
+Compare these functions between 1.0.4 and 1.0.5:
+
+selectComboboxStep()
+
+fillStep()
+
+waitForField()
+
+waitForNamedField()
+
+runPublishingFlow()
+
+Identify exactly which change caused Vehicle Type to stop opening.
+
+====================================================
+STEP 2
+====================================================
+
+Restore the exact Vehicle Type selection logic from 1.0.4.
+
+Keep the new DOM polling ONLY after Make is selected.
+
+The desired flow is:
+
+Vehicle Type
+↓
+
+Year
+
+↓
+
+Make
+
+↓
+
+WAIT until Model combobox actually exists
+
+↓
+
+Model
+
+↓
+
+WAIT until Title input exists
+
+↓
+
+Title
+
+↓
+
+Continue.
+
+====================================================
+STEP 3
+====================================================
+
+Instrument EVERYTHING.
+
+Before every action log:
+
+[STEP] Vehicle Type
+[STEP] Year
+[STEP] Make
+[STEP] Model
+[STEP] Title
+
+When locating elements:
+
+[FOUND] Vehicle Type combobox
+[FOUND] Year combobox
+[FOUND] Make combobox
+[FOUND] Model combobox
+[FOUND] Title input
+
+When clicking:
+
+[CLICK] Vehicle Type
+[CLICK] Make
+[CLICK] Model
+
+After every click log:
+
+document.activeElement
+
+====================================================
+STEP 4
+====================================================
+
+When opening a combobox:
+
+Log:
+
+Number of options found
+
+Option texts
+
+Option HTML
+
+Popup container HTML
+
+If zero options appear, dump the popup HTML to the console.
+
+Example:
+
+[OPTIONS]
+0 options found
+
+Popup HTML:
+
+<div ...>
+
+...
+
+</div>
+
+====================================================
+STEP 5
+====================================================
+
+Do NOT search options using only exact text.
+
+Facebook changes labels frequently.
+
+Implement a fuzzy matcher.
+
+Accept any of:
+
+Car/Truck
+
+Cars & Trucks
+
+Vehicle
+
+Car
+
+Truck
+
+Automobile
+
+Cars
+
+====================================================
+STEP 6
+====================================================
+
+If no matching text exists during Test Mode:
+
+Automatically select the FIRST available option.
+
+This makes the state machine resilient to Facebook UI changes.
+
+====================================================
+STEP 7
+====================================================
+
+Increase the Model wait timeout.
+
+Instead of sleeping a fixed amount:
+
+Poll every 250ms.
+
+Maximum timeout:
+
+20 seconds.
+
+Do NOT continue until the Model combobox exists.
+
+After selecting Model:
+
+Poll for the Title input.
+
+Maximum timeout:
+
+20 seconds.
+
+====================================================
+STEP 8
+====================================================
+
+Do NOT use fixed sleeps anywhere.
+
+Every step must wait for DOM conditions.
+
+====================================================
+STEP 9
+====================================================
+
+Do not modify:
+
+background.js
+
+backend API
+
+queue logic
+
+claim logic
+
+complete logic
+
+test payload
+
+Only modify the DOM interaction layer.
+
+====================================================
+FINAL
+====================================================
+
+Bump the version to 1.0.6.
+
+Set:
+
+BUILD_LABEL = "COMBOBOX_REGRESSION_FIX_1.0.6"
+
+Generate a completely new ZIP (not overwrite the previous archive).
+
+Verify the ZIP contains the updated content.js before packaging.

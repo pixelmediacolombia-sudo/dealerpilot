@@ -137,3 +137,9 @@ id = "xG0T2NvXfiQJ1HcxKF8d9"
 uri = "file://DealerPilot-Extension-v1.0.5-DOM_WAIT_20260629-144813.zip"
 type = "unspecified"
 title = "DealerPilot Extension v1.0.5 — DOM_WAIT"
+
+[[outputs]]
+id = "E7bhZr_2_aQ39WtYVOFUR"
+uri = "file://DealerPilot-Extension-v1.0.6-COMBOBOX_REGRESSION_FIX_20260630-010209.zip"
+type = "unspecified"
+title = "DealerPilot Extension v1.0.6 — COMBOBOX_REGRESSION_FIX"
