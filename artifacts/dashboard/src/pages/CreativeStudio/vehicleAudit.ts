@@ -122,6 +122,61 @@ export function vehicleAuditBreakdown(vehicleId: number): VehicleAuditResult {
   };
 }
 
+// ── Per-photo scorer (used in the horizontal strip) ──────────────────────────
+
+export type PhotoScore = {
+  total: number;
+  decision: VehicleAuditResult["decision"];
+  topReasons: [string, string];
+  brandingOverlays: number;
+};
+
+export function photoScore(vehicleId: number, position: number): PhotoScore {
+  function ps(offset: number) {
+    return Math.abs(Math.sin(vehicleId * 0.073 + position * 0.29 + offset)) * 100;
+  }
+  const vehicleVisibility  = scaleDown(ps(1.37), 20, 9);
+  const angleQuality       = scaleDown(ps(2.79), 20, 9);
+  const lighting           = scaleDown(ps(4.13), 15, 5);
+  const sharpness          = scaleDown(ps(5.91), 15, 5);
+  const backgroundCleanliness = scaleDown(ps(7.53), 15, 4);
+  const brandRaw           = ps(2.41);
+  const brandingOverlays   = scaleDown(brandRaw > 55 ? brandRaw - 30 : brandRaw, 10, 2);
+  const cropFraming        = scaleDown(ps(11.19), 10, 3);
+  const marketplaceTrust   = scaleDown(ps(13.77), 10, 3);
+  const rawTotal = vehicleVisibility + angleQuality + lighting + sharpness +
+                   backgroundCleanliness + brandingOverlays + cropFraming + marketplaceTrust;
+  const total = Math.round((rawTotal / 115) * 100);
+
+  const penalties = [
+    { key: "brandingOverlays", val: brandingOverlays, max: 10, w: 2.0, reason: brandingOverlays <= 4 ? "Heavy dealer branding" : "Dealer overlays visible" },
+    { key: "angleQuality",     val: angleQuality,     max: 20, w: 1.0, reason: angleQuality < 12 ? "Poor shooting angle" : "Angle not optimal" },
+    { key: "vehicleVisibility",val: vehicleVisibility, max: 20, w: 1.0, reason: vehicleVisibility < 12 ? "Vehicle partially cropped" : "Visibility reduced" },
+    { key: "lighting",         val: lighting,         max: 15, w: 1.33, reason: lighting < 9 ? "Poor lighting" : "Lighting needs boost" },
+    { key: "sharpness",        val: sharpness,        max: 15, w: 1.33, reason: sharpness < 9 ? "Low sharpness / blur" : "Sharpness reduced" },
+    { key: "backgroundCleanliness", val: backgroundCleanliness, max: 15, w: 1.33, reason: backgroundCleanliness < 8 ? "Cluttered background" : "Busy background" },
+    { key: "cropFraming",      val: cropFraming,      max: 10, w: 2.0, reason: cropFraming < 6 ? "Bad framing" : "Framing could improve" },
+    { key: "marketplaceTrust", val: marketplaceTrust, max: 10, w: 2.0, reason: marketplaceTrust < 5 ? "Low Marketplace trust" : "Trust reduced" },
+  ].sort((a, b) => (1 - b.val / b.max) * b.w - (1 - a.val / a.max) * a.w);
+
+  const topReasons: [string, string] = [
+    penalties[0]?.reason ?? "Good quality",
+    penalties[1]?.reason ?? "Minor issues",
+  ];
+
+  let decision: VehicleAuditResult["decision"];
+  if (total >= 90) {
+    decision = brandingOverlays >= 8 ? "Use Original" : "Enhance Recommended";
+  } else if (total >= 60) {
+    decision = "Enhance Recommended";
+  } else {
+    const critFail = vehicleVisibility < 11 || sharpness < 7 || cropFraming < 4;
+    decision = critFail ? "Do Not Use" : "Enhance Recommended";
+  }
+
+  return { total, decision, topReasons, brandingOverlays };
+}
+
 export function decisionBadgeClass(decision: VehicleAuditResult["decision"]): string {
   if (decision === "Use Original") return "bg-success/90 text-white";
   if (decision === "Enhance Recommended") return "bg-amber-500/90 text-black";

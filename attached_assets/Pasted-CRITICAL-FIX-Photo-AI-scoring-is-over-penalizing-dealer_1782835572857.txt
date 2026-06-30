@@ -1,0 +1,70 @@
+CRITICAL FIX — Photo AI scoring is over-penalizing dealer branding
+
+DealerPilot is currently marking many photos as:
+“Enhance Recommended”
+Reason: “Dealer overlays visible”
+
+This is wrong.
+
+Dealer branding / Alpha wall / dealership background should NOT automatically trigger enhancement.
+
+DealerPilot should recommend enhancement only when the photo quality hurts Marketplace performance.
+
+New rule:
+Dealer branding is acceptable if:
+- it does not block the vehicle
+- it does not cover the car body
+- it does not reduce buyer trust
+- it looks like a normal dealership photo
+- the vehicle is clearly visible
+
+Enhancement should be recommended only for real photo quality issues:
+- vehicle cropped
+- vehicle too dark
+- blurry photo
+- bad angle
+- poor framing
+- heavy reflections
+- low sharpness
+- vehicle partially blocked
+- bad exposure
+- messy background that distracts from the car
+- promotional overlay covering the vehicle
+- text/phone/banner physically covering important parts of the vehicle
+
+Important:
+Dealer wall branding in the background is NOT the same as an overlay covering the vehicle.
+
+Examples:
+1. Alpha logo on wall behind car:
+Do NOT automatically enhance.
+Score can still be high.
+
+2. Yellow banner covering bottom of image but not blocking vehicle:
+Minor penalty only.
+Do NOT automatically enhance unless other issues exist.
+
+3. Text/phone/logo covering the car body:
+Enhance recommended.
+
+4. Photo is dark/blurry/cropped:
+Enhance recommended.
+
+Update photo decision logic:
+- Use Original if vehicle visibility, angle, lighting and sharpness are strong, even with dealer background.
+- Enhance Recommended only if photo quality issues meaningfully reduce Marketplace trust.
+- Do Not Use only for truly bad photos.
+
+Also stop giving every vehicle the same score like 77.
+Scores must vary based on actual photo factors, not a repeated fallback.
+
+Each card should show:
+- Photo Score
+- Decision
+- Main reason
+- Top positive signal
+- Top negative signal
+
+Acceptance:
+A clean Alpha showroom photo with the car clearly visible should often be Use Original.
+Dealer overlays visible alone should not be enough for Enhance Recommended.
