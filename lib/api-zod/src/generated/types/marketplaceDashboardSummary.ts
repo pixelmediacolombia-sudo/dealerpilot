@@ -8,7 +8,19 @@
 
 export interface MarketplaceDashboardSummary {
   totalListings: number;
-  avgOutcomeScore: number;
-  totalConversations: number;
-  totalHotLeads: number;
+  totalListingsSource: string;
+  totalListingsNote: string;
+  /** @nullable */
+  avgOutcomeScore?: number | null;
+  avgOutcomeScoreSource: string;
+  avgOutcomeScoreNote: string;
+  /** @nullable */
+  totalConversations?: number | null;
+  totalConversationsSource: string;
+  totalConversationsNote: string;
+  /** @nullable */
+  totalHotLeads?: number | null;
+  totalHotLeadsSource: string;
+  totalHotLeadsNote: string;
+  hasMockPerformanceData: boolean;
 }

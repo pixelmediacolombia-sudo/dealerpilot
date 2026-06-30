@@ -2531,9 +2531,18 @@ export const RunSimulatorResponse = zod.object({
 export const GetMarketplaceDashboardResponse = zod.object({
   "summary": zod.object({
   "totalListings": zod.number(),
-  "avgOutcomeScore": zod.number(),
-  "totalConversations": zod.number(),
-  "totalHotLeads": zod.number()
+  "totalListingsSource": zod.string(),
+  "totalListingsNote": zod.string(),
+  "avgOutcomeScore": zod.number().nullish(),
+  "avgOutcomeScoreSource": zod.string(),
+  "avgOutcomeScoreNote": zod.string(),
+  "totalConversations": zod.number().nullish(),
+  "totalConversationsSource": zod.string(),
+  "totalConversationsNote": zod.string(),
+  "totalHotLeads": zod.number().nullish(),
+  "totalHotLeadsSource": zod.string(),
+  "totalHotLeadsNote": zod.string(),
+  "hasMockPerformanceData": zod.boolean()
 }),
   "postingTimePerformance": zod.array(zod.object({
   "dayOfWeek": zod.number(),
@@ -2645,6 +2654,24 @@ export const ListMarketplaceRecommendationsResponse = zod.object({
   "actionCta": zod.string().nullish(),
   "strategyEngineVersion": zod.string().nullish()
 }))
+})
+
+
+/**
+ * @summary Real data source health summary for the dashboard
+ */
+export const GetMarketplaceDashboardHealthResponse = zod.object({
+  "inventoryCount": zod.number(),
+  "marketplaceListingCount": zod.number(),
+  "publishedListingCount": zod.number(),
+  "conversationsCount": zod.number(),
+  "realLeadsCount": zod.number(),
+  "hotLeadsCount": zod.number(),
+  "hasMockData": zod.boolean(),
+  "mockRecordCount": zod.number(),
+  "lastSyncAt": zod.string().nullish(),
+  "duplicateRecordsDetected": zod.number(),
+  "dataSourcesConnected": zod.array(zod.string())
 })
 
 

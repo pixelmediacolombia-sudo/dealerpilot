@@ -1,10 +1,14 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull, isNotNull, sql, count } from "drizzle-orm";
 import {
   vehiclesTable,
   listingPerformanceTable,
   vehicleIntelligenceTable,
+  listingsTable,
+  conversationsTable,
+  leadsTable,
+  feedRunsTable,
   type ListingPerformance,
 } from "@workspace/db";
 import { seedMarketplaceIntelligence } from "../intelligence/seed";
@@ -112,7 +116,6 @@ function buildVehicleTypePerformance(records: ListingPerformance[]) {
 }
 
 function buildWeakListings(records: ListingPerformance[], threshold = 25) {
-  // Latest record per vehicle with low outcomeScore
   const byVehicle = groupBy(records, (r) => r.vehicleId);
   const result: Array<{
     vehicleId: number; year: number | null; make: string; model: string;
@@ -164,6 +167,96 @@ function buildLowEngagement(records: ListingPerformance[]) {
     }));
 }
 
+// --- Real data aggregations ---
+
+async function getRealSummary() {
+  // 1. Total Marketplace listings — unique vehicles with a marketplace listing
+  const marketplaceListings = await db
+    .select()
+    .from(listingsTable)
+    .where(eq(listingsTable.channel, "marketplace"));
+
+  const totalListings = marketplaceListings.length;
+
+  // 2. Real conversations — imported from Marketplace / Messenger
+  const conversations = await db
+    .select()
+    .from(conversationsTable)
+    .where(eq(conversationsTable.dealerId, DEALER_ID));
+
+  const totalConversations = conversations.length;
+  const hasConversations = totalConversations > 0;
+
+  // 3. Hot leads — qualified leads with temperature = Hot
+  const hotLeads = await db
+    .select()
+    .from(leadsTable)
+    .where(and(eq(leadsTable.dealerId, DEALER_ID), eq(leadsTable.temperature, "Hot")));
+
+  const totalLeads = await db
+    .select()
+    .from(leadsTable)
+    .where(eq(leadsTable.dealerId, DEALER_ID));
+
+  const totalHotLeads = hotLeads.length;
+  const hasLeads = totalLeads.length > 0;
+
+  // 4. Outcome score — only from real publishing batches (publishingBatchId is not null)
+  //    Seeded records have publishingBatchId = null
+  const realPerformanceRecords = await db
+    .select()
+    .from(listingPerformanceTable)
+    .where(
+      and(
+        eq(listingPerformanceTable.dealerId, DEALER_ID),
+        isNotNull(listingPerformanceTable.publishingBatchId),
+      ),
+    );
+
+  const hasRealPerformance = realPerformanceRecords.length > 0;
+  const avgOutcomeScore = hasRealPerformance
+    ? avg(realPerformanceRecords.map((r) => r.outcomeScore))
+    : null;
+
+  // 5. Mock data flag: seeded records = LP records without a publishingBatchId
+  const [mockCountRow] = await db
+    .select({ cnt: count() })
+    .from(listingPerformanceTable)
+    .where(
+      and(
+        eq(listingPerformanceTable.dealerId, DEALER_ID),
+        isNull(listingPerformanceTable.publishingBatchId),
+      ),
+    );
+  const hasMockPerformanceData = (mockCountRow?.cnt ?? 0) > 0;
+
+  return {
+    totalListings,
+    totalListingsSource: "live_data" as const,
+    totalListingsNote: "Count of unique Marketplace listings in the database. Each vehicle has at most one Marketplace listing.",
+
+    avgOutcomeScore,
+    avgOutcomeScoreSource: hasRealPerformance ? ("historical" as const) : ("no_data" as const),
+    avgOutcomeScoreNote: hasRealPerformance
+      ? `Average outcome score from ${realPerformanceRecords.length} published listing${realPerformanceRecords.length !== 1 ? "s" : ""} with real engagement data. Score = (Hot leads × 25 + Warm leads × 10 + Appointments × 30 + Sales × 50) / Conversations.`
+      : "Insufficient data — score will appear once vehicles are published and receive buyer engagement. Requires at least one published listing with a real conversation.",
+
+    totalConversations: hasConversations ? totalConversations : null,
+    totalConversationsSource: hasConversations ? ("live_data" as const) : ("no_data" as const),
+    totalConversationsNote: hasConversations
+      ? `${totalConversations} buyer conversation${totalConversations !== 1 ? "s" : ""} imported from Marketplace / Messenger via the Chrome extension.`
+      : "No conversations imported yet. Connect the Chrome extension on an active Marketplace inbox to sync buyer conversations.",
+
+    totalHotLeads: hasLeads ? totalHotLeads : null,
+    totalHotLeadsSource: hasLeads ? ("live_data" as const) : ("no_data" as const),
+    totalHotLeadsNote: hasLeads
+      ? `${totalHotLeads} hot lead${totalHotLeads !== 1 ? "s" : ""} out of ${totalLeads.length} total. A Hot lead is a buyer who confirmed budget, timeline, and documents.`
+      : "No leads scored yet. Hot leads are buyers who confirmed budget, timeline, and proof of income via Messenger conversations.",
+
+    hasMockPerformanceData,
+  };
+}
+
 // GET /api/marketplace-intelligence/dashboard
 router.get("/marketplace-intelligence/dashboard", async (req, res) => {
   const records = await db
@@ -200,7 +293,6 @@ router.get("/marketplace-intelligence/dashboard", async (req, res) => {
     if (a > bestTimeScore) { bestTimeScore = a; bestTime = t; }
   }
 
-  // Next batch: low-engagement + weak listings eligible for next post
   const vehicleIdsWithPerf = new Set(records.map((r) => r.vehicleId));
   const nextBatchVehicles = intelligence
     .filter((vi) => vi.confidenceScore >= 50)
@@ -223,14 +315,12 @@ router.get("/marketplace-intelligence/dashboard", async (req, res) => {
 
   const estimatedHotLeads = Math.round(nextBatchVehicles.length * 1.8);
 
+  // Real KPI summary from live tables
+  const realSummary = await getRealSummary();
+
   res.json({
-    summary: {
-      totalListings: records.length,
-      avgOutcomeScore: avg(records.map((r) => r.outcomeScore)),
-      totalConversations: sum(records.map((r) => r.conversationsCount)),
-      totalHotLeads: sum(records.map((r) => r.hotLeadsCount)),
-    },
-    postingTimePerformance: bestByDay,
+    summary: realSummary,
+    postingTimePerformance: buildPostingTimePerformance(records),
     downPaymentPerformance: buildDownPaymentPerformance(records),
     creativePerformance: buildCreativePerformance(records),
     vehicleTypePerformance: buildVehicleTypePerformance(records),
@@ -248,7 +338,107 @@ router.get("/marketplace-intelligence/dashboard", async (req, res) => {
   });
 });
 
-// Parse v2 JSON explanation — returns null for v1 plaintext records
+// GET /api/marketplace-intelligence/dashboard-health
+router.get("/marketplace-intelligence/dashboard-health", async (req, res) => {
+  // Inventory count
+  const inventoryRows = await db
+    .select({ cnt: count() })
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.dealerId, DEALER_ID));
+  const inventoryCount = Number(inventoryRows[0]?.cnt ?? 0);
+
+  // Marketplace listing count (all listings)
+  const listingRows = await db
+    .select({ cnt: count() })
+    .from(listingsTable)
+    .where(eq(listingsTable.channel, "marketplace"));
+  const marketplaceListingCount = Number(listingRows[0]?.cnt ?? 0);
+
+  // Published listings
+  const publishedRows = await db
+    .select({ cnt: count() })
+    .from(listingsTable)
+    .where(and(eq(listingsTable.channel, "marketplace"), eq(listingsTable.status, "Published")));
+  const publishedListingCount = Number(publishedRows[0]?.cnt ?? 0);
+
+  // Conversations
+  const convRows = await db
+    .select({ cnt: count() })
+    .from(conversationsTable)
+    .where(eq(conversationsTable.dealerId, DEALER_ID));
+  const conversationsCount = Number(convRows[0]?.cnt ?? 0);
+
+  // Leads
+  const leadRows = await db
+    .select({ cnt: count() })
+    .from(leadsTable)
+    .where(eq(leadsTable.dealerId, DEALER_ID));
+  const realLeadsCount = Number(leadRows[0]?.cnt ?? 0);
+
+  // Hot leads
+  const hotLeadRows = await db
+    .select({ cnt: count() })
+    .from(leadsTable)
+    .where(and(eq(leadsTable.dealerId, DEALER_ID), eq(leadsTable.temperature, "Hot")));
+  const hotLeadsCount = Number(hotLeadRows[0]?.cnt ?? 0);
+
+  // Mock data (seeded performance records = no publishingBatchId)
+  const mockRows = await db
+    .select({ cnt: count() })
+    .from(listingPerformanceTable)
+    .where(
+      and(
+        eq(listingPerformanceTable.dealerId, DEALER_ID),
+        isNull(listingPerformanceTable.publishingBatchId),
+      ),
+    );
+  const mockRecordCount = Number(mockRows[0]?.cnt ?? 0);
+  const hasMockData = mockRecordCount > 0;
+
+  // Last successful feed sync
+  const lastSyncRows = await db
+    .select()
+    .from(feedRunsTable)
+    .where(and(eq(feedRunsTable.dealerId, DEALER_ID), eq(feedRunsTable.status, "completed")))
+    .orderBy(desc(feedRunsTable.finishedAt))
+    .limit(1);
+  const lastSyncAt = lastSyncRows[0]?.finishedAt?.toISOString() ?? null;
+
+  // Detect duplicate performance records (same vehicleId appearing multiple times)
+  const dupRows = await db
+    .select({
+      vehicleId: listingPerformanceTable.vehicleId,
+      cnt: sql<number>`count(*)::int`,
+    })
+    .from(listingPerformanceTable)
+    .where(eq(listingPerformanceTable.dealerId, DEALER_ID))
+    .groupBy(listingPerformanceTable.vehicleId)
+    .having(sql`count(*) > 1`);
+  const duplicateRecordsDetected = dupRows.length;
+
+  // Data sources connected
+  const dataSourcesConnected: string[] = [];
+  if (inventoryCount > 0) dataSourcesConnected.push("Inventory XML Feed");
+  if (marketplaceListingCount > 0) dataSourcesConnected.push("Marketplace Listings");
+  if (conversationsCount > 0) dataSourcesConnected.push("Messenger Conversations");
+  if (realLeadsCount > 0) dataSourcesConnected.push("CRM Leads");
+
+  res.json({
+    inventoryCount,
+    marketplaceListingCount,
+    publishedListingCount,
+    conversationsCount,
+    realLeadsCount,
+    hotLeadsCount,
+    hasMockData,
+    mockRecordCount,
+    lastSyncAt,
+    duplicateRecordsDetected,
+    dataSourcesConnected,
+  });
+});
+
+// Parse v2 JSON explanation
 function parseV2Explanation(explanation: string | null): {
   v: 2;
   strategyName: string;
@@ -314,7 +504,6 @@ router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
       explanation: vi.explanation,
       expectedLeadQuality: vi.expectedLeadQuality,
       generatedAt: vi.generatedAt,
-      // v2 enriched fields
       strategyName: v2?.strategyName ?? null,
       reason: v2?.reason ?? vi.explanation ?? null,
       supportingSignals: v2?.supportingSignals ?? [],
@@ -401,10 +590,9 @@ router.get("/marketplace-intelligence/vehicles/:vehicleId", async (req, res) => 
   });
 });
 
-// POST /api/marketplace-intelligence/seed — force re-seed (clears and regenerates)
+// POST /api/marketplace-intelligence/seed — force re-seed
 router.post("/marketplace-intelligence/seed", async (req, res) => {
   try {
-    // Clear existing data so seedMarketplaceIntelligence will run again
     await db.delete(listingPerformanceTable).where(eq(listingPerformanceTable.dealerId, DEALER_ID));
     await db.delete(vehicleIntelligenceTable).where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID));
     await seedMarketplaceIntelligence(req.log);

@@ -95,6 +95,7 @@ import type {
   ListingWorkspaceList,
   MarkListingPublished200,
   MarkListingPublishedBody,
+  MarketplaceDashboardHealthResponse,
   MarketplaceDashboardResponse,
   MarketplaceRecommendationsResponse,
   MessageContextInput,
@@ -5598,6 +5599,83 @@ export function useListMarketplaceRecommendations<TData = Awaited<ReturnType<typ
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListMarketplaceRecommendationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMarketplaceDashboardHealthUrl = () => {
+
+
+
+
+  return `/api/marketplace-intelligence/dashboard-health`
+}
+
+/**
+ * @summary Real data source health summary for the dashboard
+ */
+export const getMarketplaceDashboardHealth = async ( options?: RequestInit): Promise<MarketplaceDashboardHealthResponse> => {
+
+  return customFetch<MarketplaceDashboardHealthResponse>(getGetMarketplaceDashboardHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMarketplaceDashboardHealthQueryKey = () => {
+    return [
+    `/api/marketplace-intelligence/dashboard-health`
+    ] as const;
+    }
+
+
+export const getGetMarketplaceDashboardHealthQueryOptions = <TData = Awaited<ReturnType<typeof getMarketplaceDashboardHealth>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMarketplaceDashboardHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMarketplaceDashboardHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMarketplaceDashboardHealth>>> = ({ signal }) => getMarketplaceDashboardHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMarketplaceDashboardHealth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMarketplaceDashboardHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getMarketplaceDashboardHealth>>>
+export type GetMarketplaceDashboardHealthQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Real data source health summary for the dashboard
+ */
+
+export function useGetMarketplaceDashboardHealth<TData = Awaited<ReturnType<typeof getMarketplaceDashboardHealth>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMarketplaceDashboardHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMarketplaceDashboardHealthQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

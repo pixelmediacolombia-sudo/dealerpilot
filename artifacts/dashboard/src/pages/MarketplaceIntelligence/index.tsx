@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
   useGetMarketplaceDashboard,
+  useGetMarketplaceDashboardHealth,
   useListMarketplaceRecommendations,
   useBulkSchedulePublishing,
 } from "@workspace/api-client-react";
@@ -9,6 +10,12 @@ import { SectionCard, PageHeader } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -32,6 +39,16 @@ import {
   Sparkles,
   Loader2,
   CalendarClock,
+  Info,
+  Wifi,
+  WifiOff,
+  Database,
+  ShieldAlert,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  Copy,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -301,11 +318,241 @@ function StrategyCard({
   );
 }
 
+// ─── KPI source badge ────────────────────────────────────────────────────────
+
+type KpiSource = "live_data" | "historical" | "ai_prediction" | "estimated" | "no_data";
+
+const SOURCE_META: Record<KpiSource, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
+  live_data: { label: "Live Data", color: "text-success", bg: "bg-success/10", border: "border-success/20", icon: Activity },
+  historical: { label: "Historical", color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20", icon: Clock },
+  ai_prediction: { label: "AI Prediction", color: "text-violet-400", bg: "bg-violet-500/10", border: "border-violet-500/20", icon: Sparkles },
+  estimated: { label: "Estimated", color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", icon: Zap },
+  no_data: { label: "No Data", color: "text-muted-foreground", bg: "bg-secondary/30", border: "border-border/30", icon: XCircle },
+};
+
+function KpiCard({
+  label,
+  icon: Icon,
+  iconColor,
+  displayValue,
+  source,
+  note,
+  hasMock,
+}: {
+  label: string;
+  icon: React.ElementType;
+  iconColor: string;
+  value: number | null;
+  displayValue: string;
+  source: KpiSource;
+  note: string;
+  hasMock: boolean;
+}) {
+  const src = SOURCE_META[source];
+  const SrcIcon = src.icon;
+  const isNoData = source === "no_data";
+
+  return (
+    <Card className="bg-white/[0.02] border-white/[0.06] relative overflow-hidden">
+      {hasMock && (
+        <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-t-amber-500/60 border-l-transparent" title="Contains model data" />
+      )}
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className={cn("p-2 rounded-lg bg-white/[0.04]", iconColor)}>
+            <Icon className="w-4 h-4" />
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button className="text-muted-foreground/50 hover:text-muted-foreground transition-colors mt-0.5">
+                <Info className="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
+              <p>{note || "No calculation note available."}</p>
+              {hasMock && (
+                <p className="mt-1.5 text-amber-400 flex items-center gap-1">
+                  <ShieldAlert className="w-3 h-3" />
+                  Seeded model data present. This metric excludes it.
+                </p>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+
+        <div className={cn("text-2xl font-bold mb-1", isNoData ? "text-muted-foreground/50 text-base" : "text-white")}>
+          {displayValue}
+        </div>
+        <div className="text-xs text-muted-foreground mb-2">{label}</div>
+
+        <div className={cn(
+          "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border",
+          src.bg, src.color, src.border,
+        )}>
+          <SrcIcon className="w-2.5 h-2.5" />
+          {src.label}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Dashboard Health Panel ───────────────────────────────────────────────────
+
+import type { MarketplaceDashboardHealthResponse } from "@workspace/api-client-react";
+
+function DashboardHealthPanel({
+  health,
+  isLoading,
+  hasMockData,
+}: {
+  health: MarketplaceDashboardHealthResponse | null;
+  isLoading: boolean;
+  hasMockData: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const statusDot = (connected: boolean) => (
+    <span className={cn("w-2 h-2 rounded-full inline-block shrink-0", connected ? "bg-success" : "bg-destructive/70")} />
+  );
+
+  const fmt = (iso: string | null) => {
+    if (!iso) return "Never";
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div className={cn(
+      "rounded-xl border transition-all",
+      hasMockData
+        ? "border-amber-500/30 bg-amber-500/5"
+        : "border-border/40 bg-white/[0.02]",
+    )}>
+      {/* Header row — always visible */}
+      <button
+        className="w-full flex items-center justify-between px-5 py-3 text-left"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <div className="flex items-center gap-2.5">
+          <Database className={cn("w-4 h-4", hasMockData ? "text-amber-400" : "text-primary")} />
+          <span className="text-sm font-semibold text-foreground">Dashboard Health</span>
+          {hasMockData && (
+            <Badge variant="outline" className="text-[10px] font-bold px-2 py-0 bg-amber-500/10 text-amber-400 border-amber-500/25 gap-1">
+              <ShieldAlert className="w-2.5 h-2.5" />
+              Mock data in analytics
+            </Badge>
+          )}
+          {!hasMockData && !isLoading && (
+            <Badge variant="outline" className="text-[10px] font-bold px-2 py-0 bg-success/10 text-success border-success/25 gap-1">
+              <CheckCircle2 className="w-2.5 h-2.5" />
+              All metrics real
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          {!isLoading && health && (
+            <>
+              <span className="flex items-center gap-1.5">
+                {statusDot(health.inventoryCount > 0)}
+                {health.inventoryCount} vehicles
+              </span>
+              <span className="flex items-center gap-1.5">
+                {statusDot(health.marketplaceListingCount > 0)}
+                {health.marketplaceListingCount} listings
+              </span>
+              <span className="flex items-center gap-1.5">
+                {statusDot(health.conversationsCount > 0)}
+                {health.conversationsCount} conversations
+              </span>
+            </>
+          )}
+          {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </div>
+      </button>
+
+      {/* Expanded detail */}
+      {open && (
+        <div className="px-5 pb-5 border-t border-border/30 pt-4">
+          {isLoading || !health ? (
+            <div className="text-muted-foreground text-sm">Loading health data…</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {/* Data sources */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Data Sources</div>
+                {(["Inventory XML Feed", "Marketplace Listings", "Messenger Conversations", "CRM Leads"] as const).map((src) => {
+                  const connected = health.dataSourcesConnected.includes(src);
+                  return (
+                    <div key={src} className="flex items-center gap-2 text-xs">
+                      {statusDot(connected)}
+                      <span className={connected ? "text-foreground" : "text-muted-foreground/50"}>{src}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Inventory */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Inventory</div>
+                <div className="text-xs space-y-1">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Vehicles imported</span><span className="font-semibold">{health.inventoryCount}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Marketplace listings</span><span className="font-semibold">{health.marketplaceListingCount}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Published</span><span className="font-semibold text-success">{health.publishedListingCount}</span></div>
+                </div>
+              </div>
+
+              {/* Leads & CRM */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Leads & CRM</div>
+                <div className="text-xs space-y-1">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Conversations</span><span className="font-semibold">{health.conversationsCount}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Total leads</span><span className="font-semibold">{health.realLeadsCount}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Hot leads</span><span className="font-semibold text-orange-400">{health.hotLeadsCount}</span></div>
+                </div>
+              </div>
+
+              {/* Data integrity */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Data Integrity</div>
+                <div className="text-xs space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">Mock analytics records</span>
+                    <span className={cn("font-semibold", health.mockRecordCount > 0 ? "text-amber-400" : "text-success")}>
+                      {health.mockRecordCount > 0 ? `${health.mockRecordCount} (excluded from KPIs)` : "None"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">Duplicate perf. records</span>
+                    <span className={cn("font-semibold", health.duplicateRecordsDetected > 0 ? "text-amber-400" : "text-success")}>
+                      {health.duplicateRecordsDetected > 0 ? health.duplicateRecordsDetected : "None"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">Last sync</span>
+                    <span className="font-semibold flex items-center gap-1">
+                      <RefreshCw className="w-2.5 h-2.5 text-muted-foreground" />
+                      {fmt(health.lastSyncAt ?? null)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function MarketplaceIntelligence() {
   const [activeTab, setActiveTab] = useState<TabKey>("recommendations");
   const [publishingId, setPublishingId] = useState<number | null>(null);
 
   const { data: dash, isLoading: dashLoading } = useGetMarketplaceDashboard();
+  const { data: health, isLoading: healthLoading } = useGetMarketplaceDashboardHealth();
   const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations();
 
   const bulkSchedule = useBulkSchedulePublishing({
@@ -393,27 +640,73 @@ export function MarketplaceIntelligence() {
             )}
           </div>
 
-          {/* KPI Summary */}
-          <div className="grid grid-cols-4 gap-4">
-            {[
-              { label: "Total Listings Tracked", value: summary?.totalListings ?? 0, icon: BarChart3, color: "text-primary" },
-              { label: "Avg Outcome Score", value: `${summary?.avgOutcomeScore ?? 0}/100`, icon: Star, color: "text-yellow-400" },
-              { label: "Total Conversations", value: summary?.totalConversations ?? 0, icon: MessageSquare, color: "text-blue-400" },
-              { label: "Total Hot Leads", value: summary?.totalHotLeads ?? 0, icon: Flame, color: "text-orange-400" },
-            ].map(({ label, value, icon: Icon, color }) => (
-              <Card key={label} className="bg-white/[0.02] border-white/[0.06]">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className={cn("p-2 rounded-lg bg-white/[0.04]", color)}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xl font-bold text-white">{isLoading ? "—" : value}</div>
-                    <div className="text-xs text-muted-foreground">{label}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {/* KPI Summary — real data only, each card declares its source */}
+          <TooltipProvider>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Total Listings Tracked */}
+              <KpiCard
+                label="Listings Tracked"
+                icon={BarChart3}
+                iconColor="text-primary"
+                value={isLoading ? null : summary?.totalListings ?? 0}
+                displayValue={isLoading ? "—" : String(summary?.totalListings ?? 0)}
+                source={(summary?.totalListingsSource ?? "live_data") as KpiSource}
+                note={summary?.totalListingsNote ?? "Count of unique Marketplace listings in the database."}
+                hasMock={false}
+              />
+              {/* Avg Outcome Score */}
+              <KpiCard
+                label="Outcome Score"
+                icon={Star}
+                iconColor="text-yellow-400"
+                value={isLoading ? null : summary?.avgOutcomeScore ?? null}
+                displayValue={
+                  isLoading ? "—"
+                  : summary?.avgOutcomeScore != null
+                    ? `${summary.avgOutcomeScore}/100`
+                    : "Insufficient data"
+                }
+                source={(summary?.avgOutcomeScoreSource ?? "no_data") as KpiSource}
+                note={summary?.avgOutcomeScoreNote ?? ""}
+                hasMock={summary?.hasMockPerformanceData ?? false}
+              />
+              {/* Total Conversations */}
+              <KpiCard
+                label="Conversations"
+                icon={MessageSquare}
+                iconColor="text-blue-400"
+                value={isLoading ? null : summary?.totalConversations ?? null}
+                displayValue={
+                  isLoading ? "—"
+                  : summary?.totalConversations != null
+                    ? String(summary.totalConversations)
+                    : "No data yet"
+                }
+                source={(summary?.totalConversationsSource ?? "no_data") as KpiSource}
+                note={summary?.totalConversationsNote ?? ""}
+                hasMock={false}
+              />
+              {/* Hot Leads */}
+              <KpiCard
+                label="Hot Leads"
+                icon={Flame}
+                iconColor="text-orange-400"
+                value={isLoading ? null : summary?.totalHotLeads ?? null}
+                displayValue={
+                  isLoading ? "—"
+                  : summary?.totalHotLeads != null
+                    ? String(summary.totalHotLeads)
+                    : "Learning"
+                }
+                source={(summary?.totalHotLeadsSource ?? "no_data") as KpiSource}
+                note={summary?.totalHotLeadsNote ?? ""}
+                hasMock={false}
+              />
+            </div>
+          </TooltipProvider>
+
+          {/* Dashboard Health Panel */}
+          <DashboardHealthPanel health={health ?? null} isLoading={healthLoading} hasMockData={summary?.hasMockPerformanceData ?? false} />
 
           {/* Tabs */}
           <div className="flex gap-1 bg-white/[0.03] p-1 rounded-lg border border-white/[0.06] flex-wrap">

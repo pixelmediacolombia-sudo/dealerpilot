@@ -1605,6 +1605,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/MarketplaceRecommendationsResponse"
 
+  /marketplace-intelligence/dashboard-health:
+    get:
+      operationId: getMarketplaceDashboardHealth
+      summary: Real data source health summary for the dashboard
+      tags: [MarketplaceIntelligence]
+      responses:
+        "200":
+          description: Dashboard health data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketplaceDashboardHealthResponse"
+
   /marketplace-intelligence/seed:
     post:
       operationId: seedMarketplaceIntelligence
@@ -3233,12 +3246,39 @@ components:
 
     MarketplaceDashboardSummary:
       type: object
-      required: [totalListings, avgOutcomeScore, totalConversations, totalHotLeads]
+      required: [totalListings, totalListingsSource, totalListingsNote, avgOutcomeScoreSource, avgOutcomeScoreNote, totalConversationsSource, totalConversationsNote, totalHotLeadsSource, totalHotLeadsNote, hasMockPerformanceData]
       properties:
         totalListings: { type: integer }
-        avgOutcomeScore: { type: integer }
-        totalConversations: { type: integer }
-        totalHotLeads: { type: integer }
+        totalListingsSource: { type: string }
+        totalListingsNote: { type: string }
+        avgOutcomeScore: { type: ["integer", "null"] }
+        avgOutcomeScoreSource: { type: string }
+        avgOutcomeScoreNote: { type: string }
+        totalConversations: { type: ["integer", "null"] }
+        totalConversationsSource: { type: string }
+        totalConversationsNote: { type: string }
+        totalHotLeads: { type: ["integer", "null"] }
+        totalHotLeadsSource: { type: string }
+        totalHotLeadsNote: { type: string }
+        hasMockPerformanceData: { type: boolean }
+
+    MarketplaceDashboardHealthResponse:
+      type: object
+      required: [inventoryCount, marketplaceListingCount, publishedListingCount, conversationsCount, realLeadsCount, hotLeadsCount, hasMockData, mockRecordCount, duplicateRecordsDetected, dataSourcesConnected]
+      properties:
+        inventoryCount: { type: integer }
+        marketplaceListingCount: { type: integer }
+        publishedListingCount: { type: integer }
+        conversationsCount: { type: integer }
+        realLeadsCount: { type: integer }
+        hotLeadsCount: { type: integer }
+        hasMockData: { type: boolean }
+        mockRecordCount: { type: integer }
+        lastSyncAt: { type: ["string", "null"] }
+        duplicateRecordsDetected: { type: integer }
+        dataSourcesConnected:
+          type: array
+          items: { type: string }
 
     MarketplaceDashboardResponse:
       type: object

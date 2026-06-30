@@ -114,6 +114,7 @@ export * from './listPublishPriorityScoresParams';
 export * from './listVehiclePhotoScoresParams';
 export * from './listVehiclesParams';
 export * from './listVehiclesSort';
+export * from './marketplaceDashboardHealthResponse';
 export * from './marketplaceDashboardResponse';
 export * from './marketplaceDashboardResponseCreativePerformance';
 export * from './marketplaceDashboardSummary';
