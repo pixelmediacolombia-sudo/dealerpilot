@@ -20,6 +20,10 @@ import {
   Lightbulb,
   CalendarCheck,
   Zap,
+  ChevronDown,
+  ChevronUp,
+  Target,
+  ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,12 +38,19 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-function strategyBadge(strat: string) {
-  if (strat === "down_payment")
-    return <Badge className="bg-primary/20 text-primary border-primary/30 text-xs">Down Payment</Badge>;
-  if (strat === "starting_down")
-    return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">Starting Down</Badge>;
-  return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs">Full Price</Badge>;
+// Strategy name → color scheme
+function strategyColor(name: string | null | undefined): { bg: string; text: string; border: string } {
+  if (!name) return { bg: "bg-white/5", text: "text-muted-foreground", border: "border-white/10" };
+  const n = name.toLowerCase();
+  if (n.includes("truck")) return { bg: "bg-amber-500/15", text: "text-amber-400", border: "border-amber-500/25" };
+  if (n.includes("luxury")) return { bg: "bg-violet-500/15", text: "text-violet-400", border: "border-violet-500/25" };
+  if (n.includes("premium suv")) return { bg: "bg-blue-500/15", text: "text-blue-400", border: "border-blue-500/25" };
+  if (n.includes("fast turn")) return { bg: "bg-green-500/15", text: "text-green-400", border: "border-green-500/25" };
+  if (n.includes("serious buyer")) return { bg: "bg-primary/15", text: "text-primary", border: "border-primary/25" };
+  if (n.includes("price review")) return { bg: "bg-destructive/15", text: "text-destructive", border: "border-destructive/25" };
+  if (n.includes("performance")) return { bg: "bg-orange-500/15", text: "text-orange-400", border: "border-orange-500/25" };
+  if (n.includes("high-value")) return { bg: "bg-violet-500/15", text: "text-violet-400", border: "border-violet-500/25" };
+  return { bg: "bg-primary/15", text: "text-primary", border: "border-primary/25" };
 }
 
 function qualityBadge(q: string | null | undefined) {
@@ -54,6 +65,14 @@ function photoBadge(strat: string) {
   if (strat === "mixed")
     return <Badge className="bg-teal-500/20 text-teal-400 border-teal-500/30 text-xs">Mixed</Badge>;
   return <Badge className="bg-white/5 text-muted-foreground border-white/10 text-xs">Original</Badge>;
+}
+
+function strategyBadge(strat: string) {
+  if (strat === "down_payment")
+    return <Badge className="bg-primary/20 text-primary border-primary/30 text-xs">Down Payment</Badge>;
+  if (strat === "price_review")
+    return <Badge className="bg-destructive/20 text-destructive border-destructive/30 text-xs">Price Review</Badge>;
+  return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs">Full Price</Badge>;
 }
 
 function ConfidenceBar({ score }: { score: number }) {
@@ -83,6 +102,147 @@ function ScoreBar({ score, max = 100 }: { score: number; max?: number }) {
   );
 }
 
+// Rich v2 recommendation card
+type Rec = {
+  vehicleId: number;
+  year: number | null;
+  make: string;
+  model: string;
+  price: number | null;
+  bodyStyle: string | null;
+  recommendedPriceStrategy: string;
+  recommendedDownPayment: number | null;
+  recommendedPhotoStrategy: string;
+  recommendedDayLabel: string | null;
+  recommendedTimeLabel: string | null;
+  confidenceScore: number;
+  expectedLeadQuality: string | null;
+  strategyName: string | null;
+  reason: string | null;
+  supportingSignals: string[];
+  expectedImpact: string | null;
+  actionCta: string | null;
+};
+
+function StrategyCard({ rec }: { rec: Rec }) {
+  const [expanded, setExpanded] = useState(false);
+  const colors = strategyColor(rec.strategyName);
+  const hasV2 = Boolean(rec.strategyName);
+
+  return (
+    <div className={cn(
+      "rounded-xl border transition-all",
+      "bg-white/[0.02] border-white/[0.06] hover:border-white/[0.10]",
+    )}>
+      {/* Header row */}
+      <div
+        className="flex items-center gap-4 p-4 cursor-pointer"
+        onClick={() => setExpanded((e) => !e)}
+      >
+        {/* Strategy name badge */}
+        <div className="shrink-0">
+          {hasV2 ? (
+            <span className={cn("inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border", colors.bg, colors.text, colors.border)}>
+              {rec.strategyName}
+            </span>
+          ) : (
+            strategyBadge(rec.recommendedPriceStrategy)
+          )}
+        </div>
+
+        {/* Vehicle */}
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-white truncate">
+            {rec.year} {rec.make} {rec.model}
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
+            {rec.price != null && <span>{formatCurrency(rec.price)}</span>}
+            {rec.bodyStyle && <span>· {rec.bodyStyle}</span>}
+            {rec.recommendedDownPayment != null && (
+              <span className="text-primary font-medium">· {formatCurrency(rec.recommendedDownPayment)} down</span>
+            )}
+          </div>
+        </div>
+
+        {/* Right-side badges */}
+        <div className="flex items-center gap-3 shrink-0">
+          {qualityBadge(rec.expectedLeadQuality)}
+          {photoBadge(rec.recommendedPhotoStrategy)}
+          <div className="w-24">
+            <ConfidenceBar score={rec.confidenceScore} />
+          </div>
+          {expanded
+            ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+            : <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          }
+        </div>
+      </div>
+
+      {/* Expanded v2 detail */}
+      {expanded && (
+        <div className="px-4 pb-4 space-y-4 border-t border-white/[0.05] pt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+            {/* Reason */}
+            {rec.reason && (
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Why this strategy</div>
+                <p className="text-sm text-white/80 leading-relaxed">{rec.reason}</p>
+              </div>
+            )}
+
+            {/* Supporting signals */}
+            {rec.supportingSignals && rec.supportingSignals.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Supporting Signals</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {rec.supportingSignals.map((s, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.08] text-xs text-white/70">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Expected impact */}
+            {rec.expectedImpact && (
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/15 flex items-start gap-2.5">
+                <Target className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-primary mb-1">Expected Impact</div>
+                  <div className="text-xs text-white/80">{rec.expectedImpact}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Action CTA */}
+            {rec.actionCta && (
+              <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.08] flex items-start gap-2.5">
+                <ArrowRight className="w-3.5 h-3.5 text-success mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-success mb-1">Action</div>
+                  <div className="text-xs text-white/80">{rec.actionCta}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Posting timing */}
+          {(rec.recommendedDayLabel || rec.recommendedTimeLabel) && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="w-3.5 h-3.5" />
+              Best post time: <span className="text-white font-medium">{rec.recommendedDayLabel} at {rec.recommendedTimeLabel}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MarketplaceIntelligence() {
   const [activeTab, setActiveTab] = useState<TabKey>("recommendations");
 
@@ -91,18 +251,29 @@ export function MarketplaceIntelligence() {
 
   const isLoading = dashLoading || recsLoading;
   const summary = dash?.summary;
-  const recs = recsData?.recommendations ?? [];
+  const recs = (recsData?.recommendations ?? []) as Rec[];
+  const engineVersion = (recsData as { strategyEngineVersion?: string } | undefined)?.strategyEngineVersion;
 
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto bg-background">
         <div className="max-w-[1400px] mx-auto px-6 py-6 space-y-6">
-          <PageHeader
-            icon={<BarChart3 className="w-5 h-5 text-primary" />}
-            eyebrow="MARKETPLACE INTELLIGENCE"
-            title="Marketplace Intelligence"
-            subtitle="DealerPilot learns from every listing, conversation, and lead to sharpen your strategy."
-          />
+          <div className="flex items-start justify-between gap-4">
+            <PageHeader
+              icon={<BarChart3 className="w-5 h-5 text-primary" />}
+              eyebrow="MARKETPLACE INTELLIGENCE"
+              title="Marketplace Intelligence"
+              subtitle="DealerPilot learns from every listing, conversation, and lead to sharpen your strategy."
+            />
+            {engineVersion === "v2" && (
+              <div className="shrink-0 mt-1">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/15 border border-primary/25 text-primary text-xs font-semibold">
+                  <Zap className="w-3 h-3" />
+                  Strategy Engine v2
+                </span>
+              </div>
+            )}
+          </div>
 
           {/* KPI Summary */}
           <div className="grid grid-cols-4 gap-4">
@@ -145,67 +316,26 @@ export function MarketplaceIntelligence() {
             ))}
           </div>
 
-          {/* ── Strategic Recommendations ── */}
+          {/* ── Strategic Recommendations (v2 cards) ── */}
           {activeTab === "recommendations" && (
-            <SectionCard icon={<Lightbulb className="w-4 h-4 text-primary" />} title="Strategic Recommendations">
-              {isLoading ? (
+            <SectionCard
+              icon={<Lightbulb className="w-4 h-4 text-primary" />}
+              title="Strategic Recommendations"
+              action={engineVersion === "v2" ? (
+                <span className="text-[10px] text-primary/60 font-medium">Click any card to expand · Strategy Engine v2</span>
+              ) : undefined}
+            >
+              {recsLoading ? (
                 <div className="text-muted-foreground text-sm py-8 text-center">Loading recommendations…</div>
               ) : recs.length === 0 ? (
-                <div className="text-muted-foreground text-sm py-8 text-center">No recommendations yet. Run the seed endpoint to generate data.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-muted-foreground border-b border-white/5">
-                        <th className="pb-2 pr-4 font-medium">Vehicle</th>
-                        <th className="pb-2 pr-4 font-medium">Price Strategy</th>
-                        <th className="pb-2 pr-4 font-medium">Down Payment</th>
-                        <th className="pb-2 pr-4 font-medium">Photo Strategy</th>
-                        <th className="pb-2 pr-4 font-medium">Post Day / Time</th>
-                        <th className="pb-2 pr-4 font-medium">Expected Quality</th>
-                        <th className="pb-2 font-medium">Confidence</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/[0.03]">
-                      {recs.map((rec) => (
-                        <tr key={rec.vehicleId} className="hover:bg-white/[0.02] group">
-                          <td className="py-3 pr-4">
-                            <div className="font-medium text-white">
-                              {rec.year} {rec.make} {rec.model}
-                            </div>
-                            {rec.price != null && (
-                              <div className="text-xs text-muted-foreground">{formatCurrency(rec.price)}</div>
-                            )}
-                          </td>
-                          <td className="py-3 pr-4">{strategyBadge(rec.recommendedPriceStrategy)}</td>
-                          <td className="py-3 pr-4">
-                            {rec.recommendedDownPayment != null ? (
-                              <span className="text-white font-medium">{formatCurrency(rec.recommendedDownPayment)}</span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-                          <td className="py-3 pr-4">{photoBadge(rec.recommendedPhotoStrategy)}</td>
-                          <td className="py-3 pr-4">
-                            <div className="text-white text-xs">
-                              {rec.recommendedDayLabel ?? "—"} · {rec.recommendedTimeLabel ?? "—"}
-                            </div>
-                          </td>
-                          <td className="py-3 pr-4">{qualityBadge(rec.expectedLeadQuality)}</td>
-                          <td className="py-3 w-32">
-                            <ConfidenceBar score={rec.confidenceScore} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="text-muted-foreground text-sm py-8 text-center">
+                  No recommendations yet. Run the seed endpoint to generate data.
                 </div>
-              )}
-              {/* Explanation drawer for selected vehicle */}
-              {recs[0]?.explanation && (
-                <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/15 text-xs text-muted-foreground">
-                  <span className="text-primary font-medium">Top Recommendation: </span>
-                  {recs[0].year} {recs[0].make} {recs[0].model} — {recs[0].explanation}
+              ) : (
+                <div className="space-y-2">
+                  {recs.map((rec) => (
+                    <StrategyCard key={rec.vehicleId} rec={rec} />
+                  ))}
                 </div>
               )}
             </SectionCard>
@@ -416,7 +546,6 @@ export function MarketplaceIntelligence() {
                         <tr className="text-left text-xs text-muted-foreground border-b border-white/5">
                           <th className="pb-2 pr-4 font-medium">Vehicle</th>
                           <th className="pb-2 pr-4 font-medium">Conversations</th>
-                          <th className="pb-2 pr-4 font-medium">Days Live</th>
                           <th className="pb-2 font-medium">Outcome Score</th>
                         </tr>
                       </thead>
@@ -425,7 +554,6 @@ export function MarketplaceIntelligence() {
                           <tr key={`hv-${w.vehicleId}`}>
                             <td className="py-2.5 pr-4 font-medium text-white">{w.year} {w.make} {w.model}</td>
                             <td className="py-2.5 pr-4 text-blue-400">{w.conversationsCount}</td>
-                            <td className="py-2.5 pr-4 text-muted-foreground">{w.daysSincePublished}d</td>
                             <td className="py-2.5 w-40">
                               <ScoreBar score={w.outcomeScore} />
                             </td>
@@ -442,7 +570,6 @@ export function MarketplaceIntelligence() {
           {/* ── Next Batch ── */}
           {activeTab === "nextbatch" && (
             <div className="space-y-4">
-              {/* Timing recommendation banner */}
               {dash?.nextBatchRecommendation && (
                 <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-4">
                   <div className="p-3 rounded-lg bg-primary/20">

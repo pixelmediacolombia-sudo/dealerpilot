@@ -1,0 +1,174 @@
+CRITICAL PRODUCT FIX — Marketplace AI must become AI-driven
+
+Marketplace AI still feels manual and basic.
+
+Goal:
+Marketplace AI should help me decide which vehicles to publish, why to publish them, what photo to use, and what strategy to use.
+
+====================================================
+PART 1 — Vehicle Photo Slideshow
+====================================================
+
+Every vehicle card in Marketplace AI must show a slideshow/gallery using ALL XML photos.
+
+Requirements:
+- If vehicle has 20 photos, the card should allow viewing all 20.
+- Add left/right arrows on image hover.
+- Add photo counter: 1 / 20.
+- Add small dots or thumbnail strip if space allows.
+- Show badge: Photos: 20.
+- Preserve current primary image but allow browsing the full gallery.
+- Do not only show the first photo.
+
+====================================================
+PART 2 — AI Cover Recommendation
+====================================================
+
+DealerPilot must automatically recommend the best photo for Marketplace cover.
+
+Each vehicle card should show:
+- AI Pick badge on recommended cover photo
+- Photo Score
+- Reason:
+  - best angle
+  - clean background
+  - full vehicle visible
+  - strong lighting
+  - low branding
+  - high buyer trust
+
+If original photo is good:
+“Use original. No enhancement needed.”
+
+If bad:
+“Enhance cover before publishing.”
+
+====================================================
+PART 3 — AI Publish Recommendation
+====================================================
+
+Do not recommend vehicles only by name.
+
+DealerPilot must rank vehicles using strategy signals.
+
+For each vehicle show:
+- Publish Priority: High / Medium / Low
+- Reason
+- Strategy
+- Recommended Down Payment
+- Recommended Posting Window
+- Recommended Creative Action
+
+Ranking signals:
+- price range
+- body style
+- mileage
+- inventory age
+- photo score
+- listing score
+- vehicle demand category
+- affordability
+- luxury/performance
+- truck/SUV demand
+- price changes
+- sold/removed status
+- existing published status
+
+Example recommendations:
+
+High Priority:
+“Publish today. SUV under 40k with strong photos and high buyer demand.”
+
+Medium Priority:
+“Publish after cover photo enhancement. Good inventory, but current cover has heavy branding.”
+
+Low Priority:
+“Wait. Price is high for Marketplace and photo quality is weak.”
+
+====================================================
+PART 4 — Strategy Types
+====================================================
+
+Replace generic recommendations like:
+- Full Price
+- $500 down
+- Monday 2pm
+
+With real strategy labels:
+
+- Fast Turn Strategy
+- Serious Buyer Down Payment
+- Premium SUV Strategy
+- Truck Demand Strategy
+- Luxury Trust Strategy
+- Price Review Needed
+- Photo Improvement First
+- Use Original Photos
+- Publish Today
+- Hold for Review
+
+====================================================
+PART 5 — Down Payment Rules
+====================================================
+
+Never default to $500 down.
+
+Use realistic rules:
+- Under $20k: $1,500–$2,000
+- $20k–$35k: $2,000–$3,000
+- $35k–$50k: $3,000–$4,000
+- $50k+: $4,000–$6,000
+- Trucks/SUVs: add +$500
+- Luxury/performance: add +$500–$1,000
+
+Show reason:
+“Higher-ticket SUV requires stronger buyer commitment.”
+
+====================================================
+PART 6 — AI Batch Suggestions
+====================================================
+
+At the top of Marketplace AI, add an AI recommendation block:
+
+DealerPilot recommends publishing:
+- 8 vehicles today
+- 3 vehicles after photo enhancement
+- 2 vehicles after price review
+
+Add CTA:
+Create AI Publishing Batch
+
+Batch should automatically select recommended vehicles, not just whatever I click manually.
+
+====================================================
+PART 7 — UI
+====================================================
+
+Vehicle cards should show:
+
+- Photo slideshow
+- AI recommended cover
+- Publish Priority
+- Strategy label
+- Recommended down
+- Photo Score
+- Listing Score
+- Reason
+- Primary CTA:
+  Publish / Generate Listing / Enhance Photo / Review Price
+
+Do not clutter with many buttons.
+Use overflow menu for secondary manual actions.
+
+====================================================
+ACCEPTANCE TEST
+====================================================
+
+1. Marketplace AI vehicle cards can browse all XML photos.
+2. Cards show 1/20 counter if 20 photos exist.
+3. AI Pick badge appears on recommended cover.
+4. DealerPilot ranks vehicles by publish priority.
+5. Recommendations include price/body/mileage/photo/listing reasoning.
+6. No $500 down recommendations unless explicitly configured.
+7. Top AI batch recommendation can select vehicles automatically.
+8. Marketplace AI feels like an AI strategist, not a manual vehicle list.

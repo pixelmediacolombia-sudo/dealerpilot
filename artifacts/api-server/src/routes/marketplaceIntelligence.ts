@@ -248,6 +248,34 @@ router.get("/marketplace-intelligence/dashboard", async (req, res) => {
   });
 });
 
+// Parse v2 JSON explanation — returns null for v1 plaintext records
+function parseV2Explanation(explanation: string | null): {
+  v: 2;
+  strategyName: string;
+  reason: string;
+  supportingSignals: string[];
+  expectedImpact: string;
+  actionCta: string;
+} | null {
+  if (!explanation) return null;
+  try {
+    const parsed = JSON.parse(explanation) as Record<string, unknown>;
+    if (parsed["v"] === 2) {
+      return parsed as {
+        v: 2;
+        strategyName: string;
+        reason: string;
+        supportingSignals: string[];
+        expectedImpact: string;
+        actionCta: string;
+      };
+    }
+  } catch {
+    // v1 plaintext — ignore
+  }
+  return null;
+}
+
 // GET /api/marketplace-intelligence/recommendations
 router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
   const intelligence = await db
@@ -265,6 +293,8 @@ router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
 
   const recommendations = intelligence.map((vi) => {
     const v = vehicleMap.get(vi.vehicleId);
+    const v2 = parseV2Explanation(vi.explanation);
+
     return {
       vehicleId: vi.vehicleId,
       year: v?.year ?? null,
@@ -284,10 +314,19 @@ router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
       explanation: vi.explanation,
       expectedLeadQuality: vi.expectedLeadQuality,
       generatedAt: vi.generatedAt,
+      // v2 enriched fields
+      strategyName: v2?.strategyName ?? null,
+      reason: v2?.reason ?? vi.explanation ?? null,
+      supportingSignals: v2?.supportingSignals ?? [],
+      expectedImpact: v2?.expectedImpact ?? null,
+      actionCta: v2?.actionCta ?? null,
     };
   });
 
-  res.json({ recommendations });
+  res.json({
+    strategyEngineVersion: "v2",
+    recommendations,
+  });
 });
 
 // GET /api/marketplace-intelligence/vehicles/:vehicleId
