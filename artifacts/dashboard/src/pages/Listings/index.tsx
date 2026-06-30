@@ -70,6 +70,10 @@ import {
   HelpCircle,
   Users,
   ChevronRight,
+  LayoutGrid,
+  List,
+  ArrowUpDown,
+  ScanSearch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader, EmptyState, SectionCard } from "@/components/shared";
@@ -243,6 +247,9 @@ export function ListingsWorkspace() {
   const [markPublishedVehicle, setMarkPublishedVehicle] = useState<{ id: number; label: string } | null>(null);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<Set<number>>(new Set());
   const [showBatchReview, setShowBatchReview] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
+  const [sortBy, setSortBy] = useState<"priority" | "ai_score" | "photo_count" | "price" | "newest" | "needs_review">("priority");
+  const [photoFilter, setPhotoFilter] = useState<string | null>(null);
 
   const toggleSelected = (id: number) => {
     setSelectedVehicleIds((prev) => {
@@ -251,7 +258,7 @@ export function ListingsWorkspace() {
       return next;
     });
   };
-  const selectAll = () => setSelectedVehicleIds(new Set(filteredWorkspaces.map((w) => w.vehicleId)));
+  const selectAll = () => setSelectedVehicleIds(new Set(filteredSortedWorkspaces.map((w) => w.vehicleId)));
   const clearSelection = () => setSelectedVehicleIds(new Set());
   const handleTabChange = (tab: string) => { setActiveTab(tab); setSelectedVehicleIds(new Set()); };
   const selectionCount = selectedVehicleIds.size;
@@ -396,6 +403,41 @@ export function ListingsWorkspace() {
       return w.publishStatus === "Published" && w.vehicleStatus === "Sold/Removed";
     return true;
   });
+
+  const filteredSortedWorkspaces = useMemo(() => {
+    let list = [...filteredWorkspaces];
+    if (photoFilter) {
+      list = list.filter((w) => {
+        const entry = photoScoreByVehicle.get(w.vehicleId);
+        const score = entry?.photoScore ?? 0;
+        const decision = entry?.photoDecision;
+        if (photoFilter === "use_original") return decision === "use_original" || score >= 88;
+        if (photoFilter === "enhance") return decision === "enhance" || (score >= 60 && score < 88);
+        if (photoFilter === "review") return !decision || score < 60;
+        return true;
+      });
+    }
+    switch (sortBy) {
+      case "ai_score":
+        list.sort((a, b) => (photoScoreByVehicle.get(b.vehicleId)?.photoScore ?? 0) - (photoScoreByVehicle.get(a.vehicleId)?.photoScore ?? 0));
+        break;
+      case "photo_count":
+        list.sort((a, b) => (b.imageCount ?? 0) - (a.imageCount ?? 0));
+        break;
+      case "price":
+        list.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
+        break;
+      case "priority":
+        list.sort((a, b) => (b.priorityScore ?? 0) - (a.priorityScore ?? 0));
+        break;
+      case "needs_review":
+        list.sort((a) => (a.publishStatus === "Needs Review" ? -1 : 1));
+        break;
+      default:
+        break;
+    }
+    return list;
+  }, [filteredWorkspaces, sortBy, photoFilter, photoScoreByVehicle]);
 
   const isPublishedTab = ["published", "needs-update", "sold"].includes(activeTab);
   const isCardTab = !isPublishedTab &&
@@ -627,9 +669,9 @@ export function ListingsWorkspace() {
 
           {/* ── Ready / Generating / Scheduled / etc — standard workspace cards ── */}
           {isCardTab && (
-            <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-              {/* Filters */}
-              <div className="glass-panel p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-center border border-border/50 z-10 sticky top-0">
+            <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+              {/* Toolbar row 1: search + selection + view toggle + sort */}
+              <div className="glass-panel p-4 rounded-xl flex flex-col sm:flex-row gap-3 items-center border border-border/50 z-10 sticky top-0">
                 <div className="relative flex-1 w-full max-w-md">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -648,7 +690,7 @@ export function ListingsWorkspace() {
                       {selectionCount} selected
                     </Badge>
                     <Button size="sm" variant="ghost" onClick={selectAll} className="h-7 text-xs px-2 gap-1">
-                      All {filteredWorkspaces.length}
+                      All {filteredSortedWorkspaces.length}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 text-xs px-2">
                       <X className="w-3 h-3" />
@@ -666,25 +708,83 @@ export function ListingsWorkspace() {
                   </Button>
                 )}
 
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-[200px] bg-background/50 border-border/50">
-                    <SelectValue placeholder="All Statuses" />
+                {/* Sort */}
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                  <SelectTrigger className="w-full sm:w-[160px] bg-background/50 border-border/50 gap-1.5">
+                    <ArrowUpDown className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="AI Generated">AI Generated</SelectItem>
-                    <SelectItem value="Approved">Approved</SelectItem>
-                    <SelectItem value="Queued">Queued</SelectItem>
-                    <SelectItem value="Scheduled">Scheduled</SelectItem>
-                    <SelectItem value="Publishing">Publishing</SelectItem>
-                    <SelectItem value="Published">Published</SelectItem>
-                    <SelectItem value="Needs Review">Needs Review</SelectItem>
-                    <SelectItem value="Failed">Failed</SelectItem>
+                    <SelectItem value="priority">Priority Score</SelectItem>
+                    <SelectItem value="ai_score">AI Photo Score</SelectItem>
+                    <SelectItem value="photo_count">Photo Count</SelectItem>
+                    <SelectItem value="price">Price</SelectItem>
+                    <SelectItem value="newest">Newest</SelectItem>
+                    <SelectItem value="needs_review">Needs Review First</SelectItem>
                   </SelectContent>
                 </Select>
+
+                {/* View toggle */}
+                <div className="flex items-center rounded-lg border border-border/50 overflow-hidden flex-shrink-0">
+                  <button
+                    onClick={() => setViewMode("list")}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors",
+                      viewMode === "list" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    List
+                  </button>
+                  <div className="w-px h-5 bg-border/60" />
+                  <button
+                    onClick={() => setViewMode("grid")}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors",
+                      viewMode === "grid" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    Grid
+                  </button>
+                </div>
               </div>
 
-              {/* Grid */}
+              {/* Toolbar row 2: photo recommendation filter pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex-shrink-0 mr-1">Filter:</span>
+                {([
+                  { key: null, label: "All" },
+                  { key: "use_original", label: "Use Original" },
+                  { key: "enhance", label: "Enhance Recommended" },
+                  { key: "review", label: "Needs Review" },
+                ] as const).map(({ key, label }) => (
+                  <button
+                    key={String(key)}
+                    onClick={() => setPhotoFilter(key)}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-[11px] font-semibold border transition-colors",
+                      photoFilter === key
+                        ? key === null
+                          ? "bg-muted text-foreground border-border"
+                          : key === "use_original"
+                            ? "bg-success/20 text-success border-success/40"
+                            : key === "enhance"
+                              ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                              : "bg-red-500/20 text-red-400 border-red-500/40"
+                        : "bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <div className="w-px h-4 bg-border/40 mx-1" />
+                <span className="text-[11px] text-muted-foreground">
+                  {filteredSortedWorkspaces.length} vehicle{filteredSortedWorkspaces.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+
+              {/* Vehicle list / grid */}
               {workspacesLoading ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                   {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -704,18 +804,173 @@ export function ListingsWorkspace() {
                     </div>
                   ))}
                 </div>
-              ) : filteredWorkspaces.length === 0 ? (
+              ) : filteredSortedWorkspaces.length === 0 ? (
                 <EmptyState
                   icon={<Sparkles className="w-8 h-8" />}
                   title="No workspaces found"
                   description="DealerPilot hasn't identified any listings matching this view."
                 />
+              ) : viewMode === "list" ? (
+                /* ── Compact List View ── */
+                <div className="rounded-xl border border-border/40 overflow-hidden">
+                  {/* List header */}
+                  <div className="flex items-center gap-3 px-4 py-2.5 bg-muted/30 border-b border-border/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    <div className="w-5 flex-shrink-0">
+                      <Checkbox
+                        checked={selectionCount === filteredSortedWorkspaces.length && filteredSortedWorkspaces.length > 0}
+                        onCheckedChange={(checked) => checked ? selectAll() : clearSelection()}
+                      />
+                    </div>
+                    <div className="w-[72px] flex-shrink-0">Photo</div>
+                    <div className="flex-1 min-w-0">Vehicle</div>
+                    <div className="w-[90px] text-center flex-shrink-0 hidden lg:block">AI Score</div>
+                    <div className="w-[120px] flex-shrink-0 hidden md:block">Price</div>
+                    <div className="w-[150px] flex-shrink-0 hidden xl:block">Strategy</div>
+                    <div className="w-[120px] flex-shrink-0 text-right">Action</div>
+                  </div>
+                  {filteredSortedWorkspaces.map((w) => {
+                    const photoEntry = photoScoreByVehicle.get(w.vehicleId);
+                    const intel = intelligenceMap.get(w.vehicleId);
+                    const strategyStatus = getStrategyStatus(intel);
+                    const statusCfg = STRATEGY_STATUS_CONFIG[strategyStatus];
+                    const isSelected = selectedVehicleIds.has(w.vehicleId);
+                    const isReady = w.publishStatus === "Approved" || w.publishStatus === "Queued";
+                    const photoScore = photoEntry?.photoScore;
+                    const decision = photoEntry?.photoDecision;
+                    const mpPrice = (w.price ?? 0) >= 16000 ? (w.downPayment ?? null) : null;
+                    const recLabel = !decision ? null
+                      : decision === "use_original" ? "Use Original"
+                      : decision === "enhance" ? "Enhance"
+                      : "Review";
+                    const recColor = !decision ? ""
+                      : decision === "use_original" ? "text-success bg-success/10"
+                      : decision === "enhance" ? "text-amber-400 bg-amber-500/10"
+                      : "text-muted-foreground bg-muted/30";
+                    return (
+                      <div
+                        key={w.vehicleId}
+                        className={cn(
+                          "flex items-center gap-3 px-4 py-2 min-h-[80px] border-b border-border/20 last:border-b-0 transition-colors hover:bg-muted/10",
+                          isSelected && "bg-primary/5 border-l-2 border-l-primary"
+                        )}
+                      >
+                        <div className="w-5 flex-shrink-0">
+                          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelected(w.vehicleId)} />
+                        </div>
+                        {/* Thumbnail */}
+                        <div className="relative w-[72px] h-[52px] flex-shrink-0 rounded-lg overflow-hidden bg-secondary/50">
+                          {w.primaryImageUrl ? (
+                            <img src={w.primaryImageUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Car className="w-5 h-5 text-muted-foreground/30" />
+                            </div>
+                          )}
+                          {(w.imageCount ?? 0) > 0 && (
+                            <div className="absolute bottom-0.5 right-0.5 flex items-center gap-0.5 bg-black/70 text-white text-[8px] font-bold px-1 py-0.5 rounded">
+                              <ImageIcon className="w-2 h-2" />{w.imageCount}
+                            </div>
+                          )}
+                        </div>
+                        {/* Vehicle info */}
+                        <div className="flex-1 min-w-0">
+                          <Link href={`/listings/${w.vehicleId}`}>
+                            <div className="font-semibold text-sm text-foreground hover:text-primary truncate transition-colors cursor-pointer">
+                              {w.label}
+                            </div>
+                          </Link>
+                          <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            {w.vin && <span className="font-mono">{w.vin.slice(-6)}</span>}
+                            {w.bodyStyle && <><span className="text-border/80">·</span><span>{w.bodyStyle}</span></>}
+                            {w.publishStatus && (
+                              <span className={cn(
+                                "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest",
+                                w.publishStatus === "Approved" || w.publishStatus === "Queued" ? "bg-success/10 text-success" :
+                                w.publishStatus === "Needs Review" ? "bg-red-500/10 text-red-400" :
+                                w.publishStatus === "Published" ? "bg-primary/10 text-primary" :
+                                "bg-muted text-muted-foreground"
+                              )}>
+                                {w.publishStatus}
+                              </span>
+                            )}
+                          </div>
+                          {recLabel && (
+                            <span className={cn("inline-flex items-center text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded mt-0.5", recColor)}>
+                              {recLabel}
+                            </span>
+                          )}
+                        </div>
+                        {/* AI score */}
+                        <div className="w-[90px] flex-shrink-0 text-center hidden lg:block">
+                          {photoScore != null ? (
+                            <div className={cn(
+                              "inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold",
+                              photoScore >= 88 ? "bg-success/15 text-success" :
+                              photoScore >= 65 ? "bg-amber-500/15 text-amber-400" :
+                              "bg-red-500/15 text-red-400"
+                            )}>
+                              <Gauge className="w-3 h-3" />{photoScore}
+                            </div>
+                          ) : <span className="text-muted-foreground text-[10px]">—</span>}
+                        </div>
+                        {/* Prices */}
+                        <div className="w-[120px] flex-shrink-0 hidden md:block">
+                          <div className={cn("font-bold text-sm", mpPrice && "text-muted-foreground line-through text-xs leading-tight")}>
+                            {w.price ? formatCurrency(w.price) : "—"}
+                          </div>
+                          {mpPrice && (
+                            <div className="text-amber-400 text-xs font-bold mt-0.5">
+                              {formatCurrency(mpPrice)} down
+                            </div>
+                          )}
+                        </div>
+                        {/* Strategy */}
+                        <div className="w-[150px] flex-shrink-0 hidden xl:block">
+                          {intel?.strategyName ? (
+                            <span className="inline-block px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-semibold truncate max-w-full">
+                              {intel.strategyName}
+                            </span>
+                          ) : (
+                            <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded inline-block", statusCfg.bg, statusCfg.color)}>
+                              {strategyStatus === "needs_strategy_review" ? "Needs Review" : "Not Prioritized"}
+                            </span>
+                          )}
+                          {w.priorityScore > 0 && (
+                            <div className={cn("text-[9px] mt-0.5 font-semibold", w.priorityScore >= 70 ? "text-primary" : "text-muted-foreground")}>
+                              Priority {w.priorityScore}
+                            </div>
+                          )}
+                        </div>
+                        {/* Action */}
+                        <div className="w-[120px] flex-shrink-0 flex items-center justify-end gap-1.5">
+                          {isReady && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-[10px] gap-1 border-success/35 text-success hover:bg-success/10 whitespace-nowrap"
+                              onClick={(e) => { e.stopPropagation(); setMarkPublishedVehicle({ id: w.vehicleId, label: w.label }); }}
+                            >
+                              <UploadCloud className="w-3 h-3" />
+                              Publish
+                            </Button>
+                          )}
+                          <Link href={`/listings/${w.vehicleId}`}>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                              <Eye className="w-3.5 h-3.5" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
+                /* ── Grid View ── */
                 <>
                 {/* ── Model group selectors (Ready tab only, when duplicates exist) ── */}
                 {activeTab === "ready" && (() => {
-                  const groups = new Map<string, typeof filteredWorkspaces>();
-                  for (const w of filteredWorkspaces) {
+                  const groups = new Map<string, typeof filteredSortedWorkspaces>();
+                  for (const w of filteredSortedWorkspaces) {
                     const key = `${w.make} ${w.model}`;
                     if (!groups.has(key)) groups.set(key, []);
                     groups.get(key)!.push(w);
@@ -755,7 +1010,7 @@ export function ListingsWorkspace() {
                   );
                 })()}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {filteredWorkspaces.map((w, i) => {
+                  {filteredSortedWorkspaces.map((w, i) => {
                     const photoScore = photoScoreByVehicle.get(w.vehicleId);
                     const isReady = activeTab === "ready" || w.publishStatus === "Approved" || w.publishStatus === "Queued";
                     const intel = intelligenceMap.get(w.vehicleId);
@@ -893,9 +1148,11 @@ export function ListingsWorkspace() {
                     );
                   })}
                 </div>
+                </>
+              )}
 
-                {/* ── Floating AI action bar ── */}
-                {selectionCount > 0 && (
+              {/* ── Floating AI action bar — visible in both list and grid modes ── */}
+              {selectionCount > 0 && (
                   <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
                     <div className="flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-card/97 border border-primary/20 shadow-2xl shadow-primary/10 backdrop-blur-md">
                       {/* AI label */}
@@ -917,7 +1174,7 @@ export function ListingsWorkspace() {
                         className="gap-1.5 px-4 font-bold text-[11px] uppercase tracking-widest whitespace-nowrap border-success/40 text-success hover:bg-success/10"
                         disabled={bulkSchedule.isPending}
                         onClick={() => {
-                          const readyIds = filteredWorkspaces
+                          const readyIds = filteredSortedWorkspaces
                             .filter(
                               (w) =>
                                 selectedVehicleIds.has(w.vehicleId) &&
@@ -1036,8 +1293,6 @@ export function ListingsWorkspace() {
                     </div>
                   </div>
                 )}
-                </>
-              )}
             </div>
           )}
 
