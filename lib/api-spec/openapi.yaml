@@ -349,6 +349,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListingWorkspaceList"
+  /listings/{vehicleId}/mark-published:
+    post:
+      operationId: markListingPublished
+      tags: [listings]
+      summary: Operator manually marks a listing as published (after publishing on Facebook)
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                marketplaceUrl: { type: string, format: uri }
+                publishedByExtensionId: { type: string }
+      responses:
+        "200":
+          description: Listing marked as published
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, vehicleId, publishedAt]
+                properties:
+                  success: { type: boolean }
+                  vehicleId: { type: integer }
+                  publishedAt: { type: string, format: date-time }
+
   /listings/{id}:
     get:
       operationId: getListingDetail
@@ -2005,9 +2037,11 @@ components:
         trim: { type: ["string", "null"] }
         bodyStyle: { type: ["string", "null"] }
         price: { type: ["integer", "null"] }
+        downPayment: { type: ["integer", "null"] }
         primaryImageUrl: { type: ["string", "null"] }
         imageCount: { type: integer }
         status: { type: string }
+        vehicleStatus: { type: string }
         versionCount: { type: integer }
         currentVersion: { type: ["integer", "null"] }
         aiStatus: { type: string }
@@ -2016,6 +2050,13 @@ components:
         listingScore: { type: ["integer", "null"] }
         listingRating: { type: ["string", "null"] }
         updatedAt: { type: ["string", "null"] }
+        publishedAt: { type: ["string", "null"] }
+        marketplaceUrl: { type: ["string", "null"] }
+        messageCount: { type: integer }
+        leadCount: { type: integer }
+        engagementStatus: { type: ["string", "null"] }
+        recommendation: { type: ["string", "null"] }
+        daysLive: { type: integer }
     ListingWorkspaceList:
       type: object
       required: [workspaces]

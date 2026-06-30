@@ -389,7 +389,12 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
   // (vehicle_id, channel) unique constraint so concurrent completions cannot
   // create duplicates; omit externalUrl from the conflict update so a re-publish
   // without a URL keeps the previously stored one.
-  const conflictSet: { status: string; externalUrl?: string } = { status: "Published" };
+  const now = new Date();
+  const conflictSet: { status: string; externalUrl?: string; publishedAt: Date; publishedByExtensionId?: string } = {
+    status: "Published",
+    publishedAt: now,
+    publishedByExtensionId: extensionId,
+  };
   if (listingUrl) conflictSet.externalUrl = listingUrl;
   await db
     .insert(listingsTable)
@@ -398,6 +403,8 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
       channel: "marketplace",
       status: "Published",
       externalUrl: listingUrl ?? null,
+      publishedAt: now,
+      publishedByExtensionId: extensionId,
     })
     .onConflictDoUpdate({
       target: [listingsTable.vehicleId, listingsTable.channel],

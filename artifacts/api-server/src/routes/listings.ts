@@ -7,6 +7,8 @@ import {
   listingVersionsTable,
   listingScoresTable,
   publishingJobsTable,
+  listingsTable,
+  listingPerformanceTable,
   type Vehicle,
   type ListingVersion,
   type ListingScore,
@@ -118,6 +120,44 @@ async function imageInfo(vehicleIds: number[]) {
   return map;
 }
 
+function deriveEngagement(
+  messageCount: number,
+  leadCount: number,
+  hotLeadCount: number,
+  appointmentReadyCount: number,
+  daysLive: number,
+  vehicleStatus: string,
+): { engagementStatus: string; recommendation: string | null } {
+  // Vehicle-level overrides take priority
+  if (vehicleStatus === "Sold/Removed") {
+    return {
+      engagementStatus: "Sold",
+      recommendation: "Vehicle sold/removed from XML — mark Marketplace listing as sold.",
+    };
+  }
+  if (vehicleStatus === "Price Changed") {
+    return {
+      engagementStatus: "Needs Update",
+      recommendation: "Price changed in XML — update Marketplace listing.",
+    };
+  }
+
+  if (hotLeadCount >= 1 || appointmentReadyCount >= 1 || messageCount >= 3) {
+    return { engagementStatus: "Strong", recommendation: "Strong engagement — keep active." };
+  }
+  if (messageCount >= 1) {
+    return { engagementStatus: "Normal", recommendation: null };
+  }
+  if (daysLive < 1) {
+    return { engagementStatus: "No engagement yet", recommendation: null };
+  }
+  // 0 messages after 24h
+  return {
+    engagementStatus: "Weak",
+    recommendation: "No messages after 24h — change cover photo or lower down payment.",
+  };
+}
+
 // GET /listings — one workspace per vehicle.
 router.get("/listings", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
@@ -143,7 +183,25 @@ router.get("/listings", async (req, res) => {
     .orderBy(desc(vehiclesTable.createdAt));
 
   const vehicleIds = vehicles.map((v) => v.id);
-  const images = await imageInfo(vehicleIds);
+  const [images, allListings, allPerformance] = await Promise.all([
+    imageInfo(vehicleIds),
+    vehicleIds.length > 0
+      ? db.select().from(listingsTable).where(inArray(listingsTable.vehicleId, vehicleIds))
+      : Promise.resolve([]),
+    vehicleIds.length > 0
+      ? db
+          .select()
+          .from(listingPerformanceTable)
+          .where(inArray(listingPerformanceTable.vehicleId, vehicleIds))
+          .orderBy(desc(listingPerformanceTable.publishedAt))
+      : Promise.resolve([]),
+  ]);
+
+  const listingByVehicle = new Map(allListings.map((l) => [l.vehicleId, l]));
+  const performanceByVehicle = new Map<number, (typeof allPerformance)[number]>();
+  for (const p of allPerformance) {
+    if (!performanceByVehicle.has(p.vehicleId)) performanceByVehicle.set(p.vehicleId, p);
+  }
 
   const versions =
     vehicleIds.length > 0
@@ -176,12 +234,16 @@ router.get("/listings", async (req, res) => {
     if (!latestJobByVehicle.has(j.vehicleId)) latestJobByVehicle.set(j.vehicleId, j);
   }
 
+  const now = new Date();
+
   const workspaces = vehicles.map((v) => {
     const img = images.get(v.id) ?? { primary: null, count: 0 };
     const vVersions = (versionsByVehicle.get(v.id) ?? []).sort((a, b) => b.version - a.version);
     const current = vVersions.find((x) => x.isCurrent) ?? null;
     const score = current ? (scores.get(current.id) ?? null) : null;
     const latestJob = latestJobByVehicle.get(v.id) ?? null;
+    const listing = listingByVehicle.get(v.id) ?? null;
+    const perf = performanceByVehicle.get(v.id) ?? null;
 
     const aiStatus = vVersions.length > 0 ? "AI Generated" : "Not Started";
     const publishStatus = latestJob
@@ -189,6 +251,22 @@ router.get("/listings", async (req, res) => {
       : current?.status === "Approved"
         ? "Approved"
         : "Not Queued";
+
+    // Published-listing engagement
+    const publishedAt = listing?.publishedAt ?? perf?.publishedAt ?? null;
+    const marketplaceUrl = listing?.externalUrl ?? perf?.marketplaceUrl ?? null;
+    const messageCount = perf?.conversationsCount ?? 0;
+    const hotLeadCount = perf?.hotLeadsCount ?? 0;
+    const appointmentReadyCount = perf?.appointmentReadyCount ?? 0;
+    const leadCount = (perf?.hotLeadsCount ?? 0) + (perf?.warmLeadsCount ?? 0) + (perf?.coldLeadsCount ?? 0);
+    const daysLive = publishedAt
+      ? Math.max(0, (now.getTime() - publishedAt.getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
+    const isPublished = publishStatus === "Published" || listing?.status === "Published";
+    const { engagementStatus, recommendation } = isPublished
+      ? deriveEngagement(messageCount, leadCount, hotLeadCount, appointmentReadyCount, daysLive, v.status)
+      : { engagementStatus: null, recommendation: null };
 
     return {
       vehicleId: v.id,
@@ -204,6 +282,7 @@ router.get("/listings", async (req, res) => {
       primaryImageUrl: img.primary,
       imageCount: img.count,
       status: current?.status ?? "Draft",
+      vehicleStatus: v.status,
       versionCount: vVersions.length,
       currentVersion: current?.version ?? null,
       aiStatus,
@@ -212,12 +291,27 @@ router.get("/listings", async (req, res) => {
       listingScore: score?.overall ?? null,
       listingRating: score?.rating ?? null,
       updatedAt: current ? current.updatedAt.toISOString() : v.updatedAt.toISOString(),
+      // Published lifecycle fields
+      publishedAt: publishedAt ? publishedAt.toISOString() : null,
+      marketplaceUrl,
+      messageCount,
+      leadCount,
+      engagementStatus,
+      recommendation,
+      daysLive: Math.floor(daysLive),
+      downPayment: current?.downPayment ?? null,
     };
   });
 
-  // Filter by workspace status after derivation (status reflects the listing).
+  // Filter by workspace status after derivation
   const filtered = status
-    ? workspaces.filter((w) => w.status === status || w.publishStatus === status)
+    ? workspaces.filter((w) => {
+        if (status === "needs-update")
+          return w.publishStatus === "Published" && (w.vehicleStatus === "Price Changed");
+        if (status === "sold")
+          return w.publishStatus === "Published" && w.vehicleStatus === "Sold/Removed";
+        return w.status === status || w.publishStatus === status;
+      })
     : workspaces;
 
   res.json({ workspaces: filtered });
@@ -285,6 +379,87 @@ router.get("/listings/:id", async (req, res) => {
     })),
     priorityScore: priorityScore(vehicle, imageCount),
   });
+});
+
+// POST /listings/:vehicleId/mark-published — operator manually marks a listing live.
+const MarkPublishedBody = z.object({
+  marketplaceUrl: z.string().url().optional(),
+  publishedByExtensionId: z.string().optional(),
+});
+
+router.post("/listings/:vehicleId/mark-published", async (req, res) => {
+  const vehicleId = Number(req.params.vehicleId);
+  if (isNaN(vehicleId)) {
+    res.status(400).json({ error: "Invalid vehicle id" });
+    return;
+  }
+
+  const parsed = MarkPublishedBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid request body" });
+    return;
+  }
+
+  const [vehicle] = await db
+    .select()
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.id, vehicleId));
+  if (!vehicle) {
+    res.status(404).json({ error: "Vehicle not found" });
+    return;
+  }
+
+  const now = new Date();
+  const { marketplaceUrl, publishedByExtensionId } = parsed.data;
+
+  await db
+    .insert(listingsTable)
+    .values({
+      vehicleId,
+      channel: "marketplace",
+      status: "Published",
+      externalUrl: marketplaceUrl ?? null,
+      publishedAt: now,
+      publishedByExtensionId: publishedByExtensionId ?? null,
+    })
+    .onConflictDoUpdate({
+      target: [listingsTable.vehicleId, listingsTable.channel],
+      set: {
+        status: "Published",
+        externalUrl: marketplaceUrl ?? undefined,
+        publishedAt: now,
+        publishedByExtensionId: publishedByExtensionId ?? undefined,
+      },
+    });
+
+  // Flip vehicle status and upsert a completed publishing job
+  await db
+    .update(vehiclesTable)
+    .set({ status: "Published" })
+    .where(eq(vehiclesTable.id, vehicleId));
+
+  // Mark the latest queued/scheduled job as Published if one exists
+  const [latestJob] = await db
+    .select()
+    .from(publishingJobsTable)
+    .where(
+      and(
+        eq(publishingJobsTable.vehicleId, vehicleId),
+        inArray(publishingJobsTable.status, ["Queued", "Scheduled", "Assigned", "Publishing", "Ready for Review"]),
+      ),
+    )
+    .orderBy(desc(publishingJobsTable.createdAt))
+    .limit(1);
+
+  if (latestJob) {
+    await db
+      .update(publishingJobsTable)
+      .set({ status: "Published", completedAt: now })
+      .where(eq(publishingJobsTable.id, latestJob.id));
+  }
+
+  req.log.info({ vehicleId, marketplaceUrl }, "Listing manually marked as published");
+  res.status(200).json({ success: true, vehicleId, publishedAt: now.toISOString() });
 });
 
 // POST /listings/:id/generate — generate a brand-new version (never overwrites).

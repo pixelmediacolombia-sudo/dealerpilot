@@ -4,3 +4,4 @@ export * from "./generated/types";
 export { UpdateConversationStatusBody } from "./generated/api";
 export { AssignPublishingJobBody } from "./generated/api";
 export { CancelPublishingJobBody } from "./generated/api";
+export { MarkListingPublishedBody } from "./generated/api";

@@ -93,6 +93,8 @@ import type {
   ListingVersionStatusUpdate,
   ListingVersionUpdate,
   ListingWorkspaceList,
+  MarkListingPublished200,
+  MarkListingPublishedBody,
   MarketplaceDashboardResponse,
   MarketplaceRecommendationsResponse,
   MessageContextInput,
@@ -1440,6 +1442,77 @@ export function useListListingWorkspaces<TData = Awaited<ReturnType<typeof listL
 
 
 
+
+export const getMarkListingPublishedUrl = (vehicleId: number,) => {
+
+
+
+
+  return `/api/listings/${vehicleId}/mark-published`
+}
+
+/**
+ * @summary Operator manually marks a listing as published (after publishing on Facebook)
+ */
+export const markListingPublished = async (vehicleId: number,
+    markListingPublishedBody?: MarkListingPublishedBody, options?: RequestInit): Promise<MarkListingPublished200> => {
+
+  return customFetch<MarkListingPublished200>(getMarkListingPublishedUrl(vehicleId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(markListingPublishedBody)
+  }
+);}
+
+
+
+
+export const getMarkListingPublishedMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markListingPublished>>, TError,{vehicleId: number;data?: BodyType<MarkListingPublishedBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markListingPublished>>, TError,{vehicleId: number;data?: BodyType<MarkListingPublishedBody>}, TContext> => {
+
+const mutationKey = ['markListingPublished'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markListingPublished>>, {vehicleId: number;data?: BodyType<MarkListingPublishedBody>}> = (props) => {
+          const {vehicleId,data} = props ?? {};
+
+          return  markListingPublished(vehicleId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkListingPublishedMutationResult = NonNullable<Awaited<ReturnType<typeof markListingPublished>>>
+    export type MarkListingPublishedMutationBody = BodyType<MarkListingPublishedBody> | undefined
+    export type MarkListingPublishedMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Operator manually marks a listing as published (after publishing on Facebook)
+ */
+export const useMarkListingPublished = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markListingPublished>>, TError,{vehicleId: number;data?: BodyType<MarkListingPublishedBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markListingPublished>>,
+        TError,
+        {vehicleId: number;data?: BodyType<MarkListingPublishedBody>},
+        TContext
+      > => {
+      return useMutation(getMarkListingPublishedMutationOptions(options));
+    }
 
 export const getGetListingDetailUrl = (id: number,) => {
 

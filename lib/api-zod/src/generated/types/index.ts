@@ -118,6 +118,8 @@ export * from './marketplaceDashboardResponse';
 export * from './marketplaceDashboardResponseCreativePerformance';
 export * from './marketplaceDashboardSummary';
 export * from './marketplaceRecommendationsResponse';
+export * from './markListingPublished200';
+export * from './markListingPublishedBody';
 export * from './messageContextInput';
 export * from './messageContextResult';
 export * from './nextBatchRecommendation';

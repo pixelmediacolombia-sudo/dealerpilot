@@ -8,8 +8,11 @@ import {
   useAssignPublishingJob,
   useCancelPublishingJob,
   useListVehiclePhotoScores,
-  getListVehiclePhotoScoresQueryKey,
+  useMarkListingPublished,
+  useBulkVehicleAction,
+  getListListingWorkspacesQueryKey,
   getListPublishingJobsQueryKey,
+  getListVehiclePhotoScoresQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,11 +48,15 @@ import {
   ImageIcon,
   Wand2,
   Eye,
+  UploadCloud,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader, EmptyState, SectionCard } from "@/components/shared";
 import { AutoPublishPlan } from "./AutoPublishPlan";
 import { BatchProgressCard } from "./BatchProgressCard";
+import { PublishedCard } from "./PublishedCard";
+import { MarkPublishedModal } from "./MarkPublishedModal";
+import { toast } from "@/hooks/use-toast";
 
 const DEALER_ID = 1;
 
@@ -169,6 +176,14 @@ export function ListingsWorkspace() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jobStatusFilter, setJobStatusFilter] = useState<string>("all");
   const [batchRefreshKey, setBatchRefreshKey] = useState(0);
+  const [markPublishedVehicle, setMarkPublishedVehicle] = useState<{ id: number; label: string } | null>(null);
+
+  const queryClient = useQueryClient();
+
+  const invalidateWorkspaces = () => {
+    queryClient.invalidateQueries({ queryKey: getListListingWorkspacesQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListPublishingJobsQueryKey() });
+  };
 
   const { data: workspacesData, isLoading: workspacesLoading } = useListListingWorkspaces({
     q: search || undefined,
@@ -180,15 +195,29 @@ export function ListingsWorkspace() {
     { query: { refetchInterval: 5000 } as never },
   );
 
-  const queryClient = useQueryClient();
-  const invalidateJobs = () =>
-    queryClient.invalidateQueries({ queryKey: getListPublishingJobsQueryKey() });
-
   const assignMutation = useAssignPublishingJob({
-    mutation: { onSuccess: () => void invalidateJobs() },
+    mutation: { onSuccess: () => void invalidateWorkspaces() },
   });
   const cancelMutation = useCancelPublishingJob({
-    mutation: { onSuccess: () => void invalidateJobs() },
+    mutation: { onSuccess: () => void invalidateWorkspaces() },
+  });
+
+  const markPublishedMutation = useMarkListingPublished({
+    mutation: {
+      onSuccess: (_, vars) => {
+        toast({ title: "Marked as Published", description: "Listing is now live and being tracked." });
+        setMarkPublishedVehicle(null);
+        invalidateWorkspaces();
+      },
+      onError: () => toast({ title: "Error", description: "Failed to mark listing as published", variant: "destructive" }),
+    },
+  });
+
+  const bulkVehicleAction = useBulkVehicleAction({
+    mutation: {
+      onSuccess: () => { invalidateWorkspaces(); },
+      onError: () => toast({ title: "Error", description: "Action failed", variant: "destructive" }),
+    },
   });
 
   const { data: photoScoresData } = useListVehiclePhotoScores(
@@ -206,7 +235,7 @@ export function ListingsWorkspace() {
     (w) => w.publishStatus === "Approved" || w.publishStatus === "Queued",
   ).length;
   const publishedWorkspacesCount = workspaces.filter(
-    (w) => w.publishStatus === "Published",
+    (w) => w.publishStatus === "Published" && w.vehicleStatus !== "Sold/Removed" && w.vehicleStatus !== "Price Changed",
   ).length;
   const scheduledCount = workspaces.filter((w) => w.publishStatus === "Scheduled").length;
   const publishingCount = workspaces.filter((w) => w.publishStatus === "Publishing").length;
@@ -214,6 +243,12 @@ export function ListingsWorkspace() {
     (w) => w.publishStatus === "Needs Review",
   ).length;
   const failedCount = workspaces.filter((w) => w.publishStatus === "Failed").length;
+  const needsUpdateCount = workspaces.filter(
+    (w) => w.publishStatus === "Published" && w.vehicleStatus === "Price Changed",
+  ).length;
+  const soldCount = workspaces.filter(
+    (w) => w.publishStatus === "Published" && w.vehicleStatus === "Sold/Removed",
+  ).length;
   const allCount = workspaces.length;
 
   const jobs = jobsData?.jobs ?? [];
@@ -224,11 +259,20 @@ export function ListingsWorkspace() {
     if (activeTab === "generating") return w.aiStatus === "Generating";
     if (activeTab === "scheduled") return w.publishStatus === "Scheduled";
     if (activeTab === "publishing") return w.publishStatus === "Publishing";
-    if (activeTab === "published") return w.publishStatus === "Published";
+    if (activeTab === "published")
+      return w.publishStatus === "Published" && w.vehicleStatus !== "Sold/Removed" && w.vehicleStatus !== "Price Changed";
     if (activeTab === "needs-review") return w.publishStatus === "Needs Review";
     if (activeTab === "failed") return w.publishStatus === "Failed";
+    if (activeTab === "needs-update")
+      return w.publishStatus === "Published" && w.vehicleStatus === "Price Changed";
+    if (activeTab === "sold")
+      return w.publishStatus === "Published" && w.vehicleStatus === "Sold/Removed";
     return true;
   });
+
+  const isPublishedTab = ["published", "needs-update", "sold"].includes(activeTab);
+  const isCardTab = !isPublishedTab &&
+    ["ready", "generating", "scheduled", "publishing", "needs-review", "failed", "all"].includes(activeTab);
 
   const tabClass =
     "rounded-full px-4 data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border-primary/30 border border-transparent flex gap-2 transition-all text-sm";
@@ -243,9 +287,36 @@ export function ListingsWorkspace() {
       </Badge>
     ) : null;
 
-  const isCardTab = ["ready", "generating", "scheduled", "publishing", "published", "needs-review", "failed", "all"].includes(
-    activeTab,
-  );
+  const handleMarkPublished = (marketplaceUrl?: string) => {
+    if (!markPublishedVehicle) return;
+    markPublishedMutation.mutate({
+      vehicleId: markPublishedVehicle.id,
+      data: marketplaceUrl ? { marketplaceUrl } : {},
+    });
+  };
+
+  const handleRenew = (vehicleId: number) => {
+    bulkVehicleAction.mutate({ data: { vehicleIds: [vehicleId], action: "mark_ready" } });
+    toast({ title: "Queued for renewal", description: "Vehicle moved to Ready to Publish." });
+  };
+
+  const handleMarkSold = (vehicleId: number) => {
+    bulkVehicleAction.mutate({ data: { vehicleIds: [vehicleId], action: "mark_sold" } });
+  };
+
+  const handleUpdateListing = (vehicleId: number) => {
+    bulkVehicleAction.mutate({ data: { vehicleIds: [vehicleId], action: "mark_ready" } });
+    toast({ title: "Queued for update", description: "Vehicle moved to Ready queue for republishing." });
+  };
+
+  const handleRemoveFromMarketplace = (vehicleId: number) => {
+    bulkVehicleAction.mutate({ data: { vehicleIds: [vehicleId], action: "mark_sold" } });
+    toast({ title: "Marked as sold", description: "Listing flagged for removal." });
+  };
+
+  const handleArchive = (vehicleId: number) => {
+    bulkVehicleAction.mutate({ data: { vehicleIds: [vehicleId], action: "archive" } });
+  };
 
   return (
     <AppLayout>
@@ -260,53 +331,42 @@ export function ListingsWorkspace() {
                   DealerPilot is managing {allCount} AI listing workspaces.
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant="secondary"
-                    className="bg-secondary/50 text-secondary-foreground border-white/5"
-                  >
-                    {publishedWorkspacesCount} Published
+                  <Badge variant="secondary" className="bg-success/10 text-success border-success/20">
+                    {publishedWorkspacesCount} Live
                   </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="bg-secondary/50 text-secondary-foreground border-white/5"
-                  >
-                    {generatingCount} Generating
-                  </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="bg-secondary/50 text-secondary-foreground border-white/5"
-                  >
+                  <Badge variant="secondary" className="bg-secondary/50 text-secondary-foreground border-white/5">
                     {readyCount} Ready
                   </Badge>
+                  <Badge variant="secondary" className="bg-secondary/50 text-secondary-foreground border-white/5">
+                    {generatingCount} Generating
+                  </Badge>
                   {scheduledCount > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-purple-500/10 text-purple-400 border-purple-500/20"
-                    >
+                    <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 border-purple-500/20">
                       {scheduledCount} Scheduled
                     </Badge>
                   )}
                   {publishingCount > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-blue-500/10 text-blue-400 border-blue-500/20"
-                    >
+                    <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
                       {publishingCount} Publishing
                     </Badge>
                   )}
+                  {needsUpdateCount > 0 && (
+                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-400 border-amber-500/20">
+                      {needsUpdateCount} Needs Update
+                    </Badge>
+                  )}
+                  {soldCount > 0 && (
+                    <Badge variant="secondary" className="bg-destructive/10 text-destructive border-destructive/20">
+                      {soldCount} Sold
+                    </Badge>
+                  )}
                   {needsReviewCount > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-warning/10 text-warning border-warning/20"
-                    >
+                    <Badge variant="secondary" className="bg-warning/10 text-warning border-warning/20">
                       {needsReviewCount} Needs Review
                     </Badge>
                   )}
                   {failedCount > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-destructive/10 text-destructive border-destructive/20"
-                    >
+                    <Badge variant="secondary" className="bg-destructive/10 text-destructive border-destructive/20">
                       {failedCount} Failed
                     </Badge>
                   )}
@@ -322,36 +382,42 @@ export function ListingsWorkspace() {
                   </Button>
                 </Link>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-                <TabsList className="bg-transparent border-0 gap-1.5 flex-wrap justify-end">
-                  <TabsTrigger value="ready" className={tabClass}>
-                    Ready {countBadge(readyCount)}
-                  </TabsTrigger>
-                  <TabsTrigger value="generating" className={tabClass}>
-                    Generating {countBadge(generatingCount)}
-                  </TabsTrigger>
-                  <TabsTrigger value="scheduled" className={tabClass}>
-                    Scheduled {countBadge(scheduledCount)}
-                  </TabsTrigger>
-                  <TabsTrigger value="publishing" className={tabClass}>
-                    Publishing {countBadge(publishingCount)}
-                  </TabsTrigger>
-                  <TabsTrigger value="published" className={tabClass}>
-                    Published {countBadge(publishedWorkspacesCount)}
-                  </TabsTrigger>
-                  <TabsTrigger value="needs-review" className={tabClass}>
-                    Needs Review {countBadge(needsReviewCount)}
-                  </TabsTrigger>
-                  <TabsTrigger value="failed" className={tabClass}>
-                    Failed {countBadge(failedCount)}
-                  </TabsTrigger>
-                  <TabsTrigger value="queue" className={tabClass}>
-                    Queue {countBadge(queuedJobs)}
-                  </TabsTrigger>
-                  <TabsTrigger value="all" className={tabClass}>
-                    All {countBadge(allCount)}
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+                  <TabsList className="bg-transparent border-0 gap-1.5 flex-wrap justify-end">
+                    <TabsTrigger value="ready" className={tabClass}>
+                      Ready {countBadge(readyCount)}
+                    </TabsTrigger>
+                    <TabsTrigger value="generating" className={tabClass}>
+                      Generating {countBadge(generatingCount)}
+                    </TabsTrigger>
+                    <TabsTrigger value="scheduled" className={tabClass}>
+                      Scheduled {countBadge(scheduledCount)}
+                    </TabsTrigger>
+                    <TabsTrigger value="publishing" className={tabClass}>
+                      Publishing {countBadge(publishingCount)}
+                    </TabsTrigger>
+                    <TabsTrigger value="published" className={tabClass}>
+                      Published {countBadge(publishedWorkspacesCount)}
+                    </TabsTrigger>
+                    <TabsTrigger value="needs-update" className={cn(tabClass, needsUpdateCount > 0 && "data-[state=inactive]:text-amber-400/80")}>
+                      Needs Update {countBadge(needsUpdateCount)}
+                    </TabsTrigger>
+                    <TabsTrigger value="sold" className={tabClass}>
+                      Sold {countBadge(soldCount)}
+                    </TabsTrigger>
+                    <TabsTrigger value="needs-review" className={tabClass}>
+                      Needs Review {countBadge(needsReviewCount)}
+                    </TabsTrigger>
+                    <TabsTrigger value="failed" className={tabClass}>
+                      Failed {countBadge(failedCount)}
+                    </TabsTrigger>
+                    <TabsTrigger value="queue" className={tabClass}>
+                      Queue {countBadge(queuedJobs)}
+                    </TabsTrigger>
+                    <TabsTrigger value="all" className={tabClass}>
+                      All {countBadge(allCount)}
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
             }
           />
@@ -365,6 +431,74 @@ export function ListingsWorkspace() {
           {/* Batch Progress */}
           <BatchProgressCard dealerId={DEALER_ID} refreshKey={batchRefreshKey} />
 
+          {/* ── Published / Needs Update / Sold tabs — engagement-rich cards ── */}
+          {isPublishedTab && (
+            <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+              <div className="glass-panel p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-center border border-border/50 z-10 sticky top-0">
+                <div className="relative flex-1 w-full max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search VIN, make, model..."
+                    className="pl-9 bg-background/50 border-border/50 focus-visible:ring-primary/30"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {workspacesLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="rounded-xl bg-card border border-border/50 h-[380px] animate-pulse">
+                      <div className="h-[200px] bg-secondary/50 rounded-t-xl" />
+                      <div className="p-4 space-y-3">
+                        <div className="h-5 bg-secondary/80 rounded w-2/3" />
+                        <div className="h-4 bg-secondary/50 rounded w-1/3" />
+                        <div className="h-12 bg-secondary/30 rounded" />
+                        <div className="flex gap-2 pt-2">
+                          <div className="h-7 bg-secondary/80 rounded w-1/3" />
+                          <div className="h-7 bg-secondary/50 rounded w-1/4" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : filteredWorkspaces.length === 0 ? (
+                <EmptyState
+                  icon={<Share className="w-8 h-8" />}
+                  title={
+                    activeTab === "published" ? "No live listings" :
+                    activeTab === "needs-update" ? "All listings are up to date" :
+                    "No sold listings"
+                  }
+                  description={
+                    activeTab === "published"
+                      ? "Publish listings from the Ready tab to see them here with engagement tracking."
+                      : activeTab === "needs-update"
+                        ? "When a vehicle's price changes in your XML feed, published listings will appear here."
+                        : "Mark sold vehicles here to remove their listings from Marketplace."
+                  }
+                />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredWorkspaces.map((w) => (
+                    <PublishedCard
+                      key={w.vehicleId}
+                      workspace={w}
+                      tab={activeTab}
+                      onMarkSold={handleMarkSold}
+                      onRenew={handleRenew}
+                      onUpdateListing={handleUpdateListing}
+                      onRemoveFromMarketplace={handleRemoveFromMarketplace}
+                      onArchive={handleArchive}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Ready / Generating / Scheduled / etc — standard workspace cards ── */}
           {isCardTab && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
               {/* Filters */}
@@ -426,76 +560,93 @@ export function ListingsWorkspace() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                   {filteredWorkspaces.map((w, i) => {
                     const photoScore = photoScoreByVehicle.get(w.vehicleId);
+                    const isReady = activeTab === "ready" || w.publishStatus === "Approved" || w.publishStatus === "Queued";
                     return (
-                      <Link key={w.vehicleId} href={`/listings/${w.vehicleId}`}>
-                        <Card
-                          className="overflow-hidden hover-lift cursor-pointer group bg-card border-border/40 hover:border-primary/30 transition-all duration-500 h-full flex flex-col relative"
-                          style={{ animationDelay: `${i * 50}ms` }}
-                        >
-                          <div className="aspect-[16/10] bg-secondary/30 relative overflow-hidden">
-                            {w.primaryImageUrl ? (
-                              <img
-                                src={w.primaryImageUrl}
-                                alt={w.label}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/50 to-background">
-                                <Car className="w-12 h-12 text-muted-foreground/20" />
+                      <div key={w.vehicleId} className="relative">
+                        <Link href={`/listings/${w.vehicleId}`}>
+                          <Card
+                            className="overflow-hidden hover-lift cursor-pointer group bg-card border-border/40 hover:border-primary/30 transition-all duration-500 h-full flex flex-col relative"
+                            style={{ animationDelay: `${i * 50}ms` }}
+                          >
+                            <div className="aspect-[16/10] bg-secondary/30 relative overflow-hidden">
+                              {w.primaryImageUrl ? (
+                                <img
+                                  src={w.primaryImageUrl}
+                                  alt={w.label}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/50 to-background">
+                                  <Car className="w-12 h-12 text-muted-foreground/20" />
+                                </div>
+                              )}
+
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
+
+                              {getStatusBadge(w)}
+
+                              <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+                                {w.listingScore != null && (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "backdrop-blur-md px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border",
+                                      ratingClass(w.listingRating),
+                                    )}
+                                  >
+                                    <Gauge className="w-3.5 h-3.5 mr-1.5" />
+                                    {w.listingScore} SCORE
+                                  </Badge>
+                                )}
                               </div>
-                            )}
 
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
-
-                            {getStatusBadge(w)}
-
-                            <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-                              {w.listingScore != null && (
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    "backdrop-blur-md px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border",
-                                    ratingClass(w.listingRating),
-                                  )}
-                                >
-                                  <Gauge className="w-3.5 h-3.5 mr-1.5" />
-                                  {w.listingScore} SCORE
-                                </Badge>
+                              {/* Photo quality badge */}
+                              {photoScore && (
+                                <PhotoBadge
+                                  decision={photoScore.photoDecision}
+                                  score={photoScore.photoScore}
+                                />
                               )}
                             </div>
-
-                            {/* Photo quality badge */}
-                            {photoScore && (
-                              <PhotoBadge
-                                decision={photoScore.photoDecision}
-                                score={photoScore.photoScore}
-                              />
-                            )}
-                          </div>
-                          <CardContent className="p-6 flex-1 flex flex-col">
-                            <div className="font-bold text-xl leading-tight mb-2 group-hover:text-primary transition-colors">
-                              {w.label}
-                            </div>
-                            <div className="text-muted-foreground text-sm flex items-center gap-2 mb-6">
-                              <span className="truncate">{w.bodyStyle || "Vehicle"}</span>
-                              <span className="w-1 h-1 rounded-full bg-border" />
-                              <span className="flex items-center gap-1">
-                                <PenTool className="w-3 h-3" /> {w.versionCount} version
-                                {w.versionCount === 1 ? "" : "s"}
-                              </span>
-                            </div>
-
-                            <div className="mt-auto pt-4 border-t border-border/30 flex items-center justify-between">
-                              <div className="font-bold text-xl text-foreground">
-                                {formatCurrency(w.price)}
+                            <CardContent className="p-6 flex-1 flex flex-col">
+                              <div className="font-bold text-xl leading-tight mb-2 group-hover:text-primary transition-colors">
+                                {w.label}
                               </div>
-                              <div className="text-xs font-semibold text-primary/80 group-hover:text-primary flex items-center gap-1 uppercase tracking-widest transition-colors">
-                                View Listing &rarr;
+                              <div className="text-muted-foreground text-sm flex items-center gap-2 mb-6">
+                                <span className="truncate">{w.bodyStyle || "Vehicle"}</span>
+                                <span className="w-1 h-1 rounded-full bg-border" />
+                                <span className="flex items-center gap-1">
+                                  <PenTool className="w-3 h-3" /> {w.versionCount} version
+                                  {w.versionCount === 1 ? "" : "s"}
+                                </span>
                               </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </Link>
+
+                              <div className="mt-auto pt-4 border-t border-border/30 flex items-center justify-between">
+                                <div className="font-bold text-xl text-foreground">
+                                  {formatCurrency(w.price)}
+                                </div>
+                                <div className="text-xs font-semibold text-primary/80 group-hover:text-primary flex items-center gap-1 uppercase tracking-widest transition-colors">
+                                  View Listing &rarr;
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </Link>
+
+                        {/* Publish button — overlaid on Ready tab cards */}
+                        {isReady && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMarkPublishedVehicle({ id: w.vehicleId, label: w.label });
+                            }}
+                            className="absolute bottom-[72px] right-6 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success/90 hover:bg-success text-white text-xs font-bold uppercase tracking-widest shadow-lg transition-all duration-150 border border-success/50"
+                          >
+                            <UploadCloud className="w-3.5 h-3.5" />
+                            Publish
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -686,6 +837,17 @@ export function ListingsWorkspace() {
           )}
         </div>
       </div>
+
+      {/* Mark as Published modal */}
+      {markPublishedVehicle && (
+        <MarkPublishedModal
+          open={!!markPublishedVehicle}
+          onClose={() => setMarkPublishedVehicle(null)}
+          vehicleLabel={markPublishedVehicle.label}
+          onConfirm={handleMarkPublished}
+          isLoading={markPublishedMutation.isPending}
+        />
+      )}
     </AppLayout>
   );
 }

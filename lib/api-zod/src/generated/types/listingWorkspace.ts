@@ -22,9 +22,12 @@ export interface ListingWorkspace {
   /** @nullable */
   price?: number | null;
   /** @nullable */
+  downPayment?: number | null;
+  /** @nullable */
   primaryImageUrl?: string | null;
   imageCount: number;
   status: string;
+  vehicleStatus?: string;
   versionCount: number;
   /** @nullable */
   currentVersion?: number | null;
@@ -37,4 +40,15 @@ export interface ListingWorkspace {
   listingRating?: string | null;
   /** @nullable */
   updatedAt?: string | null;
+  /** @nullable */
+  publishedAt?: string | null;
+  /** @nullable */
+  marketplaceUrl?: string | null;
+  messageCount?: number;
+  leadCount?: number;
+  /** @nullable */
+  engagementStatus?: string | null;
+  /** @nullable */
+  recommendation?: string | null;
+  daysLive?: number;
 }

@@ -484,9 +484,11 @@ export const ListListingWorkspacesResponse = zod.object({
   "trim": zod.string().nullish(),
   "bodyStyle": zod.string().nullish(),
   "price": zod.number().nullish(),
+  "downPayment": zod.number().nullish(),
   "primaryImageUrl": zod.string().nullish(),
   "imageCount": zod.number(),
   "status": zod.string(),
+  "vehicleStatus": zod.string().optional(),
   "versionCount": zod.number(),
   "currentVersion": zod.number().nullish(),
   "aiStatus": zod.string(),
@@ -494,8 +496,34 @@ export const ListListingWorkspacesResponse = zod.object({
   "priorityScore": zod.number(),
   "listingScore": zod.number().nullish(),
   "listingRating": zod.string().nullish(),
-  "updatedAt": zod.string().nullish()
+  "updatedAt": zod.string().nullish(),
+  "publishedAt": zod.string().nullish(),
+  "marketplaceUrl": zod.string().nullish(),
+  "messageCount": zod.number().optional(),
+  "leadCount": zod.number().optional(),
+  "engagementStatus": zod.string().nullish(),
+  "recommendation": zod.string().nullish(),
+  "daysLive": zod.number().optional()
 }))
+})
+
+
+/**
+ * @summary Operator manually marks a listing as published (after publishing on Facebook)
+ */
+export const MarkListingPublishedParams = zod.object({
+  "vehicleId": zod.coerce.number()
+})
+
+export const MarkListingPublishedBody = zod.object({
+  "marketplaceUrl": zod.string().url().optional(),
+  "publishedByExtensionId": zod.string().optional()
+})
+
+export const MarkListingPublishedResponse = zod.object({
+  "success": zod.boolean(),
+  "vehicleId": zod.number(),
+  "publishedAt": zod.coerce.date()
 })
 
 

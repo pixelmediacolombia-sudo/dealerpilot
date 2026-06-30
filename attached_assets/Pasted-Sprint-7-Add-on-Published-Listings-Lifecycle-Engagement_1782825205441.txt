@@ -1,0 +1,113 @@
+Sprint 7 Add-on — Published Listings Lifecycle + Engagement
+
+We need the Marketplace AI workflow to behave like a real publishing system.
+
+Problem:
+Vehicles that are published should not remain in the same "ready to publish" list.
+Once a vehicle is published, it should move to a Published section and start tracking engagement.
+
+Requirements:
+
+1. Publish Button
+- Every vehicle/listing that is ready should have one clear primary button:
+  Publish
+- If multiple vehicles are selected, show:
+  Publish Selected
+- Do not show Publish for already published vehicles.
+
+2. Status Movement
+When a listing is marked Published:
+- remove it from Ready / Queue
+- move it to Published
+- set status = PUBLISHED
+- store published_at
+- store marketplace_url if provided
+- store published_by_extension_id if available
+
+3. Published Section
+Create or improve the Published tab.
+
+Published listings should show:
+- vehicle image
+- title
+- price
+- down payment
+- date published
+- days live
+- marketplace URL
+- message count
+- lead count
+- engagement status
+
+Engagement status:
+- Strong
+- Normal
+- Weak
+- No engagement yet
+
+4. Engagement Logic
+Engagement should be based on incoming Marketplace/Messenger conversations.
+
+Rules:
+- 0 messages after 24h = No engagement yet / Weak
+- 1–2 messages = Normal
+- 3+ messages = Strong
+- Hot lead created = Strong
+- Appointment ready = Strong
+
+5. Published Listing Intelligence
+Each published listing should show recommendation:
+
+Examples:
+- Strong engagement — keep active.
+- Weak engagement — renew listing.
+- No messages after 24h — change cover photo or lower down payment.
+- Price changed in XML — update Marketplace listing.
+- Vehicle sold/removed from XML — mark Marketplace listing as sold.
+
+6. Tabs
+Marketplace AI should have clear tabs:
+- Ready
+- Scheduled
+- Publishing
+- Ready for Review
+- Published
+- Needs Update
+- Sold
+
+7. CTA Behavior
+Ready tab:
+- Publish
+
+Published tab:
+- View Performance
+- Renew
+- Update Listing
+- Mark Sold
+
+Needs Update tab:
+- Update Price
+- Regenerate Listing
+- Renew
+
+Sold tab:
+- Remove from Marketplace
+- Archive
+
+8. Visual UI
+Published vehicles should have a green LIVE badge on the image.
+Weak engagement should have an orange warning badge.
+Sold should have red SOLD badge.
+
+9. Do not auto-click final Facebook Publish.
+The operator still manually publishes, then marks Published.
+
+10. Acceptance test
+- Publish a ready listing
+- Mark it Published
+- Verify it disappears from Ready
+- Verify it appears in Published
+- Verify published_at is stored
+- Add/mock a conversation
+- Verify engagement status updates
+- Verify weak/strong engagement recommendations appear

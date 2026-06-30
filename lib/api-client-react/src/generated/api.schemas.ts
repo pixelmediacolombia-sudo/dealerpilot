@@ -370,9 +370,12 @@ export interface ListingWorkspace {
   /** @nullable */
   price?: number | null;
   /** @nullable */
+  downPayment?: number | null;
+  /** @nullable */
   primaryImageUrl?: string | null;
   imageCount: number;
   status: string;
+  vehicleStatus?: string;
   versionCount: number;
   /** @nullable */
   currentVersion?: number | null;
@@ -385,6 +388,17 @@ export interface ListingWorkspace {
   listingRating?: string | null;
   /** @nullable */
   updatedAt?: string | null;
+  /** @nullable */
+  publishedAt?: string | null;
+  /** @nullable */
+  marketplaceUrl?: string | null;
+  messageCount?: number;
+  leadCount?: number;
+  /** @nullable */
+  engagementStatus?: string | null;
+  /** @nullable */
+  recommendation?: string | null;
+  daysLive?: number;
 }
 
 export interface ListingWorkspaceList {
@@ -1501,6 +1515,17 @@ q?: string;
  * Filter by draft/listing status
  */
 status?: string;
+};
+
+export type MarkListingPublishedBody = {
+  marketplaceUrl?: string;
+  publishedByExtensionId?: string;
+};
+
+export type MarkListingPublished200 = {
+  success: boolean;
+  vehicleId: number;
+  publishedAt: string;
 };
 
 export type ListPublishingJobsParams = {
