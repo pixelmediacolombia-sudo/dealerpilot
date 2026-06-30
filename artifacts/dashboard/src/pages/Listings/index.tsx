@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useListListingWorkspaces,
   useListPublishingJobs,
+  useAssignPublishingJob,
+  useCancelPublishingJob,
   useListVehiclePhotoScores,
   getListVehiclePhotoScoresQueryKey,
+  getListPublishingJobsQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -66,6 +70,13 @@ function publishStatusClass(status: string) {
   switch (status) {
     case "Published":
       return "bg-success/80 text-success-foreground border-success/20";
+    case "Assigned":
+      return "bg-indigo-500/80 text-white border-indigo-500/20";
+    case "Opening Facebook":
+    case "Filling Form":
+      return "bg-violet-500/80 text-white border-violet-500/20";
+    case "Ready for Review":
+      return "bg-amber-500/80 text-white border-amber-500/20";
     case "Approved":
     case "Queued":
     case "Scheduled":
@@ -168,6 +179,17 @@ export function ListingsWorkspace() {
     { status: jobStatusFilter === "all" ? undefined : jobStatusFilter },
     { query: { refetchInterval: 5000 } as never },
   );
+
+  const queryClient = useQueryClient();
+  const invalidateJobs = () =>
+    queryClient.invalidateQueries({ queryKey: getListPublishingJobsQueryKey() });
+
+  const assignMutation = useAssignPublishingJob({
+    mutation: { onSuccess: () => void invalidateJobs() },
+  });
+  const cancelMutation = useCancelPublishingJob({
+    mutation: { onSuccess: () => void invalidateJobs() },
+  });
 
   const { data: photoScoresData } = useListVehiclePhotoScores(
     { dealerId: DEALER_ID },
@@ -493,7 +515,11 @@ export function ListingsWorkspace() {
                     <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="Queued">Queued</SelectItem>
                     <SelectItem value="Scheduled">Scheduled</SelectItem>
+                    <SelectItem value="Assigned">Assigned</SelectItem>
                     <SelectItem value="Publishing">Publishing</SelectItem>
+                    <SelectItem value="Opening Facebook">Opening Facebook</SelectItem>
+                    <SelectItem value="Filling Form">Filling Form</SelectItem>
+                    <SelectItem value="Ready for Review">Ready for Review</SelectItem>
                     <SelectItem value="Published">Published</SelectItem>
                     <SelectItem value="Retry">Retry</SelectItem>
                     <SelectItem value="Failed">Failed</SelectItem>
@@ -525,6 +551,7 @@ export function ListingsWorkspace() {
                         <TableHead className="font-medium">Started</TableHead>
                         <TableHead className="font-medium">Retries</TableHead>
                         <TableHead className="font-medium">Priority</TableHead>
+                        <TableHead className="font-medium">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -549,9 +576,9 @@ export function ListingsWorkspace() {
                               variant="outline"
                               className={cn("px-2 py-0.5", publishStatusClass(job.status))}
                             >
-                              {job.status === "Publishing" && (
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin inline" />
-                              )}
+                              {["Publishing", "Opening Facebook", "Filling Form"].includes(
+                                job.status,
+                              ) && <Loader2 className="w-3 h-3 mr-1 animate-spin inline" />}
                               {job.status}
                             </Badge>
                             {(job.status === "Failed" || job.status === "Retry") &&
@@ -608,6 +635,46 @@ export function ListingsWorkspace() {
                             >
                               P{job.priority}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {(job.status === "Queued" || job.status === "Retry") && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/10"
+                                  disabled={assignMutation.isPending}
+                                  onClick={() =>
+                                    assignMutation.mutate({ id: job.id, data: {} })
+                                  }
+                                >
+                                  {assignMutation.isPending ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    "Assign"
+                                  )}
+                                </Button>
+                              )}
+                              {![
+                                "Published",
+                                "Failed",
+                                "Queued",
+                                "Retry",
+                                "Scheduled",
+                              ].includes(job.status) && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                                  disabled={cancelMutation.isPending}
+                                  onClick={() =>
+                                    cancelMutation.mutate({ id: job.id, data: {} })
+                                  }
+                                >
+                                  Cancel
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

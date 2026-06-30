@@ -4,7 +4,7 @@ const DEFAULT_BACKEND_URL =
 // ---- DOM refs: main panel ----
 const urlInput   = document.getElementById("url");
 const statusEl   = document.getElementById("status");
-const startBtn   = document.getElementById("start");
+const startBtn   = document.getElementById("dev-start");
 const refreshBtn = document.getElementById("refresh");
 
 const el = {
@@ -12,7 +12,7 @@ const el = {
   vOnline:    document.getElementById("v-online"),
   dotBackend: document.getElementById("dot-backend"),
   vBackend:   document.getElementById("v-backend"),
-  vJobs:      document.getElementById("v-jobs"),
+  vAssigned:  document.getElementById("v-assigned"),
   vCurrent:   document.getElementById("v-current"),
   vSync:      document.getElementById("v-sync"),
 };
@@ -179,7 +179,7 @@ async function refresh() {
   } else {
     el.vBackend.textContent = "Unreachable";
     setDot(el.dotBackend, "off");
-    el.vJobs.textContent    = "—";
+    el.vAssigned.textContent = "—";
     el.vCurrent.textContent = activeJob
       ? activeJob.listingTitle || `Job #${activeJob.id}`
       : "None";
@@ -189,24 +189,29 @@ async function refresh() {
     return;
   }
 
+  // Fetch the next queued job (for the dev-start button in debug mode)
   const res = await send({ type: "GET_NEXT_JOB" });
-  console.log("[DealerPilot] Next job response:", JSON.stringify(res));
   if (res && res.ok) {
-    // Backend returns { job: {...} } when a job exists, or { job: null } when empty.
-    // Extract the actual job object; guard against the fallback-to-response-body bug
-    // that would make nextJob truthy (e.g. { job: null }) while nextJob.id is undefined.
     const raw = res.data;
-    const candidate =
-      (raw && raw.job && raw.job.id != null)   ? raw.job        : // { job: {id, ...} }
-      (raw && Array.isArray(raw.jobs) && raw.jobs[0]?.id != null) ? raw.jobs[0] : // { jobs: [...] }
-      (raw && raw.id != null)                  ? raw            : // bare job object
+    nextJob =
+      (raw && raw.job && raw.job.id != null) ? raw.job :
+      (raw && Array.isArray(raw.jobs) && raw.jobs[0]?.id != null) ? raw.jobs[0] :
+      (raw && raw.id != null) ? raw :
       null;
-    nextJob = candidate;
-    console.log("[DealerPilot] Extracted nextJob:", JSON.stringify(nextJob));
-    el.vJobs.textContent = nextJob ? "1+ ready" : "None";
   } else {
     nextJob = null;
-    el.vJobs.textContent = "Error";
+  }
+
+  // Check if the backend has assigned a job to this extension
+  const assignedRes = await send({ type: "GET_ASSIGNED_JOB" });
+  if (assignedRes && assignedRes.ok && assignedRes.data && assignedRes.data.job) {
+    const aj = assignedRes.data.job;
+    el.vAssigned.textContent =
+      `#${aj.id} — ${(aj.vehicleLabel || aj.listingTitle || "Job").slice(0, 22)}`;
+    el.vAssigned.className = "value ok";
+  } else {
+    el.vAssigned.textContent = "None";
+    el.vAssigned.className = "value";
   }
 
   el.vCurrent.textContent = activeJob

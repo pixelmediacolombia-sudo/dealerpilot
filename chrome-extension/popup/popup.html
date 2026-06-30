@@ -126,6 +126,18 @@
       summary:hover { color: #cdd9ea; }
       .details-inner { margin-top: 10px; }
 
+      /* ---- App-controlled mode info banner ---- */
+      #app-mode-banner {
+        background: #0e2d1a;
+        border: 1px solid #1e5e30;
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-bottom: 10px;
+        font-size: 11px;
+        color: #6fe39f;
+        line-height: 1.5;
+      }
+
       /* ---- Debug panel ---- */
       #debug-card {
         background: #050f1e;
@@ -155,8 +167,14 @@
       <div class="header-logo">DP</div>
       <div>
         <h1>DealerPilot AI</h1>
-        <p class="sub">Publishing assistant — fills listings, never auto-publishes.</p>
+        <p class="sub">Bridge mode — controlled from the DealerPilot app.</p>
       </div>
+    </div>
+
+    <!-- App-controlled mode info -->
+    <div id="app-mode-banner">
+      ✓ Publishing is controlled from the DealerPilot app.<br>
+      The extension polls for assigned jobs automatically.
     </div>
 
     <!-- Extension Status -->
@@ -177,8 +195,8 @@
         </span>
       </div>
       <div class="row">
-        <span class="label">Jobs available</span>
-        <span class="value" id="v-jobs">—</span>
+        <span class="label">Assigned job</span>
+        <span class="value" id="v-assigned">None</span>
       </div>
       <div class="row">
         <span class="label">Current job</span>
@@ -190,7 +208,6 @@
       </div>
     </div>
 
-    <button id="start" disabled>Start Publishing Job</button>
     <button id="refresh" class="secondary">Refresh Status</button>
     <div id="status"></div>
 
@@ -212,7 +229,7 @@
           <h2>System Info</h2>
           <div class="row">
             <span class="label">Build</span>
-            <span class="value ok" id="d-build">SAFE_RUNTIME_1.0.3</span>
+            <span class="value ok" id="d-build">APP_CONTROLLED_PUBLISHING_1.0.8</span>
           </div>
           <div class="row">
             <span class="label">Extension Version</span>
@@ -279,6 +296,9 @@
             <span class="value" id="d-messenger">—</span>
           </div>
 
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Dev Controls</h2>
+          <button id="dev-start" class="ghost" disabled>Dev: Claim Next Queued Job</button>
           <button id="clear-error" class="ghost">Clear Last Error</button>
           <button id="reload-debug" class="ghost">Reload Debug State</button>
         </div>

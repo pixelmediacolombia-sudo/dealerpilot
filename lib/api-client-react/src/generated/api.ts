@@ -20,8 +20,12 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AssignPublishingJob200,
+  AssignPublishingJobBody,
   AutoPublishSettingsInput,
   AutoPublishSettingsResponse,
+  CancelPublishingJob200,
+  CancelPublishingJobBody,
   ClaimJobInput,
   CompleteJobInput,
   ConnectionStatus,
@@ -54,6 +58,8 @@ import type {
   FeedRunList,
   FieldValidationResponse,
   GenerateCreativeInput,
+  GetAssignedPublishingJob200,
+  GetAssignedPublishingJobParams,
   GetDownPaymentIntelligenceParams,
   GetExtensionDiagnosticsParams,
   GetFeedQualityParams,
@@ -2317,6 +2323,232 @@ export function useListPublishingJobEvents<TData = Awaited<ReturnType<typeof lis
 
 
 
+
+export const getAssignPublishingJobUrl = (id: number,) => {
+
+
+
+
+  return `/api/publishing/jobs/${id}/assign`
+}
+
+/**
+ * @summary Assign a queued job to a specific extension
+ */
+export const assignPublishingJob = async (id: number,
+    assignPublishingJobBody?: AssignPublishingJobBody, options?: RequestInit): Promise<AssignPublishingJob200> => {
+
+  return customFetch<AssignPublishingJob200>(getAssignPublishingJobUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(assignPublishingJobBody)
+  }
+);}
+
+
+
+
+export const getAssignPublishingJobMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignPublishingJob>>, TError,{id: number;data?: BodyType<AssignPublishingJobBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof assignPublishingJob>>, TError,{id: number;data?: BodyType<AssignPublishingJobBody>}, TContext> => {
+
+const mutationKey = ['assignPublishingJob'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof assignPublishingJob>>, {id: number;data?: BodyType<AssignPublishingJobBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  assignPublishingJob(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AssignPublishingJobMutationResult = NonNullable<Awaited<ReturnType<typeof assignPublishingJob>>>
+    export type AssignPublishingJobMutationBody = BodyType<AssignPublishingJobBody> | undefined
+    export type AssignPublishingJobMutationError = ErrorType<void>
+
+    /**
+ * @summary Assign a queued job to a specific extension
+ */
+export const useAssignPublishingJob = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignPublishingJob>>, TError,{id: number;data?: BodyType<AssignPublishingJobBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof assignPublishingJob>>,
+        TError,
+        {id: number;data?: BodyType<AssignPublishingJobBody>},
+        TContext
+      > => {
+      return useMutation(getAssignPublishingJobMutationOptions(options));
+    }
+
+export const getGetAssignedPublishingJobUrl = (params: GetAssignedPublishingJobParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/publishing/jobs/assigned?${stringifiedParams}` : `/api/publishing/jobs/assigned`
+}
+
+/**
+ * @summary Poll for a job assigned to this extension
+ */
+export const getAssignedPublishingJob = async (params: GetAssignedPublishingJobParams, options?: RequestInit): Promise<GetAssignedPublishingJob200> => {
+
+  return customFetch<GetAssignedPublishingJob200>(getGetAssignedPublishingJobUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAssignedPublishingJobQueryKey = (params?: GetAssignedPublishingJobParams,) => {
+    return [
+    `/api/publishing/jobs/assigned`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAssignedPublishingJobQueryOptions = <TData = Awaited<ReturnType<typeof getAssignedPublishingJob>>, TError = ErrorType<unknown>>(params: GetAssignedPublishingJobParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAssignedPublishingJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAssignedPublishingJobQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAssignedPublishingJob>>> = ({ signal }) => getAssignedPublishingJob(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAssignedPublishingJob>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAssignedPublishingJobQueryResult = NonNullable<Awaited<ReturnType<typeof getAssignedPublishingJob>>>
+export type GetAssignedPublishingJobQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Poll for a job assigned to this extension
+ */
+
+export function useGetAssignedPublishingJob<TData = Awaited<ReturnType<typeof getAssignedPublishingJob>>, TError = ErrorType<unknown>>(
+ params: GetAssignedPublishingJobParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAssignedPublishingJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAssignedPublishingJobQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCancelPublishingJobUrl = (id: number,) => {
+
+
+
+
+  return `/api/publishing/jobs/${id}/cancel`
+}
+
+/**
+ * @summary Cancel a publishing job from the dashboard
+ */
+export const cancelPublishingJob = async (id: number,
+    cancelPublishingJobBody?: CancelPublishingJobBody, options?: RequestInit): Promise<CancelPublishingJob200> => {
+
+  return customFetch<CancelPublishingJob200>(getCancelPublishingJobUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(cancelPublishingJobBody)
+  }
+);}
+
+
+
+
+export const getCancelPublishingJobMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelPublishingJob>>, TError,{id: number;data?: BodyType<CancelPublishingJobBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelPublishingJob>>, TError,{id: number;data?: BodyType<CancelPublishingJobBody>}, TContext> => {
+
+const mutationKey = ['cancelPublishingJob'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelPublishingJob>>, {id: number;data?: BodyType<CancelPublishingJobBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  cancelPublishingJob(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelPublishingJobMutationResult = NonNullable<Awaited<ReturnType<typeof cancelPublishingJob>>>
+    export type CancelPublishingJobMutationBody = BodyType<CancelPublishingJobBody> | undefined
+    export type CancelPublishingJobMutationError = ErrorType<void>
+
+    /**
+ * @summary Cancel a publishing job from the dashboard
+ */
+export const useCancelPublishingJob = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelPublishingJob>>, TError,{id: number;data?: BodyType<CancelPublishingJobBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelPublishingJob>>,
+        TError,
+        {id: number;data?: BodyType<CancelPublishingJobBody>},
+        TContext
+      > => {
+      return useMutation(getCancelPublishingJobMutationOptions(options));
+    }
 
 export const getGetAutoPublishSettingsUrl = (dealerId: number,) => {
 

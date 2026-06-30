@@ -666,6 +666,95 @@ paths:
               schema:
                 $ref: "#/components/schemas/PublishingEventList"
 
+  /publishing/jobs/{id}/assign:
+    post:
+      operationId: assignPublishingJob
+      tags: [publishing]
+      summary: Assign a queued job to a specific extension
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                extensionId:
+                  type: string
+      responses:
+        "200":
+          description: Assigned job
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: "#/components/schemas/PublishingJob"
+        "404":
+          description: Job not found
+        "409":
+          description: Job is not assignable
+
+  /publishing/jobs/assigned:
+    get:
+      operationId: getAssignedPublishingJob
+      tags: [publishing]
+      summary: Poll for a job assigned to this extension
+      parameters:
+        - name: extensionId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Assigned job or null
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    oneOf:
+                      - $ref: "#/components/schemas/PublishingJob"
+                      - type: "null"
+
+  /publishing/jobs/{id}/cancel:
+    post:
+      operationId: cancelPublishingJob
+      tags: [publishing]
+      summary: Cancel a publishing job from the dashboard
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Cancelled job
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: "#/components/schemas/PublishingJob"
+        "404":
+          description: Job not found
+        "409":
+          description: Cannot cancel a Published or Failed job
+
   /auto-publish/settings/{dealerId}:
     get:
       operationId: getAutoPublishSettings

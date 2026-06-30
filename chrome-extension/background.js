@@ -138,6 +138,56 @@ const handlers = {
     });
   },
 
+  // ---- App-controlled bridge mode ----
+
+  async GET_ASSIGNED_JOB() {
+    const extensionId = await getExtensionId();
+    return apiGet(`/api/publishing/jobs/assigned?extensionId=${encodeURIComponent(extensionId)}`);
+  },
+
+  // Full auto-start flow triggered by the alarm poll.
+  // Claims the job, sets activeJob in storage, opens Facebook Marketplace.
+  async AUTO_START_ASSIGNED(message) {
+    const extensionId = await getExtensionId();
+    const job = await apiPost(`/api/publishing/jobs/${message.jobId}/claim`, { extensionId });
+
+    await chrome.storage.local.set({
+      activeJob: job,
+      lastClaimedJob: {
+        id: job.id,
+        title: job.listingTitle || job.vehicleLabel || `Job #${job.id}`,
+        claimedAt: new Date().toISOString(),
+      },
+    });
+
+    await apiPost(`/api/publishing/jobs/${job.id}/event`, {
+      event: "job_claimed",
+      extensionId,
+    });
+
+    const tab = await chrome.tabs.create({ url: MARKETPLACE_CREATE_URL });
+    return { ok: true, jobId: job.id, tabId: tab.id };
+  },
+
+  // Called by the alarm. Skips if an active job is already in progress.
+  async POLL_ASSIGNED_JOB() {
+    const { activeJob } = await chrome.storage.local.get("activeJob");
+    if (activeJob) return { skipped: true };
+
+    const extensionId = await getExtensionId();
+    let data;
+    try {
+      data = await apiGet(`/api/publishing/jobs/assigned?extensionId=${encodeURIComponent(extensionId)}`);
+    } catch {
+      return { job: null };
+    }
+
+    const assignedJob = data && data.job && data.job.id ? data.job : null;
+    if (!assignedJob) return { job: null };
+
+    return handlers.AUTO_START_ASSIGNED({ jobId: assignedJob.id });
+  },
+
   async GET_EXTENSION_ID() {
     return { extensionId: await getExtensionId() };
   },
@@ -214,6 +264,18 @@ const handlers = {
     });
   },
 };
+
+// ---- App-controlled polling alarm ----
+// Creates a 15-second repeating alarm so the service worker polls for jobs
+// assigned by the DealerPilot app even when the popup is closed.
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.alarms.create("pollAssigned", { periodInMinutes: 0.25 });
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name !== "pollAssigned") return;
+  handlers.POLL_ASSIGNED_JOB().catch((err) => saveLastError(err));
+});
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {

@@ -1060,6 +1060,104 @@ export const ListPublishingJobEventsResponse = zod.object({
 
 
 /**
+ * @summary Assign a queued job to a specific extension
+ */
+export const AssignPublishingJobParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AssignPublishingJobBody = zod.object({
+  "extensionId": zod.string().optional()
+})
+
+export const AssignPublishingJobResponse = zod.object({
+  "job": zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+}).optional()
+})
+
+
+/**
+ * @summary Poll for a job assigned to this extension
+ */
+export const GetAssignedPublishingJobQueryParams = zod.object({
+  "extensionId": zod.coerce.string()
+})
+
+export const GetAssignedPublishingJobResponse = zod.object({
+  "job": zod.union([zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Cancel a publishing job from the dashboard
+ */
+export const CancelPublishingJobParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CancelPublishingJobBody = zod.object({
+  "reason": zod.string().optional()
+})
+
+export const CancelPublishingJobResponse = zod.object({
+  "job": zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+}).optional()
+})
+
+
+/**
  * @summary Get auto-publish schedule settings for a dealer
  */
 export const GetAutoPublishSettingsParams = zod.object({

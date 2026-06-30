@@ -26,6 +26,7 @@ import {
   inArray,
   isNull,
   ne,
+  or,
   sql,
 } from "drizzle-orm";
 
@@ -704,6 +705,29 @@ router.post("/publishing/jobs/:id/event", async (req, res) => {
         .set({ skippedCount: sql`${publishingBatchesTable.skippedCount} + 1` })
         .where(eq(publishingBatchesTable.id, job.batchId));
     }
+  }
+
+  // Map progress events to live job status so the dashboard reflects real-time state.
+  const EVENT_STATUS_MAP: Record<string, string> = {
+    opening_facebook: "Opening Facebook",
+    filling_form: "Filling Form",
+    ready_for_review: "Ready for Review",
+  };
+  const mappedStatus = EVENT_STATUS_MAP[parsed.data.event];
+  if (mappedStatus) {
+    await db
+      .update(publishingJobsTable)
+      .set({ status: mappedStatus })
+      .where(
+        and(
+          eq(publishingJobsTable.id, jobId),
+          or(
+            eq(publishingJobsTable.status, "Publishing"),
+            eq(publishingJobsTable.status, "Opening Facebook"),
+            eq(publishingJobsTable.status, "Filling Form"),
+          ),
+        ),
+      );
   }
 
   res.json({ event: ev });

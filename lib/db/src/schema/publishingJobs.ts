@@ -32,6 +32,8 @@ export const publishingJobsTable = pgTable(
     failedReason: text("failed_reason"),
     attempts: integer("attempts").notNull().default(0),
     listingUrl: text("listing_url"),
+    assignedExtensionId: text("assigned_extension_id"),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }),
     needsReview: boolean("needs_review").notNull().default(false),
     reviewReason: text("review_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

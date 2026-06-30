@@ -1472,6 +1472,30 @@ export type ListPublishingJobsParams = {
 status?: string;
 };
 
+export type AssignPublishingJobBody = {
+  extensionId?: string;
+};
+
+export type AssignPublishingJob200 = {
+  job?: PublishingJob;
+};
+
+export type GetAssignedPublishingJobParams = {
+extensionId: string;
+};
+
+export type GetAssignedPublishingJob200 = {
+  job?: PublishingJob | null;
+};
+
+export type CancelPublishingJobBody = {
+  reason?: string;
+};
+
+export type CancelPublishingJob200 = {
+  job?: PublishingJob;
+};
+
 export type ListPublishingBatchesParams = {
 dealerId?: number;
 };

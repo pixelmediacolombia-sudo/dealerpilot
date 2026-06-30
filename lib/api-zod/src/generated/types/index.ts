@@ -6,10 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './assignPublishingJob200';
+export * from './assignPublishingJobBody';
 export * from './autoPublishSettings';
 export * from './autoPublishSettingsInput';
 export * from './autoPublishSettingsResponse';
 export * from './batchJobSummary';
+export * from './cancelPublishingJob200';
+export * from './cancelPublishingJobBody';
 export * from './claimJobInput';
 export * from './completeJobInput';
 export * from './connectionStatus';
@@ -66,6 +70,8 @@ export * from './fieldReport';
 export * from './fieldValidationAggregated';
 export * from './fieldValidationResponse';
 export * from './generateCreativeInput';
+export * from './getAssignedPublishingJob200';
+export * from './getAssignedPublishingJobParams';
 export * from './getDownPaymentIntelligenceParams';
 export * from './getExtensionDiagnosticsParams';
 export * from './getFeedQualityParams';

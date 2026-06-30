@@ -1,0 +1,225 @@
+# DealerPilot AI — Sprint 7
+## App-Controlled Marketplace Automation
+
+Sprint 6 is complete.
+
+Goal:
+Move publishing control from the Chrome Extension popup into the DealerPilot web app.
+
+The extension should become a background execution bridge.
+The operator should control publishing from DealerPilot, not from the popup.
+
+Do NOT auto-click Facebook's final Publish button.
+The extension fills the form and stops for human review.
+
+--------------------------------------------------
+CORE FLOW
+--------------------------------------------------
+
+DealerPilot App
+→ Marketplace AI / Publishing Queue
+→ Operator clicks “Publish with Extension”
+→ Backend assigns job to online extension
+→ Extension detects assigned job
+→ Extension opens Facebook Marketplace create vehicle page
+→ Extension claims job
+→ Extension fetches payload
+→ Extension fills the form
+→ Extension reports “Ready for Review”
+→ Operator manually clicks Publish on Facebook
+→ Operator returns to DealerPilot or extension panel to mark Published / Failed
+→ DealerPilot stores result
+
+--------------------------------------------------
+REQUIREMENTS
+--------------------------------------------------
+
+1. App-Controlled Publishing
+
+On /marketplace-ai or the publishing queue tab:
+
+Add:
+- Publish with Extension button per queued job
+- Start Assisted Publishing button for next ready job
+- Bulk Publish Selected button
+
+When clicked:
+- validate job.id exists
+- validate an online extension is available
+- assign job to extension
+- set job status to ASSIGNED or WAITING_FOR_EXTENSION
+- show live status in the UI
+
+Do not depend on the popup button to start production publishing.
+
+--------------------------------------------------
+
+2. Extension Bridge Mode
+
+Chrome extension should poll backend for assigned jobs.
+
+Popup behavior:
+- Status only
+- Debug only
+- Hide “Start Publishing Job” under Debug Mode
+- Main operator flow should happen from the app
+
+Extension behavior:
+- poll assigned jobs
+- if assigned job exists:
+  - open Facebook Marketplace create vehicle page if not already open
+  - claim the job
+  - fetch payload
+  - run existing state machine
+  - fill the form
+  - stop before final Publish
+  - report READY_FOR_REVIEW
+
+Keep existing form-filling state machine from v1.0.7.
+Do not rewrite field filling.
+
+--------------------------------------------------
+
+3. Fix Job ID Contract
+
+Current bug:
+POST /api/publishing/jobs/undefined/claim failed: 500
+
+Fix this permanently.
+
+Requirements:
+- Never call claim with undefined.
+- Log full next-job response if id missing.
+- Add backend validation: invalid job id returns 400, not 500.
+- Ensure extension reads job id correctly from backend response.
+- Support response shapes safely:
+  { job: {...} }
+  { data: { job: {...} } }
+  { jobs: [...] }
+
+--------------------------------------------------
+
+4. Publishing Job States
+
+Add or map these states:
+
+QUEUED
+ASSIGNED
+CLAIMED
+OPENING_FACEBOOK
+FILLING_FORM
+READY_FOR_REVIEW
+PUBLISHED
+FAILED
+CANCELLED
+
+Keep backward compatibility with existing statuses.
+
+--------------------------------------------------
+
+5. Live UI Status
+
+In the app show:
+
+- Waiting for extension
+- Assigned to extension
+- Opening Facebook
+- Filling form
+- Ready for review
+- Published
+- Failed
+
+Use polling or existing mechanisms.
+
+--------------------------------------------------
+
+6. Completion Flow
+
+When the operator publishes manually:
+
+Allow marking Published from:
+- DealerPilot app
+- extension panel
+
+Require:
+- Marketplace listing URL if available
+- optional notes
+
+Store:
+- marketplace_url
+- published_at
+- published_by_extension_id
+- final_status
+- notes
+
+If failed:
+- require failure reason
+- store failed_reason
+
+--------------------------------------------------
+
+7. Extension Assignment
+
+Use extension_connections.
+
+A job must be assigned to one extension.
+
+Track:
+- assigned_extension_id
+- claimed_by_extension
+- last_heartbeat
+- extension status
+
+If extension goes offline:
+- show warning
+- allow reassigning job
+
+--------------------------------------------------
+
+8. Safety
+
+- Never store Facebook credentials.
+- Never bypass Facebook security.
+- Never click final Publish.
+- Stop if Facebook shows login, checkpoint, captcha, or security warning.
+- Report failure back to backend.
+
+--------------------------------------------------
+
+9. Versioning
+
+Bump extension to 1.0.8.
+
+Set BUILD_LABEL:
+APP_CONTROLLED_PUBLISHING_1.0.8
+
+Create a fresh timestamped ZIP.
+
+--------------------------------------------------
+
+10. Deliverables
+
+- App-controlled publishing buttons
+- Backend assignment endpoints
+- Extension polling assigned jobs
+- Job ID contract fixed
+- Live job status UI
+- Ready for Review state
+- Published / Failed completion flow
+- Fresh extension ZIP
+- Typecheck clean
+- Test checklist
+
+Acceptance Test:
+
+1. Queue a real listing in DealerPilot.
+2. Click Publish with Extension from the app.
+3. Job becomes Assigned.
+4. Extension sees the job automatically.
+5. Extension opens Facebook Marketplace create vehicle page.
+6. Extension fills:
+   vehicle type, year, make, model, mileage, price, description, title auto-generated.
+7. Extension stops before Publish.
+8. App shows Ready for Review.
+9. Operator manually publishes or marks failed.
+10. DealerPilot stores final result.

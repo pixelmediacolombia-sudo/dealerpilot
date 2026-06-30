@@ -25,7 +25,7 @@
   // ---- Safe runtime communication ----
   // Sentinel returned (never thrown) when Chrome invalidates the extension context.
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "JOB_ID_CONTRACT_FIX_1.0.8";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.0.8";
 
   function _runtimeAlive() {
     try {
@@ -871,6 +871,8 @@
   }
 
   function renderReview(job, result) {
+    // Signal the backend that form filling is complete and operator review is needed.
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "ready_for_review" }).catch(() => {});
     showOutput(`
       <div class="mai-section-label">Filled successfully</div>
       <div class="mai-chips">${chips(result.filled, "ok")}</div>

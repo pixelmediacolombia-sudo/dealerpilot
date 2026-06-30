@@ -34,6 +34,8 @@ function toJob(j: PublishingJob, extras: JobExtras = {
     priority: j.priority,
     scheduledAt: j.scheduledAt ? j.scheduledAt.toISOString() : null,
     claimedByExtension: j.claimedByExtension ?? null,
+    assignedExtensionId: j.assignedExtensionId ?? null,
+    assignedAt: j.assignedAt ? j.assignedAt.toISOString() : null,
     startedAt: j.startedAt ? j.startedAt.toISOString() : null,
     completedAt: j.completedAt ? j.completedAt.toISOString() : null,
     failedReason: j.failedReason ?? null,
@@ -92,6 +94,87 @@ router.get("/publishing/jobs", async (req, res) => {
   res.json({ jobs: await enrich(rows) });
 });
 
+const AssignBody = z.object({ extensionId: z.string().min(1).optional() });
+
+// POST /publishing/jobs/:id/assign — app assigns a queued job to a specific extension.
+// Sets status=Assigned and records which extension is expected to claim it.
+router.post("/publishing/jobs/:id/assign", async (req, res) => {
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Invalid job id" });
+    return;
+  }
+  const parsed = AssignBody.safeParse(req.body ?? {});
+  const extensionId = parsed.success ? (parsed.data.extensionId ?? null) : null;
+
+  const [job] = await db
+    .select()
+    .from(publishingJobsTable)
+    .where(eq(publishingJobsTable.id, id));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  if (!["Queued", "Retry"].includes(job.status)) {
+    res.status(409).json({ error: `Job is not assignable (status: ${job.status})` });
+    return;
+  }
+
+  const [updated] = await db
+    .update(publishingJobsTable)
+    .set({
+      status: "Assigned",
+      assignedExtensionId: extensionId,
+      assignedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(publishingJobsTable.id, id),
+        or(eq(publishingJobsTable.status, "Queued"), eq(publishingJobsTable.status, "Retry")),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    res.status(409).json({ error: "Job could not be assigned" });
+    return;
+  }
+
+  req.log.info({ jobId: id, extensionId }, "Publishing job assigned to extension");
+  const [enriched] = await enrich([updated]);
+  res.json({ job: enriched });
+});
+
+// GET /publishing/jobs/assigned — extension polls for a job assigned to it.
+// Returns the first Assigned job for this extensionId, or { job: null }.
+router.get("/publishing/jobs/assigned", async (req, res) => {
+  const extensionId = typeof req.query.extensionId === "string" ? req.query.extensionId : null;
+  if (!extensionId) {
+    res.status(400).json({ error: "extensionId query param is required" });
+    return;
+  }
+
+  const [row] = await db
+    .select()
+    .from(publishingJobsTable)
+    .where(
+      and(
+        eq(publishingJobsTable.status, "Assigned"),
+        eq(publishingJobsTable.assignedExtensionId, extensionId),
+        isNull(publishingJobsTable.claimedByExtension),
+      ),
+    )
+    .orderBy(desc(publishingJobsTable.priority), asc(publishingJobsTable.createdAt))
+    .limit(1);
+
+  if (!row) {
+    res.json({ job: null });
+    return;
+  }
+  const [enriched] = await enrich([row]);
+  res.json({ job: enriched });
+});
+
 // GET /publishing/jobs/next — next claimable job for the Chrome extension.
 router.get("/publishing/jobs/next", async (req, res) => {
   const [row] = await db
@@ -99,7 +182,10 @@ router.get("/publishing/jobs/next", async (req, res) => {
     .from(publishingJobsTable)
     .where(
       and(
-        or(eq(publishingJobsTable.status, "Queued"), eq(publishingJobsTable.status, "Retry")),
+        or(
+          eq(publishingJobsTable.status, "Queued"),
+          eq(publishingJobsTable.status, "Retry"),
+        ),
         isNull(publishingJobsTable.claimedByExtension),
       ),
     )
@@ -209,7 +295,11 @@ router.post("/publishing/jobs/:id/claim", async (req, res) => {
     .where(
       and(
         eq(publishingJobsTable.id, id),
-        or(eq(publishingJobsTable.status, "Queued"), eq(publishingJobsTable.status, "Retry")),
+        or(
+          eq(publishingJobsTable.status, "Queued"),
+          eq(publishingJobsTable.status, "Retry"),
+          eq(publishingJobsTable.status, "Assigned"),
+        ),
         isNull(publishingJobsTable.claimedByExtension),
       ),
     )
@@ -260,15 +350,19 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
     return;
   }
 
-  // Atomic, ownership-scoped transition: only a Publishing job claimed by this
-  // extension can be completed.
+  // Atomic, ownership-scoped transition: accepts Publishing, Filling Form, or
+  // Ready for Review so the operator can confirm from any in-progress state.
   const [updated] = await db
     .update(publishingJobsTable)
     .set({ status: "Published", completedAt: new Date(), failedReason: null })
     .where(
       and(
         eq(publishingJobsTable.id, id),
-        eq(publishingJobsTable.status, "Publishing"),
+        or(
+          eq(publishingJobsTable.status, "Publishing"),
+          eq(publishingJobsTable.status, "Filling Form"),
+          eq(publishingJobsTable.status, "Ready for Review"),
+        ),
         eq(publishingJobsTable.claimedByExtension, extensionId),
       ),
     )
@@ -341,8 +435,8 @@ router.post("/publishing/jobs/:id/fail", async (req, res) => {
   }
 
   const nextStatus = job.attempts >= MAX_ATTEMPTS ? "Failed" : "Retry";
-  // Atomic, ownership-scoped transition: only a Publishing job claimed by this
-  // extension can be failed/retried.
+  // Atomic, ownership-scoped transition: accepts Publishing, Filling Form, or
+  // Ready for Review so the operator/extension can fail from any in-progress state.
   const [updated] = await db
     .update(publishingJobsTable)
     .set({
@@ -353,7 +447,11 @@ router.post("/publishing/jobs/:id/fail", async (req, res) => {
     .where(
       and(
         eq(publishingJobsTable.id, id),
-        eq(publishingJobsTable.status, "Publishing"),
+        or(
+          eq(publishingJobsTable.status, "Publishing"),
+          eq(publishingJobsTable.status, "Filling Form"),
+          eq(publishingJobsTable.status, "Ready for Review"),
+        ),
         eq(publishingJobsTable.claimedByExtension, extensionId),
       ),
     )
@@ -367,6 +465,44 @@ router.post("/publishing/jobs/:id/fail", async (req, res) => {
   req.log.warn({ jobId: id, reason, nextStatus }, "Publishing job failed");
   const [enriched] = await enrich([updated]);
   res.json(enriched);
+});
+
+const CancelBody = z.object({ reason: z.string().optional() });
+
+// POST /publishing/jobs/:id/cancel — operator cancels a job from the dashboard.
+// Moves the job to Failed so it is removed from the active queue.
+router.post("/publishing/jobs/:id/cancel", async (req, res) => {
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Invalid job id" });
+    return;
+  }
+  const parsed = CancelBody.safeParse(req.body ?? {});
+  const reason =
+    parsed.success ? (parsed.data.reason ?? "Cancelled by operator") : "Cancelled by operator";
+
+  const [job] = await db
+    .select()
+    .from(publishingJobsTable)
+    .where(eq(publishingJobsTable.id, id));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  if (["Published", "Failed"].includes(job.status)) {
+    res.status(409).json({ error: `Cannot cancel a ${job.status} job` });
+    return;
+  }
+
+  const [updated] = await db
+    .update(publishingJobsTable)
+    .set({ status: "Failed", failedReason: reason, claimedByExtension: null })
+    .where(eq(publishingJobsTable.id, id))
+    .returning();
+
+  req.log.info({ jobId: id, reason }, "Publishing job cancelled by operator");
+  const [enriched] = await enrich([updated]);
+  res.json({ job: enriched });
 });
 
 const QueueBody = z.object({
