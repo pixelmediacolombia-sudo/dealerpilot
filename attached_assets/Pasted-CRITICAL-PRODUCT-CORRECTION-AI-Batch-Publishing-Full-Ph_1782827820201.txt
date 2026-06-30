@@ -1,0 +1,183 @@
+CRITICAL PRODUCT CORRECTION — AI Batch Publishing + Full Photo Gallery
+
+The current Marketplace AI page is still too manual.
+
+Problems:
+1. Only one photo is visible per vehicle even though Alpha XML includes many images.
+2. Multi-select currently shows manual actions, but the purpose of selecting vehicles is to create an AI publishing batch.
+3. The UI has too many manual buttons and not enough AI guidance.
+4. DealerPilot should decide which vehicles are ready, which photos are best, and which vehicles need review before publishing.
+
+DO NOT add more manual buttons.
+
+GOAL:
+Marketplace AI should work like an AI operator.
+
+====================================================
+PART 1 — FULL PHOTO GALLERY
+====================================================
+
+Each vehicle card must show:
+- primary image
+- Photos: X
+- small gallery preview count
+- button/hover: View Photos
+
+Vehicle detail/listing detail must show:
+- full gallery
+- all XML images
+- selectable cover photo
+- AI recommended cover photo
+
+If XML has 20 images, DealerPilot must show 20 images.
+
+Acceptance:
+Every Alpha vehicle should show actual image_count.
+No vehicle with multiple XML photos should show only one photo.
+
+====================================================
+PART 2 — AI PHOTO SELECTION
+====================================================
+
+DealerPilot must score every vehicle image.
+
+Photo Score metrics:
+- vehicle visibility
+- front angle quality
+- lighting
+- sharpness
+- background cleanliness
+- marketplace trust
+- crop quality
+
+AI should recommend:
+- Best Marketplace Cover
+- Backup Cover
+- Photos to exclude
+
+Show badges:
+- AI Pick
+- Best Cover
+- Needs Better Photo
+- Low Quality
+
+Do not make flyer creatives here.
+This is for selecting the best real vehicle photo.
+
+====================================================
+PART 3 — AI PUBLISHING BATCH
+====================================================
+
+Multi-select is not for manual actions.
+
+When vehicles are selected, show a floating bar with ONE primary CTA:
+
+Create AI Publishing Batch
+
+Secondary:
+Clear Selection
+
+After clicking Create AI Publishing Batch:
+DealerPilot analyzes selected vehicles and creates a batch plan.
+
+Batch plan should show:
+- vehicles selected
+- ready to publish
+- needs better photo
+- needs listing generated
+- needs creative enhancement
+- excluded / not recommended
+- recommended publishing order
+- recommended spacing between posts
+- recommended posting window
+
+Example:
+DealerPilot recommends publishing 8 of 12 selected vehicles today.
+4 need review before publishing.
+
+====================================================
+PART 4 — AI BATCH REVIEW SCREEN
+====================================================
+
+Create a batch review experience.
+
+For each selected vehicle show:
+- vehicle image
+- Photos: X
+- AI selected cover photo
+- listing score
+- photo score
+- readiness status
+- recommendation
+- reason
+
+Statuses:
+- Ready
+- Needs Better Photo
+- Needs Listing
+- Needs Price Review
+- Not Recommended Today
+
+Only Ready vehicles can be scheduled/published.
+
+====================================================
+PART 5 — REMOVE MANUAL CLUTTER
+====================================================
+
+Do not show Mark Ready, Mark Sold, Archive as primary floating actions.
+
+Move manual actions into overflow menu.
+
+The main flow should be:
+Select vehicles
+→ Create AI Publishing Batch
+→ AI reviews vehicles
+→ Approve batch
+→ Schedule / Publish with Extension
+
+====================================================
+PART 6 — BATCH SCHEDULING
+====================================================
+
+Batch scheduler should allow:
+- publish now
+- schedule later
+- number of vehicles per batch
+- spacing between posts
+- assigned extension
+- require human approval
+
+DealerPilot should recommend:
+- best posting time
+- posting order
+- which vehicles to publish first
+
+====================================================
+PART 7 — UI LANGUAGE
+====================================================
+
+Replace manual language with AI guidance.
+
+Bad:
+1 selected
+Mark Ready
+Mark Sold
+Archive
+
+Good:
+DealerPilot selected 1 vehicle for review.
+Create AI Publishing Batch
+AI will choose the best photo and publishing order.
+
+====================================================
+ACCEPTANCE TEST
+====================================================
+
+1. Vehicle cards show Photos: X.
+2. Clicking a vehicle shows full gallery.
+3. AI recommends best cover photo.
+4. Selecting multiple vehicles shows Create AI Publishing Batch.
+5. Batch review explains which vehicles are ready and why.
+6. Manual actions are hidden in overflow.
+7. Publishing batch creates publishing jobs only for approved ready vehicles.
+8. No flyer-style creatives are used for Marketplace listing photos.

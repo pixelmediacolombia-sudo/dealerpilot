@@ -26,6 +26,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Table,
   TableBody,
   TableCell,
@@ -55,6 +62,7 @@ import {
   Tag,
   Archive,
   CalendarClock,
+  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader, EmptyState, SectionCard } from "@/components/shared";
@@ -62,6 +70,7 @@ import { AutoPublishPlan } from "./AutoPublishPlan";
 import { BatchProgressCard } from "./BatchProgressCard";
 import { PublishedCard } from "./PublishedCard";
 import { MarkPublishedModal } from "./MarkPublishedModal";
+import { BatchReviewPanel } from "./BatchReviewPanel";
 import { toast } from "@/hooks/use-toast";
 
 const DEALER_ID = 1;
@@ -185,6 +194,7 @@ export function ListingsWorkspace() {
   const [batchRefreshKey, setBatchRefreshKey] = useState(0);
   const [markPublishedVehicle, setMarkPublishedVehicle] = useState<{ id: number; label: string } | null>(null);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<Set<number>>(new Set());
+  const [showBatchReview, setShowBatchReview] = useState(false);
 
   const toggleSelected = (id: number) => {
     setSelectedVehicleIds((prev) => {
@@ -726,65 +736,96 @@ export function ListingsWorkspace() {
                   })}
                 </div>
 
-                {/* ── Floating multi-select action bar ── */}
+                {/* ── Floating AI action bar ── */}
                 {selectionCount > 0 && (
                   <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
-                    <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-card/95 border border-border shadow-2xl backdrop-blur-md">
-                      <span className="text-sm font-semibold text-foreground px-1 mr-1">
-                        {selectionCount} vehicle{selectionCount !== 1 ? "s" : ""}
-                      </span>
-                      <div className="w-px h-5 bg-border mx-1" />
+                    <div className="flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-card/97 border border-primary/20 shadow-2xl shadow-primary/10 backdrop-blur-md">
+                      {/* AI label */}
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
+                        <span className="text-sm font-semibold text-foreground whitespace-nowrap">
+                          DealerPilot selected{" "}
+                          <span className="text-primary">{selectionCount}</span>{" "}
+                          vehicle{selectionCount !== 1 ? "s" : ""} for review
+                        </span>
+                      </div>
+
+                      <div className="w-px h-6 bg-border/60" />
+
+                      {/* Primary CTA */}
                       <Button
-                        size="sm"
-                        variant="ghost"
-                        className="gap-1.5 text-xs h-8"
-                        onClick={() => {
-                          bulkVehicleAction.mutate(
-                            { data: { vehicleIds: [...selectedVehicleIds], action: "mark_ready" } },
-                            { onSuccess: () => { clearSelection(); invalidateWorkspaces(); } }
-                          );
-                        }}
-                        disabled={bulkVehicleAction.isPending}
+                        className="gap-2 px-5 font-bold text-[11px] uppercase tracking-widest premium-gradient-btn whitespace-nowrap"
+                        onClick={() => setShowBatchReview(true)}
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5 text-success" />
-                        Mark Ready
+                        <Wand2 className="w-3.5 h-3.5" />
+                        Create AI Publishing Batch
                       </Button>
+
+                      <div className="w-px h-6 bg-border/60" />
+
+                      {/* Overflow: manual actions */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                            title="Manual actions"
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem
+                            className="gap-2 text-xs"
+                            disabled={bulkVehicleAction.isPending}
+                            onClick={() => {
+                              bulkVehicleAction.mutate(
+                                { data: { vehicleIds: [...selectedVehicleIds], action: "mark_ready" } },
+                                { onSuccess: () => { clearSelection(); invalidateWorkspaces(); } },
+                              );
+                            }}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                            Mark Ready
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="gap-2 text-xs"
+                            disabled={bulkVehicleAction.isPending}
+                            onClick={() => {
+                              bulkVehicleAction.mutate(
+                                { data: { vehicleIds: [...selectedVehicleIds], action: "mark_sold" } },
+                                { onSuccess: () => { clearSelection(); invalidateWorkspaces(); } },
+                              );
+                            }}
+                          >
+                            <Tag className="w-3.5 h-3.5 text-amber-400" />
+                            Mark Sold
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="gap-2 text-xs text-muted-foreground"
+                            disabled={bulkVehicleAction.isPending}
+                            onClick={() => {
+                              bulkVehicleAction.mutate(
+                                { data: { vehicleIds: [...selectedVehicleIds], action: "archive" } },
+                                { onSuccess: () => { clearSelection(); invalidateWorkspaces(); } },
+                              );
+                            }}
+                          >
+                            <Archive className="w-3.5 h-3.5" />
+                            Archive
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {/* Clear */}
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="gap-1.5 text-xs h-8"
-                        onClick={() => {
-                          bulkVehicleAction.mutate(
-                            { data: { vehicleIds: [...selectedVehicleIds], action: "mark_sold" } },
-                            { onSuccess: () => { clearSelection(); invalidateWorkspaces(); } }
-                          );
-                        }}
-                        disabled={bulkVehicleAction.isPending}
-                      >
-                        <Tag className="w-3.5 h-3.5 text-amber-400" />
-                        Mark Sold
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="gap-1.5 text-xs h-8"
-                        onClick={() => {
-                          bulkVehicleAction.mutate(
-                            { data: { vehicleIds: [...selectedVehicleIds], action: "archive" } },
-                            { onSuccess: () => { clearSelection(); invalidateWorkspaces(); } }
-                          );
-                        }}
-                        disabled={bulkVehicleAction.isPending}
-                      >
-                        <Archive className="w-3.5 h-3.5 text-muted-foreground" />
-                        Archive
-                      </Button>
-                      <div className="w-px h-5 bg-border mx-1" />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
                         onClick={clearSelection}
+                        title="Clear selection"
                       >
                         <X className="w-4 h-4" />
                       </Button>
@@ -988,6 +1029,40 @@ export function ListingsWorkspace() {
           vehicleLabel={markPublishedVehicle.label}
           onConfirm={handleMarkPublished}
           isLoading={markPublishedMutation.isPending}
+        />
+      )}
+
+      {/* AI Batch Review Panel */}
+      {showBatchReview && selectedVehicleIds.size > 0 && (
+        <BatchReviewPanel
+          vehicles={filteredWorkspaces.filter((w) =>
+            selectedVehicleIds.has(w.vehicleId),
+          )}
+          photoScoreByVehicle={photoScoreByVehicle}
+          onClose={() => setShowBatchReview(false)}
+          isApproving={bulkVehicleAction.isPending}
+          onApprove={(readyVehicleIds) => {
+            bulkVehicleAction.mutate(
+              { data: { vehicleIds: readyVehicleIds, action: "mark_ready" } },
+              {
+                onSuccess: () => {
+                  setShowBatchReview(false);
+                  clearSelection();
+                  invalidateWorkspaces();
+                  toast({
+                    title: "Batch created",
+                    description: `${readyVehicleIds.length} vehicle${readyVehicleIds.length !== 1 ? "s" : ""} queued for publishing. DealerPilot will publish them in order.`,
+                  });
+                },
+                onError: () =>
+                  toast({
+                    title: "Error",
+                    description: "Failed to create batch",
+                    variant: "destructive",
+                  }),
+              },
+            );
+          }}
         />
       )}
     </AppLayout>

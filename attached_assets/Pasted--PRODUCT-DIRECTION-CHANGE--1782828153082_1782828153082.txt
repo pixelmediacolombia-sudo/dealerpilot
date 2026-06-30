@@ -1,0 +1,173 @@
+====================================================
+PRODUCT DIRECTION CHANGE
+====================================================
+
+Remove the "Ad Creative Generator" mode completely.
+
+Marketplace is NOT the place for flyer ads.
+
+DealerPilot Marketplace AI should only generate optimized vehicle photography.
+
+Delete:
+
+- Ad Creative Generator
+- Creative Templates
+- Marketplace Standard
+- Luxury Template
+- Showroom Template
+- Generated Template
+- Approve Creative
+- All flyer generation UI
+
+Those features belong in the Meta Ads / Creative Studio module, NOT inside Marketplace.
+
+====================================================
+NEW PRODUCT STRUCTURE
+====================================================
+
+Rename the module:
+
+AI Vehicle Studio
+
+This module has ONE purpose:
+
+Transform dealership inventory photos into premium Marketplace-ready vehicle photos.
+
+The workflow becomes:
+
+1. Analyze all vehicle photos.
+2. Choose the best source image automatically.
+3. Remove dealer branding.
+4. Remove promotional banners.
+5. Remove phone numbers.
+6. Remove financing graphics.
+7. Reconstruct hidden vehicle parts.
+8. Improve lighting.
+9. Improve paint reflections.
+10. Generate premium Marketplace-ready photography.
+
+No text.
+
+No CTA.
+
+No prices.
+
+No marketing graphics.
+
+Only professional automotive photography.
+
+====================================================
+REPLACE THE TABS
+====================================================
+
+Instead of
+
+Marketplace Photo Enhancer
+Ad Creative Generator
+
+Use
+
+Photo Audit
+Enhanced Photos
+Gallery
+
+Photo Audit
+------------
+AI analyzes every image.
+
+Enhanced Photos
+---------------
+Shows all AI-generated outputs.
+
+Gallery
+-------
+Shows every original XML image.
+
+====================================================
+NEW OUTPUTS
+====================================================
+
+Marketplace Clean
+
+Luxury Studio
+
+White Catalog
+
+Outdoor Premium
+
+Gray Studio
+
+Black Studio
+
+Transparent PNG
+
+Each output should have:
+
+Approve
+
+Download
+
+Use as Cover Photo
+
+Use for Marketplace Listing
+
+====================================================
+AI AUDIT
+====================================================
+
+Every vehicle receives an AI report.
+
+Example
+
+Overall Score
+
+92/100
+
+Best Cover Photo
+
+Photo #7
+
+Branding Severity
+
+High
+
+Lighting
+
+Excellent
+
+Composition
+
+Excellent
+
+Reflection Quality
+
+Good
+
+Background
+
+Poor
+
+Recommended Action
+
+Generate Marketplace Clean version from Photo #7.
+
+====================================================
+VERY IMPORTANT
+====================================================
+
+DealerPilot Marketplace AI should NEVER create flyer-style graphics.
+
+Marketplace users want to see the vehicle.
+
+DealerPilot's competitive advantage is producing premium automotive photography, not advertisements.
+
+Think:
+
+BMW Certified
+Bring a Trailer
+Carvana
+Porsche Finder
+Cars & Bids
+AutoTrader
+
+DealerPilot should generate photographs that increase trust and Marketplace engagement—not ad creatives.
