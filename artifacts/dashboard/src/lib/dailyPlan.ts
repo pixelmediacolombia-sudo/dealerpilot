@@ -124,6 +124,11 @@ export type DailyMarketplacePlan = {
 
 // ─── Composite priority score ─────────────────────────────────────────────────
 // Deterministic. Inputs: real vehicle attributes + strategy engine confidence.
+//
+// Facebook Marketplace is a budget-first marketplace. Everyday affordable
+// vehicles (< $25K) have dramatically higher buyer engagement than exotic or
+// luxury vehicles. Price affordability is weighted heavily so that a Porsche 911
+// or GR Supra does not outrank a well-photographed $18K Honda Accord.
 function compositeScore(
   confidenceScore: number,
   imageCount: number,
@@ -132,26 +137,32 @@ function compositeScore(
   actualPrice: number | null,
   priceMode: "FULL_PRICE" | "DOWN_PAYMENT",
 ): number {
-  // Strategy engine confidence: 0–100 → 50 pts max
-  let score = confidenceScore * 0.5;
+  // Strategy engine confidence: 0–100 → 35 pts max (reduced — price now co-anchors)
+  let score = confidenceScore * 0.35;
 
   // Photo count: coverage for Marketplace → 20 pts max (20+ photos = full score)
   score += Math.min(imageCount / 20, 1) * 20;
 
-  // Listing readiness → 15 pts max
-  score += ((listingScore ?? 0) / 100) * 15;
+  // Listing readiness → 10 pts max
+  score += ((listingScore ?? 0) / 100) * 10;
 
-  // Priority score from backend → 10 pts max
-  score += ((priorityScore ?? 0) / 100) * 10;
+  // Priority score from backend → 5 pts max
+  score += ((priorityScore ?? 0) / 100) * 5;
 
-  // Price range: affordable vehicles move faster on Marketplace → up to 5 pts
+  // ── FB Marketplace price-fit bonus/penalty ──────────────────────────────
+  // Affordable everyday vehicles move much faster on FB Marketplace.
+  // Luxury/exotic vehicles are a poor fit for the platform and rank down.
   if (actualPrice != null) {
-    if (actualPrice < 10_000) score += 5;
-    else if (actualPrice < 16_000) score += 4;
-    else if (actualPrice < 25_000) score += 2;
+    if (actualPrice < 10_000) score += 30;       // budget — best FB fit
+    else if (actualPrice < 16_000) score += 25;  // affordable sweet spot
+    else if (actualPrice < 22_000) score += 18;  // good everyday range
+    else if (actualPrice < 30_000) score += 10;  // above average, still moves
+    else if (actualPrice < 40_000) score += 2;   // marginal FB fit
+    else if (actualPrice < 60_000) score -= 10;  // poor FB fit
+    else score -= 20;                            // luxury/exotic — not FB Marketplace material
   }
 
-  // Down payment pricing is preferred for high-ticket Marketplace listings → +3
+  // Down payment display preferred for higher-priced vehicles → +3
   if (priceMode === "DOWN_PAYMENT") score += 3;
 
   return Math.round(score);
@@ -203,9 +214,14 @@ export function buildDailyMarketplacePlan(
       reasons.push(`Affordable price: $${actualPrice.toLocaleString()}`);
     }
     if (rec?.reason && !reasons.some((r) => r === rec.reason)) {
-      // Use the strategy engine reason (v2 explanation) if different from strategy name
       const shortReason = rec.reason.split(".")[0];
-      if (shortReason && shortReason.length < 120) reasons.push(shortReason);
+      // Skip backend reasons that say "under $16k" when the car is actually above $16k —
+      // those are seeded strategy engine labels that don't match this vehicle's real price.
+      const contradictsPrice =
+        shortReason?.toLowerCase().includes("under $16k") && (actualPrice ?? 0) >= 16_000;
+      if (shortReason && shortReason.length < 120 && !contradictsPrice) {
+        reasons.push(shortReason);
+      }
     }
 
     return {
