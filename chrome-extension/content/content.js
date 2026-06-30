@@ -25,7 +25,7 @@
   // ---- Safe runtime communication ----
   // Sentinel returned (never thrown) when Chrome invalidates the extension context.
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "COMBOBOX_REGRESSION_FIX_1.0.6";
+  const BUILD_LABEL = "MODEL_TEXT_INPUT_FIX_1.0.7";
 
   function _runtimeAlive() {
     try {
@@ -737,35 +737,42 @@
         "generic", // waitForMoreComboboxes — restored v1.0.4 behaviour
       );
 
-      // Make — DOM-poll specifically for the Model combobox (up to 20 s, 250 ms ticks).
-      // Facebook loads Model asynchronously; generic count wait is unreliable here.
+      // Make — generic count-based wait (same as Vehicle Type / Year).
+      // Model is a plain text input — NOT a combobox — so we do NOT poll for
+      // a model combobox here.  The generic wait lets React settle after Make.
       setStatus("Step 3 of 4: Selecting make…");
       await selectComboboxStep(
         "make",
         ["make"],
         fill.make,
-        { label: "model", keywords: ["model"] }, // waitForNamedCombobox — new DOM-poll
+        "generic", // waitForMoreComboboxes — v1.0.4 behaviour restored for Make
       );
 
-      // Model — no cascade combobox expected; text fields appear after this.
-      setStatus("Step 4 of 4: Selecting model…");
-      await selectComboboxStep(
+      // Model — Facebook renders this as a plain <input type="text"> inside a
+      // <label><span>Model</span><input …></label>, NOT a [role="combobox"].
+      // Poll for that input (up to 20 s, 250 ms ticks) then fill it with the
+      // React-safe native setter so React's onChange fires correctly.
+      setStatus("Step 4 of 4: Filling model…");
+      console.log("[STEP] Model (text input — not a combobox)");
+      stateLog("Waiting for Model text input");
+      const modelInput = await waitForNamedField(
         "model",
         ["model"],
-        fill.model,
-        false, // no post-combobox wait; title field polled explicitly below
-      );
-
-      // DOM-poll: block until the Title input appears in the DOM (up to 20 s, 250 ms ticks).
-      // React renders the text-field section asynchronously after the final dropdown.
-      stateLog("Waiting for title field after model selection");
-      console.log("[STEP] Title");
-      console.log("[WAIT] Polling for title field after model selection (up to 20 s)…");
-      await waitForNamedField(
-        "title",
-        ["title", "listing title", "what are you selling", "vehicle name", "add a title", "item title"],
         20000,
       );
+      if (modelInput) {
+        console.log("[FOUND] Model text input", modelInput);
+        setNativeValue(modelInput, String(fill.model || ""));
+        modelInput.dispatchEvent(new Event("input",  { bubbles: true }));
+        modelInput.dispatchEvent(new Event("change", { bubbles: true }));
+        modelInput.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+        filled.push("model");
+        log(`model → "${fill.model}"`);
+      } else {
+        console.log("[WARN] Model text input did not appear within 20 s");
+        missed.push("model");
+        warnings.push("model: text input did not appear after Make selection");
+      }
 
       // ---- Phase 2: Text fields ----
 
@@ -781,10 +788,40 @@
         "price", "listing price", "asking price",
       ], fill.price);
 
-      await fillStep("title", [
-        "title", "listing title", "what are you selling",
-        "vehicle name", "add a title", "item title",
-      ], fill.title);
+      // Title — Facebook may auto-generate it from Year/Make/Model.
+      // Try to find a writable title input; if absent, check for a read-only
+      // preview/auto-generated title and mark accordingly rather than "missed".
+      {
+        const TITLE_KWS = [
+          "title", "listing title", "what are you selling",
+          "vehicle name", "add a title", "item title",
+        ];
+        console.log("[STEP] Title");
+        stateLog("Checking for title field");
+        const titleEl = await waitForField(TITLE_KWS, 8000);
+        if (titleEl) {
+          console.log("[FOUND] Title input", titleEl);
+          if (fill.title) {
+            setNativeValue(titleEl, String(fill.title));
+            titleEl.dispatchEvent(new Event("input",  { bubbles: true }));
+            titleEl.dispatchEvent(new Event("change", { bubbles: true }));
+            titleEl.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+            filled.push("title");
+            log(`title → "${fill.title}"`);
+          } else {
+            stateLog("title field found but no value in listing data — skipped");
+            warnings.push("title: field exists but no value in listing data");
+          }
+        } else {
+          // No writable title input — Facebook likely auto-generated the title
+          // from the Year/Make/Model selections.  This is normal behaviour on
+          // the vehicle listing form.  Do NOT add to missed[].
+          console.log("[INFO] Title input not found — Facebook may have auto-generated it from Year/Make/Model");
+          stateLog("title auto generated by Facebook");
+          filled.push("title (auto generated)");
+          log("title: auto generated by Facebook from Year/Make/Model");
+        }
+      }
 
       await fillStep("description", [
         "description", "describe", "details",

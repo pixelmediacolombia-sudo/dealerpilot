@@ -143,3 +143,9 @@ id = "E7bhZr_2_aQ39WtYVOFUR"
 uri = "file://DealerPilot-Extension-v1.0.6-COMBOBOX_REGRESSION_FIX_20260630-010209.zip"
 type = "unspecified"
 title = "DealerPilot Extension v1.0.6 — COMBOBOX_REGRESSION_FIX"
+
+[[outputs]]
+id = "q2RtVyr1J7iUA3BvQnypX"
+uri = "file://DealerPilot-Extension-v1.0.7-MODEL_TEXT_INPUT_FIX_20260630-011322.zip"
+type = "unspecified"
+title = "DealerPilot Extension v1.0.7 — MODEL_TEXT_INPUT_FIX"
