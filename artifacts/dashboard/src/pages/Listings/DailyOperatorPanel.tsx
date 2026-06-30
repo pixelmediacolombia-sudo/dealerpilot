@@ -38,6 +38,58 @@ import {
   Plus,
 } from "lucide-react";
 
+const DUPE_VISIBLE = 5;
+
+function DuplicateGroupsSection({ groups }: { groups: DuplicateGroup[] }) {
+  const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const sorted = [...groups].sort((a, b) => b.count - a.count);
+  const visible = showAll ? sorted : sorted.slice(0, DUPE_VISIBLE);
+  const hidden = sorted.length - DUPE_VISIBLE;
+
+  return (
+    <div className="border-t border-white/[0.05]">
+      <button
+        className="w-full flex items-center gap-2 px-5 py-2.5 hover:bg-white/[0.02] transition-colors"
+        onClick={() => setOpen(v => !v)}
+      >
+        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+        <span className="text-xs font-semibold text-amber-400 flex-1 text-left">
+          {groups.length} duplicate model group{groups.length !== 1 ? "s" : ""} detected — hold duplicates to avoid self-competition
+        </span>
+        {open ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+      </button>
+      {open && (
+        <div className="px-5 pb-3 space-y-2">
+          {visible.map((g) => (
+            <div key={g.key} className="rounded-lg bg-amber-500/5 border border-amber-500/15 px-3 py-2">
+              <p className="text-xs font-bold text-amber-400">{g.make} {g.model} — {g.count} ready</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{g.winReason}</p>
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[10px]">
+                <span className="text-success font-semibold">Publish: {g.publishFirst.label}</span>
+                {g.holdOthers.slice(0, 2).map(h => (
+                  <span key={h.vehicleId} className="text-muted-foreground">· Hold: {h.label}</span>
+                ))}
+                {g.holdOthers.length > 2 && (
+                  <span className="text-muted-foreground">· +{g.holdOthers.length - 2} more</span>
+                )}
+              </div>
+            </div>
+          ))}
+          {!showAll && hidden > 0 && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="w-full text-center text-[10px] text-muted-foreground hover:text-amber-400 py-1 transition-colors"
+            >
+              + {hidden} more group{hidden !== 1 ? "s" : ""} — click to show all
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function strategyColor(name: string | null | undefined) {
   if (!name) return { bg: "bg-primary/10", text: "text-primary", border: "border-primary/20" };
   const n = name.toLowerCase();
@@ -189,7 +241,6 @@ export function DailyOperatorPanel({
   publishingId: number | null;
   isPending: boolean;
 }) {
-  const [showDuplicates, setShowDuplicates] = useState(true);
 
   const plan = useMemo(() =>
     buildDailyMarketplacePlan(workspaces, recommendations, activeJobs),
@@ -238,39 +289,9 @@ export function DailyOperatorPanel({
         </div>
       )}
 
-      {/* Duplicate groups */}
+      {/* Duplicate groups — show top 5 by group size, collapse the rest */}
       {plan.duplicateGroups.length > 0 && (
-        <div className="border-t border-white/[0.05]">
-          <button
-            className="w-full flex items-center gap-2 px-5 py-2.5 hover:bg-white/[0.02] transition-colors"
-            onClick={() => setShowDuplicates(v => !v)}
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-            <span className="text-xs font-semibold text-amber-400 flex-1 text-left">
-              {plan.duplicateGroups.length} duplicate model group{plan.duplicateGroups.length !== 1 ? "s" : ""} detected
-            </span>
-            {showDuplicates ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
-          </button>
-          {showDuplicates && (
-            <div className="px-5 pb-3 space-y-2">
-              {plan.duplicateGroups.map((g) => (
-                <div key={g.key} className="rounded-lg bg-amber-500/5 border border-amber-500/15 px-3 py-2">
-                  <p className="text-xs font-bold text-amber-400">{g.make} {g.model} — {g.count} ready</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{g.winReason}</p>
-                  <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[10px]">
-                    <span className="text-success font-semibold">Publish: {g.publishFirst.label}</span>
-                    {g.holdOthers.slice(0, 2).map(h => (
-                      <span key={h.vehicleId} className="text-muted-foreground">· Hold: {h.label}</span>
-                    ))}
-                    {g.holdOthers.length > 2 && (
-                      <span className="text-muted-foreground">· +{g.holdOthers.length - 2} more</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <DuplicateGroupsSection groups={plan.duplicateGroups} />
       )}
     </div>
   );

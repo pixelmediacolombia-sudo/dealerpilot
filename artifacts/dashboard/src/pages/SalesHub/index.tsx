@@ -33,6 +33,7 @@ import {
   buildDailyMarketplacePlan,
   type DailyVehicleRec,
   type DailyMarketplacePlan,
+  type DuplicateGroup,
 } from "@/lib/dailyPlan";
 import {
   Command,
@@ -61,6 +62,54 @@ import {
   Users,
 } from "lucide-react";
 import { StatusPulse } from "@/components/shared";
+
+// ─── Duplicate Groups (capped at 5, sorted by size) ─────────────────────────
+
+const CC_DUPE_VISIBLE = 5;
+
+function CommandCenterDuplicates({ groups }: { groups: DuplicateGroup[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const sorted = [...groups].sort((a, b) => b.count - a.count);
+  const visible = showAll ? sorted : sorted.slice(0, CC_DUPE_VISIBLE);
+  const hidden = sorted.length - CC_DUPE_VISIBLE;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+        Duplicate Groups · {groups.length} model{groups.length !== 1 ? "s" : ""} — hold to avoid self-competition
+      </p>
+      {visible.map((g) => (
+        <div key={g.key} className="glass-panel rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-amber-400">{g.make} {g.model} — {g.count} ready</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{g.winReason}</p>
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                <span className="text-[10px] text-amber-400 font-semibold">Publish: </span>
+                <span className="text-[10px] text-white">{g.publishFirst.label}</span>
+                {g.holdOthers.slice(0, 2).map((h) => (
+                  <span key={h.vehicleId} className="text-[10px] text-muted-foreground">· Hold: {h.label}</span>
+                ))}
+                {g.holdOthers.length > 2 && (
+                  <span className="text-[10px] text-muted-foreground">· +{g.holdOthers.length - 2} more</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+      {!showAll && hidden > 0 && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="w-full text-center text-[10px] text-muted-foreground hover:text-amber-400 py-1 transition-colors"
+        >
+          + {hidden} more group{hidden !== 1 ? "s" : ""} — click to show all
+        </button>
+      )}
+    </div>
+  );
+}
 
 // ─── Vehicle Recommendation Card ─────────────────────────────────────────────
 
@@ -488,29 +537,9 @@ export function SalesHub() {
                 </div>
               )}
 
-              {/* DUPLICATE GROUPS */}
+              {/* DUPLICATE GROUPS — top 5 only, sorted by count */}
               {plan && plan.duplicateGroups.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Duplicate Groups Detected</p>
-                  {plan.duplicateGroups.map((g) => (
-                    <div key={g.key} className="glass-panel rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-                      <div className="flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-sm font-bold text-amber-400">{g.make} {g.model} — {g.count} ready</p>
-                          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{g.winReason}</p>
-                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                            <span className="text-[10px] text-amber-400 font-semibold">Publish: </span>
-                            <span className="text-[10px] text-white">{g.publishFirst.label}</span>
-                            {g.holdOthers.slice(0, 2).map((h) => (
-                              <span key={h.vehicleId} className="text-[10px] text-muted-foreground">· Hold: {h.label}</span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <CommandCenterDuplicates groups={plan.duplicateGroups} />
               )}
 
               {/* HOLD VEHICLES */}
