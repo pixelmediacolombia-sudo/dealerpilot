@@ -65,6 +65,11 @@ import {
   Archive,
   CalendarClock,
   MoreHorizontal,
+  TrendingUp,
+  Star,
+  HelpCircle,
+  Users,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader, EmptyState, SectionCard } from "@/components/shared";
@@ -76,6 +81,47 @@ import { BatchReviewPanel } from "./BatchReviewPanel";
 import { toast } from "@/hooks/use-toast";
 
 const DEALER_ID = 1;
+
+type StrategyStatus = "recommended" | "not_prioritized" | "needs_strategy_review";
+
+function getStrategyStatus(
+  intel: { strategyName: string | null } | undefined,
+): StrategyStatus {
+  if (!intel?.strategyName) return "needs_strategy_review";
+  const s = intel.strategyName.toLowerCase();
+  if (s.includes("price review")) return "needs_strategy_review";
+  const isHigh =
+    s.includes("truck") || s.includes("suv") || s.includes("performance") ||
+    s.includes("luxury") || s.includes("fast turn") || s.includes("premium");
+  return isHigh ? "recommended" : "not_prioritized";
+}
+
+const STRATEGY_STATUS_CONFIG: Record<
+  StrategyStatus,
+  { label: string; color: string; bg: string; border: string; icon: React.ElementType }
+> = {
+  recommended: {
+    label: "Recommended by AI",
+    color: "text-rose-400",
+    bg: "bg-rose-500/8",
+    border: "border-rose-500/20",
+    icon: TrendingUp,
+  },
+  not_prioritized: {
+    label: "Ready, not prioritized",
+    color: "text-amber-400",
+    bg: "bg-amber-500/8",
+    border: "border-amber-500/20",
+    icon: Star,
+  },
+  needs_strategy_review: {
+    label: "Needs strategy review",
+    color: "text-muted-foreground",
+    bg: "bg-secondary/30",
+    border: "border-border/40",
+    icon: HelpCircle,
+  },
+};
 
 function ratingClass(rating: string | null | undefined) {
   switch (rating) {
@@ -666,10 +712,56 @@ export function ListingsWorkspace() {
                 />
               ) : (
                 <>
+                {/* ── Model group selectors (Ready tab only, when duplicates exist) ── */}
+                {activeTab === "ready" && (() => {
+                  const groups = new Map<string, typeof filteredWorkspaces>();
+                  for (const w of filteredWorkspaces) {
+                    const key = `${w.make} ${w.model}`;
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key)!.push(w);
+                  }
+                  const hasDupes = [...groups.values()].some((g) => g.length > 1);
+                  if (!hasDupes) return null;
+                  return (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {[...groups.entries()]
+                        .filter(([, g]) => g.length > 1)
+                        .map(([key, group]) => (
+                          <div
+                            key={key}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/40 border border-border/40 text-sm"
+                          >
+                            <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="font-semibold text-foreground">{key}</span>
+                            <Badge variant="secondary" className="text-[10px] font-bold px-1.5 py-0">
+                              {group.length} ready
+                            </Badge>
+                            <button
+                              onClick={() => {
+                                setSelectedVehicleIds((prev) => {
+                                  const next = new Set(prev);
+                                  group.forEach((v) => next.add(v.vehicleId));
+                                  return next;
+                                });
+                              }}
+                              className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-0.5 whitespace-nowrap"
+                            >
+                              Select all {group.length}
+                              <ChevronRight className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  );
+                })()}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                   {filteredWorkspaces.map((w, i) => {
                     const photoScore = photoScoreByVehicle.get(w.vehicleId);
                     const isReady = activeTab === "ready" || w.publishStatus === "Approved" || w.publishStatus === "Queued";
+                    const intel = intelligenceMap.get(w.vehicleId);
+                    const strategyStatus = getStrategyStatus(intel);
+                    const statusCfg = STRATEGY_STATUS_CONFIG[strategyStatus];
+                    const StatusIcon = statusCfg.icon;
                     const isSelected = selectedVehicleIds.has(w.vehicleId);
                     return (
                       <div key={w.vehicleId} className="relative">
@@ -748,6 +840,21 @@ export function ListingsWorkspace() {
                               <div className="font-bold text-xl leading-tight mb-2 group-hover:text-primary transition-colors">
                                 {w.label}
                               </div>
+                              {/* Strategy status — only on ready tab */}
+                              {activeTab === "ready" && (
+                                <div className={cn(
+                                  "inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-md border mb-2 w-fit",
+                                  statusCfg.bg, statusCfg.color, statusCfg.border,
+                                )}>
+                                  <StatusIcon className="w-3 h-3 shrink-0" />
+                                  {statusCfg.label}
+                                  {intel?.strategyName && (
+                                    <span className="opacity-60 font-normal">
+                                      · {intel.strategyName}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                               <div className="text-muted-foreground text-sm flex items-center gap-2 mb-6">
                                 <span className="truncate">{w.bodyStyle || "Vehicle"}</span>
                                 <span className="w-1 h-1 rounded-full bg-border" />
@@ -803,13 +910,56 @@ export function ListingsWorkspace() {
 
                       <div className="w-px h-6 bg-border/60" />
 
+                      {/* Publish Selected Now */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 px-4 font-bold text-[11px] uppercase tracking-widest whitespace-nowrap border-success/40 text-success hover:bg-success/10"
+                        disabled={bulkSchedule.isPending}
+                        onClick={() => {
+                          const readyIds = filteredWorkspaces
+                            .filter(
+                              (w) =>
+                                selectedVehicleIds.has(w.vehicleId) &&
+                                (w.publishStatus === "Approved" || w.publishStatus === "Queued"),
+                            )
+                            .map((w) => w.vehicleId);
+                          if (readyIds.length === 0) {
+                            toast({
+                              title: "No ready vehicles selected",
+                              description: "Select vehicles with Ready / Queued status to publish now.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          bulkSchedule.mutate(
+                            { data: { vehicleIds: readyIds, spacingMinutes: 30 } },
+                            {
+                              onSuccess: (result) => {
+                                clearSelection();
+                                toast({
+                                  title: "Publishing queued",
+                                  description: `${result.enqueued} vehicle${result.enqueued !== 1 ? "s" : ""} added to publishing queue.`,
+                                });
+                              },
+                              onError: () =>
+                                toast({ title: "Error", description: "Failed to queue vehicles", variant: "destructive" }),
+                            },
+                          );
+                        }}
+                      >
+                        {bulkSchedule.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <UploadCloud className="w-3.5 h-3.5" />
+                        )}
+                        Publish Selected Now
+                      </Button>
+
                       {/* Primary CTA */}
                       <Button
                         className="gap-2 px-5 font-bold text-[11px] uppercase tracking-widest premium-gradient-btn whitespace-nowrap"
-                        onClick={() => {
-                          autoSelectHighPriority();
-                          setShowBatchReview(true);
-                        }}
+                        onClick={() => setShowBatchReview(true)}
                       >
                         <Wand2 className="w-3.5 h-3.5" />
                         Create AI Publishing Batch

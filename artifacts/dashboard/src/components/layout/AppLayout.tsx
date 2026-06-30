@@ -9,7 +9,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   return (
-    <div className="flex min-h-[100dvh] bg-background text-foreground overflow-hidden selection:bg-primary/30 selection:text-white">
+    <div className="flex h-[100dvh] bg-background text-foreground overflow-hidden selection:bg-primary/30 selection:text-white">
       {/* Ambient background glows */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-[120px]" />

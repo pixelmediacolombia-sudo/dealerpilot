@@ -1,0 +1,68 @@
+SPRINT 7.2 — Marketplace AI Operational Fixes
+
+Stop adding new AI features for now. Fix these workflow blockers.
+
+1. Ready tab clarity
+In Marketplace AI → Ready:
+- Group similar vehicles by make/model when there are duplicates.
+Example:
+  Honda Accord — 3 ready
+- Show each unit clearly with year, trim, price, mileage, VIN/stock, photo count, score.
+- Make it obvious why each one is in Ready.
+- Add “Why ready?” tooltip/reason.
+
+2. Selection bug
+When I select vehicles in Ready, the batch action must appear.
+If 1+ vehicles are selected, show:
+- Create AI Publishing Batch
+- Publish Selected Now
+- Clear Selection
+Do not hide the action bar.
+
+3. Strategic recommendations mismatch
+If vehicles are Ready but not in Strategic Recommendations, show why.
+Add status:
+- Recommended by AI
+- Ready but not prioritized
+- Needs strategy review
+Every Ready vehicle must have a strategy reason, even if priority is low.
+
+4. Fixed left sidebar
+The left navigation must be sticky/static.
+Only the main content should scroll.
+Sidebar should remain visible at all times.
+
+5. Publishing batches delete/cancel
+Publishing Batches must have:
+- Cancel Batch
+- Delete Batch
+- Clear Completed
+- Clear Failed
+If a batch is annoying or stuck, I need to remove it from the UI.
+Require confirmation before delete/cancel.
+
+6. Marketplace Intelligence publish button
+In Marketplace Intelligence, each recommendation card/row must have:
+- Publish Now
+- Add to Batch
+- Schedule
+Top-level CTA:
+- Publish Recommended Vehicles
+This should create publishing jobs using Strategy Engine v2 recommendations.
+
+7. Honda Accord example
+If 3 Honda Accords appear in Ready:
+- show “Honda Accord — 3 ready”
+- allow selecting all 3
+- allow selecting one specific VIN
+- allow publishing only selected units
+- show why each Accord is or is not recommended strategically.
+
+Acceptance tests:
+- Select any Ready vehicle → bulk action appears.
+- Select 3 Honda Accords → can Create AI Publishing Batch.
+- Ready vehicles not in strategic recommendations show “Ready but not prioritized” with reason.
+- Sidebar does not scroll away.
+- Any publishing batch can be cancelled/deleted.
+- Marketplace Intelligence has Publish Now / Add to Batch / Schedule actions.
+- Typecheck clean.

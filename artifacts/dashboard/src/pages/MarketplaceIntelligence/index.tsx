@@ -3,11 +3,14 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import {
   useGetMarketplaceDashboard,
   useListMarketplaceRecommendations,
+  useBulkSchedulePublishing,
 } from "@workspace/api-client-react";
 import { SectionCard, PageHeader } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
+import { toast } from "@/hooks/use-toast";
 import {
   TrendingUp,
   MessageSquare,
@@ -24,6 +27,11 @@ import {
   ChevronUp,
   Target,
   ArrowRight,
+  UploadCloud,
+  Plus,
+  Sparkles,
+  Loader2,
+  CalendarClock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -124,7 +132,17 @@ type Rec = {
   actionCta: string | null;
 };
 
-function StrategyCard({ rec }: { rec: Rec }) {
+function StrategyCard({
+  rec,
+  onPublishNow,
+  onAddToBatch,
+  isPublishingThis,
+}: {
+  rec: Rec;
+  onPublishNow: (id: number) => void;
+  onAddToBatch: (id: number) => void;
+  isPublishingThis: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   const colors = strategyColor(rec.strategyName);
   const hasV2 = Boolean(rec.strategyName);
@@ -136,7 +154,7 @@ function StrategyCard({ rec }: { rec: Rec }) {
     )}>
       {/* Header row */}
       <div
-        className="flex items-center gap-4 p-4 cursor-pointer"
+        className="flex items-center gap-3 p-4 cursor-pointer"
         onClick={() => setExpanded((e) => !e)}
       >
         {/* Strategy name badge */}
@@ -168,14 +186,54 @@ function StrategyCard({ rec }: { rec: Rec }) {
         <div className="flex items-center gap-3 shrink-0">
           {qualityBadge(rec.expectedLeadQuality)}
           {photoBadge(rec.recommendedPhotoStrategy)}
-          <div className="w-24">
+          <div className="w-24 hidden sm:block">
             <ConfidenceBar score={rec.confidenceScore} />
           </div>
-          {expanded
-            ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
-            : <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          }
         </div>
+
+        {/* Action buttons — stop propagation so they don't toggle expand */}
+        <div
+          className="flex items-center gap-1.5 shrink-0 ml-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2.5 text-xs gap-1 border-success/35 text-success hover:bg-success/10 whitespace-nowrap"
+            disabled={isPublishingThis}
+            onClick={() => onPublishNow(rec.vehicleId)}
+          >
+            {isPublishingThis ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <UploadCloud className="w-3 h-3" />
+            )}
+            Publish Now
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2.5 text-xs gap-1 border-primary/35 text-primary hover:bg-primary/10 whitespace-nowrap"
+            onClick={() => onAddToBatch(rec.vehicleId)}
+          >
+            <Plus className="w-3 h-3" />
+            Add to Batch
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+            onClick={() => toast({ title: "Schedule", description: "Open Marketplace AI → select vehicle → schedule publishing." })}
+          >
+            <CalendarClock className="w-3 h-3" />
+            Schedule
+          </Button>
+        </div>
+
+        {expanded
+          ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
+          : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+        }
       </div>
 
       {/* Expanded v2 detail */}
@@ -245,9 +303,69 @@ function StrategyCard({ rec }: { rec: Rec }) {
 
 export function MarketplaceIntelligence() {
   const [activeTab, setActiveTab] = useState<TabKey>("recommendations");
+  const [publishingId, setPublishingId] = useState<number | null>(null);
 
   const { data: dash, isLoading: dashLoading } = useGetMarketplaceDashboard();
   const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations();
+
+  const bulkSchedule = useBulkSchedulePublishing({
+    mutation: {
+      onSuccess: (result, vars) => {
+        setPublishingId(null);
+        toast({
+          title: "Publishing queued",
+          description: `${result.enqueued} vehicle${result.enqueued !== 1 ? "s" : ""} added to the publishing queue. Open Marketplace AI → Queue to track progress.`,
+        });
+      },
+      onError: () => {
+        setPublishingId(null);
+        toast({ title: "Error", description: "Failed to queue vehicle for publishing.", variant: "destructive" });
+      },
+    },
+  });
+
+  const handlePublishNow = (vehicleId: number) => {
+    setPublishingId(vehicleId);
+    bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } });
+  };
+
+  const handleAddToBatch = (vehicleId: number) => {
+    bulkSchedule.mutate(
+      { data: { vehicleIds: [vehicleId], spacingMinutes: 30 } },
+      {
+        onSuccess: (result) => {
+          toast({
+            title: "Added to batch",
+            description: `Vehicle added to publishing queue. ${result.skipped > 0 ? "Already queued." : ""}`,
+          });
+        },
+      },
+    );
+  };
+
+  const handlePublishAllRecommended = () => {
+    const topIds = recs.filter((r) => {
+      const s = (r.strategyName ?? "").toLowerCase();
+      return s.includes("truck") || s.includes("suv") || s.includes("performance") ||
+             s.includes("luxury") || s.includes("fast turn") || s.includes("premium");
+    }).slice(0, 10).map((r) => r.vehicleId);
+
+    if (topIds.length === 0) {
+      toast({ title: "No high-priority vehicles", description: "No vehicles matched high-demand strategies." });
+      return;
+    }
+    bulkSchedule.mutate(
+      { data: { vehicleIds: topIds, spacingMinutes: 30 } },
+      {
+        onSuccess: (result) => {
+          toast({
+            title: "Publishing batch created",
+            description: `${result.enqueued} recommended vehicle${result.enqueued !== 1 ? "s" : ""} queued. ${result.skipped > 0 ? `${result.skipped} already queued.` : ""}`,
+          });
+        },
+      },
+    );
+  };
 
   const isLoading = dashLoading || recsLoading;
   const summary = dash?.summary;
@@ -321,9 +439,28 @@ export function MarketplaceIntelligence() {
             <SectionCard
               icon={<Lightbulb className="w-4 h-4 text-primary" />}
               title="Strategic Recommendations"
-              action={engineVersion === "v2" ? (
-                <span className="text-[10px] text-primary/60 font-medium">Click any card to expand · Strategy Engine v2</span>
-              ) : undefined}
+              action={
+                <div className="flex items-center gap-3">
+                  {engineVersion === "v2" && (
+                    <span className="text-[10px] text-primary/60 font-medium hidden sm:block">
+                      Click any card to expand · Strategy Engine v2
+                    </span>
+                  )}
+                  <Button
+                    size="sm"
+                    className="gap-2 premium-gradient-btn text-[11px] font-bold uppercase tracking-widest"
+                    onClick={handlePublishAllRecommended}
+                    disabled={bulkSchedule.isPending}
+                  >
+                    {bulkSchedule.isPending && publishingId === null ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5" />
+                    )}
+                    Publish Recommended Vehicles
+                  </Button>
+                </div>
+              }
             >
               {recsLoading ? (
                 <div className="text-muted-foreground text-sm py-8 text-center">Loading recommendations…</div>
@@ -334,7 +471,13 @@ export function MarketplaceIntelligence() {
               ) : (
                 <div className="space-y-2">
                   {recs.map((rec) => (
-                    <StrategyCard key={rec.vehicleId} rec={rec} />
+                    <StrategyCard
+                      key={rec.vehicleId}
+                      rec={rec}
+                      onPublishNow={handlePublishNow}
+                      onAddToBatch={handleAddToBatch}
+                      isPublishingThis={publishingId === rec.vehicleId && bulkSchedule.isPending}
+                    />
                   ))}
                 </div>
               )}
