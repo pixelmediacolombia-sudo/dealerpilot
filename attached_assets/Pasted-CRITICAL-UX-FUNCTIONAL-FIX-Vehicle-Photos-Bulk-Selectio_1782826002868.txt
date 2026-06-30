@@ -1,0 +1,113 @@
+CRITICAL UX/FUNCTIONAL FIX — Vehicle Photos + Bulk Selection
+
+Before adding new Marketplace Intelligence features, fix two blockers:
+
+1. DealerPilot only shows one photo per vehicle/listing.
+2. DealerPilot does not allow selecting multiple vehicles for posting.
+
+These are required for real operation.
+
+Do NOT build new strategy features until this is fixed.
+
+====================================================
+PART 1 — FULL PHOTO GALLERY
+====================================================
+
+The real Alpha XML feed includes many photos per vehicle.
+
+Example:
+VIN 5J8YE1H04PL018252 includes around 20 image URLs.
+
+Current issue:
+DealerPilot only displays one photo.
+
+Fix requirements:
+
+- Parse ALL images from the Alpha XML feed.
+- Store all images in vehicle_images.
+- Preserve image order.
+- First image = primary.
+- Additional images = gallery.
+- Do not duplicate images on repeated sync.
+- Add image_count per vehicle.
+- Inventory cards must show: Photos: X
+- Vehicle detail must show full gallery.
+- Listing detail must show full gallery.
+- Creative AI must show all vehicle photos.
+- Publishing payload must include all gallery images.
+
+Acceptance:
+VIN 5J8YE1H04PL018252 should show around 20 photos.
+Re-sync should not duplicate photos.
+
+====================================================
+PART 2 — VEHICLE SELECTION FOR POSTING
+====================================================
+
+Add multi-select to Marketplace AI and Vehicle Intelligence.
+
+Requirements:
+
+- Add checkbox on every vehicle/listing card.
+- Add Select All visible.
+- Add Clear Selection.
+- Show selected count.
+- Allow selecting multiple vehicles.
+- When selected, show floating action bar.
+
+Floating action bar actions:
+- Generate Listings
+- Generate Creatives
+- Schedule
+- Publish Selected
+- Mark Sold
+- Archive
+
+Per-card primary button:
+- If ready: Publish
+- If no listing: Generate Listing
+- If no creative: Generate Creative
+- If published: View Performance
+- If price changed: Update Listing
+
+Do not clutter the card with many buttons.
+Use one primary button + overflow menu.
+
+====================================================
+PART 3 — PUBLISHING WORKFLOW
+====================================================
+
+Publish Selected should:
+- create or reuse listing versions
+- create publishing_jobs
+- set status QUEUED or SCHEDULED
+- show jobs in Publishing Queue
+- allow app-controlled publishing with extension
+
+Schedule should open modal:
+- selected vehicles count
+- date
+- time
+- spacing between posts
+- assigned extension
+- priority
+- notes
+
+====================================================
+DO NOT BREAK
+====================================================
+
+Do not modify Chrome Extension form filling.
+Do not modify backend job lifecycle unless needed for selected jobs.
+Do not remove existing routes.
+Do not mix sample data with real Alpha inventory.
+
+Run full typecheck.
+
+Deliver:
+- full gallery working
+- photo count visible
+- multi-select working
+- floating bulk action bar working
+- Publish Selected working
+- Schedule modal working

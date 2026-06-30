@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Search,
   Car,
@@ -49,6 +50,11 @@ import {
   Wand2,
   Eye,
   UploadCloud,
+  X,
+  ListChecks,
+  Tag,
+  Archive,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader, EmptyState, SectionCard } from "@/components/shared";
@@ -172,11 +178,25 @@ export function ListingsWorkspace() {
     const tab = new URLSearchParams(window.location.search).get("tab");
     return tab || "ready";
   });
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jobStatusFilter, setJobStatusFilter] = useState<string>("all");
   const [batchRefreshKey, setBatchRefreshKey] = useState(0);
   const [markPublishedVehicle, setMarkPublishedVehicle] = useState<{ id: number; label: string } | null>(null);
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<Set<number>>(new Set());
+
+  const toggleSelected = (id: number) => {
+    setSelectedVehicleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const selectAll = () => setSelectedVehicleIds(new Set(filteredWorkspaces.map((w) => w.vehicleId)));
+  const clearSelection = () => setSelectedVehicleIds(new Set());
+  const handleTabChange = (tab: string) => { setActiveTab(tab); setSelectedVehicleIds(new Set()); };
+  const selectionCount = selectedVehicleIds.size;
 
   const queryClient = useQueryClient();
 
@@ -381,7 +401,7 @@ export function ListingsWorkspace() {
                     Production Readiness
                   </Button>
                 </Link>
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+                <Tabs value={activeTab} onValueChange={handleTabChange} className="w-auto">
                   <TabsList className="bg-transparent border-0 gap-1.5 flex-wrap justify-end">
                     <TabsTrigger value="ready" className={tabClass}>
                       Ready {countBadge(readyCount)}
@@ -512,6 +532,33 @@ export function ListingsWorkspace() {
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
+
+                {/* Selection controls */}
+                {selectionCount > 0 ? (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge className="bg-primary/20 text-primary border-primary/30 gap-1.5">
+                      <ListChecks className="w-3 h-3" />
+                      {selectionCount} selected
+                    </Badge>
+                    <Button size="sm" variant="ghost" onClick={selectAll} className="h-7 text-xs px-2 gap-1">
+                      All {filteredWorkspaces.length}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 text-xs px-2">
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={selectAll}
+                    className="h-7 text-xs px-2.5 gap-1.5 text-muted-foreground hover:text-foreground flex-shrink-0"
+                  >
+                    <ListChecks className="w-3.5 h-3.5" />
+                    Select All
+                  </Button>
+                )}
+
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-full sm:w-[200px] bg-background/50 border-border/50">
                     <SelectValue placeholder="All Statuses" />
@@ -557,15 +604,35 @@ export function ListingsWorkspace() {
                   description="DealerPilot hasn't identified any listings matching this view."
                 />
               ) : (
+                <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                   {filteredWorkspaces.map((w, i) => {
                     const photoScore = photoScoreByVehicle.get(w.vehicleId);
                     const isReady = activeTab === "ready" || w.publishStatus === "Approved" || w.publishStatus === "Queued";
+                    const isSelected = selectedVehicleIds.has(w.vehicleId);
                     return (
                       <div key={w.vehicleId} className="relative">
+                        {/* Checkbox — top-left corner of card */}
+                        <div
+                          className="absolute top-3 left-3 z-30"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSelected(w.vehicleId); }}
+                        >
+                          <div className={cn(
+                            "w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all duration-150 shadow-sm cursor-pointer",
+                            isSelected
+                              ? "bg-primary border-primary"
+                              : "bg-black/40 border-white/60 hover:border-white backdrop-blur-sm"
+                          )}>
+                            {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary-foreground" />}
+                          </div>
+                        </div>
+
                         <Link href={`/listings/${w.vehicleId}`}>
                           <Card
-                            className="overflow-hidden hover-lift cursor-pointer group bg-card border-border/40 hover:border-primary/30 transition-all duration-500 h-full flex flex-col relative"
+                            className={cn(
+                              "overflow-hidden hover-lift cursor-pointer group bg-card border-border/40 hover:border-primary/30 transition-all duration-500 h-full flex flex-col relative",
+                              isSelected && "ring-2 ring-primary border-primary/50"
+                            )}
                             style={{ animationDelay: `${i * 50}ms` }}
                           >
                             <div className="aspect-[16/10] bg-secondary/30 relative overflow-hidden">
@@ -585,7 +652,7 @@ export function ListingsWorkspace() {
 
                               {getStatusBadge(w)}
 
-                              <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+                              <div className="absolute top-4 left-10 z-10 flex flex-col gap-2">
                                 {w.listingScore != null && (
                                   <Badge
                                     variant="outline"
@@ -599,6 +666,14 @@ export function ListingsWorkspace() {
                                   </Badge>
                                 )}
                               </div>
+
+                              {/* Photo count badge — bottom left */}
+                              {(w.imageCount ?? 0) > 0 && (
+                                <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-white text-[10px] font-semibold">
+                                  <ImageIcon className="w-3 h-3" />
+                                  {w.imageCount} photos
+                                </div>
+                              )}
 
                               {/* Photo quality badge */}
                               {photoScore && (
@@ -650,6 +725,73 @@ export function ListingsWorkspace() {
                     );
                   })}
                 </div>
+
+                {/* ── Floating multi-select action bar ── */}
+                {selectionCount > 0 && (
+                  <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
+                    <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-card/95 border border-border shadow-2xl backdrop-blur-md">
+                      <span className="text-sm font-semibold text-foreground px-1 mr-1">
+                        {selectionCount} vehicle{selectionCount !== 1 ? "s" : ""}
+                      </span>
+                      <div className="w-px h-5 bg-border mx-1" />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1.5 text-xs h-8"
+                        onClick={() => {
+                          bulkVehicleAction.mutate(
+                            { data: { vehicleIds: [...selectedVehicleIds], action: "mark_ready" } },
+                            { onSuccess: () => { clearSelection(); invalidateWorkspaces(); } }
+                          );
+                        }}
+                        disabled={bulkVehicleAction.isPending}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                        Mark Ready
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1.5 text-xs h-8"
+                        onClick={() => {
+                          bulkVehicleAction.mutate(
+                            { data: { vehicleIds: [...selectedVehicleIds], action: "mark_sold" } },
+                            { onSuccess: () => { clearSelection(); invalidateWorkspaces(); } }
+                          );
+                        }}
+                        disabled={bulkVehicleAction.isPending}
+                      >
+                        <Tag className="w-3.5 h-3.5 text-amber-400" />
+                        Mark Sold
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1.5 text-xs h-8"
+                        onClick={() => {
+                          bulkVehicleAction.mutate(
+                            { data: { vehicleIds: [...selectedVehicleIds], action: "archive" } },
+                            { onSuccess: () => { clearSelection(); invalidateWorkspaces(); } }
+                          );
+                        }}
+                        disabled={bulkVehicleAction.isPending}
+                      >
+                        <Archive className="w-3.5 h-3.5 text-muted-foreground" />
+                        Archive
+                      </Button>
+                      <div className="w-px h-5 bg-border mx-1" />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={clearSelection}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                </>
               )}
             </div>
           )}
