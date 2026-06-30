@@ -650,6 +650,23 @@ export function MarketplaceIntelligence() {
             )}
           </div>
 
+          {/* Demo intelligence banner — shown whenever seeded performance data is present */}
+          {(summary?.hasMockPerformanceData ?? false) && (
+            <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5">
+              <ShieldAlert className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-amber-400">Demo intelligence — not real Marketplace performance yet.</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  The posting time, down payment, creative performance, and weak-listing analytics below are based on
+                  seeded model data, not real buyer engagement. KPI cards (Conversations, Hot Leads, Outcome Score) show
+                  "No Data" until the Chrome extension syncs real Marketplace conversations.
+                  Strategic Recommendations are <span className="text-amber-400 font-semibold">Estimated</span> — derived
+                  from real inventory rules, not past performance.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* KPI Summary — real data only, each card declares its source */}
           <TooltipProvider>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -741,7 +758,14 @@ export function MarketplaceIntelligence() {
           {activeTab === "recommendations" && (
             <SectionCard
               icon={<Lightbulb className="w-4 h-4 text-primary" />}
-              title="Strategic Recommendations"
+              title={
+                <span className="flex items-center gap-2">
+                  Strategic Recommendations
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border bg-amber-500/10 text-amber-400 border-amber-500/20">
+                    <Zap className="w-2.5 h-2.5" /> Estimated Strategy
+                  </span>
+                </span>
+              }
               action={
                 <div className="flex items-center gap-3">
                   {engineVersion === "v2" && (
@@ -790,6 +814,12 @@ export function MarketplaceIntelligence() {
           {/* ── Down Payment Performance ── */}
           {activeTab === "downpayment" && (
             <div className="space-y-4">
+              {(summary?.hasMockPerformanceData ?? false) && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-500/25 bg-amber-500/5 text-xs text-amber-400">
+                  <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span><span className="font-bold">Demo Data</span> — Down payment performance is based on seeded model data, not real Marketplace engagement.</span>
+                </div>
+              )}
               {dashLoading ? (
                 <div className="text-muted-foreground text-sm py-8 text-center">Loading…</div>
               ) : (dash?.downPaymentPerformance ?? []).length === 0 ? (
@@ -843,6 +873,12 @@ export function MarketplaceIntelligence() {
           {/* ── Posting Time Performance ── */}
           {activeTab === "posting" && (
             <SectionCard icon={<Clock className="w-4 h-4 text-primary" />} title="Best Posting Days">
+              {(summary?.hasMockPerformanceData ?? false) && (
+                <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg border border-amber-500/25 bg-amber-500/5 text-xs text-amber-400">
+                  <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span><span className="font-bold">Demo Data</span> — Posting time performance is based on seeded model data, not real Marketplace engagement.</span>
+                </div>
+              )}
               {dashLoading ? (
                 <div className="text-muted-foreground text-sm py-8 text-center">Loading…</div>
               ) : (
@@ -879,6 +915,12 @@ export function MarketplaceIntelligence() {
           {/* ── Creative Performance ── */}
           {activeTab === "creative" && (
             <div className="space-y-4">
+              {(summary?.hasMockPerformanceData ?? false) && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-500/25 bg-amber-500/5 text-xs text-amber-400">
+                  <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span><span className="font-bold">Demo Data</span> — Creative performance scores are based on seeded model data, not real Marketplace engagement.</span>
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-4">
                 {(["original", "ai_creative", "mixed"] as const).map((strat) => {
                   const perf = dash?.creativePerformance?.[strat];
@@ -949,6 +991,12 @@ export function MarketplaceIntelligence() {
           {/* ── Weak Listings ── */}
           {activeTab === "weak" && (
             <div className="space-y-4">
+              {(summary?.hasMockPerformanceData ?? false) && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-500/25 bg-amber-500/5 text-xs text-amber-400">
+                  <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span><span className="font-bold">Demo Data</span> — Weak listing scores are based on seeded model data, not real Marketplace engagement.</span>
+                </div>
+              )}
               <SectionCard icon={<AlertTriangle className="w-4 h-4 text-destructive" />} title="Low Outcome — Needs Renewal">
                 {dashLoading ? (
                   <div className="text-muted-foreground text-sm py-4 text-center">Loading…</div>

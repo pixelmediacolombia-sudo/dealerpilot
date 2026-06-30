@@ -1,0 +1,87 @@
+Sprint 8 — Truth + AI Foundation
+
+Stop building new features.
+
+DealerPilot looks premium, but too many AI parts are fake, seeded, or heuristic. The next sprint must make the product honest, usable, and ready for real AI.
+
+Goals:
+1. Remove fake AI scores.
+2. Remove fake Marketplace KPIs.
+3. Remove fake photo enhancement claims.
+4. Make Sales Hub answer: “What should I do today?”
+5. Keep only real, estimated, or pending states clearly labeled.
+
+Tasks:
+
+1. Photo AI cleanup
+- Remove all Math.sin / random / position-based photo scores.
+- Do not show numeric AI scores until real vision is integrated.
+- Replace with:
+  Pending AI Review
+  Use Original
+  Needs Human Review
+  Enhancement Available
+- Do not claim enhancement unless a real image is generated.
+- Generate only one enhanced photo when real enhancement exists.
+- No 7 outputs.
+
+2. Marketplace Intelligence cleanup
+- Remove or hide fake KPIs:
+  views
+  conversations
+  hot leads
+  CTR
+  outcome score
+  posting performance
+- If data is seeded, show a clear banner:
+  “Demo intelligence — not real Marketplace performance yet.”
+- Real metrics only:
+  inventory count
+  photo count
+  listings generated
+  publishing jobs
+  published listings
+  feed sync status
+
+3. Sales Hub AI Daily Plan
+Add a top section:
+“DealerPilot recommends these actions today.”
+
+Show:
+- 3 vehicles to publish today
+- why each was chosen
+- marketplace price to post
+- recommended down payment
+- one button: Post to Marketplace
+
+Use only real vehicle data + Strategy Engine rules.
+Clearly label as “Estimated strategy” until real engagement exists.
+
+4. Publishing workflow
+- Make Publish button from Sales Hub and Marketplace Intelligence create a real publishing job.
+- No undefined job IDs.
+- Ready → Queue → Extension → Mark Published → Published tab.
+- Published vehicles disappear from Ready.
+
+5. Data labels
+Every metric and recommendation must show source:
+- Real Data
+- Estimated
+- Demo
+- Pending AI
+
+6. UI cleanup
+- Fewer buttons.
+- One primary action per card.
+- Manual actions go to overflow.
+- Sidebar stays fixed.
+- Compact list view should be default for 100+ vehicles.
+
+Acceptance:
+- No fake scores.
+- No fake KPIs shown as real.
+- No 7 photo outputs.
+- Sales Hub shows 3 publish-today recommendations.
+- Publish buttons create real jobs.
+- All data is labeled honestly.
+- Typecheck clean.
