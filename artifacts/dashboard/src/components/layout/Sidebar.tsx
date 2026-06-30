@@ -15,7 +15,7 @@ import { useGetDealer, useListDealers, getGetDealerQueryKey } from "@workspace/a
 const NAV_ITEMS = [
   { name: "Sales Hub", path: "/", icon: LayoutDashboard },
   { name: "Marketplace AI", path: "/listings", icon: Sparkles },
-  { name: "Creative AI", path: "/creative-studio", icon: Wand2 },
+  { name: "AI Vehicle Studio", path: "/creative-studio", icon: Wand2 },
   { name: "Sales AI", path: "/sales-ai", icon: MessageSquare },
   { name: "Intelligence", path: "/marketplace-intelligence", icon: BarChart3 },
   { name: "Dealer DNA", path: "/dealer-dna", icon: Dna },
