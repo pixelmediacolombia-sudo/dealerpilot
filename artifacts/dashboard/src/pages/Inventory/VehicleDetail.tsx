@@ -1,4 +1,5 @@
 import { useRoute, Link } from "wouter";
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { 
   useGetVehicle, 
@@ -11,11 +12,11 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatMileage, formatDate } from "@/lib/format";
 import { 
-  ChevronLeft, 
+  ChevronLeft,
+  ChevronRight,
   ExternalLink, 
   Car, 
   CheckCircle2, 
@@ -30,6 +31,7 @@ import {
   Tag,
   Palette,
   Brain,
+  Camera,
 } from "lucide-react";
 import {
   Collapsible,
@@ -56,6 +58,8 @@ export function VehicleDetail() {
     query: { enabled: !!id, queryKey: getGetVehicleIntelligenceQueryKey(id) },
   });
   const intel = intelData?.intelligence;
+
+  const [selectedIdx, setSelectedIdx] = useState(0);
 
   const handleStatusUpdate = (status: string) => {
     updateStatus.mutate({ id, data: { status } }, {
@@ -108,6 +112,7 @@ export function VehicleDetail() {
   }
 
   const { vehicle, images, changes, sourceRaw } = data;
+  const clampIdx = (i: number) => Math.max(0, Math.min(i, images.length - 1));
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -202,44 +207,85 @@ export function VehicleDetail() {
             <div className="lg:col-span-2 space-y-8">
               
               {/* Image Gallery */}
-              <div className="glass-panel p-2 rounded-2xl">
+              <div className="glass-panel p-2 rounded-2xl space-y-2">
                 {images.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="aspect-[21/9] rounded-xl overflow-hidden bg-secondary relative group">
-                      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 items-end">
+                  <>
+                    {/* Header bar */}
+                    <div className="flex items-center justify-between px-1 py-0.5">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                        <Camera className="w-4 h-4" />
+                        <span>{images.length} Photos</span>
+                        {images[selectedIdx]?.category && (
+                          <Badge variant="outline" className="text-[10px] uppercase tracking-wider capitalize px-2">
+                            {images[selectedIdx].category}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                        <button
+                          onClick={() => setSelectedIdx(clampIdx(selectedIdx - 1))}
+                          disabled={selectedIdx === 0}
+                          className="p-1.5 rounded-lg hover:bg-secondary disabled:opacity-30 transition-colors"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <span className="min-w-[3rem] text-center">{selectedIdx + 1} / {images.length}</span>
+                        <button
+                          onClick={() => setSelectedIdx(clampIdx(selectedIdx + 1))}
+                          disabled={selectedIdx === images.length - 1}
+                          className="p-1.5 rounded-lg hover:bg-secondary disabled:opacity-30 transition-colors"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Primary / selected image */}
+                    <div className="aspect-video rounded-xl overflow-hidden bg-secondary relative group">
+                      <div className="absolute top-3 right-3 z-10">
                         <Badge variant="outline" className={cn("backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border", getStatusBadge(vehicle.status).className)}>
                           {getStatusBadge(vehicle.status).label}
                         </Badge>
                       </div>
-                      <img 
-                        src={images[0].url} 
-                        alt="Primary" 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      <img
+                        key={images[selectedIdx].url}
+                        src={images[selectedIdx].url}
+                        alt={`Photo ${selectedIdx + 1}`}
+                        className="w-full h-full object-cover transition-opacity duration-300"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
+
+                    {/* Scrollable thumbnail strip — ALL images */}
                     {images.length > 1 && (
-                      <div className="grid grid-cols-4 gap-2">
-                        {images.slice(1, 5).map((img, i) => (
-                          <div key={img.id} className="aspect-[4/3] rounded-lg overflow-hidden bg-secondary relative group cursor-pointer">
-                            <img 
-                              src={img.url} 
-                              alt={`Gallery ${i}`} 
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 max-h-52 overflow-y-auto pr-0.5 pt-0.5">
+                        {images.map((img, i) => (
+                          <button
+                            key={img.id}
+                            onClick={() => setSelectedIdx(i)}
+                            className={cn(
+                              "aspect-square rounded-lg overflow-hidden relative group transition-all duration-150 focus:outline-none",
+                              i === selectedIdx
+                                ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                                : "opacity-70 hover:opacity-100"
+                            )}
+                          >
+                            <img
+                              src={img.url}
+                              alt={`Thumbnail ${i + 1}`}
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                             />
-                            <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
-                            {i === 3 && images.length > 5 && (
-                              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center font-bold text-xl text-white">
-                                +{images.length - 5}
+                            {img.isPrimary && i !== selectedIdx && (
+                              <div className="absolute bottom-0.5 left-0.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary shadow" />
                               </div>
                             )}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
-                  </div>
+                  </>
                 ) : (
-                  <div className="aspect-[21/9] rounded-xl bg-secondary/50 border border-border/50 flex flex-col items-center justify-center text-muted-foreground">
+                  <div className="aspect-video rounded-xl bg-secondary/50 border border-border/50 flex flex-col items-center justify-center text-muted-foreground">
                     <Car className="w-16 h-16 mb-4 opacity-30" />
                     <p className="font-medium">No images available</p>
                   </div>

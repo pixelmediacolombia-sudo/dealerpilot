@@ -1,0 +1,116 @@
+UX + Workflow Upgrade — Bulk Vehicle Actions
+
+We need to make vehicle selection and publishing much easier.
+
+Goal:
+Allow operators to select multiple vehicles and choose what to do with them:
+- Generate Listing
+- Generate Creative
+- Schedule
+- Publish
+- Mark Sold
+- Archive
+
+Requirements:
+
+1. Vehicle Selection
+- Add checkbox selection to vehicle cards in:
+  - Marketplace AI
+  - Vehicle Intelligence
+  - Creative AI if applicable
+- Allow selecting multiple vehicles.
+- Add Select All visible vehicles.
+- Add Clear Selection.
+- Show selected count.
+
+2. Floating Bulk Action Bar
+When one or more vehicles are selected, show a floating action bar at the bottom.
+
+Actions:
+- Generate Listings
+- Generate Creatives
+- Schedule
+- Publish with Extension
+- Mark Sold
+- Archive
+
+Only show actions that make sense for the current page/status.
+
+3. Per Vehicle Quick Actions
+Each vehicle card should have one primary action and one overflow menu.
+
+Primary action depends on status:
+- No listing → Generate Listing
+- Listing ready → Publish
+- Creative missing → Generate Creative
+- Already published → Renew
+- Price changed → Update Listing
+
+Overflow menu:
+- View Details
+- Schedule
+- Generate Creative
+- Generate Listing
+- Mark Sold
+- Archive
+
+Do not show too many buttons on the card.
+
+4. Schedule Modal
+Add a scheduling modal.
+
+Fields:
+- selected vehicles count
+- publish date
+- publish time
+- assigned extension
+- spacing between posts
+- priority
+- notes
+
+Options:
+- publish now
+- schedule later
+- spread posts every 15 / 30 / 45 / 60 minutes
+
+5. Publishing Queue Integration
+When scheduled:
+- create publishing_jobs for selected vehicles/listings
+- set scheduled_at
+- keep status queued/scheduled
+- show in Publishing Queue
+
+6. Creative Integration
+Bulk Generate Creatives should:
+- create creative jobs for all selected vehicles
+- show live progress in Creative AI
+
+7. Listing Integration
+Bulk Generate Listings should:
+- generate listing versions for all selected vehicles
+- do not overwrite existing versions
+- show completed/failed result per vehicle
+
+8. UX
+- Make selection obvious but clean.
+- Do not clutter cards.
+- Use hover checkbox on desktop, always visible when selection mode is active.
+- Floating bar should feel premium.
+- One primary action per card.
+- Secondary actions hidden under overflow menu.
+
+9. Safety
+- Confirm before bulk archive or mark sold.
+- Do not publish immediately without operator confirmation.
+- Do not auto-click final Facebook Publish.
+
+Deliverables:
+- Multi-select vehicle cards
+- Floating bulk action bar
+- Schedule modal
+- Per-vehicle primary action
+- Overflow menu
+- Bulk listing generation
+- Bulk creative generation
+- Bulk publishing/scheduling
+- Typecheck clean
