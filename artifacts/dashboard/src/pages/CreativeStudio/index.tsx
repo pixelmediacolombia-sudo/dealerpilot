@@ -21,7 +21,6 @@ import { cn } from "@/lib/utils";
 import {
   Search,
   Car,
-  Gauge,
   Sparkles,
   Camera,
   ImageIcon,
@@ -29,16 +28,14 @@ import {
   LayoutGrid,
   List,
   ArrowUpDown,
-  AlertTriangle,
+  Clock,
 } from "lucide-react";
 import { PageHeader, EmptyState } from "@/components/shared";
-import { vehicleAuditBreakdown, decisionBadgeClass, scoreBadgeClass, scoreTextClass } from "./vehicleAudit";
 
 export function CreativeStudio() {
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
-  const [sortBy, setSortBy] = useState<"ai_score" | "photo_count" | "price" | "newest">("ai_score");
-  const [photoFilter, setPhotoFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"photo_count" | "price" | "newest">("photo_count");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const studioParams = { q: search || undefined };
@@ -51,31 +48,9 @@ export function CreativeStudio() {
 
   const vehicles = data?.vehicles ?? [];
 
-  // Pre-compute audits so filter/sort and render are consistent
-  const audits = useMemo(
-    () => new Map(vehicles.map((v) => [v.vehicleId, vehicleAuditBreakdown(v.vehicleId)])),
-    [vehicles],
-  );
-
-  const useOriginalCount = [...audits.values()].filter((a) => a.decision === "Use Original").length;
-  const enhanceCount = [...audits.values()].filter((a) => a.decision === "Enhance Recommended").length;
-
-  const filteredSortedVehicles = useMemo(() => {
-    let list = [...vehicles];
-    if (photoFilter) {
-      list = list.filter((v) => {
-        const audit = audits.get(v.vehicleId);
-        if (!audit) return true;
-        if (photoFilter === "use_original") return audit.decision === "Use Original";
-        if (photoFilter === "enhance") return audit.decision === "Enhance Recommended";
-        if (photoFilter === "review") return audit.decision === "Do Not Use";
-        return true;
-      });
-    }
+  const sortedVehicles = useMemo(() => {
+    const list = [...vehicles];
     switch (sortBy) {
-      case "ai_score":
-        list.sort((a, b) => (audits.get(b.vehicleId)?.total ?? 0) - (audits.get(a.vehicleId)?.total ?? 0));
-        break;
       case "photo_count":
         list.sort((a, b) => (b.imageCount ?? 0) - (a.imageCount ?? 0));
         break;
@@ -86,7 +61,7 @@ export function CreativeStudio() {
         break;
     }
     return list;
-  }, [vehicles, sortBy, photoFilter, audits]);
+  }, [vehicles, sortBy]);
 
   const toggleSelected = (id: number) => {
     setSelectedIds((prev) => {
@@ -95,7 +70,7 @@ export function CreativeStudio() {
       return next;
     });
   };
-  const selectAll = () => setSelectedIds(new Set(filteredSortedVehicles.map((v) => v.vehicleId)));
+  const selectAll = () => setSelectedIds(new Set(sortedVehicles.map((v) => v.vehicleId)));
   const clearSelection = () => setSelectedIds(new Set());
 
   return (
@@ -108,17 +83,17 @@ export function CreativeStudio() {
             description={
               <div className="flex flex-col gap-2">
                 <span className="text-muted-foreground text-sm">
-                  {vehicles.length} vehicles · {useOriginalCount} use original · {enhanceCount} enhance recommended
+                  {vehicles.length} vehicles · {vehicles.reduce((s, v) => s + (v.imageCount ?? 0), 0)} photos · pending AI review
                 </span>
                 <div className="flex flex-wrap gap-2 mt-1">
                   <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] uppercase tracking-widest gap-1.5">
-                    <ScanSearch className="w-3 h-3" /> Photo Audit
-                  </Badge>
-                  <Badge variant="secondary" className="bg-success/10 text-success border-success/20 text-[10px] uppercase tracking-widest gap-1.5">
-                    <Camera className="w-3 h-3" /> Marketplace Photo
+                    <ScanSearch className="w-3 h-3" /> Photo Gallery
                   </Badge>
                   <Badge variant="secondary" className="bg-secondary/50 text-muted-foreground border-white/5 text-[10px] uppercase tracking-widest gap-1.5">
-                    <ImageIcon className="w-3 h-3" /> Gallery
+                    <Clock className="w-3 h-3" /> AI Review Pending
+                  </Badge>
+                  <Badge variant="secondary" className="bg-secondary/50 text-muted-foreground border-white/5 text-[10px] uppercase tracking-widest gap-1.5">
+                    <Camera className="w-3 h-3" /> Marketplace Photo
                   </Badge>
                 </div>
               </div>
@@ -127,16 +102,14 @@ export function CreativeStudio() {
           />
 
           {/* Module description strip */}
-          <div className="flex items-start gap-3 p-4 rounded-xl border bg-primary/5 border-primary/20 text-primary text-xs">
-            <Camera className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div className="flex items-start gap-3 p-4 rounded-xl border bg-muted/10 border-border/30 text-xs">
+            <Clock className="w-4 h-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
             <div>
-              <span className="font-bold">AI Vehicle Studio</span>
+              <span className="font-bold text-foreground/80">AI Photo Review — Coming Soon</span>
               {" — "}
               <span className="text-muted-foreground">
-                DealerPilot audits every vehicle photo and recommends{" "}
-                <strong className="text-foreground/70">Use Original</strong> when photos are already strong.
-                Enhancement is only recommended when overlays, poor lighting, or background issues require it.
-                Select a vehicle to open its Photo Audit.
+                Real photo scoring (angle, lighting, sharpness, overlays) requires computer vision integration.
+                Browse and review your vehicle photos below. Select a vehicle to view its full gallery.
               </span>
             </div>
           </div>
@@ -159,7 +132,7 @@ export function CreativeStudio() {
                   {selectedIds.size} selected
                 </Badge>
                 <Button size="sm" variant="ghost" onClick={selectAll} className="h-7 text-xs px-2">
-                  All {filteredSortedVehicles.length}
+                  All {sortedVehicles.length}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 text-xs px-2">×</Button>
               </div>
@@ -171,7 +144,6 @@ export function CreativeStudio() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ai_score">AI Audit Score</SelectItem>
                 <SelectItem value="photo_count">Photo Count</SelectItem>
                 <SelectItem value="price">Price</SelectItem>
                 <SelectItem value="newest">Newest</SelectItem>
@@ -201,83 +173,58 @@ export function CreativeStudio() {
             </div>
           </div>
 
-          {/* Photo recommendation filter pills */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex-shrink-0 mr-1">Filter:</span>
-            {([
-              { key: null, label: "All" },
-              { key: "use_original", label: "Use Original" },
-              { key: "enhance", label: "Enhance Recommended" },
-              { key: "review", label: "Needs Review" },
-            ] as const).map(({ key, label }) => (
-              <button
-                key={String(key)}
-                onClick={() => setPhotoFilter(key)}
-                className={cn(
-                  "px-3 py-1 rounded-full text-[11px] font-semibold border transition-colors",
-                  photoFilter === key
-                    ? key === null
-                      ? "bg-muted text-foreground border-border"
-                      : key === "use_original"
-                        ? "bg-success/20 text-success border-success/40"
-                        : key === "enhance"
-                          ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
-                          : "bg-red-500/20 text-red-400 border-red-500/40"
-                    : "bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground"
-                )}
-              >
-                {label}
-              </button>
-            ))}
-            <div className="w-px h-4 bg-border/40 mx-1" />
+          {/* Count pill */}
+          <div className="flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground">
-              {filteredSortedVehicles.length} vehicle{filteredSortedVehicles.length !== 1 ? "s" : ""}
+              {sortedVehicles.length} vehicle{sortedVehicles.length !== 1 ? "s" : ""}
             </span>
           </div>
 
-          {/* Vehicle grid / list */}
+          {/* Vehicle list / grid */}
           {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="aspect-[4/3] rounded-2xl bg-secondary/50 animate-pulse" />
               ))}
             </div>
-          ) : filteredSortedVehicles.length === 0 ? (
+          ) : sortedVehicles.length === 0 ? (
             <EmptyState
               icon={Car}
               title="No vehicles found"
               description="DealerPilot couldn't find any vehicles matching your search criteria."
             />
           ) : viewMode === "list" ? (
-            /* ── Compact List View ── */
+
+            /* ── List View ── */
             <div className="rounded-xl border border-border/40 overflow-hidden">
               <div className="flex items-center gap-3 px-4 py-2.5 bg-muted/30 border-b border-border/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 <div className="w-5 flex-shrink-0">
                   <Checkbox
-                    checked={selectedIds.size === filteredSortedVehicles.length && filteredSortedVehicles.length > 0}
+                    checked={selectedIds.size === sortedVehicles.length && sortedVehicles.length > 0}
                     onCheckedChange={(checked) => checked ? selectAll() : clearSelection()}
                   />
                 </div>
                 <div className="w-[72px] flex-shrink-0">Photo</div>
                 <div className="flex-1 min-w-0">Vehicle</div>
-                <div className="w-[110px] text-center flex-shrink-0 hidden lg:block">AI Score</div>
+                <div className="w-[80px] text-center flex-shrink-0 hidden sm:block">Photos</div>
                 <div className="w-[120px] flex-shrink-0 hidden md:block">Price</div>
                 <div className="w-[100px] flex-shrink-0 text-right">Action</div>
               </div>
-              {filteredSortedVehicles.map((v) => {
-                const audit = audits.get(v.vehicleId)!;
+
+              {sortedVehicles.map((v) => {
                 const isSelected = selectedIds.has(v.vehicleId);
                 return (
                   <div
                     key={v.vehicleId}
                     className={cn(
-                      "flex items-center gap-3 px-4 py-2 min-h-[82px] border-b border-border/20 last:border-b-0 transition-colors hover:bg-muted/10",
+                      "flex items-center gap-3 px-4 py-2 min-h-[72px] border-b border-border/20 last:border-b-0 transition-colors hover:bg-muted/10",
                       isSelected && "bg-primary/5 border-l-2 border-l-primary"
                     )}
                   >
                     <div className="w-5 flex-shrink-0">
                       <Checkbox checked={isSelected} onCheckedChange={() => toggleSelected(v.vehicleId)} />
                     </div>
+
                     {/* Thumbnail */}
                     <div className="relative w-[72px] h-[52px] flex-shrink-0 rounded-lg overflow-hidden bg-secondary/50">
                       {v.primaryImageUrl ? (
@@ -287,57 +234,40 @@ export function CreativeStudio() {
                           <Car className="w-5 h-5 text-muted-foreground/30" />
                         </div>
                       )}
-                      {v.imageCount > 0 && (
-                        <div className="absolute bottom-0.5 right-0.5 flex items-center gap-0.5 bg-black/70 text-white text-[8px] font-bold px-1 py-0.5 rounded">
-                          <ImageIcon className="w-2 h-2" />{v.imageCount}
-                        </div>
-                      )}
                     </div>
-                    {/* Vehicle info + decision + top reasons */}
+
+                    {/* Vehicle info */}
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm text-foreground truncate">{v.label}</div>
                       <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
                         <span className="font-mono">{v.vin.slice(-6)}</span>
-                        <span className="text-border/80">·</span>
-                        <span>{v.imageCount} photo{v.imageCount === 1 ? "" : "s"}</span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                        <span className={cn(
-                          "inline-flex items-center text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded",
-                          audit.decision === "Use Original" ? "text-success bg-success/10" :
-                          audit.decision === "Enhance Recommended" ? "text-amber-400 bg-amber-500/10" :
-                          "text-red-400 bg-red-500/10"
-                        )}>
-                          {audit.decision}
-                        </span>
-                        {audit.topReasons[0] && (
-                          <span className="text-[9px] text-muted-foreground/70 flex items-center gap-0.5 hidden sm:flex">
-                            <AlertTriangle className="w-2.5 h-2.5 text-amber-400/60 flex-shrink-0" />
-                            {audit.topReasons[0]}
-                          </span>
-                        )}
-                      </div>
+                      <Badge className="mt-1 text-[8px] font-bold uppercase tracking-widest bg-muted/40 text-muted-foreground border-border/30 gap-1">
+                        <Clock className="w-2 h-2" /> Pending AI Review
+                      </Badge>
                     </div>
-                    {/* AI score — labeled "AI-estimated" on hover */}
-                    <div className="w-[110px] flex-shrink-0 text-center hidden lg:flex flex-col items-center gap-1">
-                      <div className={cn(
-                        "inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border",
-                        scoreBadgeClass(audit.total)
-                      )}>
-                        <Gauge className="w-3 h-3" />{audit.total}
-                      </div>
-                      <span className="text-[8px] text-muted-foreground/50 uppercase tracking-widest">AI-estimated</span>
+
+                    {/* Photo count */}
+                    <div className="w-[80px] flex-shrink-0 text-center hidden sm:flex items-center justify-center gap-1 text-[11px] text-muted-foreground">
+                      <ImageIcon className="w-3 h-3" />
+                      {v.imageCount}
                     </div>
+
                     {/* Price */}
                     <div className="w-[120px] flex-shrink-0 hidden md:block">
                       <div className="font-bold text-sm">{formatCurrency(v.price)}</div>
                     </div>
+
                     {/* Action */}
                     <div className="w-[100px] flex-shrink-0 flex items-center justify-end">
                       <Link href={`/creative-studio/${v.vehicleId}`}>
-                        <Button size="sm" variant="outline" className="h-7 px-2.5 text-[10px] gap-1.5 border-primary/30 text-primary hover:bg-primary/10 whitespace-nowrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 text-[10px] gap-1.5 border-primary/30 text-primary hover:bg-primary/10 whitespace-nowrap"
+                        >
                           <ScanSearch className="w-3 h-3" />
-                          Audit →
+                          Review →
                         </Button>
                       </Link>
                     </div>
@@ -345,13 +275,13 @@ export function CreativeStudio() {
                 );
               })}
             </div>
+
           ) : (
+
             /* ── Grid View ── */
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
-              {filteredSortedVehicles.map((v, i) => {
-                const audit = audits.get(v.vehicleId)!;
+              {sortedVehicles.map((v, i) => {
                 const isSelected = selectedIds.has(v.vehicleId);
-
                 return (
                   <div key={v.vehicleId} className="relative">
                     <div
@@ -365,6 +295,7 @@ export function CreativeStudio() {
                         {isSelected && <span className="text-white text-[10px] font-bold">✓</span>}
                       </div>
                     </div>
+
                     <Link href={`/creative-studio/${v.vehicleId}`}>
                       <div
                         className="group glass-panel rounded-2xl overflow-hidden hover-lift cursor-pointer flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 shadow-sm hover:shadow-primary/5 border border-white/5 hover:border-primary/30 transition-all duration-500 relative"
@@ -385,28 +316,12 @@ export function CreativeStudio() {
                           )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/30" />
 
-                          {/* Decision badge — top right */}
-                          <Badge className={cn(
-                            "absolute top-4 right-4 z-10 backdrop-blur-md uppercase text-[9px] font-bold tracking-widest px-2 py-0.5 rounded-full border-0",
-                            decisionBadgeClass(audit.decision),
-                          )}>
-                            {audit.decision}
+                          {/* Pending review badge */}
+                          <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md bg-black/50 text-white/70 border-white/10 uppercase text-[8px] font-bold tracking-widest gap-1">
+                            <Clock className="w-2.5 h-2.5" /> Pending Review
                           </Badge>
 
-                          {/* Score badge — top left */}
-                          <div className="absolute top-4 left-4 z-10">
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "backdrop-blur-md font-bold text-[10px] uppercase tracking-widest px-2.5 py-1 border-white/10",
-                                scoreBadgeClass(audit.total),
-                              )}
-                            >
-                              <Gauge className="w-3 h-3 mr-1" />
-                              {audit.total}
-                            </Badge>
-                          </div>
-
+                          {/* Photo count */}
                           {v.imageCount > 0 && (
                             <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-lg backdrop-blur-sm">
                               <ImageIcon className="w-3 h-3" />
@@ -423,28 +338,16 @@ export function CreativeStudio() {
                           <div className="font-bold tracking-tight text-xl truncate mb-1 text-foreground/90 group-hover:text-primary transition-colors">
                             {v.label}
                           </div>
-                          <div className="text-muted-foreground text-xs mb-2">
-                            {v.imageCount} photo{v.imageCount === 1 ? "" : "s"} · <span className="text-muted-foreground/60">AI-estimated score</span>
+                          <div className="text-muted-foreground text-xs mb-4">
+                            {v.imageCount} photo{v.imageCount === 1 ? "" : "s"} · AI review pending
                           </div>
-
-                          {/* Top 2 reasons */}
-                          {audit.topReasons.length > 0 && (
-                            <div className="space-y-1 mb-4">
-                              {audit.topReasons.slice(0, 2).map((reason, ri) => (
-                                <div key={ri} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-                                  <AlertTriangle className={cn("w-3 h-3 flex-shrink-0 mt-0.5", ri === 0 ? "text-amber-400/80" : "text-muted-foreground/50")} />
-                                  {reason}
-                                </div>
-                              ))}
-                            </div>
-                          )}
 
                           <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between">
                             <div className="font-bold text-foreground/90 text-xl">
                               {formatCurrency(v.price)}
                             </div>
                             <div className="text-xs font-semibold flex items-center gap-1 text-primary/80 group-hover:text-primary uppercase tracking-widest transition-colors">
-                              <ScanSearch className="w-3 h-3" /> Open Audit →
+                              <ScanSearch className="w-3 h-3" /> View Photos →
                             </div>
                           </div>
                         </div>
