@@ -70,6 +70,22 @@ function renderStart() {
   if (activeJob) {
     startBtn.textContent = `Reopen Marketplace${getModeLabel(activeJob)}`;
     startBtn.disabled = false;
+    // Show a small reset link so the operator can clear a stuck/deleted job
+    const existing = document.getElementById("dp-reset-job");
+    if (!existing) {
+      const reset = document.createElement("button");
+      reset.id = "dp-reset-job";
+      reset.textContent = "✕ Clear stuck job";
+      reset.style.cssText = "display:block;margin:4px auto 0;background:none;border:none;color:#888;font-size:11px;cursor:pointer;text-decoration:underline;";
+      reset.addEventListener("click", async () => {
+        await send({ type: "CLEAR_ACTIVE_JOB" });
+        activeJob = null;
+        reset.remove();
+        setStatus("Job cleared. Refreshing…", "ok");
+        await refresh();
+      });
+      startBtn.insertAdjacentElement("afterend", reset);
+    }
   } else if (nextJob) {
     startBtn.textContent = `Start Publishing Job${getModeLabel(nextJob)}`;
     startBtn.disabled = false;

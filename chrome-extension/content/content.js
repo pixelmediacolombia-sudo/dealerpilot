@@ -535,7 +535,15 @@
       const res = await send({ type: "GET_JOB_PAYLOAD", jobId: job.id });
       if (!res || !res.ok) {
         if (res?.error === CTXI) return; // context invalidated — do not continue workflow
-        setStatus("Could not load job data: " + (res && res.error), "err");
+        // Job was deleted from the backend (e.g. operator cleared the queue).
+        // Auto-clear the stale activeJob so the extension can pick up a fresh job.
+        const is404 = res && typeof res.error === "string" && res.error.includes("404");
+        if (is404) {
+          await chrome.storage.local.remove(["activeJob", "lastClaimedJob"]);
+          setStatus("Job #" + job.id + " no longer exists — queue was cleared. Reopen the extension popup to start a new job.", "err");
+        } else {
+          setStatus("Could not load job data: " + (res && res.error), "err");
+        }
         return;
       }
       fill   = res.data.fill;

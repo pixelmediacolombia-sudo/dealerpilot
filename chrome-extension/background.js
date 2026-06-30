@@ -236,6 +236,11 @@ const handlers = {
     return { ok: true };
   },
 
+  async CLEAR_ACTIVE_JOB() {
+    await chrome.storage.local.remove(["activeJob", "lastClaimedJob"]);
+    return { ok: true };
+  },
+
   // ---- Sales AI: Conversation Intake ----
   async CONVERSATION_INTAKE(message) {
     const extensionId = await getExtensionId();
