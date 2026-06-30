@@ -1,0 +1,88 @@
+STOP new features.
+
+Marketplace Intelligence is still showing simplistic seeded recommendations:
+- Full Price
+- $500 down
+- Monday 2pm
+- Warm/Cold
+- confidence
+
+This is not acceptable.
+
+We need Marketplace Intelligence 2.0.
+
+Goal:
+Turn this page from a static table into an explainable AI strategy engine.
+
+Problems to fix:
+1. Down payments are wrong and too simplistic.
+2. Recommendations look fake/sample.
+3. There is no reasoning.
+4. No supporting data.
+5. No action button.
+6. No real strategy per vehicle.
+
+Requirements:
+
+1. Replace the current Strategic Recommendations table with strategy cards per vehicle.
+
+Each card must show:
+- vehicle photo
+- vehicle name
+- price
+- mileage
+- body style
+- DealerPilot Score
+- recommended action
+- recommended down payment
+- recommended creative strategy
+- recommended posting time
+- reason why
+- expected impact
+- confidence
+
+2. Down Payment Intelligence must use rules based on:
+- price
+- body style
+- luxury/non-luxury
+- mileage
+- dealer financing strategy
+
+Use better rules:
+- vehicles under $20k: $1,500–$2,000 down
+- $20k–$35k: $2,000–$3,000 down
+- $35k–$50k: $3,000–$4,000 down
+- $50k+: $4,000–$6,000 down
+- trucks/SUVs usually higher
+- luxury/performance higher
+- never recommend $500 down unless explicitly configured
+
+3. Every recommendation must explain WHY.
+
+Example:
+Recommended Down Payment: $3,500
+Reason: This SUV is priced above $35k, has strong buyer demand, and similar higher-ticket SUVs perform better with serious-buyer down-payment framing.
+
+4. Add action buttons:
+- Optimize Listing
+- Generate Creative
+- Schedule Post
+- Publish
+
+5. Label sample data clearly.
+If this is seeded data, show:
+“Sample Intelligence — not based on real Marketplace performance yet.”
+
+6. Add empty state for real mode:
+“DealerPilot will improve recommendations after collecting Marketplace messages and listing performance.”
+
+7. Remove fake confidence if unsupported.
+Confidence should be based on available signals.
+If sample mode, show “sample confidence.”
+
+8. Keep all existing backend routes working.
+Do not break Marketplace Intelligence route.
+Do not break Vehicle Detail widget.
+
+Deliverable:
+Marketplace Intelligence should feel like an AI strategist, not a static report.
