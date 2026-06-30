@@ -36,4 +36,15 @@ export interface VehicleRecommendation {
   /** @nullable */
   expectedLeadQuality?: string | null;
   generatedAt?: Date;
+  /** @nullable */
+  strategyName?: string | null;
+  /** @nullable */
+  reason?: string | null;
+  supportingSignals?: string[] | null;
+  /** @nullable */
+  expectedImpact?: string | null;
+  /** @nullable */
+  actionCta?: string | null;
+  /** @nullable */
+  strategyEngineVersion?: string | null;
 }

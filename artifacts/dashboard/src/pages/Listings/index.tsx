@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,8 @@ import {
   useListVehiclePhotoScores,
   useMarkListingPublished,
   useBulkVehicleAction,
+  useBulkSchedulePublishing,
+  useListMarketplaceRecommendations,
   getListListingWorkspacesQueryKey,
   getListPublishingJobsQueryKey,
   getListVehiclePhotoScoresQueryKey,
@@ -250,6 +252,8 @@ export function ListingsWorkspace() {
     },
   });
 
+  const bulkSchedule = useBulkSchedulePublishing();
+
   const { data: photoScoresData } = useListVehiclePhotoScores(
     { dealerId: DEALER_ID },
     { query: { queryKey: getListVehiclePhotoScoresQueryKey({ dealerId: DEALER_ID }) } },
@@ -258,6 +262,53 @@ export function ListingsWorkspace() {
   const photoScoreByVehicle = new Map(
     (photoScoresData?.scores ?? []).map((s) => [s.vehicleId, s]),
   );
+
+  const { data: intelligenceData } = useListMarketplaceRecommendations();
+
+  const intelligenceMap = useMemo(() => {
+    const m = new Map<number, {
+      strategyName: string | null;
+      recommendedDownPayment: number | null;
+      reason: string | null;
+      supportingSignals?: string[] | null;
+      expectedImpact?: string | null;
+      actionCta?: string | null;
+    }>();
+    for (const rec of intelligenceData?.recommendations ?? []) {
+      m.set(rec.vehicleId, {
+        strategyName: rec.strategyName ?? null,
+        recommendedDownPayment: rec.recommendedDownPayment ?? null,
+        reason: rec.reason ?? null,
+        supportingSignals: rec.supportingSignals ?? null,
+        expectedImpact: rec.expectedImpact ?? null,
+        actionCta: rec.actionCta ?? null,
+      });
+    }
+    return m;
+  }, [intelligenceData]);
+
+  const autoSelectHighPriority = () => {
+    const allWorkspaces = workspacesData?.workspaces ?? [];
+    const highPriorityIds = allWorkspaces
+      .filter((w) => {
+        if (w.publishStatus === "Published") return false;
+        const intel = intelligenceMap.get(w.vehicleId);
+        const strategy = (intel?.strategyName ?? "").toLowerCase();
+        const photoEntry = photoScoreByVehicle.get(w.vehicleId);
+        const photoScore = photoEntry?.photoScore ?? 0;
+        const listingScore = w.listingScore ?? 0;
+        const isHighDemand =
+          strategy.includes("truck") ||
+          strategy.includes("suv") ||
+          strategy.includes("performance") ||
+          strategy.includes("luxury") ||
+          strategy.includes("fast turn") ||
+          strategy.includes("premium");
+        return isHighDemand && listingScore >= 50 && photoScore >= 55;
+      })
+      .map((w) => w.vehicleId);
+    setSelectedVehicleIds(new Set(highPriorityIds.length > 0 ? highPriorityIds : allWorkspaces.slice(0, 8).map((w) => w.vehicleId)));
+  };
 
   const workspaces = workspacesData?.workspaces ?? [];
   const generatingCount = workspaces.filter((w) => w.aiStatus === "Generating").length;
@@ -755,7 +806,10 @@ export function ListingsWorkspace() {
                       {/* Primary CTA */}
                       <Button
                         className="gap-2 px-5 font-bold text-[11px] uppercase tracking-widest premium-gradient-btn whitespace-nowrap"
-                        onClick={() => setShowBatchReview(true)}
+                        onClick={() => {
+                          autoSelectHighPriority();
+                          setShowBatchReview(true);
+                        }}
                       >
                         <Wand2 className="w-3.5 h-3.5" />
                         Create AI Publishing Batch
@@ -1039,25 +1093,26 @@ export function ListingsWorkspace() {
             selectedVehicleIds.has(w.vehicleId),
           )}
           photoScoreByVehicle={photoScoreByVehicle}
+          intelligenceMap={intelligenceMap}
           onClose={() => setShowBatchReview(false)}
-          isApproving={bulkVehicleAction.isPending}
+          isApproving={bulkSchedule.isPending}
           onApprove={(readyVehicleIds) => {
-            bulkVehicleAction.mutate(
-              { data: { vehicleIds: readyVehicleIds, action: "mark_ready" } },
+            bulkSchedule.mutate(
+              { data: { vehicleIds: readyVehicleIds, spacingMinutes: 30 } },
               {
-                onSuccess: () => {
+                onSuccess: (result) => {
                   setShowBatchReview(false);
                   clearSelection();
                   invalidateWorkspaces();
                   toast({
-                    title: "Batch created",
-                    description: `${readyVehicleIds.length} vehicle${readyVehicleIds.length !== 1 ? "s" : ""} queued for publishing. DealerPilot will publish them in order.`,
+                    title: "Publishing batch created",
+                    description: `${result.enqueued} vehicle${result.enqueued !== 1 ? "s" : ""} queued for publishing. DealerPilot will publish them in order.`,
                   });
                 },
                 onError: () =>
                   toast({
                     title: "Error",
-                    description: "Failed to create batch",
+                    description: "Failed to create publishing batch",
                     variant: "destructive",
                   }),
               },

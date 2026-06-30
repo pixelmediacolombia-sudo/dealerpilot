@@ -2637,7 +2637,13 @@ export const ListMarketplaceRecommendationsResponse = zod.object({
   "confidenceScore": zod.number(),
   "explanation": zod.string().nullish(),
   "expectedLeadQuality": zod.string().nullish(),
-  "generatedAt": zod.coerce.date().optional()
+  "generatedAt": zod.coerce.date().optional(),
+  "strategyName": zod.string().nullish(),
+  "reason": zod.string().nullish(),
+  "supportingSignals": zod.array(zod.string()).nullish(),
+  "expectedImpact": zod.string().nullish(),
+  "actionCta": zod.string().nullish(),
+  "strategyEngineVersion": zod.string().nullish()
 }))
 })
 

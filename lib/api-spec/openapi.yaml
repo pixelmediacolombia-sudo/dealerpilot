@@ -3290,6 +3290,15 @@ components:
         explanation: { type: ["string", "null"] }
         expectedLeadQuality: { type: ["string", "null"] }
         generatedAt: { type: string, format: date-time }
+        strategyName: { type: ["string", "null"] }
+        reason: { type: ["string", "null"] }
+        supportingSignals:
+          type: array
+          nullable: true
+          items: { type: string }
+        expectedImpact: { type: ["string", "null"] }
+        actionCta: { type: ["string", "null"] }
+        strategyEngineVersion: { type: ["string", "null"] }
 
     MarketplaceRecommendationsResponse:
       type: object

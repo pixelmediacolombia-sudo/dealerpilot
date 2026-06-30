@@ -272,6 +272,10 @@ const ClaimBody = z.object({ extensionId: z.string().min(1) });
 // POST /publishing/jobs/:id/claim — extension takes ownership of a job.
 router.post("/publishing/jobs/:id/claim", async (req, res) => {
   const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid job ID" });
+    return;
+  }
   const parsed = ClaimBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "extensionId is required" });

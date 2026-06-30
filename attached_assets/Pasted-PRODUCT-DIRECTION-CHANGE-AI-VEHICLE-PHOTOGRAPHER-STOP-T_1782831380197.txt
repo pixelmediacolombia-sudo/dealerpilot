@@ -1,0 +1,427 @@
+PRODUCT DIRECTION CHANGE — AI VEHICLE PHOTOGRAPHER
+
+STOP.
+
+The current AI Vehicle Studio is still behaving like an image generator.
+
+That is NOT the product.
+
+DealerPilot should behave like an AI Automotive Photographer and Marketplace Expert.
+
+====================================================
+MISSION
+====================================================
+
+DealerPilot must NOT generate multiple random versions of the same image.
+
+DealerPilot must first THINK.
+
+It must analyze the entire vehicle gallery before generating anything.
+
+The AI should decide:
+
+• Which photo is the best.
+• Whether enhancement is even necessary.
+• Which photos should never be used.
+• Whether the original photo should be preserved.
+
+DealerPilot should make intelligent decisions before editing.
+
+====================================================
+REMOVE THE CURRENT OUTPUT LOGIC
+====================================================
+
+Remove the current workflow:
+
+Marketplace Clean
+
+Luxury Studio
+
+White Catalog
+
+Gray Studio
+
+Black Studio
+
+Transparent PNG
+
+Those outputs are simply different backgrounds.
+
+They do NOT provide value.
+
+Do not generate multiple versions just because we can.
+
+====================================================
+NEW AI WORKFLOW
+====================================================
+
+STEP 1
+
+Analyze ALL XML photos.
+
+Example:
+
+Vehicle
+
+20 Photos Found
+
+DealerPilot analyzes ALL 20.
+
+NOT only the first photo.
+
+====================================================
+STEP 2
+
+Score every photo.
+
+Each photo receives:
+
+Photo Score
+
+0-100
+
+based on
+
+• angle
+• framing
+• lighting
+• reflections
+• vehicle visibility
+• crop
+• background
+• sharpness
+• cleanliness
+• dealer branding
+• marketplace trust
+• resolution
+
+====================================================
+STEP 3
+
+Choose the best photos automatically.
+
+Example
+
+Best Cover
+
+Photo #7
+
+Top Marketplace Photos
+
+#7
+#11
+#15
+#18
+#20
+
+Ignore
+
+#2
+#6
+#9
+
+====================================================
+STEP 4
+
+AI DECISION
+
+This is the most important feature.
+
+DealerPilot must decide one of three actions.
+
+USE ORIGINAL
+
+ENHANCE PHOTO
+
+DO NOT USE
+
+Examples
+
+Photo Score
+
+96
+
+Recommendation
+
+Use Original
+
+Reason
+
+Excellent lighting
+
+Excellent angle
+
+Vehicle fully visible
+
+Branding does not interfere
+
+Marketplace Ready
+
+----------------------------
+
+Photo Score
+
+67
+
+Recommendation
+
+Enhancement Recommended
+
+Reason
+
+Dealer branding blocks vehicle
+
+Poor lighting
+
+Needs reconstruction
+
+----------------------------
+
+Photo Score
+
+43
+
+Recommendation
+
+Do Not Use
+
+Reason
+
+Vehicle cropped
+
+Strong reflections
+
+Low quality
+
+Choose another image
+
+====================================================
+STEP 5
+
+ONLY IF enhancement is needed
+
+DealerPilot performs AI restoration.
+
+Tasks
+
+Remove dealer logo
+
+Remove financing banner
+
+Remove phone numbers
+
+Remove promotional graphics
+
+Remove showroom distractions
+
+Reconstruct hidden vehicle areas
+
+Repair pixels hidden by banners
+
+Improve paint reflections
+
+Improve lighting
+
+Correct white balance
+
+Improve sharpness
+
+Generate natural shadow
+
+Generate realistic background
+
+The result must still look like a real dealership photograph.
+
+====================================================
+STEP 6
+
+Final Result
+
+DealerPilot should output
+
+ONE APPROVED PHOTO
+
+NOT seven different versions.
+
+If additional versions are useful,
+
+show them inside
+
+"Alternative Suggestions"
+
+collapsed by default.
+
+The primary output should always be
+
+Recommended Marketplace Cover
+
+====================================================
+PHOTO REPORT
+====================================================
+
+Every vehicle receives an AI report.
+
+Example
+
+Overall Photo Score
+
+94/100
+
+Best Cover
+
+Photo #7
+
+Marketplace Readiness
+
+Excellent
+
+Branding Severity
+
+Medium
+
+Lighting
+
+Excellent
+
+Angle
+
+Excellent
+
+Crop
+
+Excellent
+
+Reflection Quality
+
+Good
+
+Recommendation
+
+Use Original
+
+Reason
+
+Current photo already performs well.
+
+No enhancement required.
+
+====================================================
+IMPORTANT RULE
+
+DealerPilot must NEVER enhance photos that are already excellent.
+
+Many Alpha Motorsport photos are already high quality.
+
+The AI should preserve those images.
+
+Enhancement should only happen when it provides measurable improvement.
+
+====================================================
+NEW UI
+====================================================
+
+Replace the current outputs with
+
+AI Vehicle Audit
+
+Overall Score
+
+Best Cover
+
+Top 5 Photos
+
+Photos to Ignore
+
+Recommendation
+
+Reason
+
+Confidence
+
+Primary Action
+
+Use Original
+
+OR
+
+Generate Enhanced Photo
+
+====================================================
+REMOVE
+====================================================
+
+Remove
+
+Marketplace Clean
+
+Luxury Studio
+
+White Catalog
+
+Gray Studio
+
+Black Studio
+
+Transparent PNG
+
+Those are implementation details.
+
+The user should never have to choose between seven nearly identical outputs.
+
+DealerPilot should make that decision automatically.
+
+====================================================
+SUCCESS CRITERIA
+====================================================
+
+When opening a vehicle:
+
+DealerPilot immediately analyzes every XML image.
+
+The operator sees:
+
+✓ Best Cover Photo
+
+✓ Top Marketplace Photos
+
+✓ Photos to Ignore
+
+✓ AI Recommendation
+
+✓ Photo Score
+
+✓ Marketplace Readiness
+
+✓ Confidence
+
+If enhancement is unnecessary,
+
+DealerPilot must explicitly say:
+
+"This vehicle already meets Marketplace quality standards.
+
+Use the original photo."
+
+That is intelligent behavior.
+
+DealerPilot is an AI decision engine, not an image template generator.
+
+====================================================
+FUTURE ARCHITECTURE
+====================================================
+
+Marketplace AI has ONE goal:
+
+Increase Marketplace engagement.
+
+DealerPilot should optimize:
+
+• photo selection
+• listing quality
+• publishing order
+• posting schedule
+• pricing strategy
+
+NOT create flyer graphics.
+
+Flyers belong exclusively inside the Meta Ads Creative Studio.

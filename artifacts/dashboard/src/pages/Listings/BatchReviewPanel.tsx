@@ -19,14 +19,14 @@ import {
   PenTool,
   Car,
   ImageIcon,
-  Clock,
-  Layers,
   Wand2,
   CalendarClock,
   ChevronRight,
   XCircle,
   Loader2,
-  LayoutGrid,
+  TrendingUp,
+  Star,
+  DollarSign,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -51,6 +51,17 @@ type PhotoScoreEntry = {
   photoScore: number | null;
 };
 
+export type IntelligenceEntry = {
+  strategyName: string | null;
+  recommendedDownPayment: number | null;
+  reason: string | null;
+  supportingSignals?: string[] | null;
+  expectedImpact?: string | null;
+  actionCta?: string | null;
+};
+
+type PublishPriority = "High" | "Medium" | "Low";
+
 type ReadinessStatus =
   | "Ready"
   | "Needs Better Photo"
@@ -64,25 +75,51 @@ type VehicleAnalysis = {
   recommendation: string;
   photoScore: number;
   publishOrder: number;
+  priority: PublishPriority;
+  bestCoverIsAi: boolean;
 };
 
 type Props = {
   vehicles: WorkspaceVehicle[];
   photoScoreByVehicle: Map<number, PhotoScoreEntry>;
+  intelligenceMap: Map<number, IntelligenceEntry>;
   onClose: () => void;
   onApprove: (readyVehicleIds: number[]) => void;
   isApproving: boolean;
 };
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function inferPriority(
+  strategyName: string | null | undefined,
+  listingScore: number,
+  photoScore: number,
+): PublishPriority {
+  if (!strategyName) return listingScore >= 65 && photoScore >= 70 ? "Medium" : "Low";
+  const s = strategyName.toLowerCase();
+  const isHighDemand =
+    s.includes("truck") ||
+    s.includes("suv") ||
+    s.includes("performance") ||
+    s.includes("luxury") ||
+    s.includes("fast turn") ||
+    s.includes("premium");
+  if (isHighDemand && listingScore >= 55 && photoScore >= 60) return "High";
+  if (listingScore >= 55 && photoScore >= 55) return "Medium";
+  return "Low";
+}
 
 // ── AI analysis ─────────────────────────────────────────────────────────────
 
 function analyzeVehicle(
   w: WorkspaceVehicle,
   photoEntry: PhotoScoreEntry | undefined,
+  intel: IntelligenceEntry | undefined,
 ): VehicleAnalysis {
   const photoDecision = photoEntry?.photoDecision ?? null;
   const photoScoreVal = photoEntry?.photoScore ?? 0;
   const listingScore = w.listingScore ?? 0;
+  const bestCoverIsAi = photoDecision === "use_original_recommend_ai_cover";
 
   if (w.publishStatus === "Published") {
     return {
@@ -91,6 +128,8 @@ function analyzeVehicle(
       recommendation: "Skip for this batch.",
       photoScore: photoScoreVal,
       publishOrder: 99,
+      priority: "Low",
+      bestCoverIsAi,
     };
   }
 
@@ -101,6 +140,8 @@ function analyzeVehicle(
       recommendation: "Add photos via XML feed re-sync before publishing.",
       photoScore: 0,
       publishOrder: 90,
+      priority: "Low",
+      bestCoverIsAi: false,
     };
   }
 
@@ -115,6 +156,8 @@ function analyzeVehicle(
       recommendation: "Run Photo Enhancer to produce a clean listing photo.",
       photoScore: photoScoreVal,
       publishOrder: 80,
+      priority: "Low",
+      bestCoverIsAi,
     };
   }
 
@@ -125,6 +168,8 @@ function analyzeVehicle(
       recommendation: "Generate or improve AI listing content first.",
       photoScore: photoScoreVal,
       publishOrder: 70,
+      priority: "Low",
+      bestCoverIsAi,
     };
   }
 
@@ -135,13 +180,18 @@ function analyzeVehicle(
       recommendation: "Confirm price before publishing.",
       photoScore: photoScoreVal,
       publishOrder: 60,
+      priority: "Low",
+      bestCoverIsAi,
     };
   }
 
-  const photoNote =
-    photoDecision === "use_original_recommend_ai_cover"
-      ? "AI cover photo recommended"
-      : "Photo approved";
+  const priority = inferPriority(intel?.strategyName, listingScore, photoScoreVal);
+
+  const photoNote = bestCoverIsAi
+    ? "AI cover recommended"
+    : photoDecision === "use_original"
+      ? "Photo approved"
+      : "Photo acceptable";
 
   const qualityNote =
     listingScore >= 80
@@ -150,12 +200,21 @@ function analyzeVehicle(
         ? "Good listing"
         : "Acceptable listing";
 
+  const priorityPublishOrder =
+    priority === "High"
+      ? Math.max(1, 20 - Math.floor(listingScore / 10))
+      : priority === "Medium"
+        ? Math.max(21, 40 - Math.floor(listingScore / 10))
+        : 50 - Math.floor(listingScore / 10);
+
   return {
     status: "Ready",
     reason: `Score ${listingScore} · ${photoNote}`,
     recommendation: `${qualityNote} — clear to publish.`,
     photoScore: photoScoreVal,
-    publishOrder: 100 - listingScore,
+    publishOrder: priorityPublishOrder,
+    priority,
+    bestCoverIsAi,
   };
 }
 
@@ -197,11 +256,33 @@ const STATUS_CONFIG: Record<
   },
 };
 
+const PRIORITY_CONFIG: Record<
+  PublishPriority,
+  { label: string; color: string; bg: string }
+> = {
+  High: {
+    label: "High Priority",
+    color: "text-rose-400",
+    bg: "bg-rose-500/10 border-rose-500/25",
+  },
+  Medium: {
+    label: "Medium",
+    color: "text-amber-400",
+    bg: "bg-amber-500/10 border-amber-500/25",
+  },
+  Low: {
+    label: "Low",
+    color: "text-muted-foreground",
+    bg: "bg-secondary/50 border-border",
+  },
+};
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function BatchReviewPanel({
   vehicles,
   photoScoreByVehicle,
+  intelligenceMap,
   onClose,
   onApprove,
   isApproving,
@@ -214,10 +295,17 @@ export function BatchReviewPanel({
   const analysisMap = useMemo(() => {
     const m = new Map<number, VehicleAnalysis>();
     for (const v of vehicles) {
-      m.set(v.vehicleId, analyzeVehicle(v, photoScoreByVehicle.get(v.vehicleId)));
+      m.set(
+        v.vehicleId,
+        analyzeVehicle(
+          v,
+          photoScoreByVehicle.get(v.vehicleId),
+          intelligenceMap.get(v.vehicleId),
+        ),
+      );
     }
     return m;
-  }, [vehicles, photoScoreByVehicle]);
+  }, [vehicles, photoScoreByVehicle, intelligenceMap]);
 
   const ready = vehicles.filter(
     (v) => analysisMap.get(v.vehicleId)?.status === "Ready",
@@ -225,6 +313,13 @@ export function BatchReviewPanel({
   const needsReview = vehicles.filter(
     (v) => analysisMap.get(v.vehicleId)?.status !== "Ready",
   );
+
+  const highCount = ready.filter(
+    (v) => analysisMap.get(v.vehicleId)?.priority === "High",
+  ).length;
+  const mediumCount = ready.filter(
+    (v) => analysisMap.get(v.vehicleId)?.priority === "Medium",
+  ).length;
 
   const sortedVehicles = useMemo(() => {
     return [...vehicles].sort((a, b) => {
@@ -238,7 +333,14 @@ export function BatchReviewPanel({
     ready.length,
     batchSize === "all" ? ready.length : parseInt(batchSize, 10),
   );
-  const batchToPublish = ready.slice(0, effectiveBatchSize);
+  const batchToPublish = ready
+    .slice()
+    .sort((a, b) => {
+      const aOrder = analysisMap.get(a.vehicleId)?.publishOrder ?? 50;
+      const bOrder = analysisMap.get(b.vehicleId)?.publishOrder ?? 50;
+      return aOrder - bOrder;
+    })
+    .slice(0, effectiveBatchSize);
 
   const windowLabel =
     postingWindow === "morning"
@@ -262,7 +364,7 @@ export function BatchReviewPanel({
           </button>
           <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
             <Sparkles className="w-3.5 h-3.5 text-primary" />
-            DealerPilot AI · Batch Review
+            DealerPilot AI · Batch Review · Strategy Engine v2
           </div>
         </div>
 
@@ -288,7 +390,7 @@ export function BatchReviewPanel({
           </div>
 
           {/* Summary stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
             {[
               {
                 label: "Ready to Publish",
@@ -297,15 +399,21 @@ export function BatchReviewPanel({
                 bg: "bg-success/10",
               },
               {
-                label: "Need Review",
-                value: needsReview.length,
+                label: "High Priority",
+                value: highCount,
+                color: "text-rose-400",
+                bg: "bg-rose-500/10",
+              },
+              {
+                label: "Medium Priority",
+                value: mediumCount,
                 color: "text-amber-400",
                 bg: "bg-amber-500/10",
               },
               {
-                label: "Total Selected",
-                value: vehicles.length,
-                color: "text-foreground",
+                label: "Need Review",
+                value: needsReview.length,
+                color: "text-muted-foreground",
                 bg: "bg-secondary/50",
               },
               {
@@ -336,32 +444,43 @@ export function BatchReviewPanel({
         {/* ── Vehicle List ── */}
         <div className="space-y-3">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-            Vehicle Analysis ({vehicles.length} selected)
+            Vehicle Analysis — Publishing Order ({vehicles.length} selected)
           </p>
 
           {sortedVehicles.map((v, idx) => {
             const analysis = analysisMap.get(v.vehicleId)!;
             const cfg = STATUS_CONFIG[analysis.status];
+            const pCfg = PRIORITY_CONFIG[analysis.priority];
             const StatusIcon = cfg.icon;
             const photoEntry = photoScoreByVehicle.get(v.vehicleId);
+            const intel = intelligenceMap.get(v.vehicleId);
 
             return (
               <div
                 key={v.vehicleId}
                 className={cn(
-                  "flex items-center gap-4 p-4 rounded-xl border transition-all",
-                  analysis.status === "Ready"
-                    ? "border-success/20 bg-success/5"
-                    : "border-border/50 bg-card/60",
+                  "flex items-start gap-4 p-4 rounded-xl border transition-all",
+                  analysis.status === "Ready" && analysis.priority === "High"
+                    ? "border-rose-500/20 bg-rose-500/5"
+                    : analysis.status === "Ready"
+                      ? "border-success/20 bg-success/5"
+                      : "border-border/50 bg-card/60",
                 )}
               >
                 {/* Order number */}
-                <div className="w-7 h-7 rounded-full bg-secondary/60 flex items-center justify-center text-[11px] font-bold text-muted-foreground flex-shrink-0">
-                  {idx + 1}
+                <div className={cn(
+                  "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-0.5",
+                  analysis.status === "Ready" && analysis.priority === "High"
+                    ? "bg-rose-500/20 text-rose-400"
+                    : analysis.status === "Ready"
+                      ? "bg-success/20 text-success"
+                      : "bg-secondary/60 text-muted-foreground",
+                )}>
+                  {analysis.status === "Ready" ? idx + 1 : "–"}
                 </div>
 
-                {/* Thumbnail */}
-                <div className="w-16 h-12 rounded-lg overflow-hidden bg-secondary/40 flex-shrink-0">
+                {/* Thumbnail with cover indicator */}
+                <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-secondary/40 flex-shrink-0">
                   {v.primaryImageUrl ? (
                     <img
                       src={v.primaryImageUrl}
@@ -373,10 +492,16 @@ export function BatchReviewPanel({
                       <Car className="w-5 h-5 text-muted-foreground/30" />
                     </div>
                   )}
+                  {analysis.bestCoverIsAi && (
+                    <div className="absolute bottom-0 inset-x-0 bg-blue-500/80 text-white text-[8px] font-bold text-center py-0.5 flex items-center justify-center gap-0.5">
+                      <Wand2 className="w-2 h-2" />
+                      AI COVER
+                    </div>
+                  )}
                 </div>
 
-                {/* Vehicle info */}
-                <div className="flex-1 min-w-0">
+                {/* Vehicle info + intelligence */}
+                <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-sm text-foreground truncate">
                       {v.label}
@@ -386,8 +511,30 @@ export function BatchReviewPanel({
                         {formatCurrency(v.price)}
                       </span>
                     )}
+                    {/* Priority badge */}
+                    {analysis.status === "Ready" && (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-widest",
+                          pCfg.bg,
+                          pCfg.color,
+                        )}
+                      >
+                        {analysis.priority === "High" && <TrendingUp className="w-2.5 h-2.5" />}
+                        {analysis.priority === "Medium" && <Star className="w-2.5 h-2.5" />}
+                        {pCfg.label}
+                      </span>
+                    )}
+                    {/* Strategy name badge */}
+                    {intel?.strategyName && (
+                      <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[9px] font-bold text-primary uppercase tracking-widest">
+                        {intel.strategyName}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+
+                  {/* Metrics row */}
+                  <div className="flex items-center gap-3 flex-wrap">
                     {(v.imageCount ?? 0) > 0 && (
                       <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
                         <ImageIcon className="w-3 h-3" />
@@ -404,8 +551,23 @@ export function BatchReviewPanel({
                         Photo {photoEntry.photoScore}
                       </span>
                     )}
+                    {/* Recommended down payment */}
+                    {intel?.recommendedDownPayment != null && (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-success">
+                        <DollarSign className="w-3 h-3" />
+                        {formatCurrency(intel.recommendedDownPayment)} down rec.
+                      </span>
+                    )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
+
+                  {/* Strategy reason */}
+                  {intel?.reason && analysis.status === "Ready" && (
+                    <p className="text-[11px] text-primary/70 leading-snug italic">
+                      "{intel.reason}"
+                    </p>
+                  )}
+
+                  <p className="text-[11px] text-muted-foreground leading-snug">
                     {analysis.recommendation}
                   </p>
                 </div>
@@ -544,6 +706,15 @@ export function BatchReviewPanel({
                     <strong className="text-foreground">{windowLabel}</strong>{" "}
                     window.
                   </p>
+                  {highCount > 0 && (
+                    <p>
+                      ✓{" "}
+                      <strong className="text-rose-400">
+                        {highCount} High Priority
+                      </strong>{" "}
+                      vehicle{highCount !== 1 ? "s" : ""} will publish first — top AI picks from Strategy Engine v2.
+                    </p>
+                  )}
                   <p>
                     ✓ Posts spaced{" "}
                     <strong className="text-foreground">
@@ -589,7 +760,7 @@ export function BatchReviewPanel({
               ) : (
                 <Sparkles className="w-4 h-4" />
               )}
-              Approve & Schedule {effectiveBatchSize} Vehicle
+              Publish {effectiveBatchSize} Vehicle
               {effectiveBatchSize !== 1 ? "s" : ""}
               <ChevronRight className="w-4 h-4" />
             </Button>
