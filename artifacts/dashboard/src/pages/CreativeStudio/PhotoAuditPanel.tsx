@@ -153,7 +153,7 @@ export function PhotoAuditPanel({ images, vehicleId, vehicleName }: Props) {
 
   const recommendedAction = bestCover.decision === "Use Original"
     ? `Use original photo #${bestCover.img.position + 1}. ${bestCover.topReasons.length > 0 ? `Strong photo — ${bestCover.topReasons[0].toLowerCase()}.` : "Clean, high-quality vehicle photo."}`
-    : `Enhance photo #${bestCover.img.position + 1} with Marketplace Clean treatment. ${bestCover.topReasons.join(", ")}.`;
+    : `Generate one Marketplace photo for #${bestCover.img.position + 1}. ${bestCover.topReasons.join(", ")}.`;
 
   const visibleScored = showAll ? scored : scored.slice(0, 9);
 

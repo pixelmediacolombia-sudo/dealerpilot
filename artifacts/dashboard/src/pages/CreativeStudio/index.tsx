@@ -115,7 +115,7 @@ export function CreativeStudio() {
                     <ScanSearch className="w-3 h-3" /> Photo Audit
                   </Badge>
                   <Badge variant="secondary" className="bg-success/10 text-success border-success/20 text-[10px] uppercase tracking-widest gap-1.5">
-                    <Camera className="w-3 h-3" /> Enhanced Photos
+                    <Camera className="w-3 h-3" /> Marketplace Photo
                   </Badge>
                   <Badge variant="secondary" className="bg-secondary/50 text-muted-foreground border-white/5 text-[10px] uppercase tracking-widest gap-1.5">
                     <ImageIcon className="w-3 h-3" /> Gallery
