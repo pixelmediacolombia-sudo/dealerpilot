@@ -149,3 +149,9 @@ id = "q2RtVyr1J7iUA3BvQnypX"
 uri = "file://DealerPilot-Extension-v1.0.7-MODEL_TEXT_INPUT_FIX_20260630-011322.zip"
 type = "unspecified"
 title = "DealerPilot Extension v1.0.7 — MODEL_TEXT_INPUT_FIX"
+
+[[outputs]]
+id = "2NHnMZGXc9bNaJHJMAHha"
+uri = "file://DealerPilot-Extension-v1.0.8-JOB_ID_CONTRACT_FIX_20260630-012448.zip"
+type = "unspecified"
+title = "DealerPilot Extension v1.0.8 — JOB_ID_CONTRACT_FIX"

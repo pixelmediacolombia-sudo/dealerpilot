@@ -25,7 +25,7 @@
   // ---- Safe runtime communication ----
   // Sentinel returned (never thrown) when Chrome invalidates the extension context.
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "MODEL_TEXT_INPUT_FIX_1.0.7";
+  const BUILD_LABEL = "JOB_ID_CONTRACT_FIX_1.0.8";
 
   function _runtimeAlive() {
     try {

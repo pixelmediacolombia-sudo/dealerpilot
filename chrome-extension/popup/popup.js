@@ -190,8 +190,19 @@ async function refresh() {
   }
 
   const res = await send({ type: "GET_NEXT_JOB" });
+  console.log("[DealerPilot] Next job response:", JSON.stringify(res));
   if (res && res.ok) {
-    nextJob = res.data && res.data.job ? res.data.job : (res.data || null);
+    // Backend returns { job: {...} } when a job exists, or { job: null } when empty.
+    // Extract the actual job object; guard against the fallback-to-response-body bug
+    // that would make nextJob truthy (e.g. { job: null }) while nextJob.id is undefined.
+    const raw = res.data;
+    const candidate =
+      (raw && raw.job && raw.job.id != null)   ? raw.job        : // { job: {id, ...} }
+      (raw && Array.isArray(raw.jobs) && raw.jobs[0]?.id != null) ? raw.jobs[0] : // { jobs: [...] }
+      (raw && raw.id != null)                  ? raw            : // bare job object
+      null;
+    nextJob = candidate;
+    console.log("[DealerPilot] Extracted nextJob:", JSON.stringify(nextJob));
     el.vJobs.textContent = nextJob ? "1+ ready" : "None";
   } else {
     nextJob = null;
@@ -224,8 +235,18 @@ startBtn.addEventListener("click", async () => {
     return;
   }
 
+  // Defensive guard: never allow undefined in the claim URL.
+  const jobId = nextJob.id ?? nextJob.jobId ?? null;
+  if (jobId == null) {
+    console.log("[DealerPilot] ERROR: No valid job id. Full nextJob:", JSON.stringify(nextJob));
+    setStatus("No valid publishing job id returned by backend.", "err");
+    startBtn.disabled = false;
+    return;
+  }
+  console.log("[DealerPilot] Claiming job id:", jobId);
+
   setStatus("Claiming job…");
-  const claim = await send({ type: "CLAIM_JOB", jobId: nextJob.id });
+  const claim = await send({ type: "CLAIM_JOB", jobId });
   if (!claim || !claim.ok) {
     if (claim && claim.status === 409) {
       setStatus("Job was already claimed. Fetching another…", "err");
