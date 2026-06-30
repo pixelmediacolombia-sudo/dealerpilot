@@ -51,7 +51,9 @@ function diffField(
 
 export type ImportSummary = {
   feedRunId: number;
+  rawCount: number;
   imported: number;
+  errors: number;
   created: number;
   updated: number;
   removed: number;
@@ -63,8 +65,8 @@ export async function importFeed(
   xml: string,
   log: Pick<Logger, "info" | "warn">,
 ): Promise<ImportSummary> {
-  const { vehicles: parsed, rawCount } = parseInventoryXml(xml);
-  log.info({ dealerId, rawCount, parsed: parsed.length }, "Parsed inventory feed");
+  const { vehicles: parsed, rawCount, errors: parseErrors } = parseInventoryXml(xml);
+  log.info({ dealerId, rawCount, parsed: parsed.length, parseErrors }, "Parsed inventory feed");
 
   const [run] = await db
     .insert(feedRunsTable)
@@ -89,7 +91,7 @@ export async function importFeed(
         status: "error",
         finishedAt: new Date(),
         vehiclesImported: 0,
-        errorCount: 1,
+        errorCount: parseErrors + 1,
         errorMessage: message,
       })
       .where(eq(feedRunsTable.id, feedRunId));
@@ -276,14 +278,14 @@ export async function importFeed(
       vehiclesUpdated: updated,
       vehiclesRemoved: removed,
       vehiclesActive: active,
-      errorCount: 0,
+      errorCount: parseErrors,
     })
     .where(eq(feedRunsTable.id, feedRunId));
 
   log.info(
-    { dealerId, feedRunId, created, updated, removed, active },
+    { dealerId, feedRunId, rawCount, parseErrors, created, updated, removed, active },
     "Feed import complete",
   );
 
-  return { feedRunId, imported: parsed.length, created, updated, removed, active };
+  return { feedRunId, rawCount, imported: parsed.length, errors: parseErrors, created, updated, removed, active };
 }

@@ -20,22 +20,32 @@ export type NormalizedVehicle = {
   sourceRaw: string;
 };
 
+// Repeated element tag names — both bare and Google Base namespaced variants.
+// This ensures <g:image>…</g:image> appearing multiple times is parsed as an
+// array rather than the last-wins scalar fast-xml-parser default.
+const ARRAY_TAG_LOCALS = new Set(["image", "photo", "picture", "item"]);
+
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "",
   trimValues: true,
   parseTagValue: true,
-  isArray: () => false,
+  isArray: (tagName: string) => {
+    // tagName may be namespace-prefixed ("g:image"); extract the local part.
+    const local = tagName.includes(":") ? tagName.split(":").pop()! : tagName;
+    return ARRAY_TAG_LOCALS.has(local.toLowerCase());
+  },
 });
 
-// Lowercase, strip non-alphanumerics so "Stock_Number", "stockNumber", and
-// "stock-number" all collapse to "stocknumber".
+// Strip namespace prefix ("g:" → ""), lowercase, strip non-alphanumerics.
+// "g:body_style" → "bodystyle"  |  "Stock_Number" → "stocknumber"
 function normalizeKey(key: string): string {
-  return key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const colonIdx = key.indexOf(":");
+  const localName = colonIdx >= 0 ? key.slice(colonIdx + 1) : key;
+  return localName.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-// Build a flat lookup of normalizedKey -> value for one vehicle node, including
-// values carried on attributes.
+// Build a flat lookup of normalizedKey → value for one vehicle node.
 function buildLookup(node: Record<string, unknown>): Map<string, unknown> {
   const lookup = new Map<string, unknown>();
   for (const [rawKey, value] of Object.entries(node)) {
@@ -50,10 +60,21 @@ function firstString(lookup: Map<string, unknown>, keys: string[]): string | nul
     const v = lookup.get(k);
     if (v === undefined || v === null) continue;
     if (typeof v === "object") {
-      // fast-xml-parser may produce { "#text": "value", attr: ... }
-      const text = (v as Record<string, unknown>)["#text"];
+      const obj = v as Record<string, unknown>;
+      // Standard fast-xml-parser text node
+      const text = obj["#text"];
       if (text !== undefined && text !== null && String(text).trim() !== "") {
         return String(text).trim();
+      }
+      // Nested value field: handles Google Base <g:mileage><g:value>N</g:value></g:mileage>
+      // After namespace stripping the inner key becomes "value".
+      for (const [ck, cv] of Object.entries(obj)) {
+        const nk = normalizeKey(ck);
+        if (nk === "value" || nk === "text") {
+          if (cv !== null && cv !== undefined && String(cv).trim() !== "") {
+            return String(cv).trim();
+          }
+        }
       }
       continue;
     }
@@ -93,14 +114,24 @@ function extractImages(node: Record<string, unknown>): string[] {
     }
     if (typeof val === "object") {
       const obj = val as Record<string, unknown>;
-      const text =
+      // Try direct bare keys first
+      let text: unknown =
         obj["#text"] ?? obj.url ?? obj.href ?? obj.src ?? obj.value ?? obj.image;
+      // Namespace-prefixed fallback: "g:url" normalizes to "url"
+      if (text === undefined) {
+        for (const [k, v] of Object.entries(obj)) {
+          const nk = normalizeKey(k);
+          if (nk === "url" || nk === "href" || nk === "src") {
+            text = v;
+            break;
+          }
+        }
+      }
       if (text !== undefined) pushUrl(text);
     }
   };
 
-  // Container shapes: <images><image>..</image></images>, <photos><photo>..,
-  // <pictures><picture>.., plus comma-separated string lists.
+  // Container shapes: <images><image>…</image></images> etc.
   const containerKeys = ["images", "photos", "pictures", "imageurls", "photourls"];
   const itemKeys = ["image", "photo", "picture", "img", "url", "href"];
 
@@ -130,7 +161,7 @@ function extractImages(node: Record<string, unknown>): string[] {
     }
   }
 
-  // Flat repeated/single keys: <imageurl>, <photourl>, <image>.
+  // Flat repeated/single keys: <image>, <g:image> (after normalization → "image"), etc.
   const flatKeys = [
     "imageurl",
     "photourl",
@@ -161,19 +192,10 @@ function findVehicleNodes(value: unknown): Record<string, unknown>[] {
   let best: Record<string, unknown>[] = [];
 
   const looksLikeVehicle = (node: unknown): boolean => {
-    if (typeof node !== "object" || node === null || Array.isArray(node))
-      return false;
+    if (typeof node !== "object" || node === null || Array.isArray(node)) return false;
     const lookup = buildLookup(node as Record<string, unknown>);
-    const signals = [
-      "vin",
-      "make",
-      "model",
-      "year",
-      "stocknumber",
-      "stockno",
-      "stock",
-      "price",
-    ];
+    // After namespace stripping, "g:make" → "make", "g:vin" → "vin", etc.
+    const signals = ["vin", "make", "model", "year", "stocknumber", "stockno", "stock", "price", "vehicleid"];
     let hits = 0;
     for (const s of signals) if (lookup.has(s)) hits++;
     return hits >= 2;
@@ -187,7 +209,6 @@ function findVehicleNodes(value: unknown): Record<string, unknown>[] {
       return;
     }
     if (typeof val === "object" && val !== null) {
-      // A single vehicle node (feed with exactly one vehicle, not in an array).
       if (looksLikeVehicle(val) && best.length === 0) {
         best = [val as Record<string, unknown>];
       }
@@ -204,19 +225,23 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
 
   const make = firstString(lookup, ["make", "manufacturer", "brand", "makename"]);
   const model = firstString(lookup, ["model", "modelname"]);
-  let vin = firstString(lookup, ["vin", "vinnumber", "vehicleid", "vehicleidnumber"]);
+  // "g:vin" → "vin" after namespace strip; "g:vehicle_id" → "vehicleid" (stock number, VIN fallback).
+  let vin = firstString(lookup, ["vin", "vinnumber", "vehicleidnumber"]);
   const stockNumber = firstString(lookup, [
     "stocknumber",
     "stockno",
     "stock",
     "stockid",
     "dealerstocknumber",
+    "vehicleid",   // Google Base: g:vehicle_id is the stock/dealer number
   ]);
 
-  // A vehicle is only usable if we can identify it and at least name it.
   if (!make || !model) return null;
   if (!vin) {
-    if (stockNumber) vin = `STOCK-${stockNumber}`;
+    // Last-resort: use vehicleid as surrogate VIN (feeds that have no vin field)
+    const vid = firstString(lookup, ["vehicleid"]);
+    if (vid) vin = `VID-${vid}`;
+    else if (stockNumber) vin = `STOCK-${stockNumber}`;
     else return null;
   }
 
@@ -227,6 +252,8 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
     make,
     model,
     trim: firstString(lookup, ["trim", "trimlevel", "series", "subseries"]),
+    // Google Base mileage: <g:mileage><g:value>N</g:value></g:mileage>
+    // firstString handles the nested "value" child automatically.
     mileage: firstNumber(lookup, ["mileage", "miles", "odometer", "kilometers"]),
     price: firstNumber(lookup, [
       "price",
@@ -272,6 +299,7 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
 export type ParseResult = {
   vehicles: NormalizedVehicle[];
   rawCount: number;
+  errors: number;
 };
 
 export function parseInventoryXml(xml: string): ParseResult {
@@ -282,5 +310,5 @@ export function parseInventoryXml(xml: string): ParseResult {
     const normalized = normalizeNode(node);
     if (normalized) vehicles.push(normalized);
   }
-  return { vehicles, rawCount: nodes.length };
+  return { vehicles, rawCount: nodes.length, errors: nodes.length - vehicles.length };
 }
