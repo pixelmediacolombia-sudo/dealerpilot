@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import {
   generateMetaCatalogXml,
+  generateMetaTestFeedXml,
   generateMetaCatalogCsv,
   validateMetaCatalog,
   auditMetaCatalogSchema,
@@ -24,6 +25,19 @@ router.get("/channels/meta-catalog/feed.xml", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to generate Meta catalog XML");
     res.status(500).json({ error: "Failed to generate XML feed" });
+  }
+});
+
+router.get("/channels/meta-catalog/test-feed.xml", async (req, res) => {
+  try {
+    const xml = await generateMetaTestFeedXml(DEALER_ID);
+    res
+      .header("Cache-Control", "no-cache")
+      .type("application/xml")
+      .send(xml);
+  } catch (err) {
+    req.log.error({ err }, "Failed to generate Meta test feed XML");
+    res.status(500).json({ error: "Failed to generate test XML feed" });
   }
 });
 

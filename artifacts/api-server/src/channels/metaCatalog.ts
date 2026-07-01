@@ -344,10 +344,12 @@ function buildItemXml(v: MetaVehicle): string {
     .join("\n");
 
   return `  <item>
-    <g:vehicle_id>${escapeXml(v.vehicleId)}</g:vehicle_id>
+    <guid isPermaLink="false">${escapeXml(v.vehicleId)}</guid>
     <title>${cdata(v.title)}</title>
     <description>${cdata(v.description.slice(0, 5000))}</description>
     <link>${escapeXml(v.link)}</link>
+    <g:id>${escapeXml(v.vehicleId)}</g:id>
+    <g:vehicle_id>${escapeXml(v.vehicleId)}</g:vehicle_id>
     <g:image_link>${escapeXml(v.imageLink)}</g:image_link>
     ${g("price", v.price).trim()}
     ${g("availability", v.availability).trim()}
@@ -380,20 +382,61 @@ export async function generateMetaCatalogXml(
   const items = exportable.map((v) => buildItemXml(v)).join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
   <channel>
     <title>${escapeXml(dealerName)} Vehicle Inventory</title>
-    <link>${getFeedBase()}</link>
+    <link>${getFeedBase()}/</link>
     <description>${escapeXml(dealerName)} — Vehicle Inventory Feed for Meta Automotive Inventory Ads</description>
-    <!--
-      DealerPilot Meta Automotive Inventory Ads Feed
-      Schema  : RSS 2.0 + Google Base g: namespace
-      Spec    : developers.facebook.com/docs/marketing-api/auto-ads/guides/catalog/
-      Dealer  : ${escapeXml(dealerName)}
-      Exported: ${exportable.length} / ${vehicles.length} vehicles
-      Generated: ${new Date().toISOString()}
-    -->
 ${items}
+  </channel>
+</rss>`;
+}
+
+/** Minimal 1-vehicle test feed — used to isolate whether the RSS wrapper is the problem */
+export async function generateMetaTestFeedXml(dealerId: number): Promise<string> {
+  const { vehicles, dealerName } = await loadMetaVehicles(dealerId);
+  const exportable = vehicles.filter((v) => validateVehicle(v).valid);
+  const sample = exportable[0];
+
+  if (!sample) {
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>${escapeXml(dealerName)} Vehicle Inventory (Test)</title>
+    <link>${getFeedBase()}/</link>
+    <description>No exportable vehicles found</description>
+  </channel>
+</rss>`;
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>${escapeXml(dealerName)} Vehicle Inventory (Test)</title>
+    <link>${getFeedBase()}/</link>
+    <description>${escapeXml(dealerName)} — 1-Vehicle Test Feed for Meta Automotive Inventory Ads</description>
+  <item>
+    <guid isPermaLink="false">${escapeXml(sample.vehicleId)}</guid>
+    <title>${cdata(sample.title)}</title>
+    <description>${cdata(sample.description.slice(0, 5000))}</description>
+    <link>${escapeXml(sample.link)}</link>
+    <g:id>${escapeXml(sample.vehicleId)}</g:id>
+    <g:vehicle_id>${escapeXml(sample.vehicleId)}</g:vehicle_id>
+    <g:image_link>${escapeXml(sample.imageLink)}</g:image_link>
+    <g:price>${escapeXml(sample.price)}</g:price>
+    <g:availability>${escapeXml(sample.availability)}</g:availability>
+    <g:condition>${escapeXml(sample.condition)}</g:condition>
+    <g:year>${escapeXml(String(sample.year ?? ""))}</g:year>
+    <g:make>${escapeXml(sample.make)}</g:make>
+    <g:model>${escapeXml(sample.model)}</g:model>
+    <g:vin>${escapeXml(sample.vin)}</g:vin>
+    <g:street_address>${escapeXml(sample.streetAddress)}</g:street_address>
+    <g:city>${escapeXml(sample.city)}</g:city>
+    <g:region>${escapeXml(sample.region)}</g:region>
+    <g:country>${escapeXml(sample.country)}</g:country>
+    <g:postal_code>${escapeXml(sample.postalCode)}</g:postal_code>
+    <g:dealer_name>${escapeXml(sample.dealerName)}</g:dealer_name>
+  </item>
   </channel>
 </rss>`;
 }
