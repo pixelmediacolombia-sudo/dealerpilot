@@ -173,3 +173,9 @@ id = "2wc4tb2O51nr0VtG9znxd"
 uri = "file://DealerPilot-Extension-1.1.0.zip"
 type = "unspecified"
 title = "DealerPilot Extension v1.1.0"
+
+[[outputs]]
+id = "HNqUzfxvR57WW9d8N9a6X"
+uri = "file://DealerPilot-AI-v1.2.0.zip"
+type = "unspecified"
+title = "DealerPilot AI Chrome Extension v1.2.0"
