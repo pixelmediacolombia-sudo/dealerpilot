@@ -326,6 +326,57 @@ paths:
               schema:
                 $ref: "#/components/schemas/LeadList"
 
+  /extension/connect-marketplace:
+    post:
+      operationId: connectMarketplace
+      tags: [extension]
+      summary: Request the extension to open Facebook and verify Marketplace access
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectMarketplaceInput"
+      responses:
+        "200":
+          description: Request queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectMarketplaceResult"
+
+  /extension/connect-status:
+    get:
+      operationId: getExtensionConnectStatus
+      tags: [extension]
+      summary: Poll current connect-marketplace request and session state
+      responses:
+        "200":
+          description: Connect status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionConnectStatus"
+
+  /extension/session-report:
+    post:
+      operationId: reportExtensionSession
+      tags: [extension]
+      summary: Extension reports back Facebook session and Marketplace access state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionReportInput"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionReportResult"
+
   /listings:
     get:
       operationId: listListingWorkspaces
@@ -1979,16 +2030,31 @@ components:
           marketplace,
           messenger,
           openai,
+          overallConnected,
+          extensionOnline,
         ]
       properties:
         backend: { $ref: "#/components/schemas/ServiceStatus" }
         database: { $ref: "#/components/schemas/ServiceStatus" }
         xmlFeed: { $ref: "#/components/schemas/ServiceStatus" }
         chromeExtension: { $ref: "#/components/schemas/ServiceStatus" }
-        facebookSession: { $ref: "#/components/schemas/ServiceStatus" }
-        marketplace: { $ref: "#/components/schemas/ServiceStatus" }
+        facebookSession:
+          allOf:
+            - $ref: "#/components/schemas/ServiceStatus"
+            - type: object
+              properties:
+                fbLoggedIn: { type: ["boolean", "null"] }
+        marketplace:
+          allOf:
+            - $ref: "#/components/schemas/ServiceStatus"
+            - type: object
+              properties:
+                marketplaceConnected: { type: ["boolean", "null"] }
         messenger: { $ref: "#/components/schemas/ServiceStatus" }
         openai: { $ref: "#/components/schemas/ServiceStatus" }
+        overallConnected: { type: boolean }
+        extensionOnline: { type: boolean }
+        connectRequestedAt: { type: ["string", "null"] }
 
     ExtensionConnection:
       type: object
@@ -1999,11 +2065,56 @@ components:
         backendUrl: { type: ["string", "null"] }
         status: { type: string }
         lastHeartbeatAt: { type: ["string", "null"] }
+        fbLoggedIn: { type: ["boolean", "null"] }
+        marketplaceConnected: { type: ["boolean", "null"] }
+
     HeartbeatInput:
       type: object
       properties:
         backendUrl: { type: string }
         status: { type: string }
+        fbLoggedIn: { type: ["boolean", "null"] }
+        marketplaceConnected: { type: ["boolean", "null"] }
+
+    ConnectMarketplaceInput:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [marketplace, login]
+          default: marketplace
+
+    ConnectMarketplaceResult:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        connectRequestedAt: { type: ["string", "null"] }
+
+    ExtensionConnectStatus:
+      type: object
+      required: [connectRequested]
+      properties:
+        connectRequested: { type: boolean }
+        connectAction: { type: ["string", "null"] }
+        fbLoggedIn: { type: ["boolean", "null"] }
+        marketplaceConnected: { type: ["boolean", "null"] }
+
+    SessionReportInput:
+      type: object
+      required: [fbLoggedIn, marketplaceConnected]
+      properties:
+        extensionId: { type: string }
+        fbLoggedIn: { type: boolean }
+        marketplaceConnected: { type: boolean }
+
+    SessionReportResult:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        fbLoggedIn: { type: ["boolean", "null"] }
+        marketplaceConnected: { type: ["boolean", "null"] }
 
     TestListing:
       type: object

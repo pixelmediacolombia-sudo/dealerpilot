@@ -1,0 +1,153 @@
+CRITICAL UX FIX — Publish Now must be one-click automation
+
+Current problem:
+When the user clicks Publish Now, the app still exposes too many manual steps:
+- generated content screen
+- listing versions
+- regenerate listing
+- queue for publishing
+- publish this version
+- description review
+- CTA review
+
+This is too manual.
+
+Product direction:
+Publish Now means:
+DealerPilot automatically prepares the listing and creates the publishing job.
+
+The operator should NOT have to manually review generated content unless there is an issue.
+
+====================================================
+NEW PUBLISH NOW FLOW
+====================================================
+
+When user clicks Publish Now from:
+- Command Center
+- Marketplace AI
+- Marketplace Intelligence
+- vehicle recommendation card
+
+DealerPilot should automatically:
+
+1. Check if a valid listing version exists.
+2. If no listing exists:
+   - generate AI title
+   - generate AI description
+   - generate Spanish and English copy if needed
+   - apply dealer rules
+   - apply marketplace pricing rule
+   - create listing version automatically
+3. If listing exists:
+   - use latest approved or active version
+4. Create publishing job automatically.
+5. Move vehicle to Queue.
+6. Show toast:
+   “Publishing job created — ready for extension.”
+7. Provide CTA:
+   “Open Queue”
+   or
+   “Start Extension”
+
+Do NOT open the listing content review page automatically.
+
+====================================================
+LISTING REVIEW PAGE
+====================================================
+
+Keep the listing review page, but make it optional.
+
+It should be accessed through:
+- Review Listing
+- Edit Copy
+- View Version History
+
+Not through Publish Now.
+
+Publish Now = automatic.
+Review Listing = manual inspection.
+
+====================================================
+BUTTON CLEANUP
+====================================================
+
+Remove confusing primary buttons from the main flow:
+- Regenerate Listing
+- Queue for Publishing
+- Publish This Version
+
+These can exist inside overflow or the optional listing detail page.
+
+Main cards should have one primary action:
+Publish Now
+
+Secondary actions:
+- Review Listing
+- Edit Copy
+- View Vehicle
+- Regenerate
+- Version History
+
+====================================================
+PUBLISHING JOB PAYLOAD
+====================================================
+
+The publishing job must include:
+- title
+- description
+- marketplaceDisplayedPrice
+- actualVehiclePrice
+- priceMode
+- recommendedDownPayment
+- year
+- make
+- model
+- mileage
+- vehicleType
+- images
+- selectedCoverPhoto if available
+- dealerId
+- vehicleId
+- listingVersionId
+
+Chrome extension should use the job payload directly.
+
+====================================================
+AI COPY REQUIREMENTS
+====================================================
+
+Generated copy must be automatic and grounded in real vehicle data.
+
+Do not mention:
+- guaranteed approval
+- everyone approved
+- fake promotions
+- fake payment terms
+- unverified claims
+
+Use dealer strategy:
+- If actual price < $16,000: full price listing
+- If actual price >= $16,000: down payment based listing
+
+Examples:
+For $7,750 GLK:
+Marketplace price = $7,750
+Copy mentions full price.
+
+For $28,995 Tacoma:
+Marketplace price = recommended down payment
+Copy frames as “starting at $X down for qualified buyers.”
+
+====================================================
+ACCEPTANCE TEST
+====================================================
+
+1. Click Publish Now on a vehicle with no listing.
+2. App generates listing automatically.
+3. App creates publishing job automatically.
+4. Vehicle appears in Queue.
+5. User is NOT redirected to listing detail page.
+6. No manual description/version screen appears.
+7. Extension can claim the job and receive full payload.
+8. Listing detail page remains available only if user clicks Review Listing.
+9. Typecheck clean.

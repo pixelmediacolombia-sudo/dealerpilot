@@ -6,14 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ExtensionConnection {
-  id: number;
-  name: string;
-  /** @nullable */
-  backendUrl?: string | null;
-  status: string;
-  /** @nullable */
-  lastHeartbeatAt: string | null;
+export interface SessionReportResult {
+  ok: boolean;
   /** @nullable */
   fbLoggedIn?: boolean | null;
   /** @nullable */

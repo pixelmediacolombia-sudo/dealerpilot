@@ -468,7 +468,7 @@ export function SalesHub() {
               ].map((svc) => (
                 <div key={svc.key} className="flex items-center gap-1.5 bg-black/20 px-2 py-1.5 rounded border border-white/5" title={svc.name}>
                   <svc.icon className="w-3.5 h-3.5 text-muted-foreground" />
-                  <StatusPulse status={getServiceColor(connections?.[svc.key as keyof typeof connections]?.status)} />
+                  <StatusPulse status={getServiceColor((connections?.[svc.key as keyof typeof connections] as { status?: string } | null | undefined)?.status)} />
                 </div>
               ))}
               <Button variant="ghost" size="icon" className="h-7 w-7 bg-white/5 hover:bg-white/10" onClick={() => setLocation("/settings")}>

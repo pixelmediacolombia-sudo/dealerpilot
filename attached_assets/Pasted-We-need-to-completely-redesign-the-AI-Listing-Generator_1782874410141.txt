@@ -1,0 +1,246 @@
+We need to completely redesign the AI Listing Generator.
+
+The current listing generation is weak.
+
+It produces long generic paragraphs that look AI-generated and buyers never read them.
+
+DealerPilot must generate listings optimized specifically for Facebook Marketplace conversion.
+
+The AI is NOT writing a brochure.
+
+The AI is writing to maximize:
+
+• Click Through Rate
+• Message Rate
+• Save Rate
+• Marketplace ranking
+• Buyer trust
+• Lead conversion
+
+----------------------------------------------------
+GLOBAL RULES
+----------------------------------------------------
+
+Never generate long paragraphs.
+
+Never generate filler.
+
+Never explain obvious vehicle specs.
+
+Never repeat year/make/model multiple times.
+
+Never write like ChatGPT.
+
+Write like the best Marketplace seller in America.
+
+----------------------------------------------------
+TITLE
+----------------------------------------------------
+
+Maximum 70 characters.
+
+Examples:
+
+🔥 2019 Toyota Camry • Clean Title • $2,500 Down
+
+🔥 Honda Civic Sport • Low Miles • Financing Available
+
+🚗 2021 Ford F150 XLT • Like New
+
+The title must immediately attract attention.
+
+----------------------------------------------------
+DESCRIPTION STRUCTURE
+----------------------------------------------------
+
+The description must always follow this structure.
+
+SECTION 1
+
+HOOK
+
+Maximum 2 lines.
+
+Examples
+
+🔥 Looking for a reliable SUV?
+
+🔥 Financing available today.
+
+🔥 Drive home today.
+
+🔥 Ready for work.
+
+🔥 Perfect family SUV.
+
+Never exceed 2 lines.
+
+----------------------------------------------------
+
+SECTION 2
+
+WHY BUY THIS CAR
+
+Use emojis.
+
+Maximum 5 bullets.
+
+Examples
+
+✅ Clean Title
+
+✅ Financing Available
+
+✅ Low Miles
+
+✅ Backup Camera
+
+✅ Apple CarPlay
+
+✅ Leather Seats
+
+✅ Third Row
+
+✅ AWD
+
+Only mention important selling points.
+
+----------------------------------------------------
+
+SECTION 3
+
+BUYER BENEFIT
+
+One short paragraph.
+
+Example
+
+Perfect for daily driving, work, commuting or family trips.
+
+Do NOT explain obvious specifications.
+
+----------------------------------------------------
+
+SECTION 4
+
+CALL TO ACTION
+
+Always emotional.
+
+Examples
+
+📩 Send us a message today!
+
+🚗 Come test drive it today.
+
+🔥 This one won't last long.
+
+⏳ First come, first served.
+
+----------------------------------------------------
+
+ENGLISH STYLE
+
+Friendly
+
+Modern
+
+Short
+
+High energy
+
+Maximum 12 lines total.
+
+----------------------------------------------------
+SPANISH VERSION
+----------------------------------------------------
+
+Do NOT translate literally.
+
+Rewrite naturally for Hispanic buyers.
+
+Use Hispanic sales language.
+
+Examples
+
+🔥 ¿Buscas una SUV confiable?
+
+✅ Financiamiento disponible
+
+✅ Bajo enganche
+
+📩 Escríbenos hoy mismo.
+
+🚗 Ven a manejarla.
+
+The Spanish version must feel native.
+
+----------------------------------------------------
+
+USE EMOJIS
+
+Allowed:
+
+🔥
+
+🚗
+
+✅
+
+💥
+
+📩
+
+💰
+
+⚡
+
+⏳
+
+Only where they improve readability.
+
+Never spam emojis.
+
+----------------------------------------------------
+
+CTA
+
+Always finish with ONE CTA.
+
+Never finish with a paragraph.
+
+----------------------------------------------------
+
+REMOVE
+
+Remove:
+
+Long specifications
+
+Huge feature lists
+
+Repeated model names
+
+Generic AI wording
+
+"This vehicle features..."
+
+"This is a great option..."
+
+"The exterior color..."
+
+Nobody cares.
+
+Sell the vehicle.
+
+----------------------------------------------------
+
+OUTPUT FORMAT
+
+TITLE
+
+ENGLISH DESCRIPTION
+
+SPANISH DESCRIPTION
+
+Nothing else.

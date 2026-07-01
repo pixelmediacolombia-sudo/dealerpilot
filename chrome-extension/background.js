@@ -2,6 +2,8 @@ const DEFAULT_BACKEND_URL =
   "https://ec193748-b4c5-4148-b6bc-c48c04b54f9f-00-3kog7rk919p6z.janeway.replit.dev";
 
 const MARKETPLACE_CREATE_URL = "https://www.facebook.com/marketplace/create/vehicle";
+const FACEBOOK_LOGIN_URL =
+  "https://www.facebook.com/login/?next=%2Fmarketplace%2Fcreate%2Fvehicle";
 
 async function getBackendUrl() {
   const { backendUrl } = await chrome.storage.local.get("backendUrl");
@@ -66,9 +68,18 @@ const handlers = {
   async PING() {
     const base = await getBackendUrl();
     await apiGet("/api/healthz");
+    const { fbLoggedIn, marketplaceConnected } = await chrome.storage.local.get([
+      "fbLoggedIn",
+      "marketplaceConnected",
+    ]);
     const now = new Date().toISOString();
     try {
-      await apiPost("/api/extension/heartbeat", { backendUrl: base, status: "online" });
+      await apiPost("/api/extension/heartbeat", {
+        backendUrl: base,
+        status: "online",
+        fbLoggedIn: fbLoggedIn ?? null,
+        marketplaceConnected: marketplaceConnected ?? null,
+      });
       await chrome.storage.local.set({ lastHeartbeat: now });
     } catch (heartbeatErr) {
       console.warn("[DealerPilot AI] heartbeat failed", heartbeatErr);
@@ -145,8 +156,6 @@ const handlers = {
     return apiGet(`/api/publishing/jobs/assigned?extensionId=${encodeURIComponent(extensionId)}`);
   },
 
-  // Full auto-start flow triggered by the alarm poll.
-  // Claims the job, sets activeJob in storage, opens Facebook Marketplace.
   async AUTO_START_ASSIGNED(message) {
     const extensionId = await getExtensionId();
     const job = await apiPost(`/api/publishing/jobs/${message.jobId}/claim`, { extensionId });
@@ -165,16 +174,60 @@ const handlers = {
       extensionId,
     });
 
-    const tab = await chrome.tabs.create({ url: MARKETPLACE_CREATE_URL });
+    const tab = await chrome.tabs.create({ url: MARKETPLACE_CREATE_URL, active: false });
     return { ok: true, jobId: job.id, tabId: tab.id };
   },
 
+  // ---- Marketplace Connection flow ----
+
+  // Opens the appropriate Facebook URL so content.js can verify session + marketplace access.
+  // action: 'marketplace' → opens create/vehicle form
+  // action: 'login'       → opens login page (with marketplace as next)
+  async CONNECT_MARKETPLACE(message) {
+    const action = message?.action || "marketplace";
+    const url = action === "login" ? FACEBOOK_LOGIN_URL : MARKETPLACE_CREATE_URL;
+    const tab = await chrome.tabs.create({ url, active: true });
+    await chrome.storage.local.set({ connectTabId: tab.id });
+    return { ok: true, tabId: tab.id, action };
+  },
+
+  // Called by content.js after it has detected FB session state on a Facebook page.
+  async FB_SESSION_REPORT(message) {
+    const { fbLoggedIn, marketplaceConnected } = message;
+    await chrome.storage.local.set({ fbLoggedIn, marketplaceConnected });
+    const extensionId = await getExtensionId();
+    try {
+      await apiPost("/api/extension/session-report", {
+        extensionId,
+        fbLoggedIn: !!fbLoggedIn,
+        marketplaceConnected: !!marketplaceConnected,
+      });
+    } catch (err) {
+      console.warn("[DealerPilot AI] session-report failed", err);
+    }
+    return { ok: true };
+  },
+
+  // Opens the Facebook login page (with marketplace as the next URL).
+  async OPEN_FACEBOOK_LOGIN() {
+    const tab = await chrome.tabs.create({ url: FACEBOOK_LOGIN_URL, active: true });
+    return { tabId: tab.id };
+  },
+
   // Called by the alarm. Skips if an active job is already in progress.
-  // Checks assigned jobs first (batch/app-controlled), then falls back to the
-  // general queue so "Publish Now" jobs are picked up automatically.
   async POLL_ASSIGNED_JOB() {
     const { activeJob } = await chrome.storage.local.get("activeJob");
     if (activeJob) return { skipped: true };
+
+    // 0. Check for a pending connect-marketplace request from the app
+    try {
+      const connectStatus = await apiGet("/api/extension/connect-status");
+      if (connectStatus.connectRequested) {
+        return handlers.CONNECT_MARKETPLACE({ action: connectStatus.connectAction || "marketplace" });
+      }
+    } catch {
+      // ignore — don't block job polling
+    }
 
     const extensionId = await getExtensionId();
 
@@ -223,6 +276,9 @@ const handlers = {
       "messengerDetected",
       "workflowStep",
       "workflowStepAt",
+      "fbLoggedIn",
+      "marketplaceConnected",
+      "connectTabId",
     ];
     const stored = await chrome.storage.local.get(keys);
     const base = await getBackendUrl();
@@ -241,6 +297,9 @@ const handlers = {
       messengerDetected: stored.messengerDetected || false,
       workflowStep: stored.workflowStep || null,
       workflowStepAt: stored.workflowStepAt || null,
+      fbLoggedIn: stored.fbLoggedIn ?? null,
+      marketplaceConnected: stored.marketplaceConnected ?? null,
+      connectTabId: stored.connectTabId || null,
     };
   },
 
@@ -284,8 +343,6 @@ const handlers = {
 };
 
 // ---- App-controlled polling alarm ----
-// Creates a 15-second repeating alarm so the service worker polls for jobs
-// assigned by the DealerPilot app even when the popup is closed.
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("pollAssigned", { periodInMinutes: 0.25 });
 });

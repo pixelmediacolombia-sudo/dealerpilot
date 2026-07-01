@@ -5,12 +5,9 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ServiceStatus } from './serviceStatus';
 
-export interface HeartbeatInput {
-  backendUrl?: string;
-  status?: string;
-  /** @nullable */
-  fbLoggedIn?: boolean | null;
+export type ConnectionStatusMarketplace = ServiceStatus & ({
   /** @nullable */
   marketplaceConnected?: boolean | null;
-}
+});

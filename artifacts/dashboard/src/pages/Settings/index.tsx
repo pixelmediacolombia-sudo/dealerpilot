@@ -282,7 +282,7 @@ export function Settings() {
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {services.map(({ key, name, icon: Icon, description }) => {
-                  const svc = connections?.[key as keyof typeof connections];
+                  const svc = connections?.[key as keyof typeof connections] as { status?: string; lastHeartbeatAt?: string | null; backendUrl?: string | null; detail?: string | null } | null | undefined;
                   const config = getStatusConfig(svc?.status || "unknown");
 
                   return (

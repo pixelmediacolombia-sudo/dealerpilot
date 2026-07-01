@@ -93,9 +93,42 @@ router.post("/extension/message-context", async (req, res) => {
   res.json({ suggestedReply, lead });
 });
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+async function getExtRow() {
+  const [ext] = await db
+    .select()
+    .from(extensionConnectionsTable)
+    .where(eq(extensionConnectionsTable.name, EXTENSION_NAME));
+  return ext ?? null;
+}
+
+async function upsertExtRow(
+  values: Partial<typeof extensionConnectionsTable.$inferInsert>,
+) {
+  const existing = await getExtRow();
+  if (existing) {
+    const [row] = await db
+      .update(extensionConnectionsTable)
+      .set(values)
+      .where(eq(extensionConnectionsTable.id, existing.id))
+      .returning();
+    return row!;
+  }
+  const [row] = await db
+    .insert(extensionConnectionsTable)
+    .values({ name: EXTENSION_NAME, ...values })
+    .returning();
+  return row!;
+}
+
+// ── Heartbeat ─────────────────────────────────────────────────────────────────
+
 const HeartbeatBody = z.object({
   backendUrl: z.string().optional(),
   status: z.string().optional(),
+  fbLoggedIn: z.boolean().nullable().optional(),
+  marketplaceConnected: z.boolean().nullable().optional(),
 });
 
 router.post("/extension/heartbeat", async (req, res) => {
@@ -104,46 +137,105 @@ router.post("/extension/heartbeat", async (req, res) => {
     res.status(400).json({ error: "Invalid heartbeat" });
     return;
   }
-  const now = new Date();
-  const status = parsed.data.status ?? "online";
+  const { status = "online", backendUrl, fbLoggedIn, marketplaceConnected } =
+    parsed.data;
 
-  const [existing] = await db
-    .select()
-    .from(extensionConnectionsTable)
-    .where(eq(extensionConnectionsTable.name, EXTENSION_NAME));
+  const existing = await getExtRow();
+  const updates: Partial<typeof extensionConnectionsTable.$inferInsert> = {
+    status,
+    lastHeartbeatAt: new Date(),
+  };
+  if (backendUrl !== undefined) updates.backendUrl = backendUrl;
+  if (fbLoggedIn !== undefined) updates.fbLoggedIn = fbLoggedIn;
+  if (marketplaceConnected !== undefined)
+    updates.marketplaceConnected = marketplaceConnected;
+  // Back-fill backendUrl from existing if not provided
+  if (!backendUrl && existing?.backendUrl)
+    updates.backendUrl = existing.backendUrl;
 
-  let row;
-  if (existing) {
-    [row] = await db
-      .update(extensionConnectionsTable)
-      .set({
-        status,
-        backendUrl: parsed.data.backendUrl ?? existing.backendUrl,
-        lastHeartbeatAt: now,
-      })
-      .where(eq(extensionConnectionsTable.id, existing.id))
-      .returning();
-  } else {
-    [row] = await db
-      .insert(extensionConnectionsTable)
-      .values({
-        name: EXTENSION_NAME,
-        status,
-        backendUrl: parsed.data.backendUrl ?? null,
-        lastHeartbeatAt: now,
-      })
-      .returning();
-  }
+  const row = await upsertExtRow(updates);
 
-  req.log.info("Recorded extension heartbeat");
+  req.log.info({ fbLoggedIn, marketplaceConnected }, "Recorded extension heartbeat");
   res.json({
-    id: row!.id,
-    name: row!.name,
-    backendUrl: row!.backendUrl ?? null,
-    status: row!.status,
-    lastHeartbeatAt: row!.lastHeartbeatAt ? row!.lastHeartbeatAt.toISOString() : null,
+    id: row.id,
+    name: row.name,
+    backendUrl: row.backendUrl ?? null,
+    status: row.status,
+    lastHeartbeatAt: row.lastHeartbeatAt ? row.lastHeartbeatAt.toISOString() : null,
+    fbLoggedIn: row.fbLoggedIn ?? null,
+    marketplaceConnected: row.marketplaceConnected ?? null,
   });
 });
+
+// ── Connect Marketplace ────────────────────────────────────────────────────────
+
+const ConnectMarketplaceBody = z.object({
+  action: z.enum(["marketplace", "login"]).optional().default("marketplace"),
+});
+
+router.post("/extension/connect-marketplace", async (req, res) => {
+  const parsed = ConnectMarketplaceBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+  const row = await upsertExtRow({
+    connectRequestedAt: new Date(),
+    connectAction: parsed.data.action,
+  });
+  req.log.info({ action: parsed.data.action }, "Connect-marketplace requested");
+  res.json({ ok: true, connectRequestedAt: row.connectRequestedAt?.toISOString() ?? null });
+});
+
+// ── Connect Status (polled by extension alarm) ─────────────────────────────────
+
+router.get("/extension/connect-status", async (req, res) => {
+  const ext = await getExtRow();
+  const CONNECT_WINDOW_MS = 5 * 60 * 1000; // ignore stale requests > 5 min
+  const connectRequested =
+    !!ext?.connectRequestedAt &&
+    Date.now() - ext.connectRequestedAt.getTime() < CONNECT_WINDOW_MS;
+
+  res.json({
+    connectRequested,
+    connectAction: connectRequested ? (ext?.connectAction ?? "marketplace") : null,
+    fbLoggedIn: ext?.fbLoggedIn ?? null,
+    marketplaceConnected: ext?.marketplaceConnected ?? null,
+  });
+});
+
+// ── Session Report (from extension after visiting Facebook) ────────────────────
+
+const SessionReportBody = z.object({
+  extensionId: z.string().optional(),
+  fbLoggedIn: z.boolean(),
+  marketplaceConnected: z.boolean(),
+});
+
+router.post("/extension/session-report", async (req, res) => {
+  const parsed = SessionReportBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid session report" });
+    return;
+  }
+  const { fbLoggedIn, marketplaceConnected } = parsed.data;
+
+  const row = await upsertExtRow({
+    fbLoggedIn,
+    marketplaceConnected,
+    connectRequestedAt: null, // clear the request
+    connectAction: null,
+  });
+
+  req.log.info({ fbLoggedIn, marketplaceConnected }, "Extension session report saved");
+  res.json({
+    ok: true,
+    fbLoggedIn: row.fbLoggedIn ?? null,
+    marketplaceConnected: row.marketplaceConnected ?? null,
+  });
+});
+
+// ── Leads ─────────────────────────────────────────────────────────────────────
 
 router.get("/extension/leads", async (req, res) => {
   const leads = await db

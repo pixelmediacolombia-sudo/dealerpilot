@@ -193,15 +193,29 @@ export interface ServiceStatus {
   backendUrl?: string | null;
 }
 
+export type ConnectionStatusFacebookSession = ServiceStatus & ({
+  /** @nullable */
+  fbLoggedIn?: boolean | null;
+});
+
+export type ConnectionStatusMarketplace = ServiceStatus & ({
+  /** @nullable */
+  marketplaceConnected?: boolean | null;
+});
+
 export interface ConnectionStatus {
   backend: ServiceStatus;
   database: ServiceStatus;
   xmlFeed: ServiceStatus;
   chromeExtension: ServiceStatus;
-  facebookSession: ServiceStatus;
-  marketplace: ServiceStatus;
+  facebookSession: ConnectionStatusFacebookSession;
+  marketplace: ConnectionStatusMarketplace;
   messenger: ServiceStatus;
   openai: ServiceStatus;
+  overallConnected: boolean;
+  extensionOnline: boolean;
+  /** @nullable */
+  connectRequestedAt?: string | null;
 }
 
 export interface ExtensionConnection {
@@ -212,11 +226,61 @@ export interface ExtensionConnection {
   status: string;
   /** @nullable */
   lastHeartbeatAt: string | null;
+  /** @nullable */
+  fbLoggedIn?: boolean | null;
+  /** @nullable */
+  marketplaceConnected?: boolean | null;
 }
 
 export interface HeartbeatInput {
   backendUrl?: string;
   status?: string;
+  /** @nullable */
+  fbLoggedIn?: boolean | null;
+  /** @nullable */
+  marketplaceConnected?: boolean | null;
+}
+
+export type ConnectMarketplaceInputAction = typeof ConnectMarketplaceInputAction[keyof typeof ConnectMarketplaceInputAction];
+
+
+export const ConnectMarketplaceInputAction = {
+  marketplace: 'marketplace',
+  login: 'login',
+} as const;
+
+export interface ConnectMarketplaceInput {
+  action?: ConnectMarketplaceInputAction;
+}
+
+export interface ConnectMarketplaceResult {
+  ok: boolean;
+  /** @nullable */
+  connectRequestedAt?: string | null;
+}
+
+export interface ExtensionConnectStatus {
+  connectRequested: boolean;
+  /** @nullable */
+  connectAction?: string | null;
+  /** @nullable */
+  fbLoggedIn?: boolean | null;
+  /** @nullable */
+  marketplaceConnected?: boolean | null;
+}
+
+export interface SessionReportInput {
+  extensionId?: string;
+  fbLoggedIn: boolean;
+  marketplaceConnected: boolean;
+}
+
+export interface SessionReportResult {
+  ok: boolean;
+  /** @nullable */
+  fbLoggedIn?: boolean | null;
+  /** @nullable */
+  marketplaceConnected?: boolean | null;
 }
 
 export interface TestListing {

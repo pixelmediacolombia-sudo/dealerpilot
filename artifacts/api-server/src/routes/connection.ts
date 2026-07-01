@@ -57,6 +57,11 @@ router.get("/connection-center", async (req, res) => {
     lastHeartbeatAt: string | null;
     backendUrl: string | null;
   };
+
+  const extOnline =
+    !!ext?.lastHeartbeatAt &&
+    Date.now() - ext.lastHeartbeatAt.getTime() < HEARTBEAT_WINDOW_MS;
+
   if (!ext || !ext.lastHeartbeatAt) {
     chromeExtension = {
       status: "offline",
@@ -65,10 +70,9 @@ router.get("/connection-center", async (req, res) => {
       backendUrl: ext?.backendUrl ?? null,
     };
   } else {
-    const online = Date.now() - ext.lastHeartbeatAt.getTime() < HEARTBEAT_WINDOW_MS;
     chromeExtension = {
-      status: online ? "connected" : "offline",
-      detail: online
+      status: extOnline ? "connected" : "offline",
+      detail: extOnline
         ? "Extension reporting in"
         : "No recent heartbeat from the extension",
       lastHeartbeatAt: ext.lastHeartbeatAt.toISOString(),
@@ -76,19 +80,83 @@ router.get("/connection-center", async (req, res) => {
     };
   }
 
+  // ── Facebook session & Marketplace (real state from extension) ───────────────
+  const fbLoggedIn = ext?.fbLoggedIn ?? null;
+  const marketplaceConnected = ext?.marketplaceConnected ?? null;
+
+  let facebookSession: {
+    status: string;
+    detail: string;
+    fbLoggedIn: boolean | null;
+  };
+  if (!extOnline) {
+    facebookSession = {
+      status: "unknown",
+      detail: "Extension offline — can't verify Facebook session",
+      fbLoggedIn: null,
+    };
+  } else if (fbLoggedIn === null) {
+    facebookSession = {
+      status: "unknown",
+      detail: "Extension hasn't visited Facebook yet",
+      fbLoggedIn: null,
+    };
+  } else if (fbLoggedIn) {
+    facebookSession = {
+      status: "connected",
+      detail: "Facebook session active",
+      fbLoggedIn: true,
+    };
+  } else {
+    facebookSession = {
+      status: "error",
+      detail: "Not logged in to Facebook",
+      fbLoggedIn: false,
+    };
+  }
+
+  let marketplace: {
+    status: string;
+    detail: string;
+    marketplaceConnected: boolean | null;
+  };
+  if (!extOnline) {
+    marketplace = {
+      status: "unknown",
+      detail: "Extension offline — can't verify Marketplace access",
+      marketplaceConnected: null,
+    };
+  } else if (marketplaceConnected === null) {
+    marketplace = {
+      status: "unknown",
+      detail: "Marketplace access not yet verified",
+      marketplaceConnected: null,
+    };
+  } else if (marketplaceConnected) {
+    marketplace = {
+      status: "connected",
+      detail: "Marketplace create form is accessible",
+      marketplaceConnected: true,
+    };
+  } else {
+    marketplace = {
+      status: "error",
+      detail: "Marketplace not accessible — check Facebook login",
+      marketplaceConnected: false,
+    };
+  }
+
+  // Overall marketplace connection status
+  const connectRequestedAt = ext?.connectRequestedAt ?? null;
+  const overallConnected = extOnline && fbLoggedIn === true && marketplaceConnected === true;
+
   res.json({
     backend: { status: "connected", detail: "API server responding" },
     database,
     xmlFeed,
     chromeExtension,
-    facebookSession: {
-      status: "unknown",
-      detail: "No Facebook session linked in this sprint",
-    },
-    marketplace: {
-      status: "coming_soon",
-      detail: "Marketplace publishing arrives in a future sprint",
-    },
+    facebookSession,
+    marketplace,
     messenger: {
       status: "coming_soon",
       detail: "Messenger AI arrives in a future sprint",
@@ -97,6 +165,10 @@ router.get("/connection-center", async (req, res) => {
       status: "coming_soon",
       detail: "AI Studio arrives in a future sprint",
     },
+    // Summary fields for the connection panel
+    overallConnected,
+    extensionOnline: extOnline,
+    connectRequestedAt: connectRequestedAt ? connectRequestedAt.toISOString() : null,
   });
 });
 

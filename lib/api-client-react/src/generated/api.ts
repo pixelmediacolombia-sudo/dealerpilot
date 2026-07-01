@@ -34,6 +34,8 @@ import type {
   CancelPublishingJobBody,
   ClaimJobInput,
   CompleteJobInput,
+  ConnectMarketplaceInput,
+  ConnectMarketplaceResult,
   ConnectionStatus,
   ConversationDetailResponse,
   ConversationIntakeInput,
@@ -56,6 +58,7 @@ import type {
   DryRunInput,
   DryRunResponse,
   ErrorResponse,
+  ExtensionConnectStatus,
   ExtensionConnection,
   ExtensionDiagnosticsResponse,
   FailJobInput,
@@ -118,6 +121,8 @@ import type {
   PublishingJobPayload,
   QueueListingInput,
   SeedMarketplaceIntelligence200,
+  SessionReportInput,
+  SessionReportResult,
   SimulatorRunBody,
   SimulatorRunResponse,
   SimulatorScenariosResponse,
@@ -1363,6 +1368,223 @@ export function useGetLeads<TData = Awaited<ReturnType<typeof getLeads>>, TError
 
 
 
+
+export const getConnectMarketplaceUrl = () => {
+
+
+
+
+  return `/api/extension/connect-marketplace`
+}
+
+/**
+ * @summary Request the extension to open Facebook and verify Marketplace access
+ */
+export const connectMarketplace = async (connectMarketplaceInput?: ConnectMarketplaceInput, options?: RequestInit): Promise<ConnectMarketplaceResult> => {
+
+  return customFetch<ConnectMarketplaceResult>(getConnectMarketplaceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(connectMarketplaceInput)
+  }
+);}
+
+
+
+
+export const getConnectMarketplaceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof connectMarketplace>>, TError,{data?: BodyType<ConnectMarketplaceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof connectMarketplace>>, TError,{data?: BodyType<ConnectMarketplaceInput>}, TContext> => {
+
+const mutationKey = ['connectMarketplace'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof connectMarketplace>>, {data?: BodyType<ConnectMarketplaceInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  connectMarketplace(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConnectMarketplaceMutationResult = NonNullable<Awaited<ReturnType<typeof connectMarketplace>>>
+    export type ConnectMarketplaceMutationBody = BodyType<ConnectMarketplaceInput> | undefined
+    export type ConnectMarketplaceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Request the extension to open Facebook and verify Marketplace access
+ */
+export const useConnectMarketplace = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof connectMarketplace>>, TError,{data?: BodyType<ConnectMarketplaceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof connectMarketplace>>,
+        TError,
+        {data?: BodyType<ConnectMarketplaceInput>},
+        TContext
+      > => {
+      return useMutation(getConnectMarketplaceMutationOptions(options));
+    }
+
+export const getGetExtensionConnectStatusUrl = () => {
+
+
+
+
+  return `/api/extension/connect-status`
+}
+
+/**
+ * @summary Poll current connect-marketplace request and session state
+ */
+export const getExtensionConnectStatus = async ( options?: RequestInit): Promise<ExtensionConnectStatus> => {
+
+  return customFetch<ExtensionConnectStatus>(getGetExtensionConnectStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetExtensionConnectStatusQueryKey = () => {
+    return [
+    `/api/extension/connect-status`
+    ] as const;
+    }
+
+
+export const getGetExtensionConnectStatusQueryOptions = <TData = Awaited<ReturnType<typeof getExtensionConnectStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExtensionConnectStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetExtensionConnectStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExtensionConnectStatus>>> = ({ signal }) => getExtensionConnectStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExtensionConnectStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetExtensionConnectStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getExtensionConnectStatus>>>
+export type GetExtensionConnectStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Poll current connect-marketplace request and session state
+ */
+
+export function useGetExtensionConnectStatus<TData = Awaited<ReturnType<typeof getExtensionConnectStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExtensionConnectStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetExtensionConnectStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReportExtensionSessionUrl = () => {
+
+
+
+
+  return `/api/extension/session-report`
+}
+
+/**
+ * @summary Extension reports back Facebook session and Marketplace access state
+ */
+export const reportExtensionSession = async (sessionReportInput: SessionReportInput, options?: RequestInit): Promise<SessionReportResult> => {
+
+  return customFetch<SessionReportResult>(getReportExtensionSessionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sessionReportInput)
+  }
+);}
+
+
+
+
+export const getReportExtensionSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportExtensionSession>>, TError,{data: BodyType<SessionReportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportExtensionSession>>, TError,{data: BodyType<SessionReportInput>}, TContext> => {
+
+const mutationKey = ['reportExtensionSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportExtensionSession>>, {data: BodyType<SessionReportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  reportExtensionSession(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportExtensionSessionMutationResult = NonNullable<Awaited<ReturnType<typeof reportExtensionSession>>>
+    export type ReportExtensionSessionMutationBody = BodyType<SessionReportInput>
+    export type ReportExtensionSessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Extension reports back Facebook session and Marketplace access state
+ */
+export const useReportExtensionSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportExtensionSession>>, TError,{data: BodyType<SessionReportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportExtensionSession>>,
+        TError,
+        {data: BodyType<SessionReportInput>},
+        TContext
+      > => {
+      return useMutation(getReportExtensionSessionMutationOptions(options));
+    }
 
 export const getListListingWorkspacesUrl = (params?: ListListingWorkspacesParams,) => {
   const normalizedParams = new URLSearchParams();

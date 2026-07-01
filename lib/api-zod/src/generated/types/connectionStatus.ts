@@ -5,6 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ConnectionStatusFacebookSession } from './connectionStatusFacebookSession';
+import type { ConnectionStatusMarketplace } from './connectionStatusMarketplace';
 import type { ServiceStatus } from './serviceStatus';
 
 export interface ConnectionStatus {
@@ -12,8 +14,12 @@ export interface ConnectionStatus {
   database: ServiceStatus;
   xmlFeed: ServiceStatus;
   chromeExtension: ServiceStatus;
-  facebookSession: ServiceStatus;
-  marketplace: ServiceStatus;
+  facebookSession: ConnectionStatusFacebookSession;
+  marketplace: ConnectionStatusMarketplace;
   messenger: ServiceStatus;
   openai: ServiceStatus;
+  overallConnected: boolean;
+  extensionOnline: boolean;
+  /** @nullable */
+  connectRequestedAt?: string | null;
 }

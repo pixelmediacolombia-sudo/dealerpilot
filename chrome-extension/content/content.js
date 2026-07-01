@@ -363,6 +363,17 @@
     const isMessengerNow =
       hostname.includes("messenger.com") || /\/messages\b/.test(pathname);
 
+    // ---- FB session detection ----
+    // Login page: Facebook redirects unauthenticated users here.
+    const isLoginPage =
+      /^\/(login(\.php)?|checkpoint|recover|two_step_verification|privacy\/consent)/.test(pathname) ||
+      location.search.includes("reauth=1") ||
+      location.search.includes("next=") && pathname === "/login.php";
+    const fbLoggedIn = hostname.includes("facebook.com") && !isLoginPage;
+    // Marketplace create: if we load this URL without being bounced to login, session is live
+    const isMarketplaceCreate = pathname.startsWith("/marketplace/create");
+    const marketplaceConnected = isMarketplaceCreate && fbLoggedIn;
+
     chrome.storage.local
       .set({
         marketplaceDetected:   isMarketplaceNow,
@@ -370,10 +381,27 @@
         marketplaceUrl:        isMarketplaceNow ? href : null,
         marketplaceDetectedAt: now,
         messengerDetected:     isMessengerNow,
+        fbLoggedIn,
+        marketplaceConnected,
       })
       .catch(() => {});
 
+    // Report session state to the service worker, which posts it to the backend.
+    // Only send if we're actually on a Facebook page (not messenger.com).
+    if (hostname.includes("facebook.com")) {
+      try {
+        chrome.runtime.sendMessage({
+          type: "FB_SESSION_REPORT",
+          fbLoggedIn,
+          marketplaceConnected,
+        });
+      } catch (_e) {
+        // Context may be invalidated; the next heartbeat will carry the state.
+      }
+    }
+
     log("Marketplace detection updated:", isMarketplaceNow, "|", href);
+    log("FB session:", fbLoggedIn ? "logged-in" : "NOT logged in", "| marketplace create:", marketplaceConnected);
 
     return { isMarketplaceNow, isMessengerNow };
   }

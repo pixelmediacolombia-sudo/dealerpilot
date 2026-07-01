@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -8,6 +8,10 @@ export const extensionConnectionsTable = pgTable("extension_connections", {
   backendUrl: text("backend_url"),
   status: text("status").notNull().default("offline"),
   lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }),
+  fbLoggedIn: boolean("fb_logged_in"),
+  marketplaceConnected: boolean("marketplace_connected"),
+  connectRequestedAt: timestamp("connect_requested_at", { withTimezone: true }),
+  connectAction: text("connect_action"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

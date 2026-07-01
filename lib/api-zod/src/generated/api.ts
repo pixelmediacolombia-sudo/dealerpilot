@@ -331,13 +331,17 @@ export const GetConnectionStatusResponse = zod.object({
   "detail": zod.string().nullish(),
   "lastHeartbeatAt": zod.string().nullish(),
   "backendUrl": zod.string().nullish()
-}),
+}).and(zod.object({
+  "fbLoggedIn": zod.boolean().nullish()
+})),
   "marketplace": zod.object({
   "status": zod.string(),
   "detail": zod.string().nullish(),
   "lastHeartbeatAt": zod.string().nullish(),
   "backendUrl": zod.string().nullish()
-}),
+}).and(zod.object({
+  "marketplaceConnected": zod.boolean().nullish()
+})),
   "messenger": zod.object({
   "status": zod.string(),
   "detail": zod.string().nullish(),
@@ -349,7 +353,10 @@ export const GetConnectionStatusResponse = zod.object({
   "detail": zod.string().nullish(),
   "lastHeartbeatAt": zod.string().nullish(),
   "backendUrl": zod.string().nullish()
-})
+}),
+  "overallConnected": zod.boolean(),
+  "extensionOnline": zod.boolean(),
+  "connectRequestedAt": zod.string().nullish()
 })
 
 
@@ -358,7 +365,9 @@ export const GetConnectionStatusResponse = zod.object({
  */
 export const RecordHeartbeatBody = zod.object({
   "backendUrl": zod.string().optional(),
-  "status": zod.string().optional()
+  "status": zod.string().optional(),
+  "fbLoggedIn": zod.boolean().nullish(),
+  "marketplaceConnected": zod.boolean().nullish()
 })
 
 export const RecordHeartbeatResponse = zod.object({
@@ -366,7 +375,9 @@ export const RecordHeartbeatResponse = zod.object({
   "name": zod.string(),
   "backendUrl": zod.string().nullish(),
   "status": zod.string(),
-  "lastHeartbeatAt": zod.string().nullable()
+  "lastHeartbeatAt": zod.string().nullable(),
+  "fbLoggedIn": zod.boolean().nullish(),
+  "marketplaceConnected": zod.boolean().nullish()
 })
 
 
@@ -461,6 +472,48 @@ export const GetLeadsResponse = zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 }))
+})
+
+
+/**
+ * @summary Request the extension to open Facebook and verify Marketplace access
+ */
+export const connectMarketplaceBodyActionDefault = `marketplace`;
+
+export const ConnectMarketplaceBody = zod.object({
+  "action": zod.enum(['marketplace', 'login']).default(connectMarketplaceBodyActionDefault)
+})
+
+export const ConnectMarketplaceResponse = zod.object({
+  "ok": zod.boolean(),
+  "connectRequestedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Poll current connect-marketplace request and session state
+ */
+export const GetExtensionConnectStatusResponse = zod.object({
+  "connectRequested": zod.boolean(),
+  "connectAction": zod.string().nullish(),
+  "fbLoggedIn": zod.boolean().nullish(),
+  "marketplaceConnected": zod.boolean().nullish()
+})
+
+
+/**
+ * @summary Extension reports back Facebook session and Marketplace access state
+ */
+export const ReportExtensionSessionBody = zod.object({
+  "extensionId": zod.string().optional(),
+  "fbLoggedIn": zod.boolean(),
+  "marketplaceConnected": zod.boolean()
+})
+
+export const ReportExtensionSessionResponse = zod.object({
+  "ok": zod.boolean(),
+  "fbLoggedIn": zod.boolean().nullish(),
+  "marketplaceConnected": zod.boolean().nullish()
 })
 
 
@@ -1727,7 +1780,9 @@ export const GetExtensionDiagnosticsResponse = zod.object({
   "name": zod.string(),
   "backendUrl": zod.string().nullish(),
   "status": zod.string(),
-  "lastHeartbeatAt": zod.string().nullable()
+  "lastHeartbeatAt": zod.string().nullable(),
+  "fbLoggedIn": zod.boolean().nullish(),
+  "marketplaceConnected": zod.boolean().nullish()
 })).optional()
 })
 })
