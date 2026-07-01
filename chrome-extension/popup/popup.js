@@ -1,5 +1,4 @@
-const DEFAULT_BACKEND_URL =
-  "https://ec193748-b4c5-4148-b6bc-c48c04b54f9f-00-3kog7rk919p6z.janeway.replit.dev";
+const DEFAULT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 
 // ---- DOM refs: main panel ----
 const urlInput   = document.getElementById("url");
