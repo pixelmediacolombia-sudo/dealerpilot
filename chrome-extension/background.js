@@ -174,7 +174,14 @@ const handlers = {
       extensionId,
     });
 
-    const tab = await chrome.tabs.create({ url: MARKETPLACE_CREATE_URL, active: true });
+    const [existing] = await chrome.tabs.query({ url: MARKETPLACE_CREATE_URL + "*" });
+    let tab;
+    if (existing) {
+      tab = await chrome.tabs.update(existing.id, { active: true });
+      await chrome.windows.update(existing.windowId, { focused: true });
+    } else {
+      tab = await chrome.tabs.create({ url: MARKETPLACE_CREATE_URL, active: true });
+    }
     return { ok: true, jobId: job.id, tabId: tab.id };
   },
 
