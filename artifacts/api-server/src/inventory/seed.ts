@@ -27,6 +27,8 @@ export async function seedDealerAndInventory(log: Logger): Promise<void> {
     state: "VA",
     country: "US",
     postalCode: "22408",
+    latitude: "38.3032",
+    longitude: "-77.4605",
   };
 
   if (!dealer) {
@@ -45,7 +47,7 @@ export async function seedDealerAndInventory(log: Logger): Promise<void> {
     log.info({ dealerId: dealer.id }, "Seeded Alpha Motorsport dealer");
   } else {
     const needsFeedUpdate = dealer.xmlFeedUrl !== REAL_FEED_URL;
-    const needsAddressUpdate = !dealer.addressLine1;
+    const needsAddressUpdate = !dealer.addressLine1 || !dealer.latitude;
     if (needsFeedUpdate || needsAddressUpdate) {
       await db
         .update(dealersTable)

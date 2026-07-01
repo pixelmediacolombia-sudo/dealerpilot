@@ -174,13 +174,12 @@ export const GetMetaCatalogDiagnosticsResponse = zod.object({
   "totalErrors": zod.number(),
   "totalWarnings": zod.number(),
   "feedReadinessPercent": zod.number(),
+  "addressComplete": zod.boolean(),
   "fieldCoverage": zod.object({
-  "vehicle_offer_id": zod.number(),
-  "image": zod.number(),
+  "vehicle_id": zod.number(),
+  "image_link": zod.number(),
   "price": zod.number(),
-  "condition": zod.number(),
-  "availability": zod.number(),
-  "url": zod.number()
+  "link": zod.number()
 }),
   "lastGenerated": zod.coerce.date(),
   "feedXmlUrl": zod.string(),
@@ -192,12 +191,10 @@ export const GetMetaCatalogDiagnosticsResponse = zod.object({
   "errors": zod.array(zod.string()),
   "warnings": zod.array(zod.string()),
   "fieldStatus": zod.object({
-  "vehicle_offer_id": zod.boolean(),
-  "image": zod.boolean(),
+  "vehicle_id": zod.boolean(),
+  "image_link": zod.boolean(),
   "price": zod.boolean(),
-  "condition": zod.boolean(),
-  "availability": zod.boolean(),
-  "url": zod.boolean()
+  "link": zod.boolean()
 })
 }))
 })
@@ -215,13 +212,12 @@ export const ValidateMetaCatalogFeedResponse = zod.object({
   "totalErrors": zod.number(),
   "totalWarnings": zod.number(),
   "feedReadinessPercent": zod.number(),
+  "addressComplete": zod.boolean(),
   "fieldCoverage": zod.object({
-  "vehicle_offer_id": zod.number(),
-  "image": zod.number(),
+  "vehicle_id": zod.number(),
+  "image_link": zod.number(),
   "price": zod.number(),
-  "condition": zod.number(),
-  "availability": zod.number(),
-  "url": zod.number()
+  "link": zod.number()
 }),
   "lastGenerated": zod.coerce.date(),
   "feedXmlUrl": zod.string(),
@@ -233,12 +229,10 @@ export const ValidateMetaCatalogFeedResponse = zod.object({
   "errors": zod.array(zod.string()),
   "warnings": zod.array(zod.string()),
   "fieldStatus": zod.object({
-  "vehicle_offer_id": zod.boolean(),
-  "image": zod.boolean(),
+  "vehicle_id": zod.boolean(),
+  "image_link": zod.boolean(),
   "price": zod.boolean(),
-  "condition": zod.boolean(),
-  "availability": zod.boolean(),
-  "url": zod.boolean()
+  "link": zod.boolean()
 })
 }))
 })
@@ -264,6 +258,47 @@ export const AuditMetaCatalogSchemaResponse = zod.object({
   "exportableVehicles": zod.number(),
   "blockedVehicles": zod.number(),
   "auditedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Detailed Meta Automotive field validation — missing fields, invalid values, invalid URLs, duplicate IDs, compatibility score
+ */
+export const ValidateMetaFieldsResponse = zod.object({
+  "exportableVehicles": zod.number(),
+  "blockedVehicles": zod.number(),
+  "compatibilityScore": zod.number(),
+  "missingFields": zod.array(zod.string()),
+  "invalidValues": zod.array(zod.object({
+  "vehicleId": zod.string(),
+  "field": zod.string(),
+  "value": zod.string(),
+  "reason": zod.string()
+})),
+  "invalidUrls": zod.array(zod.object({
+  "vehicleId": zod.string(),
+  "field": zod.string(),
+  "url": zod.string()
+})),
+  "missingAddressFields": zod.array(zod.string()),
+  "duplicateIds": zod.array(zod.string()),
+  "fieldCoverage": zod.array(zod.object({
+  "tag": zod.string(),
+  "fieldName": zod.string(),
+  "required": zod.boolean(),
+  "presentCount": zod.number(),
+  "totalCount": zod.number(),
+  "coveragePercent": zod.number(),
+  "exampleInvalidValues": zod.array(zod.string())
+})),
+  "vehicles": zod.array(zod.object({
+  "vehicleId": zod.string(),
+  "title": zod.string(),
+  "valid": zod.boolean(),
+  "errors": zod.array(zod.string()),
+  "warnings": zod.array(zod.string())
+})),
+  "validatedAt": zod.coerce.date()
 })
 
 

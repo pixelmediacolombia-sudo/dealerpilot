@@ -191,6 +191,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/SchemaAuditResult"
 
+  /channels/meta-catalog/validate-meta:
+    get:
+      operationId: validateMetaFields
+      tags: [inventory]
+      summary: Detailed Meta Automotive field validation — missing fields, invalid values, invalid URLs, duplicate IDs, compatibility score
+      responses:
+        "200":
+          description: Comprehensive Meta Automotive field validation report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateMetaResult"
+
   /vehicles:
     get:
       operationId: listVehicles
@@ -3658,14 +3671,12 @@ components:
 
     MetaFieldStatus:
       type: object
-      required: [vehicle_offer_id, image, price, condition, availability, url]
+      required: [vehicle_id, image_link, price, link]
       properties:
-        vehicle_offer_id: { type: boolean }
-        image: { type: boolean }
+        vehicle_id: { type: boolean }
+        image_link: { type: boolean }
         price: { type: boolean }
-        condition: { type: boolean }
-        availability: { type: boolean }
-        url: { type: boolean }
+        link: { type: boolean }
 
     MetaVehicleValidation:
       type: object
@@ -3685,14 +3696,12 @@ components:
 
     MetaFieldCoverage:
       type: object
-      required: [vehicle_offer_id, image, price, condition, availability, url]
+      required: [vehicle_id, image_link, price, link]
       properties:
-        vehicle_offer_id: { type: integer }
-        image: { type: integer }
+        vehicle_id: { type: integer }
+        image_link: { type: integer }
         price: { type: integer }
-        condition: { type: integer }
-        availability: { type: integer }
-        url: { type: integer }
+        link: { type: integer }
 
     SchemaAuditEntry:
       type: object
@@ -3723,7 +3732,7 @@ components:
 
     MetaDiagnostics:
       type: object
-      required: [totalVehicles, exportableVehicles, blockedVehicles, validVehicles, invalidVehicles, totalErrors, totalWarnings, feedReadinessPercent, fieldCoverage, lastGenerated, feedXmlUrl, feedCsvUrl, vehicles]
+      required: [totalVehicles, exportableVehicles, blockedVehicles, validVehicles, invalidVehicles, totalErrors, totalWarnings, feedReadinessPercent, addressComplete, fieldCoverage, lastGenerated, feedXmlUrl, feedCsvUrl, vehicles]
       properties:
         totalVehicles: { type: integer }
         exportableVehicles: { type: integer }
@@ -3733,6 +3742,7 @@ components:
         totalErrors: { type: integer }
         totalWarnings: { type: integer }
         feedReadinessPercent: { type: integer }
+        addressComplete: { type: boolean }
         fieldCoverage:
           $ref: "#/components/schemas/MetaFieldCoverage"
         lastGenerated: { type: string, format: date-time }
@@ -3741,6 +3751,81 @@ components:
         vehicles:
           type: array
           items: { $ref: "#/components/schemas/MetaVehicleValidation" }
+
+    ValidateMetaFieldCoverage:
+      type: object
+      required: [tag, fieldName, required, presentCount, totalCount, coveragePercent, exampleInvalidValues]
+      properties:
+        tag: { type: string }
+        fieldName: { type: string }
+        required: { type: boolean }
+        presentCount: { type: integer }
+        totalCount: { type: integer }
+        coveragePercent: { type: integer }
+        exampleInvalidValues:
+          type: array
+          items: { type: string }
+
+    ValidateMetaVehicleResult:
+      type: object
+      required: [vehicleId, title, valid, errors, warnings]
+      properties:
+        vehicleId: { type: string }
+        title: { type: string }
+        valid: { type: boolean }
+        errors:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+
+    ValidateMetaInvalidValue:
+      type: object
+      required: [vehicleId, field, value, reason]
+      properties:
+        vehicleId: { type: string }
+        field: { type: string }
+        value: { type: string }
+        reason: { type: string }
+
+    ValidateMetaInvalidUrl:
+      type: object
+      required: [vehicleId, field, url]
+      properties:
+        vehicleId: { type: string }
+        field: { type: string }
+        url: { type: string }
+
+    ValidateMetaResult:
+      type: object
+      required: [exportableVehicles, blockedVehicles, compatibilityScore, missingFields, invalidValues, invalidUrls, missingAddressFields, duplicateIds, fieldCoverage, vehicles, validatedAt]
+      properties:
+        exportableVehicles: { type: integer }
+        blockedVehicles: { type: integer }
+        compatibilityScore: { type: integer }
+        missingFields:
+          type: array
+          items: { type: string }
+        invalidValues:
+          type: array
+          items: { $ref: "#/components/schemas/ValidateMetaInvalidValue" }
+        invalidUrls:
+          type: array
+          items: { $ref: "#/components/schemas/ValidateMetaInvalidUrl" }
+        missingAddressFields:
+          type: array
+          items: { type: string }
+        duplicateIds:
+          type: array
+          items: { type: string }
+        fieldCoverage:
+          type: array
+          items: { $ref: "#/components/schemas/ValidateMetaFieldCoverage" }
+        vehicles:
+          type: array
+          items: { $ref: "#/components/schemas/ValidateMetaVehicleResult" }
+        validatedAt: { type: string, format: date-time }
 
     ListingPerformanceRecord:
       type: object

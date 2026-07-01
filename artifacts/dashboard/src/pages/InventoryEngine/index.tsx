@@ -408,14 +408,12 @@ export function InventoryEngine() {
             const isReady = blocked === 0 && total > 0;
             const coverage = validation?.fieldCoverage;
 
-            type MetaFieldKey = "vehicle_offer_id" | "image" | "price" | "condition" | "availability" | "url";
+            type MetaFieldKey = "vehicle_id" | "image_link" | "price" | "link";
             const FIELDS: { key: MetaFieldKey; label: string; desc: string }[] = [
-              { key: "vehicle_offer_id", label: "vehicle_offer_id", desc: "Vehicle identifier (VIN)" },
-              { key: "image", label: "image", desc: "Primary photo URL" },
-              { key: "price", label: "price", desc: "Listing price in USD" },
-              { key: "condition", label: "condition", desc: "GOOD / EXCELLENT / FAIR / POOR" },
-              { key: "availability", label: "availability", desc: "FOR_SALE / NOT_AVAILABLE" },
-              { key: "url", label: "url", desc: "Vehicle detail page URL" },
+              { key: "vehicle_id", label: "g:vehicle_id", desc: "Unique vehicle ID (VIN)" },
+              { key: "image_link", label: "g:image_link", desc: "Primary photo HTTPS URL" },
+              { key: "price", label: "g:price", desc: "Price — \"28900 USD\" format" },
+              { key: "link", label: "link", desc: "Vehicle Detail Page HTTPS URL" },
             ];
 
             return (

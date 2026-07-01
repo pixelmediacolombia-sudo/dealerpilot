@@ -1595,12 +1595,10 @@ export interface FeedHealthReport {
 }
 
 export interface MetaFieldStatus {
-  vehicle_offer_id: boolean;
-  image: boolean;
+  vehicle_id: boolean;
+  image_link: boolean;
   price: boolean;
-  condition: boolean;
-  availability: boolean;
-  url: boolean;
+  link: boolean;
 }
 
 export interface MetaVehicleValidation {
@@ -1613,12 +1611,10 @@ export interface MetaVehicleValidation {
 }
 
 export interface MetaFieldCoverage {
-  vehicle_offer_id: number;
-  image: number;
+  vehicle_id: number;
+  image_link: number;
   price: number;
-  condition: number;
-  availability: number;
-  url: number;
+  link: number;
 }
 
 export type SchemaAuditEntryStatus = typeof SchemaAuditEntryStatus[keyof typeof SchemaAuditEntryStatus];
@@ -1659,11 +1655,57 @@ export interface MetaDiagnostics {
   totalErrors: number;
   totalWarnings: number;
   feedReadinessPercent: number;
+  addressComplete: boolean;
   fieldCoverage: MetaFieldCoverage;
   lastGenerated: string;
   feedXmlUrl: string;
   feedCsvUrl: string;
   vehicles: MetaVehicleValidation[];
+}
+
+export interface ValidateMetaFieldCoverage {
+  tag: string;
+  fieldName: string;
+  required: boolean;
+  presentCount: number;
+  totalCount: number;
+  coveragePercent: number;
+  exampleInvalidValues: string[];
+}
+
+export interface ValidateMetaVehicleResult {
+  vehicleId: string;
+  title: string;
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface ValidateMetaInvalidValue {
+  vehicleId: string;
+  field: string;
+  value: string;
+  reason: string;
+}
+
+export interface ValidateMetaInvalidUrl {
+  vehicleId: string;
+  field: string;
+  url: string;
+}
+
+export interface ValidateMetaResult {
+  exportableVehicles: number;
+  blockedVehicles: number;
+  compatibilityScore: number;
+  missingFields: string[];
+  invalidValues: ValidateMetaInvalidValue[];
+  invalidUrls: ValidateMetaInvalidUrl[];
+  missingAddressFields: string[];
+  duplicateIds: string[];
+  fieldCoverage: ValidateMetaFieldCoverage[];
+  vehicles: ValidateMetaVehicleResult[];
+  validatedAt: string;
 }
 
 export interface ListingPerformanceRecord {

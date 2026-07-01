@@ -7,10 +7,8 @@
  */
 
 export interface MetaFieldCoverage {
-  vehicle_offer_id: number;
-  image: number;
+  vehicle_id: number;
+  image_link: number;
   price: number;
-  condition: number;
-  availability: number;
-  url: number;
+  link: number;
 }

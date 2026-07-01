@@ -14,6 +14,8 @@ export const dealersTable = pgTable("dealers", {
   state: text("state"),
   country: text("country").default("US"),
   postalCode: text("postal_code"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

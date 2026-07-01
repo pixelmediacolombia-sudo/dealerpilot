@@ -17,6 +17,7 @@ export interface MetaDiagnostics {
   totalErrors: number;
   totalWarnings: number;
   feedReadinessPercent: number;
+  addressComplete: boolean;
   fieldCoverage: MetaFieldCoverage;
   lastGenerated: Date;
   feedXmlUrl: string;

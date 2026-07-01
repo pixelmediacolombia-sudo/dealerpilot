@@ -132,6 +132,7 @@ import type {
   TestListing,
   UpdateConversationStatus200,
   UpdateConversationStatusBody,
+  ValidateMetaResult,
   Vehicle,
   VehicleDetail,
   VehicleIntelligenceResponse,
@@ -915,6 +916,83 @@ export function useAuditMetaCatalogSchema<TData = Awaited<ReturnType<typeof audi
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getAuditMetaCatalogSchemaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getValidateMetaFieldsUrl = () => {
+
+
+
+
+  return `/api/channels/meta-catalog/validate-meta`
+}
+
+/**
+ * @summary Detailed Meta Automotive field validation — missing fields, invalid values, invalid URLs, duplicate IDs, compatibility score
+ */
+export const validateMetaFields = async ( options?: RequestInit): Promise<ValidateMetaResult> => {
+
+  return customFetch<ValidateMetaResult>(getValidateMetaFieldsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getValidateMetaFieldsQueryKey = () => {
+    return [
+    `/api/channels/meta-catalog/validate-meta`
+    ] as const;
+    }
+
+
+export const getValidateMetaFieldsQueryOptions = <TData = Awaited<ReturnType<typeof validateMetaFields>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateMetaFields>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getValidateMetaFieldsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof validateMetaFields>>> = ({ signal }) => validateMetaFields({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof validateMetaFields>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ValidateMetaFieldsQueryResult = NonNullable<Awaited<ReturnType<typeof validateMetaFields>>>
+export type ValidateMetaFieldsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Detailed Meta Automotive field validation — missing fields, invalid values, invalid URLs, duplicate IDs, compatibility score
+ */
+
+export function useValidateMetaFields<TData = Awaited<ReturnType<typeof validateMetaFields>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateMetaFields>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getValidateMetaFieldsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

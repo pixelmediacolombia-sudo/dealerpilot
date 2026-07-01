@@ -6,9 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface MetaFieldStatus {
-  vehicle_id: boolean;
-  image_link: boolean;
-  price: boolean;
-  link: boolean;
+export interface ValidateMetaInvalidUrl {
+  vehicleId: string;
+  field: string;
+  url: string;
 }

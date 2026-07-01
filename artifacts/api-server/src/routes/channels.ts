@@ -4,6 +4,7 @@ import {
   generateMetaCatalogCsv,
   validateMetaCatalog,
   auditMetaCatalogSchema,
+  validateMetaCatalogMeta,
   type FeedVersion,
 } from "../channels/metaCatalog";
 
@@ -67,6 +68,16 @@ router.get("/channels/meta-catalog/schema-audit", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to run Meta catalog schema audit");
     res.status(500).json({ error: "Failed to run schema audit" });
+  }
+});
+
+router.get("/channels/meta-catalog/validate-meta", async (req, res) => {
+  try {
+    const result = await validateMetaCatalogMeta(DEALER_ID);
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "Failed to run Meta catalog field validation");
+    res.status(500).json({ error: "Failed to validate Meta feed fields" });
   }
 });
 
