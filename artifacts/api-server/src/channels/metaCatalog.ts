@@ -50,25 +50,27 @@ interface MetaVehicle {
   vehicleId: string;
   title: string;
   description: string;
-  url: string;                                          // VDP URL
-  images: string[];                                     // all images, ordered by position
-  price: string;                                        // "28900 USD"
-  availability: "AVAILABLE" | "NOT_AVAILABLE";
-  condition: "EXCELLENT" | "GOOD" | "FAIR" | "POOR";   // vehicle quality rating
-  stateOfVehicle: "NEW" | "USED" | "CPO";
+  url: string;                                             // VDP URL
+  images: string[];                                        // ordered by position
+  price: string;                                           // "28900 USD"
+  // Spec enum values (case-sensitive as shown in AIA reference)
+  availability: "available" | "not_available";             // lowercase per spec
+  condition: "EXCELLENT" | "GOOD" | "FAIR" | "POOR" | "OTHER";
+  stateOfVehicle: "New" | "Used" | "CPO";                 // title-case per spec
   year: number | null;
   make: string;
   model: string;
   trim: string | null;
   vin: string;
-  mileageValue: number | null;
+  mileageValue: number;                                    // always 0 for new
   mileageUnit: "MI" | "KM";
-  bodyStyle: string | null;
-  transmission: string | null;
-  fuelType: string | null;
-  drivetrain: string | null;
-  exteriorColor: string | null;
+  bodyStyle: string;                                       // required — never null
+  transmission: string | null;                             // "Automatic" | "Manual" | null
+  fuelType: string | null;                                 // normalized AIA enum
+  drivetrain: string | null;                               // "4X2" | "4X4" | "AWD" | "FWD" | "RWD" | "Other"
+  exteriorColor: string;                                   // required — never null
   interiorColor: string | null;
+  dealerId: string;
   dealerName: string;
   addr1: string;
   city: string;
@@ -236,9 +238,107 @@ function isValidHttpsUrl(url: string): boolean {
   return /^https?:\/\/.+/.test(url);
 }
 
-/** Normalize to UPPERCASE for AIA enum fields (fuel_type, transmission, body_style, drivetrain). */
-function toUpper(val: string | null): string | null {
-  return val ? val.trim().toUpperCase() : null;
+// ──────────────────────────────────────────────────────────────────────────────
+// Enum normalizers — map raw DB strings to exact Meta AIA spec values
+// Spec source: developers.facebook.com/documentation/ads-commerce/marketing-api/auto-ads/reference
+// ──────────────────────────────────────────────────────────────────────────────
+
+const FUEL_TYPE_VALID = new Set(["DIESEL", "ELECTRIC", "FLEX", "GASOLINE", "HYBRID", "OTHER"]);
+const FUEL_TYPE_MAP: Record<string, string> = {
+  GAS: "GASOLINE",
+  GASOLINE: "GASOLINE",
+  PETROL: "GASOLINE",
+  UNLEADED: "GASOLINE",
+  DIESEL: "DIESEL",
+  ELECTRIC: "ELECTRIC",
+  EV: "ELECTRIC",
+  BEV: "ELECTRIC",
+  HYBRID: "HYBRID",
+  "MILD HYBRID": "HYBRID",
+  "PLUG-IN HYBRID": "HYBRID",
+  "PLUGIN HYBRID": "HYBRID",
+  PHEV: "HYBRID",
+  FLEX: "FLEX",
+  "FLEX FUEL": "FLEX",
+  "FLEXIBLE FUEL": "FLEX",
+  E85: "FLEX",
+  "NATURAL GAS": "OTHER",
+  CNG: "OTHER",
+  LPG: "OTHER",
+  HYDROGEN: "OTHER",
+};
+function normalizeFuelType(val: string | null): string | null {
+  if (!val) return null;
+  const key = val.trim().toUpperCase();
+  return FUEL_TYPE_MAP[key] ?? (FUEL_TYPE_VALID.has(key) ? key : "OTHER");
+}
+
+// Spec: Automatic | Manual only (case-sensitive as shown in spec description)
+function normalizeTransmission(val: string | null): string | null {
+  if (!val) return null;
+  const key = val.trim().toUpperCase();
+  if (key === "AUTOMATIC" || key === "AUTO" || key === "A" || key === "CVT") return "Automatic";
+  if (key === "MANUAL" || key === "STANDARD" || key === "M" || key === "MT") return "Manual";
+  return null; // omit unknown values
+}
+
+// Spec body_style enum (AIA feed — different from Graph API)
+const BODY_STYLE_VALID = new Set([
+  "CONVERTIBLE", "COUPE", "HATCHBACK", "MINIVAN", "TRUCK",
+  "SUV", "SEDAN", "VAN", "WAGON", "CROSSOVER", "SMALL_CAR", "OTHER",
+]);
+const BODY_STYLE_MAP: Record<string, string> = {
+  PICKUP: "TRUCK",
+  "PICKUP TRUCK": "TRUCK",
+  TRUCK: "TRUCK",
+  SUV: "SUV",
+  "SPORT UTILITY": "SUV",
+  CROSSOVER: "CROSSOVER",
+  "SPORT UTILITY VEHICLE": "SUV",
+  SEDAN: "SEDAN",
+  SALOON: "SEDAN",
+  COUPE: "COUPE",
+  CONVERTIBLE: "CONVERTIBLE",
+  HATCHBACK: "HATCHBACK",
+  MINIVAN: "MINIVAN",
+  "MINI VAN": "MINIVAN",
+  VAN: "VAN",
+  WAGON: "WAGON",
+  "STATION WAGON": "WAGON",
+  ESTATE: "WAGON",
+  SMALL_CAR: "SMALL_CAR",
+  "SMALL CAR": "SMALL_CAR",
+};
+function normalizeBodyStyle(val: string | null): string {
+  if (!val) return "OTHER";
+  const key = val.trim().toUpperCase();
+  return BODY_STYLE_MAP[key] ?? (BODY_STYLE_VALID.has(key) ? key : "OTHER");
+}
+
+// Spec drivetrain enum: 4X2, 4X4, AWD, FWD, RWD, Other
+const DRIVETRAIN_MAP: Record<string, string> = {
+  FWD: "FWD",
+  "FRONT WHEEL DRIVE": "FWD",
+  "FRONT-WHEEL DRIVE": "FWD",
+  RWD: "RWD",
+  "REAR WHEEL DRIVE": "RWD",
+  "REAR-WHEEL DRIVE": "RWD",
+  AWD: "AWD",
+  "ALL WHEEL DRIVE": "AWD",
+  "ALL-WHEEL DRIVE": "AWD",
+  "4WD": "4X4",
+  "4X4": "4X4",
+  "FOUR WHEEL DRIVE": "4X4",
+  "FOUR-WHEEL DRIVE": "4X4",
+  "2WD": "4X2",
+  "4X2": "4X2",
+  "TWO WHEEL DRIVE": "4X2",
+  "TWO-WHEEL DRIVE": "4X2",
+};
+function normalizeDrivetrain(val: string | null): string | null {
+  if (!val) return null;
+  const key = val.trim().toUpperCase();
+  return DRIVETRAIN_MAP[key] ?? null;
 }
 
 /** Format address as AIA JSON object literal (single-quoted values, no JSON.stringify). */
@@ -291,6 +391,12 @@ async function loadMetaVehicles(
     const yearStr = v.year ? String(v.year) : "";
     const title = [yearStr, v.make, v.model, v.trim].filter(Boolean).join(" ");
 
+    // state_of_vehicle: spec values are "New" | "Used" | "CPO" (title-case)
+    // DB vehicles table has no condition/stateOfVehicle column — default to "Used"
+    const stateOfVehicle: "New" | "Used" | "CPO" = "Used";
+
+    const mileageValue = v.mileage ?? 0;
+
     return {
       vehicleId: v.vin,
       title: title || `Vehicle #${v.id}`,
@@ -300,22 +406,24 @@ async function loadMetaVehicles(
       url: v.vdpUrl ?? `${feedBase}/inventory/${v.id}`,
       images: sortedImages,
       price: formatPrice(v.price),
-      availability: "AVAILABLE",
+      // Spec-exact enum values
+      availability: "available",
       condition: "EXCELLENT",
-      stateOfVehicle: "USED",
+      stateOfVehicle,
       year: v.year,
       make: v.make,
       model: v.model,
       trim: v.trim ?? null,
       vin: v.vin,
-      mileageValue: v.mileage ?? null,
+      mileageValue,
       mileageUnit: "MI",
-      bodyStyle: toUpper(v.bodyStyle ?? null),
-      transmission: toUpper(v.transmission ?? null),
-      fuelType: toUpper(v.fuelType ?? null),
-      drivetrain: null,
-      exteriorColor: v.exteriorColor ?? null,
+      bodyStyle: normalizeBodyStyle(v.bodyStyle ?? null),       // required — never null
+      transmission: normalizeTransmission(v.transmission ?? null),
+      fuelType: normalizeFuelType(v.fuelType ?? null),
+      drivetrain: null, // drivetrain not in DB schema
+      exteriorColor: v.exteriorColor ?? "",                     // required — empty string if missing
       interiorColor: v.interiorColor ?? null,
+      dealerId: String(dealerId),
       dealerName,
       addr1: dealer?.addressLine1 ?? "",
       city: dealer?.city ?? "",
@@ -335,43 +443,51 @@ async function loadMetaVehicles(
 // ──────────────────────────────────────────────────────────────────────────────
 
 function buildListingXml(v: MetaVehicle): string {
+  // Images: each in its own <image> element per spec
+  // First image gets tag "Exterior"; tag is optional on subsequent images
   const imageElements = v.images
     .map(
-      (url) =>
-        `    <image>\n      <url>${escapeXml(url)}</url>\n      <tag>Exterior</tag>\n    </image>`,
+      (url, i) =>
+        i === 0
+          ? `    <image>\n      <url>${escapeXml(url)}</url>\n      <tag>Exterior</tag>\n    </image>`
+          : `    <image>\n      <url>${escapeXml(url)}</url>\n    </image>`,
     )
     .join("\n");
 
+  // Optional fields — omit entirely when null (not empty elements)
   const optional = [
-    v.trim ? `    <trim>${cdata(v.trim)}</trim>` : "",
-    v.mileageValue != null
-      ? `    <mileage>\n      <value>${v.mileageValue}</value>\n      <unit>${v.mileageUnit}</unit>\n    </mileage>`
-      : "",
-    v.bodyStyle ? `    <body_style>${escapeXml(v.bodyStyle)}</body_style>` : "",
+    v.trim ? `    <trim>${escapeXml(v.trim)}</trim>` : "",
+    v.drivetrain ? `    <drivetrain>${escapeXml(v.drivetrain)}</drivetrain>` : "",
     v.transmission ? `    <transmission>${escapeXml(v.transmission)}</transmission>` : "",
     v.fuelType ? `    <fuel_type>${escapeXml(v.fuelType)}</fuel_type>` : "",
-    v.drivetrain ? `    <drivetrain>${escapeXml(v.drivetrain)}</drivetrain>` : "",
-    v.exteriorColor ? `    <exterior_color>${escapeXml(v.exteriorColor)}</exterior_color>` : "",
     v.latitude ? `    <latitude>${escapeXml(v.latitude)}</latitude>` : "",
     v.longitude ? `    <longitude>${escapeXml(v.longitude)}</longitude>` : "",
+    v.interiorColor ? `    <interior_color>${escapeXml(v.interiorColor)}</interior_color>` : "",
+    v.dealerId ? `    <dealer_id>${escapeXml(v.dealerId)}</dealer_id>` : "",
+    v.dealerName ? `    <dealer_name>${escapeXml(v.dealerName)}</dealer_name>` : "",
   ]
     .filter(Boolean)
     .join("\n");
 
+  // Element order matches Meta's official AIA XML sample exactly
+  // No CDATA — use XML-escaped plain text per spec samples
   return `  <listing>
     <vehicle_id>${escapeXml(v.vehicleId)}</vehicle_id>
-    <title>${cdata(v.title)}</title>
-    <description>${cdata(v.description.slice(0, 5000))}</description>
+    <title>${escapeXml(v.title)}</title>
+    <description>${escapeXml(v.description.slice(0, 5000))}</description>
     <url>${escapeXml(v.url)}</url>
-    <make>${cdata(v.make)}</make>
-    <model>${cdata(v.model)}</model>
-    <year>${v.year ?? ""}</year>
-    <vin>${escapeXml(v.vin)}</vin>
+    <make>${escapeXml(v.make)}</make>
 ${imageElements}
+    <model>${escapeXml(v.model)}</model>
+    <year>${v.year ?? ""}</year>
+    <mileage>
+      <value>${v.mileageValue}</value>
+      <unit>${v.mileageUnit}</unit>
+    </mileage>
+    <vin>${escapeXml(v.vin)}</vin>
+    <body_style>${escapeXml(v.bodyStyle)}</body_style>
     <condition>${v.condition}</condition>
-    <state_of_vehicle>${v.stateOfVehicle}</state_of_vehicle>
     <price>${escapeXml(v.price)}</price>
-    <availability>${v.availability}</availability>
     <address format="simple">
       <component name="addr1">${escapeXml(v.addr1)}</component>
       <component name="city">${escapeXml(v.city)}</component>
@@ -379,6 +495,9 @@ ${imageElements}
       <component name="postal_code">${escapeXml(v.postalCode)}</component>
       <component name="country">${escapeXml(v.country)}</component>
     </address>
+    <exterior_color>${escapeXml(v.exteriorColor)}</exterior_color>
+    <availability>${v.availability}</availability>
+    <state_of_vehicle>${v.stateOfVehicle}</state_of_vehicle>
 ${optional}
   </listing>`;
 }
@@ -446,6 +565,7 @@ ${buildListingXml(sample)}
 
 const IMAGE_COLUMNS = Array.from({ length: MAX_IMAGES }, (_, i) => `image[${i}].url`);
 
+// CSV headers match official AIA spec column order (Jun 2026 reference)
 const META_CSV_HEADERS = [
   "vehicle_id",
   "title",
@@ -465,11 +585,15 @@ const META_CSV_HEADERS = [
   "condition",
   "state_of_vehicle",
   "price",
-  "availability",
   "exterior_color",
+  "availability",
   "address",
   "latitude",
   "longitude",
+  "trim",
+  "interior_color",
+  "dealer_id",
+  "dealer_name",
 ];
 
 function escapeCsv(val: string | number | null | undefined): string {
@@ -494,22 +618,26 @@ function vehicleToCsvRow(v: MetaVehicle): string {
     escapeCsv(v.make),
     escapeCsv(v.model),
     escapeCsv(v.year ?? ""),
-    escapeCsv(v.mileageValue ?? ""),
-    escapeCsv(v.mileageValue != null ? v.mileageUnit : ""),
+    escapeCsv(v.mileageValue),
+    escapeCsv(v.mileageUnit),
     ...imageValues,
     escapeCsv(v.transmission ?? ""),
     escapeCsv(v.fuelType ?? ""),
-    escapeCsv(v.bodyStyle ?? ""),
+    escapeCsv(v.bodyStyle),
     escapeCsv(v.drivetrain ?? ""),
     escapeCsv(v.vin),
     escapeCsv(v.condition),
     escapeCsv(v.stateOfVehicle),
     escapeCsv(v.price),
+    escapeCsv(v.exteriorColor),
     escapeCsv(v.availability),
-    escapeCsv(v.exteriorColor ?? ""),
     `"${formatAddressJson(v).replace(/"/g, '""')}"`,
     escapeCsv(v.latitude),
     escapeCsv(v.longitude),
+    escapeCsv(v.trim ?? ""),
+    escapeCsv(v.interiorColor ?? ""),
+    escapeCsv(v.dealerId),
+    escapeCsv(v.dealerName),
   ].join(",");
 }
 
