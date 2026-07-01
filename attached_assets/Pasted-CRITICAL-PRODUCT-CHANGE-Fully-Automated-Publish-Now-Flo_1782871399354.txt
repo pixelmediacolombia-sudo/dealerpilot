@@ -1,0 +1,177 @@
+CRITICAL PRODUCT CHANGE — Fully Automated Publish Now Flow
+
+DealerPilot must stop treating publishing as a manual assisted workflow.
+
+The operator wants to publish 2–3 vehicles per day with ONE button:
+
+Publish Now
+
+The Chrome extension should only act as the bridge between the web app and the currently open Facebook Marketplace page.
+
+====================================================
+NEW GOAL
+====================================================
+
+When the user clicks Publish Now:
+
+1. DealerPilot automatically generates listing copy if needed.
+2. DealerPilot creates the publishing job.
+3. DealerPilot sends the job to the extension.
+4. Extension opens or uses the already-open Facebook Marketplace vehicle page.
+5. Extension fills all fields.
+6. Extension uploads photos if available.
+7. Extension clicks through the required steps.
+8. Extension publishes the listing automatically.
+9. App shows progress in real time.
+10. Vehicle moves to Published if successful.
+
+No manual review.
+No Queue for Publishing button.
+No Publish This Version button.
+No extension Start button required.
+
+====================================================
+USER EXPERIENCE
+====================================================
+
+Click Publish Now.
+
+Show modal/progress panel:
+
+Publishing 2024 Honda Accord
+
+Step 1 — Preparing listing copy
+Step 2 — Creating publishing job
+Step 3 — Sending to extension
+Step 4 — Opening Marketplace
+Step 5 — Filling vehicle details
+Step 6 — Uploading photos
+Step 7 — Reviewing form
+Step 8 — Publishing listing
+Step 9 — Confirming status
+
+Show:
+- progress bar
+- current step
+- vehicle name
+- elapsed time
+- error message if failed
+
+Final states:
+
+Success:
+Published successfully
+Marketplace URL: [link if available]
+Button: View Published Listing
+
+Failed:
+Publishing failed
+Reason:
+Missing field / Facebook selector changed / photo upload failed / Facebook blocked action
+Buttons:
+Retry
+Open Manual Review
+
+====================================================
+EXTENSION ROLE
+====================================================
+
+The extension is not the UI anymore.
+
+The app controls publishing.
+
+The extension only executes commands from the backend.
+
+Extension should:
+- poll for active publishing job
+- receive the full payload
+- fill Facebook Marketplace form
+- click Next buttons
+- click Publish when form is complete
+- report every step back to backend
+- report success/failure
+- include marketplace URL if available
+
+====================================================
+BACKEND REQUIREMENTS
+====================================================
+
+Add publishing job progress tracking.
+
+Each job should have:
+- status: queued | preparing | filling | uploading_photos | reviewing | publishing | published | failed
+- currentStep
+- progressPercent
+- errorMessage
+- marketplaceUrl
+- startedAt
+- completedAt
+- extensionId
+- retryCount
+
+Add endpoints:
+- POST /api/publishing/jobs/:vehicleId/publish-now
+- GET /api/publishing/jobs/:jobId/progress
+- POST /api/publishing/jobs/:jobId/progress
+- POST /api/publishing/jobs/:jobId/complete
+- POST /api/publishing/jobs/:jobId/fail
+
+====================================================
+IMPORTANT SAFETY RULE
+====================================================
+
+Publish Now should only publish 1 vehicle at a time.
+
+For daily operations:
+- allow 2–3 vehicles per day
+- queue them sequentially
+- never publish multiple vehicles simultaneously
+- wait until one vehicle finishes before starting the next
+
+====================================================
+PHOTOS
+====================================================
+
+If photo upload is not reliable yet:
+- still create the flow
+- show exact failure:
+  “Photo upload failed — manual intervention required”
+- do not silently continue
+
+But the goal is full automation.
+
+====================================================
+PUBLISH NOW BUTTON
+====================================================
+
+All Publish Now buttons from:
+- Command Center
+- Marketplace AI
+- Marketplace Intelligence
+- vehicle cards
+
+must use the same automated publish-now pipeline.
+
+They should NOT redirect to listing detail.
+
+They should NOT require manual queue approval.
+
+They should open the publishing progress modal immediately.
+
+====================================================
+ACCEPTANCE TEST
+====================================================
+
+1. User clicks Publish Now.
+2. App shows publishing progress modal.
+3. Listing copy is generated automatically if missing.
+4. Publishing job is created automatically.
+5. Extension receives job automatically.
+6. Facebook Marketplace form is filled automatically.
+7. Extension attempts final publish automatically.
+8. App updates progress in real time.
+9. On success, vehicle moves to Published.
+10. On failure, app shows exact reason and Retry button.
+11. No manual extension start button is required.
+12. No listing review screen appears.
+13. Typecheck clean.

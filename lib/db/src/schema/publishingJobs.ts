@@ -11,8 +11,8 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 // A unit of publishing work handed to the Chrome extension. Created when an
-// approved listing version is queued. The extension claims a job, then reports
-// completion or failure. The extension never auto-publishes without a job.
+// approved listing version is queued, or directly via POST /publishing/jobs/publish-now.
+// mode: Assisted = operator confirms; Controlled = extension auto-clicks Publish.
 export const publishingJobsTable = pgTable(
   "publishing_jobs",
   {
@@ -21,9 +21,14 @@ export const publishingJobsTable = pgTable(
     vehicleId: integer("vehicle_id").notNull(),
     dealerId: integer("dealer_id").notNull(),
     batchId: integer("batch_id"),
-    // Assisted: operator clicks Publish manually. Controlled: extension may auto-click.
+    // Assisted: operator confirms. Controlled: extension auto-clicks Publish.
     mode: text("mode").notNull().default("Assisted"),
+    // status: Queued | Claimed | Opening Facebook | Filling Form |
+    //         Auto Publishing | Ready for Review | Published | Failed | Cancelled
     status: text("status").notNull().default("Queued"),
+    // Real-time progress — written by extension via POST /publishing/jobs/:id/event
+    currentStep: text("current_step"),
+    progressPercent: integer("progress_percent").notNull().default(0),
     priority: integer("priority").notNull().default(0),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     claimedByExtension: text("claimed_by_extension"),
