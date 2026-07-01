@@ -11,10 +11,8 @@ import {
   usePublishNow,
   useGetPublishingJobProgress,
   getGetPublishingJobProgressQueryKey,
-  useGetConnectionStatus,
-  getGetConnectionStatusQueryKey,
 } from "@workspace/api-client-react";
-import { ExternalLink, Loader2, CheckCircle2, XCircle, RefreshCw, AlertTriangle, Puzzle, Wifi } from "lucide-react";
+import { ExternalLink, Loader2, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
 
 interface PublishNowModalProps {
   vehicleId: number | null;
@@ -24,15 +22,14 @@ interface PublishNowModalProps {
 }
 
 const STEPS = [
-  { label: "Job created",          minProgress: 0 },
-  { label: "Extension active",     minProgress: 10 },
-  { label: "Opening Facebook",     minProgress: 15 },
-  { label: "Filling vehicle details", minProgress: 35 },
-  { label: "All fields filled",    minProgress: 65 },
-  { label: "Starting auto-publish",minProgress: 75 },
-  { label: "Clicking Next",        minProgress: 82 },
-  { label: "Clicking Publish",     minProgress: 92 },
-  { label: "Published!",           minProgress: 100 },
+  { label: "Job created",       minProgress: 0  },
+  { label: "Extension active",  minProgress: 12 },
+  { label: "Opening Facebook",  minProgress: 22 },
+  { label: "Detecting session", minProgress: 35 },
+  { label: "Opening Marketplace", minProgress: 48 },
+  { label: "Filling vehicle",   minProgress: 62 },
+  { label: "Publishing",        minProgress: 82 },
+  { label: "Published!",        minProgress: 100 },
 ];
 
 function StepBubble({ label, done, active, index }: {
@@ -65,34 +62,11 @@ function StepBubble({ label, done, active, index }: {
   );
 }
 
-// ─── Readiness check helpers ─────────────────────────────────────────────────
-function deriveReadiness(data: { chromeExtension?: unknown; facebookSession?: unknown; marketplace?: unknown } | null | undefined): {
-  ready: boolean;
-  missingStep: string | null;
-} {
-  if (!data) return { ready: false, missingStep: "Loading connection status…" };
-  const extStatus = (data.chromeExtension as { status?: string } | null | undefined)?.status;
-  const extOnline = extStatus === "connected" || extStatus === "online";
-  if (!extOnline) return { ready: false, missingStep: "Chrome extension is not connected — open the extension popup and log in." };
-  const fbLoggedIn = (data.facebookSession as { fbLoggedIn?: boolean | null } | undefined)?.fbLoggedIn;
-  if (fbLoggedIn === false) return { ready: false, missingStep: "Not logged into Facebook — open a Facebook tab and log in." };
-  const mktConnected = (data.marketplace as { marketplaceConnected?: boolean | null } | undefined)?.marketplaceConnected;
-  if (mktConnected === false) return { ready: false, missingStep: "Marketplace not verified — visit Facebook Marketplace in the extension." };
-  return { ready: true, missingStep: null };
-}
-
 export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }: PublishNowModalProps) {
   const isOpen = vehicleId !== null;
   const [jobId, setJobId] = useState<number | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
-  const [overrideReadiness, setOverrideReadiness] = useState(false);
-
-  const { data: connStatus } = useGetConnectionStatus({
-    query: { queryKey: getGetConnectionStatusQueryKey(), enabled: isOpen, refetchInterval: 10_000 },
-  });
-  const { ready: publishingReady, missingStep } = deriveReadiness(connStatus);
-  const blockedByReadiness = !publishingReady && !overrideReadiness && !jobId;
 
   const { mutate: publishNow, isPending: isCreating } = usePublishNow({
     mutation: {
@@ -107,13 +81,14 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
     },
   });
 
+  // Always create the job immediately — the extension handles all environment prep.
   useEffect(() => {
-    if (isOpen && vehicleId != null && !blockedByReadiness) {
+    if (isOpen && vehicleId != null) {
       setJobId(null);
       setCreateError(null);
       publishNow({ data: { vehicleId } });
     }
-  }, [isOpen, vehicleId, retryKey, overrideReadiness]);
+  }, [isOpen, vehicleId, retryKey]);
 
   const { data: progress } = useGetPublishingJobProgress(jobId ?? 0, {
     query: {
@@ -124,8 +99,7 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
   });
 
   const isDone = progress?.status === "Published";
-  const isFailed =
-    progress?.status === "Failed" || progress?.status === "Cancelled";
+  const isFailed = progress?.status === "Failed" || progress?.status === "Cancelled";
 
   const pct = progress?.progressPercent ?? (isCreating ? 0 : jobId ? 5 : 0);
   const currentStepLabel = progress?.currentStep ?? (isCreating ? "Creating job…" : jobId ? "Extension picking up job…" : "");
@@ -147,7 +121,6 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
   function handleClose() {
     setJobId(null);
     setCreateError(null);
-    setOverrideReadiness(false);
     onClose();
   }
 
@@ -156,52 +129,12 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
       <DialogContent className="sm:max-w-md bg-[#0f1117] border-white/[0.08] text-foreground">
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold text-foreground">
-            {blockedByReadiness
-              ? "Not Ready to Publish"
-              : isDone
-                ? "✓ Published"
-                : isFailed
-                  ? "Publish Failed"
-                  : "Publishing Now…"}
+            {isDone ? "✓ Published" : isFailed ? "Publish Failed" : "Publishing Now…"}
           </DialogTitle>
           {vehicleLabel && (
             <p className="text-xs text-muted-foreground mt-0.5">{vehicleLabel}</p>
           )}
         </DialogHeader>
-
-        {/* Readiness gate — extension not connected / not logged in */}
-        {blockedByReadiness && (
-          <div className="space-y-4">
-            <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/8 p-3">
-              <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-              <div className="space-y-1">
-                <p className="text-xs text-amber-300 font-medium">Extension not ready</p>
-                <p className="text-[11px] text-amber-400/70">{missingStep}</p>
-              </div>
-            </div>
-            <div className="space-y-1.5 text-[11px] text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Puzzle className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>Open the DealerPilot Chrome extension and sign in</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Wifi className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>Visit Facebook in the browser tab controlled by the extension</span>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-xs text-muted-foreground hover:text-white"
-                onClick={() => setOverrideReadiness(true)}
-              >
-                Publish anyway
-              </Button>
-              <Button size="sm" variant="ghost" onClick={handleClose}>Close</Button>
-            </div>
-          </div>
-        )}
 
         {/* Error state: job creation failed */}
         {createError && !jobId && (
@@ -250,7 +183,7 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
 
             {jobId && (
               <p className="text-[10px] text-muted-foreground/60">
-                Job #{jobId} · Extension will execute automatically
+                Job #{jobId} · Extension will open Facebook and fill the form automatically
               </p>
             )}
           </div>
