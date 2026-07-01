@@ -191,3 +191,9 @@ id = "mw1jCVEpC0ThdajG19bBh"
 uri = "file://DealerPilot-AI-Extension-v1.2.1.zip"
 type = "unspecified"
 title = "DealerPilot AI Extension v1.2.1 — MVP photo upload + priority fix"
+
+[[outputs]]
+id = "uuZGoOtJyWq1LzDhN9HHD"
+uri = "file://DealerPilot-AI-Extension-v1.2.2.zip"
+type = "unspecified"
+title = "DealerPilot AI Extension v1.2.2"
