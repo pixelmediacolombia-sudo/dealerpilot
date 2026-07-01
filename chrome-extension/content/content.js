@@ -1110,9 +1110,10 @@
         );
       }
 
-      // ---- Always-visible debug button (Vehicle Type only) ----
-      const dbgBtn = button("🔍 DEBUG VEHICLE TYPE", () => debugVehicleType(), "mai-btn-secondary");
-      dbgBtn.style.cssText += ";margin-top:6px;border:2px dashed #e74c3c;color:#e74c3c;font-weight:700;";
+      // ---- Always-visible debug button (Vehicle Type only — intentionally stops after Car/Truck) ----
+      const dbgBtn = button("🔍 DEBUG: Vehicle Type only (stops here)", () => debugVehicleType(), "mai-btn-secondary");
+      dbgBtn.title = "Selects Vehicle Type = Car/Truck then stops. Use Fill Marketplace Fields for the full workflow.";
+      dbgBtn.style.cssText += ";margin-top:6px;border:2px dashed #e74c3c;color:#e74c3c;font-weight:700;font-size:10px;";
       actionsEl.appendChild(dbgBtn);
     });
   }

@@ -170,22 +170,35 @@ const handlers = {
   },
 
   // Called by the alarm. Skips if an active job is already in progress.
+  // Checks assigned jobs first (batch/app-controlled), then falls back to the
+  // general queue so "Publish Now" jobs are picked up automatically.
   async POLL_ASSIGNED_JOB() {
     const { activeJob } = await chrome.storage.local.get("activeJob");
     if (activeJob) return { skipped: true };
 
     const extensionId = await getExtensionId();
+
+    // 1. Check for a job explicitly assigned to this extension (app-controlled mode)
     let data;
     try {
       data = await apiGet(`/api/publishing/jobs/assigned?extensionId=${encodeURIComponent(extensionId)}`);
     } catch {
       return { job: null };
     }
-
     const assignedJob = data && data.job && data.job.id ? data.job : null;
-    if (!assignedJob) return { job: null };
+    if (assignedJob) return handlers.AUTO_START_ASSIGNED({ jobId: assignedJob.id });
 
-    return handlers.AUTO_START_ASSIGNED({ jobId: assignedJob.id });
+    // 2. Fallback: any queued job in the general queue (created via Publish Now)
+    let nextData;
+    try {
+      nextData = await apiGet("/api/publishing/jobs/next");
+    } catch {
+      return { job: null };
+    }
+    const nextJob = nextData && nextData.job && nextData.job.id ? nextData.job : null;
+    if (!nextJob) return { job: null };
+
+    return handlers.AUTO_START_ASSIGNED({ jobId: nextJob.id });
   },
 
   async GET_EXTENSION_ID() {

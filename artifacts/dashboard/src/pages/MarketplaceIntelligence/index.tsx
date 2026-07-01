@@ -564,12 +564,22 @@ export function MarketplaceIntelligence() {
 
   const bulkSchedule = useBulkSchedulePublishing({
     mutation: {
-      onSuccess: (result, vars) => {
+      onSuccess: (result) => {
         setPublishingId(null);
-        toast({
-          title: "Publishing queued",
-          description: `${result.enqueued} vehicle${result.enqueued !== 1 ? "s" : ""} added to the publishing queue. Open Marketplace AI → Queue to track progress.`,
-        });
+        if (result.enqueued > 0) {
+          toast({
+            title: `✓ ${result.enqueued} job${result.enqueued !== 1 ? "s" : ""} created`,
+            description: result.skipped > 0
+              ? `${result.skipped} already queued. Extension will pick up the job on next poll — open the extension popup to start now.`
+              : "Extension will pick up the job on next poll — open the extension popup to start now.",
+          });
+          setActiveTab("opportunities");
+        } else {
+          toast({
+            title: "Already queued",
+            description: result.skipped > 0 ? `${result.skipped} vehicle${result.skipped !== 1 ? "s" : ""} already in the queue.` : "No new jobs created.",
+          });
+        }
       },
       onError: () => {
         setPublishingId(null);

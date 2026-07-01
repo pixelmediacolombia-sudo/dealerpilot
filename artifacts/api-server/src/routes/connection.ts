@@ -67,7 +67,7 @@ router.get("/connection-center", async (req, res) => {
   } else {
     const online = Date.now() - ext.lastHeartbeatAt.getTime() < HEARTBEAT_WINDOW_MS;
     chromeExtension = {
-      status: online ? "online" : "offline",
+      status: online ? "connected" : "offline",
       detail: online
         ? "Extension reporting in"
         : "No recent heartbeat from the extension",
