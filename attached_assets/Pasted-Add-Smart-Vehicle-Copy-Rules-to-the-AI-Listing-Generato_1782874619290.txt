@@ -1,0 +1,87 @@
+Add “Smart Vehicle Copy Rules” to the AI Listing Generator prompt.
+
+These rules must be injected server-side before calling OpenAI, not only shown in the UI.
+
+File to inspect:
+- listing generator service
+- OpenAI prompt builder
+- listing version generation route
+
+Goal:
+DealerPilot should adapt the copy based on vehicle type.
+
+Add this logic:
+
+1. Detect vehicle category:
+- pickup / truck
+- SUV
+- sedan
+- coupe / sports
+- luxury
+- hybrid / electric
+- van / work vehicle
+
+Use available fields:
+bodyStyle, make, model, trim, fuelType, price, mileage, year.
+
+2. Add category-specific copy strategy:
+
+Pickup / Truck:
+Focus on work, reliability, towing, construction, contractors, daily use.
+
+SUV:
+Focus on family, space, comfort, road trips, safety, AWD/4WD if available.
+
+Sedan:
+Focus on gas savings, commuting, first car, affordability, easy financing.
+
+Sports / Performance:
+Focus on excitement, style, power, weekend driving, head-turning design.
+
+Luxury:
+Focus on premium feel, comfort, brand prestige, smooth ride, upscale interior.
+
+Hybrid / Electric:
+Focus on fuel savings, technology, efficiency, modern driving.
+
+Van / Work Vehicle:
+Focus on business use, cargo space, delivery, contractors, fleet use.
+
+3. Add anti-duplicate rule:
+Never generate the same hook or CTA for similar vehicles.
+If multiple vehicles share the same make/model, vary:
+- hook
+- CTA
+- first bullet
+- buyer angle
+
+4. Add output style:
+- short
+- emoji-friendly
+- Marketplace focused
+- no long paragraphs
+- max 12 lines
+- English and Spanish versions
+- Spanish must be rewritten naturally, not literal translation
+
+5. Add examples inside the system prompt.
+
+6. Add generated metadata:
+copyAngle:
+examples:
+- “family SUV”
+- “contractor truck”
+- “first-time buyer sedan”
+- “luxury comfort”
+- “fuel saver”
+- “performance buyer”
+
+buyerProfile:
+short sentence explaining who this listing is targeting.
+
+Acceptance:
+- Pickup copy sounds different from SUV copy.
+- Sedan copy sounds different from luxury copy.
+- Spanish copy sounds natural for Hispanic buyers.
+- Two similar vehicles do not get identical hooks.
+- Generated listing page shows copyAngle and buyerProfile.

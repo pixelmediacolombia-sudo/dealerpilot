@@ -83,6 +83,7 @@ import { PublishedCard } from "./PublishedCard";
 import { MarkPublishedModal } from "./MarkPublishedModal";
 import { BatchReviewPanel } from "./BatchReviewPanel";
 import { DailyOperatorPanel } from "./DailyOperatorPanel";
+import { PublishNowModal } from "@/components/PublishNowModal";
 import { toast } from "@/hooks/use-toast";
 
 const DEALER_ID = 1;
@@ -251,6 +252,7 @@ export function ListingsWorkspace() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [sortBy, setSortBy] = useState<"priority" | "photo_count" | "price" | "newest" | "needs_review">("priority");
   const [publishingId, setPublishingId] = useState<number | null>(null);
+  const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
   const [photoFilter, setPhotoFilter] = useState<string | null>(null);
 
   const toggleSelected = (id: number) => {
@@ -596,13 +598,7 @@ export function ListingsWorkspace() {
               workspaces={workspacesData?.workspaces ?? []}
               recommendations={(intelligenceData?.recommendations ?? []) as never}
               activeJobs={jobsData?.jobs ?? []}
-              onPublish={(vehicleId) => {
-                setPublishingId(vehicleId);
-                bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } }, {
-                  onSuccess: () => { setPublishingId(null); toast({ title: "Publishing queued", description: "Vehicle added to the publishing queue." }); invalidateWorkspaces(); },
-                  onError: () => { setPublishingId(null); toast({ title: "Error", description: "Failed to queue vehicle.", variant: "destructive" }); },
-                });
-              }}
+              onPublish={(vehicleId) => setPublishNowVehicleId(vehicleId)}
               onAddToBatch={(vehicleId) => {
                 bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } }, {
                   onSuccess: () => { toast({ title: "Added to batch", description: "Vehicle added to publishing queue." }); invalidateWorkspaces(); },
@@ -936,20 +932,17 @@ export function ListingsWorkspace() {
                           )}
                         </div>
                         {/* Action */}
-                        <div className="w-[120px] flex-shrink-0 flex items-center justify-end gap-1.5">
-                          {isReady && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 px-2 text-[10px] gap-1 border-success/35 text-success hover:bg-success/10 whitespace-nowrap"
-                              onClick={(e) => { e.stopPropagation(); setMarkPublishedVehicle({ id: w.vehicleId, label: w.label }); }}
-                            >
-                              <UploadCloud className="w-3 h-3" />
-                              Publish
-                            </Button>
-                          )}
+                        <div className="w-[140px] flex-shrink-0 flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            className="h-7 px-2 text-[10px] gap-1 bg-success hover:bg-success/90 text-white whitespace-nowrap font-bold uppercase tracking-widest"
+                            onClick={(e) => { e.stopPropagation(); setPublishNowVehicleId(w.vehicleId); }}
+                          >
+                            <UploadCloud className="w-3 h-3" />
+                            Publish Now
+                          </Button>
                           <Link href={`/listings/${w.vehicleId}`}>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" title="Review Listing">
                               <Eye className="w-3.5 h-3.5" />
                             </Button>
                           </Link>
@@ -1125,19 +1118,18 @@ export function ListingsWorkspace() {
                           </Card>
                         </Link>
 
-                        {/* Publish button — overlaid on Ready tab cards */}
-                        {isReady && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMarkPublishedVehicle({ id: w.vehicleId, label: w.label });
-                            }}
-                            className="absolute bottom-[72px] right-6 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success/90 hover:bg-success text-white text-xs font-bold uppercase tracking-widest shadow-lg transition-all duration-150 border border-success/50"
-                          >
-                            <UploadCloud className="w-3.5 h-3.5" />
-                            Publish
-                          </button>
-                        )}
+                        {/* Publish Now — overlaid on all cards */}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setPublishNowVehicleId(w.vehicleId);
+                          }}
+                          className="absolute bottom-[72px] right-6 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success/90 hover:bg-success text-white text-xs font-bold uppercase tracking-widest shadow-lg transition-all duration-150 border border-success/50"
+                        >
+                          <UploadCloud className="w-3.5 h-3.5" />
+                          Publish Now
+                        </button>
                       </div>
                     );
                   })}
@@ -1519,6 +1511,12 @@ export function ListingsWorkspace() {
           }}
         />
       )}
+
+      <PublishNowModal
+        vehicleId={publishNowVehicleId}
+        vehicleLabel={workspacesData?.workspaces.find((w) => w.vehicleId === publishNowVehicleId)?.label}
+        onClose={() => { setPublishNowVehicleId(null); invalidateWorkspaces(); }}
+      />
     </AppLayout>
   );
 }

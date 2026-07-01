@@ -13,6 +13,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
 import { formatCurrency, formatMileage, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -30,9 +36,12 @@ import {
   Globe,
   Flag,
   FileText,
-  Activity
+  Activity,
+  UploadCloud,
+  MoreHorizontal,
 } from "lucide-react";
 import { PageHeader, SectionCard, StatusPulse } from "@/components/shared";
+import { PublishNowModal } from "@/components/PublishNowModal";
 
 function ratingClass(rating: string | null | undefined) {
   switch (rating) {
@@ -179,6 +188,7 @@ export function ListingDetail() {
   const id = Number(params.id);
   const queryClient = useQueryClient();
   const [activeVersionId, setActiveVersionId] = useState<number | null>(null);
+  const [publishNowOpen, setPublishNowOpen] = useState(false);
 
   const { data, isLoading } = useGetListingDetail(id, {
     query: { queryKey: getGetListingDetailQueryKey(id), enabled: !Number.isNaN(id) },
@@ -315,38 +325,51 @@ export function ListingDetail() {
                     </div>
                   </div>
                   
-                  <div className="flex flex-wrap gap-3 mt-auto">
-                    <Button 
-                      onClick={() => generate.mutate({ id: vehicle.id })} 
-                      disabled={generate.isPending} 
-                      className={cn(
-                        "gap-2 px-6",
-                        versions.length === 0 ? "premium-gradient-btn" : "bg-primary text-primary-foreground hover:bg-primary/90"
-                      )}
+                  <div className="flex flex-wrap gap-3 mt-auto items-center">
+                    <Button
+                      onClick={() => setPublishNowOpen(true)}
+                      className="gap-2 px-6 premium-gradient-btn"
                     >
-                      {generate.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-4 h-4" />
-                      )}
-                      {versions.length === 0 ? "Generate AI Listing" : "Regenerate Listing"}
+                      <UploadCloud className="w-4 h-4" />
+                      Publish Now
                     </Button>
-                    
-                    {selectedVersion && (
-                      <Button
-                        variant="outline"
-                        className="gap-2 px-6 border-success/30 text-success hover:bg-success hover:text-success-foreground"
-                        onClick={() => queue.mutate({ id: selectedVersion.id, data: { priority: 5 } })}
-                        disabled={queue.isPending}
-                      >
-                        {queue.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Send className="w-4 h-4" />
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="gap-2 px-4 border-border/60">
+                          <MoreHorizontal className="w-4 h-4" />
+                          More
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem
+                          onClick={() => generate.mutate({ id: vehicle.id })}
+                          disabled={generate.isPending}
+                          className="gap-2 cursor-pointer"
+                        >
+                          {generate.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-4 h-4 text-primary" />
+                          )}
+                          {versions.length === 0 ? "Generate AI Listing" : "Regenerate Listing"}
+                        </DropdownMenuItem>
+                        {selectedVersion && (
+                          <DropdownMenuItem
+                            onClick={() => queue.mutate({ id: selectedVersion.id, data: { priority: 5 } })}
+                            disabled={queue.isPending}
+                            className="gap-2 cursor-pointer"
+                          >
+                            {queue.isPending ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Send className="w-4 h-4 text-success" />
+                            )}
+                            Queue for Publishing
+                          </DropdownMenuItem>
                         )}
-                        Queue for Publishing
-                      </Button>
-                    )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </div>
@@ -455,6 +478,12 @@ export function ListingDetail() {
           )}
         </div>
       </div>
+
+      <PublishNowModal
+        vehicleId={publishNowOpen ? vehicle.id : null}
+        vehicleLabel={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+        onClose={() => { setPublishNowOpen(false); invalidate(); }}
+      />
     </AppLayout>
   );
 }
