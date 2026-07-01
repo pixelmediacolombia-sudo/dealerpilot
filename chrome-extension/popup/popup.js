@@ -208,16 +208,31 @@ async function loadDebugState() {
   dbg.lastPoll.className   = d.lastPollTime ? "value ok" : "value";
 
   if (d.lastNextResponse) {
-    dbg.lastNext.textContent = truncate(d.lastNextResponse, 32);
-    dbg.lastNext.title       = d.lastNextResponse;
-    const isLiveJob    = d.lastNextResponse.startsWith("job #");
+    const isLiveJobFmt = d.lastNextResponse.startsWith("job #");
     const isStale      = d.lastNextResponse.startsWith("[stale]");
     const needsApprove = d.lastNextResponse.startsWith("[needs approval]");
-    dbg.lastNext.className = "value " + (
-      isLiveJob    ? "ok"       :
-      isStale      ? "err"      :
-      needsApprove ? "warn-text" : ""
-    );
+
+    // Suppress unconfirmed legacy cache: if it looks like a raw "job #N" string
+    // (no prefix from the current safety gate) and the timestamp is older than
+    // 2 minutes, treat it as unverified and hide it. This catches stale
+    // chrome.storage.local values from previous sessions (e.g. "job #19").
+    const STALE_MS = 2 * 60 * 1000;
+    const responseAge = d.lastNextResponseAt ? Date.now() - d.lastNextResponseAt : Infinity;
+    const isUnconfirmedLegacy = isLiveJobFmt && responseAge > STALE_MS;
+
+    if (isUnconfirmedLegacy) {
+      dbg.lastNext.textContent = "— (stale cache cleared)";
+      dbg.lastNext.title       = `Suppressed: ${d.lastNextResponse}`;
+      dbg.lastNext.className   = "value";
+    } else {
+      dbg.lastNext.textContent = truncate(d.lastNextResponse, 32);
+      dbg.lastNext.title       = d.lastNextResponse;
+      dbg.lastNext.className   = "value " + (
+        isLiveJobFmt ? "ok"        :
+        isStale      ? "err"       :
+        needsApprove ? "warn-text" : ""
+      );
+    }
   } else {
     dbg.lastNext.textContent = "—";
     dbg.lastNext.className   = "value";
@@ -428,6 +443,51 @@ el.btnFbLogin.addEventListener("click", async () => {
 refreshBtn.addEventListener("click", () => {
   setStatus("");
   refresh();
+});
+
+// ---- Emergency Kill ----
+document.getElementById("emergency-kill").addEventListener("click", async () => {
+  const btn = document.getElementById("emergency-kill");
+  btn.disabled = true;
+  btn.textContent = "Killing…";
+  await send({ type: "EMERGENCY_KILL" });
+  // Also wipe chrome.storage display fields directly so popup reflects it instantly
+  await chrome.storage.local.remove([
+    "activeJob", "lastClaimedJob", "lastPublishedJob",
+    "lastError", "lastClaimAttempt", "lastClaimError",
+    "lastNextResponse", "lastNextResponseAt",
+    "lastPollTime", "auditLog",
+  ]);
+  activeJob = null;
+  nextJob = null;
+  // Reset display immediately without waiting for refresh
+  dbg.activeJob.textContent = "None";   dbg.activeJob.className = "value";
+  dbg.claimed.textContent   = "None";   dbg.claimed.className   = "value";
+  dbg.published.textContent = "None";   dbg.published.className = "value";
+  dbg.lastNext.textContent  = "—";      dbg.lastNext.className  = "value";
+  dbg.lastPoll.textContent  = "Never";  dbg.lastPoll.className  = "value";
+  dbg.lastClaim.textContent = "None";   dbg.lastClaim.className = "value";
+  dbg.lastClaimErr.textContent = "None"; dbg.lastClaimErr.className = "value ok";
+  dbg.error.textContent     = "None";   dbg.error.className     = "value ok";
+  el.vQueued.textContent    = "None";
+  el.vCurrent.textContent   = "None";
+  renderStart();
+  setStatus("Emergency kill complete — all state cleared.", "ok");
+  btn.disabled = false;
+  btn.textContent = "🚨 Emergency Kill / Reset All";
+  await refresh();
+});
+
+// ---- Clear Cached Queue Display ----
+document.getElementById("clear-queue-display").addEventListener("click", async () => {
+  await chrome.storage.local.remove(["lastNextResponse", "lastNextResponseAt"]);
+  dbg.lastNext.textContent  = "—";
+  dbg.lastNext.className    = "value";
+  dbg.lastNextAt.textContent = "Never";
+  el.vQueued.textContent    = "None";
+  if (!activeJob) nextJob = null;
+  renderStart();
+  setStatus("Queue display cleared.", "ok");
 });
 
 // ---- Debug buttons ----

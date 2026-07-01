@@ -471,12 +471,12 @@ const handlers = {
     // Get current state before wiping
     const { activeJob } = await chrome.storage.local.get("activeJob");
 
-    // Wipe all local extension state
+    // Wipe all local extension state (including audit log)
     await chrome.storage.local.remove([
       "activeJob", "lastClaimedJob", "lastPublishedJob",
       "lastError", "lastClaimAttempt", "lastClaimError",
       "lastNextResponse", "lastNextResponseAt", "connectTabId",
-      "lastPollTime",
+      "lastPollTime", "auditLog",
     ]);
 
     // Cancel active job on backend (mark Failed)

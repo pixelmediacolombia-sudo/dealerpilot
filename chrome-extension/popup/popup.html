@@ -152,6 +152,17 @@
         padding: 5px;
         margin-top: 6px;
       }
+      button.danger {
+        background: #c0001a;
+        border: 2px solid #ff3b52;
+        color: #fff;
+        font-weight: 800;
+        font-size: 12px;
+        padding: 8px;
+        margin-top: 10px;
+        letter-spacing: 0.02em;
+      }
+      button.danger:not(:disabled):hover { opacity: 1; background: #e8001f; }
       button.btn-fb-login {
         background: #1877f2;
         font-size: 12px;
@@ -397,6 +408,8 @@
 
           <div class="divider"></div>
           <h2 style="margin-top:6px">Dev Controls</h2>
+          <button id="emergency-kill" class="danger">🚨 Emergency Kill / Reset All</button>
+          <button id="clear-queue-display" class="ghost" style="border-color:#4a3020;color:#c8915a;">Clear Cached Queue Display</button>
           <button id="clear-error" class="ghost">Clear Last Error</button>
           <button id="clear-active-job" class="ghost">Clear Stuck Active Job</button>
           <button id="reload-debug" class="ghost">Reload Debug State</button>
