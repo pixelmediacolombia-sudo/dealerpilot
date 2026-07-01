@@ -7,7 +7,7 @@ id = "3B4_FFSkEVBkAeYMFRJ2e"
 [[services]]
 localPort = 8080
 name = "API Server"
-paths = ["/api", "/meta-test-feed.xml", "/meta-catalog-feed.xml"]
+paths = ["/api", "/meta-test-feed.xml", "/meta-catalog-feed.xml", "/meta-test-feed.csv", "/meta-catalog-feed.csv"]
 
 [services.development]
 run = "pnpm --filter @workspace/api-server run dev"

@@ -468,85 +468,99 @@ export async function generateMetaTestFeedXml(dealerId: number): Promise<string>
 </rss>`;
 }
 
-// CSV column names match Meta field names (no g: prefix)
-const CSV_HEADERS = [
+// Meta Automotive Inventory Ads — CSV feed
+// Column order matches Meta's required headers exactly.
+const META_CSV_HEADERS = [
+  "id",
   "vehicle_id",
   "title",
   "description",
+  "availability",
+  "condition",
+  "price",
   "link",
   "image_link",
   "additional_image_link",
-  "price",
-  "availability",
-  "condition",
-  "year",
+  "brand",
   "make",
   "model",
-  "trim",
+  "year",
   "vin",
   "mileage",
   "body_style",
-  "transmission",
   "fuel_type",
-  "exterior_color",
-  "interior_color",
+  "transmission",
+  "color",
   "street_address",
   "city",
   "region",
-  "country",
   "postal_code",
+  "country",
   "latitude",
   "longitude",
-  "dealer_name",
 ];
 
 function escapeCsv(val: string | number | null | undefined): string {
   if (val === null || val === undefined) return "";
   const s = String(val);
-  if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+  if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
     return `"${s.replace(/"/g, '""')}"`;
   }
   return s;
 }
 
+/** Strip the " mi" unit suffix — Meta wants a bare number for mileage. */
+function mileageNumber(raw: string | null): string {
+  if (!raw) return "";
+  return raw.replace(/\s*mi\s*$/i, "").trim();
+}
+
+function vehicleToCsvRow(v: MetaVehicle): string {
+  return [
+    escapeCsv(v.vehicleId),                                  // id
+    escapeCsv(v.vehicleId),                                  // vehicle_id
+    escapeCsv(v.title),                                      // title
+    escapeCsv(v.description.slice(0, 5000)),                 // description
+    escapeCsv(v.availability),                               // availability
+    escapeCsv(v.condition),                                  // condition
+    escapeCsv(v.price),                                      // price
+    escapeCsv(v.link),                                       // link
+    escapeCsv(v.imageLink),                                  // image_link
+    escapeCsv(v.additionalImageLinks.slice(0, 9).join(",")), // additional_image_link
+    escapeCsv(v.make),                                       // brand
+    escapeCsv(v.make),                                       // make
+    escapeCsv(v.model),                                      // model
+    escapeCsv(v.year ?? ""),                                 // year
+    escapeCsv(v.vin),                                        // vin
+    escapeCsv(mileageNumber(v.mileage)),                     // mileage (number only)
+    escapeCsv(v.bodyStyle ?? ""),                            // body_style
+    escapeCsv(v.fuelType ?? ""),                             // fuel_type
+    escapeCsv(v.transmission ?? ""),                         // transmission
+    escapeCsv(v.exteriorColor ?? ""),                        // color
+    escapeCsv(v.streetAddress),                              // street_address
+    escapeCsv(v.city),                                       // city
+    escapeCsv(v.region),                                     // region
+    escapeCsv(v.postalCode),                                 // postal_code
+    escapeCsv(v.country),                                    // country
+    escapeCsv(v.latitude),                                   // latitude
+    escapeCsv(v.longitude),                                  // longitude
+  ].join(",");
+}
+
 export async function generateMetaCatalogCsv(dealerId: number): Promise<string> {
   const { vehicles } = await loadMetaVehicles(dealerId);
   const exportable = vehicles.filter((v) => validateVehicle(v).valid);
+  const rows = exportable.map(vehicleToCsvRow);
+  return [META_CSV_HEADERS.join(","), ...rows].join("\r\n");
+}
 
-  const rows = exportable.map((v) =>
-    [
-      escapeCsv(v.vehicleId),
-      escapeCsv(v.title),
-      escapeCsv(v.description.slice(0, 5000)),
-      escapeCsv(v.link),
-      escapeCsv(v.imageLink),
-      escapeCsv(v.additionalImageLinks.slice(0, 9).join("|")),
-      escapeCsv(v.price),
-      escapeCsv(v.availability),
-      escapeCsv(v.condition),
-      escapeCsv(v.year),
-      escapeCsv(v.make),
-      escapeCsv(v.model),
-      escapeCsv(v.trim),
-      escapeCsv(v.vin),
-      escapeCsv(v.mileage),
-      escapeCsv(v.bodyStyle),
-      escapeCsv(v.transmission),
-      escapeCsv(v.fuelType),
-      escapeCsv(v.exteriorColor),
-      escapeCsv(v.interiorColor),
-      escapeCsv(v.streetAddress),
-      escapeCsv(v.city),
-      escapeCsv(v.region),
-      escapeCsv(v.country),
-      escapeCsv(v.postalCode),
-      escapeCsv(v.latitude),
-      escapeCsv(v.longitude),
-      escapeCsv(v.dealerName),
-    ].join(","),
-  );
-
-  return [CSV_HEADERS.join(","), ...rows].join("\n");
+export async function generateMetaTestCsv(dealerId: number): Promise<string> {
+  const { vehicles } = await loadMetaVehicles(dealerId);
+  const exportable = vehicles.filter((v) => validateVehicle(v).valid);
+  const header = META_CSV_HEADERS.join(",");
+  const sample = exportable[0];
+  if (!sample) return header + "\r\n";
+  return [header, vehicleToCsvRow(sample)].join("\r\n");
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
