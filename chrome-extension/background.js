@@ -401,6 +401,26 @@ const handlers = {
       return { conversation: conv || null };
     });
   },
+
+  // ---- Image proxy: fetch a remote image and return it as base64 ----
+  // Content scripts cannot bypass CORS; the service worker can.
+  async FETCH_IMAGE_AS_BASE64(message) {
+    const response = await fetch(message.url);
+    if (!response.ok) {
+      throw new Error(`Image fetch failed: ${response.status} ${response.statusText} — ${message.url}`);
+    }
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+
+    // Convert binary to base64 in safe chunks (avoids call-stack overflow on large images)
+    let binary = "";
+    const chunkSize = 32768;
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, uint8Array.subarray(i, i + chunkSize));
+    }
+    return { base64: btoa(binary), type: contentType };
+  },
 };
 
 // ---- App-controlled polling alarm ----

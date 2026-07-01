@@ -798,10 +798,26 @@
       log("Publishing flow crashed", err);
     }
 
-    // ---- Done ----
+    // ---- Phase 4: Photo upload ----
 
     if (images && images.length) {
-      warnings.push(`${images.length} photo(s) available — drag-drop them manually after publishing.`);
+      const photoResult = await uploadPhotos(images, job.id, warnings);
+      if (photoResult.failed) {
+        if (job.mode === "Controlled") {
+          const reason = photoResult.reason || "Photo upload failed";
+          stateError("Photo upload failed", new Error(reason));
+          setStatus(reason, "err");
+          send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
+          await send({ type: "FAIL_JOB", jobId: job.id, reason });
+          await chrome.storage.local.remove("activeJob");
+          renderReview(job, { filled, missed, warnings });
+          return;
+        } else {
+          warnings.push(photoResult.reason || "Photo upload failed — upload photos manually");
+        }
+      }
+    } else {
+      warnings.push("No photos in job payload — upload photos manually");
     }
 
     if (job.mode === "Controlled") {
@@ -811,6 +827,131 @@
       renderReview(job, { filled, missed, warnings });
       log("Publishing fill complete", { job, filled, missed, warnings });
     }
+  }
+
+  // =====================================================================
+  // Photo upload — fetch via background service worker (bypasses CORS),
+  // inject into Facebook's hidden file input, wait for thumbnails.
+  // =====================================================================
+
+  async function uploadPhotos(imageUrls, jobId, warnings) {
+    const MAX_PHOTOS = 20;
+    const toUpload = imageUrls.slice(0, MAX_PHOTOS);
+
+    stateLog(`Photo upload: ${toUpload.length} URL(s) — locating file input`);
+    setStatus("Looking for photo upload input…");
+
+    // Wait up to 10 s for Facebook to render the file input
+    let input = null;
+    const FILE_SELECTORS = [
+      'input[type="file"][accept*="image"]',
+      'input[type="file"][multiple]',
+      'input[type="file"]',
+    ];
+    for (let attempt = 0; attempt < 20; attempt++) {
+      for (const sel of FILE_SELECTORS) {
+        const found = document.querySelector(sel);
+        if (found) { input = found; break; }
+      }
+      if (input) break;
+      await sleep(500);
+    }
+
+    if (!input) {
+      const reason = "Photo upload failed: no file input found on Facebook form";
+      stateError(reason);
+      return { uploaded: 0, failed: true, reason };
+    }
+
+    stateLog(`Photo upload: file input found — downloading ${toUpload.length} image(s)`);
+    setStatus(`Downloading ${toUpload.length} photo(s)…`);
+
+    // Fetch each image via the background service worker (no CORS restrictions there)
+    const files = [];
+    for (let i = 0; i < toUpload.length; i++) {
+      const url = toUpload[i];
+      setStatus(`Downloading photo ${i + 1} / ${toUpload.length}…`);
+      try {
+        const res = await send({ type: "FETCH_IMAGE_AS_BASE64", url });
+        if (!res || !res.ok) {
+          stateLog(`Photo ${i + 1}: background fetch failed — ${res?.error}`);
+          continue;
+        }
+        const { base64, type } = res.data;
+        // Decode base64 → Uint8Array → Blob → File
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+        const mimeType = type || "image/jpeg";
+        const ext = mimeType.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+        files.push(new File([new Blob([bytes], { type: mimeType })], `vehicle-${i + 1}.${ext}`, { type: mimeType }));
+        stateLog(`Photo ${i + 1}: downloaded OK (${Math.round(bytes.length / 1024)} KB)`);
+      } catch (err) {
+        stateLog(`Photo ${i + 1}: error — ${err.message}`);
+      }
+    }
+
+    if (files.length === 0) {
+      const reason = "Photo upload failed: could not download any images from the job payload";
+      stateError(reason);
+      return { uploaded: 0, failed: true, reason };
+    }
+
+    stateLog(`Photo upload: injecting ${files.length} file(s) into input`);
+    setStatus(`Uploading ${files.length} photo(s) to Facebook…`);
+
+    // Inject files via DataTransfer — works in Chrome even for React-controlled inputs
+    const dt = new DataTransfer();
+    for (const file of files) dt.items.add(file);
+    input.files = dt.files;
+    input.dispatchEvent(new Event("input",  { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+
+    // Wait for Facebook to process the upload (thumbnails or count change)
+    stateLog("Photo upload: waiting for Facebook to confirm upload…");
+    setStatus(`Waiting for Facebook to process ${files.length} photo(s)…`);
+    const confirmed = await waitForPhotoThumbnails(files.length, 30000);
+
+    if (!confirmed) {
+      // Not a hard failure — Facebook may have accepted without showing expected thumb count
+      warnings.push(`Photo upload: injected ${files.length} file(s); thumbnails not fully confirmed — form may still proceed`);
+      stateLog("Photo upload: thumbnail confirmation timed out — continuing anyway");
+    } else {
+      stateLog(`Photo upload: confirmed — ${files.length} photo(s) visible`);
+    }
+
+    send({ type: "SEND_JOB_EVENT", jobId, event: "photos_uploaded", details: `${files.length} photos` }).catch(() => {});
+    setStatus(`Photos uploaded (${files.length}). Continuing…`);
+    await sleep(800);
+
+    return { uploaded: files.length, failed: false };
+  }
+
+  async function waitForPhotoThumbnails(expectedCount, timeoutMs) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      // Facebook renders uploaded photo thumbnails in a few different ways
+      const thumbs = [
+        ...document.querySelectorAll('[data-testid="media-attachment-delete-button"]'),
+        ...document.querySelectorAll('img[src^="blob:"]'),
+      ];
+      // Deduplicate by filtering to unique elements
+      const unique = [...new Set(thumbs)];
+      if (unique.length >= 1) {
+        stateLog(`Photo thumbnails found: ${unique.length} / ${expectedCount}`);
+        return true;
+      }
+      // Also accept: any visible image that appeared inside the upload area
+      const uploadArea = document.querySelector(
+        '[aria-label*="photo" i], [aria-label*="image" i], [aria-label*="upload" i]'
+      );
+      if (uploadArea) {
+        const imgs = uploadArea.querySelectorAll("img");
+        if (imgs.length >= 1) return true;
+      }
+      await sleep(500);
+    }
+    return false;
   }
 
   // ── Controlled-mode: auto-click Next → Publish ─────────────────────────────
