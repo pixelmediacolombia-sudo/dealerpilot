@@ -677,7 +677,7 @@ paths:
                   type: integer
       responses:
         "201":
-          description: Job created
+          description: New job created
           content:
             application/json:
               schema:
@@ -687,23 +687,33 @@ paths:
                     type: integer
                   job:
                     $ref: "#/components/schemas/PublishingJob"
+                  resumed:
+                    type: boolean
+                    description: Always false for new jobs
+                  message:
+                    type: string
+        "200":
+          description: Existing active job returned (idempotent resume — no duplicate created)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: integer
+                  job:
+                    $ref: "#/components/schemas/PublishingJob"
+                  resumed:
+                    type: boolean
+                    description: true when returning an existing active job instead of creating a new one
+                  message:
+                    type: string
         "404":
           description: Vehicle not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Vehicle already has an active publishing job
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                  jobId:
-                    type: integer
 
   /publishing/jobs/next:
     get:

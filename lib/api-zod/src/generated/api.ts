@@ -1114,7 +1114,9 @@ export const PublishNowResponse = zod.object({
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
   "listingTitle": zod.string().nullish()
-}).optional()
+}).optional(),
+  "resumed": zod.boolean().optional().describe('true when returning an existing active job instead of creating a new one'),
+  "message": zod.string().optional()
 })
 
 

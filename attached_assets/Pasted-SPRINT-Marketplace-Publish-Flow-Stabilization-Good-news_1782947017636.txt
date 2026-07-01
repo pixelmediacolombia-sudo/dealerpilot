@@ -1,0 +1,89 @@
+SPRINT — Marketplace Publish Flow Stabilization
+
+Good news:
+Photo upload now works. Facebook shows the vehicle photos.
+
+Current problem:
+The flow is not smooth. After clicking Publish Now, it sometimes requires refreshing, reopening Marketplace, or clearing stuck jobs manually.
+
+This is not acceptable for MVP.
+
+Audit and fix the end-to-end publish state machine.
+
+Issues observed:
+- Publish Now creates a job but the UI may show HTTP 409: vehicle already has active publishing job.
+- Existing active jobs are not surfaced clearly to the user.
+- Operator has to refresh/reopen Marketplace manually.
+- Stuck jobs require manual clearing.
+- Extension overlay and dashboard modal can show different job states.
+- After photo upload, Facebook may still show 0 photos temporarily while thumbnails are processing.
+- The extension fails too early instead of waiting/polling for Facebook to finish processing uploads.
+- The dashboard does not always resume an existing active job cleanly.
+
+Required fixes:
+
+1. Idempotent Publish Now
+If vehicle already has an active publishing job:
+- do not return generic HTTP 409
+- return the existing job
+- reopen/resume the PublishNowModal for that job
+- show “Publishing already in progress — resuming job #X”
+
+2. Resume existing job
+When user opens dashboard:
+- if there is an active job for that dealer/vehicle, show Resume Publishing
+- do not create duplicate jobs
+- do not require manual refresh
+
+3. Better photo wait logic
+After injecting photos:
+- wait until Facebook thumbnails are visible
+- also wait until Facebook photo counter updates if available
+- use longer timeout, e.g. 60 seconds
+- only fail if still 0 photos after timeout
+- do not fail immediately after injection
+
+4. Accurate failure reason
+If the job fails before publishing:
+- report true blocker:
+  - photos still processing
+  - Next disabled
+  - missing required field
+  - Facebook validation error
+- never show generic “stuck” unless timeout is real
+
+5. Dashboard ↔ extension state sync
+Dashboard modal must poll the existing job progress.
+Extension overlay must render the same jobId as the dashboard.
+If mismatch:
+- clear local stale job
+- reload current job from backend
+
+6. Auto recovery
+If a job is stuck:
+- retry automatically once
+- reopen Marketplace automatically
+- reload payload
+- do not require the operator to manually clear stuck job
+
+7. Manual controls
+Add clear buttons:
+- Resume job
+- Retry job
+- Cancel job
+- Clear local extension state
+
+8. No hidden auto-starts
+Only Publish Now or explicit Resume should start/restart a job.
+
+Acceptance:
+- Click Publish Now once.
+- Facebook opens automatically.
+- Photos upload.
+- Extension waits for thumbnails properly.
+- Required fields fill.
+- Next is clicked only when enabled.
+- Publish is clicked.
+- Dashboard shows progress continuously.
+- If job already exists, modal resumes it instead of throwing 409.
+- No manual refresh/reopen/clear required.

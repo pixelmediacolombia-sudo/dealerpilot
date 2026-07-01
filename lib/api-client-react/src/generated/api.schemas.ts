@@ -1810,14 +1810,20 @@ export type PublishNowBody = {
   vehicleId: number;
 };
 
+export type PublishNow200 = {
+  jobId?: number;
+  job?: PublishingJob;
+  /** true when returning an existing active job instead of creating a new one */
+  resumed?: boolean;
+  message?: string;
+};
+
 export type PublishNow201 = {
   jobId?: number;
   job?: PublishingJob;
-};
-
-export type PublishNow409 = {
-  error?: string;
-  jobId?: number;
+  /** Always false for new jobs */
+  resumed?: boolean;
+  message?: string;
 };
 
 export type RetryPublishingJob200 = {

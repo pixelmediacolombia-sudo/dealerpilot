@@ -7,10 +7,10 @@
  */
 import type { PublishingJob } from './publishingJob';
 
-export type PublishNow201 = {
+export type PublishNow200 = {
   jobId?: number;
   job?: PublishingJob;
-  /** Always false for new jobs */
+  /** true when returning an existing active job instead of creating a new one */
   resumed?: boolean;
   message?: string;
 };

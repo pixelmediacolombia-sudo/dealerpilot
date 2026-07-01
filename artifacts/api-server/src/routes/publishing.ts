@@ -744,9 +744,9 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     return;
   }
 
-  // Reject if an active job already exists for this vehicle
+  // If an active job already exists, return it instead of creating a duplicate
   const [existing] = await db
-    .select({ id: publishingJobsTable.id })
+    .select()
     .from(publishingJobsTable)
     .where(
       and(
@@ -759,9 +759,13 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     )
     .limit(1);
   if (existing) {
-    res.status(409).json({
-      error: "Vehicle already has an active publishing job",
+    const [enriched] = await enrich([existing]);
+    req.log.info({ vehicleId, jobId: existing.id, source: "publish_now_resume" }, "Publish Now: existing active job returned (idempotent)");
+    res.status(200).json({
       jobId: existing.id,
+      job: enriched,
+      resumed: true,
+      message: `Publishing already in progress — resuming job #${existing.id}`,
     });
     return;
   }

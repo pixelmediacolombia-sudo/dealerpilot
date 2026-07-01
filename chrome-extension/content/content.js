@@ -22,7 +22,7 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.2.6";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.2.7";
 
   function _runtimeAlive() {
     try {
@@ -932,7 +932,7 @@
     // Wait for Facebook to process the upload (thumbnails or count change)
     stateLog("Photo upload: waiting for Facebook to confirm upload…");
     setStatus(`Waiting for Facebook to process ${files.length} photo(s)…`);
-    const confirmed = await waitForPhotoThumbnails(files.length, 30000);
+    const confirmed = await waitForPhotoThumbnails(files.length, 60000);
 
     if (!confirmed) {
       // Not a hard failure — Facebook may have accepted without showing expected thumb count
@@ -976,6 +976,46 @@
     return false;
   }
 
+  // ── Auto-retry helper ────────────────────────────────────────────────────────
+  // On first failure: fails the job, resets it to Queued on the backend, then
+  // navigates back to the Marketplace create page so the content script picks
+  // it up fresh. On second+ failure: returns false so the caller renders review.
+
+  async function handleAutoRetry(job, reason, extras) {
+    const retryCount = job._retryCount ?? 0;
+    if (retryCount >= 1) {
+      // Already retried once — do a final fail and let caller render review
+      await send({ type: "FAIL_JOB", jobId: job.id, reason });
+      await chrome.storage.local.remove("activeJob");
+      return false;
+    }
+
+    stateLog(`Auto-retry: first failure — "${reason}" — will retry job #${job.id}`);
+    setStatus("First attempt failed — auto-retrying in 4 s…", "err");
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_retry_pending", details: reason }).catch(() => {});
+
+    try {
+      await send({ type: "FAIL_JOB", jobId: job.id, reason: `${reason} [auto-retry pending]` });
+      const retryRes = await send({ type: "RETRY_JOB", jobId: job.id });
+      if (!retryRes || !retryRes.ok) throw new Error(retryRes?.error ?? "Retry API call failed");
+
+      // Persist incremented retry count; clear prefetched payload so next run fetches fresh data
+      await chrome.storage.local.set({
+        activeJob: { ...job, _retryCount: retryCount + 1, _prefetchedPayload: undefined },
+      });
+
+      setStatus("Auto-retry: reopening Marketplace in 4 s…");
+      await sleep(4000);
+      window.location.href = "https://www.facebook.com/marketplace/create/vehicle";
+    } catch (e) {
+      console.error("[AUTO-RETRY] Setup failed:", e);
+      await chrome.storage.local.remove("activeJob");
+      return false; // caller should render review
+    }
+
+    return true; // navigating away — caller must NOT call renderReview
+  }
+
   // ── Controlled-mode: auto-click Next → Publish ─────────────────────────────
 
   async function autoPublishFlow(job, { filled, missed, warnings }) {
@@ -992,28 +1032,29 @@
     const validation = await validateBeforeNext();
     if (!validation.ok) {
       stateError("Pre-Next validation failed", new Error(validation.reason));
-      setStatus(validation.reason, "err");
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: validation.reason }).catch(() => {});
-      await send({ type: "FAIL_JOB", jobId: job.id, reason: validation.reason });
-      await chrome.storage.local.remove("activeJob");
-      renderReview(job, { filled, missed, warnings });
+      const retried = await handleAutoRetry(job, validation.reason);
+      if (!retried) {
+        setStatus(validation.reason, "err");
+        renderReview(job, { filled, missed, warnings });
+      }
       return;
     }
 
     setStatus("Auto-publishing — clicking Next…");
     const nextClicked = await clickEnabledButtonByText(["next", "continue", "next step"], 10000);
     if (!nextClicked) {
-      // Scrape whatever validation errors Facebook is showing to give a useful reason
       const fbErrors = scrapeFacebookErrors();
       const reason = fbErrors
         ? `Next button blocked: ${fbErrors}`
         : "Could not find an enabled Next button — check the form for errors";
       stateError("Auto-publish: Next not found/enabled", new Error(reason));
-      setStatus(reason, "err");
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
-      await send({ type: "FAIL_JOB", jobId: job.id, reason });
-      await chrome.storage.local.remove("activeJob");
-      renderReview(job, { filled, missed, warnings });
+      const retried = await handleAutoRetry(job, reason);
+      if (!retried) {
+        setStatus(reason, "err");
+        renderReview(job, { filled, missed, warnings });
+      }
       return;
     }
 
@@ -1029,11 +1070,12 @@
     if (!publishClicked) {
       const reason = "Could not find the Publish button after clicking Next";
       stateError("Auto-publish: Publish not found", new Error(reason));
-      setStatus("Auto-publish failed: " + reason, "err");
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
-      await send({ type: "FAIL_JOB", jobId: job.id, reason });
-      await chrome.storage.local.remove("activeJob");
-      renderReview(job, { filled, missed, warnings });
+      const retried = await handleAutoRetry(job, reason);
+      if (!retried) {
+        setStatus("Auto-publish failed: " + reason, "err");
+        renderReview(job, { filled, missed, warnings });
+      }
       return;
     }
 
@@ -1098,17 +1140,24 @@
   // validateBeforeNext — checks the form has the minimum required data before
   // we try to click Next. Returns { ok, reason }.
   async function validateBeforeNext() {
-    // 1. Check at least 1 photo was uploaded (look for blob: thumbnails or FB thumb UI)
-    const photoThumbs = [
-      ...document.querySelectorAll('img[src^="blob:"]'),
-      ...document.querySelectorAll('[data-testid="media-attachment-delete-button"]'),
-    ];
-    if (photoThumbs.length === 0) {
-      // Also check the count indicator Facebook sometimes shows ("1 photo")
+    // 1. Wait up to 15 s for at least one photo thumbnail (Facebook may still be
+    //    processing when we arrive here — give it more time before failing).
+    const PHOTO_POLL_MS = 15000;
+    const photoStart = Date.now();
+    let hasPhoto = false;
+    while (Date.now() - photoStart < PHOTO_POLL_MS) {
+      const thumbs = [
+        ...document.querySelectorAll('img[src^="blob:"]'),
+        ...document.querySelectorAll('[data-testid="media-attachment-delete-button"]'),
+      ];
+      if (thumbs.length > 0) { hasPhoto = true; break; }
+      // Also accept Facebook's text counter ("1 photo", "3 photos")
       const countText = (document.body.innerText || "").match(/(\d+)\s*photo/i);
-      if (!countText || parseInt(countText[1], 10) === 0) {
-        return { ok: false, reason: "Photo upload failed: Facebook shows 0 photos — upload could not be confirmed" };
-      }
+      if (countText && parseInt(countText[1], 10) > 0) { hasPhoto = true; break; }
+      await sleep(600);
+    }
+    if (!hasPhoto) {
+      return { ok: false, reason: "Photo upload failed: Facebook still shows 0 photos after waiting 15 s — upload may not have been accepted" };
     }
 
     // 2. Check Next button exists and is not disabled

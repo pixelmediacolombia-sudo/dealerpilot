@@ -108,8 +108,8 @@ import type {
   MetaDiagnostics,
   NextPublishingJob,
   PatchBatchInput,
+  PublishNow200,
   PublishNow201,
-  PublishNow409,
   PublishNowBody,
   PublishPriorityScoreList,
   PublishingBatchDetail,
@@ -2586,9 +2586,9 @@ export const getPublishNowUrl = () => {
 /**
  * @summary Create a high-priority Controlled-mode job for a single vehicle (Publish Now)
  */
-export const publishNow = async (publishNowBody: PublishNowBody, options?: RequestInit): Promise<PublishNow201> => {
+export const publishNow = async (publishNowBody: PublishNowBody, options?: RequestInit): Promise<PublishNow200 | PublishNow201> => {
 
-  return customFetch<PublishNow201>(getPublishNowUrl(),
+  return customFetch<PublishNow200 | PublishNow201>(getPublishNowUrl(),
   {
     ...options,
     method: 'POST',
@@ -2600,7 +2600,7 @@ export const publishNow = async (publishNowBody: PublishNowBody, options?: Reque
 
 
 
-export const getPublishNowMutationOptions = <TError = ErrorType<ErrorResponse | PublishNow409>,
+export const getPublishNowMutationOptions = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishNow>>, TError,{data: BodyType<PublishNowBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof publishNow>>, TError,{data: BodyType<PublishNowBody>}, TContext> => {
 
@@ -2629,12 +2629,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PublishNowMutationResult = NonNullable<Awaited<ReturnType<typeof publishNow>>>
     export type PublishNowMutationBody = BodyType<PublishNowBody>
-    export type PublishNowMutationError = ErrorType<ErrorResponse | PublishNow409>
+    export type PublishNowMutationError = ErrorType<ErrorResponse>
 
     /**
  * @summary Create a high-priority Controlled-mode job for a single vehicle (Publish Now)
  */
-export const usePublishNow = <TError = ErrorType<ErrorResponse | PublishNow409>,
+export const usePublishNow = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishNow>>, TError,{data: BodyType<PublishNowBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof publishNow>>,

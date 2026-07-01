@@ -161,6 +161,16 @@ const handlers = {
     return apiPost(`/api/publishing/jobs/${message.jobId}/fail`, body);
   },
 
+  async CANCEL_JOB(message) {
+    return apiPost(`/api/publishing/jobs/${message.jobId}/cancel`, {
+      reason: message.reason || "Cancelled by operator from extension",
+    });
+  },
+
+  async RETRY_JOB(message) {
+    return apiPost(`/api/publishing/jobs/${message.jobId}/retry`, {});
+  },
+
   async SEND_JOB_EVENT(message) {
     const extensionId = await getExtensionId();
     return apiPost(`/api/publishing/jobs/${message.jobId}/event`, {
