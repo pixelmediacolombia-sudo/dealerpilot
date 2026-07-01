@@ -53,6 +53,8 @@ export interface MetaFieldCoverage {
 
 export interface MetaDiagnostics {
   totalVehicles: number;
+  exportableVehicles: number;
+  blockedVehicles: number;
   validVehicles: number;
   invalidVehicles: number;
   totalErrors: number;
@@ -212,8 +214,9 @@ export async function generateMetaCatalogXml(
   version: FeedVersion = "v1",
 ): Promise<string> {
   const { vehicles, dealerName } = await loadMetaVehicles(dealerId);
+  const exportable = vehicles.filter((v) => validateVehicle(v).valid);
 
-  const listings = vehicles.map((v) => buildListingXml(v, version)).join("\n");
+  const listings = exportable.map((v) => buildListingXml(v, version)).join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <listings>
@@ -221,7 +224,7 @@ export async function generateMetaCatalogXml(
     DealerPilot Meta Automotive Catalog Feed
     Schema: Automotive Feed ${version.toUpperCase()}
     Dealer: ${escapeXml(dealerName)}
-    Vehicles: ${vehicles.length}
+    Exported: ${exportable.length} / ${vehicles.length} vehicles
     Generated: ${new Date().toISOString()}
   -->
 ${listings}
@@ -261,8 +264,9 @@ const CSV_HEADERS = [
 
 export async function generateMetaCatalogCsv(dealerId: number): Promise<string> {
   const { vehicles } = await loadMetaVehicles(dealerId);
+  const exportable = vehicles.filter((v) => validateVehicle(v).valid);
 
-  const rows = vehicles.map((v) =>
+  const rows = exportable.map((v) =>
     [
       escapeCsv(v.vehicleOfferId),
       escapeCsv(v.title),
@@ -351,10 +355,15 @@ export async function validateMetaCatalog(dealerId: number): Promise<MetaDiagnos
   const feedReadinessPercent =
     vehicles.length > 0 ? Math.round((validCount / vehicles.length) * 100) : 100;
 
+  const exportableVehicles = validations.filter((v) => v.valid).length;
+  const blockedVehicles = validations.filter((v) => !v.valid).length;
+
   return {
     totalVehicles: vehicles.length,
-    validVehicles: validations.filter((v) => v.valid).length,
-    invalidVehicles: validations.filter((v) => !v.valid).length,
+    exportableVehicles,
+    blockedVehicles,
+    validVehicles: exportableVehicles,
+    invalidVehicles: blockedVehicles,
     totalErrors: validations.reduce((sum, v) => sum + v.errors.length, 0),
     totalWarnings: validations.reduce((sum, v) => sum + v.warnings.length, 0),
     feedReadinessPercent,

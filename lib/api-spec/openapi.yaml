@@ -3683,9 +3683,11 @@ components:
 
     MetaDiagnostics:
       type: object
-      required: [totalVehicles, validVehicles, invalidVehicles, totalErrors, totalWarnings, feedReadinessPercent, fieldCoverage, lastGenerated, feedXmlUrl, feedCsvUrl, vehicles]
+      required: [totalVehicles, exportableVehicles, blockedVehicles, validVehicles, invalidVehicles, totalErrors, totalWarnings, feedReadinessPercent, fieldCoverage, lastGenerated, feedXmlUrl, feedCsvUrl, vehicles]
       properties:
         totalVehicles: { type: integer }
+        exportableVehicles: { type: integer }
+        blockedVehicles: { type: integer }
         validVehicles: { type: integer }
         invalidVehicles: { type: integer }
         totalErrors: { type: integer }

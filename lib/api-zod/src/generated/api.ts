@@ -167,6 +167,8 @@ export const GetInventoryHealthResponse = zod.object({
  */
 export const GetMetaCatalogDiagnosticsResponse = zod.object({
   "totalVehicles": zod.number(),
+  "exportableVehicles": zod.number(),
+  "blockedVehicles": zod.number(),
   "validVehicles": zod.number(),
   "invalidVehicles": zod.number(),
   "totalErrors": zod.number(),
@@ -206,6 +208,8 @@ export const GetMetaCatalogDiagnosticsResponse = zod.object({
  */
 export const ValidateMetaCatalogFeedResponse = zod.object({
   "totalVehicles": zod.number(),
+  "exportableVehicles": zod.number(),
+  "blockedVehicles": zod.number(),
   "validVehicles": zod.number(),
   "invalidVehicles": zod.number(),
   "totalErrors": zod.number(),

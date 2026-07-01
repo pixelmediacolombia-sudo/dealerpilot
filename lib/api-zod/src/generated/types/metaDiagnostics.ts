@@ -10,6 +10,8 @@ import type { MetaVehicleValidation } from './metaVehicleValidation';
 
 export interface MetaDiagnostics {
   totalVehicles: number;
+  exportableVehicles: number;
+  blockedVehicles: number;
   validVehicles: number;
   invalidVehicles: number;
   totalErrors: number;

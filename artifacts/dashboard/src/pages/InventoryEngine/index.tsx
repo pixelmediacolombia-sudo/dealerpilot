@@ -402,8 +402,10 @@ export function InventoryEngine() {
           {/* ── META AUTOMOTIVE VALIDATION ── */}
           {(() => {
             const total = validation?.totalVehicles ?? 0;
+            const exportable = validation?.exportableVehicles ?? 0;
+            const blocked = validation?.blockedVehicles ?? 0;
             const readiness = validation?.feedReadinessPercent ?? 0;
-            const isReady = readiness === 100 && (validation?.invalidVehicles ?? 0) === 0;
+            const isReady = blocked === 0 && total > 0;
             const coverage = validation?.fieldCoverage;
 
             type MetaFieldKey = "vehicle_offer_id" | "image" | "price" | "condition" | "availability" | "url";
@@ -419,7 +421,11 @@ export function InventoryEngine() {
             return (
               <SectionCard
                 title="Meta Automotive Validation"
-                description="Required field coverage across all active vehicles — must be 100% before uploading to Commerce Manager"
+                description={
+                  total > 0
+                    ? `${exportable} exportable / ${total} total — ${blocked > 0 ? `${blocked} blocked from feed` : "all vehicles clear"}`
+                    : "Required field coverage — must be 100% before uploading to Commerce Manager"
+                }
                 action={
                   isReady ? (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-success/10 text-success border-success/20">
@@ -429,7 +435,7 @@ export function InventoryEngine() {
                   ) : (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-destructive/10 text-destructive border-destructive/20">
                       <XCircle className="w-3.5 h-3.5" />
-                      Export Blocked
+                      {blocked} Blocked
                     </span>
                   )
                 }
@@ -584,16 +590,16 @@ export function InventoryEngine() {
                     icon={<Database className="w-4 h-4" />}
                   />
                   <KpiCard
-                    label="Valid"
-                    value={diagnostics.validVehicles}
+                    label="Exportable"
+                    value={diagnostics.exportableVehicles}
                     icon={<CheckCircle2 className="w-4 h-4" />}
                     accentColor="green"
                   />
                   <KpiCard
-                    label="Invalid"
-                    value={diagnostics.invalidVehicles}
+                    label="Blocked"
+                    value={diagnostics.blockedVehicles}
                     icon={<XCircle className="w-4 h-4" />}
-                    valueColor={diagnostics.invalidVehicles > 0 ? "text-destructive" : undefined}
+                    valueColor={diagnostics.blockedVehicles > 0 ? "text-destructive" : undefined}
                   />
                   <KpiCard
                     label="Warnings"
