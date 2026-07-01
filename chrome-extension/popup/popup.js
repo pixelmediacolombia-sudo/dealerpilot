@@ -8,36 +8,43 @@ const startBtn   = document.getElementById("dev-start");
 const refreshBtn = document.getElementById("refresh");
 
 const el = {
-  dotBackend: document.getElementById("dot-backend"),
-  vBackend:   document.getElementById("v-backend"),
-  vAssigned:  document.getElementById("v-assigned"),
-  vCurrent:   document.getElementById("v-current"),
-  vSync:      document.getElementById("v-sync"),
-  pillFb:     document.getElementById("pill-fb"),
-  pillFbText: document.getElementById("pill-fb-text"),
-  pillMkp:    document.getElementById("pill-mkp"),
-  pillMkpText:document.getElementById("pill-mkp-text"),
-  fbLoginRow: document.getElementById("fb-login-row"),
-  btnFbLogin: document.getElementById("btn-fb-login"),
+  dotBackend:   document.getElementById("dot-backend"),
+  vBackend:     document.getElementById("v-backend"),
+  vCurrent:     document.getElementById("v-current"),
+  vQueued:      document.getElementById("v-queued"),
+  vLastPoll:    document.getElementById("v-last-poll"),
+  vSync:        document.getElementById("v-sync"),
+  pillFb:       document.getElementById("pill-fb"),
+  pillFbText:   document.getElementById("pill-fb-text"),
+  pillMkp:      document.getElementById("pill-mkp"),
+  pillMkpText:  document.getElementById("pill-mkp-text"),
+  fbLoginRow:   document.getElementById("fb-login-row"),
+  btnFbLogin:   document.getElementById("btn-fb-login"),
 };
 
 // ---- DOM refs: debug panel ----
 const dbg = {
-  version:    document.getElementById("d-version"),
-  chromeId:   document.getElementById("d-chrome-id"),
-  dealerId:   document.getElementById("d-dealer-id"),
-  backendUrl: document.getElementById("d-backend-url"),
-  connStatus: document.getElementById("d-conn-status"),
-  fbLogin:    document.getElementById("d-fb-login"),
-  mkpAccess:  document.getElementById("d-mkp-access"),
-  heartbeat:  document.getElementById("d-heartbeat"),
-  claimed:    document.getElementById("d-claimed"),
-  published:  document.getElementById("d-published"),
-  error:          document.getElementById("d-error"),
-  marketplace:    document.getElementById("d-marketplace"),
-  messenger:      document.getElementById("d-messenger"),
-  workflowStep:   document.getElementById("d-workflow-step"),
-  workflowStepAt: document.getElementById("d-workflow-step-at"),
+  version:       document.getElementById("d-version"),
+  chromeId:      document.getElementById("d-chrome-id"),
+  dealerId:      document.getElementById("d-dealer-id"),
+  backendUrl:    document.getElementById("d-backend-url"),
+  connStatus:    document.getElementById("d-conn-status"),
+  fbLogin:       document.getElementById("d-fb-login"),
+  mkpAccess:     document.getElementById("d-mkp-access"),
+  heartbeat:     document.getElementById("d-heartbeat"),
+  claimed:       document.getElementById("d-claimed"),
+  published:     document.getElementById("d-published"),
+  error:             document.getElementById("d-error"),
+  marketplace:       document.getElementById("d-marketplace"),
+  messenger:         document.getElementById("d-messenger"),
+  workflowStep:      document.getElementById("d-workflow-step"),
+  workflowStepAt:    document.getElementById("d-workflow-step-at"),
+  lastPoll:          document.getElementById("d-last-poll"),
+  lastNext:          document.getElementById("d-last-next"),
+  lastNextAt:        document.getElementById("d-last-next-at"),
+  lastClaim:         document.getElementById("d-last-claim"),
+  lastClaimErr:      document.getElementById("d-last-claim-err"),
+  activeJob:         document.getElementById("d-active-job"),
 };
 
 let nextJob   = null;
@@ -185,6 +192,60 @@ async function loadDebugState() {
 
   dbg.heartbeat.textContent = fmtTime(d.lastHeartbeat);
 
+  // Publisher
+  if (d.workflowStep) {
+    const isErr = d.workflowStep.startsWith("❌");
+    dbg.workflowStep.textContent = d.workflowStep;
+    dbg.workflowStep.className   = "value " + (isErr ? "err" : "ok");
+    dbg.workflowStepAt.textContent = fmtTime(d.workflowStepAt);
+  } else {
+    dbg.workflowStep.textContent   = "—";
+    dbg.workflowStep.className     = "value";
+    dbg.workflowStepAt.textContent = "—";
+  }
+
+  // Poll diagnostics
+  dbg.lastPoll.textContent = fmtTime(d.lastPollTime);
+  dbg.lastPoll.className   = d.lastPollTime ? "value ok" : "value";
+
+  if (d.lastNextResponse) {
+    dbg.lastNext.textContent   = truncate(d.lastNextResponse, 30);
+    dbg.lastNext.title         = d.lastNextResponse;
+    const hasJob = d.lastNextResponse.startsWith("job #");
+    dbg.lastNext.className     = "value " + (hasJob ? "ok" : "");
+  } else {
+    dbg.lastNext.textContent = "—";
+    dbg.lastNext.className   = "value";
+  }
+  dbg.lastNextAt.textContent = fmtTime(d.lastNextResponseAt);
+
+  if (d.lastClaimAttempt) {
+    dbg.lastClaim.textContent = `#${d.lastClaimAttempt.jobId} at ${fmtTime(d.lastClaimAttempt.at)}`;
+    dbg.lastClaim.className   = "value ok";
+  } else {
+    dbg.lastClaim.textContent = "None";
+    dbg.lastClaim.className   = "value";
+  }
+
+  if (d.lastClaimError) {
+    dbg.lastClaimErr.textContent = truncate(d.lastClaimError.message, 28) + ` (${fmtTime(d.lastClaimError.at)})`;
+    dbg.lastClaimErr.title       = d.lastClaimError.message;
+    dbg.lastClaimErr.className   = "value err";
+  } else {
+    dbg.lastClaimErr.textContent = "None";
+    dbg.lastClaimErr.className   = "value ok";
+  }
+
+  if (d.activeJob) {
+    const aj = d.activeJob;
+    dbg.activeJob.textContent = `#${aj.id} — ${truncate(aj.vehicleLabel || aj.listingTitle || "Job", 18)} (${aj.status})`;
+    dbg.activeJob.className   = "value ok";
+  } else {
+    dbg.activeJob.textContent = "None";
+    dbg.activeJob.className   = "value";
+  }
+
+  // Job history
   if (d.lastClaimedJob) {
     const j = d.lastClaimedJob;
     dbg.claimed.textContent = `#${j.id} — ${truncate(j.title || "", 20)} (${fmtTime(j.claimedAt)})`;
@@ -219,17 +280,6 @@ async function loadDebugState() {
   dbg.messenger.textContent = msgYes ? "Yes ✓" : "No";
   dbg.messenger.className   = "value " + (msgYes ? "ok" : "");
 
-  if (d.workflowStep) {
-    const isErr = d.workflowStep.startsWith("❌");
-    dbg.workflowStep.textContent = d.workflowStep;
-    dbg.workflowStep.className   = "value " + (isErr ? "err" : "ok");
-    dbg.workflowStepAt.textContent = fmtTime(d.workflowStepAt);
-  } else {
-    dbg.workflowStep.textContent   = "—";
-    dbg.workflowStep.className     = "value";
-    dbg.workflowStepAt.textContent = "—";
-  }
-
   // Sync pills with latest stored state
   updateFbPills(d.fbLoggedIn, d.marketplaceConnected);
 }
@@ -248,13 +298,14 @@ async function refresh() {
   } else {
     el.vBackend.textContent = "Unreachable";
     setDot(el.dotBackend, "off");
-    el.vAssigned.textContent = "—";
+    el.vQueued.textContent = "—";
 
-    const stored = await chrome.storage.local.get(["activeJob", "fbLoggedIn", "marketplaceConnected"]);
+    const stored = await chrome.storage.local.get(["activeJob", "fbLoggedIn", "marketplaceConnected", "lastPollTime"]);
     activeJob = stored.activeJob || null;
     el.vCurrent.textContent = activeJob
-      ? activeJob.listingTitle || `Job #${activeJob.id}`
+      ? (activeJob.vehicleLabel || activeJob.listingTitle || `Job #${activeJob.id}`) + getModeLabel(activeJob)
       : "None";
+    el.vLastPoll.textContent = fmtTime(stored.lastPollTime);
     el.vSync.textContent = new Date().toLocaleTimeString();
     updateFbPills(stored.fbLoggedIn ?? null, stored.marketplaceConnected ?? null);
     renderStart();
@@ -262,10 +313,11 @@ async function refresh() {
     return;
   }
 
-  const stored = await chrome.storage.local.get("activeJob");
+  const stored = await chrome.storage.local.get(["activeJob", "lastPollTime"]);
   activeJob = stored.activeJob || null;
+  el.vLastPoll.textContent = fmtTime(stored.lastPollTime);
 
-  // Fetch the next queued job
+  // Fetch the next queued job — this is what the alarm polls too
   const res = await send({ type: "GET_NEXT_JOB" });
   if (res && res.ok) {
     const raw = res.data;
@@ -278,20 +330,16 @@ async function refresh() {
     nextJob = null;
   }
 
-  // Check assigned job
-  const assignedRes = await send({ type: "GET_ASSIGNED_JOB" });
-  if (assignedRes && assignedRes.ok && assignedRes.data && assignedRes.data.job) {
-    const aj = assignedRes.data.job;
-    el.vAssigned.textContent =
-      `#${aj.id} — ${(aj.vehicleLabel || aj.listingTitle || "Job").slice(0, 22)}`;
-    el.vAssigned.className = "value ok";
+  if (nextJob) {
+    el.vQueued.textContent = `#${nextJob.id} — ${truncate(nextJob.vehicleLabel || nextJob.listingTitle || "Job", 18)}`;
+    el.vQueued.className = "value ok";
   } else {
-    el.vAssigned.textContent = "None";
-    el.vAssigned.className = "value";
+    el.vQueued.textContent = "None";
+    el.vQueued.className = "value";
   }
 
   el.vCurrent.textContent = activeJob
-    ? (activeJob.listingTitle || `Job #${activeJob.id}`) + getModeLabel(activeJob)
+    ? (activeJob.vehicleLabel || activeJob.listingTitle || `Job #${activeJob.id}`) + getModeLabel(activeJob)
     : "None";
   el.vSync.textContent = new Date().toLocaleTimeString();
   renderStart();
@@ -382,6 +430,16 @@ document.getElementById("clear-error").addEventListener("click", async () => {
   await send({ type: "CLEAR_LAST_ERROR" });
   dbg.error.textContent = "None";
   dbg.error.className   = "value ok";
+});
+
+document.getElementById("clear-active-job").addEventListener("click", async () => {
+  await send({ type: "CLEAR_ACTIVE_JOB" });
+  activeJob = null;
+  dbg.activeJob.textContent = "None";
+  dbg.activeJob.className   = "value";
+  el.vCurrent.textContent   = "None";
+  setStatus("Active job cleared.", "ok");
+  await refresh();
 });
 
 document.getElementById("reload-debug").addEventListener("click", () => {

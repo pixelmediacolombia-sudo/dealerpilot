@@ -158,7 +158,26 @@ const handlers = {
 
   async AUTO_START_ASSIGNED(message) {
     const extensionId = await getExtensionId();
-    const job = await apiPost(`/api/publishing/jobs/${message.jobId}/claim`, { extensionId });
+    const now = new Date().toISOString();
+
+    // Record that we are attempting to claim this job
+    await chrome.storage.local.set({
+      lastClaimAttempt: { jobId: message.jobId, at: now },
+    });
+
+    let job;
+    try {
+      job = await apiPost(`/api/publishing/jobs/${message.jobId}/claim`, { extensionId });
+    } catch (err) {
+      await chrome.storage.local.set({
+        lastClaimError: {
+          jobId: message.jobId,
+          message: err instanceof Error ? err.message : String(err),
+          at: new Date().toISOString(),
+        },
+      });
+      throw err;
+    }
 
     await chrome.storage.local.set({
       activeJob: job,
@@ -167,6 +186,7 @@ const handlers = {
         title: job.listingTitle || job.vehicleLabel || `Job #${job.id}`,
         claimedAt: new Date().toISOString(),
       },
+      lastClaimError: null,
     });
 
     await apiPost(`/api/publishing/jobs/${job.id}/event`, {
@@ -217,8 +237,28 @@ const handlers = {
   },
 
   async POLL_ASSIGNED_JOB() {
+    // Self-heal: if activeJob is set, verify it is still in-progress on the backend.
+    // A stuck/finished job in storage would otherwise block all future polling forever.
     const { activeJob } = await chrome.storage.local.get("activeJob");
-    if (activeJob) return { skipped: true };
+    if (activeJob) {
+      try {
+        const progress = await apiGet(`/api/publishing/jobs/${activeJob.id}/progress`);
+        const terminal = ["Published", "Failed", "Cancelled"];
+        if (terminal.includes(progress.status)) {
+          // Job finished — clear it so the next queued job can be picked up
+          await chrome.storage.local.remove("activeJob");
+          // fall through to normal poll
+        } else {
+          return { skipped: true, jobId: activeJob.id };
+        }
+      } catch {
+        // Can't verify — keep skipping to avoid thrashing
+        return { skipped: true, jobId: activeJob.id };
+      }
+    }
+
+    const now = new Date().toISOString();
+    await chrome.storage.local.set({ lastPollTime: now });
 
     try {
       const connectStatus = await apiGet("/api/extension/connect-status");
@@ -231,6 +271,7 @@ const handlers = {
 
     const extensionId = await getExtensionId();
 
+    // Check for a job explicitly assigned to this extension
     let data;
     try {
       data = await apiGet(`/api/publishing/jobs/assigned?extensionId=${encodeURIComponent(extensionId)}`);
@@ -240,10 +281,22 @@ const handlers = {
     const assignedJob = data && data.job && data.job.id ? data.job : null;
     if (assignedJob) return handlers.AUTO_START_ASSIGNED({ jobId: assignedJob.id });
 
+    // Check the general queue for any Queued/Retry job
     let nextData;
     try {
       nextData = await apiGet("/api/publishing/jobs/next");
-    } catch {
+      const summary = (nextData && nextData.job)
+        ? `job #${nextData.job.id} — ${nextData.job.vehicleLabel || nextData.job.status}`
+        : "null";
+      await chrome.storage.local.set({
+        lastNextResponse: summary,
+        lastNextResponseAt: now,
+      });
+    } catch (err) {
+      await chrome.storage.local.set({
+        lastNextResponse: `error: ${err instanceof Error ? err.message : String(err)}`,
+        lastNextResponseAt: now,
+      });
       return { job: null };
     }
     const nextJob = nextData && nextData.job && nextData.job.id ? nextData.job : null;
@@ -276,6 +329,12 @@ const handlers = {
       "fbLoggedIn",
       "marketplaceConnected",
       "connectTabId",
+      "activeJob",
+      "lastPollTime",
+      "lastNextResponse",
+      "lastNextResponseAt",
+      "lastClaimAttempt",
+      "lastClaimError",
     ];
     const stored = await chrome.storage.local.get(keys);
     const base = await getBackendUrl();
@@ -297,6 +356,12 @@ const handlers = {
       fbLoggedIn: stored.fbLoggedIn ?? null,
       marketplaceConnected: stored.marketplaceConnected ?? null,
       connectTabId: stored.connectTabId || null,
+      activeJob: stored.activeJob || null,
+      lastPollTime: stored.lastPollTime || null,
+      lastNextResponse: stored.lastNextResponse || null,
+      lastNextResponseAt: stored.lastNextResponseAt || null,
+      lastClaimAttempt: stored.lastClaimAttempt || null,
+      lastClaimError: stored.lastClaimError || null,
     };
   },
 

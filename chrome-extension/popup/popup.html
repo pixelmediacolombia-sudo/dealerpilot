@@ -237,12 +237,16 @@
         </span>
       </div>
       <div class="row">
-        <span class="label">Assigned job</span>
-        <span class="value" id="v-assigned">None</span>
+        <span class="label">Active job</span>
+        <span class="value" id="v-current">None</span>
       </div>
       <div class="row">
-        <span class="label">Current job</span>
-        <span class="value" id="v-current">None</span>
+        <span class="label">Queued job</span>
+        <span class="value" id="v-queued">—</span>
+      </div>
+      <div class="row">
+        <span class="label">Last poll</span>
+        <span class="value" id="v-last-poll">—</span>
       </div>
       <div class="row">
         <span class="label">Last sync</span>
@@ -339,6 +343,33 @@
           </div>
 
           <div class="divider"></div>
+          <h2 style="margin-top:6px">Poll Diagnostics</h2>
+          <div class="row">
+            <span class="label">Last Poll</span>
+            <span class="value" id="d-last-poll">Never</span>
+          </div>
+          <div class="row">
+            <span class="label">Last /next Response</span>
+            <span class="value" id="d-last-next">—</span>
+          </div>
+          <div class="row">
+            <span class="label">/next At</span>
+            <span class="value" id="d-last-next-at">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Claim Attempt</span>
+            <span class="value" id="d-last-claim">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Claim Error</span>
+            <span class="value ok" id="d-last-claim-err">None</span>
+          </div>
+          <div class="row">
+            <span class="label">Active Job (storage)</span>
+            <span class="value" id="d-active-job">None</span>
+          </div>
+
+          <div class="divider"></div>
           <h2 style="margin-top:6px">Job History</h2>
           <div class="row">
             <span class="label">Last Claimed Job</span>
@@ -367,6 +398,7 @@
           <div class="divider"></div>
           <h2 style="margin-top:6px">Dev Controls</h2>
           <button id="clear-error" class="ghost">Clear Last Error</button>
+          <button id="clear-active-job" class="ghost">Clear Stuck Active Job</button>
           <button id="reload-debug" class="ghost">Reload Debug State</button>
         </div>
       </div>
