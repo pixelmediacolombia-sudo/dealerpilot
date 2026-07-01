@@ -167,6 +167,14 @@ router.post("/extension/heartbeat", async (req, res) => {
   });
 });
 
+// ── Connect Acknowledge (clears connectRequested immediately after extension opens the tab) ──
+
+router.post("/extension/connect-acknowledge", async (req, res) => {
+  await upsertExtRow({ connectRequestedAt: null, connectAction: null });
+  req.log.info("Connect-acknowledge: connectRequested cleared by extension");
+  res.json({ ok: true });
+});
+
 // ── Connect Marketplace ────────────────────────────────────────────────────────
 
 const ConnectMarketplaceBody = z.object({

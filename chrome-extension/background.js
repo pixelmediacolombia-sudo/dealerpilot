@@ -61,6 +61,29 @@ function saveLastError(err) {
     .catch(() => {});
 }
 
+// ---- Structured audit log ----
+// Every Facebook tab open MUST call logAudit with a reason before tabs.create().
+// Last 50 entries are persisted in chrome.storage.local under "auditLog".
+async function logAudit(event, details = {}) {
+  const entry = { event, timestamp: new Date().toISOString(), ...details };
+  console.log("[DealerPilot AI] [AUDIT]", JSON.stringify(entry));
+  try {
+    const { auditLog = [] } = await chrome.storage.local.get("auditLog");
+    const updated = [...auditLog, entry].slice(-50);
+    await chrome.storage.local.set({ auditLog: updated });
+  } catch (_) { /* non-critical */ }
+}
+
+// ---- Clear connectRequested on backend immediately after opening connection tab ----
+// Prevents repeated tab-opens on every 15-second poll if the FB page doesn't load.
+async function clearConnectRequested() {
+  try {
+    await apiPost("/api/extension/connect-acknowledge", {});
+  } catch (e) {
+    console.warn("[DealerPilot AI] Failed to clear connectRequested:", e);
+  }
+}
+
 // ---- Message handlers ----
 
 const handlers = {
@@ -159,6 +182,34 @@ const handlers = {
     const extensionId = await getExtensionId();
     const now = new Date().toISOString();
 
+    // ── SAFETY GUARD 1: Job age ──────────────────────────────────────────────
+    // Reject jobs older than 10 minutes. Stale queued jobs must not auto-open
+    // Facebook — the user must explicitly trigger them from the popup.
+    const JOB_MAX_AGE_MS = 10 * 60 * 1000;
+    if (message.createdAt) {
+      const age = Date.now() - new Date(message.createdAt).getTime();
+      if (age > JOB_MAX_AGE_MS) {
+        await logAudit("AUTO_START_BLOCKED_STALE", {
+          jobId: message.jobId,
+          createdAt: message.createdAt,
+          ageMin: Math.round(age / 60000),
+          reason: "Job older than 10 minutes — requires explicit user action from popup",
+        });
+        return { skipped: true, reason: "stale", jobId: message.jobId };
+      }
+    }
+
+    // ── SAFETY GUARD 2: Mode check ────────────────────────────────────────────
+    // Only Controlled-mode jobs are processed by the extension.
+    if (message.mode && message.mode !== "Controlled") {
+      await logAudit("AUTO_START_BLOCKED_MODE", {
+        jobId: message.jobId,
+        mode: message.mode,
+        reason: "Only Controlled-mode jobs are processed by extension",
+      });
+      return { skipped: true, reason: "wrong_mode", jobId: message.jobId };
+    }
+
     // Record that we are attempting to claim this job
     await chrome.storage.local.set({
       lastClaimAttempt: { jobId: message.jobId, at: now },
@@ -193,6 +244,18 @@ const handlers = {
       extensionId,
     });
 
+    // ── AUDIT LOG: every tab open must be logged with a reason ────────────────
+    await logAudit("MARKETPLACE_TAB_OPENED", {
+      reason: message.source || "auto_start_assigned",
+      jobId: job.id,
+      vehicleId: job.vehicleId || null,
+      vehicleLabel: job.vehicleLabel || null,
+      source: message.source || "poll",
+      mode: job.mode || "Controlled",
+      approvedByUser: message.approvedByUser ?? true,
+      timestamp: new Date().toISOString(),
+    });
+
     const [existing] = await chrome.tabs.query({ url: MARKETPLACE_CREATE_URL + "*" });
     let tab;
     if (existing) {
@@ -209,8 +272,26 @@ const handlers = {
   async CONNECT_MARKETPLACE(message) {
     const action = message?.action || "marketplace";
     const url = action === "login" ? FACEBOOK_LOGIN_URL : MARKETPLACE_CREATE_URL;
+
+    // AUDIT: every tab open must be logged
+    await logAudit("MARKETPLACE_TAB_OPENED", {
+      reason: "connect_requested",
+      action,
+      url,
+      jobId: null,
+      vehicleId: null,
+      source: "connectRequested",
+      approvedByUser: true,
+      timestamp: new Date().toISOString(),
+    });
+
     const tab = await chrome.tabs.create({ url, active: true });
     await chrome.storage.local.set({ connectTabId: tab.id });
+
+    // SAFETY: clear connectRequested on backend immediately after opening the tab.
+    // Without this, every 15-second poll sees connectRequested=true and opens another tab.
+    await clearConnectRequested();
+
     return { ok: true, tabId: tab.id, action };
   },
 
@@ -278,9 +359,22 @@ const handlers = {
       return { job: null };
     }
     const assignedJob = data && data.job && data.job.id ? data.job : null;
-    if (assignedJob) return handlers.AUTO_START_ASSIGNED({ jobId: assignedJob.id });
+    if (assignedJob) {
+      // Pass createdAt + mode so AUTO_START_ASSIGNED can apply its safety guards
+      return handlers.AUTO_START_ASSIGNED({
+        jobId: assignedJob.id,
+        createdAt: assignedJob.createdAt || null,
+        mode: assignedJob.mode || "Controlled",
+        source: "assigned",
+        approvedByUser: true,
+      });
+    }
 
-    // Check the general queue for any Queued/Retry job
+    // Check the general queue for any Queued/Retry job.
+    // SAFETY: Only report availability here — do NOT auto-start general queue jobs.
+    // General queue jobs are auto-started ONLY if they are very recent (< 5 min),
+    // because a "Publish Now" job lands here seconds after the user clicks the button.
+    // Older jobs require an explicit user action from the popup.
     let nextData;
     try {
       nextData = await apiGet("/api/publishing/jobs/next");
@@ -301,7 +395,28 @@ const handlers = {
     const nextJob = nextData && nextData.job && nextData.job.id ? nextData.job : null;
     if (!nextJob) return { job: null };
 
-    return handlers.AUTO_START_ASSIGNED({ jobId: nextJob.id });
+    // SAFETY GATE: Only auto-start a general-queue job if it was created very recently.
+    // This allows "Publish Now" jobs (created seconds ago) to be picked up automatically,
+    // while preventing old stale jobs from ever opening Facebook without user approval.
+    const RECENT_JOB_MS = 5 * 60 * 1000; // 5 minutes
+    const jobAge = nextJob.createdAt ? Date.now() - new Date(nextJob.createdAt).getTime() : Infinity;
+    if (jobAge > RECENT_JOB_MS) {
+      await logAudit("POLL_STALE_JOB_SKIPPED", {
+        jobId: nextJob.id,
+        createdAt: nextJob.createdAt,
+        ageMin: Math.round(jobAge / 60000),
+        reason: "Job is older than 5 minutes — user must trigger from popup",
+      });
+      return { job: null, skipped: "stale", jobId: nextJob.id };
+    }
+
+    return handlers.AUTO_START_ASSIGNED({
+      jobId: nextJob.id,
+      createdAt: nextJob.createdAt || null,
+      mode: nextJob.mode || "Controlled",
+      source: "publish_now",
+      approvedByUser: true,
+    });
   },
 
   async GET_EXTENSION_ID() {
@@ -309,8 +424,63 @@ const handlers = {
   },
 
   async OPEN_MARKETPLACE() {
+    await logAudit("MARKETPLACE_TAB_OPENED", {
+      reason: "explicit_user_action",
+      source: "OPEN_MARKETPLACE",
+      jobId: null,
+      vehicleId: null,
+      approvedByUser: true,
+      timestamp: new Date().toISOString(),
+    });
     const tab = await chrome.tabs.create({ url: MARKETPLACE_CREATE_URL });
     return { tabId: tab.id };
+  },
+
+  // ---- Job validation ----
+  // Called by content.js before running the publishing flow to confirm the
+  // activeJob is still active on the backend (not stale/terminal/cancelled).
+  async VALIDATE_JOB(message) {
+    return apiGet(`/api/publishing/jobs/${message.jobId}/progress`);
+  },
+
+  // ---- Emergency kill switch ----
+  // Clears ALL local extension state, cancels the active job on backend,
+  // and resets connectRequested. Safe to call at any time.
+  async EMERGENCY_KILL() {
+    await logAudit("EMERGENCY_KILL", {
+      reason: "operator_triggered",
+      timestamp: new Date().toISOString(),
+    });
+
+    // Get current state before wiping
+    const { activeJob } = await chrome.storage.local.get("activeJob");
+
+    // Wipe all local extension state
+    await chrome.storage.local.remove([
+      "activeJob", "lastClaimedJob", "lastPublishedJob",
+      "lastError", "lastClaimAttempt", "lastClaimError",
+      "lastNextResponse", "lastNextResponseAt", "connectTabId",
+      "lastPollTime",
+    ]);
+
+    // Cancel active job on backend (mark Failed)
+    if (activeJob && activeJob.id) {
+      try {
+        const extensionId = await getExtensionId();
+        await apiPost(`/api/publishing/jobs/${activeJob.id}/fail`, {
+          extensionId,
+          reason: "Emergency kill switch activated by operator",
+        });
+        await logAudit("EMERGENCY_KILL_JOB_CANCELLED", { jobId: activeJob.id });
+      } catch (e) {
+        console.warn("[DealerPilot AI] Emergency kill: failed to cancel job on backend", e);
+      }
+    }
+
+    // Reset connectRequested on backend
+    await clearConnectRequested();
+
+    return { ok: true, cancelledJobId: activeJob?.id ?? null };
   },
 
   async GET_DEBUG_STATE() {
@@ -334,6 +504,7 @@ const handlers = {
       "lastNextResponseAt",
       "lastClaimAttempt",
       "lastClaimError",
+      "auditLog",
     ];
     const stored = await chrome.storage.local.get(keys);
     const base = await getBackendUrl();
@@ -361,6 +532,7 @@ const handlers = {
       lastNextResponseAt: stored.lastNextResponseAt || null,
       lastClaimAttempt: stored.lastClaimAttempt || null,
       lastClaimError: stored.lastClaimError || null,
+      auditLog: stored.auditLog || [],
     };
   },
 

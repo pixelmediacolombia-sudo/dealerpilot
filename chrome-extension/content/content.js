@@ -1264,8 +1264,38 @@
   // Marketplace create page — job flow + debug button
   // ==================================================================
   if (isMarketplaceCreate) {
-    chrome.storage.local.get("activeJob").then(({ activeJob }) => {
+    chrome.storage.local.get("activeJob").then(async ({ activeJob }) => {
       if (activeJob) {
+        // ── SAFETY: Validate activeJob against backend before auto-running ──
+        // A stale/terminal job in chrome.storage.local must never trigger publishing.
+        let jobIsActive = false;
+        let jobStatus = null;
+        try {
+          const valRes = await send({ type: "VALIDATE_JOB", jobId: activeJob.id });
+          if (valRes && valRes.ok && valRes.data) {
+            jobStatus = valRes.data.status;
+            const ACTIVE_STATUSES = ["Queued", "Claimed", "Publishing", "Retry"];
+            jobIsActive = ACTIVE_STATUSES.includes(jobStatus);
+          }
+          console.log(`[DealerPilot AI] [AUDIT] activeJob #${activeJob.id} validation: status=${jobStatus}, active=${jobIsActive}`);
+        } catch (e) {
+          console.warn("[DealerPilot AI] Could not validate activeJob against backend — aborting auto-start:", e);
+        }
+
+        if (!jobIsActive) {
+          console.warn(
+            `[DealerPilot AI] [AUDIT] Stale/invalid activeJob #${activeJob.id} (status=${jobStatus}) — cleared, auto-start blocked`,
+          );
+          await chrome.storage.local.remove("activeJob");
+          // Fall through to else branch — show test listing button instead
+          actionsEl.appendChild(
+            button("Fill Test Listing (job cleared)", () => {}),
+          );
+          return;
+        }
+
+        // Job is confirmed active on backend — safe to auto-start
+        console.log(`[DealerPilot AI] [AUDIT] activeJob #${activeJob.id} confirmed active (${jobStatus}) — auto-starting flow`);
         actionsEl.appendChild(
           button("Fill Marketplace Fields", () => runPublishingFlow(activeJob)),
         );

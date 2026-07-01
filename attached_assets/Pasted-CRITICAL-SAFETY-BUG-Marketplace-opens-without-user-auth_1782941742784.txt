@@ -1,0 +1,78 @@
+CRITICAL SAFETY BUG — Marketplace opens without user authorization
+
+When I open the DealerPilot dashboard, Facebook Marketplace opens automatically with a vehicle that is NOT in the queue.
+
+This is unacceptable. The extension must never open Facebook or start a publish flow unless there is an explicit user-approved job.
+
+Expected behavior:
+- Opening the dashboard should NOT open Facebook.
+- Extension heartbeat should NOT open Facebook.
+- Extension polling should NOT open Facebook unless the backend returns a valid queued publishing job.
+- Stale activeJob in chrome.storage.local must not trigger publishing.
+- connectRequested must expire after use and must not persist forever.
+
+Audit all auto-open triggers:
+
+1. AUTO_START_ASSIGNED
+2. POLL_ASSIGNED_JOB
+3. CONNECT_MARKETPLACE
+4. OPEN_MARKETPLACE
+5. content.js auto-start on marketplace/create
+6. chrome.storage.local.activeJob
+7. chrome.storage.local.lastClaimedJob
+8. backend connectRequested flag
+9. any alarm/onStartup/onInstalled handlers
+
+Fix requirements:
+
+1. Add a strict authorization token to every publish job.
+A job can only be auto-started if:
+- it exists in backend
+- status is Queued or Retry
+- dealerId matches extension dealerId
+- job.mode === Controlled
+- job.source === PublishNow or ApprovedSchedule
+- job.approvedByUser === true
+- job.createdAt is recent, e.g. less than 30 minutes old
+
+2. Content.js must never runPublishingFlow from chrome.storage.local alone.
+Before running:
+- call backend to validate activeJob still exists
+- confirm status is Assigned/Publishing
+- confirm job is approved
+- confirm vehicle is still eligible
+If validation fails:
+- clear activeJob
+- stop immediately
+
+3. connectRequested should only open Marketplace for connection setup, not publishing.
+After extension handles connectRequested:
+- clear connectRequested on backend
+- do not start any job
+
+4. On dashboard load:
+- no endpoint should create a publishing job
+- no job should be claimed
+- no Facebook tab should open
+
+5. Add audit log:
+- reason why Marketplace tab opened
+- jobId
+- vehicleId
+- source
+- approvedByUser
+- timestamp
+
+6. Add emergency kill switch:
+- Clear all local extension state
+- Cancel all non-published active jobs
+- Reset connectRequested
+- Stop auto-publishing
+
+Acceptance:
+- Opening dashboard does nothing.
+- Refreshing dashboard does nothing.
+- Opening extension popup does nothing.
+- Only Publish Now opens Facebook.
+- Unknown/stale jobs are ignored and cleared.
+- Logs clearly show why Facebook opened.
