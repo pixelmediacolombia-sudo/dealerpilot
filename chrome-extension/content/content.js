@@ -528,7 +528,7 @@
     // ------------------------------------------------------------------
     // selectComboboxStep — interact with a Facebook [role="combobox"].
     // ------------------------------------------------------------------
-    async function selectComboboxStep(label, keywords, targetValue, afterWait) {
+    async function selectComboboxStep(label, keywords, targetValue, afterWait, isRequired = true) {
       console.log(`[STEP] ${label}`);
       stateLog(`Step: ${label}`);
 
@@ -615,6 +615,17 @@
           : undefined);
 
       if (!pick) {
+        if (!isRequired) {
+          // Optional field — skip rather than guess with a random option
+          const sample = options.slice(0, 5)
+            .map((o) => `"${(o.innerText || o.textContent || "").trim()}"`)
+            .join(", ");
+          console.log(`[SKIP] ${label}: no exact match for "${targetValue}" (optional) — skipping. Options: ${sample}`);
+          warnings.push(`${label}: skipped — no exact match for "${targetValue}"`);
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          return false;
+        }
+        // Required field — fall back to first available option
         pick = options[0];
         const fallbackText = pick ? (pick.innerText || pick.textContent || "").trim() : "(none)";
         console.log(
@@ -684,68 +695,94 @@
     }
 
     // ==================================================================
-    // STATE MACHINE — sequential progressive form fill
+    // STATE MACHINE — Phase 0: Photos first → required → optional
+    // Priority: photos + required fields. Optional fields skip on no match.
     // ==================================================================
 
     try {
 
-      // ---- Phase 1: Dropdown cascade ----
-      stateLog("Phase 1 starting — dropdown cascade");
+      // ---- Phase 0: Upload photos FIRST ----
+      // Must happen before filling any text — Facebook requires at least
+      // one photo before the Next button becomes active.
+      stateLog("Phase 0: uploading photos first");
+      setStatus("Uploading photos…");
 
-      setStatus("Step 1 of 4: Selecting vehicle type…");
+      if (images && images.length) {
+        const photoResult = await uploadPhotos(images, job.id, warnings);
+        if (photoResult.failed) {
+          if (job.mode === "Controlled") {
+            const reason = photoResult.reason || "Photo upload failed";
+            stateError("Photo upload failed — aborting", new Error(reason));
+            setStatus(reason, "err");
+            send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
+            await send({ type: "FAIL_JOB", jobId: job.id, reason });
+            await chrome.storage.local.remove("activeJob");
+            renderReview(job, { filled, missed, warnings });
+            return;
+          }
+          warnings.push(photoResult.reason || "Photo upload failed — upload photos manually");
+        } else {
+          filled.push(`photos (${photoResult.uploaded} uploaded)`);
+        }
+      } else {
+        warnings.push("No photos in job payload — upload photos manually");
+      }
+
+      // ---- Phase 1: Vehicle type (required for Next button to activate) ----
+      stateLog("Phase 1: vehicle type (required)");
+      setStatus("Selecting vehicle type…");
       await selectComboboxStep(
         "vehicle type",
         ["vehicle type", "type of vehicle", "category"],
         fill.vehicleType || "Car/Truck",
         "generic",
+        true,   // required — fallback to first option if no exact match
       );
 
-      setStatus("Step 2 of 4: Selecting year…");
+      // ---- Phase 2: Year / Make / Model (optional — skip if no exact match) ----
+      stateLog("Phase 2: year / make / model (optional)");
+
+      setStatus("Selecting year…");
       await selectComboboxStep(
         "year",
         ["year"],
         fill.year ? String(fill.year) : null,
         "generic",
+        false,  // optional
       );
 
-      setStatus("Step 3 of 4: Selecting make…");
+      setStatus("Selecting make…");
       await selectComboboxStep(
         "make",
         ["make"],
         fill.make,
         "generic",
+        false,
       );
 
-      // Model — plain text input after Make cascade
-      setStatus("Step 4 of 4: Filling model…");
-      console.log("[STEP] Model (text input — not a combobox)");
+      // Model — text input that appears after Make cascade
+      setStatus("Filling model…");
       stateLog("Waiting for Model text input");
-      const modelInput = await waitForNamedField("model", ["model"], 20000);
-      if (modelInput) {
-        console.log("[FOUND] Model text input", modelInput);
-        setNativeValue(modelInput, String(fill.model || ""));
+      const modelInput = await waitForNamedField("model", ["model"], 10000);
+      if (modelInput && fill.model) {
+        setNativeValue(modelInput, String(fill.model));
         modelInput.dispatchEvent(new Event("input",  { bubbles: true }));
         modelInput.dispatchEvent(new Event("change", { bubbles: true }));
         modelInput.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
         filled.push("model");
         log(`model → "${fill.model}"`);
+      } else if (!fill.model) {
+        warnings.push("model: no value in listing data — skipped");
       } else {
-        console.log("[WARN] Model text input did not appear within 20 s");
-        missed.push("model");
-        warnings.push("model: text input did not appear after Make selection");
+        warnings.push("model: text input did not appear after Make selection — skipped");
       }
 
-      // ---- Phase 2: Text fields ----
-      stateLog("Phase 2 starting — text fields");
-      setStatus("Filling mileage, price, title, description…");
-
-      await fillStep("mileage", [
-        "mileage", "odometer", "miles", "vehicle mileage",
-        "number of miles", "mileage (optional)", "odometer reading",
-      ], fill.mileage);
+      // ---- Phase 3: Required text fields — price, title, description, location ----
+      stateLog("Phase 3: required text fields");
+      setStatus("Filling price, title, description, location…");
 
       if (fill.priceMode === "DOWN_PAYMENT") {
-        log(`pricing mode: DOWN_PAYMENT — posting $${fill.marketplaceDisplayedPrice ?? fill.price} (down payment)`);
+        log(`pricing mode: DOWN_PAYMENT — posting $${fill.marketplaceDisplayedPrice ?? fill.price}`);
       } else {
         log(`pricing mode: FULL_PRICE — posting $${fill.price}`);
       }
@@ -768,27 +805,32 @@
             filled.push("title");
             log(`title → "${fill.title}"`);
           } else {
-            stateLog("title field found but no value — skipped");
             warnings.push("title: field exists but no value in listing data");
           }
         } else {
           stateLog("title auto generated by Facebook");
           filled.push("title (auto generated)");
-          log("title: auto generated by Facebook from Year/Make/Model");
         }
       }
 
       await fillStep("description", ["description", "describe", "details"], fill.description);
-      await fillStep("vin", ["vin", "vin number", "vehicle identification number"], fill.vin);
       await fillStep("location", ["location", "city", "where"], fill.location);
 
-      // ---- Phase 3: Optional dropdowns ----
-      stateLog("Phase 3 starting — optional dropdowns");
-      await selectComboboxStep("condition",    ["condition"],    fill.condition,    false);
-      await selectComboboxStep("transmission", ["transmission"], fill.transmission, false);
-      await selectComboboxStep("fuel type",    ["fuel"],         fill.fuelType,     false);
-      await selectComboboxStep("color",        ["color", "exterior color"], fill.color, false);
-      await selectComboboxStep("body style",   ["body style", "body type"], fill.bodyStyle, false);
+      // ---- Phase 4: Optional text fields — mileage, VIN ----
+      stateLog("Phase 4: optional text fields (mileage, VIN)");
+      await fillStep("mileage", [
+        "mileage", "odometer", "miles", "vehicle mileage",
+        "number of miles", "mileage (optional)", "odometer reading",
+      ], fill.mileage);
+      await fillStep("vin", ["vin", "vin number", "vehicle identification number"], fill.vin);
+
+      // ---- Phase 5: Optional dropdowns — strict match only, no first-option fallback ----
+      stateLog("Phase 5: optional dropdowns (strict — skip if no exact match)");
+      await selectComboboxStep("condition",    ["condition"],    fill.condition,    false, false);
+      await selectComboboxStep("transmission", ["transmission"], fill.transmission, false, false);
+      await selectComboboxStep("fuel type",    ["fuel"],         fill.fuelType,     false, false);
+      await selectComboboxStep("color",        ["color", "exterior color"], fill.color, false, false);
+      await selectComboboxStep("body style",   ["body style", "body type"], fill.bodyStyle, false, false);
 
       stateLog("Workflow Complete");
 
@@ -796,28 +838,6 @@
       stateError("Unexpected error in publishing workflow", err);
       setStatus("Workflow error: " + ((err && err.message) || String(err)), "err");
       log("Publishing flow crashed", err);
-    }
-
-    // ---- Phase 4: Photo upload ----
-
-    if (images && images.length) {
-      const photoResult = await uploadPhotos(images, job.id, warnings);
-      if (photoResult.failed) {
-        if (job.mode === "Controlled") {
-          const reason = photoResult.reason || "Photo upload failed";
-          stateError("Photo upload failed", new Error(reason));
-          setStatus(reason, "err");
-          send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
-          await send({ type: "FAIL_JOB", jobId: job.id, reason });
-          await chrome.storage.local.remove("activeJob");
-          renderReview(job, { filled, missed, warnings });
-          return;
-        } else {
-          warnings.push(photoResult.reason || "Photo upload failed — upload photos manually");
-        }
-      }
-    } else {
-      warnings.push("No photos in job payload — upload photos manually");
     }
 
     if (job.mode === "Controlled") {
@@ -958,16 +978,36 @@
 
   async function autoPublishFlow(job, { filled, missed, warnings }) {
     stateLog("Auto-publish: starting");
-    setStatus("Auto-publishing — all fields filled, clicking Next…");
+    setStatus("Auto-publishing — validating form before clicking Next…");
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_starting" }).catch(() => {});
 
     await sleep(800);
 
-    const nextClicked = await clickButtonByText(["next", "continue", "next step"], 10000);
+    // ---- Pre-Next validation ----
+    // Ensure the form is ready before we click Next. If the Next button is
+    // disabled or missing required fields, detect the exact reason instead
+    // of reporting a generic "Publish button not found" error.
+    const validation = await validateBeforeNext();
+    if (!validation.ok) {
+      stateError("Pre-Next validation failed", new Error(validation.reason));
+      setStatus(validation.reason, "err");
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: validation.reason }).catch(() => {});
+      await send({ type: "FAIL_JOB", jobId: job.id, reason: validation.reason });
+      await chrome.storage.local.remove("activeJob");
+      renderReview(job, { filled, missed, warnings });
+      return;
+    }
+
+    setStatus("Auto-publishing — clicking Next…");
+    const nextClicked = await clickEnabledButtonByText(["next", "continue", "next step"], 10000);
     if (!nextClicked) {
-      const reason = "Could not find the Next button after filling all fields";
-      stateError("Auto-publish: Next not found", new Error(reason));
-      setStatus("Auto-publish failed: " + reason, "err");
+      // Scrape whatever validation errors Facebook is showing to give a useful reason
+      const fbErrors = scrapeFacebookErrors();
+      const reason = fbErrors
+        ? `Next button blocked: ${fbErrors}`
+        : "Could not find an enabled Next button — check the form for errors";
+      stateError("Auto-publish: Next not found/enabled", new Error(reason));
+      setStatus(reason, "err");
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
       await send({ type: "FAIL_JOB", jobId: job.id, reason });
       await chrome.storage.local.remove("activeJob");
@@ -1022,13 +1062,20 @@
     log("Auto-publish complete", { job, filled, missed, warnings, listingUrl });
   }
 
-  async function clickButtonByText(textOptions, timeoutMs) {
+  // clickEnabledButtonByText — only clicks buttons that are NOT disabled.
+  async function clickEnabledButtonByText(textOptions, timeoutMs) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const candidates = Array.from(
         document.querySelectorAll('div[role="button"], button, [role="button"]'),
       );
       for (const el of candidates) {
+        // Skip disabled buttons
+        if (
+          el.disabled ||
+          el.getAttribute("aria-disabled") === "true" ||
+          el.hasAttribute("disabled")
+        ) continue;
         const text = (el.innerText || el.textContent || "").toLowerCase().trim();
         if (textOptions.some((t) => text === t || text === t + " ")) {
           log("Auto-publish clicking:", text);
@@ -1039,6 +1086,84 @@
       await sleep(400);
     }
     return false;
+  }
+
+  // clickButtonByText — legacy alias (used outside autoPublishFlow; keeps original behaviour)
+  async function clickButtonByText(textOptions, timeoutMs) {
+    return clickEnabledButtonByText(textOptions, timeoutMs);
+  }
+
+  // validateBeforeNext — checks the form has the minimum required data before
+  // we try to click Next. Returns { ok, reason }.
+  async function validateBeforeNext() {
+    // 1. Check at least 1 photo was uploaded (look for blob: thumbnails or FB thumb UI)
+    const photoThumbs = [
+      ...document.querySelectorAll('img[src^="blob:"]'),
+      ...document.querySelectorAll('[data-testid="media-attachment-delete-button"]'),
+    ];
+    if (photoThumbs.length === 0) {
+      // Also check the count indicator Facebook sometimes shows ("1 photo")
+      const countText = (document.body.innerText || "").match(/(\d+)\s*photo/i);
+      if (!countText || parseInt(countText[1], 10) === 0) {
+        return { ok: false, reason: "Photo upload failed: Facebook shows 0 photos — upload could not be confirmed" };
+      }
+    }
+
+    // 2. Check Next button exists and is not disabled
+    const NEXT_TEXTS = ["next", "continue", "next step"];
+    const allButtons = Array.from(
+      document.querySelectorAll('div[role="button"], button, [role="button"]'),
+    );
+    const nextBtn = allButtons.find((el) => {
+      const t = (el.innerText || el.textContent || "").toLowerCase().trim();
+      return NEXT_TEXTS.some((n) => t === n || t === n + " ");
+    });
+
+    if (!nextBtn) {
+      const fbErrors = scrapeFacebookErrors();
+      return {
+        ok: false,
+        reason: fbErrors
+          ? `Form not ready for Next: ${fbErrors}`
+          : "Next button not found on page — form may not have loaded correctly",
+      };
+    }
+
+    const isDisabled =
+      nextBtn.disabled ||
+      nextBtn.getAttribute("aria-disabled") === "true" ||
+      nextBtn.hasAttribute("disabled");
+
+    if (isDisabled) {
+      const fbErrors = scrapeFacebookErrors();
+      return {
+        ok: false,
+        reason: fbErrors
+          ? `Next button is disabled: ${fbErrors}`
+          : "Next button is disabled — a required field may be missing (price, title, description, or location)",
+      };
+    }
+
+    return { ok: true };
+  }
+
+  // scrapeFacebookErrors — collect visible validation error messages from the form.
+  function scrapeFacebookErrors() {
+    const errorSelectors = [
+      '[data-testid*="error" i]',
+      '[aria-describedby*="error" i]',
+      ".errorMessage",
+      '[role="alert"]',
+    ];
+    const errors = [];
+    for (const sel of errorSelectors) {
+      document.querySelectorAll(sel).forEach((el) => {
+        const t = (el.innerText || el.textContent || "").trim();
+        if (t && t.length < 200) errors.push(t);
+      });
+    }
+    // Deduplicate
+    return [...new Set(errors)].join("; ") || null;
   }
 
   async function waitForPublishSuccess(timeoutMs) {

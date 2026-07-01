@@ -1,0 +1,96 @@
+CHANGE PRIORITY — Marketplace MVP should optimize for successful posting, not perfect spec completion.
+
+For Facebook Marketplace posting, do NOT block on optional vehicle fields.
+
+Required for MVP:
+- Photos uploaded
+- Price
+- Title
+- Description
+- Location
+- Vehicle type/category only if Facebook requires it to enable Next
+
+Optional:
+- VIN
+- mileage
+- fuel type
+- transmission
+- color
+- body style
+- condition
+- drivetrain
+
+If optional fields fail, skip them and continue.
+
+Critical fix:
+Photos must upload automatically.
+Without photos, Marketplace will never publish.
+
+Implementation rules:
+
+1. Upload photos first.
+- Fetch image URLs from job payload.
+- Convert to File objects.
+- Attach to Facebook file input.
+- Dispatch input/change events.
+- Wait until Facebook shows at least 1 uploaded photo.
+- Prefer 8 photos, max 20.
+
+2. Fill required fields:
+- vehicle type/category
+- price
+- title
+- description
+- location
+
+3. Fill optional vehicle details only if selectors are found reliably.
+- Do not use wrong dropdowns.
+- Do not select random first option.
+- If exact option is not found, skip.
+- Log warning only.
+
+4. Before clicking Next, validate only true blockers:
+- photo count > 0
+- price filled
+- title filled
+- description filled
+- location filled
+- Next button enabled
+
+5. If Next is disabled:
+- detect visible Facebook validation errors
+- fail job with exact reason
+- do not say “Publish button not found”
+
+6. Copy must be stronger.
+The description should be short, bilingual, emoji-friendly, and CTA-focused.
+
+Example:
+
+🔥 2018 Nissan Leaf lista para manejar
+
+✅ Buen precio
+✅ Económica y práctica
+✅ Ideal para diario
+✅ Financiamiento disponible
+
+📩 Escríbenos “LEAF” y te damos más detalles hoy.
+
+English:
+
+🔥 2018 Nissan Leaf ready to drive
+
+✅ Great price
+✅ Easy daily driver
+✅ Financing available
+✅ Clean electric ride
+
+📩 Message us “LEAF” today for details.
+
+Acceptance:
+- Facebook shows at least 1 uploaded photo before Next.
+- Required fields are filled.
+- Optional fields can fail without blocking.
+- Extension only clicks Next when Facebook allows it.
+- If it fails, the error explains the true missing blocker.
+- No more false “Publish button not found” when still on page 1.
