@@ -767,6 +767,44 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
   res.status(201).json({ jobId: job.id, job: enriched });
 });
 
+// POST /publishing/jobs/:id/retry — operator manually resets a Failed job back to Queued.
+// Resets attempts to 0 so the extension can try again from scratch.
+router.post("/publishing/jobs/:id/retry", async (req, res) => {
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Invalid job id" });
+    return;
+  }
+
+  const [job] = await db
+    .select()
+    .from(publishingJobsTable)
+    .where(eq(publishingJobsTable.id, id));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  if (!["Failed", "Retry"].includes(job.status)) {
+    res.status(409).json({ error: `Only Failed or Retry jobs can be manually retried (status: ${job.status})` });
+    return;
+  }
+
+  const [updated] = await db
+    .update(publishingJobsTable)
+    .set({
+      status: "Queued",
+      attempts: 0,
+      claimedByExtension: null,
+      failedReason: null,
+    })
+    .where(eq(publishingJobsTable.id, id))
+    .returning();
+
+  req.log.info({ jobId: id }, "Publishing job manually retried by operator");
+  const [enriched] = await enrich([updated]);
+  res.json({ job: enriched });
+});
+
 // GET /publishing/jobs/:id/progress — lightweight polling endpoint for the progress modal.
 router.get("/publishing/jobs/:id/progress", async (req, res) => {
   const id = Number(req.params.id);

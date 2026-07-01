@@ -1820,6 +1820,10 @@ export type PublishNow409 = {
   jobId?: number;
 };
 
+export type RetryPublishingJob200 = {
+  job?: PublishingJob;
+};
+
 export type GetPublishingJobProgress200 = {
   id?: number;
   mode?: string;

@@ -43,9 +43,11 @@ export function PhotoAuditPanel({ images, vehicleName }: Props) {
         </span>
         <span className="text-border/60">·</span>
         <span className="truncate">{vehicleName}</span>
-        <Badge className="ml-auto flex-shrink-0 bg-muted/50 text-muted-foreground border-border/40 text-[9px] uppercase tracking-widest">
-          Pending AI Review
-        </Badge>
+        {images.length > 0 && (
+          <Badge className="ml-auto flex-shrink-0 bg-muted/50 text-muted-foreground border-border/40 text-[9px] uppercase tracking-widest">
+            Cover: Photo #1
+          </Badge>
+        )}
       </div>
 
       {/* Photo grid */}
@@ -94,9 +96,6 @@ export function PhotoAuditPanel({ images, vehicleName }: Props) {
                       {img.category}
                     </div>
                   )}
-                  <div className="text-[8px] text-muted-foreground/40 uppercase tracking-widest">
-                    Pending review
-                  </div>
                 </div>
               </div>
             ))}

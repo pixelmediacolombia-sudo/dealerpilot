@@ -160,6 +160,7 @@ export * from './publishNowBody';
 export * from './publishPriorityScore';
 export * from './publishPriorityScoreList';
 export * from './queueListingInput';
+export * from './retryPublishingJob200';
 export * from './schemaAuditEntry';
 export * from './schemaAuditEntryStatus';
 export * from './schemaAuditResult';

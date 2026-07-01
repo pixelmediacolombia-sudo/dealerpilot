@@ -7,6 +7,7 @@ import {
   useListPublishingJobs,
   useAssignPublishingJob,
   useCancelPublishingJob,
+  useRetryPublishingJob,
   useListVehiclePhotoScores,
   useMarkListingPublished,
   useBulkVehicleAction,
@@ -74,6 +75,8 @@ import {
   List,
   ArrowUpDown,
   ScanSearch,
+  RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader, EmptyState, SectionCard } from "@/components/shared";
@@ -107,7 +110,7 @@ const STRATEGY_STATUS_CONFIG: Record<
   { label: string; color: string; bg: string; border: string; icon: React.ElementType }
 > = {
   recommended: {
-    label: "Recommended by AI",
+    label: "Strategy: High Priority",
     color: "text-rose-400",
     bg: "bg-rose-500/8",
     border: "border-rose-500/20",
@@ -289,6 +292,15 @@ export function ListingsWorkspace() {
   });
   const cancelMutation = useCancelPublishingJob({
     mutation: { onSuccess: () => void invalidateWorkspaces() },
+  });
+  const retryMutation = useRetryPublishingJob({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Job queued for retry", description: "The extension will pick it up on the next poll." });
+        void invalidateWorkspaces();
+      },
+      onError: () => toast({ title: "Error", description: "Failed to retry job", variant: "destructive" }),
+    },
   });
 
   const markPublishedMutation = useMarkListingPublished({
@@ -1452,6 +1464,33 @@ export function ListingsWorkspace() {
                                 >
                                   Cancel
                                 </Button>
+                              )}
+                              {job.status === "Failed" && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                                    disabled={retryMutation.isPending}
+                                    onClick={() => retryMutation.mutate({ id: job.id })}
+                                  >
+                                    {retryMutation.isPending ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <><RefreshCw className="w-3 h-3 mr-1" />Retry</>
+                                    )}
+                                  </Button>
+                                  <a
+                                    href={`/vehicles/${job.vehicleId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 h-7 px-2 text-xs text-muted-foreground hover:text-white transition-colors"
+                                    title="Open vehicle page for manual review"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    Manual Review
+                                  </a>
+                                </>
                               )}
                             </div>
                           </TableCell>

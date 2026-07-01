@@ -174,7 +174,7 @@ const handlers = {
       extensionId,
     });
 
-    const tab = await chrome.tabs.create({ url: MARKETPLACE_CREATE_URL, active: false });
+    const tab = await chrome.tabs.create({ url: MARKETPLACE_CREATE_URL, active: true });
     return { ok: true, jobId: job.id, tabId: tab.id };
   },
 

@@ -122,6 +122,7 @@ import type {
   PublishingJobList,
   PublishingJobPayload,
   QueueListingInput,
+  RetryPublishingJob200,
   SchemaAuditResult,
   SeedMarketplaceIntelligence200,
   SessionReportInput,
@@ -3009,6 +3010,76 @@ export const useFailPublishingJob = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getFailPublishingJobMutationOptions(options));
+    }
+
+export const getRetryPublishingJobUrl = (id: number,) => {
+
+
+
+
+  return `/api/publishing/jobs/${id}/retry`
+}
+
+/**
+ * @summary Manually reset a Failed or Retry job back to Queued (operator action)
+ */
+export const retryPublishingJob = async (id: number, options?: RequestInit): Promise<RetryPublishingJob200> => {
+
+  return customFetch<RetryPublishingJob200>(getRetryPublishingJobUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRetryPublishingJobMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryPublishingJob>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryPublishingJob>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['retryPublishingJob'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryPublishingJob>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  retryPublishingJob(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryPublishingJobMutationResult = NonNullable<Awaited<ReturnType<typeof retryPublishingJob>>>
+
+    export type RetryPublishingJobMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Manually reset a Failed or Retry job back to Queued (operator action)
+ */
+export const useRetryPublishingJob = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryPublishingJob>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof retryPublishingJob>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRetryPublishingJobMutationOptions(options));
     }
 
 export const getAddPublishingJobEventUrl = (id: number,) => {

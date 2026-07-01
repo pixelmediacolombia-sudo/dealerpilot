@@ -54,7 +54,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { key: "recommendations", label: "Recommendations", icon: Lightbulb },
+  { key: "recommendations", label: "Posting Strategy", icon: Lightbulb },
   { key: "performance", label: "Performance", icon: BarChart3 },
   { key: "opportunities", label: "Opportunities", icon: AlertTriangle },
 ] as const;

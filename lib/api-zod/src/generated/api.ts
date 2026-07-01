@@ -1307,6 +1307,36 @@ export const FailPublishingJobResponse = zod.object({
 
 
 /**
+ * @summary Manually reset a Failed or Retry job back to Queued (operator action)
+ */
+export const RetryPublishingJobParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RetryPublishingJobResponse = zod.object({
+  "job": zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+}).optional()
+})
+
+
+/**
  * @summary Record a progress event for a publishing job (from the Chrome extension)
  */
 export const AddPublishingJobEventParams = zod.object({
