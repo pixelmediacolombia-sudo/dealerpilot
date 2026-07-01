@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { 
   useListDealers, 
@@ -279,6 +280,11 @@ export function Settings() {
               description="Real-time telemetry for the DealerPilot operating system."
               icon={Activity}
               className="border-white/5"
+              action={
+                <Link href="/connection-center" className="text-[11px] text-muted-foreground hover:text-primary transition-colors">
+                  Advanced connection diagnostics →
+                </Link>
+              }
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {services.map(({ key, name, icon: Icon, description }) => {

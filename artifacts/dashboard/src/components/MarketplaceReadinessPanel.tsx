@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
 import {
   useGetConnectionStatus,
   useConnectMarketplace,
@@ -255,6 +256,16 @@ export function MarketplaceReadinessPanel() {
           DealerPilot is ready to publish. Publish Now is enabled for all vehicles.
         </p>
       )}
+
+      {/* Advanced diagnostics link */}
+      <div className="mt-3 pt-3 border-t border-white/[0.05]">
+        <Link
+          href="/connection-center"
+          className="text-[11px] text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+        >
+          Connection Details →
+        </Link>
+      </div>
     </div>
   );
 }

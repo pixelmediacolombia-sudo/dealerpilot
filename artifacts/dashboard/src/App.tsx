@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +14,7 @@ import { PublishingQueue } from "@/pages/Publishing";
 import { CreativeStudio } from "@/pages/CreativeStudio";
 import { CreativeDetail } from "@/pages/CreativeStudio/CreativeDetail";
 import { DealerDna } from "@/pages/DealerDna";
+import { ConnectionCenter } from "@/pages/ConnectionCenter";
 import { Settings } from "@/pages/Settings";
 import { SalesAIWorkspace } from "@/pages/SalesAI";
 import { ConversationDetail } from "@/pages/SalesAI/ConversationDetail";
@@ -57,9 +58,7 @@ function Router() {
       <Route path="/marketplace-intelligence" component={MarketplaceIntelligence} />
 
       <Route path="/dealer-dna" component={DealerDna} />
-      <Route path="/connection-center">
-        <Redirect to="/" />
-      </Route>
+      <Route path="/connection-center" component={ConnectionCenter} />
       <Route path="/settings" component={Settings} />
 
       <Route component={NotFound} />
