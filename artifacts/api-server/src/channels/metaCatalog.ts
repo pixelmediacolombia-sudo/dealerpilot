@@ -2,13 +2,13 @@ import { db, vehiclesTable, vehicleImagesTable, dealersTable, feedRunsTable } fr
 import { eq, count, desc } from "drizzle-orm";
 
 interface MetaVehicle {
-  id: string;
+  vehicleId: string;
   title: string;
   description: string;
-  availability: "in stock" | "out of stock";
-  condition: "used" | "new";
+  availability: "FOR_SALE" | "NOT_AVAILABLE";
+  condition: "EXCELLENT" | "GOOD" | "FAIR" | "POOR";
   price: string;
-  link: string;
+  url: string;
   imageLinkPrimary: string;
   additionalImageLinks: string[];
   make: string;
@@ -16,7 +16,7 @@ interface MetaVehicle {
   year: number | null;
   trim: string | null;
   bodyStyle: string | null;
-  mileage: string | null;
+  mileageValue: number | null;
   vin: string;
   exteriorColor: string | null;
   dealerName: string;
@@ -109,15 +109,15 @@ async function loadMetaVehicles(
     const title = [yearStr, v.make, v.model, v.trim].filter(Boolean).join(" ");
 
     return {
-      id: v.vin || `stock-${v.stockNumber ?? v.id}`,
+      vehicleId: v.vin || `stock-${v.stockNumber ?? v.id}`,
       title: title || `Vehicle #${v.id}`,
       description:
         v.description ??
         `${title} available at ${dealerName}. Contact us for more information.`,
-      availability: "in stock",
-      condition: "used",
+      availability: "FOR_SALE",
+      condition: "GOOD",
       price: formatPrice(v.price),
-      link: v.vdpUrl ?? `${getFeedBase()}/inventory/${v.id}`,
+      url: v.vdpUrl ?? `${getFeedBase()}/inventory/${v.id}`,
       imageLinkPrimary: primaryImage,
       additionalImageLinks: additionalImages,
       make: v.make,
@@ -125,7 +125,7 @@ async function loadMetaVehicles(
       year: v.year,
       trim: v.trim ?? null,
       bodyStyle: v.bodyStyle ?? null,
-      mileage: v.mileage != null ? `${v.mileage} mi` : null,
+      mileageValue: v.mileage ?? null,
       vin: v.vin,
       exteriorColor: v.exteriorColor ?? null,
       dealerName,
@@ -144,58 +144,61 @@ function escapeXml(str: string): string {
     .replace(/'/g, "&apos;");
 }
 
+function cdata(str: string): string {
+  return `<![CDATA[${str.replace(/\]\]>/g, "]]]]><![CDATA[>")}]]>`;
+}
+
 export async function generateMetaCatalogXml(dealerId: number): Promise<string> {
   const { vehicles, dealerName } = await loadMetaVehicles(dealerId);
 
-  const items = vehicles
+  const listings = vehicles
     .map((v) => {
       const additionalImages = v.additionalImageLinks
         .slice(0, 10)
-        .map((url) => `    <g:additional_image_link>${escapeXml(url)}</g:additional_image_link>`)
+        .map((url) => `    <additional_image_link>${escapeXml(url)}</additional_image_link>`)
         .join("\n");
 
       const optionalLines = [
-        additionalImages,
-        v.year ? `    <g:year>${v.year}</g:year>` : "",
-        v.trim ? `    <g:trim>${escapeXml(v.trim)}</g:trim>` : "",
-        v.bodyStyle ? `    <g:body_style>${escapeXml(v.bodyStyle)}</g:body_style>` : "",
-        v.mileage ? `    <g:mileage>${escapeXml(v.mileage)}</g:mileage>` : "",
-        v.vin ? `    <g:vin>${escapeXml(v.vin)}</g:vin>` : "",
-        v.exteriorColor
-          ? `    <g:exterior_color>${escapeXml(v.exteriorColor)}</g:exterior_color>`
+        v.trim ? `    <trim>${cdata(v.trim)}</trim>` : "",
+        v.bodyStyle ? `    <body_style>${cdata(v.bodyStyle)}</body_style>` : "",
+        v.mileageValue != null
+          ? `    <mileage>\n      <value>${v.mileageValue}</value>\n      <unit>MI</unit>\n    </mileage>`
           : "",
+        v.vin ? `    <vin>${escapeXml(v.vin)}</vin>` : "",
+        v.exteriorColor ? `    <exterior_color>${cdata(v.exteriorColor)}</exterior_color>` : "",
+        additionalImages,
       ]
         .filter(Boolean)
         .join("\n");
 
-      return `  <item>
-    <g:id>${escapeXml(v.id)}</g:id>
-    <g:title>${escapeXml(v.title)}</g:title>
-    <g:description>${escapeXml(v.description.slice(0, 5000))}</g:description>
-    <g:availability>${v.availability}</g:availability>
-    <g:condition>${v.condition}</g:condition>
-    <g:price>${escapeXml(v.price)}</g:price>
-    <g:link>${escapeXml(v.link)}</g:link>
-    <g:image_link>${escapeXml(v.imageLinkPrimary)}</g:image_link>
-    <g:make>${escapeXml(v.make)}</g:make>
-    <g:model>${escapeXml(v.model)}</g:model>
-    <g:dealer_name>${escapeXml(v.dealerName)}</g:dealer_name>
+      return `  <listing>
+    <vehicle_id>${escapeXml(v.vehicleId)}</vehicle_id>
+    <make>${cdata(v.make)}</make>
+    <model>${cdata(v.model)}</model>
+    <year>${v.year ?? ""}</year>
+    <title>${cdata(v.title)}</title>
+    <description>${cdata(v.description.slice(0, 5000))}</description>
+    <availability>${v.availability}</availability>
+    <condition>${v.condition}</condition>
+    <price>${escapeXml(v.price)}</price>
+    <url>${escapeXml(v.url)}</url>
+    <image_link>${escapeXml(v.imageLinkPrimary)}</image_link>
+    <dealer_name>${cdata(v.dealerName)}</dealer_name>
 ${optionalLines}
-  </item>`;
+  </listing>`;
     })
     .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
-  <channel>
-    <title>${escapeXml(dealerName)} — DealerPilot Inventory Catalog</title>
-    <link>https://www.facebook.com/marketplace</link>
-    <description>DealerPilot-hosted Meta Catalog Feed for ${escapeXml(dealerName)}</description>
-    <g:total_vehicles>${vehicles.length}</g:total_vehicles>
-    <g:generated_at>${new Date().toISOString()}</g:generated_at>
-${items}
-  </channel>
-</rss>`;
+<listings>
+  <!--
+    DealerPilot Meta Vehicle Catalog Feed
+    Dealer: ${escapeXml(dealerName)}
+    Vehicles: ${vehicles.length}
+    Generated: ${new Date().toISOString()}
+  -->
+${listings}
+</listings>`;
 }
 
 function escapeCsv(val: string | number | null | undefined): string {
@@ -208,13 +211,13 @@ function escapeCsv(val: string | number | null | undefined): string {
 }
 
 const CSV_HEADERS = [
-  "id",
+  "vehicle_id",
   "title",
   "description",
   "availability",
   "condition",
   "price",
-  "link",
+  "url",
   "image_link",
   "additional_image_link",
   "make",
@@ -222,7 +225,8 @@ const CSV_HEADERS = [
   "year",
   "trim",
   "body_style",
-  "mileage",
+  "mileage.value",
+  "mileage.unit",
   "vin",
   "exterior_color",
   "dealer_name",
@@ -233,13 +237,13 @@ export async function generateMetaCatalogCsv(dealerId: number): Promise<string> 
 
   const rows = vehicles.map((v) =>
     [
-      escapeCsv(v.id),
+      escapeCsv(v.vehicleId),
       escapeCsv(v.title),
       escapeCsv(v.description.slice(0, 5000)),
       escapeCsv(v.availability),
       escapeCsv(v.condition),
       escapeCsv(v.price),
-      escapeCsv(v.link),
+      escapeCsv(v.url),
       escapeCsv(v.imageLinkPrimary),
       escapeCsv(v.additionalImageLinks.slice(0, 10).join("|")),
       escapeCsv(v.make),
@@ -247,7 +251,8 @@ export async function generateMetaCatalogCsv(dealerId: number): Promise<string> 
       escapeCsv(v.year),
       escapeCsv(v.trim),
       escapeCsv(v.bodyStyle),
-      escapeCsv(v.mileage),
+      escapeCsv(v.mileageValue),
+      v.mileageValue != null ? "MI" : "",
       escapeCsv(v.vin),
       escapeCsv(v.exteriorColor),
       escapeCsv(v.dealerName),
@@ -269,16 +274,20 @@ export async function validateMetaCatalog(dealerId: number): Promise<MetaDiagnos
     if (!v.price || v.price === "0 USD") errors.push("missing or invalid price");
     if (!v.imageLinkPrimary) errors.push("missing primary image");
     else if (!v.imageLinkPrimary.startsWith("http")) errors.push("invalid image URL format");
-    if (!v.link || !v.link.startsWith("http")) errors.push("invalid VDP link");
+    if (!v.url || !v.url.startsWith("http")) errors.push("invalid VDP URL");
+    if (!v.make) errors.push("missing make");
+    if (!v.model) errors.push("missing model");
+    if (!v.year) errors.push("missing year");
 
     if (!v.trim) warnings.push("trim not specified");
     if (!v.exteriorColor) warnings.push("exterior color not specified");
     if (!v.bodyStyle) warnings.push("body style not specified");
     if (v.additionalImageLinks.length === 0) warnings.push("no additional images");
     if (!v.description || v.description.length < 20) warnings.push("description too short");
+    if (v.mileageValue == null) warnings.push("mileage not specified");
 
     return {
-      vin: v.id,
+      vin: v.vehicleId,
       title: v.title,
       valid: errors.length === 0,
       errors,
