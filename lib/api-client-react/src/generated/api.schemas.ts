@@ -1596,9 +1596,9 @@ export interface FeedHealthReport {
 
 export interface MetaFieldStatus {
   vehicle_id: boolean;
-  image_link: boolean;
+  image_url: boolean;
   price: boolean;
-  link: boolean;
+  url: boolean;
 }
 
 export interface MetaVehicleValidation {
@@ -1612,9 +1612,9 @@ export interface MetaVehicleValidation {
 
 export interface MetaFieldCoverage {
   vehicle_id: number;
-  image_link: number;
+  image_url: number;
   price: number;
-  link: number;
+  url: number;
 }
 
 export type SchemaAuditEntryStatus = typeof SchemaAuditEntryStatus[keyof typeof SchemaAuditEntryStatus];

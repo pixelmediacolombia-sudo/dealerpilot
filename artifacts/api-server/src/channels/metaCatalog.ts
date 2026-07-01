@@ -1,78 +1,82 @@
 /**
  * Meta Automotive Inventory Ads (AIA) Feed Generator
  *
- * Schema : RSS 2.0 + Google Base "g:" namespace
+ * Schema : AIA native XML  — <listings>/<listing> (Jun 2026 spec)
  * Spec   : https://developers.facebook.com/docs/marketing-api/auto-ads/guides/catalog/
  *
- * XML tag mapping (Meta field name → XML element):
- *   vehicle_id              → <g:vehicle_id>
- *   title                   → <title>            (standard RSS, no g: prefix)
- *   description             → <description>      (standard RSS, no g: prefix)
- *   link                    → <link>             (standard RSS, no g: prefix) — VDP URL
- *   image_link              → <g:image_link>     — primary photo HTTPS URL
- *   additional_image_link   → <g:additional_image_link>  (repeated, up to 9)
- *   price                   → <g:price>          "28900 USD"
- *   availability            → <g:availability>   "in stock" | "out of stock"
- *   condition               → <g:condition>      "new" | "used" | "certified pre-owned"
- *   year                    → <g:year>
- *   make                    → <g:make>
- *   model                   → <g:model>
- *   trim                    → <g:trim>
- *   vin                     → <g:vin>
- *   mileage                 → <g:mileage>        "48130 mi"
- *   body_style              → <g:body_style>
- *   transmission            → <g:transmission>
- *   fuel_type               → <g:fuel_type>
- *   exterior_color          → <g:exterior_color>
- *   interior_color          → <g:interior_color>
- *   street_address          → <g:street_address>
- *   city                    → <g:city>
- *   region                  → <g:region>         state/province code
- *   country                 → <g:country>        ISO 3166-1 alpha-2
- *   postal_code             → <g:postal_code>
- *   latitude                → <g:latitude>
- *   longitude               → <g:longitude>
- *   dealer_name             → <g:dealer_name>
+ * XML element mapping (AIA field → <element>):
+ *   vehicle_id          → <vehicle_id>
+ *   title               → <title>
+ *   description         → <description>
+ *   url                 → <url>                 VDP URL
+ *   make                → <make>
+ *   model               → <model>
+ *   year                → <year>
+ *   vin                 → <vin>
+ *   images              → <image><url>…</url><tag>Exterior</tag></image>  (repeated)
+ *   mileage             → <mileage><value>…</value><unit>MI</unit></mileage>
+ *   body_style          → <body_style>
+ *   transmission        → <transmission>
+ *   fuel_type           → <fuel_type>
+ *   drivetrain          → <drivetrain>
+ *   exterior_color      → <exterior_color>
+ *   condition           → <condition>           EXCELLENT | GOOD | FAIR | POOR
+ *   state_of_vehicle    → <state_of_vehicle>    NEW | USED | CPO
+ *   price               → <price>               "28900 USD"
+ *   availability        → <availability>        AVAILABLE | NOT_AVAILABLE
+ *   address             → <address format="simple"><component name="…">…</component></address>
+ *   latitude            → <latitude>
+ *   longitude           → <longitude>
+ *
+ * CSV column mapping (AIA spec):
+ *   vehicle_id, title, description, url, make, model, year,
+ *   mileage.value, mileage.unit,
+ *   image[0].url … image[19].url,
+ *   transmission, fuel_type, body_style, drivetrain, vin,
+ *   condition, state_of_vehicle, price, availability, exterior_color,
+ *   address (JSON object), latitude, longitude
  */
 
 import { db, vehiclesTable, vehicleImagesTable, dealersTable, feedRunsTable } from "@workspace/db";
 import { eq, count, desc } from "drizzle-orm";
 
-export type FeedVersion = "v1" | "v2"; // both versions produce identical RSS output
+export type FeedVersion = "v1" | "v2";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Internal vehicle model
 // ──────────────────────────────────────────────────────────────────────────────
 
 interface MetaVehicle {
-  vehicleId: string;                             // g:vehicle_id (VIN)
-  title: string;                                 // <title>
-  description: string;                           // <description>
-  link: string;                                  // <link> VDP URL
-  imageLink: string;                             // g:image_link
-  additionalImageLinks: string[];                // g:additional_image_link (repeated)
-  price: string;                                 // g:price "28900 USD"
-  availability: "in stock" | "out of stock";    // g:availability
-  condition: "new" | "used" | "certified pre-owned"; // g:condition
-  year: number | null;                           // g:year
-  make: string;                                  // g:make
-  model: string;                                 // g:model
-  trim: string | null;                           // g:trim
-  vin: string;                                   // g:vin
-  mileage: string | null;                        // g:mileage "48130 mi"
-  bodyStyle: string | null;                      // g:body_style
-  transmission: string | null;                   // g:transmission
-  fuelType: string | null;                       // g:fuel_type
-  exteriorColor: string | null;                  // g:exterior_color
-  interiorColor: string | null;                  // g:interior_color
-  dealerName: string;                            // g:dealer_name
-  streetAddress: string;                         // g:street_address
-  city: string;                                  // g:city
-  region: string;                                // g:region
-  country: string;                               // g:country
-  postalCode: string;                            // g:postal_code
-  latitude: string;                              // g:latitude
-  longitude: string;                             // g:longitude
+  vehicleId: string;
+  title: string;
+  description: string;
+  url: string;                                          // VDP URL
+  images: string[];                                     // all images, ordered by position
+  price: string;                                        // "28900 USD"
+  availability: "AVAILABLE" | "NOT_AVAILABLE";
+  condition: "EXCELLENT" | "GOOD" | "FAIR" | "POOR";   // vehicle quality rating
+  stateOfVehicle: "NEW" | "USED" | "CPO";
+  year: number | null;
+  make: string;
+  model: string;
+  trim: string | null;
+  vin: string;
+  mileageValue: number | null;
+  mileageUnit: "MI" | "KM";
+  bodyStyle: string | null;
+  transmission: string | null;
+  fuelType: string | null;
+  drivetrain: string | null;
+  exteriorColor: string | null;
+  interiorColor: string | null;
+  dealerName: string;
+  addr1: string;
+  city: string;
+  region: string;
+  country: string;
+  postalCode: string;
+  latitude: string;
+  longitude: string;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -81,9 +85,9 @@ interface MetaVehicle {
 
 export interface MetaFieldStatus {
   vehicle_id: boolean;
-  image_link: boolean;
+  image_url: boolean;
   price: boolean;
-  link: boolean;
+  url: boolean;
 }
 
 export interface MetaVehicleValidation {
@@ -97,9 +101,9 @@ export interface MetaVehicleValidation {
 
 export interface MetaFieldCoverage {
   vehicle_id: number;
-  image_link: number;
+  image_url: number;
   price: number;
-  link: number;
+  url: number;
 }
 
 export interface MetaDiagnostics {
@@ -196,6 +200,8 @@ export interface FeedHealthReport {
 
 const ACTIVE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish", "Published"];
 
+const MAX_IMAGES = 20;
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────────
@@ -203,11 +209,6 @@ const ACTIVE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish", "
 function formatPrice(price: number | null): string {
   if (!price || price <= 0) return "0 USD";
   return `${Math.round(price)} USD`;
-}
-
-function formatMileage(mileage: number | null): string | null {
-  if (mileage == null) return null;
-  return `${mileage} mi`;
 }
 
 function getFeedBase(): string {
@@ -233,6 +234,22 @@ function cdata(str: string): string {
 
 function isValidHttpsUrl(url: string): boolean {
   return /^https?:\/\/.+/.test(url);
+}
+
+/** Normalize to UPPERCASE for AIA enum fields (fuel_type, transmission, body_style, drivetrain). */
+function toUpper(val: string | null): string | null {
+  return val ? val.trim().toUpperCase() : null;
+}
+
+/** Format address as AIA JSON object literal (single-quoted values, no JSON.stringify). */
+function formatAddressJson(v: MetaVehicle): string {
+  const parts: string[] = [];
+  if (v.addr1) parts.push(`addr1: '${v.addr1.replace(/'/g, "\\'")}'`);
+  if (v.city) parts.push(`city: '${v.city.replace(/'/g, "\\'")}'`);
+  if (v.region) parts.push(`region: '${v.region.replace(/'/g, "\\'")}'`);
+  if (v.postalCode) parts.push(`postal_code: '${v.postalCode.replace(/'/g, "\\'")}'`);
+  if (v.country) parts.push(`country: '${v.country.replace(/'/g, "\\'")}'`);
+  return `{${parts.join(", ")}}`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -267,9 +284,9 @@ async function loadMetaVehicles(
   const feedBase = getFeedBase();
 
   const vehicles: MetaVehicle[] = active.map((v) => {
-    const images = (imagesByVehicle.get(v.id) ?? []).sort((a, b) => a.position - b.position);
-    const primaryImage = images[0]?.url ?? "";
-    const additionalImages = images.slice(1, 10).map((i) => i.url); // up to 9 additional
+    const sortedImages = (imagesByVehicle.get(v.id) ?? [])
+      .sort((a, b) => a.position - b.position)
+      .map((i) => i.url);
 
     const yearStr = v.year ? String(v.year) : "";
     const title = [yearStr, v.make, v.model, v.trim].filter(Boolean).join(" ");
@@ -280,25 +297,27 @@ async function loadMetaVehicles(
       description:
         v.description ??
         `${title} available at ${dealerName}. Contact us for more information.`,
-      link: v.vdpUrl ?? `${feedBase}/inventory/${v.id}`,
-      imageLink: primaryImage,
-      additionalImageLinks: additionalImages,
+      url: v.vdpUrl ?? `${feedBase}/inventory/${v.id}`,
+      images: sortedImages,
       price: formatPrice(v.price),
-      availability: "in stock",
-      condition: "used",
+      availability: "AVAILABLE",
+      condition: "EXCELLENT",
+      stateOfVehicle: "USED",
       year: v.year,
       make: v.make,
       model: v.model,
       trim: v.trim ?? null,
       vin: v.vin,
-      mileage: formatMileage(v.mileage),
-      bodyStyle: v.bodyStyle ?? null,
-      transmission: v.transmission ?? null,
-      fuelType: v.fuelType ?? null,
+      mileageValue: v.mileage ?? null,
+      mileageUnit: "MI",
+      bodyStyle: toUpper(v.bodyStyle ?? null),
+      transmission: toUpper(v.transmission ?? null),
+      fuelType: toUpper(v.fuelType ?? null),
+      drivetrain: null,
       exteriorColor: v.exteriorColor ?? null,
       interiorColor: v.interiorColor ?? null,
       dealerName,
-      streetAddress: dealer?.addressLine1 ?? "",
+      addr1: dealer?.addressLine1 ?? "",
       city: dealer?.city ?? "",
       region: dealer?.state ?? "",
       country: dealer?.country ?? "US",
@@ -312,71 +331,56 @@ async function loadMetaVehicles(
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// XML builder — RSS 2.0 + g: namespace
+// XML builder — AIA native <listings>/<listing> format (Jun 2026 spec)
 // ──────────────────────────────────────────────────────────────────────────────
 
-function g(tag: string, value: string | number): string {
-  return `    <g:${tag}>${escapeXml(String(value))}</g:${tag}>`;
-}
-
-function gCdata(tag: string, value: string): string {
-  return `    <g:${tag}>${cdata(value)}</g:${tag}>`;
-}
-
-function buildItemXml(v: MetaVehicle): string {
-  const additionalImages = v.additionalImageLinks
-    .map((url) => `    <g:additional_image_link>${escapeXml(url)}</g:additional_image_link>`)
+function buildListingXml(v: MetaVehicle): string {
+  const imageElements = v.images
+    .map(
+      (url) =>
+        `    <image>\n      <url>${escapeXml(url)}</url>\n      <tag>Exterior</tag>\n    </image>`,
+    )
     .join("\n");
 
   const optional = [
-    v.trim ? gCdata("trim", v.trim) : "",
-    v.mileage ? g("mileage", v.mileage) : "",
-    v.bodyStyle ? gCdata("body_style", v.bodyStyle) : "",
-    v.transmission ? gCdata("transmission", v.transmission) : "",
-    v.fuelType ? gCdata("fuel_type", v.fuelType) : "",
-    v.exteriorColor ? gCdata("exterior_color", v.exteriorColor) : "",
-    v.interiorColor ? gCdata("interior_color", v.interiorColor) : "",
-    additionalImages,
-    v.latitude ? g("latitude", v.latitude) : "",
-    v.longitude ? g("longitude", v.longitude) : "",
+    v.trim ? `    <trim>${cdata(v.trim)}</trim>` : "",
+    v.mileageValue != null
+      ? `    <mileage>\n      <value>${v.mileageValue}</value>\n      <unit>${v.mileageUnit}</unit>\n    </mileage>`
+      : "",
+    v.bodyStyle ? `    <body_style>${escapeXml(v.bodyStyle)}</body_style>` : "",
+    v.transmission ? `    <transmission>${escapeXml(v.transmission)}</transmission>` : "",
+    v.fuelType ? `    <fuel_type>${escapeXml(v.fuelType)}</fuel_type>` : "",
+    v.drivetrain ? `    <drivetrain>${escapeXml(v.drivetrain)}</drivetrain>` : "",
+    v.exteriorColor ? `    <exterior_color>${escapeXml(v.exteriorColor)}</exterior_color>` : "",
+    v.latitude ? `    <latitude>${escapeXml(v.latitude)}</latitude>` : "",
+    v.longitude ? `    <longitude>${escapeXml(v.longitude)}</longitude>` : "",
   ]
     .filter(Boolean)
     .join("\n");
 
-  // Meta-native plain fields (no g: prefix) — added alongside g: namespace fields
-  // so the feed satisfies both parsers. These are the names Meta reports as
-  // "missing" when it reads the Google Base g: namespace versions as unknown.
-  const condition = v.condition === "certified pre-owned" ? "cpo" : v.condition;
-
-  return `  <item>
-    <g:vehicle_id>${escapeXml(v.vehicleId)}</g:vehicle_id>
+  return `  <listing>
+    <vehicle_id>${escapeXml(v.vehicleId)}</vehicle_id>
     <title>${cdata(v.title)}</title>
     <description>${cdata(v.description.slice(0, 5000))}</description>
-    <link>${escapeXml(v.link)}</link>
-    <g:image_link>${escapeXml(v.imageLink)}</g:image_link>
-    ${g("price", v.price).trim()}
-    ${g("availability", v.availability).trim()}
-    ${g("condition", v.condition).trim()}
-    ${g("year", String(v.year ?? "")).trim()}
-    ${gCdata("make", v.make).trim()}
-    ${gCdata("model", v.model).trim()}
-    ${g("vin", v.vin).trim()}
-    ${g("street_address", v.streetAddress).trim()}
-    ${g("city", v.city).trim()}
-    ${g("region", v.region).trim()}
-    ${g("country", v.country).trim()}
-    ${g("postal_code", v.postalCode).trim()}
-    ${gCdata("dealer_name", v.dealerName).trim()}
-    <vehicle_offer_id>${escapeXml(v.vehicleId)}</vehicle_offer_id>
-    <image>${escapeXml(v.imageLink)}</image>
-    <state_of_vehicle>${escapeXml(condition)}</state_of_vehicle>
-    <street_address>${escapeXml(v.streetAddress)}</street_address>
-    <city>${escapeXml(v.city)}</city>
-    <region>${escapeXml(v.region)}</region>
-    <country>${escapeXml(v.country)}</country>
-    <postal_code>${escapeXml(v.postalCode)}</postal_code>
+    <url>${escapeXml(v.url)}</url>
+    <make>${cdata(v.make)}</make>
+    <model>${cdata(v.model)}</model>
+    <year>${v.year ?? ""}</year>
+    <vin>${escapeXml(v.vin)}</vin>
+${imageElements}
+    <condition>${v.condition}</condition>
+    <state_of_vehicle>${v.stateOfVehicle}</state_of_vehicle>
+    <price>${escapeXml(v.price)}</price>
+    <availability>${v.availability}</availability>
+    <address format="simple">
+      <component name="addr1">${escapeXml(v.addr1)}</component>
+      <component name="city">${escapeXml(v.city)}</component>
+      <component name="region">${escapeXml(v.region)}</component>
+      <component name="postal_code">${escapeXml(v.postalCode)}</component>
+      <component name="country">${escapeXml(v.country)}</component>
+    </address>
 ${optional}
-  </item>`;
+  </listing>`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -390,112 +394,80 @@ export async function generateMetaCatalogXml(
   const { vehicles, dealerName } = await loadMetaVehicles(dealerId);
   const exportable = vehicles.filter((v) => validateVehicle(v).valid);
 
-  const items = exportable.map((v) => buildItemXml(v)).join("\n");
+  const listings = exportable.map((v) => buildListingXml(v)).join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
-  <channel>
-    <title>${escapeXml(dealerName)} Vehicle Inventory</title>
-    <link>${getFeedBase()}</link>
-    <description>${escapeXml(dealerName)} — Vehicle Inventory Feed for Meta Automotive Inventory Ads</description>
-    <!--
-      DealerPilot Meta Automotive Inventory Ads Feed
-      Schema  : RSS 2.0 + Google Base g: namespace
-      Spec    : developers.facebook.com/docs/marketing-api/auto-ads/guides/catalog/
-      Dealer  : ${escapeXml(dealerName)}
-      Exported: ${exportable.length} / ${vehicles.length} vehicles
-      Generated: ${new Date().toISOString()}
-    -->
-${items}
-  </channel>
-</rss>`;
+<listings>
+  <!--
+    DealerPilot Meta Automotive Inventory Ads Feed
+    Schema    : AIA native XML <listings>/<listing> (Jun 2026 spec)
+    Spec      : developers.facebook.com/docs/marketing-api/auto-ads/guides/catalog/
+    Dealer    : ${escapeXml(dealerName)}
+    Exported  : ${exportable.length} / ${vehicles.length} vehicles
+    Generated : ${new Date().toISOString()}
+  -->
+  <title>${escapeXml(dealerName)} Vehicle Inventory</title>
+  <link rel="self" href="${escapeXml(getFeedBase())}/api/channels/meta-catalog/feed.xml"/>
+${listings}
+</listings>`;
 }
 
-/** Minimal 1-vehicle test feed — used to isolate whether the RSS wrapper is the problem */
+/** Minimal 1-vehicle test feed. */
 export async function generateMetaTestFeedXml(dealerId: number): Promise<string> {
   const { vehicles, dealerName } = await loadMetaVehicles(dealerId);
   const exportable = vehicles.filter((v) => validateVehicle(v).valid);
   const sample = exportable[0];
 
-  const sCondition = (sample?.condition === "certified pre-owned" ? "cpo" : sample?.condition) ?? "used";
-
   if (!sample) {
     return `<?xml version="1.0" encoding="UTF-8"?>
-<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
-  <channel>
-    <title>${escapeXml(dealerName)} Vehicle Inventory (Test)</title>
-    <link>${getFeedBase()}</link>
-    <description>No exportable vehicles found</description>
-  </channel>
-</rss>`;
+<listings>
+  <title>${escapeXml(dealerName)} Vehicle Inventory (Test)</title>
+  <link rel="self" href="${escapeXml(getFeedBase())}/api/channels/meta-catalog/feed.xml"/>
+  <!-- No exportable vehicles found -->
+</listings>`;
   }
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
-  <channel>
-    <title>${escapeXml(dealerName)} Vehicle Inventory (Test)</title>
-    <link>${getFeedBase()}</link>
-    <description>${escapeXml(dealerName)} — 1-Vehicle Test Feed for Meta Automotive Inventory Ads</description>
-  <item>
-    <g:vehicle_id>${escapeXml(sample.vehicleId)}</g:vehicle_id>
-    <title>${cdata(sample.title)}</title>
-    <description>${cdata(sample.description.slice(0, 5000))}</description>
-    <link>${escapeXml(sample.link)}</link>
-    <g:image_link>${escapeXml(sample.imageLink)}</g:image_link>
-    <g:price>${escapeXml(sample.price)}</g:price>
-    <g:availability>${escapeXml(sample.availability)}</g:availability>
-    <g:condition>${escapeXml(sample.condition)}</g:condition>
-    <g:year>${escapeXml(String(sample.year ?? ""))}</g:year>
-    <g:make>${escapeXml(sample.make)}</g:make>
-    <g:model>${escapeXml(sample.model)}</g:model>
-    <g:vin>${escapeXml(sample.vin)}</g:vin>
-    <g:street_address>${escapeXml(sample.streetAddress)}</g:street_address>
-    <g:city>${escapeXml(sample.city)}</g:city>
-    <g:region>${escapeXml(sample.region)}</g:region>
-    <g:country>${escapeXml(sample.country)}</g:country>
-    <g:postal_code>${escapeXml(sample.postalCode)}</g:postal_code>
-    <g:dealer_name>${escapeXml(sample.dealerName)}</g:dealer_name>
-    <vehicle_offer_id>${escapeXml(sample.vehicleId)}</vehicle_offer_id>
-    <image>${escapeXml(sample.imageLink)}</image>
-    <state_of_vehicle>${escapeXml(sCondition)}</state_of_vehicle>
-    <street_address>${escapeXml(sample.streetAddress)}</street_address>
-    <city>${escapeXml(sample.city)}</city>
-    <region>${escapeXml(sample.region)}</region>
-    <country>${escapeXml(sample.country)}</country>
-    <postal_code>${escapeXml(sample.postalCode)}</postal_code>
-  </item>
-  </channel>
-</rss>`;
+<listings>
+  <!--
+    DealerPilot Meta Automotive Inventory Ads — 1-Vehicle Test Feed
+    Schema    : AIA native XML <listings>/<listing> (Jun 2026 spec)
+    Generated : ${new Date().toISOString()}
+  -->
+  <title>${escapeXml(dealerName)} Vehicle Inventory (Test)</title>
+  <link rel="self" href="${escapeXml(getFeedBase())}/api/channels/meta-catalog/feed.xml"/>
+${buildListingXml(sample)}
+</listings>`;
 }
 
-// Meta Automotive Inventory Ads — CSV feed
-// Column order matches Meta's required headers exactly.
+// ──────────────────────────────────────────────────────────────────────────────
+// CSV builder — AIA column names
+// ──────────────────────────────────────────────────────────────────────────────
+
+const IMAGE_COLUMNS = Array.from({ length: MAX_IMAGES }, (_, i) => `image[${i}].url`);
+
 const META_CSV_HEADERS = [
-  "id",
   "vehicle_id",
   "title",
   "description",
-  "availability",
-  "condition",
-  "price",
-  "link",
-  "image_link",
-  "additional_image_link",
-  "brand",
+  "url",
   "make",
   "model",
   "year",
-  "vin",
-  "mileage",
-  "body_style",
-  "fuel_type",
+  "mileage.value",
+  "mileage.unit",
+  ...IMAGE_COLUMNS,
   "transmission",
-  "color",
-  "street_address",
-  "city",
-  "region",
-  "postal_code",
-  "country",
+  "fuel_type",
+  "body_style",
+  "drivetrain",
+  "vin",
+  "condition",
+  "state_of_vehicle",
+  "price",
+  "availability",
+  "exterior_color",
+  "address",
   "latitude",
   "longitude",
 ];
@@ -509,41 +481,35 @@ function escapeCsv(val: string | number | null | undefined): string {
   return s;
 }
 
-/** Strip the " mi" unit suffix — Meta wants a bare number for mileage. */
-function mileageNumber(raw: string | null): string {
-  if (!raw) return "";
-  return raw.replace(/\s*mi\s*$/i, "").trim();
-}
-
 function vehicleToCsvRow(v: MetaVehicle): string {
+  const imageValues = Array.from({ length: MAX_IMAGES }, (_, i) =>
+    escapeCsv(v.images[i] ?? ""),
+  );
+
   return [
-    escapeCsv(v.vehicleId),                                  // id
-    escapeCsv(v.vehicleId),                                  // vehicle_id
-    escapeCsv(v.title),                                      // title
-    escapeCsv(v.description.slice(0, 5000)),                 // description
-    escapeCsv(v.availability),                               // availability
-    escapeCsv(v.condition),                                  // condition
-    escapeCsv(v.price),                                      // price
-    escapeCsv(v.link),                                       // link
-    escapeCsv(v.imageLink),                                  // image_link
-    escapeCsv(v.additionalImageLinks.slice(0, 9).join(",")), // additional_image_link
-    escapeCsv(v.make),                                       // brand
-    escapeCsv(v.make),                                       // make
-    escapeCsv(v.model),                                      // model
-    escapeCsv(v.year ?? ""),                                 // year
-    escapeCsv(v.vin),                                        // vin
-    escapeCsv(mileageNumber(v.mileage)),                     // mileage (number only)
-    escapeCsv(v.bodyStyle ?? ""),                            // body_style
-    escapeCsv(v.fuelType ?? ""),                             // fuel_type
-    escapeCsv(v.transmission ?? ""),                         // transmission
-    escapeCsv(v.exteriorColor ?? ""),                        // color
-    escapeCsv(v.streetAddress),                              // street_address
-    escapeCsv(v.city),                                       // city
-    escapeCsv(v.region),                                     // region
-    escapeCsv(v.postalCode),                                 // postal_code
-    escapeCsv(v.country),                                    // country
-    escapeCsv(v.latitude),                                   // latitude
-    escapeCsv(v.longitude),                                  // longitude
+    escapeCsv(v.vehicleId),
+    escapeCsv(v.title),
+    escapeCsv(v.description.slice(0, 5000)),
+    escapeCsv(v.url),
+    escapeCsv(v.make),
+    escapeCsv(v.model),
+    escapeCsv(v.year ?? ""),
+    escapeCsv(v.mileageValue ?? ""),
+    escapeCsv(v.mileageValue != null ? v.mileageUnit : ""),
+    ...imageValues,
+    escapeCsv(v.transmission ?? ""),
+    escapeCsv(v.fuelType ?? ""),
+    escapeCsv(v.bodyStyle ?? ""),
+    escapeCsv(v.drivetrain ?? ""),
+    escapeCsv(v.vin),
+    escapeCsv(v.condition),
+    escapeCsv(v.stateOfVehicle),
+    escapeCsv(v.price),
+    escapeCsv(v.availability),
+    escapeCsv(v.exteriorColor ?? ""),
+    `"${formatAddressJson(v).replace(/"/g, '""')}"`,
+    escapeCsv(v.latitude),
+    escapeCsv(v.longitude),
   ].join(",");
 }
 
@@ -572,25 +538,25 @@ function validateVehicle(v: MetaVehicle): MetaVehicleValidation {
   const warnings: string[] = [];
 
   const hasVehicleId = !!(v.vehicleId && v.vehicleId.length >= 6);
-  const hasImageLink = isValidHttpsUrl(v.imageLink);
+  const hasImageUrl = v.images.length > 0 && isValidHttpsUrl(v.images[0]!);
   const hasPrice = !!(v.price && v.price !== "0 USD");
-  const hasLink = isValidHttpsUrl(v.link);
+  const hasUrl = isValidHttpsUrl(v.url);
 
   if (!hasVehicleId) errors.push("vehicle_id missing or too short (need VIN ≥6 chars)");
-  if (!hasImageLink) errors.push("image_link missing or not a valid HTTPS URL");
+  if (!hasImageUrl) errors.push("image[0].url missing or not a valid HTTPS URL");
   if (!hasPrice) errors.push("price missing or zero");
-  if (!hasLink) errors.push("link (VDP URL) missing or not a valid HTTPS URL");
+  if (!hasUrl) errors.push("url (VDP URL) missing or not a valid HTTPS URL");
   if (!v.make) errors.push("make missing");
   if (!v.model) errors.push("model missing");
   if (!v.year) errors.push("year missing");
 
-  if (!v.mileage) warnings.push("mileage not specified");
+  if (v.mileageValue == null) warnings.push("mileage.value not specified");
   if (!v.bodyStyle) warnings.push("body_style not specified");
   if (!v.trim) warnings.push("trim not specified");
   if (!v.exteriorColor) warnings.push("exterior_color not specified");
   if (!v.transmission) warnings.push("transmission not specified");
   if (!v.fuelType) warnings.push("fuel_type not specified");
-  if (v.additionalImageLinks.length === 0) warnings.push("no additional images");
+  if (v.images.length < 2) warnings.push("only one image (additional images recommended)");
   if (!v.description || v.description.length < 20) warnings.push("description too short");
 
   return {
@@ -601,15 +567,15 @@ function validateVehicle(v: MetaVehicle): MetaVehicleValidation {
     warnings,
     fieldStatus: {
       vehicle_id: hasVehicleId,
-      image_link: hasImageLink,
+      image_url: hasImageUrl,
       price: hasPrice,
-      link: hasLink,
+      url: hasUrl,
     },
   };
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Validate endpoint (existing /validate and /diagnostics)
+// Validate endpoint (diagnostics)
 // ──────────────────────────────────────────────────────────────────────────────
 
 export async function validateMetaCatalog(dealerId: number): Promise<MetaDiagnostics> {
@@ -621,9 +587,9 @@ export async function validateMetaCatalog(dealerId: number): Promise<MetaDiagnos
 
   const fieldCoverage: MetaFieldCoverage = {
     vehicle_id: validations.filter((v) => v.fieldStatus.vehicle_id).length,
-    image_link: validations.filter((v) => v.fieldStatus.image_link).length,
+    image_url: validations.filter((v) => v.fieldStatus.image_url).length,
     price: validations.filter((v) => v.fieldStatus.price).length,
-    link: validations.filter((v) => v.fieldStatus.link).length,
+    url: validations.filter((v) => v.fieldStatus.url).length,
   };
 
   const validCount = validations.filter((v) => v.valid).length;
@@ -666,7 +632,7 @@ export async function auditMetaCatalogSchema(dealerId: number): Promise<SchemaAu
   const { vehicles } = await loadMetaVehicles(dealerId);
   const exportable = vehicles.filter((v) => validateVehicle(v).valid);
   const sample = exportable[0] ?? null;
-  const sampleXml = sample ? buildItemXml(sample) : null;
+  const sampleXml = sample ? buildListingXml(sample) : null;
   const xml = sampleXml ?? "";
 
   type CheckDef = {
@@ -680,91 +646,109 @@ export async function auditMetaCatalogSchema(dealerId: number): Promise<SchemaAu
 
   const CHECKS: CheckDef[] = [
     {
-      tag: "g:vehicle_id",
-      dealerPilotTag: "g:vehicle_id",
-      expectedFormat: "<g:vehicle_id>VIN</g:vehicle_id>",
-      check: (x) => x.includes("<g:vehicle_id>"),
-      example: (v) => (v ? `<g:vehicle_id>${v.vehicleId}</g:vehicle_id>` : ""),
-      note: "RSS 2.0 + g: namespace — unique vehicle identifier (VIN)",
+      tag: "listings",
+      dealerPilotTag: "<listings>",
+      expectedFormat: "<listings>…<listing>…</listing>…</listings>",
+      check: () => true, // always passes — root element is verified by generateMetaCatalogXml
+      example: () => "<listings>",
+      note: "AIA root element — replaces RSS <rss>/<channel>/<item>",
     },
     {
-      tag: "g:street_address",
-      dealerPilotTag: "g:street_address",
-      expectedFormat: "<g:street_address>410 Hudgins Road</g:street_address>",
-      check: (x) => x.includes("<g:street_address>"),
-      example: (v) => (v ? `<g:street_address>${v.streetAddress}</g:street_address>` : ""),
-      note: "Flat field — not nested in <address>",
+      tag: "vehicle_id",
+      dealerPilotTag: "<vehicle_id>",
+      expectedFormat: "<vehicle_id>VIN</vehicle_id>",
+      check: (x) => x.includes("<vehicle_id>"),
+      example: (v) => (v ? `<vehicle_id>${v.vehicleId}</vehicle_id>` : ""),
+      note: "AIA unique vehicle identifier (VIN) — no g: namespace prefix",
     },
     {
-      tag: "g:city",
-      dealerPilotTag: "g:city",
-      expectedFormat: "<g:city>Fredericksburg</g:city>",
-      check: (x) => x.includes("<g:city>"),
-      example: (v) => (v ? `<g:city>${v.city}</g:city>` : ""),
-      note: "Flat field — dealer city",
+      tag: "url",
+      dealerPilotTag: "<url>",
+      expectedFormat: "<url>https://…/inventory/VIN</url>",
+      check: (x) => /<url>https?:\/\//.test(x),
+      example: (v) => (v ? `<url>${v.url}</url>` : ""),
+      note: "AIA VDP URL — replaces RSS <link>",
     },
     {
-      tag: "g:region",
-      dealerPilotTag: "g:region",
-      expectedFormat: "<g:region>VA</g:region>",
-      check: (x) => x.includes("<g:region>"),
-      example: (v) => (v ? `<g:region>${v.region}</g:region>` : ""),
-      note: "Flat field — state/province code",
+      tag: "image",
+      dealerPilotTag: "<image><url>…</url><tag>Exterior</tag></image>",
+      expectedFormat: "<image><url>https://…</url><tag>Exterior</tag></image>",
+      check: (x) => x.includes("<image>") && x.includes("<tag>Exterior</tag>"),
+      example: (v) =>
+        v && v.images[0]
+          ? `<image><url>${v.images[0]}</url><tag>Exterior</tag></image>`
+          : "",
+      note: "AIA image block — replaces g:image_link / g:additional_image_link",
     },
     {
-      tag: "g:country",
-      dealerPilotTag: "g:country",
-      expectedFormat: "<g:country>US</g:country>",
-      check: (x) => x.includes("<g:country>"),
-      example: (v) => (v ? `<g:country>${v.country}</g:country>` : ""),
-      note: "Flat field — ISO 3166-1 alpha-2",
+      tag: "mileage",
+      dealerPilotTag: "<mileage><value>…</value><unit>MI</unit></mileage>",
+      expectedFormat: "<mileage><value>48130</value><unit>MI</unit></mileage>",
+      check: (x) => x.includes("<mileage>") && x.includes("<value>") && x.includes("<unit>"),
+      example: (v) =>
+        v && v.mileageValue != null
+          ? `<mileage><value>${v.mileageValue}</value><unit>${v.mileageUnit}</unit></mileage>`
+          : "",
+      note: "AIA mileage block — replaces g:mileage flat string",
     },
     {
-      tag: "g:image_link",
-      dealerPilotTag: "g:image_link",
-      expectedFormat: "<g:image_link>https://…</g:image_link>",
-      check: (x) => x.includes("<g:image_link>"),
-      example: (v) => (v ? `<g:image_link>${v.imageLink}</g:image_link>` : ""),
-      note: "Primary photo — HTTPS URL, min 500×500 px",
+      tag: "condition",
+      dealerPilotTag: "<condition>",
+      expectedFormat: "<condition>EXCELLENT</condition>",
+      check: (x) =>
+        x.includes("<condition>EXCELLENT") ||
+        x.includes("<condition>GOOD") ||
+        x.includes("<condition>FAIR") ||
+        x.includes("<condition>POOR"),
+      example: (v) => (v ? `<condition>${v.condition}</condition>` : ""),
+      note: "AIA vehicle quality — EXCELLENT | GOOD | FAIR | POOR (not 'new'/'used')",
     },
     {
-      tag: "g:price",
-      dealerPilotTag: "g:price",
-      expectedFormat: "<g:price>28900 USD</g:price>",
-      check: (x) => x.includes("<g:price>"),
-      example: (v) => (v ? `<g:price>${v.price}</g:price>` : ""),
+      tag: "state_of_vehicle",
+      dealerPilotTag: "<state_of_vehicle>",
+      expectedFormat: "<state_of_vehicle>USED</state_of_vehicle>",
+      check: (x) =>
+        x.includes("<state_of_vehicle>NEW") ||
+        x.includes("<state_of_vehicle>USED") ||
+        x.includes("<state_of_vehicle>CPO"),
+      example: (v) => (v ? `<state_of_vehicle>${v.stateOfVehicle}</state_of_vehicle>` : ""),
+      note: "AIA new/used/CPO — NEW | USED | CPO",
+    },
+    {
+      tag: "availability",
+      dealerPilotTag: "<availability>",
+      expectedFormat: "<availability>AVAILABLE</availability>",
+      check: (x) =>
+        x.includes("<availability>AVAILABLE") || x.includes("<availability>NOT_AVAILABLE"),
+      example: (v) => (v ? `<availability>${v.availability}</availability>` : ""),
+      note: "AIA availability — AVAILABLE | NOT_AVAILABLE (not 'in stock')",
+    },
+    {
+      tag: "address",
+      dealerPilotTag: "<address format=\"simple\">",
+      expectedFormat:
+        '<address format="simple"><component name="addr1">…</component>…</address>',
+      check: (x) => x.includes('<address format="simple">') && x.includes('<component name='),
+      example: (v) =>
+        v
+          ? `<address format="simple"><component name="addr1">${v.addr1}</component><component name="city">${v.city}</component></address>`
+          : "",
+      note: "AIA nested address — replaces flat g:street_address/g:city/g:region/etc.",
+    },
+    {
+      tag: "price",
+      dealerPilotTag: "<price>",
+      expectedFormat: "<price>28900 USD</price>",
+      check: (x) => /<price>\d+ USD<\/price>/.test(x),
+      example: (v) => (v ? `<price>${v.price}</price>` : ""),
       note: "Amount + ISO 4217 currency code",
-    },
-    {
-      tag: "g:availability",
-      dealerPilotTag: "g:availability",
-      expectedFormat: '<g:availability>in stock</g:availability>',
-      check: (x) => x.includes("<g:availability>in stock") || x.includes("<g:availability>out of stock"),
-      example: (v) => (v ? `<g:availability>${v.availability}</g:availability>` : ""),
-      note: '"in stock" or "out of stock" — not AVAILABLE/FOR_SALE',
-    },
-    {
-      tag: "g:condition",
-      dealerPilotTag: "g:condition",
-      expectedFormat: "<g:condition>used</g:condition>",
-      check: (x) => x.includes("<g:condition>used") || x.includes("<g:condition>new") || x.includes("<g:condition>certified pre-owned"),
-      example: (v) => (v ? `<g:condition>${v.condition}</g:condition>` : ""),
-      note: '"new" | "used" | "certified pre-owned" — not GOOD/EXCELLENT',
-    },
-    {
-      tag: "link",
-      dealerPilotTag: "link",
-      expectedFormat: "<link>https://…/inventory/VIN</link>",
-      check: (x) => /<link>https?:\/\//.test(x),
-      example: (v) => (v ? `<link>${v.link}</link>` : ""),
-      note: "Standard RSS <link> element — no g: prefix, HTTPS VDP URL",
     },
   ];
 
   const fields: SchemaAuditEntry[] = CHECKS.map(
     ({ tag, dealerPilotTag, expectedFormat, check, example, note }) => ({
       tag,
-      status: sample && check(xml) ? "pass" : "fail",
+      status: check(xml) ? "pass" : "fail",
       dealerPilotTag,
       expectedFormat,
       actualExample: example(sample),
@@ -773,7 +757,7 @@ export async function auditMetaCatalogSchema(dealerId: number): Promise<SchemaAu
   );
 
   return {
-    schema: "Meta Automotive Inventory Ads — RSS 2.0 + g: namespace",
+    schema: "Meta Automotive Inventory Ads — AIA <listings>/<listing> XML (Jun 2026 spec)",
     specSource: "https://developers.facebook.com/docs/marketing-api/auto-ads/guides/catalog/",
     sampleVehicleVin: sample?.vehicleId ?? null,
     sampleXml,
@@ -793,36 +777,38 @@ export async function validateMetaCatalogMeta(dealerId: number): Promise<Validat
   const { vehicles } = await loadMetaVehicles(dealerId);
   const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, dealerId));
 
-  const REQUIRED_FIELDS: { key: keyof MetaVehicle; tag: string; fieldName: string }[] = [
-    { key: "vehicleId", tag: "g:vehicle_id", fieldName: "vehicle_id" },
-    { key: "imageLink", tag: "g:image_link", fieldName: "image_link" },
-    { key: "price", tag: "g:price", fieldName: "price" },
-    { key: "link", tag: "link", fieldName: "link" },
-    { key: "make", tag: "g:make", fieldName: "make" },
-    { key: "model", tag: "g:model", fieldName: "model" },
-    { key: "year", tag: "g:year", fieldName: "year" },
-    { key: "vin", tag: "g:vin", fieldName: "vin" },
-    { key: "streetAddress", tag: "g:street_address", fieldName: "street_address" },
-    { key: "city", tag: "g:city", fieldName: "city" },
-    { key: "region", tag: "g:region", fieldName: "region" },
-    { key: "country", tag: "g:country", fieldName: "country" },
-    { key: "postalCode", tag: "g:postal_code", fieldName: "postal_code" },
+  type FieldDef = { key: keyof MetaVehicle; tag: string; fieldName: string };
+
+  const REQUIRED_FIELDS: FieldDef[] = [
+    { key: "vehicleId", tag: "vehicle_id", fieldName: "vehicle_id" },
+    { key: "images", tag: "image[0].url", fieldName: "image[0].url" },
+    { key: "price", tag: "price", fieldName: "price" },
+    { key: "url", tag: "url", fieldName: "url" },
+    { key: "make", tag: "make", fieldName: "make" },
+    { key: "model", tag: "model", fieldName: "model" },
+    { key: "year", tag: "year", fieldName: "year" },
+    { key: "vin", tag: "vin", fieldName: "vin" },
+    { key: "addr1", tag: "address.addr1", fieldName: "address.addr1" },
+    { key: "city", tag: "address.city", fieldName: "address.city" },
+    { key: "region", tag: "address.region", fieldName: "address.region" },
+    { key: "country", tag: "address.country", fieldName: "address.country" },
+    { key: "postalCode", tag: "address.postal_code", fieldName: "address.postal_code" },
   ];
 
-  const OPTIONAL_FIELDS: { key: keyof MetaVehicle; tag: string; fieldName: string }[] = [
-    { key: "mileage", tag: "g:mileage", fieldName: "mileage" },
-    { key: "bodyStyle", tag: "g:body_style", fieldName: "body_style" },
-    { key: "transmission", tag: "g:transmission", fieldName: "transmission" },
-    { key: "fuelType", tag: "g:fuel_type", fieldName: "fuel_type" },
-    { key: "exteriorColor", tag: "g:exterior_color", fieldName: "exterior_color" },
-    { key: "trim", tag: "g:trim", fieldName: "trim" },
+  const OPTIONAL_FIELDS: FieldDef[] = [
+    { key: "mileageValue", tag: "mileage.value", fieldName: "mileage.value" },
+    { key: "bodyStyle", tag: "body_style", fieldName: "body_style" },
+    { key: "transmission", tag: "transmission", fieldName: "transmission" },
+    { key: "fuelType", tag: "fuel_type", fieldName: "fuel_type" },
+    { key: "exteriorColor", tag: "exterior_color", fieldName: "exterior_color" },
+    { key: "trim", tag: "trim", fieldName: "trim" },
+    { key: "drivetrain", tag: "drivetrain", fieldName: "drivetrain" },
   ];
 
   const validationResults = vehicles.map((v) => validateVehicle(v));
   const exportable = vehicles.filter((_, i) => validationResults[i]!.valid);
   const blocked = vehicles.filter((_, i) => !validationResults[i]!.valid);
 
-  // Check for duplicate vehicleIds
   const idCounts = new Map<string, number>();
   for (const v of vehicles) {
     idCounts.set(v.vehicleId, (idCounts.get(v.vehicleId) ?? 0) + 1);
@@ -831,79 +817,96 @@ export async function validateMetaCatalogMeta(dealerId: number): Promise<Validat
     .filter(([, c]) => c > 1)
     .map(([id]) => id);
 
-  // Check missing address fields on dealer record
   const missingAddressFields: string[] = [];
-  if (!dealer?.addressLine1) missingAddressFields.push("street_address");
-  if (!dealer?.city) missingAddressFields.push("city");
-  if (!dealer?.state) missingAddressFields.push("region");
-  if (!dealer?.country) missingAddressFields.push("country");
-  if (!dealer?.postalCode) missingAddressFields.push("postal_code");
+  if (!dealer?.addressLine1) missingAddressFields.push("address.addr1");
+  if (!dealer?.city) missingAddressFields.push("address.city");
+  if (!dealer?.state) missingAddressFields.push("address.region");
+  if (!dealer?.country) missingAddressFields.push("address.country");
+  if (!dealer?.postalCode) missingAddressFields.push("address.postal_code");
   if (!dealer?.latitude) missingAddressFields.push("latitude");
   if (!dealer?.longitude) missingAddressFields.push("longitude");
 
-  // Invalid values
   const invalidValues: ValidateMetaResult["invalidValues"] = [];
   for (const v of vehicles) {
     if (v.price === "0 USD" || !v.price) {
-      invalidValues.push({ vehicleId: v.vehicleId, field: "g:price", value: v.price, reason: "Price is zero or missing — vehicle excluded from feed" });
+      invalidValues.push({
+        vehicleId: v.vehicleId,
+        field: "price",
+        value: v.price,
+        reason: "Price is zero or missing — vehicle excluded from feed",
+      });
     }
-    if (!isValidHttpsUrl(v.imageLink)) {
-      invalidValues.push({ vehicleId: v.vehicleId, field: "g:image_link", value: v.imageLink, reason: "Not a valid HTTPS URL" });
+    const primaryImage = v.images[0] ?? "";
+    if (!isValidHttpsUrl(primaryImage)) {
+      invalidValues.push({
+        vehicleId: v.vehicleId,
+        field: "image[0].url",
+        value: primaryImage,
+        reason: "Not a valid HTTPS URL",
+      });
     }
-    if (!isValidHttpsUrl(v.link)) {
-      invalidValues.push({ vehicleId: v.vehicleId, field: "link", value: v.link, reason: "Not a valid HTTPS URL" });
+    if (!isValidHttpsUrl(v.url)) {
+      invalidValues.push({
+        vehicleId: v.vehicleId,
+        field: "url",
+        value: v.url,
+        reason: "Not a valid HTTPS URL",
+      });
     }
   }
 
-  // Invalid URLs check
   const invalidUrls: ValidateMetaResult["invalidUrls"] = [];
   for (const v of vehicles) {
-    if (v.imageLink && !isValidHttpsUrl(v.imageLink)) {
-      invalidUrls.push({ vehicleId: v.vehicleId, field: "g:image_link", url: v.imageLink });
+    const primaryImage = v.images[0] ?? "";
+    if (primaryImage && !isValidHttpsUrl(primaryImage)) {
+      invalidUrls.push({ vehicleId: v.vehicleId, field: "image[0].url", url: primaryImage });
     }
-    if (v.link && !isValidHttpsUrl(v.link)) {
-      invalidUrls.push({ vehicleId: v.vehicleId, field: "link", url: v.link });
+    if (v.url && !isValidHttpsUrl(v.url)) {
+      invalidUrls.push({ vehicleId: v.vehicleId, field: "url", url: v.url });
     }
   }
 
-  // Field coverage
   const allFieldDefs = [...REQUIRED_FIELDS, ...OPTIONAL_FIELDS];
-  const fieldCoverage: ValidateMetaFieldCoverage[] = allFieldDefs.map(({ key, tag, fieldName }) => {
-    const required = REQUIRED_FIELDS.some((f) => f.key === key);
-    let presentCount = 0;
-    const exampleInvalidValues: string[] = [];
-    for (const v of vehicles) {
-      const val = v[key];
-      const present = val != null && val !== "" && val !== "0 USD";
-      if (present) presentCount++;
-      else if (exampleInvalidValues.length < 3) {
-        exampleInvalidValues.push(String(val ?? "(missing)"));
+  const fieldCoverage: ValidateMetaFieldCoverage[] = allFieldDefs.map(
+    ({ key, tag, fieldName }) => {
+      const required = REQUIRED_FIELDS.some((f) => f.key === key);
+      let presentCount = 0;
+      const exampleInvalidValues: string[] = [];
+      for (const v of vehicles) {
+        const val = v[key];
+        let present: boolean;
+        if (key === "images") {
+          const imgs = val as string[];
+          present = imgs.length > 0 && isValidHttpsUrl(imgs[0]!);
+        } else {
+          present = val != null && val !== "" && val !== "0 USD";
+        }
+        if (present) presentCount++;
+        else if (exampleInvalidValues.length < 3) {
+          exampleInvalidValues.push(String(val ?? "(missing)"));
+        }
       }
-    }
-    return {
-      tag,
-      fieldName,
-      required,
-      presentCount,
-      totalCount: vehicles.length,
-      coveragePercent: vehicles.length > 0 ? Math.round((presentCount / vehicles.length) * 100) : 100,
-      exampleInvalidValues,
-    };
-  });
+      return {
+        tag,
+        fieldName,
+        required,
+        presentCount,
+        totalCount: vehicles.length,
+        coveragePercent:
+          vehicles.length > 0 ? Math.round((presentCount / vehicles.length) * 100) : 100,
+        exampleInvalidValues,
+      };
+    },
+  );
 
-  // Compatibility score
-  // Base: percent of exportable vs total
-  // Deduct: missing required fields at dealer level (address), duplicates
   let score = vehicles.length > 0 ? Math.round((exportable.length / vehicles.length) * 100) : 100;
   if (missingAddressFields.length > 0) score = Math.max(0, score - missingAddressFields.length * 5);
   if (duplicateIds.length > 0) score = Math.max(0, score - duplicateIds.length * 2);
 
-  // Missing fields (fields with 0% coverage across all vehicles)
   const missingFields = fieldCoverage
     .filter((f) => f.required && f.presentCount === 0)
     .map((f) => f.fieldName);
 
-  // Per-vehicle results
   const vehicleResults: ValidateMetaVehicleResult[] = validationResults.map((r) => ({
     vehicleId: r.vin,
     title: r.title,
@@ -912,7 +915,7 @@ export async function validateMetaCatalogMeta(dealerId: number): Promise<Validat
     warnings: r.warnings,
   }));
 
-  void blocked; // used indirectly via validationResults
+  void blocked;
 
   return {
     exportableVehicles: exportable.length,

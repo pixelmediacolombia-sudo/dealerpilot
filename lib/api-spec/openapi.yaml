@@ -3671,12 +3671,12 @@ components:
 
     MetaFieldStatus:
       type: object
-      required: [vehicle_id, image_link, price, link]
+      required: [vehicle_id, image_url, price, url]
       properties:
         vehicle_id: { type: boolean }
-        image_link: { type: boolean }
+        image_url: { type: boolean }
         price: { type: boolean }
-        link: { type: boolean }
+        url: { type: boolean }
 
     MetaVehicleValidation:
       type: object
@@ -3696,12 +3696,12 @@ components:
 
     MetaFieldCoverage:
       type: object
-      required: [vehicle_id, image_link, price, link]
+      required: [vehicle_id, image_url, price, url]
       properties:
         vehicle_id: { type: integer }
-        image_link: { type: integer }
+        image_url: { type: integer }
         price: { type: integer }
-        link: { type: integer }
+        url: { type: integer }
 
     SchemaAuditEntry:
       type: object

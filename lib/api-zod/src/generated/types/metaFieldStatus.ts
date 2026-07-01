@@ -8,7 +8,7 @@
 
 export interface MetaFieldStatus {
   vehicle_id: boolean;
-  image_link: boolean;
+  image_url: boolean;
   price: boolean;
-  link: boolean;
+  url: boolean;
 }

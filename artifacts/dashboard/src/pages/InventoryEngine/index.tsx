@@ -408,12 +408,12 @@ export function InventoryEngine() {
             const isReady = blocked === 0 && total > 0;
             const coverage = validation?.fieldCoverage;
 
-            type MetaFieldKey = "vehicle_id" | "image_link" | "price" | "link";
+            type MetaFieldKey = "vehicle_id" | "image_url" | "price" | "url";
             const FIELDS: { key: MetaFieldKey; label: string; desc: string }[] = [
-              { key: "vehicle_id", label: "g:vehicle_id", desc: "Unique vehicle ID (VIN)" },
-              { key: "image_link", label: "g:image_link", desc: "Primary photo HTTPS URL" },
-              { key: "price", label: "g:price", desc: "Price — \"28900 USD\" format" },
-              { key: "link", label: "link", desc: "Vehicle Detail Page HTTPS URL" },
+              { key: "vehicle_id", label: "vehicle_id", desc: "Unique vehicle ID (VIN)" },
+              { key: "image_url", label: "image[0].url", desc: "Primary photo HTTPS URL" },
+              { key: "price", label: "price", desc: "Price — \"28900 USD\" format" },
+              { key: "url", label: "url", desc: "Vehicle Detail Page (VDP) HTTPS URL" },
             ];
 
             return (
