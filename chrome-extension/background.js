@@ -405,13 +405,45 @@ const handlers = {
   // ---- Image proxy: fetch a remote image and return it as base64 ----
   // Content scripts cannot bypass CORS; the service worker can.
   async FETCH_IMAGE_AS_BASE64(message) {
-    const response = await fetch(message.url);
-    if (!response.ok) {
-      throw new Error(`Image fetch failed: ${response.status} ${response.statusText} — ${message.url}`);
+    console.log("[PHOTO] background received request — url:", message.url);
+
+    // Detect and reject relative URLs early — they cannot be resolved by the
+    // service worker (it would try chrome-extension://[id]/... which doesn't exist).
+    if (!message.url || message.url.startsWith("/") || message.url.startsWith("./")) {
+      const err = `[PHOTO] RELATIVE URL DETECTED — cannot fetch "${message.url}" from service worker. ` +
+        "The payload endpoint must return absolute URLs (https://...). " +
+        "Fix: prepend the backend base URL before returning image URLs in the payload response.";
+      console.error(err);
+      throw new Error(err);
     }
+
+    console.log("[PHOTO] fetching URL:", message.url);
+    let response;
+    try {
+      response = await fetch(message.url);
+    } catch (fetchErr) {
+      // Surface the raw network/CORS exception instead of swallowing it
+      const errMsg = `[PHOTO] fetch() threw exception for "${message.url}": ${fetchErr && fetchErr.message ? fetchErr.message : String(fetchErr)}`;
+      console.error(errMsg, fetchErr);
+      throw new Error(errMsg);
+    }
+
+    console.log("[PHOTO] response status:", response.status, response.statusText, "— url:", message.url);
+
+    // Log CORS-relevant headers
+    const corsHeader = response.headers.get("access-control-allow-origin");
     const contentType = response.headers.get("content-type") || "image/jpeg";
+    console.log("[PHOTO] response headers — content-type:", contentType, "| access-control-allow-origin:", corsHeader);
+
+    if (!response.ok) {
+      const errMsg = `[PHOTO] Image fetch failed: HTTP ${response.status} ${response.statusText} — ${message.url}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+
     const arrayBuffer = await response.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
+    console.log("[PHOTO] blob size:", uint8Array.length, "bytes —", Math.round(uint8Array.length / 1024), "KB");
 
     // Convert binary to base64 in safe chunks (avoids call-stack overflow on large images)
     let binary = "";
@@ -419,7 +451,9 @@ const handlers = {
     for (let i = 0; i < uint8Array.length; i += chunkSize) {
       binary += String.fromCharCode.apply(null, uint8Array.subarray(i, i + chunkSize));
     }
-    return { base64: btoa(binary), type: contentType };
+    const base64 = btoa(binary);
+    console.log("[PHOTO] returning base64 — length:", base64.length, "chars, type:", contentType);
+    return { base64, type: contentType };
   },
 };
 

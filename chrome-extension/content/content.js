@@ -891,9 +891,11 @@
     for (let i = 0; i < toUpload.length; i++) {
       const url = toUpload[i];
       setStatus(`Downloading photo ${i + 1} / ${toUpload.length}…`);
+      console.log(`[PHOTO] requesting image ${i + 1}/${toUpload.length} — url: "${url}" — isAbsolute: ${url.startsWith("http")}`);
       try {
         const res = await send({ type: "FETCH_IMAGE_AS_BASE64", url });
         if (!res || !res.ok) {
+          console.error(`[PHOTO] background fetch FAILED for photo ${i + 1} — error:`, res?.error, "| full response:", res);
           stateLog(`Photo ${i + 1}: background fetch failed — ${res?.error}`);
           continue;
         }
