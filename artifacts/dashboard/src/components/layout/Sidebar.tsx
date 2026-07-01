@@ -29,7 +29,7 @@ const ACTIVE_PATHS: Record<string, string[]> = {
   "/sales-ai": ["/sales-ai", "/conversations", "/leads"],
   "/marketplace-intelligence": ["/marketplace-intelligence"],
   "/dealer-dna": ["/dealer-dna"],
-  "/settings": ["/settings", "/connection-center"],
+  "/settings": ["/settings"],
 };
 
 export function Sidebar() {

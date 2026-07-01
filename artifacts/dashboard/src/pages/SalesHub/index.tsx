@@ -63,6 +63,7 @@ import {
   Users,
 } from "lucide-react";
 import { StatusPulse } from "@/components/shared";
+import { MarketplaceReadinessPanel } from "@/components/MarketplaceReadinessPanel";
 
 // ─── Duplicate Groups (capped at 5, sorted by size) ─────────────────────────
 
@@ -476,6 +477,9 @@ export function SalesHub() {
               </Button>
             </div>
           </div>
+
+          {/* Marketplace Publishing Readiness */}
+          <MarketplaceReadinessPanel />
 
           <div className="flex flex-col xl:flex-row gap-8">
 
