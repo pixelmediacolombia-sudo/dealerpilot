@@ -133,6 +133,8 @@ export * from './markListingPublishedBody';
 export * from './messageContextInput';
 export * from './messageContextResult';
 export * from './metaDiagnostics';
+export * from './metaFieldCoverage';
+export * from './metaFieldStatus';
 export * from './metaVehicleValidation';
 export * from './nextBatchRecommendation';
 export * from './nextBatchVehicle';

@@ -171,6 +171,15 @@ export const GetMetaCatalogDiagnosticsResponse = zod.object({
   "invalidVehicles": zod.number(),
   "totalErrors": zod.number(),
   "totalWarnings": zod.number(),
+  "feedReadinessPercent": zod.number(),
+  "fieldCoverage": zod.object({
+  "vehicle_offer_id": zod.number(),
+  "image": zod.number(),
+  "price": zod.number(),
+  "condition": zod.number(),
+  "availability": zod.number(),
+  "url": zod.number()
+}),
   "lastGenerated": zod.coerce.date(),
   "feedXmlUrl": zod.string(),
   "feedCsvUrl": zod.string(),
@@ -179,7 +188,54 @@ export const GetMetaCatalogDiagnosticsResponse = zod.object({
   "title": zod.string(),
   "valid": zod.boolean(),
   "errors": zod.array(zod.string()),
-  "warnings": zod.array(zod.string())
+  "warnings": zod.array(zod.string()),
+  "fieldStatus": zod.object({
+  "vehicle_offer_id": zod.boolean(),
+  "image": zod.boolean(),
+  "price": zod.boolean(),
+  "condition": zod.boolean(),
+  "availability": zod.boolean(),
+  "url": zod.boolean()
+})
+}))
+})
+
+
+/**
+ * @summary Meta Automotive feed validation — per-field coverage for all active vehicles
+ */
+export const ValidateMetaCatalogFeedResponse = zod.object({
+  "totalVehicles": zod.number(),
+  "validVehicles": zod.number(),
+  "invalidVehicles": zod.number(),
+  "totalErrors": zod.number(),
+  "totalWarnings": zod.number(),
+  "feedReadinessPercent": zod.number(),
+  "fieldCoverage": zod.object({
+  "vehicle_offer_id": zod.number(),
+  "image": zod.number(),
+  "price": zod.number(),
+  "condition": zod.number(),
+  "availability": zod.number(),
+  "url": zod.number()
+}),
+  "lastGenerated": zod.coerce.date(),
+  "feedXmlUrl": zod.string(),
+  "feedCsvUrl": zod.string(),
+  "vehicles": zod.array(zod.object({
+  "vin": zod.string(),
+  "title": zod.string(),
+  "valid": zod.boolean(),
+  "errors": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "fieldStatus": zod.object({
+  "vehicle_offer_id": zod.boolean(),
+  "image": zod.boolean(),
+  "price": zod.boolean(),
+  "condition": zod.boolean(),
+  "availability": zod.boolean(),
+  "url": zod.boolean()
+})
 }))
 })
 

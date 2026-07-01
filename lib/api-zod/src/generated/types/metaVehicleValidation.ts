@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MetaFieldStatus } from './metaFieldStatus';
 
 export interface MetaVehicleValidation {
   vin: string;
@@ -12,4 +13,5 @@ export interface MetaVehicleValidation {
   valid: boolean;
   errors: string[];
   warnings: string[];
+  fieldStatus: MetaFieldStatus;
 }

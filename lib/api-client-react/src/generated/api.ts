@@ -772,6 +772,83 @@ export function useGetMetaCatalogDiagnostics<TData = Awaited<ReturnType<typeof g
 
 
 
+export const getValidateMetaCatalogFeedUrl = () => {
+
+
+
+
+  return `/api/channels/meta-catalog/validate`
+}
+
+/**
+ * @summary Meta Automotive feed validation — per-field coverage for all active vehicles
+ */
+export const validateMetaCatalogFeed = async ( options?: RequestInit): Promise<MetaDiagnostics> => {
+
+  return customFetch<MetaDiagnostics>(getValidateMetaCatalogFeedUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getValidateMetaCatalogFeedQueryKey = () => {
+    return [
+    `/api/channels/meta-catalog/validate`
+    ] as const;
+    }
+
+
+export const getValidateMetaCatalogFeedQueryOptions = <TData = Awaited<ReturnType<typeof validateMetaCatalogFeed>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateMetaCatalogFeed>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getValidateMetaCatalogFeedQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof validateMetaCatalogFeed>>> = ({ signal }) => validateMetaCatalogFeed({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof validateMetaCatalogFeed>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ValidateMetaCatalogFeedQueryResult = NonNullable<Awaited<ReturnType<typeof validateMetaCatalogFeed>>>
+export type ValidateMetaCatalogFeedQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Meta Automotive feed validation — per-field coverage for all active vehicles
+ */
+
+export function useValidateMetaCatalogFeed<TData = Awaited<ReturnType<typeof validateMetaCatalogFeed>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateMetaCatalogFeed>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getValidateMetaCatalogFeedQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getListVehiclesUrl = (params?: ListVehiclesParams,) => {
   const normalizedParams = new URLSearchParams();
 

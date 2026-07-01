@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MetaFieldCoverage } from './metaFieldCoverage';
 import type { MetaVehicleValidation } from './metaVehicleValidation';
 
 export interface MetaDiagnostics {
@@ -13,6 +14,8 @@ export interface MetaDiagnostics {
   invalidVehicles: number;
   totalErrors: number;
   totalWarnings: number;
+  feedReadinessPercent: number;
+  fieldCoverage: MetaFieldCoverage;
   lastGenerated: Date;
   feedXmlUrl: string;
   feedCsvUrl: string;

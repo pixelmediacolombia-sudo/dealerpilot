@@ -4,12 +4,14 @@ import { PageHeader, SectionCard, KpiCard, StatusPulse } from "@/components/shar
 import {
   useGetInventoryHealth,
   useGetMetaCatalogDiagnostics,
+  useValidateMetaCatalogFeed,
   useListDealers,
   useSyncDealerFeed,
   useListFeedRuns,
   getListFeedRunsQueryKey,
   getGetInventoryHealthQueryKey,
   getGetMetaCatalogDiagnosticsQueryKey,
+  getValidateMetaCatalogFeedQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -146,6 +148,10 @@ export function InventoryEngine() {
     query: { queryKey: getGetMetaCatalogDiagnosticsQueryKey(), refetchInterval: 120_000 },
   });
 
+  const { data: validation, isLoading: validationLoading, refetch: refetchValidation } = useValidateMetaCatalogFeed({
+    query: { queryKey: getValidateMetaCatalogFeedQueryKey(), refetchInterval: 120_000 },
+  });
+
   const { data: feedRunsData } = useListFeedRuns(dealerId, {
     query: { enabled: !!dealerId, queryKey: getListFeedRunsQueryKey(dealerId) },
   });
@@ -172,8 +178,8 @@ export function InventoryEngine() {
   };
 
   const handleValidate = async () => {
-    await refetchDiag();
-    toast({ title: "Feed validated", description: "Meta catalog validation refreshed." });
+    await Promise.all([refetchDiag(), refetchValidation()]);
+    toast({ title: "Feed validated", description: "Meta Automotive validation refreshed." });
   };
 
   const handleDownloadCsv = () => {
@@ -393,6 +399,147 @@ export function InventoryEngine() {
             )}
           </SectionCard>
 
+          {/* ── META AUTOMOTIVE VALIDATION ── */}
+          {(() => {
+            const total = validation?.totalVehicles ?? 0;
+            const readiness = validation?.feedReadinessPercent ?? 0;
+            const isReady = readiness === 100 && (validation?.invalidVehicles ?? 0) === 0;
+            const coverage = validation?.fieldCoverage;
+
+            type MetaFieldKey = "vehicle_offer_id" | "image" | "price" | "condition" | "availability" | "url";
+            const FIELDS: { key: MetaFieldKey; label: string; desc: string }[] = [
+              { key: "vehicle_offer_id", label: "vehicle_offer_id", desc: "Vehicle identifier (VIN)" },
+              { key: "image", label: "image", desc: "Primary photo URL" },
+              { key: "price", label: "price", desc: "Listing price in USD" },
+              { key: "condition", label: "condition", desc: "GOOD / EXCELLENT / FAIR / POOR" },
+              { key: "availability", label: "availability", desc: "FOR_SALE / NOT_AVAILABLE" },
+              { key: "url", label: "url", desc: "Vehicle detail page URL" },
+            ];
+
+            return (
+              <SectionCard
+                title="Meta Automotive Validation"
+                description="Required field coverage across all active vehicles — must be 100% before uploading to Commerce Manager"
+                action={
+                  isReady ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-success/10 text-success border-success/20">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Feed Ready
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-destructive/10 text-destructive border-destructive/20">
+                      <XCircle className="w-3.5 h-3.5" />
+                      Export Blocked
+                    </span>
+                  )
+                }
+              >
+                {validationLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : validation ? (
+                  <div className="space-y-5">
+                    {/* Field checklist */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {FIELDS.map(({ key, label, desc }) => {
+                        const count = coverage ? coverage[key] : 0;
+                        const passing = total > 0 ? count === total : true;
+                        return (
+                          <div
+                            key={key}
+                            className={cn(
+                              "flex items-center justify-between gap-3 rounded-lg px-3.5 py-2.5 border",
+                              passing
+                                ? "bg-success/5 border-success/20"
+                                : "bg-destructive/5 border-destructive/20",
+                            )}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {passing ? (
+                                <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+                              ) : (
+                                <XCircle className="w-4 h-4 text-destructive shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <div className="text-xs font-mono font-semibold text-white truncate">
+                                  {label}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground truncate">
+                                  {desc}
+                                </div>
+                              </div>
+                            </div>
+                            <div className={cn(
+                              "text-xs font-semibold shrink-0 tabular-nums",
+                              passing ? "text-success" : "text-destructive",
+                            )}>
+                              {count}/{total}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Readiness bar */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Feed Readiness</span>
+                        <span className={cn(
+                          "font-semibold",
+                          readiness === 100 ? "text-success" : readiness >= 90 ? "text-yellow-400" : "text-destructive",
+                        )}>
+                          {readiness}%
+                        </span>
+                      </div>
+                      <ScoreBar score={readiness} />
+                    </div>
+
+                    {/* Problem vehicles */}
+                    {validation.invalidVehicles > 0 && (
+                      <div className="rounded-lg bg-destructive/5 border border-destructive/15 px-4 py-3 space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-destructive">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          {validation.invalidVehicles} vehicle{validation.invalidVehicles !== 1 ? "s" : ""} with missing required fields
+                        </div>
+                        <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                          {validation.vehicles
+                            .filter((v) => !v.valid)
+                            .map((v) => (
+                              <div key={v.vin} className="flex items-start gap-2 text-[11px] py-1 border-t border-destructive/10 first:border-0">
+                                <XCircle className="w-3 h-3 text-destructive mt-0.5 shrink-0" />
+                                <div className="min-w-0">
+                                  <span className="font-medium text-white/80">{v.title}</span>
+                                  <div className="flex flex-wrap gap-1 mt-0.5">
+                                    {v.errors.map((e) => (
+                                      <span key={e} className="text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5">
+                                        {e}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {isReady && (
+                      <div className="flex items-center gap-2 text-xs text-success">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        All {total} vehicles pass Meta Automotive required field validation — feed is ready to upload.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No validation data available. Click Validate above.
+                  </div>
+                )}
+              </SectionCard>
+            );
+          })()}
+
           {/* ── PART 2: Meta Catalog Adapter ── */}
           <SectionCard
             title="Meta Catalog Adapter"
@@ -403,7 +550,14 @@ export function InventoryEngine() {
                   <Activity className="w-3.5 h-3.5" />
                   Validate
                 </Button>
-                <Button size="sm" variant="outline" className="gap-1.5 h-7 text-xs" onClick={handleDownloadCsv}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 h-7 text-xs"
+                  onClick={handleDownloadCsv}
+                  disabled={!!(validation && validation.invalidVehicles > 0)}
+                  title={validation && validation.invalidVehicles > 0 ? "Fix required field errors before exporting" : undefined}
+                >
                   <Download className="w-3.5 h-3.5" />
                   CSV
                 </Button>

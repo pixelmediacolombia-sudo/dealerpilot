@@ -165,6 +165,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/MetaDiagnostics"
 
+  /channels/meta-catalog/validate:
+    get:
+      operationId: validateMetaCatalogFeed
+      tags: [inventory]
+      summary: Meta Automotive feed validation — per-field coverage for all active vehicles
+      responses:
+        "200":
+          description: Meta Automotive feed validation report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaDiagnostics"
+
   /vehicles:
     get:
       operationId: listVehicles
@@ -3630,9 +3643,20 @@ components:
           type: string
           enum: [Healthy, "Needs Attention", Critical]
 
+    MetaFieldStatus:
+      type: object
+      required: [vehicle_offer_id, image, price, condition, availability, url]
+      properties:
+        vehicle_offer_id: { type: boolean }
+        image: { type: boolean }
+        price: { type: boolean }
+        condition: { type: boolean }
+        availability: { type: boolean }
+        url: { type: boolean }
+
     MetaVehicleValidation:
       type: object
-      required: [vin, title, valid, errors, warnings]
+      required: [vin, title, valid, errors, warnings, fieldStatus]
       properties:
         vin: { type: string }
         title: { type: string }
@@ -3643,16 +3667,32 @@ components:
         warnings:
           type: array
           items: { type: string }
+        fieldStatus:
+          $ref: "#/components/schemas/MetaFieldStatus"
+
+    MetaFieldCoverage:
+      type: object
+      required: [vehicle_offer_id, image, price, condition, availability, url]
+      properties:
+        vehicle_offer_id: { type: integer }
+        image: { type: integer }
+        price: { type: integer }
+        condition: { type: integer }
+        availability: { type: integer }
+        url: { type: integer }
 
     MetaDiagnostics:
       type: object
-      required: [totalVehicles, validVehicles, invalidVehicles, totalErrors, totalWarnings, lastGenerated, feedXmlUrl, feedCsvUrl, vehicles]
+      required: [totalVehicles, validVehicles, invalidVehicles, totalErrors, totalWarnings, feedReadinessPercent, fieldCoverage, lastGenerated, feedXmlUrl, feedCsvUrl, vehicles]
       properties:
         totalVehicles: { type: integer }
         validVehicles: { type: integer }
         invalidVehicles: { type: integer }
         totalErrors: { type: integer }
         totalWarnings: { type: integer }
+        feedReadinessPercent: { type: integer }
+        fieldCoverage:
+          $ref: "#/components/schemas/MetaFieldCoverage"
         lastGenerated: { type: string, format: date-time }
         feedXmlUrl: { type: string }
         feedCsvUrl: { type: string }

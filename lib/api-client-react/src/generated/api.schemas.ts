@@ -1594,12 +1594,31 @@ export interface FeedHealthReport {
   healthStatus: FeedHealthReportHealthStatus;
 }
 
+export interface MetaFieldStatus {
+  vehicle_offer_id: boolean;
+  image: boolean;
+  price: boolean;
+  condition: boolean;
+  availability: boolean;
+  url: boolean;
+}
+
 export interface MetaVehicleValidation {
   vin: string;
   title: string;
   valid: boolean;
   errors: string[];
   warnings: string[];
+  fieldStatus: MetaFieldStatus;
+}
+
+export interface MetaFieldCoverage {
+  vehicle_offer_id: number;
+  image: number;
+  price: number;
+  condition: number;
+  availability: number;
+  url: number;
 }
 
 export interface MetaDiagnostics {
@@ -1608,6 +1627,8 @@ export interface MetaDiagnostics {
   invalidVehicles: number;
   totalErrors: number;
   totalWarnings: number;
+  feedReadinessPercent: number;
+  fieldCoverage: MetaFieldCoverage;
   lastGenerated: string;
   feedXmlUrl: string;
   feedCsvUrl: string;
