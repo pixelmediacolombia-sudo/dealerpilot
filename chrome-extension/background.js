@@ -509,10 +509,20 @@ const handlers = {
     return { ok: true, cancelledJobId: activeJob?.id ?? null };
   },
 
+  // ---- Reset all local state (non-destructive: keeps backendUrl, extensionId) ----
+  async RESET_EXTENSION_STATE() {
+    await chrome.storage.local.remove(STATE_KEYS_TO_CLEAR);
+    await chrome.storage.local.set({ installedAt: new Date().toISOString() });
+    console.log("[DealerPilot AI] Extension state reset by operator");
+    return { ok: true };
+  },
+
   async GET_DEBUG_STATE() {
     const keys = [
       "backendUrl",
       "extensionId",
+      "installedAt",
+      "storedVersion",
       "lastHeartbeat",
       "lastClaimedJob",
       "lastPublishedJob",
@@ -666,9 +676,42 @@ const handlers = {
   },
 };
 
+// ── Version check on every service worker start ─────────────────────────────
+// Runs before any message handler. If the stored version differs from the
+// current manifest version, all stale local state is wiped and installedAt
+// is reset so the popup never surfaces jobs from a previous install/session.
+const STATE_KEYS_TO_CLEAR = [
+  "activeJob", "lastClaimedJob", "lastPublishedJob",
+  "lastError", "lastClaimAttempt", "lastClaimError",
+  "lastNextResponse", "lastNextResponseAt", "connectTabId",
+  "lastPollTime", "auditLog",
+];
+
+(async () => {
+  const manifest = chrome.runtime.getManifest();
+  const currentVersion = manifest.version;
+  const { storedVersion } = await chrome.storage.local.get("storedVersion");
+  if (storedVersion !== currentVersion) {
+    await chrome.storage.local.remove(STATE_KEYS_TO_CLEAR);
+    await chrome.storage.local.set({
+      storedVersion: currentVersion,
+      installedAt: new Date().toISOString(),
+    });
+    console.log(`[DealerPilot AI] Version ${storedVersion ?? "none"} → ${currentVersion}: state cleared, installedAt reset`);
+  }
+})();
+
 // ---- App-controlled polling alarm ----
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   chrome.alarms.create("pollAssigned", { periodInMinutes: 0.25 });
+  // Clear all stale state on fresh install or update
+  await chrome.storage.local.remove(STATE_KEYS_TO_CLEAR);
+  const manifest = chrome.runtime.getManifest();
+  await chrome.storage.local.set({
+    installedAt: new Date().toISOString(),
+    storedVersion: manifest.version,
+  });
+  console.log(`[DealerPilot AI] onInstalled (${details.reason}): state cleared, installedAt set`);
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {

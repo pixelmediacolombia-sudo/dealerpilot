@@ -1,0 +1,86 @@
+CRITICAL PRODUCT POLISH — Fresh extension must start clean
+
+Problem:
+I installed a fresh extension v1.2.7, but it still shows:
+
+Queued job #20 — 2012 Mercedes-Benz...
+
+That makes no sense for a client install. A new extension should not appear with old jobs or test jobs.
+
+Required behavior:
+A newly installed extension should start clean and only show jobs created AFTER the install, unless the user explicitly clicks Resume.
+
+Fix requirements:
+
+1. Extension install timestamp
+On chrome.runtime.onInstalled:
+- save installedAt timestamp in chrome.storage.local
+- clear activeJob, lastClaimedJob, lastNextResponse, auditLog, last errors
+- do NOT show old queue state
+
+2. Fresh install queue filter
+When extension calls /api/publishing/jobs/next:
+- pass installedAt or extensionSessionId
+- backend should not return jobs created before this extension install/session unless source=publish_now and user explicitly resumes
+
+3. Production queue cleanup endpoint
+Add admin/dev button in dashboard:
+“Clear Test Queue”
+
+It should cancel all:
+- Queued
+- Retry
+- Assigned
+- Publishing
+jobs older than 10 minutes or created by test/dev/demo source.
+
+Never cancel Published records.
+
+4. Popup Reset button
+Add visible button, not hidden in Debug:
+
+“Reset Extension State”
+
+It must clear:
+- activeJob
+- lastClaimedJob
+- lastNextResponse
+- lastPollTime
+- lastClaimAttempt
+- lastClaimError
+- auditLog
+- cached queued job display
+- current overlay state
+
+After reset:
+Active job: None
+Queued job: None
+FB/Marketplace can remain Unknown until Facebook is visited.
+
+5. Do not auto-show stale backend jobs
+The popup should only show a queued job if:
+- job.createdAt > extension installedAt
+OR
+- job.source = publish_now AND approvedByUser = true AND age < 10 minutes.
+
+6. Version reset rule
+Every time extension version changes:
+- compare storedVersion with manifest version
+- if different:
+  - clear local state
+  - set storedVersion to current version
+  - set installedAt to now
+  - show “Extension updated — state reset.”
+
+7. Remove dangerous popup button
+The red “Start Publishing Job [AUTO]” button is confusing.
+Remove it or rename to:
+“Resume Current Approved Job”
+and disable if no valid active job exists.
+
+Acceptance:
+- Installing v1.2.8 shows no stale queued jobs.
+- Reloading extension after version change clears old state.
+- Opening popup never shows old production jobs.
+- Only jobs created after clicking Publish Now appear.
+- Client install feels clean.

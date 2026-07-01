@@ -948,6 +948,43 @@ router.get("/publishing/jobs/:id/photo/:index", async (req, res) => {
   req.log.info({ jobId: id, index, bytes: buffer.length, contentType }, "Photo proxy: served OK");
 });
 
+// ── Clear Queue ───────────────────────────────────────────────────────────────
+// POST /publishing/jobs/clear-queue
+// Dashboard admin action: cancels ALL in-flight jobs older than N minutes.
+// Covers Queued, Scheduled, Retry, Claimed, and Publishing — never touches Published.
+
+const ClearQueueBody = z.object({
+  olderThanMinutes: z.number().int().min(0).max(1440).optional().default(10),
+  dealerId: z.number().int().positive().optional(),
+});
+
+router.post("/publishing/jobs/clear-queue", async (req, res) => {
+  const parsed = ClearQueueBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid request" });
+    return;
+  }
+  const { olderThanMinutes, dealerId } = parsed.data;
+  const cutoff = new Date(Date.now() - olderThanMinutes * 60_000);
+
+  const conditions = [
+    inArray(publishingJobsTable.status, ["Queued", "Scheduled", "Retry", "Claimed", "Publishing"]),
+    lt(publishingJobsTable.createdAt, cutoff),
+  ];
+  if (dealerId != null) {
+    conditions.push(eq(publishingJobsTable.dealerId, dealerId));
+  }
+
+  const cleared = await db
+    .update(publishingJobsTable)
+    .set({ status: "Cancelled", failedReason: `Cleared by operator (clear-queue, >${olderThanMinutes} min)` })
+    .where(and(...conditions))
+    .returning({ id: publishingJobsTable.id });
+
+  req.log.info({ count: cleared.length, olderThanMinutes }, "Queue cleared by operator");
+  res.json({ cleared: cleared.length, ids: cleared.map((j) => j.id) });
+});
+
 // ── Cancel Stale Jobs ─────────────────────────────────────────────────────────
 // POST /publishing/jobs/cancel-stale
 // Cancels all Queued/Scheduled jobs older than `olderThanMinutes` (default 60).

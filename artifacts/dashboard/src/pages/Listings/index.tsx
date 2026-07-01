@@ -257,6 +257,7 @@ export function ListingsWorkspace() {
   const [publishingId, setPublishingId] = useState<number | null>(null);
   const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
   const [photoFilter, setPhotoFilter] = useState<string | null>(null);
+  const [clearingQueue, setClearingQueue] = useState(false);
 
   const toggleSelected = (id: number) => {
     setSelectedVehicleIds((prev) => {
@@ -275,6 +276,29 @@ export function ListingsWorkspace() {
   const invalidateWorkspaces = () => {
     queryClient.invalidateQueries({ queryKey: getListListingWorkspacesQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListPublishingJobsQueryKey() });
+  };
+
+  const handleClearTestQueue = async () => {
+    setClearingQueue(true);
+    try {
+      const res = await fetch("/api/publishing/jobs/clear-queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ olderThanMinutes: 10 }),
+      });
+      const data = (await res.json()) as { cleared: number };
+      toast({
+        title: "Test queue cleared",
+        description: data.cleared > 0
+          ? `Cancelled ${data.cleared} job${data.cleared !== 1 ? "s" : ""} older than 10 min.`
+          : "No qualifying jobs found (none older than 10 min).",
+      });
+      queryClient.invalidateQueries({ queryKey: getListPublishingJobsQueryKey() });
+    } catch {
+      toast({ title: "Clear failed", description: "Could not reach the server.", variant: "destructive" });
+    } finally {
+      setClearingQueue(false);
+    }
   };
 
   const { data: workspacesData, isLoading: workspacesLoading } = useListListingWorkspaces({
@@ -1296,8 +1320,17 @@ export function ListingsWorkspace() {
 
           {activeTab === "queue" && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-              <div className="glass-panel p-4 rounded-xl flex items-center justify-between border border-border/50">
-                <div className="font-medium px-2">Job Queue</div>
+              <div className="glass-panel p-4 rounded-xl flex items-center justify-between gap-3 border border-border/50">
+                <div className="font-medium px-2 shrink-0">Job Queue</div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearTestQueue}
+                  disabled={clearingQueue}
+                  className="text-destructive border-destructive/40 hover:bg-destructive/10 shrink-0"
+                >
+                  {clearingQueue ? "Clearing…" : "Clear Test Queue"}
+                </Button>
                 <Select value={jobStatusFilter} onValueChange={setJobStatusFilter}>
                   <SelectTrigger className="w-full sm:w-[200px] bg-background/50 border-border/50">
                     <SelectValue placeholder="All Statuses" />

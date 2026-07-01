@@ -81,7 +81,7 @@ function getModeLabel(job) {
 
 function renderStart() {
   if (activeJob) {
-    startBtn.textContent = `Reopen Marketplace${getModeLabel(activeJob)}`;
+    startBtn.textContent = "Reopen Marketplace";
     startBtn.disabled = false;
     const existing = document.getElementById("dp-reset-job");
     if (!existing) {
@@ -99,10 +99,10 @@ function renderStart() {
       startBtn.insertAdjacentElement("afterend", reset);
     }
   } else if (nextJob) {
-    startBtn.textContent = `Start Publishing Job${getModeLabel(nextJob)}`;
+    startBtn.textContent = "Resume Current Approved Job";
     startBtn.disabled = false;
   } else {
-    startBtn.textContent = "Start Publishing Job";
+    startBtn.textContent = "Resume Current Approved Job";
     startBtn.disabled = true;
   }
 }
@@ -350,6 +350,24 @@ async function refresh() {
     nextJob = null;
   }
 
+  // ── Fresh-install filter ──────────────────────────────────────────────────
+  // Only show a queued job if it was created AFTER this extension was installed,
+  // OR it's a publish_now job that the user approved within the last 10 minutes.
+  if (nextJob) {
+    const { installedAt } = await chrome.storage.local.get("installedAt");
+    if (installedAt) {
+      const installedTime = new Date(installedAt).getTime();
+      const jobCreatedAt = nextJob.createdAt ? new Date(nextJob.createdAt).getTime() : 0;
+      const jobAge = Date.now() - jobCreatedAt;
+      const isAfterInstall = jobCreatedAt > installedTime;
+      const isPublishNowApproved = nextJob.source === "publish_now" && nextJob.approvedByUser === true;
+      const isRecent = jobAge < 10 * 60 * 1000;
+      if (!isAfterInstall && !(isPublishNowApproved && isRecent)) {
+        nextJob = null;
+      }
+    }
+  }
+
   if (nextJob) {
     el.vQueued.textContent = `#${nextJob.id} — ${truncate(nextJob.vehicleLabel || nextJob.listingTitle || "Job", 18)}`;
     el.vQueued.className = "value ok";
@@ -475,6 +493,21 @@ document.getElementById("emergency-kill").addEventListener("click", async () => 
   setStatus("Emergency kill complete — all state cleared.", "ok");
   btn.disabled = false;
   btn.textContent = "🚨 Emergency Kill / Reset All";
+  await refresh();
+});
+
+// ---- Reset Extension State ----
+document.getElementById("reset-state").addEventListener("click", async () => {
+  const btn = document.getElementById("reset-state");
+  btn.disabled = true;
+  await send({ type: "RESET_EXTENSION_STATE" });
+  activeJob = null;
+  nextJob = null;
+  el.vQueued.textContent = "None";   el.vQueued.className = "value";
+  el.vCurrent.textContent = "None";
+  renderStart();
+  setStatus("Extension state reset — ready for a fresh start.", "ok");
+  btn.disabled = false;
   await refresh();
 });
 
