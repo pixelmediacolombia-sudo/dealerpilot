@@ -391,6 +391,8 @@ export interface ListingVersion {
   /** @nullable */
   buyerProfile?: string | null;
   /** @nullable */
+  copyAngle?: string | null;
+  /** @nullable */
   priority?: string | null;
   status: string;
   generatedBy: string;

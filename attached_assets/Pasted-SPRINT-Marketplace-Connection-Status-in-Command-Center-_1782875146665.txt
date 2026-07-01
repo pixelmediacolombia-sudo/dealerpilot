@@ -1,0 +1,109 @@
+SPRINT — Marketplace Connection Status in Command Center
+
+Do NOT create a separate hidden Connection Center page.
+
+The connection experience must live inside the main app, especially Command Center and the global header.
+
+Goal:
+DealerPilot should always show whether the system is ready to publish.
+
+====================================================
+PART 1 — GLOBAL CONNECTION BAR
+====================================================
+
+Replace the current basic top badges with a clear connection bar:
+
+- Extension Agent
+- Facebook Session
+- Marketplace Access
+- Publishing Ready
+
+Each status must show:
+- Green = Ready
+- Yellow = Needs attention
+- Red = Offline / blocked
+- Grey = Unknown
+
+Add one primary button:
+Connect Marketplace
+
+Only show the button when Facebook / Marketplace / Extension is not fully ready.
+
+====================================================
+PART 2 — COMMAND CENTER CONNECTION PANEL
+====================================================
+
+At the top of Command Center, add a compact card:
+
+Marketplace Publishing Readiness
+
+Status rows:
+1. Extension Agent
+2. Facebook Login
+3. Marketplace Access
+4. Auto Publisher
+
+If all green:
+“DealerPilot is ready to publish.”
+
+If not ready:
+Show exact missing step:
+- Extension not connected
+- Facebook login required
+- Marketplace access not verified
+- Publisher not ready
+
+Primary CTA:
+Connect Marketplace
+
+====================================================
+PART 3 — CONNECT MARKETPLACE FLOW
+====================================================
+
+When user clicks Connect Marketplace:
+
+1. Backend sets connectRequested = true.
+2. Extension detects request.
+3. Extension opens or reuses facebook.com/marketplace/create/vehicle.
+4. If Facebook login is required:
+   - app shows “Facebook login required”
+   - button: Open Facebook Login
+5. If Marketplace loads:
+   - extension reports marketplaceConnected = true
+   - app status turns green
+6. No popup interaction required.
+
+====================================================
+PART 4 — SETTINGS CLEANUP
+====================================================
+
+Settings can keep detailed system telemetry, but it should not be the main place to connect Marketplace.
+
+Settings should only show diagnostics.
+
+Command Center should be the user-facing connection control.
+
+====================================================
+PART 5 — ROUTING / NAVIGATION
+====================================================
+
+If /connection-center exists:
+- either remove it
+- or redirect it to Command Center with the readiness panel
+
+Do not leave unreachable pages.
+
+====================================================
+PART 6 — ACCEPTANCE TEST
+====================================================
+
+1. User opens Command Center.
+2. User immediately sees Marketplace Publishing Readiness.
+3. Header shows Extension / Facebook / Marketplace / Publishing status.
+4. If Facebook is offline, user sees Connect Marketplace.
+5. Clicking Connect Marketplace opens Facebook automatically through extension.
+6. After login/Marketplace access, statuses turn green.
+7. User does not need to open extension popup.
+8. Publish Now is disabled or warned if Publishing Ready is false.
+9. Settings still shows diagnostics, but not the main connection workflow.
+10. Typecheck clean.

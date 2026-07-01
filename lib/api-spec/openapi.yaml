@@ -2207,6 +2207,7 @@ components:
         downPayment: { type: ["integer", "null"] }
         callToAction: { type: ["string", "null"] }
         buyerProfile: { type: ["string", "null"] }
+        copyAngle: { type: ["string", "null"] }
         priority: { type: ["string", "null"] }
         status: { type: string }
         generatedBy: { type: string }

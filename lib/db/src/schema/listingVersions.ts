@@ -28,6 +28,7 @@ export const listingVersionsTable = pgTable(
     downPayment: integer("down_payment"),
     callToAction: text("call_to_action"),
     buyerProfile: text("buyer_profile"),
+    copyAngle: text("copy_angle"),
     priority: text("priority"),
     status: text("status").notNull().default("AI Generated"),
     generatedBy: text("generated_by").notNull().default("ai"),

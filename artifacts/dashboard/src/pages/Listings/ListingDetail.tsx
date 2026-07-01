@@ -79,13 +79,26 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 function VersionView({ version }: { version: ListingVersion }) {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2 col-span-2 md:col-span-1">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-xs font-medium uppercase tracking-wider">Copy Angle</span>
+          </div>
+          {version.copyAngle ? (
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 w-fit text-xs font-bold capitalize">
+              {version.copyAngle}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-sm">—</span>
+          )}
+        </div>
+        <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2 col-span-2 md:col-span-2">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Target className="w-4 h-4 text-primary" />
             <span className="text-xs font-medium uppercase tracking-wider">Buyer Profile</span>
           </div>
-          <div className="font-semibold">{version.buyerProfile || "N/A"}</div>
+          <div className="font-semibold text-sm leading-snug">{version.buyerProfile || "N/A"}</div>
         </div>
         <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2">
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -100,13 +113,6 @@ function VersionView({ version }: { version: ListingVersion }) {
             <span className="text-xs font-medium uppercase tracking-wider">Priority</span>
           </div>
           <div className="font-semibold">{version.priority || "N/A"}</div>
-        </div>
-        <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Globe className="w-4 h-4 text-blue-400" />
-            <span className="text-xs font-medium uppercase tracking-wider">Language</span>
-          </div>
-          <div className="font-semibold">{version.language}</div>
         </div>
       </div>
 

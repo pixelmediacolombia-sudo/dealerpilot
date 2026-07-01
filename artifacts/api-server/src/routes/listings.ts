@@ -517,6 +517,7 @@ router.post("/listings/:id/generate", async (req, res) => {
         downPayment: generated.downPayment,
         callToAction: generated.callToAction,
         buyerProfile: generated.buyerProfile,
+        copyAngle: generated.copyAngle,
         priority: generated.priority,
         status: "AI Generated",
         generatedBy: "ai",
