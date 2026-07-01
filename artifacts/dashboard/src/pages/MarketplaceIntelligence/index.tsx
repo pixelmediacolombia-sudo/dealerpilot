@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/tooltip";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
+import { PublishNowModal } from "@/components/PublishNowModal";
 import {
   TrendingUp,
   MessageSquare,
@@ -557,6 +558,7 @@ function DashboardHealthPanel({
 export function MarketplaceIntelligence() {
   const [activeTab, setActiveTab] = useState<TabKey>("recommendations");
   const [publishingId, setPublishingId] = useState<number | null>(null);
+  const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
 
   const { data: dash, isLoading: dashLoading } = useGetMarketplaceDashboard();
   const { data: health, isLoading: healthLoading } = useGetMarketplaceDashboardHealth();
@@ -589,8 +591,7 @@ export function MarketplaceIntelligence() {
   });
 
   const handlePublishNow = (vehicleId: number) => {
-    setPublishingId(vehicleId);
-    bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } });
+    setPublishNowVehicleId(vehicleId);
   };
 
   const handleAddToBatch = (vehicleId: number) => {
@@ -810,7 +811,7 @@ export function MarketplaceIntelligence() {
                       rec={rec}
                       onPublishNow={handlePublishNow}
                       onAddToBatch={handleAddToBatch}
-                      isPublishingThis={publishingId === rec.vehicleId && bulkSchedule.isPending}
+                      isPublishingThis={false}
                     />
                   ))}
                 </div>
@@ -1020,6 +1021,10 @@ export function MarketplaceIntelligence() {
           )}
         </div>
       </div>
+      <PublishNowModal
+        vehicleId={publishNowVehicleId}
+        onClose={() => setPublishNowVehicleId(null)}
+      />
     </AppLayout>
   );
 }

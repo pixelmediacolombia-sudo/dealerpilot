@@ -27,6 +27,7 @@ import {
   useBulkSchedulePublishing,
 } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
+import { PublishNowModal } from "@/components/PublishNowModal";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -295,6 +296,7 @@ function HoldCard({ rec }: { rec: DailyVehicleRec }) {
 export function SalesHub() {
   const [, setLocation] = useLocation();
   const [publishingId, setPublishingId] = useState<number | null>(null);
+  const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
   const [showHold, setShowHold] = useState(false);
 
   // Dealer
@@ -334,8 +336,7 @@ export function SalesHub() {
   });
 
   const handlePublish = (vehicleId: number) => {
-    setPublishingId(vehicleId);
-    bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } });
+    setPublishNowVehicleId(vehicleId);
   };
 
   const handleAddToBatch = (vehicleId: number) => {
@@ -531,7 +532,7 @@ export function SalesHub() {
                       onPublish={handlePublish}
                       onAddToBatch={handleAddToBatch}
                       onViewStrategy={() => setLocation("/marketplace-intelligence")}
-                      isPublishing={publishingId === rec.vehicleId && bulkSchedule.isPending}
+                      isPublishing={false}
                     />
                   ))}
                 </div>
@@ -688,6 +689,10 @@ export function SalesHub() {
           </div>
         </div>
       </div>
+      <PublishNowModal
+        vehicleId={publishNowVehicleId}
+        onClose={() => setPublishNowVehicleId(null)}
+      />
     </AppLayout>
   );
 }

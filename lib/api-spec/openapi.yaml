@@ -544,6 +544,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PublishingJobList"
+  /publishing/jobs/publish-now:
+    post:
+      operationId: publishNow
+      tags: [publishing]
+      summary: Create a high-priority Controlled-mode job for a single vehicle (Publish Now)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vehicleId]
+              properties:
+                vehicleId:
+                  type: integer
+      responses:
+        "201":
+          description: Job created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: integer
+                  job:
+                    $ref: "#/components/schemas/PublishingJob"
+        "404":
+          description: Vehicle not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Vehicle already has an active publishing job
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  jobId:
+                    type: integer
+
   /publishing/jobs/next:
     get:
       operationId: getNextPublishingJob
@@ -719,6 +764,61 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PublishingEventList"
+
+  /publishing/jobs/{id}/progress:
+    get:
+      operationId: getPublishingJobProgress
+      tags: [publishing]
+      summary: Lightweight progress polling for the Publish Now modal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Current job progress
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  mode:
+                    type: string
+                  status:
+                    type: string
+                  currentStep:
+                    type: string
+                    nullable: true
+                  progressPercent:
+                    type: integer
+                  failedReason:
+                    type: string
+                    nullable: true
+                  listingUrl:
+                    type: string
+                    nullable: true
+                  vehicleId:
+                    type: integer
+                  vehicleLabel:
+                    type: string
+                    nullable: true
+                  startedAt:
+                    type: string
+                    nullable: true
+                  completedAt:
+                    type: string
+                    nullable: true
+                  createdAt:
+                    type: string
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /publishing/jobs/{id}/assign:
     post:

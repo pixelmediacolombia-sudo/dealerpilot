@@ -707,11 +707,34 @@ router.post("/publishing/jobs/:id/event", async (req, res) => {
     }
   }
 
-  // Map progress events to live job status so the dashboard reflects real-time state.
+  // Update currentStep + progressPercent on the job row for live polling.
+  const EVENT_PROGRESS_MAP: Record<string, { step: string; progress: number }> = {
+    opening_facebook:      { step: "Opening Facebook Marketplace", progress: 15 },
+    filling_form:          { step: "Filling vehicle details",       progress: 35 },
+    form_complete:         { step: "All fields filled",             progress: 65 },
+    ready_for_review:      { step: "Ready for review",              progress: 70 },
+    auto_publish_starting: { step: "Starting auto-publish",         progress: 75 },
+    clicking_next:         { step: "Clicking Next…",                progress: 82 },
+    clicking_publish:      { step: "Clicking Publish…",             progress: 92 },
+    published:             { step: "Published on Marketplace",      progress: 100 },
+    auto_publish_failed:   { step: "Auto-publish failed",           progress: 0 },
+  };
+  const progressData = EVENT_PROGRESS_MAP[parsed.data.event];
+  if (progressData) {
+    await db
+      .update(publishingJobsTable)
+      .set({ currentStep: progressData.step, progressPercent: progressData.progress })
+      .where(eq(publishingJobsTable.id, jobId));
+  }
+
+  // Map events → job status transitions.
   const EVENT_STATUS_MAP: Record<string, string> = {
-    opening_facebook: "Opening Facebook",
-    filling_form: "Filling Form",
-    ready_for_review: "Ready for Review",
+    opening_facebook:      "Opening Facebook",
+    filling_form:          "Filling Form",
+    ready_for_review:      "Ready for Review",
+    auto_publish_starting: "Auto Publishing",
+    clicking_next:         "Auto Publishing",
+    clicking_publish:      "Auto Publishing",
   };
   const mappedStatus = EVENT_STATUS_MAP[parsed.data.event];
   if (mappedStatus) {
@@ -725,6 +748,7 @@ router.post("/publishing/jobs/:id/event", async (req, res) => {
             eq(publishingJobsTable.status, "Publishing"),
             eq(publishingJobsTable.status, "Opening Facebook"),
             eq(publishingJobsTable.status, "Filling Form"),
+            eq(publishingJobsTable.status, "Auto Publishing"),
           ),
         ),
       );

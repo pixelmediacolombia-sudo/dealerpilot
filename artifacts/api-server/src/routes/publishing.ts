@@ -32,7 +32,10 @@ function toJob(j: PublishingJob, extras: JobExtras = {
     listingVersionId: j.listingVersionId,
     vehicleId: j.vehicleId,
     dealerId: j.dealerId,
+    mode: j.mode,
     status: j.status,
+    currentStep: j.currentStep ?? null,
+    progressPercent: j.progressPercent,
     priority: j.priority,
     scheduledAt: j.scheduledAt ? j.scheduledAt.toISOString() : null,
     claimedByExtension: j.claimedByExtension ?? null,
@@ -41,6 +44,9 @@ function toJob(j: PublishingJob, extras: JobExtras = {
     startedAt: j.startedAt ? j.startedAt.toISOString() : null,
     completedAt: j.completedAt ? j.completedAt.toISOString() : null,
     failedReason: j.failedReason ?? null,
+    listingUrl: j.listingUrl ?? null,
+    needsReview: j.needsReview,
+    reviewReason: j.reviewReason ?? null,
     attempts: j.attempts,
     createdAt: j.createdAt.toISOString(),
     updatedAt: j.updatedAt.toISOString(),
@@ -240,25 +246,49 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     .where(eq(vehicleImagesTable.vehicleId, job.vehicleId))
     .orderBy(asc(vehicleImagesTable.position));
 
-  if (!version || !vehicle) {
-    res.status(404).json({ error: "Listing data not found for job" });
+  if (!vehicle) {
+    res.status(404).json({ error: "Vehicle not found for job" });
     return;
   }
 
   const pricing = getMarketplacePricing(vehicle, intel?.recommendedDownPayment ?? null);
 
-  const descriptionParts = [version.descriptionEn?.trim(), version.callToAction?.trim()].filter(
-    (p): p is string => !!p,
-  );
+  // Build fill content — prefer an existing listing version; auto-generate from inventory otherwise.
+  let fillTitle: string;
+  let fillDescription: string;
+  let fillDescriptionEs: string | null = null;
+  let fillDownPayment: number | null = null;
+
+  if (version) {
+    const descriptionParts = [version.descriptionEn?.trim(), version.callToAction?.trim()].filter(
+      (p): p is string => !!p,
+    );
+    fillTitle = version.title;
+    fillDescription = descriptionParts.join("\n\n");
+    fillDescriptionEs = version.descriptionEs ?? null;
+    fillDownPayment = version.downPayment ?? null;
+  } else {
+    // Auto-generate minimal copy from inventory data — no listing version required.
+    const yr = vehicle.year ?? "";
+    const trimStr = vehicle.trim ? ` ${vehicle.trim}` : "";
+    fillTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
+    const parts: string[] = [];
+    if (vehicle.mileage != null) parts.push(`${vehicle.mileage.toLocaleString()} miles`);
+    if (vehicle.transmission) parts.push(vehicle.transmission);
+    if (vehicle.fuelType) parts.push(vehicle.fuelType);
+    if (vehicle.exteriorColor) parts.push(vehicle.exteriorColor);
+    if (dealer?.name) parts.push(`Listed by ${dealer.name}`);
+    fillDescription = parts.length > 0 ? parts.join(" · ") : fillTitle;
+  }
 
   const [enriched] = await enrich([job]);
   res.json({
     job: enriched,
     fill: {
-      title: version.title,
+      title: fillTitle,
       price: pricing.marketplaceDisplayedPrice,
-      description: descriptionParts.join("\n\n"),
-      descriptionEs: version.descriptionEs ?? null,
+      description: fillDescription,
+      descriptionEs: fillDescriptionEs,
       mileage: vehicle.mileage ?? null,
       year: vehicle.year ?? null,
       make: vehicle.make,
@@ -271,7 +301,7 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       transmission: vehicle.transmission ?? null,
       location: dealer?.name ?? null,
       category: "Vehicle",
-      downPayment: version.downPayment ?? null,
+      downPayment: fillDownPayment,
       actualVehiclePrice: pricing.actualVehiclePrice,
       marketplaceDisplayedPrice: pricing.marketplaceDisplayedPrice,
       priceMode: pricing.priceMode,
@@ -668,6 +698,112 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
     "Bulk publishing jobs scheduled",
   );
   res.status(202).json({ enqueued: enqueued.length, skipped });
+});
+
+// ── Publish Now ────────────────────────────────────────────────────────────────
+// Creates a high-priority Controlled-mode job for a single vehicle, bypassing
+// the listing-version approval flow. Listing copy is auto-generated at payload
+// time if no version exists. Rejects when an active job already exists.
+
+const PublishNowBody = z.object({
+  vehicleId: z.number().int().positive(),
+});
+
+router.post("/publishing/jobs/publish-now", async (req, res) => {
+  const parsed = PublishNowBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "vehicleId is required" });
+    return;
+  }
+  const { vehicleId } = parsed.data;
+  const DEALER_ID = 1;
+
+  const [vehicle] = await db
+    .select()
+    .from(vehiclesTable)
+    .where(and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, DEALER_ID)));
+  if (!vehicle) {
+    res.status(404).json({ error: "Vehicle not found" });
+    return;
+  }
+
+  // Reject if an active job already exists for this vehicle
+  const [existing] = await db
+    .select({ id: publishingJobsTable.id })
+    .from(publishingJobsTable)
+    .where(
+      and(
+        eq(publishingJobsTable.vehicleId, vehicleId),
+        inArray(publishingJobsTable.status, [
+          "Queued", "Scheduled", "Claimed", "Publishing",
+          "Opening Facebook", "Filling Form", "Auto Publishing",
+        ]),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    res.status(409).json({
+      error: "Vehicle already has an active publishing job",
+      jobId: existing.id,
+    });
+    return;
+  }
+
+  const [job] = await db
+    .insert(publishingJobsTable)
+    .values({
+      vehicleId,
+      dealerId: DEALER_ID,
+      listingVersionId: null,
+      mode: "Controlled",
+      status: "Queued",
+      priority: 100,
+      progressPercent: 0,
+    })
+    .returning();
+
+  req.log.info({ vehicleId, jobId: job.id }, "Publish Now job created (Controlled mode)");
+  const [enriched] = await enrich([job]);
+  res.status(201).json({ jobId: job.id, job: enriched });
+});
+
+// GET /publishing/jobs/:id/progress — lightweight polling endpoint for the progress modal.
+router.get("/publishing/jobs/:id/progress", async (req, res) => {
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Invalid job id" });
+    return;
+  }
+  const [job] = await db
+    .select()
+    .from(publishingJobsTable)
+    .where(eq(publishingJobsTable.id, id));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  const [vehicle] = await db
+    .select()
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.id, job.vehicleId));
+  const vehicleLabel = vehicle
+    ? `${vehicle.year ?? ""} ${vehicle.make} ${vehicle.model}${vehicle.trim ? ` ${vehicle.trim}` : ""}`.trim()
+    : null;
+
+  res.json({
+    id: job.id,
+    mode: job.mode,
+    status: job.status,
+    currentStep: job.currentStep ?? null,
+    progressPercent: job.progressPercent,
+    failedReason: job.failedReason ?? null,
+    listingUrl: job.listingUrl ?? null,
+    vehicleId: job.vehicleId,
+    vehicleLabel,
+    startedAt: job.startedAt ? job.startedAt.toISOString() : null,
+    completedAt: job.completedAt ? job.completedAt.toISOString() : null,
+    createdAt: job.createdAt.toISOString(),
+  });
 });
 
 export default router;

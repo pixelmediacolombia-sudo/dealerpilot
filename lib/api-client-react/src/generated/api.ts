@@ -71,6 +71,7 @@ import type {
   GetFeedQualityParams,
   GetFieldValidationParams,
   GetLaunchChecklistParams,
+  GetPublishingJobProgress200,
   HealthStatus,
   HeartbeatInput,
   LaunchChecklistResponse,
@@ -102,6 +103,9 @@ import type {
   MessageContextResult,
   NextPublishingJob,
   PatchBatchInput,
+  PublishNow201,
+  PublishNow409,
+  PublishNowBody,
   PublishPriorityScoreList,
   PublishingBatchDetail,
   PublishingBatchList,
@@ -1959,6 +1963,76 @@ export function useListPublishingJobs<TData = Awaited<ReturnType<typeof listPubl
 
 
 
+export const getPublishNowUrl = () => {
+
+
+
+
+  return `/api/publishing/jobs/publish-now`
+}
+
+/**
+ * @summary Create a high-priority Controlled-mode job for a single vehicle (Publish Now)
+ */
+export const publishNow = async (publishNowBody: PublishNowBody, options?: RequestInit): Promise<PublishNow201> => {
+
+  return customFetch<PublishNow201>(getPublishNowUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(publishNowBody)
+  }
+);}
+
+
+
+
+export const getPublishNowMutationOptions = <TError = ErrorType<ErrorResponse | PublishNow409>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishNow>>, TError,{data: BodyType<PublishNowBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof publishNow>>, TError,{data: BodyType<PublishNowBody>}, TContext> => {
+
+const mutationKey = ['publishNow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof publishNow>>, {data: BodyType<PublishNowBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  publishNow(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PublishNowMutationResult = NonNullable<Awaited<ReturnType<typeof publishNow>>>
+    export type PublishNowMutationBody = BodyType<PublishNowBody>
+    export type PublishNowMutationError = ErrorType<ErrorResponse | PublishNow409>
+
+    /**
+ * @summary Create a high-priority Controlled-mode job for a single vehicle (Publish Now)
+ */
+export const usePublishNow = <TError = ErrorType<ErrorResponse | PublishNow409>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishNow>>, TError,{data: BodyType<PublishNowBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof publishNow>>,
+        TError,
+        {data: BodyType<PublishNowBody>},
+        TContext
+      > => {
+      return useMutation(getPublishNowMutationOptions(options));
+    }
+
 export const getGetNextPublishingJobUrl = () => {
 
 
@@ -2462,6 +2536,83 @@ export function useListPublishingJobEvents<TData = Awaited<ReturnType<typeof lis
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListPublishingJobEventsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPublishingJobProgressUrl = (id: number,) => {
+
+
+
+
+  return `/api/publishing/jobs/${id}/progress`
+}
+
+/**
+ * @summary Lightweight progress polling for the Publish Now modal
+ */
+export const getPublishingJobProgress = async (id: number, options?: RequestInit): Promise<GetPublishingJobProgress200> => {
+
+  return customFetch<GetPublishingJobProgress200>(getGetPublishingJobProgressUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublishingJobProgressQueryKey = (id: number,) => {
+    return [
+    `/api/publishing/jobs/${id}/progress`
+    ] as const;
+    }
+
+
+export const getGetPublishingJobProgressQueryOptions = <TData = Awaited<ReturnType<typeof getPublishingJobProgress>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublishingJobProgress>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublishingJobProgressQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublishingJobProgress>>> = ({ signal }) => getPublishingJobProgress(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublishingJobProgress>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublishingJobProgressQueryResult = NonNullable<Awaited<ReturnType<typeof getPublishingJobProgress>>>
+export type GetPublishingJobProgressQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Lightweight progress polling for the Publish Now modal
+ */
+
+export function useGetPublishingJobProgress<TData = Awaited<ReturnType<typeof getPublishingJobProgress>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublishingJobProgress>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublishingJobProgressQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

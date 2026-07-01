@@ -868,6 +868,37 @@ export const ListPublishingJobsResponse = zod.object({
 
 
 /**
+ * @summary Create a high-priority Controlled-mode job for a single vehicle (Publish Now)
+ */
+export const PublishNowBody = zod.object({
+  "vehicleId": zod.number()
+})
+
+export const PublishNowResponse = zod.object({
+  "jobId": zod.number().optional(),
+  "job": zod.object({
+  "id": zod.number(),
+  "listingVersionId": zod.number(),
+  "vehicleId": zod.number(),
+  "dealerId": zod.number(),
+  "status": zod.string(),
+  "priority": zod.number(),
+  "scheduledAt": zod.string().nullish(),
+  "claimedByExtension": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "failedReason": zod.string().nullish(),
+  "attempts": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "vehicleLabel": zod.string().nullish(),
+  "dealerName": zod.string().nullish(),
+  "listingTitle": zod.string().nullish()
+}).optional()
+})
+
+
+/**
  * @summary Get the next claimable publishing job (for the Chrome extension)
  */
 export const GetNextPublishingJobResponse = zod.object({
@@ -1106,6 +1137,29 @@ export const ListPublishingJobEventsResponse = zod.object({
   "extensionId": zod.string().nullish(),
   "createdAt": zod.string()
 }))
+})
+
+
+/**
+ * @summary Lightweight progress polling for the Publish Now modal
+ */
+export const GetPublishingJobProgressParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPublishingJobProgressResponse = zod.object({
+  "id": zod.number().optional(),
+  "mode": zod.string().optional(),
+  "status": zod.string().optional(),
+  "currentStep": zod.string().nullish(),
+  "progressPercent": zod.number().optional(),
+  "failedReason": zod.string().nullish(),
+  "listingUrl": zod.string().nullish(),
+  "vehicleId": zod.number().optional(),
+  "vehicleLabel": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string().optional()
 })
 
 

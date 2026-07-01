@@ -161,3 +161,9 @@ id = "Qe_YMQxalU9k-5g-PB4KD"
 uri = "file://DealerPilot-Extension-1.0.8-FRESH.zip"
 type = "unspecified"
 title = "DealerPilot Extension 1.0.8 — All fixes (FRESH BUILD)"
+
+[[outputs]]
+id = "knURaIe4hzZ8iHx-DRlkI"
+uri = "file://DealerPilot-Extension-1.0.9.zip"
+type = "unspecified"
+title = "DealerPilot Extension v1.0.9"

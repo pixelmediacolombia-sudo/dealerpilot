@@ -1595,6 +1595,35 @@ export type ListPublishingJobsParams = {
 status?: string;
 };
 
+export type PublishNowBody = {
+  vehicleId: number;
+};
+
+export type PublishNow201 = {
+  jobId?: number;
+  job?: PublishingJob;
+};
+
+export type PublishNow409 = {
+  error?: string;
+  jobId?: number;
+};
+
+export type GetPublishingJobProgress200 = {
+  id?: number;
+  mode?: string;
+  status?: string;
+  currentStep?: string | null;
+  progressPercent?: number;
+  failedReason?: string | null;
+  listingUrl?: string | null;
+  vehicleId?: number;
+  vehicleLabel?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt?: string;
+};
+
 export type AssignPublishingJobBody = {
   extensionId?: string;
 };

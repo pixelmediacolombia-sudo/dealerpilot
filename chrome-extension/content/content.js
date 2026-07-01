@@ -25,7 +25,7 @@
   // ---- Safe runtime communication ----
   // Sentinel returned (never thrown) when Chrome invalidates the extension context.
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.0.8";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.0.9";
 
   function _runtimeAlive() {
     try {
@@ -870,14 +870,129 @@
     // ---- Done ----
 
     if (images && images.length) {
-      warnings.push(
-        `${images.length} photo(s) available — add them manually (drag-drop not automated).`,
-      );
+      warnings.push(`${images.length} photo(s) available — drag-drop them manually after publishing.`);
     }
 
-    setStatus("Fields filled. Review, then mark the result. Publish was NOT clicked.", "ok");
-    renderReview(job, { filled, missed, warnings });
-    log("Publishing fill complete", { job, filled, missed, warnings });
+    if (job.mode === "Controlled") {
+      await autoPublishFlow(job, { filled, missed, warnings });
+    } else {
+      setStatus("Fields filled. Review, then mark the result. Publish was NOT clicked.", "ok");
+      renderReview(job, { filled, missed, warnings });
+      log("Publishing fill complete", { job, filled, missed, warnings });
+    }
+  }
+
+  // ── Controlled-mode: auto-click Next → Publish ─────────────────────────────
+  // Called instead of renderReview when job.mode === "Controlled". Clicks the
+  // form's Next button, then the Publish button, waits for success, and marks
+  // the job complete — all without operator intervention.
+
+  async function autoPublishFlow(job, { filled, missed, warnings }) {
+    stateLog("Auto-publish: starting");
+    setStatus("Auto-publishing — all fields filled, clicking Next…");
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_starting" }).catch(() => {});
+
+    await sleep(800);
+
+    // Step 1: click Next
+    const nextClicked = await clickButtonByText(["next", "continue", "next step"], 10000);
+    if (!nextClicked) {
+      const reason = "Could not find the Next button after filling all fields";
+      stateError("Auto-publish: Next not found", new Error(reason));
+      setStatus("Auto-publish failed: " + reason, "err");
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
+      await send({ type: "FAIL_JOB", jobId: job.id, reason });
+      await chrome.storage.local.remove("activeJob");
+      renderReview(job, { filled, missed, warnings });
+      return;
+    }
+
+    stateLog("Auto-publish: Next clicked, waiting for Publish button…");
+    setStatus("Auto-publishing — waiting for Publish button…");
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_next" }).catch(() => {});
+    await sleep(2000);
+
+    // Step 2: click Publish
+    const publishClicked = await clickButtonByText(
+      ["publish listing", "publish", "post listing", "post"],
+      15000,
+    );
+    if (!publishClicked) {
+      const reason = "Could not find the Publish button after clicking Next";
+      stateError("Auto-publish: Publish not found", new Error(reason));
+      setStatus("Auto-publish failed: " + reason, "err");
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
+      await send({ type: "FAIL_JOB", jobId: job.id, reason });
+      await chrome.storage.local.remove("activeJob");
+      renderReview(job, { filled, missed, warnings });
+      return;
+    }
+
+    stateLog("Auto-publish: Publish clicked, waiting for Marketplace confirmation…");
+    setStatus("Auto-publishing — waiting for Marketplace to confirm…");
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_publish" }).catch(() => {});
+    await sleep(2500);
+
+    // Step 3: wait for success URL
+    const listingUrl = await waitForPublishSuccess(20000);
+    stateLog("Auto-publish: complete — " + (listingUrl || "no URL detected"));
+
+    const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl: listingUrl || undefined });
+    if (!r || !r.ok) {
+      if (r?.error === CTXI) return;
+      setStatus("Published but failed to record result: " + (r?.error ?? "unknown error"), "err");
+      return;
+    }
+
+    await chrome.storage.local.remove("activeJob");
+    setStatus("✓ Published successfully!" + (listingUrl ? " Listing is live." : ""), "ok");
+    clearOutput();
+    jobBoxEl.innerHTML = `
+      <div class="mai-job">
+        <div class="mai-job-title">Published ✓</div>
+        <div class="mai-job-meta">Job #${escapeHtml(String(job.id))} complete.${listingUrl ? ` <a href="${escapeHtml(listingUrl)}" target="_blank" style="color:#4ade80">View listing ↗</a>` : ""}</div>
+        <div class="mai-job-meta">Open the popup to claim the next job.</div>
+      </div>`;
+    log("Auto-publish complete", { job, filled, missed, warnings, listingUrl });
+  }
+
+  // Finds and clicks a button/role=button matching any of the given text labels (case-insensitive).
+  async function clickButtonByText(textOptions, timeoutMs) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const candidates = Array.from(
+        document.querySelectorAll('div[role="button"], button, [role="button"]'),
+      );
+      for (const el of candidates) {
+        const text = (el.innerText || el.textContent || "").toLowerCase().trim();
+        if (textOptions.some((t) => text === t || text === t + " ")) {
+          log("Auto-publish clicking:", text);
+          el.click();
+          return true;
+        }
+      }
+      await sleep(400);
+    }
+    return false;
+  }
+
+  // Waits for a URL change to a Marketplace listing page; returns the URL or null on timeout.
+  async function waitForPublishSuccess(timeoutMs) {
+    const startUrl = window.location.href;
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const cur = window.location.href;
+      if (cur !== startUrl && (cur.includes("/marketplace/item/") || cur.includes("/marketplace/"))) {
+        return cur;
+      }
+      const successEl =
+        document.querySelector('[aria-label*="listed" i]') ||
+        document.querySelector('[data-testid*="success" i]');
+      if (successEl) return window.location.href !== startUrl ? window.location.href : null;
+      await sleep(500);
+    }
+    const final = window.location.href;
+    return final !== startUrl && final.includes("marketplace") ? final : null;
   }
 
   function chips(items, cls) {
