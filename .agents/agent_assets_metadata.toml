@@ -155,3 +155,9 @@ id = "2NHnMZGXc9bNaJHJMAHha"
 uri = "file://DealerPilot-Extension-v1.0.8-JOB_ID_CONTRACT_FIX_20260630-012448.zip"
 type = "unspecified"
 title = "DealerPilot Extension v1.0.8 — JOB_ID_CONTRACT_FIX"
+
+[[outputs]]
+id = "Qe_YMQxalU9k-5g-PB4KD"
+uri = "file://DealerPilot-Extension-1.0.8-FRESH.zip"
+type = "unspecified"
+title = "DealerPilot Extension 1.0.8 — FRESH BUILD"
