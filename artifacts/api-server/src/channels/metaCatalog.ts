@@ -343,13 +343,16 @@ function buildItemXml(v: MetaVehicle): string {
     .filter(Boolean)
     .join("\n");
 
+  // Meta-native plain fields (no g: prefix) — added alongside g: namespace fields
+  // so the feed satisfies both parsers. These are the names Meta reports as
+  // "missing" when it reads the Google Base g: namespace versions as unknown.
+  const condition = v.condition === "certified pre-owned" ? "cpo" : v.condition;
+
   return `  <item>
-    <guid isPermaLink="false">${escapeXml(v.vehicleId)}</guid>
+    <g:vehicle_id>${escapeXml(v.vehicleId)}</g:vehicle_id>
     <title>${cdata(v.title)}</title>
     <description>${cdata(v.description.slice(0, 5000))}</description>
     <link>${escapeXml(v.link)}</link>
-    <g:id>${escapeXml(v.vehicleId)}</g:id>
-    <g:vehicle_id>${escapeXml(v.vehicleId)}</g:vehicle_id>
     <g:image_link>${escapeXml(v.imageLink)}</g:image_link>
     ${g("price", v.price).trim()}
     ${g("availability", v.availability).trim()}
@@ -364,6 +367,14 @@ function buildItemXml(v: MetaVehicle): string {
     ${g("country", v.country).trim()}
     ${g("postal_code", v.postalCode).trim()}
     ${gCdata("dealer_name", v.dealerName).trim()}
+    <vehicle_offer_id>${escapeXml(v.vehicleId)}</vehicle_offer_id>
+    <image>${escapeXml(v.imageLink)}</image>
+    <state_of_vehicle>${escapeXml(condition)}</state_of_vehicle>
+    <street_address>${escapeXml(v.streetAddress)}</street_address>
+    <city>${escapeXml(v.city)}</city>
+    <region>${escapeXml(v.region)}</region>
+    <country>${escapeXml(v.country)}</country>
+    <postal_code>${escapeXml(v.postalCode)}</postal_code>
 ${optional}
   </item>`;
 }
@@ -382,11 +393,19 @@ export async function generateMetaCatalogXml(
   const items = exportable.map((v) => buildItemXml(v)).join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
   <channel>
     <title>${escapeXml(dealerName)} Vehicle Inventory</title>
-    <link>${getFeedBase()}/</link>
+    <link>${getFeedBase()}</link>
     <description>${escapeXml(dealerName)} — Vehicle Inventory Feed for Meta Automotive Inventory Ads</description>
+    <!--
+      DealerPilot Meta Automotive Inventory Ads Feed
+      Schema  : RSS 2.0 + Google Base g: namespace
+      Spec    : developers.facebook.com/docs/marketing-api/auto-ads/guides/catalog/
+      Dealer  : ${escapeXml(dealerName)}
+      Exported: ${exportable.length} / ${vehicles.length} vehicles
+      Generated: ${new Date().toISOString()}
+    -->
 ${items}
   </channel>
 </rss>`;
@@ -398,30 +417,30 @@ export async function generateMetaTestFeedXml(dealerId: number): Promise<string>
   const exportable = vehicles.filter((v) => validateVehicle(v).valid);
   const sample = exportable[0];
 
+  const sCondition = (sample?.condition === "certified pre-owned" ? "cpo" : sample?.condition) ?? "used";
+
   if (!sample) {
     return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
   <channel>
     <title>${escapeXml(dealerName)} Vehicle Inventory (Test)</title>
-    <link>${getFeedBase()}/</link>
+    <link>${getFeedBase()}</link>
     <description>No exportable vehicles found</description>
   </channel>
 </rss>`;
   }
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
   <channel>
     <title>${escapeXml(dealerName)} Vehicle Inventory (Test)</title>
-    <link>${getFeedBase()}/</link>
+    <link>${getFeedBase()}</link>
     <description>${escapeXml(dealerName)} — 1-Vehicle Test Feed for Meta Automotive Inventory Ads</description>
   <item>
-    <guid isPermaLink="false">${escapeXml(sample.vehicleId)}</guid>
+    <g:vehicle_id>${escapeXml(sample.vehicleId)}</g:vehicle_id>
     <title>${cdata(sample.title)}</title>
     <description>${cdata(sample.description.slice(0, 5000))}</description>
     <link>${escapeXml(sample.link)}</link>
-    <g:id>${escapeXml(sample.vehicleId)}</g:id>
-    <g:vehicle_id>${escapeXml(sample.vehicleId)}</g:vehicle_id>
     <g:image_link>${escapeXml(sample.imageLink)}</g:image_link>
     <g:price>${escapeXml(sample.price)}</g:price>
     <g:availability>${escapeXml(sample.availability)}</g:availability>
@@ -436,6 +455,14 @@ export async function generateMetaTestFeedXml(dealerId: number): Promise<string>
     <g:country>${escapeXml(sample.country)}</g:country>
     <g:postal_code>${escapeXml(sample.postalCode)}</g:postal_code>
     <g:dealer_name>${escapeXml(sample.dealerName)}</g:dealer_name>
+    <vehicle_offer_id>${escapeXml(sample.vehicleId)}</vehicle_offer_id>
+    <image>${escapeXml(sample.imageLink)}</image>
+    <state_of_vehicle>${escapeXml(sCondition)}</state_of_vehicle>
+    <street_address>${escapeXml(sample.streetAddress)}</street_address>
+    <city>${escapeXml(sample.city)}</city>
+    <region>${escapeXml(sample.region)}</region>
+    <country>${escapeXml(sample.country)}</country>
+    <postal_code>${escapeXml(sample.postalCode)}</postal_code>
   </item>
   </channel>
 </rss>`;
