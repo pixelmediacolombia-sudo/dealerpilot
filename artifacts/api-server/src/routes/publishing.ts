@@ -308,7 +308,18 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       recommendedDownPayment: pricing.recommendedDownPayment,
       pricingReason: pricing.pricingReason,
     },
-    images: images.map((img) => img.url),
+    images: images.map((img) => {
+      const url = img.url;
+      if (!url) return url;
+      if (url.startsWith("http://") || url.startsWith("https://")) return url;
+      // Relative URL — build an absolute URL from the request origin.
+      // Prefer X-Forwarded-Proto (set by Replit's reverse proxy) over req.protocol,
+      // which stays "http" for internal traffic even on HTTPS deployments.
+      const proto = (req.get("x-forwarded-proto") || req.protocol).split(",")[0].trim();
+      const host = req.get("host") ?? "localhost";
+      const origin = `${proto}://${host}`;
+      return `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
+    }),
   });
 });
 
