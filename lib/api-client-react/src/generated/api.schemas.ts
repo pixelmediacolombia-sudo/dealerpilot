@@ -1621,6 +1621,35 @@ export interface MetaFieldCoverage {
   url: number;
 }
 
+export type SchemaAuditEntryStatus = typeof SchemaAuditEntryStatus[keyof typeof SchemaAuditEntryStatus];
+
+
+export const SchemaAuditEntryStatus = {
+  pass: 'pass',
+  fail: 'fail',
+} as const;
+
+export interface SchemaAuditEntry {
+  tag: string;
+  status: SchemaAuditEntryStatus;
+  dealerPilotTag: string;
+  expectedFormat: string;
+  actualExample: string;
+  note: string;
+}
+
+export interface SchemaAuditResult {
+  schema: string;
+  specSource: string;
+  sampleVehicleVin: string | null;
+  sampleXml: string | null;
+  fields: SchemaAuditEntry[];
+  allCompliant: boolean;
+  exportableVehicles: number;
+  blockedVehicles: number;
+  auditedAt: string;
+}
+
 export interface MetaDiagnostics {
   totalVehicles: number;
   exportableVehicles: number;

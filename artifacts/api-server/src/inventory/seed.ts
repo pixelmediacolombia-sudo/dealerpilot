@@ -21,6 +21,14 @@ export async function seedDealerAndInventory(log: Logger): Promise<void> {
   // know to force a real-feed sync even if sample vehicles already exist.
   const wasOnSampleFeed = !dealer || isSampleFeedUrl(dealer.xmlFeedUrl);
 
+  const ALPHA_ADDRESS = {
+    addressLine1: "410 Hudgins Road",
+    city: "Fredericksburg",
+    state: "VA",
+    country: "US",
+    postalCode: "22408",
+  };
+
   if (!dealer) {
     const [created] = await db
       .insert(dealersTable)
@@ -30,22 +38,27 @@ export async function seedDealerAndInventory(log: Logger): Promise<void> {
         xmlFeedUrl: REAL_FEED_URL,
         status: "Active",
         notes: "Primary launch dealer — inventory synced from the real Alpha Motorsport XML feed.",
+        ...ALPHA_ADDRESS,
       })
       .returning();
     dealer = created!;
     log.info({ dealerId: dealer.id }, "Seeded Alpha Motorsport dealer");
-  } else if (dealer.xmlFeedUrl !== REAL_FEED_URL) {
-    // Upgrade: point the dealer at the real feed (may have been sample or empty).
-    await db
-      .update(dealersTable)
-      .set({
-        xmlFeedUrl: REAL_FEED_URL,
-        websiteUrl: "https://www.alphamotorsport.net",
-        notes: "Primary launch dealer — inventory synced from the real Alpha Motorsport XML feed.",
-      })
-      .where(eq(dealersTable.id, dealer.id));
-    dealer = { ...dealer, xmlFeedUrl: REAL_FEED_URL };
-    log.info({ dealerId: dealer.id }, "Upgraded Alpha Motorsport dealer to real feed URL");
+  } else {
+    const needsFeedUpdate = dealer.xmlFeedUrl !== REAL_FEED_URL;
+    const needsAddressUpdate = !dealer.addressLine1;
+    if (needsFeedUpdate || needsAddressUpdate) {
+      await db
+        .update(dealersTable)
+        .set({
+          xmlFeedUrl: REAL_FEED_URL,
+          websiteUrl: "https://www.alphamotorsport.net",
+          notes: "Primary launch dealer — inventory synced from the real Alpha Motorsport XML feed.",
+          ...ALPHA_ADDRESS,
+        })
+        .where(eq(dealersTable.id, dealer.id));
+      dealer = { ...dealer, xmlFeedUrl: REAL_FEED_URL, ...ALPHA_ADDRESS };
+      log.info({ dealerId: dealer.id }, "Updated Alpha Motorsport dealer record");
+    }
   }
 
   // Keep the feeds table in sync with the dealer's canonical URL.

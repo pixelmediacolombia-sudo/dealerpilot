@@ -178,6 +178,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/MetaDiagnostics"
 
+  /channels/meta-catalog/schema-audit:
+    get:
+      operationId: auditMetaCatalogSchema
+      tags: [inventory]
+      summary: Meta Automotive schema compliance audit — verifies every required XML tag matches the official spec
+      responses:
+        "200":
+          description: Schema audit result with per-tag compliance status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchemaAuditResult"
+
   /vehicles:
     get:
       operationId: listVehicles
@@ -3680,6 +3693,33 @@ components:
         condition: { type: integer }
         availability: { type: integer }
         url: { type: integer }
+
+    SchemaAuditEntry:
+      type: object
+      required: [tag, status, dealerPilotTag, expectedFormat, actualExample, note]
+      properties:
+        tag: { type: string }
+        status: { type: string, enum: [pass, fail] }
+        dealerPilotTag: { type: string }
+        expectedFormat: { type: string }
+        actualExample: { type: string }
+        note: { type: string }
+
+    SchemaAuditResult:
+      type: object
+      required: [schema, specSource, sampleVehicleVin, sampleXml, fields, allCompliant, exportableVehicles, blockedVehicles, auditedAt]
+      properties:
+        schema: { type: string }
+        specSource: { type: string }
+        sampleVehicleVin: { type: string, nullable: true }
+        sampleXml: { type: string, nullable: true }
+        fields:
+          type: array
+          items: { $ref: "#/components/schemas/SchemaAuditEntry" }
+        allCompliant: { type: boolean }
+        exportableVehicles: { type: integer }
+        blockedVehicles: { type: integer }
+        auditedAt: { type: string, format: date-time }
 
     MetaDiagnostics:
       type: object

@@ -122,6 +122,7 @@ import type {
   PublishingJobList,
   PublishingJobPayload,
   QueueListingInput,
+  SchemaAuditResult,
   SeedMarketplaceIntelligence200,
   SessionReportInput,
   SessionReportResult,
@@ -837,6 +838,83 @@ export function useValidateMetaCatalogFeed<TData = Awaited<ReturnType<typeof val
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getValidateMetaCatalogFeedQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAuditMetaCatalogSchemaUrl = () => {
+
+
+
+
+  return `/api/channels/meta-catalog/schema-audit`
+}
+
+/**
+ * @summary Meta Automotive schema compliance audit — verifies every required XML tag matches the official spec
+ */
+export const auditMetaCatalogSchema = async ( options?: RequestInit): Promise<SchemaAuditResult> => {
+
+  return customFetch<SchemaAuditResult>(getAuditMetaCatalogSchemaUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAuditMetaCatalogSchemaQueryKey = () => {
+    return [
+    `/api/channels/meta-catalog/schema-audit`
+    ] as const;
+    }
+
+
+export const getAuditMetaCatalogSchemaQueryOptions = <TData = Awaited<ReturnType<typeof auditMetaCatalogSchema>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof auditMetaCatalogSchema>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAuditMetaCatalogSchemaQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof auditMetaCatalogSchema>>> = ({ signal }) => auditMetaCatalogSchema({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof auditMetaCatalogSchema>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type AuditMetaCatalogSchemaQueryResult = NonNullable<Awaited<ReturnType<typeof auditMetaCatalogSchema>>>
+export type AuditMetaCatalogSchemaQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Meta Automotive schema compliance audit — verifies every required XML tag matches the official spec
+ */
+
+export function useAuditMetaCatalogSchema<TData = Awaited<ReturnType<typeof auditMetaCatalogSchema>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof auditMetaCatalogSchema>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getAuditMetaCatalogSchemaQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

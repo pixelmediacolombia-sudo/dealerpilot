@@ -7,8 +7,9 @@ interface MetaVehicle {
   vehicleOfferId: string;
   title: string;
   description: string;
-  availability: "FOR_SALE" | "NOT_AVAILABLE";
+  availability: "AVAILABLE" | "NOT_AVAILABLE";
   condition: "EXCELLENT" | "GOOD" | "FAIR" | "POOR";
+  stateOfVehicle: "new" | "used" | "certified_pre_owned";
   price: string;
   url: string;
   imagePrimary: string;
@@ -22,6 +23,11 @@ interface MetaVehicle {
   vin: string;
   exteriorColor: string | null;
   dealerName: string;
+  dealerAddr1: string;
+  dealerCity: string;
+  dealerRegion: string;
+  dealerCountry: string;
+  dealerPostalCode: string;
 }
 
 export interface MetaFieldStatus {
@@ -49,6 +55,27 @@ export interface MetaFieldCoverage {
   condition: number;
   availability: number;
   url: number;
+}
+
+export interface SchemaAuditEntry {
+  tag: string;
+  status: "pass" | "fail";
+  dealerPilotTag: string;
+  expectedFormat: string;
+  actualExample: string;
+  note: string;
+}
+
+export interface SchemaAuditResult {
+  schema: string;
+  specSource: string;
+  sampleVehicleVin: string | null;
+  sampleXml: string | null;
+  fields: SchemaAuditEntry[];
+  allCompliant: boolean;
+  exportableVehicles: number;
+  blockedVehicles: number;
+  auditedAt: string;
 }
 
 export interface MetaDiagnostics {
@@ -139,8 +166,9 @@ async function loadMetaVehicles(
       description:
         v.description ??
         `${title} available at ${dealerName}. Contact us for more information.`,
-      availability: "FOR_SALE",
+      availability: "AVAILABLE",
       condition: "GOOD",
+      stateOfVehicle: "used",
       price: formatPrice(v.price),
       url: v.vdpUrl ?? `${getFeedBase()}/inventory/${v.id}`,
       imagePrimary: primaryImage,
@@ -154,6 +182,11 @@ async function loadMetaVehicles(
       vin: v.vin,
       exteriorColor: v.exteriorColor ?? null,
       dealerName,
+      dealerAddr1: dealer?.addressLine1 ?? "",
+      dealerCity: dealer?.city ?? "",
+      dealerRegion: dealer?.state ?? "",
+      dealerCountry: dealer?.country ?? "US",
+      dealerPostalCode: dealer?.postalCode ?? "",
     };
   });
 
@@ -173,11 +206,33 @@ function cdata(str: string): string {
   return `<![CDATA[${str.replace(/\]\]>/g, "]]]]><![CDATA[>")}]]>`;
 }
 
-function buildListingXml(v: MetaVehicle, _version: FeedVersion): string {
-  const additionalImages = v.additionalImages
-    .slice(0, 10)
-    .map((url) => `    <additional_image>${escapeXml(url)}</additional_image>`)
+function buildImageXml(url: string, tag: string, indent = "    "): string {
+  return `${indent}<image>\n${indent}  <url>${escapeXml(url)}</url>\n${indent}  <tag>${escapeXml(tag)}</tag>\n${indent}</image>`;
+}
+
+function buildAddressXml(v: MetaVehicle): string {
+  if (!v.dealerAddr1 && !v.dealerCity) return "";
+  return [
+    "    <address>",
+    v.dealerAddr1 ? `      <addr1>${escapeXml(v.dealerAddr1)}</addr1>` : "",
+    v.dealerCity ? `      <city>${escapeXml(v.dealerCity)}</city>` : "",
+    v.dealerRegion ? `      <region>${escapeXml(v.dealerRegion)}</region>` : "",
+    `      <country>${escapeXml(v.dealerCountry || "US")}</country>`,
+    v.dealerPostalCode ? `      <postal_code>${escapeXml(v.dealerPostalCode)}</postal_code>` : "",
+    "    </address>",
+  ]
+    .filter(Boolean)
     .join("\n");
+}
+
+function buildListingXml(v: MetaVehicle, _version: FeedVersion): string {
+  const primaryImageXml = buildImageXml(v.imagePrimary, "Exterior");
+  const additionalImageXml = v.additionalImages
+    .slice(0, 19)
+    .map((url, i) => buildImageXml(url, i === 0 ? "Exterior Rear" : `Additional View ${i + 1}`))
+    .join("\n");
+
+  const addressXml = buildAddressXml(v);
 
   const optionalLines = [
     v.trim ? `    <trim>${cdata(v.trim)}</trim>` : "",
@@ -187,13 +242,15 @@ function buildListingXml(v: MetaVehicle, _version: FeedVersion): string {
       : "",
     v.vin ? `    <vin>${escapeXml(v.vin)}</vin>` : "",
     v.exteriorColor ? `    <exterior_color>${cdata(v.exteriorColor)}</exterior_color>` : "",
-    additionalImages,
+    additionalImageXml,
+    addressXml,
   ]
     .filter(Boolean)
     .join("\n");
 
   return `  <listing>
     <vehicle_offer_id>${escapeXml(v.vehicleOfferId)}</vehicle_offer_id>
+    <state_of_vehicle>${v.stateOfVehicle}</state_of_vehicle>
     <make>${cdata(v.make)}</make>
     <model>${cdata(v.model)}</model>
     <year>${v.year ?? ""}</year>
@@ -203,7 +260,7 @@ function buildListingXml(v: MetaVehicle, _version: FeedVersion): string {
     <condition>${v.condition}</condition>
     <price>${escapeXml(v.price)}</price>
     <url>${escapeXml(v.url)}</url>
-    <image>${escapeXml(v.imagePrimary)}</image>
+${primaryImageXml}
     <dealer_name>${cdata(v.dealerName)}</dealer_name>
 ${optionalLines}
   </listing>`;
@@ -372,6 +429,122 @@ export async function validateMetaCatalog(dealerId: number): Promise<MetaDiagnos
     feedXmlUrl: `${feedBase}/api/channels/meta-catalog/feed.xml`,
     feedCsvUrl: `${feedBase}/api/channels/meta-catalog/feed.csv`,
     vehicles: validations,
+  };
+}
+
+export async function auditMetaCatalogSchema(dealerId: number): Promise<SchemaAuditResult> {
+  const { vehicles } = await loadMetaVehicles(dealerId);
+  const exportable = vehicles.filter((v) => validateVehicle(v).valid);
+
+  const sample = exportable[0] ?? null;
+  const sampleXml = sample ? buildListingXml(sample, "v1") : null;
+  const xml = sampleXml ?? "";
+
+  type CheckDef = {
+    tag: string;
+    dealerPilotTag: string;
+    expectedFormat: string;
+    check: (x: string, v: MetaVehicle | null) => boolean;
+    example: (v: MetaVehicle | null) => string;
+    note: string;
+  };
+
+  const REQUIRED_TAGS: CheckDef[] = [
+    {
+      tag: "vehicle_offer_id",
+      dealerPilotTag: "vehicle_offer_id",
+      expectedFormat: "<vehicle_offer_id>VIN</vehicle_offer_id>",
+      check: (x) => x.includes("<vehicle_offer_id>"),
+      example: (v) => (v ? `<vehicle_offer_id>${v.vehicleOfferId}</vehicle_offer_id>` : ""),
+      note: "Unique vehicle identifier — VIN used as ID",
+    },
+    {
+      tag: "state_of_vehicle",
+      dealerPilotTag: "state_of_vehicle",
+      expectedFormat: "<state_of_vehicle>used</state_of_vehicle>",
+      check: (x) => x.includes("<state_of_vehicle>"),
+      example: (v) => (v ? `<state_of_vehicle>${v.stateOfVehicle}</state_of_vehicle>` : ""),
+      note: "Required by Meta — accepted values: new / used / certified_pre_owned",
+    },
+    {
+      tag: "address",
+      dealerPilotTag: "address",
+      expectedFormat:
+        "<address><addr1>410 Hudgins Road</addr1><city>Fredericksburg</city><region>VA</region><country>US</country><postal_code>22408</postal_code></address>",
+      check: (x) => x.includes("<address>") && x.includes("<addr1>"),
+      example: (v) =>
+        v
+          ? `<address><addr1>${v.dealerAddr1}</addr1><city>${v.dealerCity}</city><region>${v.dealerRegion}</region><country>${v.dealerCountry}</country><postal_code>${v.dealerPostalCode}</postal_code></address>`
+          : "",
+      note: "Dealer location — nested addr1/city/region/country/postal_code",
+    },
+    {
+      tag: "image",
+      dealerPilotTag: "image",
+      expectedFormat: "<image><url>https://…</url><tag>Exterior</tag></image>",
+      check: (x) => x.includes("<image>") && x.includes("  <url>") && x.includes("  <tag>"),
+      example: (v) =>
+        v
+          ? `<image><url>${v.imagePrimary}</url><tag>Exterior</tag></image>`
+          : "",
+      note: "Nested <url> + <tag> required — flat <image>URL</image> rejected by Meta",
+    },
+    {
+      tag: "price",
+      dealerPilotTag: "price",
+      expectedFormat: "<price>28900 USD</price>",
+      check: (x) => x.includes("<price>"),
+      example: (v) => (v ? `<price>${v.price}</price>` : ""),
+      note: "Amount + ISO 4217 currency code, e.g. '28900 USD'",
+    },
+    {
+      tag: "url",
+      dealerPilotTag: "url",
+      expectedFormat: "<url>https://www.alphamotorsport.net/…</url>",
+      check: (x) => /<url>https?:\/\//.test(x),
+      example: (v) => (v ? `<url>${v.url}</url>` : ""),
+      note: "Absolute HTTPS URL to the vehicle detail page",
+    },
+    {
+      tag: "condition",
+      dealerPilotTag: "condition",
+      expectedFormat: "<condition>GOOD</condition>",
+      check: (x) => x.includes("<condition>"),
+      example: (v) => (v ? `<condition>${v.condition}</condition>` : ""),
+      note: "Accepted values: EXCELLENT / GOOD / FAIR / POOR",
+    },
+    {
+      tag: "availability",
+      dealerPilotTag: "availability",
+      expectedFormat: "<availability>AVAILABLE</availability>",
+      check: (x) =>
+        x.includes("<availability>AVAILABLE") || x.includes("<availability>NOT_AVAILABLE"),
+      example: (v) => (v ? `<availability>${v.availability}</availability>` : ""),
+      note: "AVAILABLE or NOT_AVAILABLE — FOR_SALE is rejected by Meta",
+    },
+  ];
+
+  const fields: SchemaAuditEntry[] = REQUIRED_TAGS.map(
+    ({ tag, dealerPilotTag, expectedFormat, check, example, note }) => ({
+      tag,
+      status: sample && check(xml, sample) ? "pass" : "fail",
+      dealerPilotTag,
+      expectedFormat,
+      actualExample: example(sample),
+      note,
+    }),
+  );
+
+  return {
+    schema: "Meta Automotive Vehicle Catalog",
+    specSource: "https://developers.facebook.com/docs/marketing-api/auto-ads/guides/catalog/",
+    sampleVehicleVin: sample?.vehicleOfferId ?? null,
+    sampleXml,
+    fields,
+    allCompliant: fields.every((f) => f.status === "pass"),
+    exportableVehicles: exportable.length,
+    blockedVehicles: vehicles.length - exportable.length,
+    auditedAt: new Date().toISOString(),
   };
 }
 

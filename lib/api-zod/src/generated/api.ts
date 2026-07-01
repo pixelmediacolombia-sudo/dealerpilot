@@ -245,6 +245,29 @@ export const ValidateMetaCatalogFeedResponse = zod.object({
 
 
 /**
+ * @summary Meta Automotive schema compliance audit — verifies every required XML tag matches the official spec
+ */
+export const AuditMetaCatalogSchemaResponse = zod.object({
+  "schema": zod.string(),
+  "specSource": zod.string(),
+  "sampleVehicleVin": zod.string().nullable(),
+  "sampleXml": zod.string().nullable(),
+  "fields": zod.array(zod.object({
+  "tag": zod.string(),
+  "status": zod.enum(['pass', 'fail']),
+  "dealerPilotTag": zod.string(),
+  "expectedFormat": zod.string(),
+  "actualExample": zod.string(),
+  "note": zod.string()
+})),
+  "allCompliant": zod.boolean(),
+  "exportableVehicles": zod.number(),
+  "blockedVehicles": zod.number(),
+  "auditedAt": zod.coerce.date()
+})
+
+
+/**
  * @summary List vehicles with search, filter, and sort
  */
 export const ListVehiclesQueryParams = zod.object({
