@@ -6,3 +6,4 @@
 - [Sprint 4.8 publishing engine](sprint48-publishing-engine.md) — 5 new tables, photo quality scoring (0/<60/60-79/80-100), vehicle selection validation, batch API, extension SEND_JOB_EVENT; seed vehicles only 3 photos (batch creation validation will always reject them as designed).
 - [Sprint 4.9 production readiness](sprint49-production-readiness.md) — 5 new API endpoints added to autoPublish.ts; ExtensionConnection schema pre-existed (don't re-add); ProductionReadiness.tsx is a standalone route at /listings/readiness.
 - [OpenAI Chat Completions token param](openai-token-param.md) — gpt-5-mini requires max_completion_tokens (not max_tokens); empty content means 200 tokens too low — use 1024+; also use || not ?? to catch empty-string replies.
+- [Sprint 10 Inventory Engine](sprint10-inventory-engine.md) — Meta catalog adapter, 24h scheduler, feed health endpoint; shared component prop names to remember.

@@ -1,5 +1,5 @@
-import { db, vehiclesTable, vehicleImagesTable, dealersTable } from "@workspace/db";
-import { eq, count } from "drizzle-orm";
+import { db, vehiclesTable, vehicleImagesTable, dealersTable, feedRunsTable } from "@workspace/db";
+import { eq, count, desc } from "drizzle-orm";
 
 interface MetaVehicle {
   id: string;
@@ -40,6 +40,24 @@ export interface MetaDiagnostics {
   feedXmlUrl: string;
   feedCsvUrl: string;
   vehicles: MetaVehicleValidation[];
+}
+
+export interface FeedHealthReport {
+  feedUrl: string | null;
+  lastSyncAt: string | null;
+  nextSyncAt: string | null;
+  lastSyncStatus: string | null;
+  totalVehicles: number;
+  newVehicles: number;
+  updatedVehicles: number;
+  removedVehicles: number;
+  totalPhotos: number;
+  avgPhotosPerVehicle: number;
+  vehiclesMissingPrice: number;
+  vehiclesMissingImages: number;
+  duplicateVins: number;
+  healthScore: number;
+  healthStatus: "Healthy" | "Needs Attention" | "Critical";
 }
 
 const ACTIVE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish", "Published"];
@@ -94,7 +112,8 @@ async function loadMetaVehicles(
       id: v.vin || `stock-${v.stockNumber ?? v.id}`,
       title: title || `Vehicle #${v.id}`,
       description:
-        v.description ?? `${title} available at ${dealerName}. Contact us for more information.`,
+        v.description ??
+        `${title} available at ${dealerName}. Contact us for more information.`,
       availability: "in stock",
       condition: "used",
       price: formatPrice(v.price),
@@ -132,9 +151,7 @@ export async function generateMetaCatalogXml(dealerId: number): Promise<string> 
     .map((v) => {
       const additionalImages = v.additionalImageLinks
         .slice(0, 10)
-        .map(
-          (url) => `    <g:additional_image_link>${escapeXml(url)}</g:additional_image_link>`,
-        )
+        .map((url) => `    <g:additional_image_link>${escapeXml(url)}</g:additional_image_link>`)
         .join("\n");
 
       const optionalLines = [
@@ -282,24 +299,6 @@ export async function validateMetaCatalog(dealerId: number): Promise<MetaDiagnos
   };
 }
 
-export interface FeedHealthReport {
-  feedUrl: string | null;
-  lastSyncAt: string | null;
-  nextSyncAt: string | null;
-  lastSyncStatus: string | null;
-  totalVehicles: number;
-  newVehicles: number;
-  updatedVehicles: number;
-  removedVehicles: number;
-  totalPhotos: number;
-  avgPhotosPerVehicle: number;
-  vehiclesMissingPrice: number;
-  vehiclesMissingImages: number;
-  duplicateVins: number;
-  healthScore: number;
-  healthStatus: "Healthy" | "Needs Attention" | "Critical";
-}
-
 export async function computeFeedHealth(
   dealerId: number,
   nextSyncAt: Date | null,
@@ -338,12 +337,7 @@ export async function computeFeedHealth(
   }
   const duplicateVins = [...vinCounts.values()].filter((c) => c > 1).length;
 
-  const { db: db2, feedRunsTable, desc } = await import("@workspace/db").then(async (m) => {
-    const { desc } = await import("drizzle-orm");
-    return { ...m, desc };
-  });
-
-  const [latestRun] = await db2
+  const [latestRun] = await db
     .select()
     .from(feedRunsTable)
     .where(eq(feedRunsTable.dealerId, dealerId))
@@ -354,7 +348,6 @@ export async function computeFeedHealth(
   const avgPhotosPerVehicle =
     totalVehicles > 0 ? Math.round((totalPhotos / totalVehicles) * 10) / 10 : 0;
 
-  // Health score
   let score = 100;
   if (vehiclesMissingPrice > 0) score -= Math.min(20, vehiclesMissingPrice * 2);
   if (vehiclesMissingImages > 0) score -= Math.min(25, vehiclesMissingImages * 2);

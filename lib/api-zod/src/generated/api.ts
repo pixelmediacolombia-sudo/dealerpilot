@@ -141,6 +141,50 @@ export const ListFeedRunsResponse = zod.object({
 
 
 /**
+ * @summary Feed health report — metrics, scores, and sync status
+ */
+export const GetInventoryHealthResponse = zod.object({
+  "feedUrl": zod.string().nullable(),
+  "lastSyncAt": zod.coerce.date().nullable(),
+  "nextSyncAt": zod.coerce.date().nullable(),
+  "lastSyncStatus": zod.string().nullable(),
+  "totalVehicles": zod.number(),
+  "newVehicles": zod.number(),
+  "updatedVehicles": zod.number(),
+  "removedVehicles": zod.number(),
+  "totalPhotos": zod.number(),
+  "avgPhotosPerVehicle": zod.number(),
+  "vehiclesMissingPrice": zod.number(),
+  "vehiclesMissingImages": zod.number(),
+  "duplicateVins": zod.number(),
+  "healthScore": zod.number(),
+  "healthStatus": zod.enum(['Healthy', 'Needs Attention', 'Critical'])
+})
+
+
+/**
+ * @summary Validate all active inventory against Meta catalog requirements
+ */
+export const GetMetaCatalogDiagnosticsResponse = zod.object({
+  "totalVehicles": zod.number(),
+  "validVehicles": zod.number(),
+  "invalidVehicles": zod.number(),
+  "totalErrors": zod.number(),
+  "totalWarnings": zod.number(),
+  "lastGenerated": zod.coerce.date(),
+  "feedXmlUrl": zod.string(),
+  "feedCsvUrl": zod.string(),
+  "vehicles": zod.array(zod.object({
+  "vin": zod.string(),
+  "title": zod.string(),
+  "valid": zod.boolean(),
+  "errors": zod.array(zod.string()),
+  "warnings": zod.array(zod.string())
+}))
+})
+
+
+/**
  * @summary List vehicles with search, filter, and sort
  */
 export const ListVehiclesQueryParams = zod.object({

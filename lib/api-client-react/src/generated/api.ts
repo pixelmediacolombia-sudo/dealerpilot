@@ -62,6 +62,7 @@ import type {
   ExtensionConnection,
   ExtensionDiagnosticsResponse,
   FailJobInput,
+  FeedHealthReport,
   FeedQualityResponse,
   FeedRun,
   FeedRunList,
@@ -104,6 +105,7 @@ import type {
   MarketplaceRecommendationsResponse,
   MessageContextInput,
   MessageContextResult,
+  MetaDiagnostics,
   NextPublishingJob,
   PatchBatchInput,
   PublishNow201,
@@ -604,6 +606,160 @@ export function useListFeedRuns<TData = Awaited<ReturnType<typeof listFeedRuns>>
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListFeedRunsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetInventoryHealthUrl = () => {
+
+
+
+
+  return `/api/inventory/health`
+}
+
+/**
+ * @summary Feed health report — metrics, scores, and sync status
+ */
+export const getInventoryHealth = async ( options?: RequestInit): Promise<FeedHealthReport> => {
+
+  return customFetch<FeedHealthReport>(getGetInventoryHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInventoryHealthQueryKey = () => {
+    return [
+    `/api/inventory/health`
+    ] as const;
+    }
+
+
+export const getGetInventoryHealthQueryOptions = <TData = Awaited<ReturnType<typeof getInventoryHealth>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInventoryHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInventoryHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInventoryHealth>>> = ({ signal }) => getInventoryHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInventoryHealth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInventoryHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getInventoryHealth>>>
+export type GetInventoryHealthQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Feed health report — metrics, scores, and sync status
+ */
+
+export function useGetInventoryHealth<TData = Awaited<ReturnType<typeof getInventoryHealth>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInventoryHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInventoryHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMetaCatalogDiagnosticsUrl = () => {
+
+
+
+
+  return `/api/channels/meta-catalog/diagnostics`
+}
+
+/**
+ * @summary Validate all active inventory against Meta catalog requirements
+ */
+export const getMetaCatalogDiagnostics = async ( options?: RequestInit): Promise<MetaDiagnostics> => {
+
+  return customFetch<MetaDiagnostics>(getGetMetaCatalogDiagnosticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMetaCatalogDiagnosticsQueryKey = () => {
+    return [
+    `/api/channels/meta-catalog/diagnostics`
+    ] as const;
+    }
+
+
+export const getGetMetaCatalogDiagnosticsQueryOptions = <TData = Awaited<ReturnType<typeof getMetaCatalogDiagnostics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMetaCatalogDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMetaCatalogDiagnosticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMetaCatalogDiagnostics>>> = ({ signal }) => getMetaCatalogDiagnostics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMetaCatalogDiagnostics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMetaCatalogDiagnosticsQueryResult = NonNullable<Awaited<ReturnType<typeof getMetaCatalogDiagnostics>>>
+export type GetMetaCatalogDiagnosticsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Validate all active inventory against Meta catalog requirements
+ */
+
+export function useGetMetaCatalogDiagnostics<TData = Awaited<ReturnType<typeof getMetaCatalogDiagnostics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMetaCatalogDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMetaCatalogDiagnosticsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

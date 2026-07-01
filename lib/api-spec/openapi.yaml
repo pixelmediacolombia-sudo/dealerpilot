@@ -139,6 +139,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeedRunList"
 
+  /inventory/health:
+    get:
+      operationId: getInventoryHealth
+      tags: [inventory]
+      summary: Feed health report — metrics, scores, and sync status
+      responses:
+        "200":
+          description: Feed health report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedHealthReport"
+
+  /channels/meta-catalog/diagnostics:
+    get:
+      operationId: getMetaCatalogDiagnostics
+      tags: [inventory]
+      summary: Validate all active inventory against Meta catalog requirements
+      responses:
+        "200":
+          description: Meta catalog diagnostics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaDiagnostics"
+
   /vehicles:
     get:
       operationId: listVehicles
@@ -3581,6 +3607,58 @@ components:
         explanation: { type: ["string", "null"] }
         expectedLeadQuality: { type: ["string", "null"] }
         generatedAt: { type: string, format: date-time }
+
+    FeedHealthReport:
+      type: object
+      required: [feedUrl, lastSyncAt, nextSyncAt, lastSyncStatus, totalVehicles, newVehicles, updatedVehicles, removedVehicles, totalPhotos, avgPhotosPerVehicle, vehiclesMissingPrice, vehiclesMissingImages, duplicateVins, healthScore, healthStatus]
+      properties:
+        feedUrl: { type: ["string", "null"] }
+        lastSyncAt: { type: ["string", "null"], format: date-time }
+        nextSyncAt: { type: ["string", "null"], format: date-time }
+        lastSyncStatus: { type: ["string", "null"] }
+        totalVehicles: { type: integer }
+        newVehicles: { type: integer }
+        updatedVehicles: { type: integer }
+        removedVehicles: { type: integer }
+        totalPhotos: { type: integer }
+        avgPhotosPerVehicle: { type: number }
+        vehiclesMissingPrice: { type: integer }
+        vehiclesMissingImages: { type: integer }
+        duplicateVins: { type: integer }
+        healthScore: { type: integer }
+        healthStatus:
+          type: string
+          enum: [Healthy, "Needs Attention", Critical]
+
+    MetaVehicleValidation:
+      type: object
+      required: [vin, title, valid, errors, warnings]
+      properties:
+        vin: { type: string }
+        title: { type: string }
+        valid: { type: boolean }
+        errors:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+
+    MetaDiagnostics:
+      type: object
+      required: [totalVehicles, validVehicles, invalidVehicles, totalErrors, totalWarnings, lastGenerated, feedXmlUrl, feedCsvUrl, vehicles]
+      properties:
+        totalVehicles: { type: integer }
+        validVehicles: { type: integer }
+        invalidVehicles: { type: integer }
+        totalErrors: { type: integer }
+        totalWarnings: { type: integer }
+        lastGenerated: { type: string, format: date-time }
+        feedXmlUrl: { type: string }
+        feedCsvUrl: { type: string }
+        vehicles:
+          type: array
+          items: { $ref: "#/components/schemas/MetaVehicleValidation" }
 
     ListingPerformanceRecord:
       type: object

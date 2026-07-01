@@ -1563,6 +1563,57 @@ export interface VehicleIntelligenceDetail {
   generatedAt?: string;
 }
 
+export type FeedHealthReportHealthStatus = typeof FeedHealthReportHealthStatus[keyof typeof FeedHealthReportHealthStatus];
+
+
+export const FeedHealthReportHealthStatus = {
+  Healthy: 'Healthy',
+  Needs_Attention: 'Needs Attention',
+  Critical: 'Critical',
+} as const;
+
+export interface FeedHealthReport {
+  /** @nullable */
+  feedUrl: string | null;
+  /** @nullable */
+  lastSyncAt: string | null;
+  /** @nullable */
+  nextSyncAt: string | null;
+  /** @nullable */
+  lastSyncStatus: string | null;
+  totalVehicles: number;
+  newVehicles: number;
+  updatedVehicles: number;
+  removedVehicles: number;
+  totalPhotos: number;
+  avgPhotosPerVehicle: number;
+  vehiclesMissingPrice: number;
+  vehiclesMissingImages: number;
+  duplicateVins: number;
+  healthScore: number;
+  healthStatus: FeedHealthReportHealthStatus;
+}
+
+export interface MetaVehicleValidation {
+  vin: string;
+  title: string;
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface MetaDiagnostics {
+  totalVehicles: number;
+  validVehicles: number;
+  invalidVehicles: number;
+  totalErrors: number;
+  totalWarnings: number;
+  lastGenerated: string;
+  feedXmlUrl: string;
+  feedCsvUrl: string;
+  vehicles: MetaVehicleValidation[];
+}
+
 export interface ListingPerformanceRecord {
   id: number;
   publishedAt: string;

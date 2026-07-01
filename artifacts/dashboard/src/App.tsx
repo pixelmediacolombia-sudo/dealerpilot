@@ -21,6 +21,7 @@ import { ConversationDetail } from "@/pages/SalesAI/ConversationDetail";
 import { LeadsCRM } from "@/pages/SalesAI/LeadsCRM";
 import { LeadDetail } from "@/pages/SalesAI/LeadDetail";
 import { MarketplaceIntelligence } from "@/pages/MarketplaceIntelligence";
+import { InventoryEngine } from "@/pages/InventoryEngine";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,6 +57,8 @@ function Router() {
 
       {/* Marketplace Intelligence */}
       <Route path="/marketplace-intelligence" component={MarketplaceIntelligence} />
+
+      <Route path="/inventory-engine" component={InventoryEngine} />
 
       <Route path="/dealer-dna" component={DealerDna} />
       <Route path="/connection-center" component={ConnectionCenter} />

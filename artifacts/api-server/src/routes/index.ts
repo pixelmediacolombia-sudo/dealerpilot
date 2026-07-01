@@ -13,6 +13,7 @@ import conversationsRouter from "./conversations";
 import leadsRouter from "./leads";
 import simulatorRouter from "./simulator";
 import marketplaceIntelligenceRouter from "./marketplaceIntelligence";
+import channelsRouter from "./channels";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(conversationsRouter);
 router.use(leadsRouter);
 router.use(simulatorRouter);
 router.use(marketplaceIntelligenceRouter);
+router.use(channelsRouter);
 
 export default router;
