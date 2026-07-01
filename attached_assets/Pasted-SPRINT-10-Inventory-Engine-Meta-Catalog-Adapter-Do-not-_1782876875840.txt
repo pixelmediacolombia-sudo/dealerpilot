@@ -1,0 +1,200 @@
+SPRINT 10 — Inventory Engine + Meta Catalog Adapter
+
+Do not build Fan Page publishing yet.
+First build the foundation that will power Marketplace, Fan Page, Instagram, Meta Catalog, and future dealers.
+
+Goal:
+Upgrade XML Sync into a true Inventory Engine.
+
+DealerPilot should take any dealer feed, validate it, normalize it, and generate channel-ready outputs.
+
+Primary input:
+https://www.alphamotorsport.net/facebook-catalog-feed.xml
+
+====================================================
+PART 1 — Rename / Reposition
+====================================================
+
+Rename “XML Sync” conceptually to:
+
+Inventory Engine
+
+It should include:
+- Feed Source
+- Feed Sync
+- Feed Validation
+- Image Validation
+- Vehicle Normalization
+- Delta Detection
+- Meta Catalog Adapter
+- Feed Health
+
+Do not remove existing XML functionality.
+Upgrade it.
+
+====================================================
+PART 2 — Feed Health Dashboard
+====================================================
+
+Add Inventory Engine page/section showing:
+
+- Feed URL
+- Last sync
+- Next sync
+- Total vehicles
+- New vehicles
+- Updated vehicles
+- Removed/Sold vehicles
+- Total photos
+- Average photos per vehicle
+- Vehicles missing VIN
+- Vehicles missing price
+- Vehicles missing images
+- Duplicate VINs
+- Broken image URLs
+- Broken VDP links
+- Feed health score
+
+Add status:
+Healthy
+Needs Attention
+Critical
+
+====================================================
+PART 3 — Auto Sync Every 24 Hours
+====================================================
+
+Add scheduled sync every 24 hours.
+
+Keep:
+- Manual Sync Now
+
+Show:
+- last sync
+- next sync
+- sync history
+
+Do not duplicate vehicles.
+Use VIN as primary identity where available.
+Fallback to stock number only if VIN missing.
+
+====================================================
+PART 4 — Meta Catalog Adapter
+====================================================
+
+Build DealerPilot-hosted Meta-ready feed.
+
+Do not send Alpha XML directly to Meta.
+
+Create:
+
+GET /api/channels/meta-catalog/feed.xml
+GET /api/channels/meta-catalog/feed.csv
+
+These feeds must be generated from normalized DealerPilot inventory.
+
+Required fields:
+- id
+- title
+- description
+- availability
+- condition
+- price
+- link
+- image_link
+- additional_image_link
+- make
+- model
+- year
+- trim
+- body_style
+- mileage
+- vin
+- exterior_color
+- dealer_name
+- address if available
+
+Price format:
+“36900 USD”
+
+Availability:
+in stock / out of stock
+
+Condition:
+used / new
+
+Images:
+- primary image = image_link
+- gallery images = additional_image_link
+- preserve order
+
+====================================================
+PART 5 — Meta Catalog Diagnostics
+====================================================
+
+Add diagnostics page/section:
+
+Meta Catalog Feed
+
+Show:
+- Total vehicles
+- Valid vehicles
+- Invalid vehicles
+- Warnings
+- Errors
+- Last generated
+- Feed XML URL
+- Feed CSV URL
+
+Per vehicle validation:
+- missing VIN
+- missing price
+- missing image
+- invalid image URL
+- invalid VDP URL
+- duplicate ID
+- invalid availability
+- invalid condition
+- invalid price format
+
+Add buttons:
+- Validate Feed
+- Regenerate Feed
+- Download CSV
+- Copy XML Feed URL
+- Copy CSV Feed URL
+
+====================================================
+PART 6 — Channel Separation
+====================================================
+
+In the UI, clearly separate:
+
+Marketplace
+Personal account · Chrome Extension
+
+Meta Catalog
+DealerPilot hosted feed · Commerce Manager
+
+Facebook Page
+Coming later · Official Page API
+
+Do not mix Marketplace publishing with catalog feed.
+
+====================================================
+PART 7 — Acceptance Test
+====================================================
+
+1. Alpha XML sync runs successfully.
+2. Inventory Engine shows real total vehicles and total photos.
+3. Average photos per vehicle is visible.
+4. Meta-ready XML feed URL works in browser.
+5. Meta-ready CSV feed URL works in browser.
+6. Diagnostics shows valid/invalid vehicles.
+7. Feed does not duplicate vehicles.
+8. Vehicles with 20 photos export primary image + additional images.
+9. Sync can run manually and is scheduled for 24h.
+10. Typecheck clean.
+
+Important:
+This is infrastructure. Build it cleanly because it will power every future channel.

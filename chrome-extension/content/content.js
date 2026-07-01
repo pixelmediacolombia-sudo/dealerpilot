@@ -5,8 +5,6 @@
   const log = (...args) => console.log("[DealerPilot AI]", ...args);
 
   // ---- Workflow step instrumentation ----
-  // Logs [STATE] / [ERROR] to the console and writes the current step to
-  // chrome.storage.local so Debug Mode in the popup shows it in real time.
   function stateLog(msg) {
     console.log(`[DealerPilot AI][STATE] ${msg}`);
     chrome.storage.local
@@ -23,31 +21,25 @@
   }
 
   // ---- Safe runtime communication ----
-  // Sentinel returned (never thrown) when Chrome invalidates the extension context.
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.0.9";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.2.0";
 
   function _runtimeAlive() {
     try {
       const id = (typeof chrome !== "undefined") && chrome.runtime && chrome.runtime.id;
-      console.log(`[DealerPilot] Runtime ID: ${id || "missing"}`);
       return !!id;
     } catch (_) {
-      console.log("[DealerPilot] Runtime ID: missing (threw during check)");
       return false;
     }
   }
 
   function showContextInvalidated() {
-    console.log("[DealerPilot] Extension context invalidated. Refresh Facebook tab.");
-    // Update the floating panel status if it is already in the DOM.
     try {
       setStatus(
         "DealerPilot extension was updated. Please fully refresh this Facebook tab and try again.",
         "err",
       );
     } catch (_) {}
-    // Inject a persistent top-of-page banner so the user cannot miss it.
     try {
       if (!document.getElementById("mai-ctx-banner")) {
         const b = document.createElement("div");
@@ -63,8 +55,6 @@
     } catch (_) {}
   }
 
-  // Every chrome.runtime.sendMessage call in this script goes through here.
-  // It NEVER throws — always resolves, so callers can simply check res.ok.
   function send(message) {
     if (!_runtimeAlive()) {
       showContextInvalidated();
@@ -73,11 +63,9 @@
     return new Promise((resolve) => {
       try {
         chrome.runtime.sendMessage(message, (response) => {
-          // Must read lastError synchronously inside the callback.
           const lastErr = chrome.runtime && chrome.runtime.lastError;
           if (lastErr) {
             const msg = lastErr.message || "";
-            console.log(`[DealerPilot] sendMessage lastError: ${msg}`);
             if (msg.toLowerCase().includes("context invalidated")) {
               showContextInvalidated();
               resolve({ ok: false, error: CTXI });
@@ -90,7 +78,6 @@
         });
       } catch (err) {
         const msg = (err && err.message) ? err.message : String(err);
-        console.log(`[DealerPilot] sendMessage threw: ${msg}`);
         if (msg.toLowerCase().includes("context invalidated")) {
           showContextInvalidated();
           resolve({ ok: false, error: CTXI });
@@ -141,8 +128,6 @@
     return null;
   }
 
-  // Wait for a field to appear in the DOM (React may render it after the initial
-  // page settle). Polls every 300 ms for up to maxWaitMs before giving up.
   function waitForField(keywords, maxWaitMs = 5000) {
     return new Promise((resolve) => {
       const interval = 300;
@@ -160,18 +145,11 @@
 
   // ---- Select-field helpers (Facebook progressive dropdowns) ----
 
-  // Simple delay — used between state-machine steps.
   function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
-
-  // Pause for React to commit its state update and re-render new fields.
   function waitForReactRender(ms) { return sleep(ms === undefined ? 900 : ms); }
 
   // ---- ARIA combobox helpers ----
-  // Facebook Marketplace renders dropdowns as [role="combobox"], NOT <select>.
-  // All dropdown interaction goes through these helpers exclusively.
 
-  // Find a visible [role="combobox"] whose innerText, aria-label, or resolved
-  // aria-labelledby label text contains any of the given keywords.
   function findCombobox(keywords) {
     const boxes = Array.from(document.querySelectorAll('[role="combobox"]'))
       .filter((el) => el.offsetParent !== null);
@@ -190,8 +168,6 @@
     return null;
   }
 
-  // Poll until a matching [role="combobox"] appears in the DOM.
-  // Logs every poll cycle and every timeout.
   function waitForCombobox(keywords, maxWaitMs) {
     const limit = maxWaitMs === undefined ? 10000 : maxWaitMs;
     const kwStr = keywords.join("/");
@@ -218,9 +194,6 @@
     });
   }
 
-  // After clicking a combobox, poll until [role="option"] items appear.
-  // stepLabel is used only for logging. Signature kept at (maxWaitMs) to match v1.0.4
-  // call convention — stepLabel is an optional second argument for log context only.
   function waitForOptions(maxWaitMs, stepLabel) {
     const limit = maxWaitMs === undefined ? 8000 : maxWaitMs;
     const tag   = stepLabel || "options";
@@ -242,7 +215,6 @@
         console.log(`[WAIT] ${tag} options — not visible yet — ${elapsed}ms / ${limit}ms`);
         elapsed += interval;
         if (elapsed >= limit) {
-          // Dump popup container HTML to help diagnose Facebook DOM changes
           const popup =
             document.querySelector('[role="listbox"]') ||
             document.querySelector('[role="dialog"]')  ||
@@ -261,8 +233,6 @@
     });
   }
 
-  // Restore generic combobox-count wait (v1.0.4 cascade signal for Vehicle Type / Year).
-  // Polls until the combobox count increases, indicating React rendered a new dropdown.
   function waitForMoreComboboxes(countBefore, maxWaitMs) {
     const limit = maxWaitMs === undefined ? 6000 : maxWaitMs;
     return new Promise((resolve) => {
@@ -288,8 +258,6 @@
     });
   }
 
-  // After selecting Make: DOM-poll until the Model combobox specifically appears.
-  // Polls every 250 ms, times out after 20 s. Logs every cycle.
   function waitForNamedCombobox(label, keywords, maxWaitMs) {
     const limit = maxWaitMs === undefined ? 20000 : maxWaitMs;
     const kwStr = keywords.join("/");
@@ -316,8 +284,6 @@
     });
   }
 
-  // After selecting Model: DOM-poll until a specific text input appears.
-  // Polls every 250 ms, times out after 20 s. Logs every cycle.
   function waitForNamedField(label, keywords, maxWaitMs) {
     const limit = maxWaitMs === undefined ? 20000 : maxWaitMs;
     return new Promise((resolve) => {
@@ -344,10 +310,6 @@
   }
 
   // ---- Page detection (SPA-aware) ----
-  //
-  // Facebook is a single-page app. The content script only loads once per tab
-  // even as the user navigates to /marketplace, /marketplace/create/vehicle, etc.
-  // We must re-check the URL on every navigation event and persist the result.
 
   function detectPageState() {
     const hostname = location.hostname;
@@ -355,22 +317,17 @@
     const href     = location.href;
     const now      = new Date().toISOString();
 
-    // Marketplace: any facebook.com URL containing /marketplace in the path
     const isMarketplaceNow =
       hostname.includes("facebook.com") && pathname.includes("/marketplace");
 
-    // Messenger: messenger.com host OR facebook.com/messages
     const isMessengerNow =
       hostname.includes("messenger.com") || /\/messages\b/.test(pathname);
 
-    // ---- FB session detection ----
-    // Login page: Facebook redirects unauthenticated users here.
     const isLoginPage =
       /^\/(login(\.php)?|checkpoint|recover|two_step_verification|privacy\/consent)/.test(pathname) ||
       location.search.includes("reauth=1") ||
-      location.search.includes("next=") && pathname === "/login.php";
+      (location.search.includes("next=") && pathname === "/login.php");
     const fbLoggedIn = hostname.includes("facebook.com") && !isLoginPage;
-    // Marketplace create: if we load this URL without being bounced to login, session is live
     const isMarketplaceCreate = pathname.startsWith("/marketplace/create");
     const marketplaceConnected = isMarketplaceCreate && fbLoggedIn;
 
@@ -386,8 +343,6 @@
       })
       .catch(() => {});
 
-    // Report session state to the service worker, which posts it to the backend.
-    // Only send if we're actually on a Facebook page (not messenger.com).
     if (hostname.includes("facebook.com")) {
       try {
         chrome.runtime.sendMessage({
@@ -395,22 +350,16 @@
           fbLoggedIn,
           marketplaceConnected,
         });
-      } catch (_e) {
-        // Context may be invalidated; the next heartbeat will carry the state.
-      }
+      } catch (_e) {}
     }
 
-    log("Marketplace detection updated:", isMarketplaceNow, "|", href);
-    log("FB session:", fbLoggedIn ? "logged-in" : "NOT logged in", "| marketplace create:", marketplaceConnected);
-
+    log("Page state:", { isMarketplaceNow, isMessengerNow, fbLoggedIn, marketplaceConnected });
     return { isMarketplaceNow, isMessengerNow };
   }
 
-  // Run immediately, then again at delays to catch late SPA renders
   const _initial = detectPageState();
   [500, 1500, 3000].forEach((ms) => setTimeout(detectPageState, ms));
 
-  // Patch history API so pushState/replaceState SPA navigation is caught
   (function patchHistory() {
     function wrap(origFn) {
       return function (...args) {
@@ -424,7 +373,6 @@
   })();
   window.addEventListener("popstate", detectPageState);
 
-  // MutationObserver fallback: catches URL changes that bypass history API
   let _lastUrl = location.href;
   new MutationObserver(() => {
     if (location.href !== _lastUrl) {
@@ -433,10 +381,8 @@
     }
   }).observe(document.documentElement, { subtree: true, childList: true });
 
-  // Stable variables used by the rest of this script (evaluated once at load time)
   const href        = location.href;
   const isMessenger = _initial.isMessengerNow;
-  // Show the fill/publish panel only on the create form, not on browse pages
   const isMarketplaceCreate = /\/marketplace\/create/.test(location.pathname);
 
   // ---- Panel UI ----
@@ -446,7 +392,7 @@
     <div id="mai-header">
       <span id="mai-dot"></span>
       <span id="mai-title">DealerPilot AI</span>
-      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">BUILD: ${BUILD_LABEL}</span>
+      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.2</span>
       <button id="mai-toggle" title="Collapse">_</button>
     </div>
     <div id="mai-body">
@@ -458,12 +404,12 @@
   `;
   document.documentElement.appendChild(panel);
 
-  const statusEl = panel.querySelector("#mai-status");
+  const statusEl  = panel.querySelector("#mai-status");
   const actionsEl = panel.querySelector("#mai-actions");
-  const outputEl = panel.querySelector("#mai-output");
-  const jobBoxEl = panel.querySelector("#mai-job-box");
-  const dotEl = panel.querySelector("#mai-dot");
-  const bodyEl = panel.querySelector("#mai-body");
+  const outputEl  = panel.querySelector("#mai-output");
+  const jobBoxEl  = panel.querySelector("#mai-job-box");
+  const dotEl     = panel.querySelector("#mai-dot");
+  const bodyEl    = panel.querySelector("#mai-body");
 
   panel.querySelector("#mai-toggle").addEventListener("click", () => {
     bodyEl.hidden = !bodyEl.hidden;
@@ -498,10 +444,10 @@
 
   // ---- Connection check ----
   send({ type: "PING" }).then((res) => {
-    if (res && res.error === CTXI) return; // context invalidated — banner already shown
+    if (res && res.error === CTXI) return;
     if (res && res.ok) {
       dotEl.classList.add("mai-on");
-      setStatus("Connected to backend", "ok");
+      setStatus("Connected to DealerPilot", "ok");
     } else {
       dotEl.classList.add("mai-off");
       setStatus("Backend unreachable. Set the URL in the extension popup.", "err");
@@ -555,16 +501,13 @@
 
     let fill, images;
     if (job._prefetchedPayload) {
-      // Pre-fetched path: called from "Fill Test Listing" with data already in hand
       fill   = job._prefetchedPayload.fill;
       images = job._prefetchedPayload.images ?? [];
     } else {
       setStatus("Loading listing data…");
       const res = await send({ type: "GET_JOB_PAYLOAD", jobId: job.id });
       if (!res || !res.ok) {
-        if (res?.error === CTXI) return; // context invalidated — do not continue workflow
-        // Job was deleted from the backend (e.g. operator cleared the queue).
-        // Auto-clear the stale activeJob so the extension can pick up a fresh job.
+        if (res?.error === CTXI) return;
         const is404 = res && typeof res.error === "string" && res.error.includes("404");
         if (is404) {
           await chrome.storage.local.remove(["activeJob", "lastClaimedJob"]);
@@ -584,13 +527,6 @@
 
     // ------------------------------------------------------------------
     // selectComboboxStep — interact with a Facebook [role="combobox"].
-    //
-    // afterWait controls what happens after an option is clicked:
-    //   'generic'              → waitForMoreComboboxes(countBefore, 6000)
-    //                            (v1.0.4 behaviour — used for Vehicle Type and Year)
-    //   { label, keywords }    → waitForNamedCombobox(label, keywords, 20000)
-    //                            (DOM-poll for a specific next combobox — used for Make)
-    //   false / null           → sleep(400)  (no cascade expected — used for Model)
     // ------------------------------------------------------------------
     async function selectComboboxStep(label, keywords, targetValue, afterWait) {
       console.log(`[STEP] ${label}`);
@@ -613,17 +549,13 @@
       console.log(`[FOUND] ${label} combobox`, combobox);
       stateLog(`${label} combobox found`);
 
-      // Track combobox count before click (used by 'generic' afterWait).
       const countBefore = document.querySelectorAll('[role="combobox"]').length;
 
       console.log(`[CLICK] ${label} combobox (countBefore=${countBefore})`);
       combobox.click();
-      console.log(`[ACTIVE] activeElement after combobox click:`, document.activeElement);
       stateLog(`${label} — combobox clicked, waiting for options`);
       setStatus(`Opened "${label}" — waiting for options…`);
 
-      // waitForOptions uses the original v1.0.4 no-argument convention.
-      // stepLabel is passed as the optional 2nd arg for log context only.
       const options = await waitForOptions(undefined, label);
       if (!options.length) {
         stateError(`No [role="option"] elements appeared for ${label}`);
@@ -633,11 +565,8 @@
       }
 
       // ---- Fuzzy option matching ----
-      // Facebook changes dropdown labels frequently. Try multiple strategies
-      // before falling back to the first available option.
       const needle   = String(targetValue).toLowerCase().trim();
       const getText  = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
-      // Strip all non-alphanumeric characters for normalised comparison
       const norm     = (s) => s.replace(/[^a-z0-9]/g, "");
 
       // Vehicle-type alias set — Facebook has used many different labels
@@ -646,23 +575,46 @@
         "vehicle", "car", "truck", "automobile", "cars", "trucks",
       ];
 
+      // Color normalization map — handle Facebook label variants
+      const COLOR_MAP = {
+        "beige":  ["beige", "tan"],
+        "black":  ["black"],
+        "blue":   ["blue", "navy", "dark blue", "light blue"],
+        "brown":  ["brown", "burgundy", "maroon", "wine"],
+        "gold":   ["gold", "champagne", "bronze", "copper"],
+        "gray":   ["gray", "grey", "silver", "charcoal", "dark gray", "light gray"],
+        "green":  ["green", "olive", "dark green", "light green"],
+        "orange": ["orange"],
+        "purple": ["purple", "violet", "lavender"],
+        "red":    ["red", "dark red"],
+        "white":  ["white", "pearl", "cream", "ivory", "off-white"],
+        "yellow": ["yellow"],
+        "other":  ["other"],
+      };
+
       let pick =
-        // 1. Exact text match
         options.find((o) => getText(o) === needle) ||
-        // 2. Option text contains needle
         options.find((o) => getText(o).includes(needle)) ||
-        // 3. Needle contains option text (short label inside longer target)
         options.find((o) => needle.includes(getText(o)) && getText(o).length > 2) ||
-        // 4. Normalised exact match (ignores punctuation / spacing)
         options.find((o) => norm(getText(o)) === norm(needle)) ||
-        // 5. Vehicle-type aliases (Facebook UI label varies by locale/experiment)
+        // Vehicle-type aliases
         (label === "vehicle type"
           ? options.find((o) => VT_ALIASES.some((a) => getText(o).includes(a)))
+          : undefined) ||
+        // Color mapping — normalize common color names to Facebook's labels
+        (label === "color"
+          ? (() => {
+              for (const [canonical, aliases] of Object.entries(COLOR_MAP)) {
+                if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
+                  const found = options.find((o) => getText(o).includes(canonical));
+                  if (found) return found;
+                }
+              }
+              return undefined;
+            })()
           : undefined);
 
       if (!pick) {
-        // 6. Fallback: select first available option so the cascade can continue.
-        //    Logs a clear warning so the operator knows a guess was made.
         pick = options[0];
         const fallbackText = pick ? (pick.innerText || pick.textContent || "").trim() : "(none)";
         console.log(
@@ -686,20 +638,17 @@
       console.log(`[CLICK] option "${pickedText}" for ${label}`);
       stateLog(`${label} → "${pickedText}"`);
       pick.click();
-      console.log(`[ACTIVE] activeElement after option click:`, document.activeElement);
       filled.push(label);
       log(`${label} → "${pickedText}"`);
 
       // ---- Post-selection wait ----
       if (afterWait === "generic") {
-        // v1.0.4 behaviour: wait for the combobox count to increase (React cascade).
         stateLog(`Waiting for next combobox after ${label} (generic count wait)`);
         const appeared = await waitForMoreComboboxes(countBefore, 6000);
         if (!appeared) {
           console.log(`[WARN] combobox count did not increase after selecting ${label}`);
         }
       } else if (afterWait && typeof afterWait === "object" && afterWait.keywords) {
-        // Specific named-combobox DOM-poll (Make → Model).
         console.log(`[STEP] Waiting for "${afterWait.label}" combobox after ${label}…`);
         stateLog(`DOM-polling for "${afterWait.label}" combobox after ${label}`);
         const appeared = await waitForNamedCombobox(afterWait.label, afterWait.keywords, 20000);
@@ -714,8 +663,7 @@
     }
 
     // ------------------------------------------------------------------
-    // fillStep — wait for a text input / textarea, write the value, and
-    // fire the full event trio so React validates the field.
+    // fillStep — wait for a text input / textarea and write the value.
     // ------------------------------------------------------------------
     async function fillStep(label, keywords, value) {
       if (value === null || value === undefined || value === "") {
@@ -737,65 +685,42 @@
 
     // ==================================================================
     // STATE MACHINE — sequential progressive form fill
-    //
-    // Phase 1: Dropdown cascade.  Facebook only renders Year after Vehicle
-    // Type is chosen, Make after Year, Model after Make, and the remaining
-    // text fields only after Model.  Never proceed to the next step until
-    // the current one resolves.
-    //
-    // Phase 2: Text fields that appear after the dropdown cascade.
-    //
-    // Phase 3: Optional dropdowns (may or may not appear).
     // ==================================================================
 
     try {
 
       // ---- Phase 1: Dropdown cascade ----
-
       stateLog("Phase 1 starting — dropdown cascade");
 
-      // Vehicle Type — use generic count-based wait (v1.0.4 behaviour).
-      // Facebook renders Year only after Vehicle Type is committed.
       setStatus("Step 1 of 4: Selecting vehicle type…");
       await selectComboboxStep(
         "vehicle type",
         ["vehicle type", "type of vehicle", "category"],
         fill.vehicleType || "Car/Truck",
-        "generic", // waitForMoreComboboxes — restored v1.0.4 behaviour
+        "generic",
       );
 
-      // Year — generic count-based wait; Make appears after Year is committed.
       setStatus("Step 2 of 4: Selecting year…");
       await selectComboboxStep(
         "year",
         ["year"],
         fill.year ? String(fill.year) : null,
-        "generic", // waitForMoreComboboxes — restored v1.0.4 behaviour
+        "generic",
       );
 
-      // Make — generic count-based wait (same as Vehicle Type / Year).
-      // Model is a plain text input — NOT a combobox — so we do NOT poll for
-      // a model combobox here.  The generic wait lets React settle after Make.
       setStatus("Step 3 of 4: Selecting make…");
       await selectComboboxStep(
         "make",
         ["make"],
         fill.make,
-        "generic", // waitForMoreComboboxes — v1.0.4 behaviour restored for Make
+        "generic",
       );
 
-      // Model — Facebook renders this as a plain <input type="text"> inside a
-      // <label><span>Model</span><input …></label>, NOT a [role="combobox"].
-      // Poll for that input (up to 20 s, 250 ms ticks) then fill it with the
-      // React-safe native setter so React's onChange fires correctly.
+      // Model — plain text input after Make cascade
       setStatus("Step 4 of 4: Filling model…");
       console.log("[STEP] Model (text input — not a combobox)");
       stateLog("Waiting for Model text input");
-      const modelInput = await waitForNamedField(
-        "model",
-        ["model"],
-        20000,
-      );
+      const modelInput = await waitForNamedField("model", ["model"], 20000);
       if (modelInput) {
         console.log("[FOUND] Model text input", modelInput);
         setNativeValue(modelInput, String(fill.model || ""));
@@ -811,7 +736,6 @@
       }
 
       // ---- Phase 2: Text fields ----
-
       stateLog("Phase 2 starting — text fields");
       setStatus("Filling mileage, price, title, description…");
 
@@ -820,30 +744,22 @@
         "number of miles", "mileage (optional)", "odometer reading",
       ], fill.mileage);
 
-      // Price field: always use fill.price (= marketplaceDisplayedPrice from the server).
-      // For DOWN_PAYMENT vehicles this is the down payment, NOT the full vehicle price.
       if (fill.priceMode === "DOWN_PAYMENT") {
-        log(`pricing mode: DOWN_PAYMENT — posting $${fill.marketplaceDisplayedPrice ?? fill.price} (down payment), NOT full price $${fill.actualVehiclePrice ?? "?"}`);
+        log(`pricing mode: DOWN_PAYMENT — posting $${fill.marketplaceDisplayedPrice ?? fill.price} (down payment)`);
       } else {
         log(`pricing mode: FULL_PRICE — posting $${fill.price}`);
       }
-      await fillStep("price", [
-        "price", "listing price", "asking price",
-      ], fill.price);
+      await fillStep("price", ["price", "listing price", "asking price"], fill.price);
 
-      // Title — Facebook may auto-generate it from Year/Make/Model.
-      // Try to find a writable title input; if absent, check for a read-only
-      // preview/auto-generated title and mark accordingly rather than "missed".
+      // Title — may be auto-generated by Facebook from Year/Make/Model
       {
         const TITLE_KWS = [
           "title", "listing title", "what are you selling",
           "vehicle name", "add a title", "item title",
         ];
-        console.log("[STEP] Title");
         stateLog("Checking for title field");
         const titleEl = await waitForField(TITLE_KWS, 8000);
         if (titleEl) {
-          console.log("[FOUND] Title input", titleEl);
           if (fill.title) {
             setNativeValue(titleEl, String(fill.title));
             titleEl.dispatchEvent(new Event("input",  { bubbles: true }));
@@ -852,40 +768,27 @@
             filled.push("title");
             log(`title → "${fill.title}"`);
           } else {
-            stateLog("title field found but no value in listing data — skipped");
+            stateLog("title field found but no value — skipped");
             warnings.push("title: field exists but no value in listing data");
           }
         } else {
-          // No writable title input — Facebook likely auto-generated the title
-          // from the Year/Make/Model selections.  This is normal behaviour on
-          // the vehicle listing form.  Do NOT add to missed[].
-          console.log("[INFO] Title input not found — Facebook may have auto-generated it from Year/Make/Model");
           stateLog("title auto generated by Facebook");
           filled.push("title (auto generated)");
           log("title: auto generated by Facebook from Year/Make/Model");
         }
       }
 
-      await fillStep("description", [
-        "description", "describe", "details",
-      ], fill.description);
+      await fillStep("description", ["description", "describe", "details"], fill.description);
+      await fillStep("vin", ["vin", "vin number", "vehicle identification number"], fill.vin);
+      await fillStep("location", ["location", "city", "where"], fill.location);
 
-      await fillStep("vin", [
-        "vin", "vin number", "vehicle identification number",
-      ], fill.vin);
-
-      await fillStep("location", [
-        "location", "city", "where",
-      ], fill.location);
-
-      // ---- Phase 3: Optional dropdowns (silently skip if no data or field absent) ----
-
+      // ---- Phase 3: Optional dropdowns ----
       stateLog("Phase 3 starting — optional dropdowns");
       await selectComboboxStep("condition",    ["condition"],    fill.condition,    false);
       await selectComboboxStep("transmission", ["transmission"], fill.transmission, false);
       await selectComboboxStep("fuel type",    ["fuel"],         fill.fuelType,     false);
-      await selectComboboxStep("color",        ["color"],        fill.color,        false);
-      await selectComboboxStep("body style",   ["body style"],   fill.bodyStyle,    false);
+      await selectComboboxStep("color",        ["color", "exterior color"], fill.color, false);
+      await selectComboboxStep("body style",   ["body style", "body type"], fill.bodyStyle, false);
 
       stateLog("Workflow Complete");
 
@@ -911,9 +814,6 @@
   }
 
   // ── Controlled-mode: auto-click Next → Publish ─────────────────────────────
-  // Called instead of renderReview when job.mode === "Controlled". Clicks the
-  // form's Next button, then the Publish button, waits for success, and marks
-  // the job complete — all without operator intervention.
 
   async function autoPublishFlow(job, { filled, missed, warnings }) {
     stateLog("Auto-publish: starting");
@@ -922,7 +822,6 @@
 
     await sleep(800);
 
-    // Step 1: click Next
     const nextClicked = await clickButtonByText(["next", "continue", "next step"], 10000);
     if (!nextClicked) {
       const reason = "Could not find the Next button after filling all fields";
@@ -940,7 +839,6 @@
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_next" }).catch(() => {});
     await sleep(2000);
 
-    // Step 2: click Publish
     const publishClicked = await clickButtonByText(
       ["publish listing", "publish", "post listing", "post"],
       15000,
@@ -961,7 +859,6 @@
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_publish" }).catch(() => {});
     await sleep(2500);
 
-    // Step 3: wait for success URL
     const listingUrl = await waitForPublishSuccess(20000);
     stateLog("Auto-publish: complete — " + (listingUrl || "no URL detected"));
 
@@ -984,7 +881,6 @@
     log("Auto-publish complete", { job, filled, missed, warnings, listingUrl });
   }
 
-  // Finds and clicks a button/role=button matching any of the given text labels (case-insensitive).
   async function clickButtonByText(textOptions, timeoutMs) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -1004,7 +900,6 @@
     return false;
   }
 
-  // Waits for a URL change to a Marketplace listing page; returns the URL or null on timeout.
   async function waitForPublishSuccess(timeoutMs) {
     const startUrl = window.location.href;
     const start = Date.now();
@@ -1029,7 +924,6 @@
   }
 
   function renderReview(job, result) {
-    // Signal the backend that form filling is complete and operator review is needed.
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "ready_for_review" }).catch(() => {});
     showOutput(`
       <div class="mai-section-label">Filled successfully</div>
@@ -1099,15 +993,244 @@
   }
 
   // ==================================================================
+  // Marketplace create page — job flow + debug button
+  // ==================================================================
+  if (isMarketplaceCreate) {
+    chrome.storage.local.get("activeJob").then(({ activeJob }) => {
+      if (activeJob) {
+        actionsEl.appendChild(
+          button("Fill Marketplace Fields", () => runPublishingFlow(activeJob)),
+        );
+        setTimeout(() => runPublishingFlow(activeJob), 1200);
+      } else {
+        actionsEl.appendChild(
+          button("Fill Test Listing", async () => {
+            setStatus("Loading test listing…");
+
+            const res = await send({ type: "GET_TEST_LISTING" });
+            if (!res || !res.ok) {
+              if (res?.error === CTXI) return;
+              setStatus("Failed to fetch test listing: " + (res && res.error), "err");
+              return;
+            }
+
+            const listing = res.data;
+            const fill = {
+              vehicleType: listing.vehicleType || "Car/Truck",
+              year:         listing.year        ?? null,
+              make:         listing.make        ?? "",
+              model:        listing.model       ?? "",
+              mileage:      listing.mileage     != null ? String(listing.mileage) : null,
+              price:        listing.price       != null ? String(listing.price)   : null,
+              title:        listing.title       ?? "",
+              description:  listing.description ?? "",
+              location:     listing.location    ?? null,
+              condition:    listing.condition   ?? null,
+              transmission: listing.transmission ?? null,
+              fuelType:     listing.fuelType    ?? null,
+              color:        listing.color       ?? null,
+              bodyStyle:    listing.bodyStyle   ?? null,
+            };
+
+            const syntheticJob = {
+              id:            0,
+              listingTitle:  listing.title || "Test Listing",
+              vehicleLabel:  `${listing.year || ""} ${listing.make || ""} ${listing.model || ""}`.trim(),
+              dealerName:    "Test Mode",
+              _prefetchedPayload: { fill, images: [] },
+            };
+
+            await runPublishingFlow(syntheticJob);
+          }),
+        );
+      }
+
+      // Debug button — always visible on create page
+      const dbgBtn = button("🔍 DEBUG: Vehicle Type only", () => debugVehicleType(), "mai-btn-secondary");
+      dbgBtn.title = "Selects Vehicle Type = Car/Truck then stops. Use Fill Marketplace Fields for the full workflow.";
+      dbgBtn.style.cssText += ";margin-top:6px;border:2px dashed #e74c3c;color:#e74c3c;font-weight:700;font-size:10px;";
+      actionsEl.appendChild(dbgBtn);
+    });
+  }
+
+  // ==================================================================
+  // Messenger AI — improved chat scraping + structured reply
+  // ==================================================================
+  if (isMessenger) {
+    let lastReply = "";
+
+    // ---- Structured chat scraping ----
+    // Extracts individual messages with speaker attribution instead of raw innerText.
+    function scrapeConversation() {
+      const main = document.querySelector('[role="main"]') || document.body;
+
+      // Try to detect buyer name from page heading
+      let buyerName = "";
+      const heading = main.querySelector('h1, [role="heading"]');
+      if (heading) buyerName = (heading.textContent || "").trim().slice(0, 120);
+
+      // Try structured message rows — Messenger renders each message in a [role="row"] or similar
+      const messageEls = Array.from(
+        main.querySelectorAll('[data-testid="message-container"], [class*="message"], [role="row"]')
+      ).filter((el) => el.offsetParent !== null);
+
+      let messages = [];
+
+      if (messageEls.length > 4) {
+        // Structured extraction: detect sent (you) vs received (buyer)
+        for (const el of messageEls.slice(-40)) {
+          const text = (el.innerText || el.textContent || "").trim();
+          if (!text || text.length < 2) continue;
+
+          // Heuristic: elements with aria-label containing "you" or sent indicators
+          const ariaLabel = (el.getAttribute("aria-label") || "").toLowerCase();
+          const isSent = ariaLabel.includes("you") || el.querySelector('[data-testid*="outgoing" i]');
+
+          messages.push({
+            speaker: isSent ? "Dealer" : (buyerName || "Buyer"),
+            text: text.slice(0, 500),
+          });
+        }
+      }
+
+      // Fallback: raw text from [role="main"]
+      if (messages.length < 2) {
+        const rawText = (main.innerText || "").trim().slice(-4000);
+        return { buyerName, rawText, messages: [] };
+      }
+
+      // Deduplicate consecutive identical messages
+      const deduped = messages.filter((m, i) =>
+        i === 0 || m.text !== messages[i - 1].text
+      );
+
+      return { buyerName, messages: deduped.slice(-30), rawText: "" };
+    }
+
+    // Detect listing context from the page (vehicle title, price, etc.)
+    function detectListingContext() {
+      const bodyText = (document.body.innerText || "").toLowerCase();
+      const urlMatch = document.querySelectorAll('a[href*="/marketplace/item/"]');
+      const listingUrl = urlMatch.length > 0 ? urlMatch[0].href : null;
+
+      // Look for price patterns like $12,500 or $12500
+      const priceMatch = bodyText.match(/\$[\d,]+/);
+      const price = priceMatch ? priceMatch[0] : null;
+
+      // Look for down payment pattern
+      const downMatch = bodyText.match(/\$[\d,]+\s*(?:down|\/mo|per month)/i);
+      const downPayment = downMatch ? downMatch[0] : null;
+
+      // Vehicle title — look for pattern like "2020 Toyota Camry" in headings or links
+      let vehicleTitle = null;
+      const headings = Array.from(document.querySelectorAll('h1, h2, [role="heading"]'));
+      for (const h of headings) {
+        const t = (h.textContent || "").trim();
+        if (/\b(19|20)\d{2}\b/.test(t) && t.length > 8 && t.length < 120) {
+          vehicleTitle = t;
+          break;
+        }
+      }
+
+      return { listingUrl, vehicleTitle, price, downPayment };
+    }
+
+    const readBtn = button("Read Chat & Suggest Reply", async () => {
+      setStatus("Reading conversation…");
+
+      const { buyerName, messages, rawText } = scrapeConversation();
+      const context = detectListingContext();
+
+      if (!messages.length && !rawText) {
+        setStatus("No conversation text found.", "err");
+        return;
+      }
+
+      // Build the payload — structured messages preferred over rawText
+      const payload = {
+        sourceUrl: href,
+        buyerName: buyerName || undefined,
+        detectedVehicleTitle: context.vehicleTitle || undefined,
+        detectedMarketplaceListingUrl: context.listingUrl || undefined,
+        marketplaceAskingPrice: context.price || undefined,
+        marketplaceDownPayment: context.downPayment || undefined,
+      };
+
+      if (messages.length >= 2) {
+        // Send structured messages
+        payload.visibleMessages = messages.map((m) => `${m.speaker}: ${m.text}`);
+        payload.chatText = messages.map((m) => `${m.speaker}: ${m.text}`).join("\n").slice(-4000);
+      } else {
+        payload.chatText = rawText;
+      }
+
+      const res = await send({ type: "SEND_MESSAGE_CONTEXT", payload });
+      if (!res || !res.ok) {
+        if (res?.error === CTXI) return;
+        setStatus("Failed: " + (res && res.error), "err");
+        return;
+      }
+
+      lastReply = res.data.suggestedReply;
+      const msgCount = messages.length || "?";
+      setStatus(`Reply ready (${msgCount} messages read). Lead saved to CRM.`, "ok");
+
+      showOutput(
+        `<div class="mai-line"><strong>Suggested reply:</strong></div>` +
+        `<div class="mai-reply">${escapeHtml(lastReply)}</div>` +
+        `${context.vehicleTitle ? `<div class="mai-line" style="opacity:.7;font-size:11px;margin-top:4px;">Vehicle: ${escapeHtml(context.vehicleTitle)}</div>` : ""}` +
+        `<button class="mai-btn mai-btn-secondary" id="mai-insert">Insert Reply</button>` +
+        `<button class="mai-btn mai-btn-secondary" id="mai-copy" style="margin-top:4px;">Copy Reply</button>`,
+      );
+
+      outputEl.querySelector("#mai-insert").addEventListener("click", () => insertReply(lastReply));
+      outputEl.querySelector("#mai-copy").addEventListener("click", () => {
+        navigator.clipboard.writeText(lastReply).then(() => {
+          setStatus("Reply copied to clipboard.", "ok");
+        }).catch(() => {
+          setStatus("Could not copy — use the Insert Reply button instead.", "err");
+        });
+      });
+    });
+
+    actionsEl.appendChild(readBtn);
+  }
+
+  function insertReply(text) {
+    // Try contenteditable first (Messenger's message box)
+    const box =
+      document.querySelector('[contenteditable="true"][role="textbox"]') ||
+      document.querySelector('[contenteditable="true"][aria-label*="Message" i]') ||
+      document.querySelector('[contenteditable="true"]') ||
+      document.querySelector('textarea[aria-label*="Message" i]') ||
+      document.querySelector('textarea');
+
+    if (!box) {
+      setStatus("Could not find the message box.", "err");
+      return;
+    }
+
+    if (box.tagName === "TEXTAREA") {
+      box.focus();
+      setNativeValue(box, text);
+    } else {
+      // contenteditable — use execCommand for reliable React compatibility
+      box.focus();
+      // Select all existing content first (handles any placeholder text)
+      document.execCommand("selectAll", false, undefined);
+      document.execCommand("insertText", false, text);
+    }
+    setStatus("Reply inserted. Review it before sending — Send was NOT clicked.", "ok");
+  }
+
+  // ==================================================================
   // DEBUG: Vehicle Type only — stops after selecting Vehicle Type.
-  // Logs every step and every dropdown found on the page.
   // ==================================================================
   async function debugVehicleType() {
     const TARGET_VALUE = "Car/Truck";
 
-    // ── STEP 1: enumerate every [role="combobox"] on the page ──────────
     console.log("[STEP 1] Waiting for Vehicle Type dropdown");
-    setStatus("[DEBUG] Step 1: Scanning for [role=\"combobox\"] elements…");
+    setStatus('[DEBUG] Step 1: Scanning for [role="combobox"] elements…');
     await sleep(400);
 
     const allBoxes = Array.from(document.querySelectorAll('[role="combobox"]'));
@@ -1131,30 +1254,24 @@
       el.style.outline = "2px dashed orange";
     });
 
-    // ── STEP 2: locate the Vehicle Type combobox ────────────────────────
     const VT_KEYWORDS = ["vehicle type", "type of vehicle", "category"];
     const targetEl = findCombobox(VT_KEYWORDS);
 
     if (!targetEl) {
       console.log("[ERROR] [STEP 2] Vehicle Type combobox NOT FOUND");
-      console.log("[DEBUG] All combobox texts:", allBoxes.map((el) =>
-        (el.innerText || el.textContent || "").trim().slice(0, 60)
-      ));
-      setStatus("[ERROR] Vehicle Type combobox NOT FOUND. Check console (F12).", "err");
+      setStatus('[ERROR] Vehicle Type combobox NOT FOUND. Check console (F12).', "err");
       return;
     }
 
     console.log("[STEP 2] Vehicle Type combobox FOUND:", targetEl);
-    targetEl.style.outline      = "4px solid red";
+    targetEl.style.outline = "4px solid red";
     targetEl.style.outlineOffset = "2px";
     setStatus("[DEBUG] Step 2: Combobox found — highlighted RED");
 
-    // ── STEP 3: click to open ───────────────────────────────────────────
     console.log("[STEP 3] Opening combobox — calling .click()");
     setStatus("[DEBUG] Step 3: Opening combobox…");
     targetEl.click();
 
-    // ── STEP 4: wait for [role="option"] to appear ──────────────────────
     const options = await waitForOptions(8000);
     console.log(`[STEP 4] Available options (${options.length}):`);
     options.forEach((o, i) =>
@@ -1162,12 +1279,11 @@
     );
 
     if (!options.length) {
-      console.log("[ERROR] [STEP 4] No [role=\"option\"] appeared after clicking");
+      console.log('[ERROR] [STEP 4] No [role="option"] appeared after clicking');
       setStatus("[ERROR] No options appeared. Combobox may use a different interaction.", "err");
       return;
     }
 
-    // ── STEP 5: find and click Car/Truck ────────────────────────────────
     const needle  = TARGET_VALUE.toLowerCase().trim();
     const getText = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
     const pick =
@@ -1188,135 +1304,13 @@
     setStatus(`[DEBUG] Step 5: Clicking "${pickedText}"…`);
     pick.click();
 
-    // ── STEP 6: confirm ─────────────────────────────────────────────────
     console.log(`[STEP 6] Selection success — clicked "${pickedText}"`);
     setStatus(
-      `[DEBUG] Step 6: Selected "${pickedText}". ` +
+      `[DEBUG] Done: Selected "${pickedText}". ` +
       `Watch if Year / Make / Model appear. WORKFLOW STOPPED.`,
       "ok",
     );
-    // STOP — do not continue to Year, Make, Model, or any other field.
   }
 
-  if (isMarketplaceCreate) {
-    chrome.storage.local.get("activeJob").then(({ activeJob }) => {
-      if (activeJob) {
-        actionsEl.appendChild(
-          button("Fill Marketplace Fields", () => runPublishingFlow(activeJob)),
-        );
-        setTimeout(() => runPublishingFlow(activeJob), 1200);
-      } else {
-        actionsEl.appendChild(
-          button("Fill Test Listing", async () => {
-            console.log("[DealerPilot] Fill button clicked — starting state machine");
-            setStatus("State Machine Running...");
-
-            const res = await send({ type: "GET_TEST_LISTING" });
-            if (!res || !res.ok) {
-              if (res?.error === CTXI) return;
-              setStatus("Failed to fetch test listing: " + (res && res.error), "err");
-              return;
-            }
-
-            const listing = res.data;
-            console.log("[DealerPilot] Test listing received:", listing);
-
-            // Shape the flat test-listing into the fill envelope the state machine expects
-            const fill = {
-              vehicleType: listing.vehicleType || "Car/Truck",
-              year:         listing.year        ?? null,
-              make:         listing.make        ?? "",
-              model:        listing.model       ?? "",
-              mileage:      listing.mileage     != null ? String(listing.mileage) : null,
-              price:        listing.price       != null ? String(listing.price)   : null,
-              title:        listing.title       ?? "",
-              description:  listing.description ?? "",
-              location:     listing.location    ?? null,
-              condition:    listing.condition   ?? null,
-              transmission: listing.transmission ?? null,
-              fuelType:     listing.fuelType    ?? null,
-              color:        listing.color       ?? null,
-              bodyStyle:    listing.bodyStyle   ?? null,
-            };
-
-            // Synthetic job that carries the pre-fetched payload
-            const syntheticJob = {
-              id:            0,
-              listingTitle:  listing.title || "Test Listing",
-              vehicleLabel:  `${listing.year || ""} ${listing.make || ""} ${listing.model || ""}`.trim(),
-              dealerName:    "Test Mode",
-              _prefetchedPayload: { fill, images: [] },
-            };
-
-            await runPublishingFlow(syntheticJob);
-          }),
-        );
-      }
-
-      // ---- Always-visible debug button (Vehicle Type only — intentionally stops after Car/Truck) ----
-      const dbgBtn = button("🔍 DEBUG: Vehicle Type only (stops here)", () => debugVehicleType(), "mai-btn-secondary");
-      dbgBtn.title = "Selects Vehicle Type = Car/Truck then stops. Use Fill Marketplace Fields for the full workflow.";
-      dbgBtn.style.cssText += ";margin-top:6px;border:2px dashed #e74c3c;color:#e74c3c;font-weight:700;font-size:10px;";
-      actionsEl.appendChild(dbgBtn);
-    });
-  }
-
-  if (isMessenger) {
-    let lastReply = "";
-
-    const readBtn = button("Read Chat & Suggest Reply", async () => {
-      setStatus("Reading conversation…");
-      const main = document.querySelector('[role="main"]') || document.body;
-      const chatText = (main.innerText || "").trim().slice(-4000);
-      if (!chatText) {
-        setStatus("No conversation text found.", "err");
-        return;
-      }
-      let buyerName = "";
-      const heading = document.querySelector('[role="main"] h1, [role="main"] [role="heading"]');
-      if (heading) buyerName = (heading.textContent || "").trim().slice(0, 120);
-
-      const res = await send({
-        type: "SEND_MESSAGE_CONTEXT",
-        payload: { chatText, buyerName: buyerName || undefined, sourceUrl: href },
-      });
-      if (!res || !res.ok) {
-        if (res?.error === CTXI) return;
-        setStatus("Failed: " + (res && res.error), "err");
-        return;
-      }
-      lastReply = res.data.suggestedReply;
-      setStatus("Suggested reply ready. Lead saved to CRM.", "ok");
-      showOutput(
-        `<div class="mai-line"><strong>Suggested reply:</strong></div>` +
-        `<div class="mai-reply">${escapeHtml(lastReply)}</div>` +
-        `<button class="mai-btn mai-btn-secondary" id="mai-insert">Insert Reply</button>`,
-      );
-      const insertBtn = outputEl.querySelector("#mai-insert");
-      insertBtn.addEventListener("click", () => insertReply(lastReply));
-    });
-    actionsEl.appendChild(readBtn);
-  }
-
-  function insertReply(text) {
-    const box =
-      document.querySelector('[contenteditable="true"][role="textbox"]') ||
-      document.querySelector('[contenteditable="true"]') ||
-      document.querySelector('textarea[aria-label*="Message" i]');
-    if (!box) {
-      setStatus("Could not find the message box.", "err");
-      return;
-    }
-    if (box.tagName === "TEXTAREA") {
-      box.focus();
-      setNativeValue(box, text);
-    } else {
-      box.focus();
-      document.execCommand("selectAll", false, undefined);
-      document.execCommand("insertText", false, text);
-    }
-    setStatus("Reply inserted. Send was NOT clicked.", "ok");
-  }
-
-  log("Panel loaded", { isMessenger, isMarketplaceCreate });
+  log("Panel loaded v1.2", { isMessenger, isMarketplaceCreate });
 })();

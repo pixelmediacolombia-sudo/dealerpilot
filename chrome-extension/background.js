@@ -180,9 +180,6 @@ const handlers = {
 
   // ---- Marketplace Connection flow ----
 
-  // Opens the appropriate Facebook URL so content.js can verify session + marketplace access.
-  // action: 'marketplace' → opens create/vehicle form
-  // action: 'login'       → opens login page (with marketplace as next)
   async CONNECT_MARKETPLACE(message) {
     const action = message?.action || "marketplace";
     const url = action === "login" ? FACEBOOK_LOGIN_URL : MARKETPLACE_CREATE_URL;
@@ -191,7 +188,6 @@ const handlers = {
     return { ok: true, tabId: tab.id, action };
   },
 
-  // Called by content.js after it has detected FB session state on a Facebook page.
   async FB_SESSION_REPORT(message) {
     const { fbLoggedIn, marketplaceConnected } = message;
     await chrome.storage.local.set({ fbLoggedIn, marketplaceConnected });
@@ -208,18 +204,15 @@ const handlers = {
     return { ok: true };
   },
 
-  // Opens the Facebook login page (with marketplace as the next URL).
   async OPEN_FACEBOOK_LOGIN() {
     const tab = await chrome.tabs.create({ url: FACEBOOK_LOGIN_URL, active: true });
     return { tabId: tab.id };
   },
 
-  // Called by the alarm. Skips if an active job is already in progress.
   async POLL_ASSIGNED_JOB() {
     const { activeJob } = await chrome.storage.local.get("activeJob");
     if (activeJob) return { skipped: true };
 
-    // 0. Check for a pending connect-marketplace request from the app
     try {
       const connectStatus = await apiGet("/api/extension/connect-status");
       if (connectStatus.connectRequested) {
@@ -231,7 +224,6 @@ const handlers = {
 
     const extensionId = await getExtensionId();
 
-    // 1. Check for a job explicitly assigned to this extension (app-controlled mode)
     let data;
     try {
       data = await apiGet(`/api/publishing/jobs/assigned?extensionId=${encodeURIComponent(extensionId)}`);
@@ -241,7 +233,6 @@ const handlers = {
     const assignedJob = data && data.job && data.job.id ? data.job : null;
     if (assignedJob) return handlers.AUTO_START_ASSIGNED({ jobId: assignedJob.id });
 
-    // 2. Fallback: any queued job in the general queue (created via Publish Now)
     let nextData;
     try {
       nextData = await apiGet("/api/publishing/jobs/next");
@@ -263,7 +254,6 @@ const handlers = {
     return { tabId: tab.id };
   },
 
-  // ---- Debug state ----
   async GET_DEBUG_STATE() {
     const keys = [
       "backendUrl",

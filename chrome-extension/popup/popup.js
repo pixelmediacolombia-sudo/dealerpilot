@@ -8,13 +8,17 @@ const startBtn   = document.getElementById("dev-start");
 const refreshBtn = document.getElementById("refresh");
 
 const el = {
-  dotOnline:  document.getElementById("dot-online"),
-  vOnline:    document.getElementById("v-online"),
   dotBackend: document.getElementById("dot-backend"),
   vBackend:   document.getElementById("v-backend"),
   vAssigned:  document.getElementById("v-assigned"),
   vCurrent:   document.getElementById("v-current"),
   vSync:      document.getElementById("v-sync"),
+  pillFb:     document.getElementById("pill-fb"),
+  pillFbText: document.getElementById("pill-fb-text"),
+  pillMkp:    document.getElementById("pill-mkp"),
+  pillMkpText:document.getElementById("pill-mkp-text"),
+  fbLoginRow: document.getElementById("fb-login-row"),
+  btnFbLogin: document.getElementById("btn-fb-login"),
 };
 
 // ---- DOM refs: debug panel ----
@@ -24,6 +28,8 @@ const dbg = {
   dealerId:   document.getElementById("d-dealer-id"),
   backendUrl: document.getElementById("d-backend-url"),
   connStatus: document.getElementById("d-conn-status"),
+  fbLogin:    document.getElementById("d-fb-login"),
+  mkpAccess:  document.getElementById("d-mkp-access"),
   heartbeat:  document.getElementById("d-heartbeat"),
   claimed:    document.getElementById("d-claimed"),
   published:  document.getElementById("d-published"),
@@ -37,6 +43,7 @@ const dbg = {
 let nextJob   = null;
 let activeJob = null;
 let lastConnectionOk = false;
+let lastFbLoggedIn = null;
 
 // ---- Helpers ----
 function setStatus(text, kind) {
@@ -70,7 +77,6 @@ function renderStart() {
   if (activeJob) {
     startBtn.textContent = `Reopen Marketplace${getModeLabel(activeJob)}`;
     startBtn.disabled = false;
-    // Show a small reset link so the operator can clear a stuck/deleted job
     const existing = document.getElementById("dp-reset-job");
     if (!existing) {
       const reset = document.createElement("button");
@@ -105,9 +111,50 @@ function truncate(str, n) {
   return str.length > n ? str.slice(0, n - 1) + "…" : str;
 }
 
+// ---- FB / Marketplace status pills ----
+function updateFbPills(fbLoggedIn, marketplaceConnected) {
+  lastFbLoggedIn = fbLoggedIn;
+
+  // Facebook pill
+  if (fbLoggedIn === true) {
+    el.pillFb.className = "status-pill pill-ok";
+    el.pillFbText.textContent = "FB: Logged In";
+    setDot(el.pillFb.querySelector(".dot"), "on");
+    el.fbLoginRow.style.display = "none";
+  } else if (fbLoggedIn === false) {
+    el.pillFb.className = "status-pill pill-err";
+    el.pillFbText.textContent = "FB: Not Logged In";
+    setDot(el.pillFb.querySelector(".dot"), "off");
+    el.fbLoginRow.style.display = "block";
+  } else {
+    el.pillFb.className = "status-pill pill-off";
+    el.pillFbText.textContent = "FB: Unknown";
+    setDot(el.pillFb.querySelector(".dot"), "");
+    el.fbLoginRow.style.display = "none";
+  }
+
+  // Marketplace pill
+  if (marketplaceConnected === true) {
+    el.pillMkp.className = "status-pill pill-ok";
+    el.pillMkpText.textContent = "Marketplace: Ready";
+    setDot(el.pillMkp.querySelector(".dot"), "on");
+  } else if (fbLoggedIn === false) {
+    el.pillMkp.className = "status-pill pill-err";
+    el.pillMkpText.textContent = "Marketplace: No FB Login";
+    setDot(el.pillMkp.querySelector(".dot"), "off");
+  } else if (marketplaceConnected === false) {
+    el.pillMkp.className = "status-pill pill-warn";
+    el.pillMkpText.textContent = "Marketplace: Not Verified";
+    setDot(el.pillMkp.querySelector(".dot"), "warn");
+  } else {
+    el.pillMkp.className = "status-pill pill-off";
+    el.pillMkpText.textContent = "Marketplace: Unknown";
+    setDot(el.pillMkp.querySelector(".dot"), "");
+  }
+}
+
 // ---- Debug panel ----
 async function loadDebugState() {
-  // Chrome extension ID is available directly in the popup context
   dbg.chromeId.textContent = truncate(chrome.runtime.id || "—", 24);
   dbg.chromeId.title = chrome.runtime.id || "";
 
@@ -126,6 +173,15 @@ async function loadDebugState() {
 
   dbg.connStatus.textContent  = lastConnectionOk ? "Connected" : "Unreachable";
   dbg.connStatus.className    = "value " + (lastConnectionOk ? "ok" : "err");
+
+  // FB login / marketplace in debug panel
+  const fbState = d.fbLoggedIn;
+  dbg.fbLogin.textContent = fbState === true ? "Yes ✓" : fbState === false ? "No ✗" : "Unknown";
+  dbg.fbLogin.className   = "value " + (fbState === true ? "ok" : fbState === false ? "err" : "");
+
+  const mkpState = d.marketplaceConnected;
+  dbg.mkpAccess.textContent = mkpState === true ? "Yes ✓" : mkpState === false ? "No" : "Unknown";
+  dbg.mkpAccess.className   = "value " + (mkpState === true ? "ok" : "");
 
   dbg.heartbeat.textContent = fmtTime(d.lastHeartbeat);
 
@@ -173,16 +229,13 @@ async function loadDebugState() {
     dbg.workflowStep.className     = "value";
     dbg.workflowStepAt.textContent = "—";
   }
+
+  // Sync pills with latest stored state
+  updateFbPills(d.fbLoggedIn, d.marketplaceConnected);
 }
 
 // ---- Main refresh ----
 async function refresh() {
-  el.vOnline.textContent = navigator.onLine ? "Yes" : "No";
-  setDot(el.dotOnline, navigator.onLine ? "on" : "off");
-
-  const stored = await chrome.storage.local.get("activeJob");
-  activeJob = stored.activeJob || null;
-
   el.vBackend.textContent = "Checking…";
   setDot(el.dotBackend, "warn");
 
@@ -196,16 +249,23 @@ async function refresh() {
     el.vBackend.textContent = "Unreachable";
     setDot(el.dotBackend, "off");
     el.vAssigned.textContent = "—";
+
+    const stored = await chrome.storage.local.get(["activeJob", "fbLoggedIn", "marketplaceConnected"]);
+    activeJob = stored.activeJob || null;
     el.vCurrent.textContent = activeJob
       ? activeJob.listingTitle || `Job #${activeJob.id}`
       : "None";
     el.vSync.textContent = new Date().toLocaleTimeString();
+    updateFbPills(stored.fbLoggedIn ?? null, stored.marketplaceConnected ?? null);
     renderStart();
     await loadDebugState();
     return;
   }
 
-  // Fetch the next queued job (for the dev-start button in debug mode)
+  const stored = await chrome.storage.local.get("activeJob");
+  activeJob = stored.activeJob || null;
+
+  // Fetch the next queued job
   const res = await send({ type: "GET_NEXT_JOB" });
   if (res && res.ok) {
     const raw = res.data;
@@ -218,7 +278,7 @@ async function refresh() {
     nextJob = null;
   }
 
-  // Check if the backend has assigned a job to this extension
+  // Check assigned job
   const assignedRes = await send({ type: "GET_ASSIGNED_JOB" });
   if (assignedRes && assignedRes.ok && assignedRes.data && assignedRes.data.job) {
     const aj = assignedRes.data.job;
@@ -256,15 +316,12 @@ startBtn.addEventListener("click", async () => {
     return;
   }
 
-  // Defensive guard: never allow undefined in the claim URL.
   const jobId = nextJob.id ?? nextJob.jobId ?? null;
   if (jobId == null) {
-    console.log("[DealerPilot] ERROR: No valid job id. Full nextJob:", JSON.stringify(nextJob));
     setStatus("No valid publishing job id returned by backend.", "err");
     startBtn.disabled = false;
     return;
   }
-  console.log("[DealerPilot] Claiming job id:", jobId);
 
   setStatus("Claiming job…");
   const claim = await send({ type: "CLAIM_JOB", jobId });
@@ -304,6 +361,13 @@ startBtn.addEventListener("click", async () => {
 
   setStatus("Job claimed. Opening Marketplace…", "ok");
   await send({ type: "OPEN_MARKETPLACE" });
+  window.close();
+});
+
+// ---- FB Login button ----
+el.btnFbLogin.addEventListener("click", async () => {
+  await send({ type: "OPEN_FACEBOOK_LOGIN" });
+  setStatus("Facebook login tab opened.", "ok");
   window.close();
 });
 

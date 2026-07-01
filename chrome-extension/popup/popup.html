@@ -76,6 +76,49 @@
       .dot.on  { background: #6fe39f; box-shadow: 0 0 6px #6fe39f55; }
       .dot.off { background: #ff8a7a; }
       .dot.warn { background: #ffce6b; }
+
+      /* FB status pills in the main card */
+      .status-pills {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #1c3a63;
+        flex-wrap: wrap;
+      }
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 7px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 600;
+        background: #0f2540;
+        border: 1px solid #1c3a63;
+        white-space: nowrap;
+      }
+      .status-pill .dot { width: 6px; height: 6px; }
+      .status-pill.pill-ok { border-color: #1e5e30; background: #0e2d1a; color: #6fe39f; }
+      .status-pill.pill-err { border-color: #5e1e1e; background: #2d0e0e; color: #ff8a7a; }
+      .status-pill.pill-warn { border-color: #5e4e1e; background: #2d250e; color: #ffce6b; }
+      .status-pill.pill-off { border-color: #1c3a63; background: #0f2540; color: #9fb3cc; }
+
+      /* Action button row */
+      .action-row {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #1c3a63;
+      }
+      .action-row button {
+        margin-top: 0;
+        flex: 1;
+        padding: 8px 6px;
+        font-size: 12px;
+      }
+
       label { display: block; font-size: 12px; margin-bottom: 4px; color: #cdd9ea; }
       input {
         width: 100%;
@@ -108,6 +151,12 @@
         font-size: 11px;
         padding: 5px;
         margin-top: 6px;
+      }
+      button.btn-fb-login {
+        background: #1877f2;
+        font-size: 12px;
+        padding: 8px;
+        margin-top: 0;
       }
       button:disabled { opacity: 0.45; cursor: not-allowed; }
       button:not(:disabled):hover { opacity: 0.88; }
@@ -167,7 +216,7 @@
       <div class="header-logo">DP</div>
       <div>
         <h1>DealerPilot AI</h1>
-        <p class="sub">Bridge mode — controlled from the DealerPilot app.</p>
+        <p class="sub">v1.2 · Alpha Motorsport</p>
       </div>
     </div>
 
@@ -181,14 +230,7 @@
     <div class="card">
       <h2>Extension Status</h2>
       <div class="row">
-        <span class="label">Online</span>
-        <span class="value pill">
-          <span id="dot-online" class="dot"></span>
-          <span id="v-online">—</span>
-        </span>
-      </div>
-      <div class="row">
-        <span class="label">Backend connected</span>
+        <span class="label">Backend</span>
         <span class="value pill">
           <span id="dot-backend" class="dot"></span>
           <span id="v-backend">Checking…</span>
@@ -206,9 +248,27 @@
         <span class="label">Last sync</span>
         <span class="value" id="v-sync">—</span>
       </div>
+
+      <!-- Facebook + Marketplace status pills -->
+      <div class="status-pills">
+        <span class="status-pill pill-off" id="pill-fb">
+          <span class="dot"></span>
+          <span id="pill-fb-text">FB: Unknown</span>
+        </span>
+        <span class="status-pill pill-off" id="pill-mkp">
+          <span class="dot"></span>
+          <span id="pill-mkp-text">Marketplace: Unknown</span>
+        </span>
+      </div>
+
+      <!-- FB Login button (shown only when not logged in) -->
+      <div id="fb-login-row" style="display:none; margin-top:8px;">
+        <button id="btn-fb-login" class="btn-fb-login">Open Facebook Login →</button>
+      </div>
     </div>
 
-    <button id="refresh" class="secondary">Refresh Status</button>
+    <button id="dev-start" disabled>Start Publishing Job</button>
+    <button id="refresh" class="secondary" style="margin-top:6px;">Refresh Status</button>
     <div id="status"></div>
 
     <!-- Backend Settings -->
@@ -229,7 +289,7 @@
           <h2>System Info</h2>
           <div class="row">
             <span class="label">Build</span>
-            <span class="value ok" id="d-build">APP_CONTROLLED_PUBLISHING_1.0.8</span>
+            <span class="value ok" id="d-build">APP_CONTROLLED_PUBLISHING_1.2.0</span>
           </div>
           <div class="row">
             <span class="label">Extension Version</span>
@@ -240,7 +300,7 @@
             <span class="value" id="d-chrome-id" title="">—</span>
           </div>
           <div class="row">
-            <span class="label">Dealer ID</span>
+            <span class="label">Dealer</span>
             <span class="value" id="d-dealer-id">—</span>
           </div>
           <div class="row">
@@ -253,6 +313,14 @@
           <div class="row">
             <span class="label">Connection Status</span>
             <span class="value" id="d-conn-status">—</span>
+          </div>
+          <div class="row">
+            <span class="label">FB Logged In</span>
+            <span class="value" id="d-fb-login">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Marketplace Access</span>
+            <span class="value" id="d-mkp-access">—</span>
           </div>
           <div class="row">
             <span class="label">Last Heartbeat</span>
@@ -298,7 +366,6 @@
 
           <div class="divider"></div>
           <h2 style="margin-top:6px">Dev Controls</h2>
-          <button id="dev-start" class="ghost" disabled>Dev: Claim Next Queued Job</button>
           <button id="clear-error" class="ghost">Clear Last Error</button>
           <button id="reload-debug" class="ghost">Reload Debug State</button>
         </div>
