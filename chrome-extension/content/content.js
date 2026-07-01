@@ -22,7 +22,7 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.2.3";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.2.4";
 
   function _runtimeAlive() {
     try {

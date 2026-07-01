@@ -11,7 +11,7 @@ import {
   vehicleIntelligenceTable,
   type PublishingJob,
 } from "@workspace/db";
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { getMarketplacePricing } from "../listings/pricing";
 
 const router: IRouter = Router();
@@ -48,6 +48,8 @@ function toJob(j: PublishingJob, extras: JobExtras = {
     needsReview: j.needsReview,
     reviewReason: j.reviewReason ?? null,
     attempts: j.attempts,
+    source: j.source ?? null,
+    approvedByUser: j.approvedByUser ?? null,
     createdAt: j.createdAt.toISOString(),
     updatedAt: j.updatedAt.toISOString(),
     ...extras,
@@ -619,6 +621,8 @@ router.post("/listing-versions/:id/queue", async (req, res) => {
         status: "Queued",
         priority,
         scheduledAt: scheduledAt && !Number.isNaN(scheduledAt.getTime()) ? scheduledAt : null,
+        source: "queue_from_listing",
+        approvedByUser: true,
       })
       .returning();
   });
@@ -698,6 +702,8 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
         status: scheduledAtStr ? "Scheduled" : "Queued",
         priority,
         scheduledAt,
+        source: "bulk_schedule",
+        approvedByUser: true,
       })
       .returning({ id: publishingJobsTable.id });
 
@@ -770,10 +776,12 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
       status: "Queued",
       priority: 100,
       progressPercent: 0,
+      source: "publish_now",
+      approvedByUser: true,
     })
     .returning();
 
-  req.log.info({ vehicleId, jobId: job.id }, "Publish Now job created (Controlled mode)");
+  req.log.info({ vehicleId, jobId: job.id, source: "publish_now" }, "Publish Now job created (Controlled mode)");
   const [enriched] = await enrich([job]);
   res.status(201).json({ jobId: job.id, job: enriched });
 });
@@ -853,6 +861,43 @@ router.get("/publishing/jobs/:id/progress", async (req, res) => {
     completedAt: job.completedAt ? job.completedAt.toISOString() : null,
     createdAt: job.createdAt.toISOString(),
   });
+});
+
+// ── Cancel Stale Jobs ─────────────────────────────────────────────────────────
+// POST /publishing/jobs/cancel-stale
+// Cancels all Queued/Scheduled jobs older than `olderThanMinutes` (default 60).
+// Safety valve for the dashboard — never touches jobs in progress (Publishing/Claimed).
+
+const CancelStaleBody = z.object({
+  dealerId: z.number().int().positive().optional(),
+  olderThanMinutes: z.number().int().min(1).max(1440).optional().default(60),
+});
+
+router.post("/publishing/jobs/cancel-stale", async (req, res) => {
+  const parsed = CancelStaleBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid request" });
+    return;
+  }
+  const { dealerId, olderThanMinutes } = parsed.data;
+  const cutoff = new Date(Date.now() - olderThanMinutes * 60_000);
+
+  const conditions = [
+    inArray(publishingJobsTable.status, ["Queued", "Scheduled"]),
+    lt(publishingJobsTable.createdAt, cutoff),
+  ];
+  if (dealerId != null) {
+    conditions.push(eq(publishingJobsTable.dealerId, dealerId));
+  }
+
+  const cancelled = await db
+    .update(publishingJobsTable)
+    .set({ status: "Cancelled", failedReason: `Cancelled by cancel-stale after ${olderThanMinutes} min` })
+    .where(and(...conditions))
+    .returning({ id: publishingJobsTable.id, vehicleId: publishingJobsTable.vehicleId });
+
+  req.log.info({ count: cancelled.length, olderThanMinutes, dealerId }, "Stale jobs cancelled");
+  res.json({ cancelled: cancelled.length, ids: cancelled.map((j) => j.id) });
 });
 
 export default router;

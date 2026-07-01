@@ -573,6 +573,8 @@ router.post("/auto-publish/batches", async (req, res) => {
         status: schedAt ? "Scheduled" : "Queued",
         priority: eligible.length - i,
         scheduledAt: schedAt ?? undefined,
+        source: "auto_publish_batch",
+        approvedByUser: false,
       })
       .returning();
     jobs.push(job);

@@ -395,17 +395,33 @@ const handlers = {
     const nextJob = nextData && nextData.job && nextData.job.id ? nextData.job : null;
     if (!nextJob) return { job: null };
 
-    // SAFETY GATE: Only auto-start a general-queue job if it was created very recently.
-    // This allows "Publish Now" jobs (created seconds ago) to be picked up automatically,
-    // while preventing old stale jobs from ever opening Facebook without user approval.
+    // SAFETY GATE: Only auto-start a job if it was created by a direct user action
+    // (source=publish_now, bulk_schedule, or queue_from_listing) AND is very recent (< 5 min).
+    // auto_publish_batch jobs and old jobs require explicit user action from the popup.
     const RECENT_JOB_MS = 5 * 60 * 1000; // 5 minutes
     const jobAge = nextJob.createdAt ? Date.now() - new Date(nextJob.createdAt).getTime() : Infinity;
-    if (jobAge > RECENT_JOB_MS) {
+    const jobSource = nextJob.source || null;
+    const isAutoPublishBatch = jobSource === "auto_publish_batch";
+    const isTooOld = jobAge > RECENT_JOB_MS;
+
+    if (isTooOld || isAutoPublishBatch) {
+      const reason = isAutoPublishBatch
+        ? "Job source is auto_publish_batch — user must approve from popup"
+        : "Job is older than 5 minutes — user must trigger from popup";
       await logAudit("POLL_STALE_JOB_SKIPPED", {
         jobId: nextJob.id,
         createdAt: nextJob.createdAt,
         ageMin: Math.round(jobAge / 60000),
-        reason: "Job is older than 5 minutes — user must trigger from popup",
+        source: jobSource,
+        reason,
+      });
+      // Overwrite lastNextResponse so popup shows the job exists but is blocked
+      const staleLabel = isAutoPublishBatch
+        ? `[needs approval] job #${nextJob.id} — ${nextJob.vehicleLabel || nextJob.status}`
+        : `[stale] job #${nextJob.id} — ${nextJob.vehicleLabel || nextJob.status}`;
+      await chrome.storage.local.set({
+        lastNextResponse: staleLabel,
+        lastNextResponseAt: Date.now(),
       });
       return { job: null, skipped: "stale", jobId: nextJob.id };
     }
@@ -414,7 +430,7 @@ const handlers = {
       jobId: nextJob.id,
       createdAt: nextJob.createdAt || null,
       mode: nextJob.mode || "Controlled",
-      source: "publish_now",
+      source: jobSource || "publish_now",
       approvedByUser: true,
     });
   },

@@ -39,6 +39,12 @@ export const publishingJobsTable = pgTable(
     listingUrl: text("listing_url"),
     assignedExtensionId: text("assigned_extension_id"),
     assignedAt: timestamp("assigned_at", { withTimezone: true }),
+    // source: who/what created this job — for audit and extension filtering.
+    // publish_now | bulk_schedule | queue_from_listing | auto_publish_batch
+    source: text("source"),
+    // approvedByUser: true when a human explicitly triggered publishing (publish_now).
+    // false/null for system-generated or batch jobs.
+    approvedByUser: boolean("approved_by_user"),
     needsReview: boolean("needs_review").notNull().default(false),
     reviewReason: text("review_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

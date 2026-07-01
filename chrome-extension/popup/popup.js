@@ -208,10 +208,16 @@ async function loadDebugState() {
   dbg.lastPoll.className   = d.lastPollTime ? "value ok" : "value";
 
   if (d.lastNextResponse) {
-    dbg.lastNext.textContent   = truncate(d.lastNextResponse, 30);
-    dbg.lastNext.title         = d.lastNextResponse;
-    const hasJob = d.lastNextResponse.startsWith("job #");
-    dbg.lastNext.className     = "value " + (hasJob ? "ok" : "");
+    dbg.lastNext.textContent = truncate(d.lastNextResponse, 32);
+    dbg.lastNext.title       = d.lastNextResponse;
+    const isLiveJob    = d.lastNextResponse.startsWith("job #");
+    const isStale      = d.lastNextResponse.startsWith("[stale]");
+    const needsApprove = d.lastNextResponse.startsWith("[needs approval]");
+    dbg.lastNext.className = "value " + (
+      isLiveJob    ? "ok"       :
+      isStale      ? "err"      :
+      needsApprove ? "warn-text" : ""
+    );
   } else {
     dbg.lastNext.textContent = "—";
     dbg.lastNext.className   = "value";
