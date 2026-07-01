@@ -16,17 +16,16 @@ export interface GeneratedListing {
   category: DownPaymentSuggestion["category"];
 }
 
-// Strip emojis / pictographs and collapse whitespace so titles obey the
-// Marketplace "no emojis" rule even if the model slips one in.
+const ALLOWED_EMOJI_CHARS = "🔥🚗✅💥📩💰⚡⏳";
+
 function sanitizeTitle(raw: string): string {
-  const noEmoji = raw.replace(/\p{Extended_Pictographic}/gu, "");
-  const collapsed = noEmoji.replace(/\s+/g, " ").trim();
-  return collapsed.length > 100 ? collapsed.slice(0, 100).trim() : collapsed;
+  const cleaned = raw.replace(/\p{Extended_Pictographic}/gu, (ch) =>
+    ALLOWED_EMOJI_CHARS.includes(ch) ? ch : ""
+  );
+  const collapsed = cleaned.replace(/\s+/g, " ").trim();
+  return collapsed.length > 70 ? collapsed.slice(0, 70).trim() : collapsed;
 }
 
-// Only the fields that actually exist on the vehicle are sent to the model.
-// Nothing is invented; absent fields are simply omitted from the prompt so the
-// model cannot "fill in" specs it was never given.
 function buildVehicleFacts(vehicle: Vehicle): Record<string, string | number> {
   const facts: Record<string, string | number> = {};
   if (vehicle.year) facts.year = vehicle.year;
@@ -53,30 +52,88 @@ const ModelOutput = z.object({
   priority: z.string().min(1),
 });
 
-const SYSTEM_PROMPT = `You are an expert automotive marketing copywriter for a US car dealership that sells on Facebook Marketplace and offers in-house financing ("buy here, pay here").
+const SYSTEM_PROMPT = `You are the top-performing Facebook Marketplace car seller in the United States.
 
-ABSOLUTE RULES:
-- Use ONLY the vehicle facts provided in the user message. NEVER invent or assume specs, features, packages, trims, mileage, history, or options that are not given. If a detail is missing, simply do not mention it.
-- The Marketplace title must be at most 100 characters, contain NO emojis, read naturally, be high click-through, and be SEO friendly (include year, make, and model when available).
-- Write TWO full descriptions: one in natural English and one in natural Latin-American Spanish. They should convey the same information; the Spanish one is a localization, not a literal word-for-word translation.
-- Descriptions should highlight the provided facts, the financing/down-payment offer, and a clear next step. No emojis in the title; descriptions may use light, professional formatting but no excessive emojis.
-- The call to action should reference the financing / low down payment offer.
-- buyerProfile: one or two sentences describing the most likely buyer for this specific vehicle.
-- priority: exactly one of "High", "Medium", or "Low" based on how desirable/fast-moving this vehicle likely is.
+Your listings maximize: Click Through Rate, Message Rate, Save Rate, Marketplace ranking, Buyer Trust, Lead Conversion.
 
-PRICING COPY RULES (strictly enforced):
-- If priceMode is DOWN_PAYMENT: frame the entire offer around the down payment. Use phrasing like "Down payment starting at $X" or "Available with $X down for qualified buyers". DO NOT use the full vehicle price as the Marketplace price in the copy.
-- If priceMode is FULL_PRICE: the listing copy may mention the full price directly.
-- NEVER use the phrases "guaranteed approval", "everyone approved", "no credit check guaranteed", or any variant implying unconditional financing.
-- NEVER say a buyer is guaranteed to qualify. Use "for qualified buyers" or "financing available" instead.
+=== GLOBAL RULES ===
+- Use ONLY the vehicle facts provided. NEVER invent specs, features, mileage, options, history, or packages not given.
+- NEVER write long paragraphs.
+- NEVER write filler or fluff.
+- NEVER explain obvious vehicle specs.
+- NEVER repeat year/make/model more than once.
+- NEVER write like ChatGPT. Write like the best Marketplace seller in America.
+- NEVER use: "This vehicle features...", "This is a great option...", "The exterior color...", "Equipped with..."
 
-Respond with a single JSON object and nothing else, with keys: title, descriptionEn, descriptionEs, callToAction, buyerProfile, priority.`;
+=== PRICING RULES (strictly enforced) ===
+- priceMode DOWN_PAYMENT: frame the ENTIRE offer around the down payment. Use "Down payment starting at $X" or "Available with $X down for qualified buyers". DO NOT mention the full vehicle price.
+- priceMode FULL_PRICE: mention the full price directly.
+- NEVER say "guaranteed approval", "everyone approved", "no credit check guaranteed", or imply unconditional financing.
+- NEVER say a buyer is guaranteed to qualify. Use "for qualified buyers" or "financing available".
 
-/**
- * Generate listing copy with the LLM, grounded strictly in XML-sourced vehicle
- * facts. Down payment and asking price come from the deterministic rule engine
- * / source data, never from the model.
- */
+=== TITLE ===
+- Maximum 70 characters (including emojis).
+- Lead with ONE emoji: 🔥 or 🚗
+- Mention year, make, model once.
+- Include the single most compelling hook (low miles, down payment, financing, clean title, etc.)
+- Use • as a separator.
+- Example: 🔥 2019 Toyota Camry • Clean Title • $2,500 Down
+- Example: 🚗 2021 Ford F-150 XLT • Low Miles • Financing Available
+
+=== ENGLISH DESCRIPTION STRUCTURE ===
+Maximum 12 lines total. Follow this EXACT 4-section structure:
+
+SECTION 1 — HOOK (max 2 lines)
+One or two punchy, high-energy sentences. NO specs.
+Examples:
+🔥 Looking for a reliable SUV with financing available?
+🔥 Drive home today — financing available.
+
+SECTION 2 — WHY BUY THIS CAR (3–5 bullets only)
+Use ✅ before each bullet. Only real selling points from the vehicle facts.
+Keep each bullet SHORT. Examples:
+✅ Clean Title
+✅ Financing Available — Low Down
+✅ 45K Low Miles
+✅ Backup Camera
+✅ Apple CarPlay
+
+SECTION 3 — BUYER BENEFIT (1 sentence max)
+No specs. No jargon. One simple human sentence.
+Example: Perfect for daily driving, commuting, or family trips.
+
+SECTION 4 — CTA (1 emotional line, no period)
+Examples:
+📩 Send us a message today!
+🚗 Come test drive it today.
+🔥 This one won't last long — act fast.
+⏳ First come, first served.
+
+=== SPANISH DESCRIPTION ===
+- Do NOT translate literally. REWRITE naturally for Hispanic buyers.
+- Use authentic Hispanic sales language and tone.
+- Same 4-section structure.
+- Must feel native and local, not translated.
+- Examples of Hispanic-style hooks:
+  🔥 ¿Buscas una SUV confiable con financiamiento?
+  🔥 Maneja a casa hoy mismo.
+- Examples of CTA:
+  📩 Escríbenos hoy mismo.
+  🚗 Ven a manejarla.
+
+=== ALLOWED EMOJIS ===
+Only these: 🔥 🚗 ✅ 💥 📩 💰 ⚡ ⏳
+Never spam. Use only where they improve readability.
+
+=== JSON OUTPUT ===
+Return a single JSON object with these keys:
+- title: the optimized Marketplace title (max 70 chars)
+- descriptionEn: the full English description (4-section structure, max 12 lines)
+- descriptionEs: the full Spanish description (4-section structure, naturally rewritten)
+- callToAction: the final CTA line exactly as it appears at the end of the English description
+- buyerProfile: one short sentence — who is the ideal buyer for this specific vehicle
+- priority: exactly "High", "Medium", or "Low" based on how fast-moving this vehicle is`;
+
 export async function generateListing(vehicle: Vehicle): Promise<GeneratedListing> {
   const suggestion = suggestDownPayment(vehicle);
   const facts = buildVehicleFacts(vehicle);
@@ -85,23 +142,28 @@ export async function generateListing(vehicle: Vehicle): Promise<GeneratedListin
   const price = vehicle.price ?? 0;
   const priceMode = price < FULL_PRICE_THRESHOLD ? "FULL_PRICE" : "DOWN_PAYMENT";
 
-  const userMessage = `Vehicle facts (the ONLY information you may use):
+  const pricingBlock =
+    priceMode === "DOWN_PAYMENT"
+      ? `priceMode: DOWN_PAYMENT
+- Marketplace display price: $${suggestion.downPayment} down payment
+- Actual vehicle price: $${price} — DO NOT mention this in the listing
+- Frame everything around the down payment: "Down payment starting at $${suggestion.downPayment}" or "Available with $${suggestion.downPayment} down for qualified buyers"
+- Down payment tier: ${suggestion.category} (typical range ${suggestion.rangeLabel})`
+      : `priceMode: FULL_PRICE
+- Full asking price: $${price}
+- You may reference the full price in the copy`;
+
+  const userMessage = `Vehicle facts (only use what is provided below — do not invent anything):
 ${JSON.stringify(facts, null, 2)}
 
-Pricing mode: ${priceMode}
-${priceMode === "DOWN_PAYMENT"
-  ? `- Marketplace display price: $${suggestion.downPayment} down payment
-- Actual vehicle price: $${price} (DO NOT use this as the Marketplace price)
-- Frame the listing around the down payment offer: "Down payment starting at $${suggestion.downPayment}" or "Available with $${suggestion.downPayment} down for qualified buyers"
-- Down payment category: ${suggestion.category} (typical range ${suggestion.rangeLabel})`
-  : `- Full asking price: $${price}
-- Listing copy may reference the full price directly`}
+Pricing:
+${pricingBlock}
 
-Generate the JSON listing now.`;
+Generate the listing now.`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-5.4",
-    max_completion_tokens: 8192,
+    max_completion_tokens: 2048,
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
@@ -127,12 +189,11 @@ Generate the JSON listing now.`;
   }
 
   const priorityRaw = parsed.data.priority.trim().toLowerCase();
-  const priority =
-    priorityRaw.startsWith("high")
-      ? "High"
-      : priorityRaw.startsWith("low")
-        ? "Low"
-        : "Medium";
+  const priority = priorityRaw.startsWith("high")
+    ? "High"
+    : priorityRaw.startsWith("low")
+      ? "Low"
+      : "Medium";
 
   return {
     title: sanitizeTitle(parsed.data.title),
