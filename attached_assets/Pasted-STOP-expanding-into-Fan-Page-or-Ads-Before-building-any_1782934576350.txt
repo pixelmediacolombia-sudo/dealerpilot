@@ -1,0 +1,124 @@
+STOP expanding into Fan Page or Ads.
+
+Before building anything new, I need a completion audit for the existing Marketplace AI system.
+
+Goal:
+Finish what already exists before adding new modules.
+
+Audit ONLY these areas:
+
+1. Marketplace AI publishing flow
+2. Chrome Extension connection
+3. Facebook session / Marketplace readiness
+4. Publish Now automation
+5. AI listing generation
+6. AI vehicle recommendations
+7. AI photo selection / photo review
+8. Queue / Published / Failed states
+9. Inventory sync dependency
+10. Error handling and retry
+
+Do NOT propose Fan Page.
+Do NOT propose Ads.
+Do NOT propose new channels.
+
+====================================================
+DELIVERABLE
+====================================================
+
+Give me a clear completion report:
+
+For each module, show:
+
+- Current status: Done / Partial / Missing / Broken
+- What works now
+- What is missing
+- What is fake/demo/manual
+- What must be finished before launch
+- Priority: Critical / High / Medium / Low
+
+====================================================
+SPECIFIC QUESTIONS
+====================================================
+
+1. Is Publish Now truly one-click from app to Facebook Marketplace?
+
+2. Does the app open Facebook automatically through the extension?
+
+3. Does the extension publish without manual popup interaction?
+
+4. Does the app know if Facebook is logged in?
+
+5. Does the app know if Marketplace is ready?
+
+6. Does the app disable Publish Now if connection is not ready?
+
+7. Does the extension report progress back to the app in real time?
+
+8. Does the vehicle move to Published after successful publish?
+
+9. Does the app capture the Marketplace listing URL?
+
+10. Can failed jobs be retried?
+
+11. Can stale jobs be cleared automatically?
+
+12. Are AI recommendations real or rule-based?
+
+13. Is photo AI real or still pending?
+
+14. Is listing copy AI real and automatic?
+
+15. Are prices/down payments applied correctly?
+
+16. Does the system prevent duplicate postings?
+
+17. Does it avoid sold/missing-price/missing-photo vehicles?
+
+18. Does it support 2–3 daily Marketplace posts safely?
+
+19. What parts still require manual operator action?
+
+20. What must be built to call Marketplace AI MVP complete?
+
+====================================================
+OUTPUT FORMAT
+====================================================
+
+Use this format:
+
+Marketplace AI MVP Completion Audit
+
+Overall status:
+__%
+
+Critical blockers:
+1.
+2.
+3.
+
+Module table:
+Module | Status | What works | What is missing | Priority
+
+Launch checklist:
+[ ] Connection Center works
+[ ] Extension installed and online
+[ ] Facebook session detected
+[ ] Marketplace page opens automatically
+[ ] Publish Now creates job
+[ ] Listing copy auto-generates
+[ ] Extension fills fields
+[ ] Extension uploads photos
+[ ] Extension clicks publish
+[ ] App receives success/failure
+[ ] Vehicle moves to Published
+[ ] URL captured
+[ ] Retry works
+[ ] Duplicate prevention works
+[ ] AI recommendations are reliable
+[ ] Photo review is honest / no fake scores
+
+Then give me:
+- The smallest sprint required to finish Marketplace AI
+- No more than 10 tasks
+- No new product areas
