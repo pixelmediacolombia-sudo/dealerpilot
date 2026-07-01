@@ -863,6 +863,87 @@ router.get("/publishing/jobs/:id/progress", async (req, res) => {
   });
 });
 
+// ── Photo Proxy ───────────────────────────────────────────────────────────────
+// GET /publishing/jobs/:id/photo/:index
+// Downloads the vehicle image at `index` server-side and streams the raw bytes.
+// The extension calls this instead of fetching CDN URLs directly, which avoids
+// CORS failures and CDN authentication issues entirely.
+
+router.get("/publishing/jobs/:id/photo/:index", async (req, res) => {
+  const id = Number(req.params.id);
+  const index = Number(req.params.index);
+
+  if (Number.isNaN(id) || Number.isNaN(index) || index < 0) {
+    res.status(400).json({ error: "Invalid job id or photo index" });
+    return;
+  }
+
+  const [job] = await db
+    .select()
+    .from(publishingJobsTable)
+    .where(eq(publishingJobsTable.id, id));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  const images = await db
+    .select()
+    .from(vehicleImagesTable)
+    .where(eq(vehicleImagesTable.vehicleId, job.vehicleId))
+    .orderBy(asc(vehicleImagesTable.position));
+
+  const image = images[index];
+  if (!image || !image.url) {
+    res.status(404).json({ error: `No image at index ${index} (vehicle has ${images.length} images)` });
+    return;
+  }
+
+  // Resolve relative URLs to absolute using the incoming request's origin
+  const proto = (req.get("x-forwarded-proto") || req.protocol).split(",")[0].trim();
+  const host = req.get("host") ?? "localhost";
+  const origin = `${proto}://${host}`;
+  const imageUrl = image.url.startsWith("http")
+    ? image.url
+    : `${origin}${image.url.startsWith("/") ? "" : "/"}${image.url}`;
+
+  req.log.info({ jobId: id, index, imageUrl }, "Photo proxy: fetching image");
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(imageUrl, {
+      signal: AbortSignal.timeout(20_000),
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; DealerPilotBot/1.0)",
+        "Accept": "image/*,*/*;q=0.8",
+      },
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    req.log.error({ jobId: id, index, imageUrl, err: msg }, "Photo proxy: fetch threw");
+    res.status(502).json({ error: `Backend could not fetch image: ${msg}` });
+    return;
+  }
+
+  if (!upstream.ok) {
+    req.log.warn({ jobId: id, index, imageUrl, status: upstream.status }, "Photo proxy: upstream non-200");
+    res.status(502).json({ error: `Upstream image returned HTTP ${upstream.status} for ${imageUrl}` });
+    return;
+  }
+
+  const contentType = upstream.headers.get("content-type") || "image/jpeg";
+  const buffer = Buffer.from(await upstream.arrayBuffer());
+
+  res.set({
+    "Content-Type": contentType,
+    "Content-Length": String(buffer.length),
+    "Cache-Control": "no-store",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.send(buffer);
+  req.log.info({ jobId: id, index, bytes: buffer.length, contentType }, "Photo proxy: served OK");
+});
+
 // ── Cancel Stale Jobs ─────────────────────────────────────────────────────────
 // POST /publishing/jobs/cancel-stale
 // Cancels all Queued/Scheduled jobs older than `olderThanMinutes` (default 60).

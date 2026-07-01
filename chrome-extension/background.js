@@ -590,6 +590,17 @@ const handlers = {
     });
   },
 
+  // ---- Photo proxy: fetch a job photo through our backend proxy ----
+  // Constructs the backend proxy URL and delegates to FETCH_IMAGE_AS_BASE64.
+  // The extension NEVER contacts CDN/dealer image hosts directly — only our backend.
+  async FETCH_JOB_PHOTO(message) {
+    const { jobId, index } = message;
+    const base = await getBackendUrl();
+    const proxyUrl = `${base}/api/publishing/jobs/${jobId}/photo/${index}`;
+    console.log(`[PHOTO] proxy fetch — job ${jobId} photo ${index} — ${proxyUrl}`);
+    return handlers.FETCH_IMAGE_AS_BASE64({ url: proxyUrl });
+  },
+
   // ---- Image proxy: fetch a remote image and return it as base64 ----
   // Content scripts cannot bypass CORS; the service worker can.
   async FETCH_IMAGE_AS_BASE64(message) {

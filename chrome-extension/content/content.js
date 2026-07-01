@@ -22,7 +22,7 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.2.5";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.2.6";
 
   function _runtimeAlive() {
     try {
@@ -883,20 +883,20 @@
       return { uploaded: 0, failed: true, reason };
     }
 
-    stateLog(`Photo upload: file input found — downloading ${toUpload.length} image(s)`);
-    setStatus(`Downloading ${toUpload.length} photo(s)…`);
+    stateLog(`Photo upload: file input found — fetching ${toUpload.length} image(s) via backend proxy`);
+    setStatus(`Downloading ${toUpload.length} photo(s) via proxy…`);
 
-    // Fetch each image via the background service worker (no CORS restrictions there)
+    // Fetch each image via the backend photo proxy (backend fetches CDN server-side,
+    // no CORS restrictions). Extension never contacts CDN hosts directly.
     const files = [];
     for (let i = 0; i < toUpload.length; i++) {
-      const url = toUpload[i];
       setStatus(`Downloading photo ${i + 1} / ${toUpload.length}…`);
-      console.log(`[PHOTO] requesting image ${i + 1}/${toUpload.length} — url: "${url}" — isAbsolute: ${url.startsWith("http")}`);
+      console.log(`[PHOTO] requesting proxy for job ${jobId} photo index ${i}`);
       try {
-        const res = await send({ type: "FETCH_IMAGE_AS_BASE64", url });
+        const res = await send({ type: "FETCH_JOB_PHOTO", jobId, index: i });
         if (!res || !res.ok) {
-          console.error(`[PHOTO] background fetch FAILED for photo ${i + 1} — error:`, res?.error, "| full response:", res);
-          stateLog(`Photo ${i + 1}: background fetch failed — ${res?.error}`);
+          console.error(`[PHOTO] proxy fetch FAILED for photo ${i + 1} — error:`, res?.error, "| full response:", res);
+          stateLog(`Photo ${i + 1}: proxy fetch failed — ${res?.error}`);
           continue;
         }
         const { base64, type } = res.data;
@@ -907,7 +907,7 @@
         const mimeType = type || "image/jpeg";
         const ext = mimeType.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
         files.push(new File([new Blob([bytes], { type: mimeType })], `vehicle-${i + 1}.${ext}`, { type: mimeType }));
-        stateLog(`Photo ${i + 1}: downloaded OK (${Math.round(bytes.length / 1024)} KB)`);
+        stateLog(`Photo ${i + 1}: proxy OK (${Math.round(bytes.length / 1024)} KB, ${mimeType})`);
       } catch (err) {
         stateLog(`Photo ${i + 1}: error — ${err.message}`);
       }
