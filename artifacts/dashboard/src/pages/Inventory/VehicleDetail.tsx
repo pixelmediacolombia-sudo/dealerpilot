@@ -10,7 +10,8 @@ import {
   getGetVehicleStatsQueryKey,
   getListVehiclesQueryKey
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { VehiclePhotoStudio, fetchPhotoSet, PHOTO_SET_QUERY_KEY } from "./VehiclePhotoStudio";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatMileage, formatDate } from "@/lib/format";
@@ -32,6 +33,7 @@ import {
   Palette,
   Brain,
   Camera,
+  Sparkles,
 } from "lucide-react";
 import {
   Collapsible,
@@ -60,6 +62,20 @@ export function VehicleDetail() {
   const intel = intelData?.intelligence;
 
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [photoMode, setPhotoMode] = useState<"original" | "ai">("original");
+
+  const { data: photoSetData } = useQuery({
+    queryKey: PHOTO_SET_QUERY_KEY(id),
+    queryFn: () => fetchPhotoSet(id),
+    enabled: !!id,
+    refetchInterval: (query) => {
+      const status = query.state.data?.set?.status;
+      const aiStatus = query.state.data?.vehicle?.aiPhotoStatus;
+      if (status === "Processing") return 3000;
+      if (!status && (aiStatus === "Processing" || aiStatus === "Queued")) return 3000;
+      return false;
+    },
+  });
 
   const handleStatusUpdate = (status: string) => {
     updateStatus.mutate({ id, data: { status } }, {
@@ -112,7 +128,23 @@ export function VehicleDetail() {
   }
 
   const { vehicle, images, changes, sourceRaw } = data;
-  const clampIdx = (i: number) => Math.max(0, Math.min(i, images.length - 1));
+
+  const photoSetReady =
+    photoSetData?.set?.status === "Ready" ||
+    photoSetData?.set?.status === "Needs Review";
+  const aiDisplayImages =
+    photoSetData?.images?.map((img) => ({
+      id: img.id,
+      url: img.compositedUrl ?? img.processedUrl ?? img.originalUrl,
+      category: img.classification,
+      isPrimary: img.position === 0,
+    })) ?? [];
+  const displayImages =
+    photoMode === "ai" && photoSetReady && aiDisplayImages.length > 0
+      ? aiDisplayImages
+      : images;
+
+  const clampIdx = (i: number) => Math.max(0, Math.min(i, displayImages.length - 1));
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -208,17 +240,22 @@ export function VehicleDetail() {
               
               {/* Image Gallery */}
               <div className="glass-panel p-2 rounded-2xl space-y-2">
-                {images.length > 0 ? (
+                {displayImages.length > 0 ? (
                   <>
                     {/* Header bar */}
                     <div className="flex items-center justify-between px-1 py-0.5">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
                         <Camera className="w-4 h-4" />
-                        <span>{images.length} Photos</span>
-                        {images[selectedIdx]?.category && (
+                        <span>{displayImages.length} Photos</span>
+                        {displayImages[selectedIdx]?.category && (
                           <Badge variant="outline" className="text-[10px] uppercase tracking-wider capitalize px-2">
-                            {images[selectedIdx].category}
+                            {displayImages[selectedIdx].category}
                           </Badge>
+                        )}
+                        {photoMode === "ai" && (
+                          <span className="flex items-center gap-0.5 text-[10px] font-bold text-primary uppercase tracking-wide">
+                            <Sparkles className="w-3 h-3" /> AI
+                          </span>
                         )}
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
@@ -229,16 +266,44 @@ export function VehicleDetail() {
                         >
                           <ChevronLeft className="w-4 h-4" />
                         </button>
-                        <span className="min-w-[3rem] text-center">{selectedIdx + 1} / {images.length}</span>
+                        <span className="min-w-[3rem] text-center">{selectedIdx + 1} / {displayImages.length}</span>
                         <button
                           onClick={() => setSelectedIdx(clampIdx(selectedIdx + 1))}
-                          disabled={selectedIdx === images.length - 1}
+                          disabled={selectedIdx === displayImages.length - 1}
                           className="p-1.5 rounded-lg hover:bg-secondary disabled:opacity-30 transition-colors"
                         >
                           <ChevronRight className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
+
+                    {/* Photo mode toggle — only visible when AI set is ready */}
+                    {photoSetReady && (
+                      <div className="flex p-0.5 bg-white/[0.04] border border-white/[0.08] rounded-lg mx-1">
+                        <button
+                          onClick={() => { setPhotoMode("original"); setSelectedIdx(0); }}
+                          className={cn(
+                            "flex-1 py-1 text-[10px] font-semibold rounded-md transition-all",
+                            photoMode === "original"
+                              ? "bg-white/10 text-white shadow-sm"
+                              : "text-muted-foreground hover:text-white/70",
+                          )}
+                        >
+                          Original
+                        </button>
+                        <button
+                          onClick={() => { setPhotoMode("ai"); setSelectedIdx(0); }}
+                          className={cn(
+                            "flex-1 py-1 text-[10px] font-semibold rounded-md transition-all flex items-center justify-center gap-0.5",
+                            photoMode === "ai"
+                              ? "bg-primary/20 text-primary shadow-sm border border-primary/20"
+                              : "text-muted-foreground hover:text-white/70",
+                          )}
+                        >
+                          <Sparkles className="w-2.5 h-2.5" /> AI Enhanced
+                        </button>
+                      </div>
+                    )}
 
                     {/* Primary / selected image */}
                     <div className="aspect-video rounded-xl overflow-hidden bg-secondary relative group">
@@ -248,17 +313,17 @@ export function VehicleDetail() {
                         </Badge>
                       </div>
                       <img
-                        key={images[selectedIdx].url}
-                        src={images[selectedIdx].url}
+                        key={displayImages[selectedIdx].url}
+                        src={displayImages[selectedIdx].url}
                         alt={`Photo ${selectedIdx + 1}`}
                         className="w-full h-full object-cover transition-opacity duration-300"
                       />
                     </div>
 
                     {/* Scrollable thumbnail strip — ALL images */}
-                    {images.length > 1 && (
+                    {displayImages.length > 1 && (
                       <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 max-h-52 overflow-y-auto pr-0.5 pt-0.5">
-                        {images.map((img, i) => (
+                        {displayImages.map((img, i) => (
                           <button
                             key={img.id}
                             onClick={() => setSelectedIdx(i)}
@@ -347,6 +412,13 @@ export function VehicleDetail() {
 
             {/* Right Column - Meta & History */}
             <div className="space-y-8">
+
+              {/* AI Photo Studio panel */}
+              <VehiclePhotoStudio
+                vehicleId={id}
+                photoMode={photoMode}
+                onPhotoModeChange={(mode) => { setPhotoMode(mode); setSelectedIdx(0); }}
+              />
               
               {/* AI Strategy Intelligence */}
               {intel && (
