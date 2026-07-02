@@ -1,4 +1,8 @@
 import { Router, type Request, type Response } from "express";
+import fs from "fs";
+import path from "path";
+import multer from "multer";
+import sharp from "sharp";
 import {
   db,
   aiPhotoJobsTable,
@@ -10,6 +14,25 @@ import {
 } from "@workspace/db";
 import { and, asc, count, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { computePhotoHash, hasChanged } from "../photo/changeDetection";
+
+// ── Multer: background image upload ─────────────────────────────────────────
+const bgUploadDir = path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos/backgrounds");
+fs.mkdirSync(bgUploadDir, { recursive: true });
+const bgStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, bgUploadDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+    cb(null, `background-${Date.now()}${ext}`);
+  },
+});
+const bgUpload = multer({
+  storage: bgStorage,
+  limits: { fileSize: 30 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (/image\/(jpeg|png|webp|tiff)/.test(file.mimetype)) cb(null, true);
+    else cb(new Error("Only JPEG, PNG, WebP, or TIFF images are accepted"));
+  },
+});
 
 const router = Router();
 
@@ -376,6 +399,146 @@ router.patch("/photo-studio/packs/:id", async (req: Request, res: Response) => {
   }
 });
 
+// ── Upload the official studio background ────────────────────────────────────
+// POST /api/photo-studio/background
+// Accepts multipart/form-data with a single "background" image field (≤ 30 MB).
+// Analyzes with Sharp, builds logo safe zones + placement mask, saves to the
+// default studio pack.  After upload, compositing is enabled for all future jobs.
+router.post(
+  "/photo-studio/background",
+  bgUpload.single("background"),
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: "No background image file provided (field: background)" });
+        return;
+      }
+
+      // Analyze uploaded image with Sharp
+      const meta = await sharp(req.file.path).metadata();
+      const bgWidth = meta.width ?? 1280;
+      const bgHeight = meta.height ?? 720;
+
+      // Auto-generate logo safe zones (0–1 relative coords):
+      //   Alpha Motorsport logo is typically in the top strip of the background.
+      //   Reserve the full top 15% of the frame so vehicles never overlap it.
+      const logoSafeZones = [{ x: 0.0, y: 0.0, w: 1.0, h: 0.15, label: "top-logo-strip" }];
+
+      // Placement mask: the area where vehicles should be composited.
+      //   Center 85% of width, occupying the bottom 78% of height (below logo strip).
+      const placementMask = { cx: 0.5, cy: 0.61, w: 0.85, h: 0.78 };
+
+      // Serve via /api/static/ai-photos/backgrounds/<filename>
+      const servedUrl = `/api/static/ai-photos/backgrounds/${req.file.filename}`;
+
+      // Bump background version (short timestamp token) to trigger re-processing
+      const newVersion = `v${Date.now().toString(36)}`;
+
+      // Update the default studio pack for dealer 1
+      const [pack] = await db
+        .select()
+        .from(aiStudioPacksTable)
+        .where(and(eq(aiStudioPacksTable.dealerId, 1), eq(aiStudioPacksTable.isDefault, true)))
+        .limit(1);
+
+      if (!pack) {
+        res.status(500).json({ error: "No default studio pack found for dealer" });
+        return;
+      }
+
+      const [updated] = await db
+        .update(aiStudioPacksTable)
+        .set({
+          backgroundUrl: servedUrl,
+          backgroundVersion: newVersion,
+          backgroundWidth: bgWidth,
+          backgroundHeight: bgHeight,
+          logoSafeZoneJson: JSON.stringify(logoSafeZones),
+          placementMaskJson: JSON.stringify(placementMask),
+        })
+        .where(eq(aiStudioPacksTable.id, pack.id))
+        .returning();
+
+      req.log.info(
+        { packId: pack.id, url: servedUrl, width: bgWidth, height: bgHeight, version: newVersion },
+        "photo:background uploaded — compositing now enabled",
+      );
+
+      // Serve the uploaded background file from the static mount
+      res.json({
+        pack: updated,
+        setup: {
+          backgroundConfigured: true,
+          backgroundSource: "upload",
+          compositingEnabled: true,
+          backgroundWidth: bgWidth,
+          backgroundHeight: bgHeight,
+          logoSafeZones,
+          placementMask,
+        },
+      });
+    } catch (err) {
+      req.log.error({ err }, "POST /photo-studio/background failed");
+      res.status(500).json({ error: "Failed to upload background image" });
+    }
+  },
+);
+
+// ── Setup status ──────────────────────────────────────────────────────────────
+// GET /api/photo-studio/setup-status
+// Returns which pipeline stages are enabled/disabled and what is still missing.
+router.get("/photo-studio/setup-status", async (req: Request, res: Response) => {
+  try {
+    const [defaultPack] = await db
+      .select()
+      .from(aiStudioPacksTable)
+      .where(and(eq(aiStudioPacksTable.dealerId, 1), eq(aiStudioPacksTable.isDefault, true)))
+      .limit(1);
+
+    const backgroundFromPack = defaultPack?.backgroundUrl ?? null;
+    const backgroundFromEnv = process.env["AI_STUDIO_BACKGROUND"] ?? null;
+    const backgroundUrl = backgroundFromPack ?? backgroundFromEnv;
+    const backgroundSource = backgroundFromPack
+      ? "upload"
+      : backgroundFromEnv
+        ? "env"
+        : null;
+
+    const falKey = !!process.env["FAL_KEY"];
+
+    res.json({
+      backgroundConfigured: !!backgroundUrl,
+      backgroundSource,
+      backgroundUrl: backgroundFromPack ?? null,
+      backgroundWidth: defaultPack?.backgroundWidth ?? null,
+      backgroundHeight: defaultPack?.backgroundHeight ?? null,
+      logoSafeZones: defaultPack?.logoSafeZoneJson
+        ? (JSON.parse(defaultPack.logoSafeZoneJson) as unknown)
+        : null,
+      placementMask: defaultPack?.placementMaskJson
+        ? (JSON.parse(defaultPack.placementMaskJson) as unknown)
+        : null,
+      stages: {
+        classify: { enabled: true, provider: "OpenAI GPT-5-mini vision" },
+        removeBackground: { enabled: falKey, provider: falKey ? "fal.ai (BRIA RMBG 2.0)" : null },
+        composite: {
+          enabled: !!backgroundUrl,
+          provider: backgroundUrl ? "Sharp.js" : null,
+          blockedReason: backgroundUrl ? null : "Upload the Alpha Motorsport studio background to enable compositing.",
+        },
+        enhance: { enabled: true, provider: "Sharp.js" },
+        validate: { enabled: true, provider: "built-in" },
+        order: { enabled: true, provider: "built-in" },
+        export: { enabled: true, provider: "built-in" },
+      },
+      readyForProduction: !!backgroundUrl,
+    });
+  } catch (err) {
+    req.log.error({ err }, "GET /photo-studio/setup-status failed");
+    res.status(500).json({ error: "Failed to get setup status" });
+  }
+});
+
 // ── Stats for the dashboard ──────────────────────────────────────────────────
 router.get("/photo-studio/stats", async (req: Request, res: Response) => {
   try {
@@ -400,13 +563,6 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
       .from(vehiclesTable)
       .where(eq(vehiclesTable.dealerId, 1));
 
-    const [avgTime] = await db
-      .select({
-        avgMs: sql<number>`avg(${aiPhotoJobsTable.completedAt}::timestamp - ${aiPhotoJobsTable.startedAt}::timestamp)`,
-      })
-      .from(aiPhotoJobsTable)
-      .where(eq(aiPhotoJobsTable.status, "Completed"));
-
     const [imageStats] = await db
       .select({
         total: count(aiPhotoImagesTable.id),
@@ -420,15 +576,31 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
       .where(and(eq(aiStudioPacksTable.dealerId, 1), eq(aiStudioPacksTable.isDefault, true)))
       .limit(1);
 
+    const backgroundConfigured = !!(defaultPack?.backgroundUrl ?? process.env["AI_STUDIO_BACKGROUND"]);
+    const backgroundSource = defaultPack?.backgroundUrl
+      ? "upload"
+      : process.env["AI_STUDIO_BACKGROUND"]
+        ? "env"
+        : null;
+    const falKey = !!process.env["FAL_KEY"];
+
     res.json({
       jobs: statusCounts ?? { queued: 0, processing: 0, completed: 0, failed: 0, cancelled: 0 },
       vehicles: vehicleCounts ?? { ready: 0, processing: 0, pending: 0, failed: 0, total: 0 },
       images: imageStats ?? { total: 0, withAI: 0 },
       defaultPack: defaultPack ?? null,
+      setup: {
+        backgroundConfigured,
+        backgroundSource,
+        compositingEnabled: backgroundConfigured,
+        backgroundWidth: defaultPack?.backgroundWidth ?? null,
+        backgroundHeight: defaultPack?.backgroundHeight ?? null,
+        readyForProduction: backgroundConfigured,
+      },
       providers: {
-        backgroundRemoval: process.env["FAL_KEY"] ? "fal.ai (BRIA RMBG 2.0)" : "Not configured",
+        backgroundRemoval: falKey ? "fal.ai (BRIA RMBG 2.0)" : "Not configured",
         classification: "OpenAI GPT-5-mini vision",
-        compositing: "Sharp.js",
+        compositing: backgroundConfigured ? "Sharp.js" : "Disabled — background not uploaded",
       },
     });
   } catch (err) {

@@ -37,12 +37,17 @@ const EXTERIOR_CLASSIFICATIONS = new Set([
 export async function stageComposite(ctx: PipelineContext): Promise<void> {
   const backgroundUrl = ctx.pack?.backgroundUrl ?? process.env["AI_STUDIO_BACKGROUND"] ?? null;
 
+  // Hard gate: compositing is disabled until the official studio background has been
+  // uploaded and stored in the studio pack. Do not silently fall through — record
+  // the disabled reason on every image so the UI can surface it.
   if (!backgroundUrl) {
-    ctx.log.info(
-      "No studio background configured — compositing skipped. Set AI_STUDIO_BACKGROUND or configure a studio pack.",
+    ctx.log.warn(
+      { jobId: ctx.job.id, dealerId: ctx.job.dealerId },
+      "photo:composite DISABLED — no studio background configured. Upload the Alpha Motorsport background to enable compositing.",
     );
     for (const img of ctx.images) {
       img.compositedUrl = img.backgroundRemovedUrl ?? img.originalUrl;
+      img.usedFallback = 1;
     }
     return;
   }

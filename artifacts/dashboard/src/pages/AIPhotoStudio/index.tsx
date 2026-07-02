@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Camera,
@@ -12,12 +12,13 @@ import {
   AlertTriangle,
   Zap,
   Image as ImageIcon,
-  Settings2,
-  ChevronRight,
+  Upload,
+  ImageOff,
+  ShieldAlert,
+  CircleSlash,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,15 @@ interface PhotoJob {
   vehicleAiStatus: string | null;
 }
 
+interface SetupInfo {
+  backgroundConfigured: boolean;
+  backgroundSource: "upload" | "env" | null;
+  compositingEnabled: boolean;
+  backgroundWidth: number | null;
+  backgroundHeight: number | null;
+  readyForProduction: boolean;
+}
+
 interface StudioStats {
   jobs: {
     queued: number;
@@ -67,7 +77,14 @@ interface StudioStats {
     total: number;
   };
   images: { total: number; withAI: number };
-  defaultPack: { backgroundUrl: string | null; backgroundVersion: string; name: string } | null;
+  defaultPack: {
+    backgroundUrl: string | null;
+    backgroundVersion: string;
+    name: string;
+    backgroundWidth: number | null;
+    backgroundHeight: number | null;
+  } | null;
+  setup: SetupInfo;
   providers: {
     backgroundRemoval: string;
     classification: string;
@@ -102,6 +119,17 @@ async function enqueueAll(): Promise<{ enqueued: number; skipped: number }> {
   return r.json() as Promise<{ enqueued: number; skipped: number }>;
 }
 
+async function uploadBackground(file: File): Promise<{ pack: unknown; setup: SetupInfo }> {
+  const fd = new FormData();
+  fd.append("background", file);
+  const r = await fetch(`${API_BASE}/photo-studio/background`, { method: "POST", body: fd });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? "Upload failed");
+  }
+  return r.json() as Promise<{ pack: unknown; setup: SetupInfo }>;
+}
+
 // ── Sub-components ──────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<
@@ -134,9 +162,10 @@ function StatusBadge({ status }: { status: string }) {
 function JobCard({ job, onReprocess }: { job: PhotoJob; onReprocess: (vehicleId: number) => void }) {
   const title = `${job.vehicleYear ?? ""} ${job.vehicleMake} ${job.vehicleModel}${job.vehicleTrim ? ` ${job.vehicleTrim}` : ""}`.trim();
   const isLive = job.status === "Processing";
-  const durationMs = job.completedAt && job.startedAt
-    ? new Date(job.completedAt).getTime() - new Date(job.startedAt).getTime()
-    : null;
+  const durationMs =
+    job.completedAt && job.startedAt
+      ? new Date(job.completedAt).getTime() - new Date(job.startedAt).getTime()
+      : null;
 
   return (
     <div className="bg-card border border-white/[0.06] rounded-xl p-4 space-y-3 hover:border-white/10 transition-colors">
@@ -162,24 +191,22 @@ function JobCard({ job, onReprocess }: { job: PhotoJob; onReprocess: (vehicleId:
         </div>
         <div className="text-[11px] text-muted-foreground text-right shrink-0">
           <div>Job #{job.id}</div>
-          {durationMs !== null && (
-            <div className="mt-0.5">{(durationMs / 1000).toFixed(1)}s</div>
-          )}
+          {durationMs !== null && <div className="mt-0.5">{(durationMs / 1000).toFixed(1)}s</div>}
         </div>
       </div>
 
-      {/* Progress bar for active jobs */}
       {isLive && (
         <div className="space-y-1">
           <Progress value={job.progressPercent} className="h-1.5" />
           <div className="flex justify-between text-[10px] text-muted-foreground">
-            <span>{job.processedPhotos}/{job.totalPhotos} photos</span>
+            <span>
+              {job.processedPhotos}/{job.totalPhotos} photos
+            </span>
             <span>{job.progressPercent}%</span>
           </div>
         </div>
       )}
 
-      {/* Completed: photo count + model info */}
       {job.status === "Completed" && (
         <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1">
@@ -195,7 +222,6 @@ function JobCard({ job, onReprocess }: { job: PhotoJob; onReprocess: (vehicleId:
         </div>
       )}
 
-      {/* Re-process button for failed jobs */}
       {(job.status === "Failed" || job.status === "Cancelled") && (
         <Button
           variant="outline"
@@ -206,6 +232,284 @@ function JobCard({ job, onReprocess }: { job: PhotoJob; onReprocess: (vehicleId:
           <RefreshCw className="w-3 h-3 mr-1.5" />
           Re-process
         </Button>
+      )}
+    </div>
+  );
+}
+
+// ── Setup Gate ───────────────────────────────────────────────────────────────
+
+function SetupGate({
+  isBgRemovalReady,
+  onUploaded,
+}: {
+  isBgRemovalReady: boolean;
+  onUploaded: () => void;
+}) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const uploadMutation = useMutation({
+    mutationFn: uploadBackground,
+    onSuccess: (data) => {
+      const s = data.setup;
+      toast({
+        title: "Background uploaded",
+        description: `${s.backgroundWidth ?? "?"}×${s.backgroundHeight ?? "?"} px — compositing is now enabled.`,
+      });
+      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
+      onUploaded();
+    },
+    onError: (err: Error) => {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleFile = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please select a JPEG, PNG, or WebP image.", variant: "destructive" });
+      return;
+    }
+    setSelectedFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setPreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  }, [toast]);
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    },
+    [handleFile],
+  );
+
+  const checklistItems = [
+    {
+      label: "Alpha Motorsport studio background",
+      done: false,
+      critical: true,
+      note: "Required for compositing",
+    },
+    {
+      label: "Classification",
+      done: true,
+      critical: false,
+      note: "OpenAI GPT-5-mini vision — ready",
+    },
+    {
+      label: "Background removal",
+      done: isBgRemovalReady,
+      critical: false,
+      note: isBgRemovalReady ? "fal.ai BRIA RMBG 2.0 — ready" : "Optional — add FAL_KEY to enable",
+    },
+    {
+      label: "Enhancement & ordering",
+      done: true,
+      critical: false,
+      note: "Sharp.js — ready",
+    },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.04] overflow-hidden">
+      {/* Header */}
+      <div className="flex items-start gap-4 p-6 border-b border-amber-500/15">
+        <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0 mt-0.5">
+          <ShieldAlert className="w-5 h-5 text-amber-400" />
+        </div>
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-base font-semibold text-white">AI Studio Setup Required</h2>
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/25 uppercase tracking-wide">
+              Not Production-Ready
+            </span>
+          </div>
+          <p className="text-sm text-amber-200/60">
+            Waiting for Alpha Motorsport Studio Background.{" "}
+            <span className="text-amber-200/40">
+              Classification, background removal, and enhancement will still run.
+              Compositing is disabled until the background is uploaded.
+            </span>
+          </p>
+        </div>
+      </div>
+
+      <div className="p-6 grid md:grid-cols-2 gap-6">
+        {/* Left: Checklist */}
+        <div className="space-y-3">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-4">
+            Pipeline Setup Checklist
+          </div>
+          {checklistItems.map((item) => (
+            <div
+              key={item.label}
+              className={cn(
+                "flex items-start gap-3 p-3 rounded-lg border",
+                item.done
+                  ? "bg-green-500/[0.04] border-green-500/15"
+                  : item.critical
+                    ? "bg-amber-500/[0.06] border-amber-500/20"
+                    : "bg-white/[0.02] border-white/[0.06]",
+              )}
+            >
+              <div className="mt-0.5 shrink-0">
+                {item.done ? (
+                  <CheckCircle2 className="w-4 h-4 text-green-400" />
+                ) : item.critical ? (
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <CircleSlash className="w-4 h-4 text-muted-foreground/50" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div
+                  className={cn(
+                    "text-sm font-medium",
+                    item.done
+                      ? "text-green-300"
+                      : item.critical
+                        ? "text-amber-200"
+                        : "text-muted-foreground",
+                  )}
+                >
+                  {item.label}
+                </div>
+                <div className="text-[11px] text-muted-foreground/60 mt-0.5">{item.note}</div>
+              </div>
+            </div>
+          ))}
+
+          {/* Compositing disabled callout */}
+          <div className="flex items-center gap-2.5 p-3 rounded-lg border border-red-500/20 bg-red-500/[0.04] mt-2">
+            <ImageOff className="w-4 h-4 text-red-400 shrink-0" />
+            <span className="text-xs text-red-300/80">
+              Compositing is <span className="font-semibold text-red-300">disabled</span> — vehicles will be
+              processed without a studio background.
+            </span>
+          </div>
+        </div>
+
+        {/* Right: Upload area */}
+        <div className="space-y-4">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Upload Studio Background
+          </div>
+
+          {/* Preview or drop zone */}
+          <div
+            className={cn(
+              "relative rounded-xl border-2 border-dashed transition-all cursor-pointer overflow-hidden",
+              dragOver
+                ? "border-amber-400/60 bg-amber-500/10"
+                : preview
+                  ? "border-white/20 bg-transparent"
+                  : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.03]",
+            )}
+            style={{ minHeight: 180 }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {preview ? (
+              <>
+                <img
+                  src={preview}
+                  alt="Background preview"
+                  className="w-full h-44 object-cover rounded-xl"
+                />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-xl">
+                  <span className="text-xs text-white font-medium">Click to change</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 px-4 text-center select-none">
+                <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-3">
+                  <Upload className="w-5 h-5 text-muted-foreground/60" />
+                </div>
+                <div className="text-sm font-medium text-muted-foreground">
+                  Drop background image here
+                </div>
+                <div className="text-[11px] text-muted-foreground/50 mt-1">
+                  JPEG, PNG or WebP · up to 30 MB
+                </div>
+              </div>
+            )}
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/tiff"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleFile(f);
+            }}
+          />
+
+          <Button
+            className="w-full"
+            disabled={!selectedFile || uploadMutation.isPending}
+            onClick={() => { if (selectedFile) uploadMutation.mutate(selectedFile); }}
+          >
+            {uploadMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Analyzing &amp; saving…
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4 mr-2" />
+                {selectedFile ? `Upload ${selectedFile.name}` : "Select an image first"}
+              </>
+            )}
+          </Button>
+
+          <p className="text-[11px] text-muted-foreground/50 text-center leading-relaxed">
+            Sharp will read the image dimensions, auto-generate the logo safe zone and vehicle
+            placement mask, and save the background to the Alpha Motorsport Studio Pack.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Setup Complete Banner ────────────────────────────────────────────────────
+
+function SetupComplete({
+  pack,
+}: {
+  pack: NonNullable<StudioStats["defaultPack"]>;
+}) {
+  return (
+    <div className="flex items-center gap-4 p-4 rounded-xl border border-green-500/20 bg-green-500/[0.04]">
+      <div className="w-8 h-8 rounded-lg bg-green-500/15 border border-green-500/25 flex items-center justify-center shrink-0">
+        <CheckCircle2 className="w-4 h-4 text-green-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-green-300">Studio background configured</div>
+        <div className="text-[11px] text-muted-foreground/60 mt-0.5">
+          {pack.name} · {pack.backgroundWidth && pack.backgroundHeight
+            ? `${pack.backgroundWidth}×${pack.backgroundHeight} px · `
+            : ""}
+          v{pack.backgroundVersion} · Compositing enabled
+        </div>
+      </div>
+      {pack.backgroundUrl && (
+        <img
+          src={pack.backgroundUrl}
+          alt="Studio background thumbnail"
+          className="h-10 w-16 object-cover rounded-md border border-white/10 shrink-0"
+        />
       )}
     </div>
   );
@@ -261,8 +565,9 @@ export function AIPhotoStudio() {
   });
 
   const jobs = allJobs?.jobs ?? [];
-  const isBackgroundRemovalConfigured = stats?.providers.backgroundRemoval?.startsWith("fal.ai");
-  const isStudioBackgroundConfigured = !!stats?.defaultPack?.backgroundUrl;
+  const setup = stats?.setup;
+  const isBgConfigured = setup?.backgroundConfigured ?? false;
+  const isBgRemovalReady = stats?.providers.backgroundRemoval?.startsWith("fal.ai") ?? false;
 
   return (
     <AppLayout>
@@ -275,53 +580,68 @@ export function AIPhotoStudio() {
                 <Camera className="w-4 h-4 text-primary" />
               </div>
               <h1 className="text-xl font-semibold text-white tracking-tight">AI Photo Studio</h1>
+              {!isBgConfigured && !statsLoading && (
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 uppercase tracking-wide">
+                  Setup Required
+                </span>
+              )}
             </div>
             <p className="text-sm text-muted-foreground ml-11">
               Automated background removal, studio compositing, and intelligent photo ordering.
             </p>
           </div>
-          <Button
-            onClick={() => enqueueAllMutation.mutate()}
-            disabled={enqueueAllMutation.isPending}
-            className="shrink-0"
-          >
-            {enqueueAllMutation.isPending ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Play className="w-4 h-4 mr-2" />
+
+          <div className="flex items-center gap-2">
+            {!isBgConfigured && !statsLoading && (
+              <div className="text-xs text-amber-400/70 text-right max-w-[160px] leading-tight">
+                Upload background to enable compositing
+              </div>
             )}
-            Process All Vehicles
-          </Button>
+            <Button
+              onClick={() => enqueueAllMutation.mutate()}
+              disabled={enqueueAllMutation.isPending || (!isBgConfigured && !statsLoading)}
+              title={
+                !isBgConfigured
+                  ? "Upload the studio background before processing"
+                  : "Enqueue all vehicles for AI photo processing"
+              }
+              className={cn(!isBgConfigured && !statsLoading && "opacity-50 cursor-not-allowed")}
+            >
+              {enqueueAllMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4 mr-2" />
+              )}
+              Process All Vehicles
+            </Button>
+          </div>
         </div>
 
-        {/* Configuration alerts */}
-        {(!isBackgroundRemovalConfigured || !isStudioBackgroundConfigured) && (
-          <div className="space-y-2">
-            {!isBackgroundRemovalConfigured && (
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-sm">
-                <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-medium text-yellow-300">Background removal not configured</span>
-                  <span className="text-yellow-400/80 ml-2">
-                    Add <code className="font-mono text-xs bg-yellow-500/20 px-1 rounded">FAL_KEY</code> to
-                    enable BRIA RMBG 2.0 background removal. Photos will be classified and ordered without
-                    background removal.
-                  </span>
-                </div>
-              </div>
-            )}
-            {!isStudioBackgroundConfigured && (
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
-                <Settings2 className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-medium text-blue-300">No studio background configured</span>
-                  <span className="text-blue-400/80 ml-2">
-                    Set <code className="font-mono text-xs bg-blue-500/20 px-1 rounded">AI_STUDIO_BACKGROUND</code> to
-                    a background image URL to enable compositing.
-                  </span>
-                </div>
-              </div>
-            )}
+        {/* Setup gate / completion banner */}
+        {statsLoading ? null : isBgConfigured ? (
+          stats?.defaultPack ? (
+            <SetupComplete pack={stats.defaultPack} />
+          ) : null
+        ) : (
+          <SetupGate
+            isBgRemovalReady={isBgRemovalReady}
+            onUploaded={() => void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] })}
+          />
+        )}
+
+        {/* FAL_KEY banner (only show after bg is configured, so it's not buried under the gate) */}
+        {isBgConfigured && !isBgRemovalReady && (
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-sm">
+            <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
+            <div>
+              <span className="font-medium text-yellow-300">Background removal not configured</span>
+              <span className="text-yellow-400/80 ml-2">
+                Add{" "}
+                <code className="font-mono text-xs bg-yellow-500/20 px-1 rounded">FAL_KEY</code> to
+                enable BRIA RMBG 2.0. Photos will be classified and ordered without background
+                removal.
+              </span>
+            </div>
           </div>
         )}
 
@@ -373,21 +693,35 @@ export function AIPhotoStudio() {
           ))}
         </div>
 
-        {/* Provider info */}
+        {/* Provider pills */}
         {stats?.providers && (
           <div className="flex flex-wrap gap-3">
-            {Object.entries(stats.providers).map(([key, value]) => (
-              <div
-                key={key}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] border border-white/[0.06] rounded-lg text-xs"
-              >
-                <Zap className="w-3 h-3 text-primary" />
-                <span className="text-muted-foreground capitalize">
-                  {key.replace(/([A-Z])/g, " $1").trim()}:
-                </span>
-                <span className="text-white/80 font-medium">{value as string}</span>
-              </div>
-            ))}
+            {Object.entries(stats.providers).map(([key, value]) => {
+              const isDisabled = (value as string).toLowerCase().startsWith("disabled");
+              return (
+                <div
+                  key={key}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs",
+                    isDisabled
+                      ? "bg-red-500/[0.04] border-red-500/15"
+                      : "bg-white/[0.03] border-white/[0.06]",
+                  )}
+                >
+                  {isDisabled ? (
+                    <ImageOff className="w-3 h-3 text-red-400/70" />
+                  ) : (
+                    <Zap className="w-3 h-3 text-primary" />
+                  )}
+                  <span className={cn("capitalize", isDisabled ? "text-red-400/60" : "text-muted-foreground")}>
+                    {key.replace(/([A-Z])/g, " $1").trim()}:
+                  </span>
+                  <span className={cn("font-medium", isDisabled ? "text-red-400/80" : "text-white/80")}>
+                    {value as string}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -432,10 +766,12 @@ export function AIPhotoStudio() {
                     <Camera className="w-10 h-10 text-muted-foreground/30 mb-3" />
                     <div className="text-sm text-muted-foreground">
                       {tab === "all"
-                        ? 'No jobs yet. Click "Process All Vehicles" to start.'
+                        ? isBgConfigured
+                          ? 'No jobs yet. Click "Process All Vehicles" to start.'
+                          : "Upload the studio background to begin processing."
                         : `No ${tab} jobs.`}
                     </div>
-                    {tab === "all" && (
+                    {tab === "all" && isBgConfigured && (
                       <Button
                         variant="outline"
                         size="sm"

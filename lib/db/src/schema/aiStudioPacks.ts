@@ -22,9 +22,14 @@ export const aiStudioPacksTable = pgTable("ai_studio_packs", {
   backgroundUrl: text("background_url"),
   // Increment whenever background is replaced — triggers AI re-processing.
   backgroundVersion: text("background_version").notNull().default("v1"),
-  // Logo safe zone bounding box (0–1 relative coords): JSON {x,y,w,h}
-  // Vehicles are positioned so they never overlap this area.
+  // Background image intrinsic dimensions (px) — populated on upload via Sharp.
+  backgroundWidth: integer("background_width"),
+  backgroundHeight: integer("background_height"),
+  // Logo safe zone bounding box (0–1 relative coords): JSON {x,y,w,h}[]
+  // Vehicles are positioned so they never overlap these areas.
   logoSafeZoneJson: text("logo_safe_zone_json"),
+  // Placement mask — JSON {cx,cy,w,h} (0–1 relative), center + size of the vehicle drop zone.
+  placementMaskJson: text("placement_mask_json"),
   // Vehicle placement fine-tuning (0 = auto)
   vehicleOffsetX: real("vehicle_offset_x").notNull().default(0),
   vehicleOffsetY: real("vehicle_offset_y").notNull().default(0),

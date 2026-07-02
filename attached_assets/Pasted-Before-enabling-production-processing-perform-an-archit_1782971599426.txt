@@ -1,0 +1,141 @@
+Before enabling production processing, perform an architecture audit.
+
+DO NOT process the full inventory yet.
+
+I want to validate the AI Photo Studio pipeline first.
+
+Audit the following:
+
+==================================================
+1. Cost Analysis
+==================================================
+
+Calculate estimated cost for:
+
+- 100 vehicles
+- 500 vehicles
+- 1000 vehicles
+
+Assume:
+
+average 20 photos per vehicle
+
+Break down:
+
+OpenAI Vision cost
+Fal.ai background removal
+Sharp processing
+Storage
+Bandwidth
+
+Show estimated cost per vehicle.
+
+==================================================
+2. Concurrency
+
+How many vehicles can process simultaneously?
+
+How many photos at once?
+
+Can Fal.ai rate limit us?
+
+Can OpenAI rate limit us?
+
+What happens if one provider becomes unavailable?
+
+==================================================
+3. Retry logic
+
+Verify every stage has retries.
+
+No stage should stop the entire vehicle.
+
+Retry only failed photos.
+
+==================================================
+4. AI cache
+
+Verify that if the same vehicle is processed twice without photo changes,
+nothing is regenerated.
+
+Everything should come from cache.
+
+==================================================
+5. Studio Background
+
+When AI_STUDIO_BACKGROUND changes,
+
+only exterior photos should regenerate.
+
+Interiors should never regenerate.
+
+==================================================
+6. Provider failure
+
+If Fal.ai fails:
+
+do NOT fail the vehicle.
+
+Keep original photo.
+
+Continue pipeline.
+
+==================================================
+7. Image quality
+
+Verify:
+
+original resolution preserved
+
+no excessive JPEG compression
+
+no alpha artifacts
+
+no logo overlap
+
+==================================================
+8. Publishing
+
+Verify Marketplace always prefers AI photos.
+
+If AI photo missing,
+
+fallback only for that photo.
+
+Never fallback entire set.
+
+==================================================
+9. Dashboard
+
+Verify progress is live.
+
+Per vehicle:
+
+Queued
+
+Classifying
+
+Removing Background
+
+Compositing
+
+Enhancing
+
+Ordering
+
+Completed
+
+==================================================
+10. Acceptance
+
+Do NOT enable Process All Vehicles until this audit passes.
+
+Return:
+
+PASS
+
+WARNINGS
+
+RECOMMENDATIONS
+
+Estimated production cost.
