@@ -22,7 +22,12 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.2.8";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.2.9";
+
+  // ── Per-job photo cache ───────────────────────────────────────────────────
+  // Keyed by "${jobId}-${index}" → { base64, type }
+  // Survives multiple uploadPhotos calls within the same page load.
+  const _photoCache = new Map();
 
   function _runtimeAlive() {
     try {
@@ -706,6 +711,7 @@
       // one photo before the Next button becomes active.
       stateLog("Phase 0: uploading photos first");
       setStatus("Uploading photos…");
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "field_fill_started", details: "Starting photo upload and form fill" }).catch(() => {});
 
       if (images && images.length) {
         const photoResult = await uploadPhotos(images, job.id, warnings);
@@ -852,13 +858,41 @@
   // =====================================================================
   // Photo upload — fetch via background service worker (bypasses CORS),
   // inject into Facebook's hidden file input, wait for thumbnails.
+  // ── Canvas resize helper ─────────────────────────────────────────────────
+  // Scales a blob to maxWidth preserving aspect ratio, encodes as JPEG.
+  // Falls back to the original blob if createImageBitmap or canvas fails.
+  async function resizeImage(blob, maxWidth, quality) {
+    try {
+      const bitmap = await createImageBitmap(blob);
+      let { width, height } = bitmap;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      bitmap.close();
+      return new Promise((resolve) => {
+        canvas.toBlob((resized) => resolve(resized || blob), "image/jpeg", quality);
+      });
+    } catch (e) {
+      console.warn("[PHOTO] resize failed — using original:", e.message);
+      return blob;
+    }
+  }
+
   // =====================================================================
 
   async function uploadPhotos(imageUrls, jobId, warnings) {
-    const MAX_PHOTOS = 20;
-    const toUpload = imageUrls.slice(0, MAX_PHOTOS);
+    // Default: first 6 photos. Keeps processing fast for typical listings.
+    const DEFAULT_MAX = 6;
+    const toUpload = imageUrls.slice(0, DEFAULT_MAX);
+    const totalPhotos = toUpload.length;
 
-    stateLog(`Photo upload: ${toUpload.length} URL(s) — locating file input`);
+    stateLog(`Photo upload: ${totalPhotos} photo(s) — locating file input`);
     setStatus("Looking for photo upload input…");
 
     // Wait up to 10 s for Facebook to render the file input
@@ -883,63 +917,103 @@
       return { uploaded: 0, failed: true, reason };
     }
 
-    stateLog(`Photo upload: file input found — fetching ${toUpload.length} image(s) via backend proxy`);
-    setStatus(`Downloading ${toUpload.length} photo(s) via proxy…`);
+    // ── Parallel download (3 concurrent) with in-memory cache ────────────
+    send({ type: "SEND_JOB_EVENT", jobId, event: "photo_download_started",
+           details: `Downloading ${totalPhotos} photos` }).catch(() => {});
+    stateLog(`Photo download: fetching ${totalPhotos} photo(s) in parallel batches of 3`);
+    setStatus(`Downloading photos 0 / ${totalPhotos}…`);
 
-    // Fetch each image via the backend photo proxy (backend fetches CDN server-side,
-    // no CORS restrictions). Extension never contacts CDN hosts directly.
-    const files = [];
-    for (let i = 0; i < toUpload.length; i++) {
-      setStatus(`Downloading photo ${i + 1} / ${toUpload.length}…`);
-      console.log(`[PHOTO] requesting proxy for job ${jobId} photo index ${i}`);
-      try {
-        const res = await send({ type: "FETCH_JOB_PHOTO", jobId, index: i });
-        if (!res || !res.ok) {
-          console.error(`[PHOTO] proxy fetch FAILED for photo ${i + 1} — error:`, res?.error, "| full response:", res);
-          stateLog(`Photo ${i + 1}: proxy fetch failed — ${res?.error}`);
-          continue;
+    const BATCH = 3;
+    const rawFiles = new Array(totalPhotos).fill(null);
+    let downloaded = 0;
+
+    for (let i = 0; i < totalPhotos; i += BATCH) {
+      const indices = [];
+      for (let j = i; j < Math.min(i + BATCH, totalPhotos); j++) indices.push(j);
+
+      await Promise.all(indices.map(async (idx) => {
+        const cacheKey = `${jobId}-${idx}`;
+        try {
+          let base64, type;
+          if (_photoCache.has(cacheKey)) {
+            ({ base64, type } = _photoCache.get(cacheKey));
+            stateLog(`Photo ${idx + 1}: cache hit`);
+          } else {
+            const res = await send({ type: "FETCH_JOB_PHOTO", jobId, index: idx });
+            if (!res || !res.ok) {
+              console.error(`[PHOTO] proxy FAILED idx ${idx}:`, res?.error);
+              stateLog(`Photo ${idx + 1}: proxy failed — ${res?.error}`);
+              return;
+            }
+            ({ base64, type } = res.data);
+            _photoCache.set(cacheKey, { base64, type });
+          }
+
+          // base64 → Uint8Array → Blob
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+          const mimeType = type || "image/jpeg";
+          const originalBlob = new Blob([bytes], { type: mimeType });
+
+          // Resize to max 1600 px wide, JPEG quality 0.82
+          const resizedBlob = await resizeImage(originalBlob, 1600, 0.82);
+          stateLog(`Photo ${idx + 1}: ${Math.round(originalBlob.size / 1024)} KB → ${Math.round(resizedBlob.size / 1024)} KB`);
+
+          rawFiles[idx] = new File([resizedBlob], `vehicle-${idx + 1}.jpg`, { type: "image/jpeg" });
+          downloaded++;
+          setStatus(`Downloading photos ${downloaded} / ${totalPhotos}…`);
+        } catch (err) {
+          stateLog(`Photo ${idx + 1}: error — ${err.message}`);
         }
-        const { base64, type } = res.data;
-        // Decode base64 → Uint8Array → Blob → File
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
-        const mimeType = type || "image/jpeg";
-        const ext = mimeType.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
-        files.push(new File([new Blob([bytes], { type: mimeType })], `vehicle-${i + 1}.${ext}`, { type: mimeType }));
-        stateLog(`Photo ${i + 1}: proxy OK (${Math.round(bytes.length / 1024)} KB, ${mimeType})`);
-      } catch (err) {
-        stateLog(`Photo ${i + 1}: error — ${err.message}`);
-      }
+      }));
+
+      // Progress event after each batch completes
+      const done = Math.min(i + BATCH, totalPhotos);
+      send({ type: "SEND_JOB_EVENT", jobId, event: "photo_download_progress",
+             details: `Downloading photos ${done} / ${totalPhotos}` }).catch(() => {});
     }
 
+    const files = rawFiles.filter(Boolean);
     if (files.length === 0) {
       const reason = "Photo upload failed: could not download any images from the job payload";
       stateError(reason);
       return { uploaded: 0, failed: true, reason };
     }
 
-    stateLog(`Photo upload: injecting ${files.length} file(s) into input`);
-    setStatus(`Uploading ${files.length} photo(s) to Facebook…`);
+    send({ type: "SEND_JOB_EVENT", jobId, event: "photo_download_complete",
+           details: `${files.length} photos ready` }).catch(() => {});
+    stateLog(`Photos ready: ${files.length} / ${totalPhotos} downloaded and resized`);
 
-    // Inject files via DataTransfer — works in Chrome even for React-controlled inputs
+    // ── Inject files into Facebook ────────────────────────────────────────
+    stateLog(`Photo upload: injecting ${files.length} file(s)`);
+    setStatus(`Uploading ${files.length} photo(s) to Facebook…`);
+    send({ type: "SEND_JOB_EVENT", jobId, event: "photo_upload_started",
+           details: `Uploading ${files.length} photos` }).catch(() => {});
+
     const dt = new DataTransfer();
     for (const file of files) dt.items.add(file);
     input.files = dt.files;
     input.dispatchEvent(new Event("input",  { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
 
-    // Wait for Facebook to process the upload (thumbnails or count change)
-    stateLog("Photo upload: waiting for Facebook to confirm upload…");
+    send({ type: "SEND_JOB_EVENT", jobId, event: "photo_upload_complete",
+           details: `${files.length} photos injected` }).catch(() => {});
+
+    // ── Wait for Facebook thumbnail confirmation ──────────────────────────
+    stateLog("Photo upload: waiting for Facebook thumbnails…");
     setStatus(`Waiting for Facebook to process ${files.length} photo(s)…`);
+    send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_wait_started" }).catch(() => {});
+
     const confirmed = await waitForPhotoThumbnails(files.length, 60000);
 
     if (!confirmed) {
-      // Not a hard failure — Facebook may have accepted without showing expected thumb count
       warnings.push(`Photo upload: injected ${files.length} file(s); thumbnails not fully confirmed — form may still proceed`);
       stateLog("Photo upload: thumbnail confirmation timed out — continuing anyway");
     } else {
       stateLog(`Photo upload: confirmed — ${files.length} photo(s) visible`);
+      send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_detected",
+             details: `${files.length} photos confirmed` }).catch(() => {});
     }
 
     send({ type: "SEND_JOB_EVENT", jobId, event: "photos_uploaded", details: `${files.length} photos` }).catch(() => {});
@@ -951,6 +1025,7 @@
 
   async function waitForPhotoThumbnails(expectedCount, timeoutMs) {
     const start = Date.now();
+    let lastMsg = 0;
     while (Date.now() - start < timeoutMs) {
       // Facebook renders uploaded photo thumbnails in a few different ways
       const thumbs = [
@@ -970,6 +1045,18 @@
       if (uploadArea) {
         const imgs = uploadArea.querySelectorAll("img");
         if (imgs.length >= 1) return true;
+      }
+      // Emit progress messages so the dashboard stays informative during long waits
+      const elapsed = Date.now() - start;
+      if (elapsed > 5000 && lastMsg < 5000) {
+        setStatus("Facebook is processing thumbnails…");
+        lastMsg = elapsed;
+      } else if (elapsed > 15000 && lastMsg < 15000) {
+        setStatus("Still waiting for Facebook to confirm photos…");
+        lastMsg = elapsed;
+      } else if (elapsed > 30000 && lastMsg < 30000) {
+        setStatus("Facebook photo processing is taking a while — still waiting…");
+        lastMsg = elapsed;
       }
       await sleep(500);
     }
@@ -1060,6 +1147,7 @@
 
     stateLog("Auto-publish: Next clicked, waiting for Publish button…");
     setStatus("Auto-publishing — waiting for Publish button…");
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "next_clicked" }).catch(() => {});
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_next" }).catch(() => {});
     await sleep(2000);
 
@@ -1081,11 +1169,16 @@
 
     stateLog("Auto-publish: Publish clicked, waiting for Marketplace confirmation…");
     setStatus("Auto-publishing — waiting for Marketplace to confirm…");
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "publish_clicked" }).catch(() => {});
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_publish" }).catch(() => {});
     await sleep(2500);
 
     const listingUrl = await waitForPublishSuccess(20000);
     stateLog("Auto-publish: complete — " + (listingUrl || "no URL detected"));
+    if (listingUrl) {
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "listing_url_captured",
+             details: listingUrl }).catch(() => {});
+    }
 
     const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl: listingUrl || undefined });
     if (!r || !r.ok) {

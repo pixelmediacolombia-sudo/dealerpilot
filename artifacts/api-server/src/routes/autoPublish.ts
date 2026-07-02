@@ -710,22 +710,42 @@ router.post("/publishing/jobs/:id/event", async (req, res) => {
   }
 
   // Update currentStep + progressPercent on the job row for live polling.
+  // When the extension supplies `details`, use that as the human-readable step
+  // text so messages like "Downloading photos 3/6" appear verbatim in the UI.
   const EVENT_PROGRESS_MAP: Record<string, { step: string; progress: number }> = {
-    opening_facebook:      { step: "Opening Facebook Marketplace", progress: 15 },
-    filling_form:          { step: "Filling vehicle details",       progress: 35 },
-    form_complete:         { step: "All fields filled",             progress: 65 },
-    ready_for_review:      { step: "Ready for review",              progress: 70 },
-    auto_publish_starting: { step: "Starting auto-publish",         progress: 75 },
-    clicking_next:         { step: "Clicking Next…",                progress: 82 },
-    clicking_publish:      { step: "Clicking Publish…",             progress: 92 },
-    published:             { step: "Published on Marketplace",      progress: 100 },
-    auto_publish_failed:   { step: "Auto-publish failed",           progress: 0 },
+    job_claimed:             { step: "Extension connected",              progress: 8   },
+    marketplace_opened:      { step: "Opening Facebook",                 progress: 10  },
+    opening_facebook:        { step: "Opening Facebook Marketplace",     progress: 15  },
+    photo_download_started:  { step: "Downloading photos…",              progress: 12  },
+    photo_download_progress: { step: "Downloading photos…",              progress: 17  },
+    photo_download_complete: { step: "Photos downloaded",                progress: 25  },
+    photo_upload_started:    { step: "Uploading photos to Facebook",     progress: 28  },
+    photo_upload_complete:   { step: "Photos uploaded",                  progress: 45  },
+    thumbnail_wait_started:  { step: "Waiting for Facebook thumbnails…", progress: 48  },
+    thumbnail_detected:      { step: "Thumbnails confirmed",             progress: 52  },
+    field_fill_started:      { step: "Filling vehicle details",          progress: 55  },
+    filling_form:            { step: "Filling vehicle details",          progress: 58  },
+    form_complete:           { step: "All fields filled",                progress: 65  },
+    ready_for_review:        { step: "Ready for review",                 progress: 70  },
+    auto_publish_starting:   { step: "Starting auto-publish",            progress: 75  },
+    next_enabled:            { step: "Form complete — clicking Next",    progress: 76  },
+    next_clicked:            { step: "Clicked Next",                     progress: 80  },
+    clicking_next:           { step: "Clicking Next…",                   progress: 82  },
+    publish_clicked:         { step: "Publishing to Marketplace…",       progress: 88  },
+    clicking_publish:        { step: "Clicking Publish…",                progress: 92  },
+    listing_url_captured:    { step: "Capturing listing URL",            progress: 95  },
+    job_complete:            { step: "Published on Marketplace",         progress: 100 },
+    published:               { step: "Published on Marketplace",         progress: 100 },
+    auto_publish_failed:     { step: "Auto-publish failed",              progress: 0   },
   };
   const progressData = EVENT_PROGRESS_MAP[parsed.data.event];
   if (progressData) {
+    // Use `details` as step text when the extension sends a dynamic message
+    // (e.g. "Downloading photos 3/6") so the dashboard shows the exact string.
+    const stepText = parsed.data.details || progressData.step;
     await db
       .update(publishingJobsTable)
-      .set({ currentStep: progressData.step, progressPercent: progressData.progress })
+      .set({ currentStep: stepText, progressPercent: progressData.progress })
       .where(eq(publishingJobsTable.id, jobId));
   }
 
