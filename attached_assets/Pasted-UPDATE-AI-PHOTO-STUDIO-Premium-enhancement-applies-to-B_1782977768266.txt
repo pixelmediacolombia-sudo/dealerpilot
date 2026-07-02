@@ -1,0 +1,106 @@
+UPDATE AI PHOTO STUDIO — Premium enhancement applies to BOTH exterior and interior
+
+Clarification:
+
+AI enhancement is not only for interiors.
+
+Every usable vehicle photo should be improved.
+
+====================================================
+EXTERIOR PHOTOS
+====================================================
+
+Exterior photos must receive:
+
+1. Background removal
+2. Alpha Motorsport studio background
+3. Correct vehicle placement
+4. Logo-safe positioning
+5. Realistic contact shadow
+6. Floor reflection
+7. Premium lighting
+8. 4K / high-quality enhancement
+9. Sharper paint, wheels, glass, headlights
+10. Better color, contrast, reflections, exposure
+
+Exterior output should look like a professional luxury dealership photo.
+
+====================================================
+INTERIOR PHOTOS
+====================================================
+
+Interior photos must NOT receive studio background.
+
+But they must receive:
+
+1. 4K / high-quality enhancement
+2. Noise reduction
+3. Better exposure
+4. Better contrast
+5. Better white balance
+6. Sharper leather/fabric/dashboard details
+7. Better screen clarity
+8. Better black levels
+9. Better color depth
+
+Interior output should look like a clean premium showroom interior photo.
+
+====================================================
+TECHNICAL / DOCUMENT PHOTOS
+====================================================
+
+Do NOT apply studio background to:
+
+- Backup camera
+- Odometer
+- Gauge cluster
+- Navigation screen close-up
+- VIN sticker
+- Window sticker
+- Keys
+- Documents
+- Warranty papers
+- Inspection papers
+
+For these:
+- keep original background
+- improve readability only
+- sharpen text/screens lightly
+- do not stylize
+- do not crop important information
+
+====================================================
+CLASSIFICATION RULE
+====================================================
+
+Only these get studio background:
+
+- Exterior Front
+- Exterior Front 45
+- Exterior Side
+- Exterior Rear 45
+- Exterior Rear
+
+These get enhancement only, no studio background:
+
+- Wheels
+- Engine
+- Interior photos
+- Backup camera
+- Dashboard
+- Seats
+- Console
+- Screen
+- Documents
+- Stickers
+- Keys
+
+====================================================
+FINAL GOAL
+====================================================
+
+Every photo should look better than the original.
+
+But only true full exterior vehicle photos get the Alpha studio background.
+
+Everything else gets quality enhancement without changing the scene.

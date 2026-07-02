@@ -1,0 +1,145 @@
+UX REFACTOR — Merge AI Photo Review + AI Photo Studio into one vehicle photo experience
+
+Current problem:
+The vehicle photo page has an “AI Photo Review” panel that says Coming Soon, while AI Photo Studio exists somewhere else.
+
+This feels duplicated and confusing.
+
+AI Vehicle / Vehicle Photos / AI Photo Studio should not feel like three separate modules doing the same thing.
+
+Fix the UX:
+
+====================================================
+1. Replace AI Photo Review with AI Photo Studio
+====================================================
+
+On the vehicle photo detail page, replace the current “AI Photo Review” card with:
+
+AI Photo Studio
+
+This panel should show the live AI photo pipeline for the current vehicle.
+
+States:
+
+- Not processed
+- Queued
+- Processing
+- AI Photos Ready
+- Failed / Needs Review
+
+====================================================
+2. Auto-start AI enhancement from this panel
+====================================================
+
+If vehicle is Ready and has no AI Photo Set:
+
+Show button:
+“Generate AI Photos”
+
+If background processing is enabled:
+
+Automatically enqueue the vehicle and show:
+“Generating AI photos…”
+
+If AI photos are already ready:
+
+Show:
+“AI Photos Ready ✓”
+
+====================================================
+3. Show real AI output here
+====================================================
+
+The main photo preview should support two modes:
+
+Original Photos
+AI Enhanced Photos
+
+Toggle:
+
+[ Original ] [ AI Enhanced ]
+
+When AI Enhanced is selected:
+- show processed AI Photo Set
+- exterior photos with Alpha Studio background
+- interior photos enhanced only
+- technical photos enhanced lightly / original if needed
+
+====================================================
+4. Before / After comparison
+====================================================
+
+Inside the AI Photo Studio panel show:
+
+- Original thumbnail
+- AI output thumbnail
+- Classification
+- Status
+- Fallback indicator
+- Processing time
+- Confidence
+
+For exterior:
+Before / After comparison.
+
+For interior:
+Original / Enhanced comparison.
+
+====================================================
+5. Make AI Photo Studio vehicle-specific
+====================================================
+
+The AI Photo Studio page can still exist globally for queue/stats.
+
+But the vehicle page must be the main place to review that vehicle’s AI photos.
+
+Global AI Photo Studio = operations dashboard.
+Vehicle AI Photo Studio = review and output.
+
+====================================================
+6. Remove duplicate Coming Soon language
+====================================================
+
+Delete:
+“Coming Soon”
+“Pending AI Review”
+fake scoring placeholders
+
+Replace with real status from ai_photo_sets and ai_photo_images.
+
+====================================================
+7. Marketplace publishing integration
+====================================================
+
+In this same panel show:
+
+Marketplace will use:
+- AI Enhanced Photos if Ready
+- Original Photos if AI not ready
+
+Add status badge:
+
+Using AI Photos for Marketplace ✓
+or
+Using Original Photos — AI not ready
+
+====================================================
+8. Remove published vehicles from recommendations
+====================================================
+
+When a vehicle is Published:
+- remove it from Today’s Recommendations
+- leave the remaining 2 opportunities
+- refresh list automatically
+
+====================================================
+Acceptance
+====================================================
+
+On the vehicle photo page:
+- AI Photo Studio replaces AI Photo Review.
+- Operator can see original vs AI photos.
+- Operator can trigger AI photo generation.
+- Operator can see processing status.
+- Marketplace clearly shows whether it will use AI photos or originals.
+- No duplicate or fake AI review placeholders.

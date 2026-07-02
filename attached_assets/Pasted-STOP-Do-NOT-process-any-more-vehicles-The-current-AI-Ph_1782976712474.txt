@@ -1,0 +1,294 @@
+STOP.
+
+Do NOT process any more vehicles.
+
+The current AI Photo Studio output is NOT production quality.
+
+The problem is NOT background removal.
+The problem is the entire post-processing pipeline.
+
+I want DealerPilot AI Photo Studio to produce dealership-quality images that look professionally photographed.
+
+====================================================
+CRITICAL ISSUES FOUND
+====================================================
+
+1. Vehicle is floating.
+
+The wheels must always sit naturally on the floor/podium.
+
+Never float.
+
+----------------------------------------------------
+
+2. Logo is partially covered.
+
+The Alpha Motorsport wall logo must NEVER be covered.
+
+The logo safe zone must be enforced, not only stored.
+
+----------------------------------------------------
+
+3. Vehicle placement is wrong.
+
+Current placement looks like a sticker.
+
+Instead:
+
+• detect the vehicle bounding box
+• detect the wheels
+• align wheels to the podium surface
+• center using the vehicle mass, not the image center
+
+----------------------------------------------------
+
+4. No realistic shadow.
+
+Generate a soft contact shadow under the tires.
+
+The vehicle must visually touch the floor.
+
+----------------------------------------------------
+
+5. Lighting is unchanged.
+
+This is one of the biggest problems.
+
+The AI output should look BETTER than the original.
+
+Requirements:
+
+• increase dynamic range
+• improve white balance
+• improve paint reflections
+• improve highlights
+• improve contrast
+• improve clarity
+• improve sharpness
+• remove color cast
+• improve saturation slightly
+• improve black levels
+
+The final image should look like it was photographed inside a luxury dealership studio.
+
+----------------------------------------------------
+
+6. Color correction.
+
+Vehicle paint should look richer.
+
+Especially:
+
+White
+Black
+Silver
+Gray
+Red
+Blue
+
+must all receive proper color enhancement.
+
+----------------------------------------------------
+
+7. Resolution.
+
+Never reduce quality.
+
+Final image must be at least as sharp as the original.
+
+No blurry outputs.
+
+No JPEG artifacts.
+
+====================================================
+CLASSIFICATION IMPROVEMENTS
+====================================================
+
+The current classifier is not sufficient.
+
+The rear backup camera photo was classified as an exterior image.
+
+That is incorrect.
+
+Add new classifications.
+
+Exterior:
+
+Front
+Front 45
+Side
+Rear 45
+Rear
+Wheel
+Engine
+Bed
+Tailgate
+
+Interior:
+
+Dashboard
+Driver Seat
+Passenger Seat
+Rear Seat
+Door Panel
+Steering Wheel
+Center Console
+Infotainment
+Roof
+Sunroof
+
+Technical:
+
+Backup Camera
+Gauge Cluster
+Navigation Screen
+Key
+VIN Sticker
+Odometer
+Window Sticker
+
+Dealer:
+
+Document
+Warranty
+Inspection
+
+Only these image types should receive the studio background:
+
+✓ Front
+✓ Front 45
+✓ Side
+✓ Rear 45
+✓ Rear
+
+Everything else remains original.
+
+Never apply studio background to:
+
+Backup Camera
+Dashboard
+Seats
+Center Console
+Navigation
+VIN
+Odometer
+Documents
+Window Sticker
+Keys
+Engine
+Wheel
+Close-up detail shots
+
+====================================================
+BACKGROUND REMOVAL
+====================================================
+
+Continue using BRIA RMBG.
+
+The cut quality is acceptable.
+
+====================================================
+COMPOSITING
+====================================================
+
+Rewrite the compositing stage.
+
+Do NOT simply paste the PNG.
+
+Requirements:
+
+• automatically detect vehicle bounding box
+
+• calculate proper scale
+
+• calculate proper floor alignment
+
+• calculate wheel position
+
+• calculate safe logo zone
+
+• calculate center of mass
+
+Vehicle width should vary depending on angle.
+
+Front images should be smaller than side images.
+
+SUVs should not use the same scaling as Corvettes.
+
+====================================================
+SHADOWS
+====================================================
+
+Generate realistic contact shadows.
+
+Not only opacity.
+
+Shadow should:
+
+• soften with distance
+
+• blur naturally
+
+• darken below tires
+
+• match studio lighting direction
+
+====================================================
+BACKGROUND
+====================================================
+
+The studio background should not look flat.
+
+Add:
+
+slight floor reflection
+
+slight vignette
+
+soft ambient lighting
+
+====================================================
+QUALITY GATE
+====================================================
+
+Before saving AI image verify:
+
+✓ logo visible
+
+✓ vehicle not floating
+
+✓ wheels touching floor
+
+✓ vehicle centered
+
+✓ no clipping
+
+✓ no transparency holes
+
+✓ correct classification
+
+If any check fails:
+
+Do NOT mark Ready.
+
+Mark Needs Review.
+
+====================================================
+VISUAL TARGET
+====================================================
+
+The result should look like:
+
+A professionally photographed vehicle inside a luxury automotive photo studio.
+
+Not like a PNG pasted on a white wall.
+
+====================================================
+PROCESSING
+====================================================
+
+Do not process the entire inventory.
+
+Keep processing ONE vehicle until the output reaches production quality.
+
+Only then enable Process All Vehicles.

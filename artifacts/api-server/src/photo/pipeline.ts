@@ -58,6 +58,9 @@ export interface PipelineContext {
   images: PipelineImage[];
   startedAt: Date;
   log: Logger;
+  /** Set to true by the validate stage when a critical quality check fails.
+   *  The export stage uses this to mark the photo set "Needs Review" instead of "Ready". */
+  qualityGateFailed?: boolean;
 }
 
 const STAGES = [

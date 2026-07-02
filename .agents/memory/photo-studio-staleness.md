@@ -19,3 +19,17 @@ description: How background-version staleness is detected and cheaply reprocesse
 ## Watch out
 - After adding columns to a lib schema, run `pnpm run typecheck:libs` before leaf package typechecks — leaf packages see stale .d.ts files until the lib is rebuilt. This causes confusing "property does not exist" errors that look like code bugs but are actually stale declarations.
 - All sets seeded before studioVersion was added will have `studioVersion = NULL`, so they'll all appear stale on first run — this is correct and intentional.
+
+## Compositing invariants (Alpha Motorsport pack, tuned July 2026)
+
+- **fit:fill** (not fit:inside/outside) is required so bbox fractions stay valid after resize. Sharp's `fit:inside` leaves padding that breaks placement math.
+- **Dual-axis scale cap**: `scaleFactor = Math.min(scaleByWidth, scaleByHeight)` where `scaleByHeight = (0.85 × bgHeight) / bboxH`. The 85% cap prevents car overflow off canvas top.
+- **Shadow**: SVG radial gradient ellipse via `sharp(Buffer.from(svgStr)).png()` blended `over`. Never use sharp blur-based approach — `blurSigma ≥ 90` on a small canvas produces a solid black bar, not a soft shadow.
+- **Alpha bbox**: threshold `alpha ≥ 30` scans every pixel to find tightest bounding box of actual car pixels (excludes transparent padding). Drives all placement math.
+
+## Tuned pack values (ai_studio_packs id=1)
+
+`{ "cx": 0.5, "bottomY": 0.76, "maxW": 0.72 }`
+
+- `bottomY = 0.76` → car bottom at y=778px on 1024px bg, wheels flush on platform top. Going lower sinks the car into the platform.
+- Logo coverage HIGH warning on front-facing shots is cosmetic only — does NOT fail the quality gate. Expected for low-slung cars.

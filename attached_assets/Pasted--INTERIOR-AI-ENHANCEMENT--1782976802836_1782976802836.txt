@@ -1,0 +1,117 @@
+====================================================
+INTERIOR AI ENHANCEMENT
+====================================================
+
+Do NOT leave interior photos untouched.
+
+Interior photos should NOT receive the studio background.
+
+However, every interior photo should be AI-enhanced to premium dealership quality.
+
+Goals:
+
+• Make the interior look like a brand-new vehicle.
+• Preserve every original detail.
+• Never hallucinate or invent new parts.
+• Never change upholstery color.
+• Never remove buttons or controls.
+• Never alter the dashboard layout.
+
+Enhance:
+
+✓ 4K quality
+✓ Super Resolution / Upscaling
+✓ Sharper details
+✓ Better dynamic range
+✓ Better white balance
+✓ Better exposure
+✓ Better contrast
+✓ Better leather texture
+✓ Better fabric texture
+✓ Better chrome reflections
+✓ Better glass clarity
+✓ Better infotainment screen clarity
+✓ Better steering wheel texture
+✓ Better seat stitching visibility
+✓ Better dashboard lighting
+✓ Remove image noise
+✓ Reduce compression artifacts
+✓ Improve color depth
+✓ Improve black levels
+✓ Improve highlight recovery
+
+The result should look like it was photographed using a professional DSLR camera inside a luxury dealership showroom.
+
+====================================================
+EXTERIOR AI ENHANCEMENT
+====================================================
+
+Exterior photos should receive ALL of the following:
+
+✓ Background removal
+✓ Premium studio background
+✓ Professional lighting
+✓ Color grading
+✓ Better reflections
+✓ Better paint finish
+✓ Better wheel detail
+✓ Better tire contrast
+✓ Better glass reflections
+✓ Better chrome reflections
+✓ Better headlight clarity
+✓ Better taillight clarity
+✓ Contact shadow
+✓ Slight floor reflection
+✓ Luxury dealership appearance
+
+====================================================
+IMAGE QUALITY
+====================================================
+
+DealerPilot AI should always output images that are visually BETTER than the originals.
+
+Target quality:
+
+Luxury dealership photography.
+
+Every processed image should look suitable for:
+
+✓ Facebook Marketplace
+✓ Facebook Ads
+✓ Instagram
+✓ Dealer Website
+✓ Google Vehicle Listings
+
+====================================================
+UPSCALING
+====================================================
+
+If the original image resolution is below 1920px:
+
+Run AI Super Resolution.
+
+Target:
+
+Minimum Full HD.
+
+Preferred:
+
+4K quality whenever possible.
+
+Never reduce image quality.
+
+Never export a processed image that looks softer than the original.
+
+====================================================
+FINAL GOAL
+====================================================
+
+The customer should immediately feel that the vehicle is:
+
+• Cleaner
+• Newer
+• More premium
+• Better maintained
+• Worth more money
+
+The AI should increase the perceived value of the vehicle while remaining completely realistic.

@@ -62,11 +62,13 @@ export async function stageExport(ctx: PipelineContext): Promise<void> {
         ),
       );
 
-    // 3. Mark this set as Ready + latest
+    // 3. Mark this set Ready (or Needs Review if quality gate failed)
+    const setStatus = ctx.qualityGateFailed ? "Needs Review" : "Ready";
+    const vehicleAiStatus = ctx.qualityGateFailed ? "Needs Review" : "Ready";
     await tx
       .update(aiPhotoSetsTable)
       .set({
-        status: "Ready",
+        status: setStatus,
         isLatest: true,
         processedPhotos: processedCount,
         failedPhotos: failedCount,
@@ -78,7 +80,7 @@ export async function stageExport(ctx: PipelineContext): Promise<void> {
     // 4. Update vehicle
     await tx
       .update(vehiclesTable)
-      .set({ aiPhotoStatus: "Ready", aiPhotoSetId: ctx.setId })
+      .set({ aiPhotoStatus: vehicleAiStatus, aiPhotoSetId: ctx.setId })
       .where(eq(vehiclesTable.id, ctx.job.vehicleId));
 
     // 5. Complete the job
