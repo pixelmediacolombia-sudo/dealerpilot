@@ -281,18 +281,60 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
   const trimStr = vehicle.trim ? ` ${vehicle.trim}` : "";
   const autoTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
 
-  // Build the structured fallback description once — used when stored copy is absent or bad.
-  function buildAutoDescription(): string {
-    const parts: string[] = [];
-    if (vehicle.mileage != null) parts.push(`${vehicle.mileage.toLocaleString()} miles`);
-    if (vehicle.transmission) parts.push(vehicle.transmission);
-    if (vehicle.fuelType) parts.push(vehicle.fuelType);
-    if (vehicle.exteriorColor) parts.push(vehicle.exteriorColor);
-    if (vehicle.vin) parts.push(`VIN: ${vehicle.vin}`);
-    if (dealer?.name) parts.push(`Listed by ${dealer.name}`);
-    return parts.length > 0
-      ? `${autoTitle} — ${parts.join(" · ")}`
-      : autoTitle;
+  // Generate AI-style sales copy with emojis and a CTA.
+  // Used when no stored listing-version prose is available.
+  // Format mirrors what a human agent would write for Facebook Marketplace:
+  //
+  //   🔥 2016 Ford Explorer — Alpha Motorsport
+  //   ✅ SUV espaciosa y cómoda — ideal para familia
+  //   ✅ 45,000 millas
+  //   ✅ Buen precio — no pierdas esta oportunidad
+  //   ✅ Financiamiento disponible
+  //   📩 Escríbenos "EXPLORER" hoy y te damos más detalles.
+  function buildAISalesCopy(): string {
+    const name = autoTitle;
+    const modelKeyword = vehicle.model.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const bodyStyle  = (vehicle.bodyStyle ?? "").toLowerCase();
+    const modelLower = vehicle.model.toLowerCase();
+
+    // Body-type bullet — pick the closest match
+    let bodyBullet: string;
+    if (
+      /suv|crossover|sport utility/i.test(bodyStyle) ||
+      /explorer|expedition|escalade|tahoe|navigator|pilot|highlander|4runner|pathfinder|murano|rogue|tucson|santa\s?fe|equinox|traverse|suburban|yukon/i.test(modelLower)
+    ) {
+      bodyBullet = "✅ SUV espaciosa y cómoda — ideal para familia";
+    } else if (
+      /truck|pickup/i.test(bodyStyle) ||
+      /f-?150|f-?250|f-?350|silverado|ram\b|sierra|tundra|tacoma|titan|ranger|colorado|canyon/i.test(modelLower)
+    ) {
+      bodyBullet = "✅ Camioneta lista para trabajar";
+    } else if (/van|minivan/i.test(bodyStyle) || /odyssey|sienna|caravan|town.?country|quest/i.test(modelLower)) {
+      bodyBullet = "✅ Van amplia — perfecta para la familia";
+    } else if (/coupe|convertible|sport/i.test(bodyStyle)) {
+      bodyBullet = "✅ Diseño deportivo y elegante";
+    } else if (/sedan/i.test(bodyStyle)) {
+      bodyBullet = "✅ Sedán cómodo y eficiente en gasolina";
+    } else {
+      bodyBullet = "✅ Auto en excelentes condiciones";
+    }
+
+    const bullets: string[] = [bodyBullet];
+    if (vehicle.mileage != null) {
+      bullets.push(`✅ ${vehicle.mileage.toLocaleString()} millas`);
+    }
+    bullets.push("✅ Buen precio — no pierdas esta oportunidad");
+    bullets.push("✅ Financiamiento disponible");
+
+    const dealerSuffix = dealer?.name ? ` — ${dealer.name}` : "";
+
+    return [
+      `🔥 ${name}${dealerSuffix}`,
+      "",
+      ...bullets,
+      "",
+      `📩 Escríbenos "${modelKeyword}" hoy y te damos más detalles.`,
+    ].join("\n");
   }
 
   if (version) {
@@ -309,14 +351,14 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       // listingVersion copy is bad/missing — fall back to the XML feed description
       fillDescription = vehicle.description;
     } else {
-      fillDescription = buildAutoDescription();
+      fillDescription = buildAISalesCopy();
     }
   } else {
-    // No listing version at all — use XML feed description or auto-generate.
+    // No listing version at all — use XML feed description or generate AI sales copy.
     fillTitle = autoTitle;
     fillDescription = isProseText(vehicle.description)
       ? vehicle.description
-      : buildAutoDescription();
+      : buildAISalesCopy();
   }
 
   const [enriched] = await enrich([job]);

@@ -827,21 +827,22 @@
       await fillStep("description", ["description", "describe", "details"], fill.description);
       await fillStep("location", ["location", "city", "where"], fill.location);
 
-      // ---- Phase 4: Optional text fields — mileage, VIN ----
-      stateLog("Phase 4: optional text fields (mileage, VIN)");
+      // ---- Phase 4: Important non-blocking fields — attempt, skip on failure ----
+      // Mileage is buyer-relevant; attempt it.
+      // VIN / transmission / fuel / color / body style are SKIPPED — unreliable
+      // dropdowns that block publishing when they fail to match.
+      stateLog("Phase 4: mileage (important, non-blocking)");
       await fillStep("mileage", [
         "mileage", "odometer", "miles", "vehicle mileage",
         "number of miles", "mileage (optional)", "odometer reading",
       ], fill.mileage);
-      await fillStep("vin", ["vin", "vin number", "vehicle identification number"], fill.vin);
 
-      // ---- Phase 5: Optional dropdowns — strict match only, no first-option fallback ----
-      stateLog("Phase 5: optional dropdowns (strict — skip if no exact match)");
-      await selectComboboxStep("condition",    ["condition"],    fill.condition,    false, false);
-      await selectComboboxStep("transmission", ["transmission"], fill.transmission, false, false);
-      await selectComboboxStep("fuel type",    ["fuel"],         fill.fuelType,     false, false);
-      await selectComboboxStep("color",        ["color", "exterior color"], fill.color, false, false);
-      await selectComboboxStep("body style",   ["body style", "body type"], fill.bodyStyle, false, false);
+      // ---- Phase 5: Condition dropdown — strict match only, skip if no match ----
+      // All other optional dropdowns (transmission, fuel type, color, body style,
+      // drivetrain) are intentionally skipped per MVP field-priority rules.
+      // The only gate that matters is whether Facebook enables the Next button.
+      stateLog("Phase 5: condition (important, non-blocking)");
+      await selectComboboxStep("condition", ["condition"], fill.condition, false, false);
 
       stateLog("Workflow Complete");
 
