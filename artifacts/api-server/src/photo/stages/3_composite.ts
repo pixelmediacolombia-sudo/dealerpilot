@@ -22,14 +22,18 @@ import { STUDIO_EXTERIOR_CLASSIFICATIONS } from "../providers/types";
 import { briaProductShot } from "../providers/falai";
 
 // Scene description sent to BRIA Product Shot for every Alpha Motorsport studio exterior.
-// Describes the desired visual outcome without specifying exact geometry —
-// the AI infers correct placement from the reference background image.
+// The reference background is a white curved automotive studio with a circular elevated
+// display platform, recessed ceiling spotlights in a curved arc, and the Alpha Motorsports
+// logo on the back wall. The vehicle must sit ON the platform, not float above it.
 const ALPHA_MOTORSPORT_SCENE =
-  "Alpha Motorsport automotive dealership showroom studio, professional car photography, " +
-  "polished showroom floor with subtle racing checkerboard pattern, dramatic overhead studio " +
-  "lighting from ceiling fixtures, realistic contact shadow beneath vehicle, subtle floor " +
-  "reflection, dealer logo and branding clearly visible on wall behind vehicle, " +
-  "commercial luxury automotive photography, photorealistic, high-end";
+  "Professional automotive studio photography, white curved showroom studio, " +
+  "circular elevated display platform, vehicle centered and dominant on the platform " +
+  "occupying 70 percent of the platform width, all four wheels resting firmly on the " +
+  "white polished platform surface with no gap, realistic contact shadow beneath each " +
+  "wheel, subtle floor reflection on polished platform, recessed ceiling spotlights in " +
+  "curved arc overhead casting soft studio lighting, Alpha Motorsports brand logo clearly " +
+  "visible on curved back wall, white studio ambient lighting balanced 5500K, " +
+  "luxury dealership photoshoot quality, photorealistic, no floating, no clipping";
 
 function getAiPhotosDir(): string {
   const dir = path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos");

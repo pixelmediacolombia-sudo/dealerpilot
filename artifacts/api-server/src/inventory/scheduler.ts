@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 import { fetchFeedXml } from "./feedSource";
 import { importFeed } from "./importFeed";
+import { autoEnqueueAfterImport } from "../photo/autoEnqueue";
 import { db, dealersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -27,6 +28,10 @@ export function startInventoryScheduler(log: Logger): void {
         { imported: summary.imported, created: summary.created, updated: summary.updated },
         "Scheduled 24h inventory sync complete",
       );
+      if (summary.created > 0 || summary.updated > 0) {
+        const { enqueued, skipped } = await autoEnqueueAfterImport(dealer.id, log);
+        log.info({ enqueued, skipped }, "photo:auto-enqueue triggered by 24h sync");
+      }
     } catch (err) {
       log.error({ err }, "Scheduled 24h inventory sync failed");
     } finally {

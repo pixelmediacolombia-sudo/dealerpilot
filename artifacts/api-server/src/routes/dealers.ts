@@ -11,6 +11,7 @@ import {
 import { count, desc, eq } from "drizzle-orm";
 import { fetchFeedXml } from "../inventory/feedSource";
 import { importFeed } from "../inventory/importFeed";
+import { autoEnqueueAfterImport } from "../photo/autoEnqueue";
 
 const router: IRouter = Router();
 
@@ -121,6 +122,10 @@ router.post("/dealers/:id/sync", async (req, res) => {
       .select()
       .from(feedRunsTable)
       .where(eq(feedRunsTable.id, summary.feedRunId));
+    // Auto-enqueue photo jobs for new/changed vehicles after every sync
+    if (summary.created > 0 || summary.updated > 0) {
+      void autoEnqueueAfterImport(dealer.id, req.log);
+    }
     res.json(toFeedRun(run!));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown sync error";

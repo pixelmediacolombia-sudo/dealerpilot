@@ -11,20 +11,25 @@ ${PHOTO_CLASSIFICATIONS.join(", ")}
 
 Classification rules — read carefully:
 
-PRIMARY EXTERIOR (vehicle against open background, entire exterior visible):
+PRIMARY EXTERIOR (full vehicle body visible against open background — studio background will be applied):
 - "Exterior Front": Straight-on front view. Hood, grille, headlights, front bumper dominate. Minimal side visible.
 - "Exterior Front 45": Front at ~45°. Front + one full side panel visible. Popular 3/4 angle.
 - "Exterior Side": Pure side profile — full driver or passenger side. Both axles visible.
 - "Exterior Rear 45": Rear at ~45°. Taillights + one full side panel visible.
 - "Exterior Rear": Straight-on rear. Trunk/liftgate, taillights, rear bumper dominate. Minimal side visible.
+IMPORTANT: Primary Exterior requires the ENTIRE vehicle body to be visible. If the shot is a close-up of one part only, use Secondary Exterior instead.
 
-SECONDARY EXTERIOR (close-up or partial exterior detail):
+SECONDARY EXTERIOR (close-up or partial exterior detail — enhancement only, no background replacement):
 - "Exterior Wheel": Close-up of wheel(s), rim(s), or tire(s). Wheel fills most of frame.
 - "Exterior Engine": Under-hood/engine bay. Engine components fill most of frame.
 - "Exterior Bed": Truck bed interior. Bed floor/walls dominate.
 - "Exterior Tailgate": Tailgate detail or tailgate-down angle.
+- "Exterior Headlights": Close-up of headlight assembly, DRL strip, or front lighting unit. Headlight fills most of frame.
+- "Exterior Taillights": Close-up of taillight assembly, brake light cluster, or rear lighting unit. Taillight fills most of frame.
+- "Exterior Badge": Close-up of brand emblem, model name badge, trim badge, or logo on the vehicle exterior.
+- "Exterior Detail": Any other close-up exterior detail — door handle, mirror, grille mesh, body panel, chrome trim, exhaust tip, etc.
 
-INTERIOR (inside the cabin):
+INTERIOR (inside the cabin — never apply studio background):
 - "Interior Dashboard": Instrument cluster, gauges, speedometer, dashboard panel. CRITICAL: Any view showing backup camera feed, navigation map, or infotainment screen through a camera or window is NOT this — see Technical.
 - "Interior Driver Seat": Driver seat, seatback, bolster. Seat fills frame.
 - "Interior Passenger Seat": Front passenger seat. Seat fills frame.
@@ -36,7 +41,7 @@ INTERIOR (inside the cabin):
 - "Interior Roof": Headliner, overhead console, moonroof interior glass.
 - "Interior Sunroof": Open panoramic sunroof from inside, sky visible.
 
-TECHNICAL (instrument / documentation detail):
+TECHNICAL (instrument / documentation detail — never apply studio background):
 - "Technical Backup Camera": Backup/reverse camera VIEW — what the camera sees (lines on pavement, objects behind car). NEVER classify this as an interior or exterior shot.
 - "Technical Gauge Cluster": Speedometer, tachometer, fuel gauge cluster viewed from driver position.
 - "Technical Navigation Screen": Navigation map screen close-up.
@@ -53,11 +58,14 @@ DEALER:
 - "Miscellaneous": Anything that does not clearly fit the above categories.
 
 CRITICAL RULES:
-1. A photo showing what the backup camera sees (pavement, yellow lines, a parking space) MUST be "Technical Backup Camera" — never interior.
-2. A full exterior vehicle shot (even if imperfect) MUST be a Primary Exterior category.
-3. When in doubt between two close categories, pick the one where the main subject fills more of the frame.
-4. Respond ONLY with a JSON object: {"label": "<category>", "confidence": <0.0-1.0>}
-5. No extra text, no markdown, no explanation.`;
+1. A photo showing what the backup camera sees (pavement, yellow lines, a parking space) MUST be "Technical Backup Camera" — never interior or exterior.
+2. A navigation map, GPS screen, or infotainment display is "Technical Navigation Screen" or "Interior Infotainment" — NEVER exterior.
+3. A dashboard, steering wheel, or seat is always INTERIOR — never exterior, even if the door is open.
+4. A full exterior vehicle shot (entire body visible) MUST be a Primary Exterior category.
+5. A close-up of only one exterior part (headlight, wheel, badge) MUST be a Secondary Exterior category.
+6. When in doubt between two close categories, pick the one where the main subject fills more of the frame.
+7. Respond ONLY with a JSON object: {"label": "<category>", "confidence": <0.0-1.0>}
+8. No extra text, no markdown, no explanation.`;
 
 export class OpenAiClassifier implements IClassificationProvider {
   readonly name = "openai";

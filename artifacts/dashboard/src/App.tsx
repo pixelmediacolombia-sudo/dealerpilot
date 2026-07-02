@@ -11,6 +11,7 @@ import { ListingsWorkspace } from "@/pages/Listings";
 import { ListingDetail } from "@/pages/Listings/ListingDetail";
 import { ProductionReadiness } from "@/pages/Listings/ProductionReadiness";
 import { PublishingQueue } from "@/pages/Publishing";
+import { Redirect } from "wouter";
 import { CreativeStudio } from "@/pages/CreativeStudio";
 import { CreativeDetail } from "@/pages/CreativeStudio/CreativeDetail";
 import { DealerDna } from "@/pages/DealerDna";
@@ -47,8 +48,10 @@ function Router() {
       <Route path="/listings/:id" component={ListingDetail} />
       <Route path="/publishing" component={PublishingQueue} />
 
-      <Route path="/creative-studio" component={CreativeStudio} />
       <Route path="/creative-studio/:id" component={CreativeDetail} />
+      <Route path="/creative-studio">
+        <Redirect to="/ai-photo-studio" />
+      </Route>
 
       {/* Sales AI */}
       <Route path="/sales-ai" component={SalesAIWorkspace} />

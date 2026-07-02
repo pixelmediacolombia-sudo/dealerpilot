@@ -1,0 +1,398 @@
+ARCHITECTURE REFACTOR — AI PHOTO STUDIO v3.0 (Production)
+
+The Marketplace publishing flow is working correctly. We are no longer fixing publishing.
+
+This refactor is focused on turning AI Photo Studio into the primary vehicle media system.
+
+1. Merge AI Vehicle + AI Photo Studio
+
+The current UI is redundant.
+
+We currently have:
+
+AI Vehicle Studio
+AI Photo Studio
+AI Photo Review
+
+These three modules are doing nearly the same thing.
+
+Replace them with a single experience.
+
+Rename:
+
+AI Vehicle Studio
+↓
+
+AI Photo Studio
+
+Remove the standalone AI Photo Review panel.
+
+Instead, inside every vehicle detail page, replace the current AI Photo Review section with the complete AI Photo Studio.
+
+That section becomes the live processing area.
+
+Example:
+
+Vehicle Detail
+
+Original Photos
+
+↓
+
+AI Photo Studio
+
+Processing Status
+Progress
+Before / After
+Generated Images
+AI Score
+AI Decisions
+AI Recommendations
+
+No duplicated pages.
+
+One AI media system only.
+
+2. AI Photo Studio becomes automatic
+
+The operator should NEVER click "Generate Photos".
+
+Processing begins automatically when:
+
+Vehicle reaches READY status
+
+or
+
+Inventory import completes.
+
+Pipeline:
+
+Import XML
+
+↓
+
+Vehicle Ready
+
+↓
+
+AI Photo Studio
+
+↓
+
+Publishing Ready
+
+Everything automatic.
+
+3. New Studio Background (LOCKED)
+
+Use the uploaded Alpha Motorsport studio background as the ONLY background.
+
+Never generate a new room.
+
+Never redesign the environment.
+
+Never ask BRIA or any AI model to invent a showroom.
+
+The uploaded background becomes immutable.
+
+Every exterior image must use exactly this studio.
+
+Only one studio exists.
+
+No randomness.
+
+4. Vehicle placement
+
+Current placement is incorrect.
+
+Vehicle is too small.
+
+Vehicle looks floating.
+
+Vehicle does not interact with the environment.
+
+Replace with:
+
+Dynamic scaling.
+
+Requirements:
+
+Vehicle occupies approximately 65–75% of the podium.
+
+All wheels touch the platform.
+
+Correct perspective.
+
+Natural floor reflections.
+
+Real shadow.
+
+Correct camera angle.
+
+Vehicle centered.
+
+No clipping.
+
+No excessive empty space.
+
+Every angle keeps the vehicle dominant.
+
+The car should feel like a real professional studio photo.
+
+5. Lighting Engine
+
+Current output only changes the background.
+
+That is not acceptable.
+
+The vehicle itself must be relit.
+
+Apply:
+
+White studio lighting
+
+Soft reflections
+
+Professional dealership lighting
+
+Balanced exposure
+
+Improved contrast
+
+Highlight recovery
+
+Shadow recovery
+
+Better black levels
+
+Better metallic reflections
+
+Better white balance
+
+Ambient reflections matching the studio
+
+Correct color temperature
+
+The vehicle should look as if it was photographed inside this studio.
+
+Not pasted.
+
+Integrated.
+
+6. AI Enhancement
+
+Every generated photo should look better than the original.
+
+Target quality:
+
+Luxury dealership photography
+
+4K appearance
+
+Sharper paint
+
+Cleaner glass
+
+Cleaner chrome
+
+Cleaner headlights
+
+Better tire contrast
+
+Higher dynamic range
+
+Higher micro contrast
+
+Professional detailing quality
+
+No oversharpening.
+
+No halos.
+
+No fake reflections.
+
+7. Exterior Classification Improvements
+
+Current classifier mistakes some images.
+
+Fix classification.
+
+Exterior means:
+
+Front
+
+Front 45
+
+Side
+
+Rear
+
+Rear 45
+
+Profile
+
+Wheel
+
+Tail lights
+
+Headlights
+
+Badge
+
+Close-up exterior
+
+DO NOT classify as exterior:
+
+Backup camera screen
+
+Navigation screen
+
+Dashboard
+
+Seats
+
+Steering wheel
+
+Door panels
+
+Center console
+
+Roof liner
+
+Infotainment
+
+These remain interior.
+
+8. Interior Enhancement
+
+Interior photos keep original background.
+
+DO NOT remove background.
+
+DO NOT replace background.
+
+Instead:
+
+Professional AI enhancement.
+
+Increase clarity.
+
+Increase sharpness.
+
+Improve leather texture.
+
+Improve stitching.
+
+Improve dashboard contrast.
+
+Reduce noise.
+
+Recover highlights.
+
+Recover shadows.
+
+Correct white balance.
+
+Improve blacks.
+
+Improve chrome.
+
+Make the cabin look brand new.
+
+Target:
+
+Luxury manufacturer brochure quality.
+
+9. Publishing Payload
+
+Publishing MUST always use:
+
+AI processed exteriors
+
+Enhanced interiors
+
+Never use original photos if AI versions exist.
+
+Fallback only if processing fails.
+
+10. AI Progress inside Vehicle Detail
+
+Replace current "AI Photo Review".
+
+Show:
+
+Pipeline
+
+Classification
+
+Enhancement
+
+Background replacement
+
+Completed
+
+Before / After
+
+AI Score
+
+Quality Report
+
+Images generated
+
+Processing time
+
+Cost
+
+Vehicle status
+
+Everything live.
+
+11. Performance
+
+Use background processing.
+
+Never block the operator.
+
+Publish becomes instant because photos are already ready.
+
+12. Architecture Rule
+
+AI Photo Studio is now the central image engine.
+
+Everything related to photos belongs there:
+
+Classification
+
+Enhancement
+
+Background replacement
+
+Quality analysis
+
+Before/After
+
+Marketplace payload
+
+Future Instagram export
+
+Future Website export
+
+Future Ads export
+
+No duplicated AI modules anywhere else.
+
+13. Goal
+
+The final image should be indistinguishable from a professional automotive photo studio.
+
+If a dealer compares:
+
+Original dealership photo
+
+vs
+
+DealerPilot AI Photo Studio
+
+The AI version should always look noticeably more premium.
+
+The objective is not to "change the background." The objective is to create a photo that looks like it was professionally photographed in a luxury automotive studio.
