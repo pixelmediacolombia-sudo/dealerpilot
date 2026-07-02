@@ -23,12 +23,17 @@ import {
   asc,
   desc,
   eq,
+  ilike,
   inArray,
   isNull,
   ne,
   or,
   sql,
 } from "drizzle-orm";
+
+// Only Manassas-confirmed vehicles are eligible for publishing/recommendations.
+// Unknown or null lot locations go to Inventory Review.
+const MANASSAS_FILTER = ilike(vehiclesTable.lotLocation, "%manassas%");
 
 const router: IRouter = Router();
 
@@ -359,13 +364,15 @@ router.post("/auto-publish/batches", async (req, res) => {
   }
   const { dealerId, mode, count, scheduledAt } = parsed.data;
 
-  // Fetch all active/ready vehicles for this dealer
+  // Fetch all active/ready Manassas vehicles for this dealer.
+  // Unknown/null lot locations are excluded — they need Inventory Review first.
   const vehicles = await db
     .select()
     .from(vehiclesTable)
     .where(
       and(
         eq(vehiclesTable.dealerId, dealerId),
+        MANASSAS_FILTER,
         // Not already published or sold
         ne(vehiclesTable.status, "Published"),
         ne(vehiclesTable.status, "Sold"),
@@ -374,7 +381,7 @@ router.post("/auto-publish/batches", async (req, res) => {
     );
 
   if (vehicles.length === 0) {
-    res.status(422).json({ error: "No eligible vehicles found for this dealer" });
+    res.status(422).json({ error: "No eligible Manassas vehicles found for this dealer" });
     return;
   }
 
@@ -953,13 +960,14 @@ router.post("/auto-publish/dry-run", async (req, res) => {
   }
   const { dealerId, count } = parsed.data;
 
-  // Same vehicle selection as batch — but no DB writes (no jobs, no batch row)
+  // Same vehicle selection as batch — Manassas only, no DB writes
   const vehicles = await db
     .select()
     .from(vehiclesTable)
     .where(
       and(
         eq(vehiclesTable.dealerId, dealerId),
+        MANASSAS_FILTER,
         ne(vehiclesTable.status, "Published"),
         ne(vehiclesTable.status, "Sold"),
         ne(vehiclesTable.status, "Removed"),

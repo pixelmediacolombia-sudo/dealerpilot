@@ -10,19 +10,15 @@ import {
   vehiclesTable,
   vehicleImagesTable,
 } from "@workspace/db";
-import { and, asc, eq, inArray, isNull, or, ilike } from "drizzle-orm";
+import { and, asc, eq, inArray, ilike } from "drizzle-orm";
 import type { Logger } from "pino";
 import { computePhotoHash } from "./changeDetection";
 
 const ELIGIBLE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish"];
 
-// Only enqueue vehicles at the Manassas location.
-// Vehicles with lotLocation IS NULL (feed predates this field) are included
-// as a safe fallback until the real feed populates location data.
-const MANASSAS_FILTER = or(
-  isNull(vehiclesTable.lotLocation),
-  ilike(vehiclesTable.lotLocation, "%manassas%"),
-);
+// Only enqueue vehicles confirmed at the Manassas location.
+// Unknown/null locations go to Inventory Review, not AI Photo processing.
+const MANASSAS_FILTER = ilike(vehiclesTable.lotLocation, "%manassas%");
 
 export async function autoEnqueueAfterImport(
   dealerId: number,

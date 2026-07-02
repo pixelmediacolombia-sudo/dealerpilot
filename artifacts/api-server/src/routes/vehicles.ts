@@ -64,8 +64,17 @@ async function attachImages(vehicles: Vehicle[]) {
 }
 
 router.get("/vehicles/stats", async (req, res) => {
-  const rows = await db.select({ status: vehiclesTable.status }).from(vehiclesTable);
+  const rows = await db
+    .select({ status: vehiclesTable.status, lotLocation: vehiclesTable.lotLocation })
+    .from(vehiclesTable);
   const by = (s: string) => rows.filter((r) => r.status === s).length;
+
+  // Location breakdown — only count active inventory (not sold/removed/archived)
+  const active = rows.filter((r) => !["Sold/Removed", "Removed", "Archived"].includes(r.status));
+  const manassas = active.filter((r) => r.lotLocation && r.lotLocation.toLowerCase().includes("manassas")).length;
+  const fredericksburg = active.filter((r) => r.lotLocation && r.lotLocation.toLowerCase().includes("fredericksburg")).length;
+  const unknownLocation = active.filter((r) => !r.lotLocation || (!r.lotLocation.toLowerCase().includes("manassas") && !r.lotLocation.toLowerCase().includes("fredericksburg"))).length;
+
   res.json({
     total: rows.length,
     active: by("Active"),
@@ -74,6 +83,7 @@ router.get("/vehicles/stats", async (req, res) => {
     published: by("Published"),
     soldRemoved: by("Sold/Removed"),
     priceChanged: by("Price Changed"),
+    locationBreakdown: { manassas, fredericksburg, unknownLocation },
   });
 });
 

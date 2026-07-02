@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Search, Car, Tag, Activity, Share, Filter, LayoutGrid, CheckSquare } from "lucide-react";
+import { Search, Car, Tag, Activity, Share, Filter, LayoutGrid, CheckSquare, MapPin, AlertTriangle, Ban } from "lucide-react";
 import { PageHeader, KpiCard, AnimatedCounter, EmptyState } from "@/components/shared";
 import { VehicleCard } from "@/components/inventory/VehicleCard";
 import { FloatingBulkBar } from "@/components/inventory/FloatingBulkBar";
@@ -204,6 +204,41 @@ export function InventoryDashboard() {
               isLoading={statsLoading}
             />
           </div>
+
+          {/* Location breakdown */}
+          {stats && (() => {
+            const loc = (stats as Record<string, unknown> & typeof stats)["locationBreakdown"] as
+              | { manassas: number; fredericksburg: number; unknownLocation: number }
+              | undefined;
+            if (!loc) return null;
+            return (
+              <div className="flex flex-wrap gap-3">
+                <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-green-500/[0.06] border border-green-500/20">
+                  <MapPin className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                  <div>
+                    <div className="text-[10px] font-bold text-green-400 uppercase tracking-widest">Manassas — Publishable</div>
+                    <div className="text-lg font-bold text-white tabular-nums leading-tight">{loc.manassas}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                  <Ban className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                  <div>
+                    <div className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Fredericksburg — Excluded</div>
+                    <div className="text-lg font-bold text-muted-foreground/60 tabular-nums leading-tight">{loc.fredericksburg}</div>
+                  </div>
+                </div>
+                {loc.unknownLocation > 0 && (
+                  <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-amber-500/[0.06] border border-amber-500/20">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <div>
+                      <div className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Unknown Location — Needs Review</div>
+                      <div className="text-lg font-bold text-amber-400 tabular-nums leading-tight">{loc.unknownLocation}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Filters + selection toolbar */}
           <div className="glass-panel p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between z-10 sticky top-0">

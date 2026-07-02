@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { eq, and, desc, isNull, isNotNull, sql, count } from "drizzle-orm";
+import { eq, and, desc, ilike, isNull, isNotNull, sql, count } from "drizzle-orm";
 import {
   vehiclesTable,
   listingPerformanceTable,
@@ -474,10 +474,12 @@ router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
     .where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID))
     .orderBy(desc(vehicleIntelligenceTable.confidenceScore));
 
+  // Only surface recommendations for Manassas vehicles — unknown/null locations
+  // go to Inventory Review and must not appear in publishing recommendations.
   const vehicles = await db
     .select()
     .from(vehiclesTable)
-    .where(eq(vehiclesTable.dealerId, DEALER_ID));
+    .where(and(eq(vehiclesTable.dealerId, DEALER_ID), ilike(vehiclesTable.lotLocation, "%manassas%")));
 
   const vehicleMap = new Map(vehicles.map((v) => [v.id, v]));
 
