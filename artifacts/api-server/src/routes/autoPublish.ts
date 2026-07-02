@@ -31,12 +31,8 @@ import {
   sql,
 } from "drizzle-orm";
 
-// Only Manassas vehicles are eligible. null lot_location = default Manassas lot
-// (the CDN feed never sets this field, so null IS Manassas).
-const MANASSAS_FILTER = or(
-  ilike(vehiclesTable.lotLocation, "%manassas%"),
-  isNull(vehiclesTable.lotLocation),
-)!;
+// All eligible vehicles are scoped to dealer_id 1 (Alpha Motorsports, Manassas).
+const DEALER_FILTER = eq(vehiclesTable.dealerId, 1);
 
 const router: IRouter = Router();
 
@@ -375,7 +371,6 @@ router.post("/auto-publish/batches", async (req, res) => {
     .where(
       and(
         eq(vehiclesTable.dealerId, dealerId),
-        MANASSAS_FILTER,
         // Not already published or sold
         ne(vehiclesTable.status, "Published"),
         ne(vehiclesTable.status, "Sold"),
@@ -970,7 +965,6 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     .where(
       and(
         eq(vehiclesTable.dealerId, dealerId),
-        MANASSAS_FILTER,
         ne(vehiclesTable.status, "Published"),
         ne(vehiclesTable.status, "Sold"),
         ne(vehiclesTable.status, "Removed"),

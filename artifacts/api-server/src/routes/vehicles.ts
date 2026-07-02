@@ -63,10 +63,13 @@ async function attachImages(vehicles: Vehicle[]) {
   });
 }
 
+const DEALER_ID = 1;
+
 router.get("/vehicles/stats", async (req, res) => {
   const rows = await db
     .select({ status: vehiclesTable.status, lotLocation: vehiclesTable.lotLocation })
-    .from(vehiclesTable);
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.dealerId, DEALER_ID));
   const by = (s: string) => rows.filter((r) => r.status === s).length;
 
   // Location breakdown — only count active inventory (not sold/removed/archived)
@@ -93,13 +96,7 @@ router.get("/vehicles", async (req, res) => {
   const status = typeof req.query.status === "string" ? req.query.status : "";
   const sort = typeof req.query.sort === "string" ? req.query.sort : "newest";
 
-  // Always scope to Manassas store (null lot_location = default Manassas lot)
-  const manassasFilter = or(
-    ilike(vehiclesTable.lotLocation, "%manassas%"),
-    isNull(vehiclesTable.lotLocation),
-  )!;
-
-  const conditions: SQL[] = [manassasFilter];
+  const conditions: SQL[] = [eq(vehiclesTable.dealerId, DEALER_ID)];
   if (status) conditions.push(eq(vehiclesTable.status, status));
   if (q) {
     const like = `%${q}%`;

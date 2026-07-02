@@ -491,7 +491,7 @@ router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
   const vehicles = await db
     .select()
     .from(vehiclesTable)
-    .where(and(eq(vehiclesTable.dealerId, DEALER_ID), or(ilike(vehiclesTable.lotLocation, "%manassas%"), isNull(vehiclesTable.lotLocation))));
+    .where(eq(vehiclesTable.dealerId, DEALER_ID));
 
   const vehicleIds = vehicles.map((v) => v.id);
   const vehicleSet = new Set(vehicleIds);

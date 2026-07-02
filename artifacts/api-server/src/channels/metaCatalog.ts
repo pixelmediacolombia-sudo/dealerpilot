@@ -38,7 +38,8 @@
  */
 
 import { db, vehiclesTable, vehicleImagesTable, dealersTable, feedRunsTable } from "@workspace/db";
-import { eq, count, desc } from "drizzle-orm";
+import { and, eq, count, desc, ilike, isNull, or } from "drizzle-orm";
+
 
 export type FeedVersion = "v1" | "v2";
 

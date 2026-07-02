@@ -15,12 +15,6 @@ import {
 import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { computePhotoHash, hasChanged } from "../photo/changeDetection";
 
-// All UI queries are scoped to the Manassas store only.
-// null lot_location = default Manassas lot (feed never sets this field).
-const MANASSAS_FILTER = or(
-  ilike(vehiclesTable.lotLocation, "%manassas%"),
-  isNull(vehiclesTable.lotLocation),
-)!;
 
 // ── Multer: background image upload ─────────────────────────────────────────
 const bgUploadDir = path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos/backgrounds");
@@ -226,7 +220,6 @@ router.post("/photo-studio/enqueue-all", async (req: Request, res: Response) => 
       .where(
         and(
           eq(vehiclesTable.dealerId, dealerId),
-          MANASSAS_FILTER,
           inArray(vehiclesTable.status, ["Active", "Ready to Publish", "New"]),
         ),
       );
@@ -361,7 +354,6 @@ router.get("/photo-studio/stale-count", async (req: Request, res: Response) => {
       .where(
         and(
           eq(vehiclesTable.dealerId, dealerId),
-          MANASSAS_FILTER,
           eq(vehiclesTable.aiPhotoStatus, "Ready"),
           or(
             isNull(aiPhotoSetsTable.studioVersion),
@@ -417,7 +409,6 @@ router.post("/photo-studio/reprocess-stale", async (req: Request, res: Response)
       .where(
         and(
           eq(vehiclesTable.dealerId, dealerId),
-          MANASSAS_FILTER,
           eq(vehiclesTable.aiPhotoStatus, "Ready"),
           or(
             isNull(aiPhotoSetsTable.studioVersion),
@@ -849,7 +840,7 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
         total: sql<number>`count(*)`,
       })
       .from(vehiclesTable)
-      .where(and(eq(vehiclesTable.dealerId, 1), MANASSAS_FILTER));
+      .where(eq(vehiclesTable.dealerId, 1));
 
     const [imageStats] = await db
       .select({
@@ -905,7 +896,6 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
             .where(
               and(
                 eq(vehiclesTable.dealerId, 1),
-                MANASSAS_FILTER,
                 eq(vehiclesTable.aiPhotoStatus, "Ready"),
                 or(
                   isNull(aiPhotoSetsTable.studioVersion),

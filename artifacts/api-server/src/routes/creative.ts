@@ -19,12 +19,7 @@ import {
 } from "@workspace/db";
 import { and, asc, desc, eq, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
 
-// All UI queries are scoped to the Manassas store only.
-// null lot_location = default Manassas lot (feed never sets this field).
-const MANASSAS_FILTER = or(
-  ilike(vehiclesTable.lotLocation, "%manassas%"),
-  isNull(vehiclesTable.lotLocation),
-)!;
+const DEALER_ID = 1;
 
 const router: IRouter = Router();
 
@@ -182,7 +177,7 @@ router.get("/creative/studio", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status : "";
 
-  const conditions: SQL[] = [MANASSAS_FILTER];
+  const conditions: SQL[] = [eq(vehiclesTable.dealerId, DEALER_ID)];
   if (q) {
     const like = `%${q}%`;
     const search = or(

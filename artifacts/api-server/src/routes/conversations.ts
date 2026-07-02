@@ -11,12 +11,6 @@ import {
 } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
 
-// All UI queries are scoped to the Manassas store only.
-// null lot_location = default Manassas lot (feed never sets this field).
-const MANASSAS_FILTER = or(
-  ilike(vehiclesTable.lotLocation, "%manassas%"),
-  isNull(vehiclesTable.lotLocation),
-)!;
 
 const router = Router();
 
@@ -185,7 +179,7 @@ router.post("/conversations/intake", async (req, res) => {
     const vRow = await db
       .select()
       .from(vehiclesTable)
-      .where(and(eq(vehiclesTable.dealerId, DEALER_ID), MANASSAS_FILTER))
+      .where(eq(vehiclesTable.dealerId, DEALER_ID))
       .limit(20);
 
     const match = vRow.find((v) => {
