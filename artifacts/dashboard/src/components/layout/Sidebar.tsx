@@ -9,6 +9,7 @@ import {
   ChevronRight,
   BarChart3,
   Cpu,
+  Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGetDealer, useListDealers, getGetDealerQueryKey } from "@workspace/api-client-react";
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { name: "Marketplace AI", path: "/listings", icon: Sparkles },
   { name: "Inventory Ads", path: "/inventory-engine", icon: Cpu },
   { name: "AI Vehicle Studio", path: "/creative-studio", icon: Wand2 },
+  { name: "AI Photo Studio", path: "/ai-photo-studio", icon: Camera },
   { name: "Sales AI", path: "/sales-ai", icon: MessageSquare },
   { name: "Intelligence", path: "/marketplace-intelligence", icon: BarChart3 },
   { name: "Dealer DNA", path: "/dealer-dna", icon: Dna },
@@ -29,6 +31,7 @@ const ACTIVE_PATHS: Record<string, string[]> = {
   "/listings": ["/listings", "/inventory", "/publishing"],
   "/inventory-engine": ["/inventory-engine"],
   "/creative-studio": ["/creative-studio"],
+  "/ai-photo-studio": ["/ai-photo-studio"],
   "/sales-ai": ["/sales-ai", "/conversations", "/leads"],
   "/marketplace-intelligence": ["/marketplace-intelligence"],
   "/dealer-dna": ["/dealer-dna"],

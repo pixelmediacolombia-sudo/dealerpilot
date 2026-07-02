@@ -4,6 +4,7 @@ import {
   db,
   vehiclesTable,
   vehicleImagesTable,
+  aiPhotoImagesTable,
   dealersTable,
   listingsTable,
   listingVersionsTable,
@@ -15,6 +16,34 @@ import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { getMarketplacePricing } from "../listings/pricing";
 
 const router: IRouter = Router();
+
+/**
+ * Returns the best available photos for a vehicle.
+ * Prefers AI-processed photos from aiPhotoImagesTable when the vehicle has
+ * aiPhotoStatus = 'Done' and a valid aiPhotoSetId; falls back to raw vehicleImagesTable.
+ */
+async function getVehiclePhotos(
+  vehicleId: number,
+  aiPhotoSetId: number | null,
+  aiPhotoStatus: string | null,
+): Promise<Array<{ url: string | null; position: number | null; source: "ai" | "raw" }>> {
+  if (aiPhotoStatus === "Done" && aiPhotoSetId !== null) {
+    const aiImages = await db
+      .select()
+      .from(aiPhotoImagesTable)
+      .where(eq(aiPhotoImagesTable.setId, aiPhotoSetId))
+      .orderBy(asc(aiPhotoImagesTable.position));
+    if (aiImages.length > 0) {
+      return aiImages.map((img) => ({ url: img.processedUrl ?? img.originalUrl, position: img.position, source: "ai" as const }));
+    }
+  }
+  const rawImages = await db
+    .select()
+    .from(vehicleImagesTable)
+    .where(eq(vehicleImagesTable.vehicleId, vehicleId))
+    .orderBy(asc(vehicleImagesTable.position));
+  return rawImages.map((img) => ({ url: img.url, position: img.position, source: "raw" as const }));
+}
 
 type JobExtras = {
   vehicleLabel: string | null;
@@ -249,16 +278,13 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     .where(eq(vehicleIntelligenceTable.vehicleId, job.vehicleId))
     .orderBy(desc(vehicleIntelligenceTable.generatedAt))
     .limit(1);
-  const images = await db
-    .select()
-    .from(vehicleImagesTable)
-    .where(eq(vehicleImagesTable.vehicleId, job.vehicleId))
-    .orderBy(asc(vehicleImagesTable.position));
-
   if (!vehicle) {
     res.status(404).json({ error: "Vehicle not found for job" });
     return;
   }
+
+  const images = await getVehiclePhotos(vehicle.id, vehicle.aiPhotoSetId, vehicle.aiPhotoStatus);
+  const usingAiPhotos = images.length > 0 && images[0].source === "ai";
 
   const pricing = getMarketplacePricing(vehicle, intel?.recommendedDownPayment ?? null);
 
@@ -353,6 +379,7 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       recommendedDownPayment: pricing.recommendedDownPayment,
       pricingReason: pricing.pricingReason,
     },
+    usingAiPhotos,
     images: images.map((img) => {
       const url = img.url;
       if (!url) return url;
@@ -1006,11 +1033,16 @@ router.get("/publishing/jobs/:id/photo/:index", async (req, res) => {
     return;
   }
 
-  const images = await db
-    .select()
-    .from(vehicleImagesTable)
-    .where(eq(vehicleImagesTable.vehicleId, job.vehicleId))
-    .orderBy(asc(vehicleImagesTable.position));
+  const [vehicle] = await db
+    .select({ id: vehiclesTable.id, aiPhotoStatus: vehiclesTable.aiPhotoStatus, aiPhotoSetId: vehiclesTable.aiPhotoSetId })
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.id, job.vehicleId));
+
+  const images = await getVehiclePhotos(
+    job.vehicleId,
+    vehicle?.aiPhotoSetId ?? null,
+    vehicle?.aiPhotoStatus ?? null,
+  );
 
   const image = images[index];
   if (!image || !image.url) {

@@ -1,0 +1,286 @@
+Proceed, but make these architectural improvements before writing code.
+
+This is the foundation of DealerPilot AI Photo Studio and will later power:
+
+- Marketplace
+- Facebook Ads
+- Google Vehicle Ads
+- Dealer Website
+- Instagram
+- Future AI Creative Studio
+
+So build it as a reusable AI pipeline, not Marketplace-specific.
+
+==================================================
+1. Create an AI Job Queue
+==================================================
+
+Do NOT process photos directly from the Ready hook.
+
+Instead create:
+
+AI Processing Queue
+
+States:
+
+Pending
+Queued
+Processing
+Completed
+Failed
+Cancelled
+
+Exactly like Publishing Jobs.
+
+This gives us:
+
+- retries
+- monitoring
+- logs
+- scalability
+- future distributed workers
+
+==================================================
+2. Make every AI step modular
+==================================================
+
+Instead of one pipeline file, create stages.
+
+Stage 1
+Photo Classification
+
+Stage 2
+Background Removal
+
+Stage 3
+Background Composition
+
+Stage 4
+Lighting Enhancement
+
+Stage 5
+Quality Validation
+
+Stage 6
+Ordering
+
+Stage 7
+Publish Assets
+
+Each stage must be independently replaceable.
+
+==================================================
+3. AI Provider abstraction
+==================================================
+
+Never call Replicate directly from business logic.
+
+Create:
+
+PhotoAIProvider
+
+Current provider:
+
+Replicate
+
+Future providers:
+
+OpenAI
+Clipdrop
+RemoveBG
+AWS
+Custom Models
+
+Switch provider using configuration.
+
+==================================================
+4. Multiple Background Packs
+==================================================
+
+Do NOT hardcode Alpha Motorsport.
+
+Create:
+
+Studio Pack
+
+Example:
+
+Alpha Motorsport
+Koons
+Eastern
+Off Lease
+Arlington
+Dealer Custom
+
+Each dealer chooses:
+
+background
+logo safe zone
+vehicle offset
+lighting preset
+
+==================================================
+5. AI Metadata
+==================================================
+
+For every processed image store:
+
+Provider
+Model
+Processing time
+Confidence
+Classification
+Exterior/Interior
+Background version
+Prompt version
+CreatedAt
+
+Never lose provenance.
+
+==================================================
+6. Version AI outputs
+==================================================
+
+Do NOT overwrite AI photos.
+
+Store versions.
+
+Example:
+
+AI Set v1
+AI Set v2
+AI Set v3
+
+Marketplace can always use the latest Ready version.
+
+==================================================
+7. Smart change detection
+==================================================
+
+Hash should NOT only use image URLs.
+
+Hash should include:
+
+photo URLs
+dealer studio version
+background version
+AI model version
+processing preset version
+
+Otherwise changing the background won't regenerate images.
+
+==================================================
+8. Quality Gate
+==================================================
+
+Before marking AI Ready verify:
+
+vehicle detected
+no mirror cut
+no wheel cut
+logo visible
+resolution >= original
+no transparent holes
+background exists
+
+If quality fails:
+
+retry
+
+If still fails:
+
+use original image only for that photo.
+
+==================================================
+9. AI Dashboard
+==================================================
+
+Create a new page:
+
+AI Studio
+
+Show:
+
+Processing Queue
+
+Pending
+
+Running
+
+Completed
+
+Failed
+
+Average processing time
+
+Images processed today
+
+AI cost
+
+Provider
+
+==================================================
+10. Future-ready outputs
+==================================================
+
+Each AI photo should later support:
+
+Marketplace
+
+Facebook Ads
+
+Instagram
+
+Website
+
+Google Vehicle Ads
+
+without reprocessing.
+
+Generate once.
+
+Reuse everywhere.
+
+==================================================
+11. Performance
+==================================================
+
+Worker concurrency configurable.
+
+Never block publishing.
+
+AI processing should happen entirely in the background.
+
+Publishing simply consumes AI assets when Ready.
+
+==================================================
+12. Background placement
+==================================================
+
+Do NOT place the vehicle using fixed coordinates.
+
+Automatically detect:
+
+vehicle bounding box
+
+logo safe zone
+
+center of mass
+
+Scale and position dynamically so:
+
+- logo is never covered
+- vehicle is centered
+- wheels stay on the floor
+- shadows remain realistic
+
+==================================================
+13. Acceptance
+==================================================
+
+This module should become DealerPilot AI Studio,
+not Marketplace AI.
+
+Marketplace should only consume its outputs.
+
+The AI Studio must be reusable by every future product in DealerPilot.

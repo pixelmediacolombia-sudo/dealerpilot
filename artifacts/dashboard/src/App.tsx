@@ -22,6 +22,7 @@ import { LeadsCRM } from "@/pages/SalesAI/LeadsCRM";
 import { LeadDetail } from "@/pages/SalesAI/LeadDetail";
 import { MarketplaceIntelligence } from "@/pages/MarketplaceIntelligence";
 import { InventoryEngine } from "@/pages/InventoryEngine";
+import { AIPhotoStudio } from "@/pages/AIPhotoStudio";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,6 +60,7 @@ function Router() {
       <Route path="/marketplace-intelligence" component={MarketplaceIntelligence} />
 
       <Route path="/inventory-engine" component={InventoryEngine} />
+      <Route path="/ai-photo-studio" component={AIPhotoStudio} />
 
       <Route path="/dealer-dna" component={DealerDna} />
       <Route path="/connection-center" component={ConnectionCenter} />

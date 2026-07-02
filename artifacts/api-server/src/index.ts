@@ -6,6 +6,8 @@ import { startCreativeWorker } from "./creative/worker";
 import { seedMarketplaceIntelligence } from "./intelligence/seed";
 import { startInventoryScheduler } from "./inventory/scheduler";
 import { startStaleJobCleaner } from "./publishing/staleCleaner";
+import { seedAiStudio } from "./photo/seed";
+import { startPhotoWorker } from "./photo/worker";
 
 const rawPort = process.env["PORT"];
 
@@ -35,6 +37,8 @@ app.listen(port, (err) => {
     .then(() => seedMarketplaceIntelligence(logger))
     .then(() => startInventoryScheduler(logger))
     .then(() => startStaleJobCleaner(logger))
+    .then(() => seedAiStudio(logger))
+    .then(() => startPhotoWorker(logger))
     .catch((seedErr) => {
       logger.error({ err: seedErr }, "Failed to seed/start engines");
     });

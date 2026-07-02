@@ -14,6 +14,7 @@ import leadsRouter from "./leads";
 import simulatorRouter from "./simulator";
 import marketplaceIntelligenceRouter from "./marketplaceIntelligence";
 import channelsRouter from "./channels";
+import photoStudioRouter from "./photoStudio";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(leadsRouter);
 router.use(simulatorRouter);
 router.use(marketplaceIntelligenceRouter);
 router.use(channelsRouter);
+router.use(photoStudioRouter);
 
 export default router;

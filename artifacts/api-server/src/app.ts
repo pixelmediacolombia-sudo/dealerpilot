@@ -220,6 +220,13 @@ app.delete("/api/feed-audit-log", (_req: Request, res: Response) => {
   }
 });
 
+// ── AI Photo Studio static files ─────────────────────────────────────────────
+// Serves Sharp-composited vehicle photos written by the AI photo pipeline.
+// Directory: artifacts/api-server/uploads/ai-photos/ (created on demand by pipeline).
+const AI_PHOTOS_DIR = path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos");
+fs.mkdirSync(AI_PHOTOS_DIR, { recursive: true });
+app.use("/api/static/ai-photos", express.static(AI_PHOTOS_DIR, { maxAge: "1d" }));
+
 // ── API routes ───────────────────────────────────────────────────────────────
 app.use("/api", router);
 

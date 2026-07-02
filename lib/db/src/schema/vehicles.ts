@@ -31,6 +31,10 @@ export const vehiclesTable = pgTable(
     vdpUrl: text("vdp_url"),
     sourceRaw: text("source_raw"),
     status: text("status").notNull().default("New"),
+    // AI Photo Studio
+    // null | Pending | Processing | Ready | Failed | Skipped
+    aiPhotoStatus: text("ai_photo_status"),
+    aiPhotoSetId: integer("ai_photo_set_id"),
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
