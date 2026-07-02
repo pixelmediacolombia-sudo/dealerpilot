@@ -1,0 +1,518 @@
+DEALERPILOT — PRODUCTION REFACTOR v4.0
+
+DealerPilot is no longer a prototype.
+
+We are transitioning from a demo application into a production SaaS.
+
+Everything below is part of one architecture refactor.
+
+====================================================
+1. REMOVE ALL DEMO CONTENT
+====================================================
+
+DealerPilot must never ship with fake data.
+
+Delete permanently:
+
+• Simulated Buyer
+• Comprador Simulado
+• Demo conversations
+• Fake HOT/WARM/COLD conversations
+• Fake AI scores
+• Demo vehicles
+• Demo listings
+• Demo inventory
+• Demo recommendations
+• Demo photos
+• Old generated AI backgrounds
+• Seeded AI Photo Studio jobs
+• Placeholder statistics
+• Placeholder cards
+• Any development-only mock data
+
+Search the entire project for:
+
+seed
+mock
+demo
+fake
+sample
+placeholder
+simulated
+
+Remove every production-visible occurrence.
+
+When no data exists, show professional Empty States instead.
+
+====================================================
+2. SALES AI COMPLETE REDESIGN
+====================================================
+
+Sales AI should become the Marketplace CRM.
+
+NOT a demo inbox.
+
+New sections:
+
+------------------------------------------------
+
+NEW MESSAGES
+
+------------------------------------------------
+
+NEEDS FOLLOW UP
+
+------------------------------------------------
+
+APPOINTMENTS
+
+------------------------------------------------
+
+SOLD
+
+------------------------------------------------
+
+Every Marketplace listing belongs here.
+
+Each card displays:
+
+Vehicle Thumbnail
+
+Year Make Model
+
+Marketplace Listing Thumbnail
+
+Buyer Name
+
+Buyer Profile Picture (future)
+
+Lead Score
+
+AI Temperature
+
+Unread Messages
+
+Last Message
+
+Last Activity
+
+Published Date
+
+Assigned Salesperson
+
+BDC Owner
+
+Listing URL
+
+Buttons:
+
+Open Conversation
+
+Reply
+
+Open Listing
+
+Mark Appointment
+
+Mark Sold
+
+====================================================
+3. REMOVE FAKE CONVERSATIONS
+====================================================
+
+Sales AI must only display REAL Marketplace conversations.
+
+If there are zero conversations show:
+
+------------------------------------------------
+
+No Marketplace conversations yet.
+
+Publish your first vehicle.
+
+DealerPilot will automatically create conversations
+as buyers begin messaging your Marketplace listings.
+
+[ Open Marketplace AI ]
+
+------------------------------------------------
+
+Never insert fake buyers again.
+
+====================================================
+4. MARKETPLACE LISTINGS
+====================================================
+
+When a vehicle is successfully published:
+
+Automatically create:
+
+Marketplace Listing
+
+Database should store:
+
+vehicleId
+
+dealerId
+
+listingId
+
+listingUrl
+
+publishedAt
+
+status
+
+messages
+
+unread
+
+lastMessage
+
+assignedUser
+
+leadScore
+
+temperature
+
+Vehicle automatically disappears from:
+
+Ready Queue
+
+Today's Recommendations
+
+Publish Queue
+
+and appears inside
+
+Sales AI
+
+====================================================
+5. MERGE AI VEHICLE + AI PHOTO
+====================================================
+
+AI Vehicle Studio must no longer exist.
+
+Everything photo related belongs inside
+
+AI Photo Studio.
+
+There should be only ONE AI media system.
+
+====================================================
+6. AI PHOTO STUDIO REDESIGN
+====================================================
+
+Current screen only shows completed jobs.
+
+That is not useful.
+
+Instead the page becomes:
+
+------------------------------------
+
+Vehicle Photos
+
+------------------------------------
+
+Top:
+
+Vehicle information
+
+VIN
+
+Price
+
+Mileage
+
+Status
+
+Location
+
+Photo count
+
+AI Status
+
+------------------------------------
+
+Original Photos
+
+20-photo gallery
+
+------------------------------------
+
+AI Enhanced Photos
+
+20-photo gallery
+
+------------------------------------
+
+Before / After comparison
+
+Slider
+
+or
+
+Side-by-side
+
+------------------------------------
+
+Enhancement Report
+
+Resolution
+
+Sharpness
+
+Exposure
+
+Contrast
+
+Noise
+
+Lighting
+
+Reflection
+
+White Balance
+
+Marketplace Score
+
+AI Quality Score
+
+Processing Time
+
+Processing Cost
+
+------------------------------------
+
+Actions
+
+Reprocess
+
+Export
+
+Download
+
+Use Original
+
+Use Enhanced
+
+====================================================
+7. INVENTORY PHOTO VIEWER
+====================================================
+
+Every inventory vehicle should expose:
+
+Original gallery
+
+Enhanced gallery
+
+Before / After
+
+Photo classification
+
+Processing status
+
+No more hidden images.
+
+Operators must inspect every generated photo.
+
+====================================================
+8. AI PHOTO PIPELINE
+====================================================
+
+Pipeline remains automatic.
+
+Inventory Import
+
+↓
+
+Vehicle Ready
+
+↓
+
+AI Enhancement
+
+↓
+
+Photo Review
+
+↓
+
+Marketplace Ready
+
+↓
+
+Publish
+
+No manual intervention.
+
+====================================================
+9. AI ENHANCEMENT
+====================================================
+
+Background replacement remains disabled.
+
+Only enhancement.
+
+Exterior:
+
+Lighting
+
+Contrast
+
+Reflection
+
+Paint
+
+Glass
+
+Chrome
+
+Exposure
+
+Shadow recovery
+
+Interior:
+
+Leather
+
+Dashboard
+
+Seats
+
+Noise reduction
+
+Color correction
+
+4K appearance
+
+====================================================
+10. MARKETPLACE RECOMMENDATIONS
+====================================================
+
+Once a vehicle is published:
+
+Automatically remove from:
+
+Recommendations
+
+Today's Opportunities
+
+Ready Queue
+
+Publishing Queue
+
+The recommendation engine should immediately choose another candidate.
+
+Never recommend an already published vehicle.
+
+====================================================
+11. DASHBOARD CLEANUP
+====================================================
+
+Remove all unused pages.
+
+Remove duplicate pages.
+
+Remove dead routes.
+
+Remove old AI Vehicle Studio code.
+
+Remove obsolete components.
+
+Remove unused API endpoints.
+
+Remove abandoned tables if no longer referenced.
+
+Project should contain only production code.
+
+====================================================
+12. PRODUCTION EMPTY STATES
+====================================================
+
+Every page without data must display a professional empty state.
+
+Never placeholders.
+
+Never lorem ipsum.
+
+Never fake statistics.
+
+====================================================
+13. DATABASE CLEANUP
+====================================================
+
+Delete obsolete records:
+
+Old AI jobs
+
+Old demo jobs
+
+Old generated photos
+
+Old fake conversations
+
+Old fake listings
+
+Old recommendations
+
+Unused photo sets
+
+Unused AI assets
+
+Keep only production data.
+
+====================================================
+14. FINAL GOAL
+====================================================
+
+DealerPilot should feel like an enterprise SaaS.
+
+No demos.
+
+No fake content.
+
+No duplicated modules.
+
+Sales AI becomes the Marketplace CRM.
+
+AI Photo Studio becomes the media center.
+
+Marketplace AI becomes the publishing engine.
+
+Inventory becomes the source of truth.
+
+Every published vehicle flows automatically into Sales AI.
+
+Every photo has:
+
+Original
+
+Enhanced
+
+Comparison
+
+Quality report
+
+Every conversation is real.
+
+Every recommendation is actionable.
+
+Every screen should be production-ready.
+
+Before finishing, run a full project audit:
+
+• Dead code
+• Unused components
+• Duplicate routes
+• Duplicate APIs
+• Orphan database tables
+• Mock data
+• Demo assets
+• Old AI code
+• Broken imports
+
+Remove everything that is no longer required.
+
+The final result must be a clean, production-ready DealerPilot architecture suitable for deployment to real dealerships.

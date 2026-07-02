@@ -12,7 +12,6 @@ import { ListingDetail } from "@/pages/Listings/ListingDetail";
 import { ProductionReadiness } from "@/pages/Listings/ProductionReadiness";
 import { PublishingQueue } from "@/pages/Publishing";
 import { Redirect } from "wouter";
-import { CreativeStudio } from "@/pages/CreativeStudio";
 import { CreativeDetail } from "@/pages/CreativeStudio/CreativeDetail";
 import { DealerDna } from "@/pages/DealerDna";
 import { ConnectionCenter } from "@/pages/ConnectionCenter";

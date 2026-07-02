@@ -4,10 +4,8 @@ import { eq, count } from "drizzle-orm";
 import {
   vehiclesTable,
   creativeVersionsTable,
-  listingPerformanceTable,
   vehicleIntelligenceTable,
   type Vehicle,
-  type ListingPerformance,
 } from "@workspace/db";
 
 // ── Strategy Engine v2 ───────────────────────────────────────────────────────
@@ -232,68 +230,24 @@ function buildV2Explanation(params: {
   return JSON.stringify(payload);
 }
 
-// ── Supporting stats helpers ─────────────────────────────────────────────────
+// ── v2 Strategy Engine ───────────────────────────────────────────────────────
 
-function computeOutcomeScore(
-  conversationsCount: number,
-  hotLeadsCount: number,
-  warmLeadsCount: number,
-  appointmentReadyCount: number,
-  soldCount: number,
-): number {
-  if (conversationsCount === 0) return 0;
-  const raw =
-    hotLeadsCount * 25 +
-    warmLeadsCount * 10 +
-    appointmentReadyCount * 30 +
-    soldCount * 50;
-  return Math.min(100, Math.round(raw / conversationsCount));
-}
+type VehiclePerfRecord = {
+  dayOfWeek: number;
+  timeOfDay: number;
+  outcomeScore: number;
+  conversationsCount: number;
+  displayedPriceStrategy: string;
+};
 
 function avg(nums: number[]): number {
   if (nums.length === 0) return 0;
   return Math.round(nums.reduce((s, n) => s + n, 0) / nums.length);
 }
 
-function computeBestDayOfWeek(records: ListingPerformance[]): number {
-  if (records.length === 0) return 6;
-  const byDay = new Map<number, number[]>();
-  for (const r of records) {
-    const arr = byDay.get(r.dayOfWeek) ?? [];
-    arr.push(r.outcomeScore);
-    byDay.set(r.dayOfWeek, arr);
-  }
-  let bestDay = 6;
-  let bestScore = -1;
-  for (const [day, scores] of byDay.entries()) {
-    const a = avg(scores);
-    if (a > bestScore) { bestScore = a; bestDay = day; }
-  }
-  return bestDay;
-}
-
-function computeBestTimeOfDay(records: ListingPerformance[]): number {
-  if (records.length === 0) return 18;
-  const byTime = new Map<number, number[]>();
-  for (const r of records) {
-    const arr = byTime.get(r.timeOfDay) ?? [];
-    arr.push(r.outcomeScore);
-    byTime.set(r.timeOfDay, arr);
-  }
-  let bestTime = 18;
-  let bestScore = -1;
-  for (const [time, scores] of byTime.entries()) {
-    const a = avg(scores);
-    if (a > bestScore) { bestScore = a; bestTime = time; }
-  }
-  return bestTime;
-}
-
-// ── v2 Strategy Engine ───────────────────────────────────────────────────────
-
 function generateVehicleStrategy(
   vehicle: Vehicle,
-  vehiclePerf: ListingPerformance[],
+  vehiclePerf: VehiclePerfRecord[],
   globalStats: {
     bestDayOfWeek: number;
     bestTimeOfDay: number;
@@ -415,14 +369,13 @@ function generateVehicleStrategy(
 // ── Main seed function ────────────────────────────────────────────────────────
 
 export async function seedMarketplaceIntelligence(logger: Logger): Promise<void> {
-  // Auto-upgrade detection: check if existing data is v1 (no v2: prefix)
+  // Check if already seeded with v2 strategy engine
   const [existing] = await db
     .select({ cnt: count() })
-    .from(listingPerformanceTable)
-    .where(eq(listingPerformanceTable.dealerId, DEALER_ID));
+    .from(vehicleIntelligenceTable)
+    .where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID));
 
   if ((existing?.cnt ?? 0) > 0) {
-    // Check if already seeded with v2
     const [firstRec] = await db
       .select({ key: vehicleIntelligenceTable.recommendedTemplateKey })
       .from(vehicleIntelligenceTable)
@@ -430,15 +383,13 @@ export async function seedMarketplaceIntelligence(logger: Logger): Promise<void>
       .limit(1);
 
     const isV2 = firstRec?.key?.startsWith(V2_MARKER) ?? false;
-
     if (isV2) {
       logger.info("Marketplace intelligence already seeded with Strategy Engine v2; skipping");
       return;
     }
 
-    // Upgrade: clear v1 data and re-seed with v2
+    // Clear v1 data, re-seed with v2
     logger.info("Upgrading Marketplace Intelligence from v1 → Strategy Engine v2…");
-    await db.delete(listingPerformanceTable).where(eq(listingPerformanceTable.dealerId, DEALER_ID));
     await db.delete(vehicleIntelligenceTable).where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID));
   }
 
@@ -458,109 +409,18 @@ export async function seedMarketplaceIntelligence(logger: Logger): Promise<void>
     .where(eq(creativeVersionsTable.dealerId, DEALER_ID));
   const creativeVehicleIds = new Set(creativeVersions.map((cv) => cv.vehicleId));
 
-  // ── Generate listing_performance records ────────────────────────────────────
-  const now = new Date();
-  for (const vehicle of vehicles) {
-    const numRecords = 1 + Math.floor(Math.random() * 3);
-    const hasCreative = creativeVehicleIds.has(vehicle.id);
-    const truckSUV = isTruckOrSUV(vehicle.bodyStyle);
-    const luxury = isLuxury(vehicle.make);
-    const price = vehicle.price ?? 0;
-    const downTiers = getHistoricalDownTiers(price, truckSUV, luxury);
-
-    for (let i = 0; i < numRecords; i++) {
-      const dayOfWeek = weightedRandom(DAY_WEIGHTS);
-      const timeOfDay = weightedRandom(TIME_WEIGHTS);
-
-      // Strategy variation across records to build comparison data
-      let displayedPriceStrategy: string;
-      if (price < 16000) {
-        displayedPriceStrategy = "full_price";
-      } else if (truckSUV) {
-        displayedPriceStrategy = i % 3 === 2 ? "full_price" : "down_payment";
-      } else {
-        displayedPriceStrategy = i % 2 === 0 ? "down_payment" : "full_price";
-      }
-
-      // v2 realistic down payment — never $500
-      const publishedDownPayment =
-        displayedPriceStrategy === "down_payment"
-          ? (downTiers[Math.floor(Math.random() * downTiers.length)] ?? downTiers[0] ?? 2000)
-          : null;
-
-      const photoStrategy = hasCreative && i === 0 ? "ai_creative" : "original";
-
-      // Outcome simulation with realistic bonuses
-      const timingBonus =
-        (dayOfWeek === 6 || dayOfWeek === 5) && timeOfDay >= 17 && timeOfDay <= 20 ? 1.6
-          : dayOfWeek === 0 && timeOfDay >= 14 ? 1.3
-          : 1.0;
-      const typeBonus = truckSUV ? 1.5 : luxury ? 0.85 : 1.0;
-      const photoBonus = photoStrategy === "ai_creative" ? 1.35 : 1.0;
-      const downBonus = displayedPriceStrategy === "down_payment" ? 1.2 : 1.0;
-
-      const baseConvos = 2 + Math.random() * 9;
-      const conversationsCount = Math.max(1, Math.round(baseConvos * timingBonus * typeBonus));
-      const hotLeadsCount = Math.round(
-        Math.min(Math.random() * (conversationsCount / 2.5), conversationsCount) * photoBonus * downBonus,
-      );
-      const warmLeadsCount = Math.min(
-        Math.round(Math.random() * (conversationsCount / 2)),
-        conversationsCount - hotLeadsCount,
-      );
-      const coldLeadsCount = Math.max(0, conversationsCount - hotLeadsCount - warmLeadsCount);
-      const appointmentReadyCount = Math.round(hotLeadsCount * (0.4 + Math.random() * 0.4));
-      const soldCount = Math.round(appointmentReadyCount * (0.2 + Math.random() * 0.3));
-      const outcomeScore = computeOutcomeScore(
-        conversationsCount, hotLeadsCount, warmLeadsCount, appointmentReadyCount, soldCount,
-      );
-
-      const publishedAt = new Date(now);
-      publishedAt.setDate(publishedAt.getDate() - Math.floor(Math.random() * 90));
-
-      await db.insert(listingPerformanceTable).values({
-        vehicleId: vehicle.id,
-        dealerId: DEALER_ID,
-        year: vehicle.year,
-        make: vehicle.make,
-        model: vehicle.model,
-        vehicleType: vehicle.bodyStyle ?? "Sedan",
-        retailPrice: vehicle.price,
-        displayedPriceStrategy,
-        publishedDownPayment,
-        photoStrategy,
-        listingVersion: 1 + Math.floor(Math.random() * 3),
-        creativeVersion: hasCreative ? 1 + Math.floor(Math.random() * 2) : null,
-        dayOfWeek,
-        timeOfDay,
-        publishedAt,
-        conversationsCount,
-        hotLeadsCount,
-        warmLeadsCount,
-        coldLeadsCount,
-        appointmentReadyCount,
-        soldCount,
-        outcomeScore,
-      });
-    }
-  }
-
-  // ── Generate vehicle_intelligence with v2 strategy engine ────────────────────
-  const allPerf = await db
-    .select()
-    .from(listingPerformanceTable)
-    .where(eq(listingPerformanceTable.dealerId, DEALER_ID));
-
+  // Use statistical defaults — no fake historical performance records.
+  // Strategy is derived algorithmically from vehicle attributes (type, price, make).
+  // Real performance data will populate as vehicles are published and buyers engage.
   const globalStats = {
-    bestDayOfWeek: computeBestDayOfWeek(allPerf),
-    bestTimeOfDay: computeBestTimeOfDay(allPerf),
-    sampleSize: allPerf.length,
+    bestDayOfWeek: 6,   // Saturday — statistically peak Marketplace day
+    bestTimeOfDay: 18,  // 6 pm — peak engagement window
+    sampleSize: 0,
   };
 
   for (const vehicle of vehicles) {
-    const vehiclePerf = allPerf.filter((p) => p.vehicleId === vehicle.id);
     const hasCreative = creativeVehicleIds.has(vehicle.id);
-    const strategy = generateVehicleStrategy(vehicle, vehiclePerf, globalStats, hasCreative);
+    const strategy = generateVehicleStrategy(vehicle, [], globalStats, hasCreative);
 
     await db
       .insert(vehicleIntelligenceTable)
@@ -572,7 +432,7 @@ export async function seedMarketplaceIntelligence(logger: Logger): Promise<void>
   }
 
   logger.info(
-    { vehicles: vehicles.length, records: allPerf.length, engine: STRATEGY_ENGINE_VERSION },
+    { vehicles: vehicles.length, engine: STRATEGY_ENGINE_VERSION },
     "Marketplace Intelligence seeded with Strategy Engine v2",
   );
 }

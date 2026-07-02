@@ -77,7 +77,7 @@ export function LeadsCRM() {
             <EmptyState
               icon={Users}
               title="No leads yet"
-              description="Run a simulator scenario in Sales AI to generate your first leads, or connect the Chrome extension to start receiving real buyer conversations."
+              description="Leads appear here automatically when buyers message your Marketplace listings. Publish your first vehicle to start receiving inquiries."
             />
           ) : (
             <div className="overflow-x-auto pb-4">

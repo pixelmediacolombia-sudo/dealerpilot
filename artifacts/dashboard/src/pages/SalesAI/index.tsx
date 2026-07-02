@@ -1,556 +1,478 @@
 import { useState } from "react";
-import { useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
-import {
-  useListConversations,
-  useListLeads,
-  useGetDownPaymentIntelligence,
-  useListSimulatorScenarios,
-  useRunSimulator,
-} from "@workspace/api-client-react";
-import {
-  PageHeader,
-  KpiCard,
-  EmptyState,
-  SectionCard,
-  StatusPulse,
-} from "@/components/shared";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   MessageSquare,
-  Users,
   Calendar,
-  Bot,
-  Zap,
-  ArrowRight,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  Car,
+  Loader2,
+  Radio,
+  ShoppingCart,
+  ChevronRight,
+  Inbox,
   Flame,
   Thermometer,
   Snowflake,
-  TrendingUp,
-  Play,
-  CheckCircle2,
-  Clock,
-  DollarSign,
-  Car,
-  Phone,
-  Radio,
+  AlertTriangle,
+  XCircle,
+  Bot,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
+const API_BASE = "/api";
 const DEALER_ID = 1;
 
-function temperatureIcon(temp: string | null | undefined) {
-  if (temp === "Hot") return <Flame className="w-3.5 h-3.5 text-red-400" />;
-  if (temp === "Warm") return <Thermometer className="w-3.5 h-3.5 text-orange-400" />;
-  return <Snowflake className="w-3.5 h-3.5 text-blue-400" />;
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface ListingVehicle {
+  id: number;
+  year: number | null;
+  make: string;
+  model: string;
+  trim: string | null;
+  price: number | null;
+  mileage: number | null;
+  stockNumber: string | null;
+  status: string;
 }
 
-function temperatureBadge(temp: string | null | undefined) {
-  if (temp === "Hot") return "bg-red-500/10 text-red-400 border-red-500/20";
-  if (temp === "Warm") return "bg-orange-500/10 text-orange-400 border-orange-500/20";
-  return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+interface MarketplaceListing {
+  id: number;
+  vehicleId: number;
+  dealerId: number;
+  listingUrl: string | null;
+  publishedAt: string | null;
+  status: string;
+  messagesReceived: number;
+  unreadMessages: number;
+  lastMessageAt: string | null;
+  assignedTo: string | null;
+  leadQuality: string | null;
+  notes: string | null;
+  vehicle: ListingVehicle;
+  thumbnailUrl: string | null;
 }
 
-function statusBadge(status: string) {
-  const map: Record<string, string> = {
-    New: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    Contacted: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-    Qualified: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    "Appointment Ready": "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-    "Appointment Set": "bg-green-500/10 text-green-400 border-green-500/20",
-    Sold: "bg-primary/10 text-primary border-primary/20",
-    Lost: "bg-white/5 text-muted-foreground border-white/10",
+// ── API ───────────────────────────────────────────────────────────────────────
+
+async function fetchListings(): Promise<{ listings: MarketplaceListing[] }> {
+  const r = await fetch(`${API_BASE}/marketplace-listings?dealerId=${DEALER_ID}`);
+  if (!r.ok) throw new Error("Failed to fetch listings");
+  return r.json() as Promise<{ listings: MarketplaceListing[] }>;
+}
+
+async function patchListing(id: number, body: { status?: string }) {
+  const r = await fetch(`${API_BASE}/marketplace-listings/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error("Update failed");
+  return r.json();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function fmtPrice(p: number | null) {
+  if (!p) return "—";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(p);
+}
+
+function fmtRelative(iso: string | null): string {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function LeadBadge({ q }: { q: string | null }) {
+  if (!q) return null;
+  const map: Record<string, { cls: string; icon: React.ElementType }> = {
+    Hot: { cls: "bg-red-500/10 text-red-400 border-red-500/20", icon: Flame },
+    Warm: { cls: "bg-orange-500/10 text-orange-400 border-orange-500/20", icon: Thermometer },
+    Cold: { cls: "bg-blue-500/10 text-blue-400 border-blue-500/20", icon: Snowflake },
   };
-  return map[status] ?? "bg-secondary/50";
+  const cfg = map[q] ?? map["Cold"]!;
+  const Icon = cfg.icon;
+  return (
+    <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide", cfg.cls)}>
+      <Icon className="w-2.5 h-2.5" />{q}
+    </span>
+  );
 }
 
-type Tab = "conversations" | "leads" | "down-payment" | "simulator";
+// ── CRM Listing Card ──────────────────────────────────────────────────────────
+
+function CrmCard({
+  listing,
+  onMarkAppointment,
+  onMarkSold,
+  busy,
+}: {
+  listing: MarketplaceListing;
+  onMarkAppointment: () => void;
+  onMarkSold: () => void;
+  busy: boolean;
+}) {
+  const { vehicle } = listing;
+  const vehicleName = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(" ");
+  const [, navigate] = useLocation();
+
+  return (
+    <div className="flex gap-3 p-4 rounded-xl bg-card border border-white/[0.06] hover:border-white/10 transition-colors">
+      {/* Thumbnail */}
+      <div className="w-20 h-16 rounded-lg bg-white/[0.02] border border-white/[0.04] overflow-hidden shrink-0">
+        {listing.thumbnailUrl ? (
+          <img src={listing.thumbnailUrl} alt={vehicleName} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Car className="w-6 h-6 text-muted-foreground/20" />
+          </div>
+        )}
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-white truncate">{vehicleName}</div>
+            <div className="text-xs text-muted-foreground/70">{fmtPrice(vehicle.price)}{vehicle.mileage ? ` · ${vehicle.mileage.toLocaleString()} mi` : ""}</div>
+          </div>
+          <LeadBadge q={listing.leadQuality} />
+        </div>
+
+        {/* Message row */}
+        <div className="flex items-center gap-2 text-[11px]">
+          {listing.unreadMessages > 0 ? (
+            <span className="flex items-center gap-1 font-bold text-blue-400">
+              <MessageSquare className="w-3 h-3" />
+              {listing.unreadMessages} unread
+            </span>
+          ) : listing.messagesReceived > 0 ? (
+            <span className="flex items-center gap-1 text-green-400/80">
+              <MessageSquare className="w-3 h-3" />
+              {listing.messagesReceived} message{listing.messagesReceived !== 1 ? "s" : ""}
+            </span>
+          ) : null}
+          {listing.lastMessageAt && (
+            <span className="text-muted-foreground/50">{fmtRelative(listing.lastMessageAt)}</span>
+          )}
+        </div>
+
+        {/* Meta row */}
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground/50">
+          <span className="flex items-center gap-1">
+            <Clock className="w-2.5 h-2.5" />
+            Published {fmtDate(listing.publishedAt)}
+          </span>
+          {listing.assignedTo && (
+            <span className="flex items-center gap-1">→ {listing.assignedTo}</span>
+          )}
+        </div>
+
+        {/* Action row */}
+        <div className="flex items-center gap-1.5 pt-0.5">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-[10px] font-bold uppercase tracking-wide border-white/10 hover:bg-white/[0.04]"
+            onClick={() => navigate(`/conversations?vehicleId=${vehicle.id}`)}
+          >
+            <MessageSquare className="w-2.5 h-2.5 mr-1" />
+            Conversation
+          </Button>
+          {listing.listingUrl && (
+            <a href={listing.listingUrl} target="_blank" rel="noopener noreferrer">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-[10px] font-bold uppercase tracking-wide border-white/10 hover:bg-white/[0.04]"
+              >
+                <ExternalLink className="w-2.5 h-2.5 mr-1" />
+                Listing
+              </Button>
+            </a>
+          )}
+          {listing.status !== "Appointment" && listing.status !== "Sold" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-[10px] font-bold uppercase tracking-wide border-green-500/20 text-green-400/80 hover:bg-green-500/[0.06]"
+              onClick={onMarkAppointment}
+              disabled={busy}
+            >
+              {busy ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Calendar className="w-2.5 h-2.5 mr-1" />}
+              Appointment
+            </Button>
+          )}
+          {listing.status !== "Sold" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-[10px] font-bold uppercase tracking-wide border-primary/25 text-primary/80 hover:bg-primary/[0.06]"
+              onClick={onMarkSold}
+              disabled={busy}
+            >
+              {busy ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <ShoppingCart className="w-2.5 h-2.5 mr-1" />}
+              Sold
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Section ───────────────────────────────────────────────────────────────────
+
+function CrmSection({
+  title,
+  icon,
+  accent,
+  listings,
+  onMarkAppointment,
+  onMarkSold,
+  busyId,
+}: {
+  title: string;
+  icon: React.ElementType;
+  accent: string;
+  listings: MarketplaceListing[];
+  onMarkAppointment: (id: number) => void;
+  onMarkSold: (id: number) => void;
+  busyId: number | null;
+}) {
+  const Icon = icon;
+  if (listings.length === 0) return null;
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <div className={cn("w-5 h-5 rounded flex items-center justify-center", accent)}>
+          <Icon className="w-3 h-3" />
+        </div>
+        <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{title}</span>
+        <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded-full", accent)}>{listings.length}</span>
+        <div className="flex-1 h-px bg-white/[0.04]" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+        {listings.map((l) => (
+          <CrmCard
+            key={l.id}
+            listing={l}
+            onMarkAppointment={() => onMarkAppointment(l.id)}
+            onMarkSold={() => onMarkSold(l.id)}
+            busy={busyId === l.id}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export function SalesAIWorkspace() {
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const [, navigate] = useLocation();
-  const [tab, setTab] = useState<Tab>("conversations");
-  const [runningScenario, setRunningScenario] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState<{
-    suggestedReply: string;
-    temperature: string;
-    leadScore: number;
-    language: string;
-    messages: string[];
-    conversationId: number;
-    leadId: number;
-  } | null>(null);
 
-  const { data: convsData, isLoading: convsLoading } = useListConversations({ dealerId: DEALER_ID });
-  const { data: leadsData, isLoading: leadsLoading } = useListLeads({ dealerId: DEALER_ID });
-  const { data: dpData } = useGetDownPaymentIntelligence({ dealerId: DEALER_ID });
-  const { data: scenariosData } = useListSimulatorScenarios();
-  const { mutateAsync: runSim } = useRunSimulator();
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["marketplace-listings"],
+    queryFn: fetchListings,
+    refetchInterval: 30_000,
+  });
 
-  const conversations = convsData?.conversations ?? [];
-  const leads = leadsData?.leads ?? [];
-  const dpSummary = dpData?.summary ?? [];
-  const scenarios = scenariosData?.scenarios ?? [];
+  const mutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) => patchListing(id, { status }),
+    onMutate: ({ id }) => setBusyId(id),
+    onSuccess: (_, { status }) => {
+      toast({ title: status === "Sold" ? "Marked as Sold" : "Appointment set" });
+      void qc.invalidateQueries({ queryKey: ["marketplace-listings"] });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onSettled: () => setBusyId(null),
+  });
 
-  const hotLeads = leads.filter((l) => l.temperature === "Hot");
-  const warmLeads = leads.filter((l) => l.temperature === "Warm");
-  const apptReady = leads.filter(
-    (l) => l.status === "Appointment Ready" || l.status === "Appointment Set",
-  );
-  const waiting = conversations.filter((c) => c.status === "active");
+  const all = data?.listings ?? [];
 
-  async function handleRunScenario(key: string) {
-    setRunningScenario(key);
-    setLastResult(null);
-    try {
-      const result = await runSim({ data: { scenarioKey: key } });
-      setLastResult(result);
-      setTab("conversations");
-    } catch (_e) {
-    } finally {
-      setRunningScenario(null);
-    }
-  }
+  // ── CRM sections ─────────────────────────────────────────────────────────────
+  const newMessages  = all.filter((l) => l.unreadMessages > 0);
+  const needsFollowUp = all.filter((l) => l.messagesReceived > 0 && l.unreadMessages === 0 && l.status !== "Appointment" && l.status !== "Sold");
+  const appointments = all.filter((l) => l.status === "Appointment");
+  const sold         = all.filter((l) => l.status === "Sold");
+  const liveCount    = all.filter((l) => l.status === "Live" || l.status === "Appointment").length;
 
-  const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
-    { key: "conversations", label: "Conversations", icon: MessageSquare },
-    { key: "leads", label: "Leads CRM", icon: Users },
-    { key: "down-payment", label: "Down Payment Intel", icon: TrendingUp },
-    { key: "simulator", label: "Simulator", icon: Play },
-  ];
+  const hasAny = all.length > 0;
+  const hasEngagement = newMessages.length + needsFollowUp.length + appointments.length + sold.length > 0;
 
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto animate-in fade-in duration-500">
-        <div className="p-8 max-w-7xl mx-auto space-y-8">
-          <PageHeader
-            eyebrow="SALES AI"
-            title="Sales AI Workspace"
-            description={
-              <div>
-                DealerPilot monitors Messenger conversations, qualifies buyers,
-                and suggests replies — 24/7.
-              </div>
-            }
-            icon={Bot}
-          />
+        <div className="p-6 max-w-7xl mx-auto space-y-6">
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KpiCard
-              label="Conversations waiting"
-              value={waiting.length}
-              icon={MessageSquare}
-              valueColor="text-primary"
-            />
-            <KpiCard
-              label="Hot leads"
-              value={hotLeads.length}
-              icon={Flame}
-              valueColor="text-red-400"
-            />
-            <KpiCard
-              label="Warm leads"
-              value={warmLeads.length}
-              icon={Thermometer}
-              valueColor="text-orange-400"
-            />
-            <KpiCard
-              label="Appointment ready"
-              value={apptReady.length}
-              icon={Calendar}
-              valueColor="text-green-400"
-            />
-          </div>
-
-          {/* Marketplace Listings quick-access card */}
-          <Link href="/sales-ai/marketplace-listings">
-            <div className="group flex items-center gap-4 p-4 rounded-xl border border-white/[0.06] bg-card hover:border-green-500/20 hover:bg-green-500/[0.02] transition-all cursor-pointer">
-              <div className="w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center shrink-0">
-                <Radio className="w-5 h-5 text-green-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-white group-hover:text-green-300 transition-colors">
-                  Marketplace Listings
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-primary" />
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  View live listings, track messages, and manage sold vehicles
+                <div>
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">SALES AI</div>
+                  <h1 className="text-xl font-semibold text-white tracking-tight leading-none">Marketplace CRM</h1>
                 </div>
               </div>
-              <ArrowRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-green-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+              <p className="text-sm text-muted-foreground ml-10">
+                DealerPilot monitors your Marketplace listings and buyer conversations 24/7.
+              </p>
             </div>
-          </Link>
-
-          {lastResult && (
-            <div className="p-5 rounded-2xl border border-green-500/20 bg-green-500/5">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle2 className="w-4 h-4 text-green-400" />
-                <span className="text-[11px] font-bold text-green-400 uppercase tracking-widest">
-                  Simulator ran — conversation #{lastResult.conversationId} created
-                </span>
-                <Badge
-                  variant="outline"
-                  className={cn("ml-auto text-[9px] font-bold uppercase tracking-widest", temperatureBadge(lastResult.temperature))}
-                >
-                  {lastResult.temperature} · Score {lastResult.leadScore}
-                </Badge>
-              </div>
-              <div className="bg-card/60 rounded-xl p-4 border border-white/5">
-                <div className="flex items-center gap-2 mb-2">
-                  <Bot className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">
-                    AI Reply ({lastResult.language === "es" ? "Spanish" : "English"})
-                  </span>
-                </div>
-                <p className="text-sm text-foreground/90">{lastResult.suggestedReply}</p>
-              </div>
+            <div className="flex gap-2">
               <Button
-                size="sm"
                 variant="outline"
-                className="mt-3 gap-2 border-green-500/20 text-green-400 hover:bg-green-500/10 text-[10px] font-bold uppercase tracking-widest"
-                onClick={() => navigate(`/conversations/${lastResult.conversationId}`)}
+                size="sm"
+                className="text-xs gap-1.5 border-white/10 hover:bg-white/[0.04]"
+                onClick={() => navigate("/leads")}
               >
-                View conversation <ArrowRight className="w-3 h-3" />
+                <ChevronRight className="w-3.5 h-3.5" />
+                Leads CRM
               </Button>
             </div>
-          )}
+          </div>
 
-          <div className="flex gap-1 p-1 bg-card/40 rounded-xl border border-white/5 w-fit">
-            {tabs.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all",
-                  tab === t.key
-                    ? "bg-primary/10 text-primary border border-primary/20"
-                    : "text-muted-foreground hover:text-white/70",
-                )}
-              >
-                <t.icon className="w-3.5 h-3.5" />
-                {t.label}
-              </button>
+          {/* KPI row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: "Live Listings", value: liveCount, icon: Radio, color: "text-green-400" },
+              { label: "New Messages", value: newMessages.length, icon: MessageSquare, color: newMessages.length > 0 ? "text-blue-400" : "text-muted-foreground" },
+              { label: "Appointments", value: appointments.length, icon: Calendar, color: appointments.length > 0 ? "text-amber-400" : "text-muted-foreground" },
+              { label: "Sold", value: sold.length, icon: CheckCircle2, color: sold.length > 0 ? "text-primary" : "text-muted-foreground" },
+            ].map((kpi) => (
+              <div key={kpi.label} className="bg-card border border-white/[0.06] rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wide">{kpi.label}</span>
+                  <kpi.icon className={cn("w-4 h-4", kpi.color)} />
+                </div>
+                <div className={cn("text-2xl font-bold tabular-nums", kpi.color)}>{kpi.value}</div>
+              </div>
             ))}
           </div>
 
-          {tab === "conversations" && (
-            <SectionCard title="Active Conversations" icon={MessageSquare}>
-              {convsLoading ? (
-                <div className="py-12 flex justify-center">
-                  <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                </div>
-              ) : conversations.length === 0 ? (
-                <EmptyState
-                  icon={MessageSquare}
-                  title="No conversations yet"
-                  description="Run a simulator scenario or connect the Chrome extension to start receiving buyer messages."
-                />
-              ) : (
-                <div className="space-y-3">
-                  {conversations.map((c) => {
-                    const lead = c.lead as {
-                      temperature?: string;
-                      leadScore?: number;
-                      status?: string;
-                    } | null;
-                    const lastMsg = c.lastMessage as { content?: string; role?: string } | null;
-                    return (
-                      <div
-                        key={c.id}
-                        className="p-5 rounded-xl border border-white/5 bg-card/40 hover:bg-card/70 hover:border-primary/20 transition-all cursor-pointer group"
-                        onClick={() => navigate(`/conversations/${c.id}`)}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <StatusPulse
-                              status={c.status === "active" ? "blue" : "default"}
-                            />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-bold text-sm text-white/90 truncate">
-                                  {c.buyerName ?? "Unknown Buyer"}
-                                </span>
-                                {c.language === "es" && (
-                                  <Badge variant="outline" className="text-[9px] px-1.5 border-white/10 text-muted-foreground">
-                                    ES
-                                  </Badge>
-                                )}
-                              </div>
-                              {c.detectedVehicleTitle && (
-                                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                  <Car className="w-3 h-3" />
-                                  {c.detectedVehicleTitle}
-                                  {c.marketplaceDownPayment ? (
-                                    <span className="ml-2 text-primary font-medium">
-                                      ${c.marketplaceDownPayment.toLocaleString()} down
-                                    </span>
-                                  ) : null}
-                                </div>
-                              )}
-                              {lastMsg && (
-                                <p className="text-xs text-muted-foreground/70 mt-1 truncate max-w-xs">
-                                  {lastMsg.role === "assistant" ? "↩ " : ""}
-                                  {lastMsg.content}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2 shrink-0">
-                            {lead?.temperature && (
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "text-[9px] font-bold uppercase tracking-widest flex items-center gap-1",
-                                  temperatureBadge(lead.temperature),
-                                )}
-                              >
-                                {temperatureIcon(lead.temperature)}
-                                {lead.temperature}
-                              </Badge>
-                            )}
-                            {lead?.leadScore != null && (
-                              <span className="text-[10px] text-muted-foreground">
-                                Score {lead.leadScore}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="mt-3 flex justify-end">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="gap-1.5 h-7 text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary"
-                          >
-                            View <ArrowRight className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </SectionCard>
-          )}
-
-          {tab === "leads" && (
-            <SectionCard title="Leads Pipeline" icon={Users}>
-              {leadsLoading ? (
-                <div className="py-12 flex justify-center">
-                  <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                </div>
-              ) : leads.length === 0 ? (
-                <EmptyState
-                  icon={Users}
-                  title="No leads yet"
-                  description="Run a simulator scenario to generate your first leads."
-                />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {(["Hot", "Warm", "Cold"] as const).map((temp) => {
-                    const group = leads.filter((l) => l.temperature === temp);
-                    return (
-                      <div key={temp} className="space-y-3">
-                        <div className="flex items-center gap-2 mb-3">
-                          {temperatureIcon(temp)}
-                          <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                            {temp} · {group.length}
-                          </span>
-                        </div>
-                        {group.length === 0 ? (
-                          <div className="p-4 rounded-xl border border-dashed border-white/10 text-center text-xs text-muted-foreground/50">
-                            No {temp.toLowerCase()} leads
-                          </div>
-                        ) : (
-                          group.map((lead) => (
-                            <div
-                              key={lead.id}
-                              className="p-4 rounded-xl border border-white/5 bg-card/40 hover:bg-card/70 hover:border-primary/20 transition-all cursor-pointer"
-                              onClick={() => navigate(`/leads/${lead.id}`)}
-                            >
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <span className="font-bold text-sm text-white/90 truncate">
-                                  {lead.buyerName ?? "Buyer"}
-                                </span>
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    "text-[9px] font-bold uppercase tracking-widest shrink-0",
-                                    statusBadge(lead.status),
-                                  )}
-                                >
-                                  {lead.status}
-                                </Badge>
-                              </div>
-                              <div className="space-y-1">
-                                {lead.publishedDownPayment && (
-                                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                    <DollarSign className="w-3 h-3" />
-                                    Published: ${lead.publishedDownPayment.toLocaleString()}
-                                  </div>
-                                )}
-                                {lead.buyerAvailableDownPayment && (
-                                  <div className="flex items-center gap-1 text-[11px] text-primary">
-                                    <DollarSign className="w-3 h-3" />
-                                    Buyer has: ${lead.buyerAvailableDownPayment.toLocaleString()}
-                                  </div>
-                                )}
-                                {lead.phone && (
-                                  <div className="flex items-center gap-1 text-[11px] text-emerald-400">
-                                    <Phone className="w-3 h-3" />
-                                    {lead.phone}
-                                  </div>
-                                )}
-                              </div>
-                              {lead.leadScore != null && (
-                                <div className="mt-2 h-1 bg-white/5 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-primary rounded-full"
-                                    style={{ width: `${Math.min(lead.leadScore, 100)}%` }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </SectionCard>
-          )}
-
-          {tab === "down-payment" && (
-            <SectionCard title="Down Payment Performance" icon={TrendingUp}>
-              {dpData?.total === 0 ? (
-                <EmptyState
-                  icon={TrendingUp}
-                  title="No data yet"
-                  description="Run simulator scenarios to generate down payment intelligence data."
-                />
-              ) : (
-                <div className="space-y-8">
-                  {dpSummary.map((group) => (
-                    <div key={group.vehicleType}>
-                      <div className="flex items-center gap-2 mb-4">
-                        <Car className="w-4 h-4 text-primary" />
-                        <span className="font-bold text-sm text-white/90 capitalize">
-                          {group.vehicleType}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {group.variants.map((v) => {
-                          const hotPct =
-                            v.totalConversations > 0
-                              ? Math.round((v.hotLeads / v.totalConversations) * 100)
-                              : 0;
-                          return (
-                            <div
-                              key={v.publishedDownPayment}
-                              className="p-4 rounded-xl border border-white/5 bg-card/40"
-                            >
-                              <div className="flex items-center justify-between mb-3">
-                                <span className="text-lg font-bold text-white/90">
-                                  ${v.publishedDownPayment.toLocaleString()}
-                                </span>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                  down
-                                </span>
-                              </div>
-                              <div className="space-y-1.5 text-[11px]">
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Conversations</span>
-                                  <span className="font-bold text-white/80">
-                                    {v.totalConversations}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-red-400">Hot leads</span>
-                                  <span className="font-bold text-red-400">
-                                    {v.hotLeads}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-green-400">Appt ready</span>
-                                  <span className="font-bold text-green-400">
-                                    {v.appointmentReady}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-red-400 rounded-full transition-all"
-                                  style={{ width: `${hotPct}%` }}
-                                />
-                              </div>
-                              <div className="mt-1 text-[10px] text-muted-foreground/60 text-right">
-                                {hotPct}% hot rate
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SectionCard>
-          )}
-
-          {tab === "simulator" && (
-            <SectionCard title="Conversation Simulator" icon={Play}>
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Simulate real buyer conversations to test the AI reply engine, lead scoring,
-                  and down payment intelligence.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {scenarios.map((s) => (
-                    <div
-                      key={s.key}
-                      className="p-4 rounded-xl border border-white/5 bg-card/40 flex items-start justify-between gap-3"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-sm text-white/90">{s.label}</span>
-                          <Badge
-                            variant="outline"
-                            className="text-[9px] uppercase tracking-widest border-white/10 text-muted-foreground"
-                          >
-                            {s.language === "es" ? "🇲🇽 ES" : "🇺🇸 EN"}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                          <span className="capitalize">{s.vehicleType}</span>
-                          <span className="text-primary font-medium">
-                            ${s.downPayment.toLocaleString()} down
-                          </span>
-                          <span>{s.messageCount} msg{s.messageCount > 1 ? "s" : ""}</span>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        disabled={runningScenario !== null}
-                        onClick={() => handleRunScenario(s.key)}
-                        className="shrink-0 gap-2 h-8 px-3 text-[10px] font-bold uppercase tracking-widest"
-                      >
-                        {runningScenario === s.key ? (
-                          <>
-                            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Running
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-3 h-3" />
-                            Run
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+          {/* Body */}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-24 text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              Loading…
+            </div>
+          ) : isError ? (
+            <div className="flex items-center justify-center py-24 text-red-400">
+              <XCircle className="w-5 h-5 mr-2" />Failed to load listings
+            </div>
+          ) : !hasAny ? (
+            // Big empty state — no published vehicles yet
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-6">
+                <Radio className="w-8 h-8 text-muted-foreground/20" />
               </div>
-            </SectionCard>
+              <div className="text-lg font-semibold text-white/70 mb-2">
+                No Marketplace conversations yet.
+              </div>
+              <div className="text-sm text-muted-foreground/60 max-w-sm mb-6">
+                Publish your first vehicle. DealerPilot will automatically create
+                conversations as buyers begin messaging your Marketplace listings.
+              </div>
+              <Button
+                variant="outline"
+                className="gap-2 border-white/10 hover:bg-white/[0.04]"
+                onClick={() => navigate("/listings")}
+              >
+                <ChevronRight className="w-4 h-4" />
+                Open Marketplace AI
+              </Button>
+            </div>
+          ) : !hasEngagement ? (
+            // Has listings but no engagement yet
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-12 h-12 rounded-xl bg-green-500/[0.06] border border-green-500/15 flex items-center justify-center mb-4">
+                <Radio className="w-6 h-6 text-green-400/60" />
+              </div>
+              <div className="text-base font-semibold text-white/60 mb-2">
+                {liveCount} listing{liveCount !== 1 ? "s" : ""} live — waiting for messages
+              </div>
+              <div className="text-xs text-muted-foreground/50 max-w-xs">
+                Buyer conversations will appear here automatically as they message your Marketplace listings.
+              </div>
+            </div>
+          ) : (
+            // CRM sections
+            <div className="space-y-8">
+              <CrmSection
+                title="New Messages"
+                icon={MessageSquare}
+                accent="bg-blue-500/10 text-blue-400"
+                listings={newMessages}
+                onMarkAppointment={(id) => mutation.mutate({ id, status: "Appointment" })}
+                onMarkSold={(id) => mutation.mutate({ id, status: "Sold" })}
+                busyId={busyId}
+              />
+              <CrmSection
+                title="Needs Follow-Up"
+                icon={AlertTriangle}
+                accent="bg-amber-500/10 text-amber-400"
+                listings={needsFollowUp}
+                onMarkAppointment={(id) => mutation.mutate({ id, status: "Appointment" })}
+                onMarkSold={(id) => mutation.mutate({ id, status: "Sold" })}
+                busyId={busyId}
+              />
+              <CrmSection
+                title="Appointments"
+                icon={Calendar}
+                accent="bg-green-500/10 text-green-400"
+                listings={appointments}
+                onMarkAppointment={(id) => mutation.mutate({ id, status: "Appointment" })}
+                onMarkSold={(id) => mutation.mutate({ id, status: "Sold" })}
+                busyId={busyId}
+              />
+              <CrmSection
+                title="Sold"
+                icon={CheckCircle2}
+                accent="bg-primary/10 text-primary"
+                listings={sold}
+                onMarkAppointment={(id) => mutation.mutate({ id, status: "Appointment" })}
+                onMarkSold={(id) => mutation.mutate({ id, status: "Sold" })}
+                busyId={busyId}
+              />
+            </div>
+          )}
+
+          {/* Quick nav footer */}
+          {hasAny && (
+            <div className="flex items-center gap-3 pt-2 border-t border-white/[0.04]">
+              <span className="text-[10px] text-muted-foreground/40 uppercase tracking-widest">Also</span>
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground/60 hover:text-white/70" onClick={() => navigate("/leads")}>
+                <Inbox className="w-3 h-3 mr-1.5" /> Leads CRM
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground/60 hover:text-white/70" onClick={() => navigate("/sales-ai/marketplace-listings")}>
+                <Radio className="w-3 h-3 mr-1.5" /> All Listings
+              </Button>
+            </div>
           )}
         </div>
       </div>

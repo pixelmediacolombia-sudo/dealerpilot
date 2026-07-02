@@ -111,7 +111,7 @@ router.get("/marketplace-listings/:id", async (req: Request, res: Response) => {
 // ── Update listing status / assignee / lead quality ──────────────────────────
 // PATCH /api/marketplace-listings/:id
 const PatchBody = z.object({
-  status: z.enum(["Live", "Needs Review", "Sold", "Failed"]).optional(),
+  status: z.enum(["Live", "Needs Review", "Appointment", "Sold", "Failed"]).optional(),
   assignedTo: z.string().optional(),
   leadQuality: z.enum(["Hot", "Warm", "Cold"]).optional(),
   notes: z.string().optional(),
