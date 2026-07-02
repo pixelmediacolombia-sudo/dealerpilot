@@ -1,18 +1,24 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   X,
   CheckCircle2,
-  AlertTriangle,
   Store,
   ArrowLeftRight,
-  Tag,
   Loader2,
   ImageOff,
+  Sparkles,
+  RotateCcw,
+  Download,
+  LayoutGrid,
+  Image as ImageIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 interface PhotoSetImage {
   id: number;
@@ -28,8 +34,6 @@ interface PhotoSetImage {
   processingStatus: string;
   usedFallback: number;
   classificationConfidence: number | null;
-  removalProvider: string | null;
-  removalTimeMs: number | null;
 }
 
 interface PhotoSetSummary {
@@ -67,7 +71,7 @@ interface PhotoSetResponse {
   isActiveForMarketplace: boolean;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const API_BASE = "/api";
 
@@ -85,175 +89,235 @@ function aiOutputUrl(img: PhotoSetImage): string {
   return img.originalUrl;
 }
 
-function isFallback(img: PhotoSetImage): boolean {
-  return img.usedFallback === 1 || aiOutputUrl(img) === img.originalUrl;
+function isEnhanced(img: PhotoSetImage): boolean {
+  return img.usedFallback !== 1 && aiOutputUrl(img) !== img.originalUrl;
 }
 
-// ── Image Tile ─────────────────────────────────────────────────────────────────
+// ── Tab types ─────────────────────────────────────────────────────────────────
 
-function ImageTile({
-  src,
-  label,
-  sublabel,
-  fallback,
-  isFallbackSrc,
-}: {
-  src: string;
-  label: string;
-  sublabel?: string;
-  fallback?: boolean;
-  isFallbackSrc?: boolean;
-}) {
+type Tab = "enhanced" | "original" | "compare" | "report";
+
+// ── Gallery Grid ──────────────────────────────────────────────────────────────
+
+function GalleryGrid({ images, urlFn, label }: { images: PhotoSetImage[]; urlFn: (img: PhotoSetImage) => string; label?: string }) {
+  const [selected, setSelected] = useState<number | null>(null);
+
+  if (images.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-white/30">
+        <ImageIcon className="w-8 h-8 mb-2" />
+        <p className="text-sm">No photos available</p>
+      </div>
+    );
+  }
+
+  const selectedIdx = selected ?? 0;
+  const selectedImg = images[selectedIdx];
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <div
-        className={cn(
-          "relative aspect-[4/3] rounded-lg overflow-hidden bg-white/[0.03] border",
-          fallback ? "border-amber-500/30" : "border-white/[0.08]",
-        )}
-      >
-        <img src={src} alt={label} className="w-full h-full object-cover" loading="lazy" />
-        {isFallbackSrc && (
-          <div className="absolute top-2 right-2">
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/80 text-black">
-              Fallback
+    <div className="space-y-4">
+      {/* Large preview */}
+      <div className="relative rounded-2xl overflow-hidden bg-white/[0.03] border border-white/[0.06]" style={{ aspectRatio: "16/9" }}>
+        <img
+          src={urlFn(selectedImg!)}
+          alt={selectedImg?.classification ?? label ?? "photo"}
+          className="w-full h-full object-contain"
+        />
+        {label && (
+          <div className="absolute top-3 left-3">
+            <span className="text-[11px] font-medium px-2 py-1 rounded-lg bg-black/60 text-white/80 backdrop-blur-sm">
+              {label}
             </span>
           </div>
         )}
+        {/* Nav arrows */}
+        {images.length > 1 && (
+          <>
+            <button
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center hover:bg-black/80 transition-colors disabled:opacity-30"
+              onClick={() => setSelected(Math.max(0, selectedIdx - 1))}
+              disabled={selectedIdx === 0}
+            >
+              <ChevronLeft className="w-4 h-4 text-white" />
+            </button>
+            <button
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center hover:bg-black/80 transition-colors disabled:opacity-30"
+              onClick={() => setSelected(Math.min(images.length - 1, selectedIdx + 1))}
+              disabled={selectedIdx === images.length - 1}
+            >
+              <ChevronRight className="w-4 h-4 text-white" />
+            </button>
+          </>
+        )}
+        <div className="absolute bottom-3 right-3 text-[11px] text-white/40 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
+          {selectedIdx + 1} / {images.length}
+        </div>
       </div>
-      <div>
-        <div className="text-[11px] font-medium text-white/70">{label}</div>
-        {sublabel && <div className="text-[10px] text-white/40">{sublabel}</div>}
+
+      {/* Thumbnail strip */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {images.map((img, i) => (
+          <button
+            key={img.id}
+            onClick={() => setSelected(i)}
+            className={cn(
+              "relative shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-all",
+              i === selectedIdx ? "border-primary" : "border-white/[0.06] opacity-50 hover:opacity-80",
+            )}
+          >
+            <img src={urlFn(img)} alt="" className="w-full h-full object-cover" loading="lazy" />
+          </button>
+        ))}
       </div>
     </div>
   );
 }
 
-// ── Exterior card (before / after side by side) ────────────────────────────────
+// ── Before / After Comparison ─────────────────────────────────────────────────
 
-function ExteriorCard({ img }: { img: PhotoSetImage }) {
-  const aiUrl = aiOutputUrl(img);
-  const fallbackUsed = isFallback(img);
+function BeforeAfterView({ images }: { images: PhotoSetImage[] }) {
+  const exterior = images.filter((i) => i.isExterior === 1);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const img = exterior[selectedIdx];
+
+  if (exterior.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-white/30">
+        <ArrowLeftRight className="w-8 h-8 mb-2" />
+        <p className="text-sm">No exterior photos to compare</p>
+      </div>
+    );
+  }
+
+  const enhanced = img ? isEnhanced(img) : false;
 
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-card p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/20 uppercase tracking-wide">
-          Exterior
-        </span>
-        {img.classification && (
-          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-            <Tag className="w-3 h-3" />
-            {img.classification}
-          </span>
-        )}
-        {img.classificationConfidence !== null && img.classificationConfidence !== undefined && (
-          <span className="text-[10px] text-muted-foreground/60 ml-auto">
-            {Math.round((img.classificationConfidence ?? 0) * 100)}% confidence
-          </span>
-        )}
-        {fallbackUsed && (
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 ml-auto">
-            Fallback — original used
-          </span>
-        )}
-      </div>
+    <div className="space-y-4">
+      {/* Photo selector */}
+      {exterior.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {exterior.map((ph, i) => (
+            <button
+              key={ph.id}
+              onClick={() => setSelectedIdx(i)}
+              className={cn(
+                "relative shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-all",
+                i === selectedIdx ? "border-primary" : "border-white/[0.06] opacity-50 hover:opacity-80",
+              )}
+            >
+              <img src={ph.originalUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+            </button>
+          ))}
+        </div>
+      )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <ImageTile src={img.originalUrl} label="Original" sublabel="Source photo" />
-        <ImageTile
-          src={aiUrl}
-          label="AI Output"
-          sublabel={
-            img.compositedUrl && img.compositedUrl !== img.originalUrl
-              ? "AI enhanced"
-              : img.backgroundRemovedUrl && img.backgroundRemovedUrl !== img.originalUrl
-                ? "Background removed"
-                : "Fallback — unchanged"
-          }
-          isFallbackSrc={fallbackUsed}
-        />
-      </div>
+      {/* Side by side */}
+      {img && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <div className="text-[11px] font-medium text-white/40 uppercase tracking-wide pl-1">Original</div>
+            <div className="rounded-xl overflow-hidden border border-white/[0.06]" style={{ aspectRatio: "4/3" }}>
+              <img src={img.originalUrl} alt="Original" className="w-full h-full object-cover" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 pl-1">
+              <div className="text-[11px] font-medium text-white/40 uppercase tracking-wide">AI Enhanced</div>
+              {enhanced && <span className="text-[10px] text-green-400">✓ Improved</span>}
+            </div>
+            <div className={cn("rounded-xl overflow-hidden border", enhanced ? "border-green-500/20" : "border-white/[0.06]")} style={{ aspectRatio: "4/3" }}>
+              <img src={aiOutputUrl(img)} alt="Enhanced" className="w-full h-full object-cover" />
+            </div>
+          </div>
+        </div>
+      )}
 
-      {img.removalProvider && img.removalTimeMs && (
-        <div className="text-[10px] text-muted-foreground/50">
-          {img.removalProvider} · {(img.removalTimeMs / 1000).toFixed(1)}s · pos #{img.position}
+      {img?.classification && (
+        <div className="text-[11px] text-white/30 text-center">
+          Classified as: <span className="text-white/50">{img.classification}</span>
+          {img.classificationConfidence !== null && img.classificationConfidence !== undefined && (
+            <span className="ml-2 text-white/20">
+              {Math.round((img.classificationConfidence) * 100)}% confidence
+            </span>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ── Interior / Misc card ───────────────────────────────────────────────────────
+// ── Quality Report ────────────────────────────────────────────────────────────
 
-function InteriorCard({ img }: { img: PhotoSetImage }) {
-  const isMisc = img.classification === "Miscellaneous" || !img.classification;
-  return (
-    <div className="rounded-xl border border-white/[0.04] bg-card/50 p-4 space-y-2">
-      <div className="flex items-center gap-2">
-        <span
-          className={cn(
-            "text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide border",
-            isMisc
-              ? "bg-white/[0.04] text-white/30 border-white/[0.06]"
-              : "bg-white/[0.06] text-white/50 border-white/[0.08]",
-          )}
-        >
-          {isMisc ? "Miscellaneous" : "Interior"}
-        </span>
-        {img.classification && (
-          <span className="text-[11px] text-muted-foreground/60 flex items-center gap-1">
-            <Tag className="w-3 h-3" />
-            {img.classification}
-          </span>
-        )}
-        <span className="ml-auto text-[10px] text-muted-foreground/40">
-          {isMisc ? "Not processed" : "Preserved — enhanced only"}
-        </span>
-      </div>
-      <div className="aspect-[4/3] rounded-lg overflow-hidden bg-white/[0.02] border border-white/[0.04]">
-        <img
-          src={img.processedUrl ?? img.originalUrl}
-          alt={img.classification ?? "photo"}
-          className={cn("w-full h-full object-cover", isMisc && "opacity-50")}
-          loading="lazy"
-        />
-      </div>
-    </div>
-  );
-}
+function QualityReport({ data }: { data: PhotoSetResponse }) {
+  const { summary, set, isActiveForMarketplace } = data;
+  if (!summary || !set) return null;
 
-// ── Summary pill row ──────────────────────────────────────────────────────────
+  const enhancedPct = set.totalPhotos > 0
+    ? Math.round((set.processedPhotos / set.totalPhotos) * 100)
+    : 0;
 
-function SummaryPills({ summary }: { summary: PhotoSetSummary }) {
-  const pills = [
-    { label: "Exterior", value: summary.exteriorCount, color: "text-primary" },
-    { label: "Interior", value: summary.interiorCount, color: "text-white/60" },
-    { label: "Misc", value: summary.miscCount, color: "text-white/40" },
+  const items = [
     {
-      label: "Composited",
-      value: summary.compositedCount,
-      color: "text-green-400",
-      hide: summary.compositedCount === 0,
+      label: "Total Photos",
+      value: summary.total,
+      status: summary.total >= 10 ? "good" : summary.total >= 5 ? "warn" : "bad",
+      note: summary.total >= 10 ? "Excellent" : summary.total >= 5 ? "Acceptable" : "Add more photos",
     },
     {
-      label: "Fallback",
-      value: summary.fallbackCount,
-      color: "text-amber-400",
-      hide: summary.fallbackCount === 0,
+      label: "Exterior Shots",
+      value: summary.exteriorCount,
+      status: summary.exteriorCount >= 6 ? "good" : summary.exteriorCount >= 3 ? "warn" : "bad",
+      note: summary.exteriorCount >= 6 ? "Great coverage" : "Recommend 6+",
+    },
+    {
+      label: "Interior Shots",
+      value: summary.interiorCount,
+      status: summary.interiorCount >= 3 ? "good" : summary.interiorCount >= 1 ? "warn" : "bad",
+      note: summary.interiorCount >= 3 ? "Good" : "Recommend 3+",
+    },
+    {
+      label: "AI Enhanced",
+      value: `${enhancedPct}%`,
+      status: enhancedPct >= 80 ? "good" : enhancedPct >= 50 ? "warn" : "bad",
+      note: `${set.processedPhotos} of ${set.totalPhotos} photos`,
+    },
+    {
+      label: "Marketplace Status",
+      value: isActiveForMarketplace ? "Active" : "Not Active",
+      status: isActiveForMarketplace ? "good" : "warn",
+      note: isActiveForMarketplace ? "Listed on Facebook Marketplace" : "Not yet listed",
     },
   ];
 
   return (
-    <div className="flex flex-wrap gap-3">
-      {pills
-        .filter((p) => !p.hide)
-        .map((p) => (
-          <span key={p.label} className="text-[12px]">
-            <span className={cn("font-semibold", p.color)}>{p.value}</span>
-            <span className="text-muted-foreground ml-1">{p.label}</span>
-          </span>
-        ))}
+    <div className="space-y-3">
+      {items.map((item) => (
+        <div key={item.label} className={cn(
+          "flex items-center gap-4 p-3.5 rounded-xl border",
+          item.status === "good" ? "bg-green-500/[0.04] border-green-500/15"
+            : item.status === "warn" ? "bg-amber-500/[0.04] border-amber-500/15"
+            : "bg-red-500/[0.04] border-red-500/15"
+        )}>
+          <div className={cn(
+            "w-2 h-2 rounded-full shrink-0",
+            item.status === "good" ? "bg-green-400"
+              : item.status === "warn" ? "bg-amber-400"
+              : "bg-red-400"
+          )} />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm text-white/80">{item.label}</div>
+            <div className="text-[11px] text-white/30 mt-0.5">{item.note}</div>
+          </div>
+          <div className={cn(
+            "text-sm font-semibold shrink-0",
+            item.status === "good" ? "text-green-400"
+              : item.status === "warn" ? "text-amber-400"
+              : "text-red-400"
+          )}>
+            {item.value}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -262,15 +326,15 @@ function SummaryPills({ summary }: { summary: PhotoSetSummary }) {
 
 export function PhotoSetViewer({
   vehicleId,
-  jobId,
-  processingTimeMs,
   onClose,
+  onReprocess,
 }: {
   vehicleId: number;
-  jobId: number;
-  processingTimeMs: number | null;
   onClose: () => void;
+  onReprocess: (vehicleId: number) => void;
 }) {
+  const [tab, setTab] = useState<Tab>("enhanced");
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ["photo-set", vehicleId],
     queryFn: () => fetchPhotoSet(vehicleId),
@@ -281,7 +345,14 @@ export function PhotoSetViewer({
     : "Loading…";
 
   const exteriorImages = (data?.images ?? []).filter((i) => i.isExterior === 1);
-  const otherImages = (data?.images ?? []).filter((i) => i.isExterior !== 1);
+  const allImages = data?.images ?? [];
+
+  const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: "enhanced", label: "Enhanced", icon: Sparkles },
+    { id: "original", label: "Original", icon: ImageIcon },
+    { id: "compare", label: "Before & After", icon: ArrowLeftRight },
+    { id: "report", label: "Quality Report", icon: CheckCircle2 },
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -290,123 +361,123 @@ export function PhotoSetViewer({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-base font-semibold text-white truncate">{vehicleName}</h2>
-            <span className="text-[11px] text-muted-foreground shrink-0">Job #{jobId}</span>
-            {processingTimeMs !== null && processingTimeMs !== undefined && (
-              <span className="text-[11px] text-muted-foreground shrink-0">
-                {(processingTimeMs / 1000).toFixed(1)}s
-              </span>
+            {data?.vehicle.vin && (
+              <span className="text-[11px] text-white/30 font-mono shrink-0">{data.vehicle.vin}</span>
             )}
             {data?.isActiveForMarketplace && (
-              <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20 uppercase tracking-wide shrink-0">
+              <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20 shrink-0">
                 <Store className="w-3 h-3" />
-                Active in Marketplace Payload
-              </span>
-            )}
-            {data && !data.isActiveForMarketplace && (
-              <span className="text-[10px] text-muted-foreground/50 shrink-0">
-                Not yet active in marketplace
+                Marketplace Ready
               </span>
             )}
           </div>
           {data?.summary && (
-            <div className="mt-1.5">
-              <SummaryPills summary={data.summary} />
+            <div className="flex items-center gap-3 mt-1.5 text-[11px] text-white/30">
+              <span><span className="text-white/60 font-medium">{data.summary.exteriorCount}</span> exterior</span>
+              <span><span className="text-white/60 font-medium">{data.summary.interiorCount}</span> interior</span>
+              <span><span className="text-white/60 font-medium">{data.set?.processedPhotos ?? 0}</span> enhanced</span>
             </div>
           )}
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose} className="shrink-0 h-8 w-8 p-0">
-          <X className="w-4 h-4" />
-        </Button>
+        {/* Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => onReprocess(vehicleId)}
+          >
+            <RotateCcw className="w-3 h-3 mr-1.5" />
+            Reprocess
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 px-6 py-2 border-b border-white/[0.06] bg-card/30 shrink-0">
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                tab === t.id
+                  ? "bg-white/[0.08] text-white"
+                  : "text-white/40 hover:text-white/60 hover:bg-white/[0.04]",
+              )}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto">
         {isLoading && (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center py-24">
+            <Loader2 className="w-6 h-6 animate-spin text-white/30" />
           </div>
         )}
 
         {isError && (
-          <div className="flex items-center gap-2 text-sm text-red-400 py-10 justify-center">
+          <div className="flex items-center gap-2 text-sm text-red-400 py-20 justify-center">
             <ImageOff className="w-4 h-4" />
-            Failed to load photo set.
+            Failed to load photos.
           </div>
         )}
 
         {data && !data.set && (
-          <div className="text-center py-20 text-muted-foreground text-sm">
-            No photo set found for this vehicle.
+          <div className="flex flex-col items-center justify-center py-24 text-center space-y-3">
+            <LayoutGrid className="w-8 h-8 text-white/20" />
+            <p className="text-white/40 text-sm">No enhanced photos yet.</p>
+            <Button size="sm" variant="outline" onClick={() => onReprocess(vehicleId)}>
+              <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+              Enhance Photos
+            </Button>
           </div>
         )}
 
         {data && data.set && (
-          <div className="max-w-6xl mx-auto space-y-8">
-            {/* Exterior section — before/after */}
-            {exteriorImages.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-4">
-                  <ArrowLeftRight className="w-4 h-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-white">
-                    Exterior Photos — Before &amp; After
-                  </h3>
-                  <span className="text-[11px] text-muted-foreground">
-                    ({exteriorImages.length} photo{exteriorImages.length !== 1 ? "s" : ""})
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 gap-4">
-                  {exteriorImages.map((img) => (
-                    <ExteriorCard key={img.id} img={img} />
-                  ))}
-                </div>
-              </section>
+          <div className="max-w-4xl mx-auto p-6">
+            {tab === "enhanced" && (
+              <GalleryGrid
+                images={allImages}
+                urlFn={aiOutputUrl}
+                label="AI Enhanced"
+              />
             )}
-
-            {/* Interior / Misc section */}
-            {otherImages.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-4">
-                  <CheckCircle2 className="w-4 h-4 text-white/40" />
-                  <h3 className="text-sm font-semibold text-white/60">
-                    Interior &amp; Other Photos
-                  </h3>
-                  <span className="text-[11px] text-muted-foreground">
-                    ({otherImages.length} photo{otherImages.length !== 1 ? "s" : ""} — preserved unchanged)
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {otherImages.map((img) => (
-                    <InteriorCard key={img.id} img={img} />
-                  ))}
-                </div>
-              </section>
+            {tab === "original" && (
+              <GalleryGrid
+                images={allImages}
+                urlFn={(img) => img.originalUrl}
+                label="Original"
+              />
             )}
-
-            {/* Fallback warning */}
-            {(data.summary?.fallbackCount ?? 0) > 0 && (
-              <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.04]">
-                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                <div className="text-sm">
-                  <span className="font-medium text-amber-300">
-                    {data.summary!.fallbackCount} photo
-                    {data.summary!.fallbackCount !== 1 ? "s" : ""} used original
-                  </span>
-                  <span className="text-amber-400/70 ml-2">
-                    FAL.ai background removal was unavailable for these images. Original photos will
-                    be used in the marketplace payload.
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Set metadata */}
-            <div className="text-[11px] text-muted-foreground/40 pb-2">
-              Set #{data.set.id} · v{data.set.version} · Studio {data.set.studioVersion ?? "v1"} ·
-              VIN {data.vehicle.vin}
-            </div>
+            {tab === "compare" && <BeforeAfterView images={allImages} />}
+            {tab === "report" && <QualityReport data={data} />}
           </div>
         )}
       </div>
+
+      {/* Footer action bar */}
+      {data?.set && (
+        <div className="flex items-center justify-between px-6 py-3 border-t border-white/[0.06] bg-card/30 shrink-0">
+          <div className="text-[11px] text-white/20">
+            {allImages.length} photo{allImages.length !== 1 ? "s" : ""} · {exteriorImages.length} exterior enhanced
+          </div>
+          <Button variant="outline" size="sm" className="h-7 text-xs" disabled>
+            <Download className="w-3 h-3 mr-1.5" />
+            Export
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

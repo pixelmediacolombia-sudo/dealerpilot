@@ -72,8 +72,10 @@ router.get("/photo-studio/jobs", async (req: Request, res: Response) => {
         vehicleMake: vehiclesTable.make,
         vehicleModel: vehiclesTable.model,
         vehicleTrim: vehiclesTable.trim,
+        vehicleVin: vehiclesTable.vin,
         vehicleStatus: vehiclesTable.status,
         vehicleAiStatus: vehiclesTable.aiPhotoStatus,
+        vehicleThumbnailUrl: sql<string | null>`(select url from vehicle_images where vehicle_id = ${aiPhotoJobsTable.vehicleId} order by position asc limit 1)`,
       })
       .from(aiPhotoJobsTable)
       .leftJoin(vehiclesTable, eq(vehiclesTable.id, aiPhotoJobsTable.vehicleId))

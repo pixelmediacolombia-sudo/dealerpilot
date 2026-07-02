@@ -1,52 +1,38 @@
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Camera,
-  Cpu,
   CheckCircle2,
-  XCircle,
   Clock,
   Loader2,
-  Play,
   RefreshCw,
-  AlertTriangle,
-  Zap,
-  Image as ImageIcon,
-  Upload,
   ImageOff,
-  ShieldAlert,
-  CircleSlash,
+  Sparkles,
+  Store,
+  AlertTriangle,
   RotateCcw,
-  Eye,
-  Layers,
+  Image as ImageIcon,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoSetViewer } from "./PhotoSetViewer";
 
 const API_BASE = "/api";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface PhotoJob {
   id: number;
   vehicleId: number;
   status: string;
-  attempts: number;
   totalPhotos: number;
   processedPhotos: number;
-  failedPhotos: number;
   exteriorCount: number;
   interiorCount: number;
-  fallbackCount: number;
-  currentStage: string | null;
-  progressPercent: number;
   outputSetId: number | null;
-  modelVersion: string | null;
   startedAt: string | null;
   completedAt: string | null;
   failedReason: string | null;
@@ -55,33 +41,13 @@ interface PhotoJob {
   vehicleMake: string;
   vehicleModel: string;
   vehicleTrim: string | null;
+  vehicleVin: string | null;
   vehicleStatus: string;
   vehicleAiStatus: string | null;
-}
-
-interface ViewSetJob {
-  vehicleId: number;
-  jobId: number;
-  processingTimeMs: number | null;
-}
-
-interface SetupInfo {
-  backgroundConfigured: boolean;
-  backgroundSource: "upload" | "env" | null;
-  compositingEnabled: boolean;
-  backgroundWidth: number | null;
-  backgroundHeight: number | null;
-  readyForProduction: boolean;
+  vehicleThumbnailUrl: string | null;
 }
 
 interface StudioStats {
-  jobs: {
-    queued: number;
-    processing: number;
-    completed: number;
-    failed: number;
-    cancelled: number;
-  };
   vehicles: {
     ready: number;
     processing: number;
@@ -91,32 +57,16 @@ interface StudioStats {
   };
   images: { total: number; withAI: number };
   staleCount: number;
-  /** enhance_only | studio */
   processingMode?: string;
-  fal?: {
-    imagesProcessed: number;
-    estimatedSpendUsd: number;
-    lowBalanceWarning: boolean;
-    thresholdUsd: number;
-    costPerImageUsd: number;
-  };
-  defaultPack: {
-    backgroundUrl: string | null;
-    backgroundVersion: string;
-    name: string;
-    backgroundWidth: number | null;
-    backgroundHeight: number | null;
-  } | null;
-  setup: SetupInfo;
-  providers: {
-    backgroundRemoval: string;
-    classification: string;
-    compositing: string;
-    enhancement?: string;
+  setup: {
+    backgroundConfigured: boolean;
+    backgroundSource: "upload" | "env" | null;
+    compositingEnabled: boolean;
+    readyForProduction: boolean;
   };
 }
 
-// ── API calls ────────────────────────────────────────────────────────────────
+// ── API calls ─────────────────────────────────────────────────────────────────
 
 async function fetchStats(): Promise<StudioStats> {
   const r = await fetch(`${API_BASE}/photo-studio/stats`);
@@ -124,26 +74,22 @@ async function fetchStats(): Promise<StudioStats> {
   return r.json() as Promise<StudioStats>;
 }
 
-async function fetchJobs(status?: string): Promise<{ jobs: PhotoJob[] }> {
-  const url = status
-    ? `${API_BASE}/photo-studio/jobs?status=${encodeURIComponent(status)}&limit=100`
-    : `${API_BASE}/photo-studio/jobs?limit=100`;
-  const r = await fetch(url);
+async function fetchJobs(): Promise<{ jobs: PhotoJob[] }> {
+  const r = await fetch(`${API_BASE}/photo-studio/jobs?limit=200`);
   if (!r.ok) throw new Error("Failed to fetch jobs");
   return r.json() as Promise<{ jobs: PhotoJob[] }>;
 }
 
-async function reprocessStale(): Promise<{ enqueued: number; currentVersion: string }> {
-  const r = await fetch(`${API_BASE}/photo-studio/reprocess-stale`, {
+async function triggerProcess(vehicleId: number): Promise<void> {
+  const r = await fetch(`${API_BASE}/photo-studio/vehicles/${vehicleId}/process`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dealerId: 1 }),
   });
   if (!r.ok) {
     const body = (await r.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? "Reprocess failed");
+    throw new Error(body.error ?? "Processing failed");
   }
-  return r.json() as Promise<{ enqueued: number; currentVersion: string }>;
 }
 
 async function enqueueAll(): Promise<{ enqueued: number; skipped: number }> {
@@ -156,820 +102,403 @@ async function enqueueAll(): Promise<{ enqueued: number; skipped: number }> {
   return r.json() as Promise<{ enqueued: number; skipped: number }>;
 }
 
-async function uploadBackground(file: File): Promise<{ pack: unknown; setup: SetupInfo }> {
-  const fd = new FormData();
-  fd.append("background", file);
-  const r = await fetch(`${API_BASE}/photo-studio/background`, { method: "POST", body: fd });
-  if (!r.ok) {
-    const body = (await r.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? "Upload failed");
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Deduplicate jobs by vehicleId — keep the most recent per vehicle */
+function dedupeByVehicle(jobs: PhotoJob[]): PhotoJob[] {
+  const seen = new Map<number, PhotoJob>();
+  for (const job of jobs) {
+    const existing = seen.get(job.vehicleId);
+    if (!existing) {
+      seen.set(job.vehicleId, job);
+    } else {
+      // Prefer Completed > Processing > others; otherwise latest createdAt
+      const rank = (s: string) =>
+        s === "Completed" ? 3 : s === "Processing" ? 2 : s === "Queued" ? 1 : 0;
+      if (rank(job.status) > rank(existing.status)) {
+        seen.set(job.vehicleId, job);
+      }
+    }
   }
-  return r.json() as Promise<{ pack: unknown; setup: SetupInfo }>;
+  return Array.from(seen.values());
 }
 
-// ── Sub-components ──────────────────────────────────────────────────────────
+function vehicleName(job: PhotoJob): string {
+  return `${job.vehicleYear ?? ""} ${job.vehicleMake} ${job.vehicleModel}${job.vehicleTrim ? ` ${job.vehicleTrim}` : ""}`.trim();
+}
 
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; color: string; icon: React.ComponentType<{ className?: string }> }
-> = {
-  Queued: { label: "Queued", color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20", icon: Clock },
-  Processing: { label: "Processing", color: "text-blue-400 bg-blue-400/10 border-blue-400/20", icon: Loader2 },
-  Completed: { label: "Completed", color: "text-green-400 bg-green-400/10 border-green-400/20", icon: CheckCircle2 },
-  Failed: { label: "Failed", color: "text-red-400 bg-red-400/10 border-red-400/20", icon: XCircle },
-  Cancelled: { label: "Cancelled", color: "text-muted-foreground bg-white/5 border-white/10", icon: XCircle },
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(ms / 60000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+// ── AI Status badge ───────────────────────────────────────────────────────────
+
+const AI_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  Ready: { label: "AI Enhanced", color: "text-green-400 bg-green-400/10 border-green-400/20" },
+  Processing: { label: "Processing", color: "text-blue-400 bg-blue-400/10 border-blue-400/20" },
+  Queued: { label: "In Queue", color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
+  Failed: { label: "Needs Retry", color: "text-red-400 bg-red-400/10 border-red-400/20" },
+  Pending: { label: "Not Started", color: "text-white/30 bg-white/[0.04] border-white/[0.08]" },
 };
 
-function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG["Queued"]!;
-  const Icon = cfg.icon;
+function AiStatusBadge({ status }: { status: string }) {
+  const cfg = AI_STATUS_CONFIG[status] ?? AI_STATUS_CONFIG["Pending"]!;
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border",
-        cfg.color,
-      )}
-    >
-      <Icon className={cn("w-3 h-3", status === "Processing" && "animate-spin")} />
+    <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border", cfg.color)}>
       {cfg.label}
     </span>
   );
 }
 
-function JobCard({
+// ── Vehicle Card ──────────────────────────────────────────────────────────────
+
+function VehicleCard({
   job,
+  onOpenStudio,
   onReprocess,
-  onViewSet,
 }: {
   job: PhotoJob;
+  onOpenStudio: (vehicleId: number) => void;
   onReprocess: (vehicleId: number) => void;
-  onViewSet: (job: ViewSetJob) => void;
 }) {
-  const title = `${job.vehicleYear ?? ""} ${job.vehicleMake} ${job.vehicleModel}${job.vehicleTrim ? ` ${job.vehicleTrim}` : ""}`.trim();
-  const isLive = job.status === "Processing";
-  const durationMs =
-    job.completedAt && job.startedAt
-      ? new Date(job.completedAt).getTime() - new Date(job.startedAt).getTime()
-      : null;
-
-  const hasSet = job.status === "Completed" && job.outputSetId !== null;
+  const name = vehicleName(job);
+  const isProcessing = job.status === "Processing";
+  const isDone = job.status === "Completed";
+  const isFailed = job.status === "Failed" || job.status === "Cancelled";
+  const aiStatus = job.vehicleAiStatus ?? (isDone ? "Ready" : isProcessing ? "Processing" : isFailed ? "Failed" : "Pending");
+  const isMarketplaceReady = aiStatus === "Ready";
+  const enhancedCount = isDone ? job.processedPhotos : 0;
 
   return (
-    <div className="bg-card border border-white/[0.06] rounded-xl p-4 space-y-3 hover:border-white/10 transition-colors">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <StatusBadge status={job.status} />
-            {job.fallbackCount > 0 && (
-              <span className="text-[11px] text-amber-400/80">
-                {job.fallbackCount} fallback{job.fallbackCount !== 1 ? "s" : ""}
-              </span>
-            )}
+    <div className="group relative bg-card border border-white/[0.06] rounded-2xl overflow-hidden hover:border-white/[0.12] transition-all duration-200">
+      {/* Thumbnail */}
+      <div className="relative aspect-[16/9] bg-white/[0.03] overflow-hidden">
+        {job.vehicleThumbnailUrl ? (
+          <img
+            src={job.vehicleThumbnailUrl}
+            alt={name}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <ImageIcon className="w-8 h-8 text-white/10" />
           </div>
-          <div className="font-medium text-sm text-white truncate">{title}</div>
-          {job.currentStage && isLive && (
-            <div className="text-[11px] text-primary mt-0.5">{job.currentStage}…</div>
-          )}
-          {job.failedReason && (
-            <div className="text-[11px] text-red-400 mt-0.5 truncate" title={job.failedReason}>
-              {job.failedReason}
+        )}
+
+        {/* Marketplace Ready badge overlay */}
+        {isMarketplaceReady && (
+          <div className="absolute top-3 left-3">
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-green-500/90 text-black backdrop-blur-sm">
+              <Store className="w-3 h-3" />
+              Marketplace Ready
+            </span>
+          </div>
+        )}
+
+        {/* Processing overlay */}
+        {isProcessing && (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              <span className="text-xs text-white/80 font-medium">Enhancing photos…</span>
             </div>
-          )}
-        </div>
-        <div className="text-[11px] text-muted-foreground text-right shrink-0">
-          <div>Job #{job.id}</div>
-          {durationMs !== null && <div className="mt-0.5">{(durationMs / 1000).toFixed(1)}s</div>}
-        </div>
+          </div>
+        )}
       </div>
 
-      {isLive && (
-        <div className="space-y-1">
-          <Progress value={job.progressPercent} className="h-1.5" />
-          <div className="flex justify-between text-[10px] text-muted-foreground">
-            <span>
-              {job.processedPhotos}/{job.totalPhotos} photos
-            </span>
-            <span>{job.progressPercent}%</span>
+      {/* Content */}
+      <div className="p-4 space-y-3">
+        {/* Title + AI status */}
+        <div className="space-y-1.5">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-semibold text-white text-sm leading-tight">{name}</h3>
+            <AiStatusBadge status={aiStatus} />
+          </div>
+          {job.vehicleVin && (
+            <div className="text-[11px] text-white/30 font-mono tracking-wide">{job.vehicleVin}</div>
+          )}
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2.5 text-center">
+            <div className="text-sm font-semibold text-white">{job.totalPhotos}</div>
+            <div className="text-[10px] text-white/40 mt-0.5">Original</div>
+          </div>
+          <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2.5 text-center">
+            <div className={cn("text-sm font-semibold", enhancedCount > 0 ? "text-green-400" : "text-white/30")}>
+              {enhancedCount}
+            </div>
+            <div className="text-[10px] text-white/40 mt-0.5">Enhanced</div>
+          </div>
+          <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2.5 text-center">
+            <div className="text-sm font-semibold text-white">
+              {enhancedCount > 0 && job.totalPhotos > 0
+                ? `${Math.round((enhancedCount / job.totalPhotos) * 100)}%`
+                : "—"}
+            </div>
+            <div className="text-[10px] text-white/40 mt-0.5">Coverage</div>
           </div>
         </div>
-      )}
 
-      {job.status === "Completed" && (
-        <div className="space-y-3">
-          {/* Breakdown stats */}
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-            {job.exteriorCount > 0 && (
-              <span className="flex items-center gap-1">
-                <Layers className="w-3 h-3 text-primary/70" />
-                <span className="text-primary/90">{job.exteriorCount}</span> ext
-              </span>
-            )}
-            {job.interiorCount > 0 && (
-              <span className="flex items-center gap-1">
-                <ImageIcon className="w-3 h-3" />
-                {job.interiorCount} int
-              </span>
-            )}
-            {job.modelVersion && (
-              <span className="flex items-center gap-1">
-                <Cpu className="w-3 h-3" />
-                {job.modelVersion}
-              </span>
-            )}
+        {/* Last processed */}
+        {job.completedAt && (
+          <div className="flex items-center gap-1.5 text-[11px] text-white/30">
+            <Clock className="w-3 h-3" />
+            Processed {timeAgo(job.completedAt)}
           </div>
+        )}
 
-          {/* View set button */}
-          {hasSet && (
+        {/* Actions */}
+        <div className="flex items-center gap-2 pt-0.5">
+          {isDone && job.outputSetId !== null ? (
+            <Button
+              size="sm"
+              className="flex-1 h-8 text-xs premium-gradient-btn"
+              onClick={() => onOpenStudio(job.vehicleId)}
+            >
+              <Sparkles className="w-3 h-3 mr-1.5" />
+              Open Studio
+            </Button>
+          ) : isFailed ? (
             <Button
               variant="outline"
               size="sm"
-              className="h-7 text-xs w-full"
-              onClick={() =>
-                onViewSet({
-                  vehicleId: job.vehicleId,
-                  jobId: job.id,
-                  processingTimeMs: durationMs,
-                })
-              }
+              className="flex-1 h-8 text-xs"
+              onClick={() => onReprocess(job.vehicleId)}
             >
-              <Eye className="w-3 h-3 mr-1.5" />
-              Review AI Photos
+              <RotateCcw className="w-3 h-3 mr-1.5" />
+              Retry
+            </Button>
+          ) : isProcessing ? (
+            <div className="flex-1 h-8 flex items-center justify-center">
+              <span className="text-xs text-blue-400/70">Processing…</span>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 h-8 text-xs"
+              onClick={() => onReprocess(job.vehicleId)}
+            >
+              <Sparkles className="w-3 h-3 mr-1.5" />
+              Enhance Photos
             </Button>
           )}
         </div>
-      )}
-
-      {(job.status === "Failed" || job.status === "Cancelled") && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs"
-          onClick={() => onReprocess(job.vehicleId)}
-        >
-          <RefreshCw className="w-3 h-3 mr-1.5" />
-          Re-process
-        </Button>
-      )}
+      </div>
     </div>
   );
 }
 
-// ── Setup Gate ───────────────────────────────────────────────────────────────
+// ── Empty State ───────────────────────────────────────────────────────────────
 
-function SetupGate({
-  isBgRemovalReady,
-  onUploaded,
-}: {
-  isBgRemovalReady: boolean;
-  onUploaded: () => void;
-}) {
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  const uploadMutation = useMutation({
-    mutationFn: uploadBackground,
-    onSuccess: (data) => {
-      const s = data.setup;
-      toast({
-        title: "Background uploaded",
-        description: `${s.backgroundWidth ?? "?"}×${s.backgroundHeight ?? "?"} px — compositing is now enabled.`,
-      });
-      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
-      onUploaded();
-    },
-    onError: (err: Error) => {
-      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const handleFile = useCallback((file: File) => {
-    if (!file.type.startsWith("image/")) {
-      toast({ title: "Invalid file", description: "Please select a JPEG, PNG, or WebP image.", variant: "destructive" });
-      return;
-    }
-    setSelectedFile(file);
-    const reader = new FileReader();
-    reader.onload = (e) => setPreview(e.target?.result as string);
-    reader.readAsDataURL(file);
-  }, [toast]);
-
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
-    },
-    [handleFile],
-  );
-
-  const checklistItems = [
-    {
-      label: "Alpha Motorsport studio background",
-      done: false,
-      critical: true,
-      note: "Required for compositing",
-    },
-    {
-      label: "Classification",
-      done: true,
-      critical: false,
-      note: "OpenAI GPT-5-mini vision — ready",
-    },
-    {
-      label: "Background removal",
-      done: isBgRemovalReady,
-      critical: false,
-      note: isBgRemovalReady ? "fal.ai BRIA RMBG 2.0 — ready" : "Optional — add FAL_KEY to enable",
-    },
-    {
-      label: "Enhancement & ordering",
-      done: true,
-      critical: false,
-      note: "Sharp.js — ready",
-    },
-  ];
-
+function EmptyState({ onEnhanceAll, isPending }: { onEnhanceAll: () => void; isPending: boolean }) {
   return (
-    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.04] overflow-hidden">
-      {/* Header */}
-      <div className="flex items-start gap-4 p-6 border-b border-amber-500/15">
-        <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0 mt-0.5">
-          <ShieldAlert className="w-5 h-5 text-amber-400" />
-        </div>
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-base font-semibold text-white">AI Studio Setup Required</h2>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/25 uppercase tracking-wide">
-              Not Production-Ready
-            </span>
-          </div>
-          <p className="text-sm text-amber-200/60">
-            Waiting for Alpha Motorsport Studio Background.{" "}
-            <span className="text-amber-200/40">
-              Classification, background removal, and enhancement will still run.
-              Compositing is disabled until the background is uploaded.
-            </span>
-          </p>
-        </div>
+    <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
+      <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
+        <Camera className="w-7 h-7 text-white/20" />
       </div>
-
-      <div className="p-6 grid md:grid-cols-2 gap-6">
-        {/* Left: Checklist */}
-        <div className="space-y-3">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-4">
-            Pipeline Setup Checklist
-          </div>
-          {checklistItems.map((item) => (
-            <div
-              key={item.label}
-              className={cn(
-                "flex items-start gap-3 p-3 rounded-lg border",
-                item.done
-                  ? "bg-green-500/[0.04] border-green-500/15"
-                  : item.critical
-                    ? "bg-amber-500/[0.06] border-amber-500/20"
-                    : "bg-white/[0.02] border-white/[0.06]",
-              )}
-            >
-              <div className="mt-0.5 shrink-0">
-                {item.done ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-400" />
-                ) : item.critical ? (
-                  <AlertTriangle className="w-4 h-4 text-amber-400" />
-                ) : (
-                  <CircleSlash className="w-4 h-4 text-muted-foreground/50" />
-                )}
-              </div>
-              <div className="min-w-0">
-                <div
-                  className={cn(
-                    "text-sm font-medium",
-                    item.done
-                      ? "text-green-300"
-                      : item.critical
-                        ? "text-amber-200"
-                        : "text-muted-foreground",
-                  )}
-                >
-                  {item.label}
-                </div>
-                <div className="text-[11px] text-muted-foreground/60 mt-0.5">{item.note}</div>
-              </div>
-            </div>
-          ))}
-
-          {/* Compositing disabled callout */}
-          <div className="flex items-center gap-2.5 p-3 rounded-lg border border-red-500/20 bg-red-500/[0.04] mt-2">
-            <ImageOff className="w-4 h-4 text-red-400 shrink-0" />
-            <span className="text-xs text-red-300/80">
-              Compositing is <span className="font-semibold text-red-300">disabled</span> — vehicles will be
-              processed without a studio background.
-            </span>
-          </div>
-        </div>
-
-        {/* Right: Upload area */}
-        <div className="space-y-4">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Upload Studio Background
-          </div>
-
-          {/* Preview or drop zone */}
-          <div
-            className={cn(
-              "relative rounded-xl border-2 border-dashed transition-all cursor-pointer overflow-hidden",
-              dragOver
-                ? "border-amber-400/60 bg-amber-500/10"
-                : preview
-                  ? "border-white/20 bg-transparent"
-                  : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.03]",
-            )}
-            style={{ minHeight: 180 }}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {preview ? (
-              <>
-                <img
-                  src={preview}
-                  alt="Background preview"
-                  className="w-full h-44 object-cover rounded-xl"
-                />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-xl">
-                  <span className="text-xs text-white font-medium">Click to change</span>
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-10 px-4 text-center select-none">
-                <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-3">
-                  <Upload className="w-5 h-5 text-muted-foreground/60" />
-                </div>
-                <div className="text-sm font-medium text-muted-foreground">
-                  Drop background image here
-                </div>
-                <div className="text-[11px] text-muted-foreground/50 mt-1">
-                  JPEG, PNG or WebP · up to 30 MB
-                </div>
-              </div>
-            )}
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/tiff"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleFile(f);
-            }}
-          />
-
-          <Button
-            className="w-full"
-            disabled={!selectedFile || uploadMutation.isPending}
-            onClick={() => { if (selectedFile) uploadMutation.mutate(selectedFile); }}
-          >
-            {uploadMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing &amp; saving…
-              </>
-            ) : (
-              <>
-                <Upload className="w-4 h-4 mr-2" />
-                {selectedFile ? `Upload ${selectedFile.name}` : "Select an image first"}
-              </>
-            )}
-          </Button>
-
-          <p className="text-[11px] text-muted-foreground/50 text-center leading-relaxed">
-            Sharp will read the image dimensions, auto-generate the logo safe zone and vehicle
-            placement mask, and save the background to the Alpha Motorsport Studio Pack.
-          </p>
-        </div>
+      <div>
+        <p className="text-white/60 font-medium text-sm">No vehicles processed yet</p>
+        <p className="text-white/30 text-xs mt-1">Enhance all your inventory photos with one click</p>
       </div>
+      <Button onClick={onEnhanceAll} disabled={isPending} className="premium-gradient-btn">
+        {isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+        Enhance All Photos
+      </Button>
     </div>
   );
 }
 
-// ── AI Photo Enhancement Active Banner (enhance_only mode) ──────────────────
-
-function EnhancementActiveBanner() {
-  return (
-    <div className="flex items-center gap-4 p-4 rounded-xl border border-green-500/20 bg-green-500/[0.04]">
-      <div className="w-8 h-8 rounded-lg bg-green-500/15 border border-green-500/25 flex items-center justify-center shrink-0">
-        <CheckCircle2 className="w-4 h-4 text-green-400" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-green-300">AI Photo Enhancement active</div>
-        <div className="text-[11px] text-muted-foreground/60 mt-0.5">
-          Original dealership backgrounds preserved · Lighting, contrast, sharpness, color &amp; detail enhanced · Classification enabled
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Setup Complete Banner (studio mode only) ─────────────────────────────────
-
-function SetupComplete({
-  pack,
-}: {
-  pack: NonNullable<StudioStats["defaultPack"]>;
-}) {
-  return (
-    <div className="flex items-center gap-4 p-4 rounded-xl border border-green-500/20 bg-green-500/[0.04]">
-      <div className="w-8 h-8 rounded-lg bg-green-500/15 border border-green-500/25 flex items-center justify-center shrink-0">
-        <CheckCircle2 className="w-4 h-4 text-green-400" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-green-300">AI Photo Enhancement active</div>
-        <div className="text-[11px] text-muted-foreground/60 mt-0.5">
-          {pack.name} · {pack.backgroundWidth && pack.backgroundHeight
-            ? `${pack.backgroundWidth}×${pack.backgroundHeight} px · `
-            : ""}
-          v{pack.backgroundVersion} · Studio compositing enabled
-        </div>
-      </div>
-      {pack.backgroundUrl && (
-        <img
-          src={pack.backgroundUrl}
-          alt="Studio background thumbnail"
-          className="h-10 w-16 object-cover rounded-md border border-white/10 shrink-0"
-        />
-      )}
-    </div>
-  );
-}
-
-// ── Main Page ────────────────────────────────────────────────────────────────
+// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export function AIPhotoStudio() {
-  const [activeTab, setActiveTab] = useState("all");
-  const [viewSetJob, setViewSetJob] = useState<ViewSetJob | null>(null);
+  const [openVehicleId, setOpenVehicleId] = useState<number | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats } = useQuery({
     queryKey: ["photo-studio-stats"],
     queryFn: fetchStats,
-    refetchInterval: 4000,
+    refetchInterval: 8000,
   });
 
-  const { data: allJobs, isLoading: jobsLoading } = useQuery({
-    queryKey: ["photo-studio-jobs", activeTab],
-    queryFn: () =>
-      fetchJobs(
-        activeTab === "all" ? undefined : activeTab.charAt(0).toUpperCase() + activeTab.slice(1),
-      ),
-    refetchInterval: activeTab === "processing" || activeTab === "all" ? 2500 : false,
+  const { data: allJobs, isLoading } = useQuery({
+    queryKey: ["photo-studio-jobs"],
+    queryFn: fetchJobs,
+    refetchInterval: 3000,
+  });
+
+  const reprocessMutation = useMutation({
+    mutationFn: triggerProcess,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
+      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
+      toast({ title: "Enhancement started", description: "Photos are being processed." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to start enhancement", description: err.message, variant: "destructive" });
+    },
   });
 
   const enqueueAllMutation = useMutation({
     mutationFn: enqueueAll,
     onSuccess: (data) => {
-      toast({
-        title: "Processing queued",
-        description: `${data.enqueued} vehicles enqueued, ${data.skipped} skipped`,
-      });
       void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
       void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to enqueue vehicles", variant: "destructive" });
-    },
-  });
-
-  const reprocessStaleMutation = useMutation({
-    mutationFn: reprocessStale,
-    onSuccess: (data) => {
       toast({
-        title: "Reprocess queued",
-        description: data.enqueued > 0
-          ? `${data.enqueued} vehicle${data.enqueued !== 1 ? "s" : ""} queued for background update (Stages 1–2 skipped — no extra API cost)`
-          : "All vehicles are already up-to-date",
+        title: "Enhancement queued",
+        description: `${data.enqueued} vehicle${data.enqueued !== 1 ? "s" : ""} added to the queue.`,
       });
-      void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
-      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
     },
     onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to queue enhancement", description: err.message, variant: "destructive" });
     },
   });
 
-  const reprocessMutation = useMutation({
-    mutationFn: (vehicleId: number) =>
-      fetch(`${API_BASE}/photo-studio/vehicles/${vehicleId}/process`, { method: "POST" }).then(
-        (r) => r.json(),
-      ),
-    onSuccess: () => {
-      toast({ title: "Re-processing queued" });
-      void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
-      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
-    },
-  });
+  const vehicles = allJobs ? dedupeByVehicle(allJobs.jobs) : [];
+  const readyCount = vehicles.filter((v) => v.vehicleAiStatus === "Ready" || (v.status === "Completed" && v.outputSetId !== null)).length;
+  const processingCount = vehicles.filter((v) => v.status === "Processing" || v.status === "Queued").length;
+  const totalCount = stats?.vehicles.total ?? vehicles.length;
 
-  const jobs = allJobs?.jobs ?? [];
-  const setup = stats?.setup;
-  const isBgConfigured = setup?.backgroundConfigured ?? false;
-  const isBgRemovalReady = stats?.providers.backgroundRemoval?.startsWith("fal.ai") ?? false;
-  const staleCount = stats?.staleCount ?? 0;
-  const isEnhanceOnly = (stats?.processingMode ?? "enhance_only") !== "studio";
+  const kpis = [
+    { label: "Total Vehicles", value: totalCount, icon: Camera, color: "text-white" },
+    { label: "AI Enhanced", value: readyCount, icon: Sparkles, color: "text-green-400" },
+    { label: "In Progress", value: processingCount, icon: Loader2, color: "text-blue-400", spin: processingCount > 0 },
+    { label: "Not Started", value: Math.max(0, totalCount - readyCount - processingCount), icon: Clock, color: "text-white/40" },
+  ];
+
+  if (openVehicleId !== null) {
+    return (
+      <PhotoSetViewer
+        vehicleId={openVehicleId}
+        onClose={() => setOpenVehicleId(null)}
+        onReprocess={(id) => { reprocessMutation.mutate(id); setOpenVehicleId(null); }}
+      />
+    );
+  }
 
   return (
     <AppLayout>
-      <div className="p-6 space-y-6 max-w-6xl">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-                <Camera className="w-4 h-4 text-primary" />
-              </div>
-              <h1 className="text-xl font-semibold text-white tracking-tight">AI Photo Studio</h1>
-              {!isEnhanceOnly && !isBgConfigured && !statsLoading && (
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 uppercase tracking-wide">
-                  Setup Required
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground ml-11">
-              {isEnhanceOnly
-                ? "Automated photo enhancement and intelligent photo ordering."
-                : "Automated background removal, studio compositing, and intelligent photo ordering."}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {!isEnhanceOnly && !isBgConfigured && !statsLoading && (
-              <div className="text-xs text-amber-400/70 text-right max-w-[160px] leading-tight">
-                Upload background to enable compositing
-              </div>
-            )}
+      <div className="max-w-5xl mx-auto px-6 py-6 space-y-8">
+        <PageHeader
+          eyebrow="AI Photo Studio"
+          title="Photo Studio"
+          subtitle="Your vehicle media library"
+          icon={Camera}
+          action={
             <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
               onClick={() => enqueueAllMutation.mutate()}
-              disabled={enqueueAllMutation.isPending || (!isEnhanceOnly && !isBgConfigured && !statsLoading)}
-              title="Enqueue all vehicles for AI photo enhancement"
+              disabled={enqueueAllMutation.isPending}
             >
               {enqueueAllMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Play className="w-4 h-4 mr-2" />
-              )}
-              Process All Vehicles
-            </Button>
-          </div>
-        </div>
-
-        {/* Status banner */}
-        {statsLoading ? null : isEnhanceOnly ? (
-          <EnhancementActiveBanner />
-        ) : isBgConfigured ? (
-          stats?.defaultPack ? (
-            <SetupComplete pack={stats.defaultPack} />
-          ) : null
-        ) : (
-          <SetupGate
-            isBgRemovalReady={isBgRemovalReady}
-            onUploaded={() => void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] })}
-          />
-        )}
-
-        {/* FAL_KEY banner — only relevant in studio mode */}
-        {!isEnhanceOnly && isBgConfigured && !isBgRemovalReady && (
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-sm">
-            <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
-            <div>
-              <span className="font-medium text-yellow-300">Background removal not configured</span>
-              <span className="text-yellow-400/80 ml-2">
-                Add{" "}
-                <code className="font-mono text-xs bg-yellow-500/20 px-1 rounded">FAL_KEY</code> to
-                enable BRIA RMBG 2.0. Photos will be classified and ordered without background
-                removal.
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Stale background banner — only relevant in studio mode */}
-        {!isEnhanceOnly && isBgConfigured && staleCount > 0 && (
-          <div className="flex items-center gap-4 p-4 rounded-xl border border-amber-500/25 bg-amber-500/[0.06]">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
-              <RotateCcw className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-amber-300">
-                {staleCount} vehicle{staleCount !== 1 ? "s" : ""} need background update
-              </div>
-              <div className="text-xs text-amber-400/70 mt-0.5">
-                Studio background changed. Exterior photos will be re-composited with the new background.
-                Classification and background removal are skipped — no extra API cost.
-              </div>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10 hover:text-amber-200 shrink-0"
-              onClick={() => reprocessStaleMutation.mutate()}
-              disabled={reprocessStaleMutation.isPending}
-            >
-              {reprocessStaleMutation.isPending ? (
                 <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
               ) : (
-                <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" />
               )}
-              Reprocess {staleCount} Vehicle{staleCount !== 1 ? "s" : ""}
+              Enhance All
+            </Button>
+          }
+        />
+        {/* KPI row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {kpis.map((kpi) => {
+            const Icon = kpi.icon;
+            return (
+              <div key={kpi.label} className="bg-card border border-white/[0.06] rounded-xl p-4">
+                <Icon className={cn("w-4 h-4 mb-2", kpi.color, (kpi as { spin?: boolean }).spin && "animate-spin")} />
+                <div className={cn("text-2xl font-bold", kpi.color)}>{kpi.value}</div>
+                <div className="text-xs text-white/40 mt-0.5">{kpi.label}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Stale warning */}
+        {(stats?.staleCount ?? 0) > 0 && (
+          <div className="flex items-center gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.04]">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="flex-1 text-sm">
+              <span className="font-medium text-amber-300">{stats!.staleCount} vehicle{stats!.staleCount !== 1 ? "s" : ""}</span>
+              <span className="text-amber-400/70 ml-1.5">have new photos since their last enhancement.</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10 shrink-0"
+              onClick={async () => {
+                try {
+                  const r = await fetch(`${API_BASE}/photo-studio/reprocess-stale`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ dealerId: 1 }),
+                  });
+                  if (!r.ok) throw new Error("Failed");
+                  const d = (await r.json()) as { enqueued: number };
+                  void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
+                  void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
+                  toast({ title: "Re-enhancement queued", description: `${d.enqueued} vehicle${d.enqueued !== 1 ? "s" : ""} queued.` });
+                } catch {
+                  toast({ title: "Failed to queue", variant: "destructive" });
+                }
+              }}
+            >
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Re-enhance
             </Button>
           </div>
         )}
 
-        {/* FAL.ai low-balance warning — cumulative spend estimate (no balance API available) */}
-        {isBgRemovalReady && stats?.fal?.lowBalanceWarning && (
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/25 text-sm">
-            <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <span className="font-medium text-amber-300">FAL.ai balance may be running low</span>
-              <span className="text-amber-400/80 ml-2">
-                Estimated spend: <span className="font-mono text-amber-300">${stats.fal.estimatedSpendUsd.toFixed(2)}</span>
-                {" "}({stats.fal.imagesProcessed.toLocaleString()} images × ${stats.fal.costPerImageUsd}/image).
-                Threshold: ${stats.fal.thresholdUsd}. Top up your FAL.ai account to avoid interruptions.
-              </span>
-            </div>
+        {/* Vehicle grid */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-6 h-6 animate-spin text-white/30" />
           </div>
-        )}
-
-        {/* Stats row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            {
-              label: "Vehicles Ready",
-              value: stats?.vehicles.ready ?? 0,
-              sub: `of ${stats?.vehicles.total ?? 0} total`,
-              icon: CheckCircle2,
-              color: "text-green-400",
-            },
-            {
-              label: "Processing",
-              value: (stats?.jobs.queued ?? 0) + (stats?.jobs.processing ?? 0),
-              sub: stats?.jobs.processing ? `${stats.jobs.processing} active` : "idle",
-              icon: Loader2,
-              color: "text-blue-400",
-              animate: (stats?.jobs.processing ?? 0) > 0,
-            },
-            {
-              label: "Photos Processed",
-              value: stats?.images.withAI ?? 0,
-              sub: `of ${stats?.images.total ?? 0} total`,
-              icon: ImageIcon,
-              color: "text-primary",
-            },
-            {
-              label: "Failed Jobs",
-              value: stats?.jobs.failed ?? 0,
-              sub: "need retry",
-              icon: XCircle,
-              color: "text-red-400",
-            },
-          ].map((s) => (
-            <div key={s.label} className="bg-card border border-white/[0.06] rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                  {s.label}
-                </span>
-                <s.icon
-                  className={cn("w-4 h-4", s.color, "animate" in s && s.animate && "animate-spin")}
-                />
-              </div>
-              <div className="text-2xl font-bold text-white tabular-nums">{s.value}</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">{s.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Provider pills */}
-        {stats?.providers && (
-          <div className="flex flex-wrap gap-3">
-            {Object.entries(stats.providers).map(([key, value]) => {
-              const isDisabled = (value as string).toLowerCase().startsWith("disabled");
-              return (
-                <div
-                  key={key}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs",
-                    isDisabled
-                      ? "bg-red-500/[0.04] border-red-500/15"
-                      : "bg-white/[0.03] border-white/[0.06]",
-                  )}
-                >
-                  {isDisabled ? (
-                    <ImageOff className="w-3 h-3 text-red-400/70" />
-                  ) : (
-                    <Zap className="w-3 h-3 text-primary" />
-                  )}
-                  <span className={cn("capitalize", isDisabled ? "text-red-400/60" : "text-muted-foreground")}>
-                    {key.replace(/([A-Z])/g, " $1").trim()}:
-                  </span>
-                  <span className={cn("font-medium", isDisabled ? "text-red-400/80" : "text-white/80")}>
-                    {value as string}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Job queue */}
-        <div>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+        ) : vehicles.length === 0 ? (
+          <EmptyState
+            onEnhanceAll={() => enqueueAllMutation.mutate()}
+            isPending={enqueueAllMutation.isPending}
+          />
+        ) : (
+          <div>
             <div className="flex items-center justify-between mb-4">
-              <TabsList className="bg-white/[0.04] border border-white/[0.06]">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="processing">
-                  Active
-                  {(stats?.jobs.queued ?? 0) + (stats?.jobs.processing ?? 0) > 0 && (
-                    <span className="ml-1.5 px-1.5 py-0.5 bg-blue-500/20 text-blue-400 text-[10px] rounded-full font-medium">
-                      {(stats?.jobs.queued ?? 0) + (stats?.jobs.processing ?? 0)}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-                <TabsTrigger value="failed">
-                  Failed
-                  {(stats?.jobs.failed ?? 0) > 0 && (
-                    <span className="ml-1.5 px-1.5 py-0.5 bg-red-500/20 text-red-400 text-[10px] rounded-full font-medium">
-                      {stats?.jobs.failed}
-                    </span>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-              <span className="text-xs text-muted-foreground">
-                {jobs.length} job{jobs.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-
-            {["all", "processing", "completed", "failed"].map((tab) => (
-              <TabsContent key={tab} value={tab} className="mt-0">
-                {jobsLoading ? (
-                  <div className="flex items-center justify-center py-16 text-muted-foreground">
-                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    Loading jobs…
-                  </div>
-                ) : jobs.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <Camera className="w-10 h-10 text-muted-foreground/30 mb-3" />
-                    <div className="text-sm text-muted-foreground">
-                      {tab === "all"
-                        ? 'No jobs yet. Click "Process All Vehicles" to start.'
-                        : `No ${tab} jobs.`}
-                    </div>
-                    {tab === "all" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-4"
-                        onClick={() => enqueueAllMutation.mutate()}
-                        disabled={enqueueAllMutation.isPending}
-                      >
-                        <Play className="w-3.5 h-3.5 mr-1.5" />
-                        Process All Vehicles
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {jobs.map((job) => (
-                      <JobCard
-                        key={job.id}
-                        job={job}
-                        onReprocess={(vid) => reprocessMutation.mutate(vid)}
-                        onViewSet={setViewSetJob}
-                      />
-                    ))}
-                  </div>
+              <h2 className="text-sm font-semibold text-white/70">
+                {vehicles.length} vehicle{vehicles.length !== 1 ? "s" : ""}
+              </h2>
+              <div className="flex items-center gap-1.5 text-[11px] text-white/30">
+                <CheckCircle2 className="w-3 h-3 text-green-400/70" />
+                <span className="text-green-400/70">{readyCount} ready</span>
+                {processingCount > 0 && (
+                  <>
+                    <span>·</span>
+                    <span className="text-blue-400/70">{processingCount} processing</span>
+                  </>
                 )}
-              </TabsContent>
-            ))}
-          </Tabs>
-        </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {vehicles.map((job) => (
+                <VehicleCard
+                  key={job.vehicleId}
+                  job={job}
+                  onOpenStudio={setOpenVehicleId}
+                  onReprocess={(id) => reprocessMutation.mutate(id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Photo set viewer — full-screen overlay */}
-      {viewSetJob && (
-        <PhotoSetViewer
-          vehicleId={viewSetJob.vehicleId}
-          jobId={viewSetJob.jobId}
-          processingTimeMs={viewSetJob.processingTimeMs}
-          onClose={() => setViewSetJob(null)}
-        />
-      )}
     </AppLayout>
   );
 }
