@@ -486,8 +486,7 @@ router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
     .where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID))
     .orderBy(desc(vehicleIntelligenceTable.confidenceScore));
 
-  // Only surface recommendations for Manassas vehicles — unknown/null locations
-  // go to Inventory Review and must not appear in publishing recommendations.
+  // All vehicles for dealer_id=1 (Alpha Motorsport). Do not filter by lot_location.
   const vehicles = await db
     .select()
     .from(vehiclesTable)
@@ -497,7 +496,7 @@ router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
   const vehicleSet = new Set(vehicleIds);
   const vehicleMap = new Map(vehicles.map((v) => [v.id, v]));
 
-  // Only recommend vehicles that actually exist in the Manassas inventory
+  // Only recommend vehicles that belong to this dealer
   const filteredIntelligence = intelligence.filter((vi) => vehicleSet.has(vi.vehicleId));
 
   // Parallel: fetch thumbnails (position=0) and photo counts

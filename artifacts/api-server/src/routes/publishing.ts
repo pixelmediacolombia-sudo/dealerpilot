@@ -16,6 +16,10 @@ import {
 import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { getMarketplacePricing } from "../listings/pricing";
 
+// Dealer scope: Alpha Motorsport = dealer_id 1.
+// Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
+const DEALER_ID = 1;
+
 const router: IRouter = Router();
 
 /**
@@ -1123,7 +1127,7 @@ router.get("/publishing/jobs/:id/photo/:index", async (req, res) => {
 
 const ClearQueueBody = z.object({
   olderThanMinutes: z.number().int().min(0).max(1440).optional().default(10),
-  dealerId: z.number().int().positive().optional(),
+  dealerId: z.number().int().positive().optional().default(DEALER_ID),
 });
 
 router.post("/publishing/jobs/clear-queue", async (req, res) => {
@@ -1138,10 +1142,8 @@ router.post("/publishing/jobs/clear-queue", async (req, res) => {
   const conditions = [
     inArray(publishingJobsTable.status, ["Queued", "Scheduled", "Retry", "Claimed", "Publishing"]),
     lt(publishingJobsTable.createdAt, cutoff),
+    eq(publishingJobsTable.dealerId, dealerId),
   ];
-  if (dealerId != null) {
-    conditions.push(eq(publishingJobsTable.dealerId, dealerId));
-  }
 
   const cleared = await db
     .update(publishingJobsTable)
@@ -1159,7 +1161,7 @@ router.post("/publishing/jobs/clear-queue", async (req, res) => {
 // Safety valve for the dashboard — never touches jobs in progress (Publishing/Claimed).
 
 const CancelStaleBody = z.object({
-  dealerId: z.number().int().positive().optional(),
+  dealerId: z.number().int().positive().optional().default(DEALER_ID),
   olderThanMinutes: z.number().int().min(1).max(1440).optional().default(60),
 });
 
@@ -1175,10 +1177,8 @@ router.post("/publishing/jobs/cancel-stale", async (req, res) => {
   const conditions = [
     inArray(publishingJobsTable.status, ["Queued", "Scheduled"]),
     lt(publishingJobsTable.createdAt, cutoff),
+    eq(publishingJobsTable.dealerId, dealerId),
   ];
-  if (dealerId != null) {
-    conditions.push(eq(publishingJobsTable.dealerId, dealerId));
-  }
 
   const cancelled = await db
     .update(publishingJobsTable)

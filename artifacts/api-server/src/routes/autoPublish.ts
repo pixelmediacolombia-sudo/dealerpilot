@@ -31,8 +31,10 @@ import {
   sql,
 } from "drizzle-orm";
 
-// All eligible vehicles are scoped to dealer_id 1 (Alpha Motorsports, Manassas).
-const DEALER_FILTER = eq(vehiclesTable.dealerId, 1);
+// Dealer scope: Alpha Motorsport = dealer_id 1.
+// Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
+const DEALER_ID = 1;
+const DEALER_FILTER = eq(vehiclesTable.dealerId, DEALER_ID);
 
 const router: IRouter = Router();
 
@@ -363,8 +365,7 @@ router.post("/auto-publish/batches", async (req, res) => {
   }
   const { dealerId, mode, count, scheduledAt } = parsed.data;
 
-  // Fetch all active/ready Manassas vehicles for this dealer.
-  // Unknown/null lot locations are excluded — they need Inventory Review first.
+  // Fetch all active/ready vehicles for this dealer (dealer_id = 1 = Alpha Motorsport).
   const vehicles = await db
     .select()
     .from(vehiclesTable)
@@ -379,7 +380,7 @@ router.post("/auto-publish/batches", async (req, res) => {
     );
 
   if (vehicles.length === 0) {
-    res.status(422).json({ error: "No eligible Manassas vehicles found for this dealer" });
+    res.status(422).json({ error: "No eligible vehicles found for this dealer" });
     return;
   }
 
@@ -600,13 +601,13 @@ router.post("/auto-publish/batches", async (req, res) => {
   });
 });
 
-// GET /auto-publish/batches — list batches for a dealer
+// GET /auto-publish/batches — list batches for a dealer (always scoped to dealer_id=1)
 router.get("/auto-publish/batches", async (req, res) => {
-  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : null;
+  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : DEALER_ID;
   const rows = await db
     .select()
     .from(publishingBatchesTable)
-    .where(dealerId ? eq(publishingBatchesTable.dealerId, dealerId) : undefined)
+    .where(eq(publishingBatchesTable.dealerId, dealerId))
     .orderBy(desc(publishingBatchesTable.createdAt));
   res.json({ batches: rows });
 });
@@ -799,24 +800,24 @@ router.get("/publishing/jobs/:id/events", async (req, res) => {
   res.json({ events });
 });
 
-// GET /auto-publish/priority-scores — priority scores for dealer vehicles
+// GET /auto-publish/priority-scores — priority scores for dealer vehicles (always scoped to dealer_id=1)
 router.get("/auto-publish/priority-scores", async (req, res) => {
-  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : null;
+  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : DEALER_ID;
   const rows = await db
     .select()
     .from(publishPriorityScoresTable)
-    .where(dealerId ? eq(publishPriorityScoresTable.dealerId, dealerId) : undefined)
+    .where(eq(publishPriorityScoresTable.dealerId, dealerId))
     .orderBy(desc(publishPriorityScoresTable.priorityScore));
   res.json({ scores: rows });
 });
 
-// GET /auto-publish/photo-scores — photo scores for dealer vehicles
+// GET /auto-publish/photo-scores — photo scores for dealer vehicles (always scoped to dealer_id=1)
 router.get("/auto-publish/photo-scores", async (req, res) => {
-  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : null;
+  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : DEALER_ID;
   const rows = await db
     .select()
     .from(vehiclePhotoScoresTable)
-    .where(dealerId ? eq(vehiclePhotoScoresTable.dealerId, dealerId) : undefined)
+    .where(eq(vehiclePhotoScoresTable.dealerId, dealerId))
     .orderBy(desc(vehiclePhotoScoresTable.photoScore));
   res.json({ scores: rows });
 });
@@ -958,7 +959,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
   }
   const { dealerId, count } = parsed.data;
 
-  // Same vehicle selection as batch — Manassas only, no DB writes
+  // Same vehicle selection as batch — dealer_id = 1, no DB writes
   const vehicles = await db
     .select()
     .from(vehiclesTable)
