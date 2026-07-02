@@ -13,14 +13,21 @@ import {
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import {
-  Puzzle,
-  Facebook,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  MapPin,
+  ChevronDown,
   ShoppingBag,
   Zap,
   Loader2,
   WifiOff,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useDealerLocation, type DealerLocation } from "@/context/LocationContext";
 
 // ─── Pill ──────────────────────────────────────────────────────────────────────
 
@@ -60,6 +67,45 @@ function Pill({
         "text-white/20",
       )}>{detail}</span>
     </div>
+  );
+}
+
+// ─── Location selector ─────────────────────────────────────────────────────────
+
+const LOCATIONS: DealerLocation[] = ["Manassas", "Fredericksburg"];
+
+function LocationSelector() {
+  const { selectedLocation, setSelectedLocation } = useDealerLocation();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-primary/20 hover:bg-white/[0.07] hover:border-primary/30 transition-colors outline-none cursor-pointer">
+          <MapPin className="w-3 h-3 text-primary/60 shrink-0" />
+          <span className="text-[10px] font-medium text-white/50 whitespace-nowrap">Alpha Motorsport</span>
+          <span className="text-[10px] font-bold text-primary/90 whitespace-nowrap">— {selectedLocation.toUpperCase()}</span>
+          <ChevronDown className="w-3 h-3 text-white/30 shrink-0" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[230px]">
+        {LOCATIONS.map((loc) => (
+          <DropdownMenuItem
+            key={loc}
+            className={cn(
+              "text-xs cursor-pointer",
+              loc === selectedLocation && "text-primary font-semibold",
+            )}
+            onClick={() => setSelectedLocation(loc)}
+          >
+            <MapPin className={cn("w-3.5 h-3.5 mr-2 shrink-0", loc === selectedLocation ? "text-primary" : "text-muted-foreground")} />
+            Alpha Motorsport — {loc}
+            {loc === selectedLocation && (
+              <span className="ml-auto text-primary text-xs">✓</span>
+            )}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -133,7 +179,13 @@ export function GlobalHeader() {
   const aiDetail = activeJobs > 0 ? `${activeJobs} ACTIVE` : "IDLE";
 
   return (
-    <header className="h-10 border-b border-white/[0.05] bg-background/80 backdrop-blur-sm flex items-center justify-end gap-2 px-5 shrink-0 relative z-30">
+    <header className="h-10 border-b border-white/[0.05] bg-background/80 backdrop-blur-sm flex items-center gap-2 px-5 shrink-0 relative z-30">
+
+      {/* Location selector — left side */}
+      <LocationSelector />
+
+      {/* Spacer */}
+      <div className="flex-1" />
 
       {/* Connection status pills */}
       <Pill

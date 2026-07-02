@@ -17,4 +17,8 @@ q?: string;
  */
 status?: string;
 sort?: ListVehiclesSort;
+/**
+ * Filter by lot location (e.g. Manassas, Fredericksburg)
+ */
+location?: string;
 };

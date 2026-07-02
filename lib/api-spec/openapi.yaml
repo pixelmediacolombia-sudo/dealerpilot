@@ -226,6 +226,11 @@ paths:
           schema:
             type: string
             enum: [newest, price_high, price_low, mileage_low]
+        - name: location
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by lot location (e.g. Manassas, Fredericksburg)
       responses:
         "200":
           description: Vehicle list
@@ -238,6 +243,12 @@ paths:
       operationId: getVehicleStats
       tags: [inventory]
       summary: Inventory counts by status
+      parameters:
+        - name: location
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by lot location (e.g. Manassas, Fredericksburg)
       responses:
         "200":
           description: Inventory stats
@@ -458,6 +469,11 @@ paths:
           required: false
           schema: { type: string }
           description: Filter by draft/listing status
+        - name: location
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by lot location (e.g. Manassas, Fredericksburg)
       responses:
         "200":
           description: Listing workspaces
@@ -1856,6 +1872,12 @@ paths:
       operationId: listMarketplaceRecommendations
       summary: Per-vehicle strategy recommendations
       tags: [MarketplaceIntelligence]
+      parameters:
+        - name: location
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by lot location (e.g. Manassas, Fredericksburg)
       responses:
         "200":
           description: Vehicle recommendations
@@ -2987,6 +3009,7 @@ components:
           enum: [Assisted, Controlled]
         count: { type: integer, minimum: 1, maximum: 20 }
         scheduledAt: { type: string }
+        lotLocation: { type: string, description: "Filter eligible vehicles by lot location" }
     IneligibleVehicle:
       type: object
       required: [vehicleId]

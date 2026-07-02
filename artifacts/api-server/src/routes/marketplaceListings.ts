@@ -17,6 +17,7 @@ router.get("/marketplace-listings", async (req: Request, res: Response) => {
   try {
     const dealerId = Number(req.query["dealerId"] ?? 1);
     const statusFilter = req.query["status"] as string | undefined;
+    const locationFilter = req.query["location"] as string | undefined;
 
     const rows = await db
       .select({
@@ -41,6 +42,7 @@ router.get("/marketplace-listings", async (req: Request, res: Response) => {
         and(
           eq(marketplaceListingsTable.dealerId, dealerId),
           statusFilter ? eq(marketplaceListingsTable.status, statusFilter) : undefined,
+          locationFilter ? eq(vehiclesTable.lotLocation, locationFilter) : undefined,
         ),
       )
       .orderBy(desc(marketplaceListingsTable.publishedAt));

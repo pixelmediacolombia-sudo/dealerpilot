@@ -479,18 +479,20 @@ function computeEstimatedDaysToSell(price: number | null, confidenceScore: numbe
 }
 
 // GET /api/marketplace-intelligence/recommendations
-router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
+router.get("/marketplace-intelligence/recommendations", async (req, res) => {
+  const location = typeof req.query.location === "string" ? req.query.location : "";
   const intelligence = await db
     .select()
     .from(vehicleIntelligenceTable)
     .where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID))
     .orderBy(desc(vehicleIntelligenceTable.confidenceScore));
 
-  // All vehicles for dealer_id=1 (Alpha Motorsport). Do not filter by lot_location.
+  const vehicleConditions = [eq(vehiclesTable.dealerId, DEALER_ID)];
+  if (location) vehicleConditions.push(eq(vehiclesTable.lotLocation, location));
   const vehicles = await db
     .select()
     .from(vehiclesTable)
-    .where(eq(vehiclesTable.dealerId, DEALER_ID));
+    .where(and(...vehicleConditions));
 
   const vehicleIds = vehicles.map((v) => v.id);
   const vehicleSet = new Set(vehicleIds);

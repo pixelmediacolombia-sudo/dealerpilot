@@ -26,6 +26,7 @@ import {
   useListMarketplaceRecommendations,
   useBulkSchedulePublishing,
 } from "@workspace/api-client-react";
+import { useDealerLocation } from "@/context/LocationContext";
 import { cn } from "@/lib/utils";
 import { PublishNowModal } from "@/components/PublishNowModal";
 import { formatCurrency } from "@/lib/format";
@@ -307,10 +308,12 @@ export function SalesHub() {
     query: { enabled: !!dealerId, queryKey: getGetDealerQueryKey(dealerId!) },
   });
 
+  const { selectedLocation } = useDealerLocation();
+
   // Data fetches
-  const { data: vehicleStats } = useGetVehicleStats();
-  const { data: workspacesData, isLoading: workspacesLoading } = useListListingWorkspaces();
-  const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations();
+  const { data: vehicleStats } = useGetVehicleStats({ location: selectedLocation });
+  const { data: workspacesData, isLoading: workspacesLoading } = useListListingWorkspaces({ location: selectedLocation });
+  const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations({ location: selectedLocation });
   const { data: jobsData } = useListPublishingJobs();
   const { data: creativeJobs } = useListCreativeJobs();
   const { data: leads } = useGetLeads();

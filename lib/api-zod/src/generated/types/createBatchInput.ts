@@ -16,4 +16,6 @@ export interface CreateBatchInput {
      */
   count?: number;
   scheduledAt?: string;
+  /** Filter eligible vehicles by lot location */
+  lotLocation?: string;
 }

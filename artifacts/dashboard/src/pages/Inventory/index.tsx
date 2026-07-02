@@ -11,6 +11,7 @@ import {
   getGetVehicleStatsQueryKey,
   ListVehiclesSort,
 } from "@workspace/api-client-react";
+import { useDealerLocation } from "@/context/LocationContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,12 +44,14 @@ export function InventoryDashboard() {
 
   const queryClient = useQueryClient();
   const selection = useVehicleSelection();
+  const { selectedLocation } = useDealerLocation();
 
-  const { data: stats, isLoading: statsLoading } = useGetVehicleStats();
+  const { data: stats, isLoading: statsLoading } = useGetVehicleStats({ location: selectedLocation });
   const { data: vehiclesData, isLoading: vehiclesLoading } = useListVehicles({
     q: search || undefined,
     status: statusFilter === "all" ? undefined : statusFilter,
     sort: sortOrder,
+    location: selectedLocation,
   });
 
   const allVisibleIds = (vehiclesData?.vehicles ?? []).map((v) => v.id);

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useDealerLocation } from "@/context/LocationContext";
 import {
   useListMarketplaceRecommendations,
   useListPublishingJobs,
@@ -307,7 +308,8 @@ export function MarketplaceIntelligence() {
   const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
   const [publishingVehicleId, setPublishingVehicleId] = useState<number | null>(null);
 
-  const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations();
+  const { selectedLocation } = useDealerLocation();
+  const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations({ location: selectedLocation });
   const { data: jobsData, isLoading: jobsLoading } = useListPublishingJobs();
   const { data: settingsData } = useGetAutoPublishSettings(1);
   const updateSettings = useUpdateAutoPublishSettings();

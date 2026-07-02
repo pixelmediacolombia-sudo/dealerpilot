@@ -956,6 +956,8 @@ export interface CreateBatchInput {
      */
   count?: number;
   scheduledAt?: string;
+  /** Filter eligible vehicles by lot location */
+  lotLocation?: string;
 }
 
 export interface IneligibleVehicle {
@@ -1774,6 +1776,10 @@ q?: string;
  */
 status?: string;
 sort?: ListVehiclesSort;
+/**
+ * Filter by lot location (e.g. Manassas, Fredericksburg)
+ */
+location?: string;
 };
 
 export type ListVehiclesSort = typeof ListVehiclesSort[keyof typeof ListVehiclesSort];
@@ -1785,6 +1791,13 @@ export const ListVehiclesSort = {
   price_low: 'price_low',
   mileage_low: 'mileage_low',
 } as const;
+
+export type GetVehicleStatsParams = {
+/**
+ * Filter by lot location (e.g. Manassas, Fredericksburg)
+ */
+location?: string;
+};
 
 export type BulkVehicleAction200 = {
   updated: number;
@@ -1799,6 +1812,10 @@ q?: string;
  * Filter by draft/listing status
  */
 status?: string;
+/**
+ * Filter by lot location (e.g. Manassas, Fredericksburg)
+ */
+location?: string;
 };
 
 export type MarkListingPublishedBody = {
@@ -1960,6 +1977,13 @@ status?: string;
 
 export type GetDownPaymentIntelligenceParams = {
 dealerId?: number;
+};
+
+export type ListMarketplaceRecommendationsParams = {
+/**
+ * Filter by lot location (e.g. Manassas, Fredericksburg)
+ */
+location?: string;
 };
 
 export type SeedMarketplaceIntelligence200 = {

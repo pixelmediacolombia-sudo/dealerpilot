@@ -15,4 +15,8 @@ q?: string;
  * Filter by draft/listing status
  */
 status?: string;
+/**
+ * Filter by lot location (e.g. Manassas, Fredericksburg)
+ */
+location?: string;
 };

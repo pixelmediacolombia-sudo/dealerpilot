@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useQueryClient } from "@tanstack/react-query";
+import { useDealerLocation } from "@/context/LocationContext";
 import {
   useListListingWorkspaces,
   useListPublishingJobs,
@@ -305,9 +306,12 @@ export function ListingsWorkspace() {
     }
   };
 
+  const { selectedLocation } = useDealerLocation();
+
   const { data: workspacesData, isLoading: workspacesLoading } = useListListingWorkspaces({
     q: search || undefined,
     status: statusFilter === "all" ? undefined : statusFilter,
+    location: selectedLocation,
   });
 
   const { data: jobsData, isLoading: jobsLoading } = useListPublishingJobs(
@@ -360,7 +364,7 @@ export function ListingsWorkspace() {
     (photoScoresData?.scores ?? []).map((s) => [s.vehicleId, s]),
   );
 
-  const { data: intelligenceData } = useListMarketplaceRecommendations();
+  const { data: intelligenceData } = useListMarketplaceRecommendations({ location: selectedLocation });
 
   const intelligenceMap = useMemo(() => {
     const m = new Map<number, {

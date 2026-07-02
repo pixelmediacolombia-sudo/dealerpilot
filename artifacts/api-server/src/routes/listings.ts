@@ -164,8 +164,10 @@ function deriveEngagement(
 router.get("/listings", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status : "";
+  const location = typeof req.query.location === "string" ? req.query.location : "";
 
   const conditions: SQL[] = [eq(vehiclesTable.dealerId, DEALER_ID)];
+  if (location) conditions.push(eq(vehiclesTable.lotLocation, location));
   if (q) {
     const like = `%${q}%`;
     const search = or(

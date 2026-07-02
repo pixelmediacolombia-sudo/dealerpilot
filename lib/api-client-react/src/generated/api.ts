@@ -76,6 +76,7 @@ import type {
   GetFieldValidationParams,
   GetLaunchChecklistParams,
   GetPublishingJobProgress200,
+  GetVehicleStatsParams,
   HealthStatus,
   HeartbeatInput,
   LaunchChecklistResponse,
@@ -88,6 +89,7 @@ import type {
   ListCreativeStudioParams,
   ListLeadsParams,
   ListListingWorkspacesParams,
+  ListMarketplaceRecommendationsParams,
   ListPublishPriorityScoresParams,
   ListPublishingBatchesParams,
   ListPublishingJobsParams,
@@ -1090,20 +1092,27 @@ export function useListVehicles<TData = Awaited<ReturnType<typeof listVehicles>>
 
 
 
-export const getGetVehicleStatsUrl = () => {
+export const getGetVehicleStatsUrl = (params?: GetVehicleStatsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/vehicles/stats`
+  return stringifiedParams.length > 0 ? `/api/vehicles/stats?${stringifiedParams}` : `/api/vehicles/stats`
 }
 
 /**
  * @summary Inventory counts by status
  */
-export const getVehicleStats = async ( options?: RequestInit): Promise<VehicleStats> => {
+export const getVehicleStats = async (params?: GetVehicleStatsParams, options?: RequestInit): Promise<VehicleStats> => {
 
-  return customFetch<VehicleStats>(getGetVehicleStatsUrl(),
+  return customFetch<VehicleStats>(getGetVehicleStatsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1116,23 +1125,23 @@ export const getVehicleStats = async ( options?: RequestInit): Promise<VehicleSt
 
 
 
-export const getGetVehicleStatsQueryKey = () => {
+export const getGetVehicleStatsQueryKey = (params?: GetVehicleStatsParams,) => {
     return [
-    `/api/vehicles/stats`
+    `/api/vehicles/stats`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetVehicleStatsQueryOptions = <TData = Awaited<ReturnType<typeof getVehicleStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVehicleStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetVehicleStatsQueryOptions = <TData = Awaited<ReturnType<typeof getVehicleStats>>, TError = ErrorType<unknown>>(params?: GetVehicleStatsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVehicleStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetVehicleStatsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetVehicleStatsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVehicleStats>>> = ({ signal }) => getVehicleStats({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVehicleStats>>> = ({ signal }) => getVehicleStats(params, { signal, ...requestOptions });
 
 
 
@@ -1150,11 +1159,11 @@ export type GetVehicleStatsQueryError = ErrorType<unknown>
  */
 
 export function useGetVehicleStats<TData = Awaited<ReturnType<typeof getVehicleStats>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVehicleStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetVehicleStatsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVehicleStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetVehicleStatsQueryOptions(options)
+  const queryOptions = getGetVehicleStatsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -6367,20 +6376,27 @@ export function useGetMarketplaceDashboard<TData = Awaited<ReturnType<typeof get
 
 
 
-export const getListMarketplaceRecommendationsUrl = () => {
+export const getListMarketplaceRecommendationsUrl = (params?: ListMarketplaceRecommendationsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/marketplace-intelligence/recommendations`
+  return stringifiedParams.length > 0 ? `/api/marketplace-intelligence/recommendations?${stringifiedParams}` : `/api/marketplace-intelligence/recommendations`
 }
 
 /**
  * @summary Per-vehicle strategy recommendations
  */
-export const listMarketplaceRecommendations = async ( options?: RequestInit): Promise<MarketplaceRecommendationsResponse> => {
+export const listMarketplaceRecommendations = async (params?: ListMarketplaceRecommendationsParams, options?: RequestInit): Promise<MarketplaceRecommendationsResponse> => {
 
-  return customFetch<MarketplaceRecommendationsResponse>(getListMarketplaceRecommendationsUrl(),
+  return customFetch<MarketplaceRecommendationsResponse>(getListMarketplaceRecommendationsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -6393,23 +6409,23 @@ export const listMarketplaceRecommendations = async ( options?: RequestInit): Pr
 
 
 
-export const getListMarketplaceRecommendationsQueryKey = () => {
+export const getListMarketplaceRecommendationsQueryKey = (params?: ListMarketplaceRecommendationsParams,) => {
     return [
-    `/api/marketplace-intelligence/recommendations`
+    `/api/marketplace-intelligence/recommendations`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListMarketplaceRecommendationsQueryOptions = <TData = Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListMarketplaceRecommendationsQueryOptions = <TData = Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError = ErrorType<unknown>>(params?: ListMarketplaceRecommendationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListMarketplaceRecommendationsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListMarketplaceRecommendationsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMarketplaceRecommendations>>> = ({ signal }) => listMarketplaceRecommendations({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMarketplaceRecommendations>>> = ({ signal }) => listMarketplaceRecommendations(params, { signal, ...requestOptions });
 
 
 
@@ -6427,11 +6443,11 @@ export type ListMarketplaceRecommendationsQueryError = ErrorType<unknown>
  */
 
 export function useListMarketplaceRecommendations<TData = Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListMarketplaceRecommendationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketplaceRecommendations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListMarketplaceRecommendationsQueryOptions(options)
+  const queryOptions = getListMarketplaceRecommendationsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

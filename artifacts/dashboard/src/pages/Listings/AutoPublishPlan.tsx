@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDealerLocation } from "@/context/LocationContext";
 import {
   useGetAutoPublishSettings,
   useUpdateAutoPublishSettings,
@@ -33,6 +34,8 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
   const [isExpanded, setIsExpanded] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
   const [batchSuccess, setBatchSuccess] = useState(false);
+
+  const { selectedLocation } = useDealerLocation();
 
   const { data, isLoading } = useGetAutoPublishSettings(dealerId, {
     query: { queryKey: getGetAutoPublishSettingsQueryKey(dealerId) },
@@ -63,6 +66,7 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
           dealerId,
           mode: (settings?.autoClickPublish ? "Controlled" : "Assisted") as "Assisted" | "Controlled",
           count: settings?.vehiclesPerBatch ?? 4,
+          lotLocation: selectedLocation,
         },
       });
       qc.invalidateQueries({ queryKey: getListPublishingBatchesQueryKey() });

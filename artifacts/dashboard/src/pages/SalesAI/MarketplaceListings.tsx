@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDealerLocation } from "@/context/LocationContext";
 import { Link } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -66,8 +67,10 @@ interface MarketplaceListing {
 
 // ── API ───────────────────────────────────────────────────────────────────────
 
-async function fetchListings(): Promise<{ listings: MarketplaceListing[] }> {
-  const r = await fetch(`${API_BASE}/marketplace-listings?dealerId=${DEALER_ID}`);
+async function fetchListings(location?: string): Promise<{ listings: MarketplaceListing[] }> {
+  const params = new URLSearchParams({ dealerId: String(DEALER_ID) });
+  if (location) params.set("location", location);
+  const r = await fetch(`${API_BASE}/marketplace-listings?${params.toString()}`);
   if (!r.ok) throw new Error("Failed to fetch marketplace listings");
   return r.json() as Promise<{ listings: MarketplaceListing[] }>;
 }
@@ -371,10 +374,11 @@ export function MarketplaceListings() {
   const [markingSoldId, setMarkingSoldId] = useState<number | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { selectedLocation } = useDealerLocation();
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["marketplace-listings"],
-    queryFn: fetchListings,
+    queryKey: ["marketplace-listings", selectedLocation],
+    queryFn: () => fetchListings(selectedLocation),
     refetchInterval: 30_000,
   });
 

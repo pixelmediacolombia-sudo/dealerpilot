@@ -211,7 +211,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
 // ── Bulk enqueue: process all vehicles missing AI photos ─────────────────────
 router.post("/photo-studio/enqueue-all", async (req: Request, res: Response) => {
   try {
-    const { dealerId = 1 } = req.body as { dealerId?: number };
+    const { dealerId = 1, location = "" } = req.body as { dealerId?: number; location?: string };
 
     // Find all active vehicles with images but no Ready AI set
     const vehicles = await db
@@ -221,6 +221,7 @@ router.post("/photo-studio/enqueue-all", async (req: Request, res: Response) => 
         and(
           eq(vehiclesTable.dealerId, dealerId),
           inArray(vehiclesTable.status, ["Active", "Ready to Publish", "New"]),
+          location ? eq(vehiclesTable.lotLocation, location) : undefined,
         ),
       );
 

@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDealerLocation } from "@/context/LocationContext";
 import {
   Camera,
   CheckCircle2,
@@ -71,8 +72,10 @@ async function fetchJobs(): Promise<{ jobs: PhotoJob[] }> {
   return r.json() as Promise<{ jobs: PhotoJob[] }>;
 }
 
-async function fetchInventory(): Promise<{ vehicles: InventoryVehicle[] }> {
-  const r = await fetch(`${API_BASE}/vehicles?sort=newest`);
+async function fetchInventory(location?: string): Promise<{ vehicles: InventoryVehicle[] }> {
+  const params = new URLSearchParams({ sort: "newest" });
+  if (location) params.set("location", location);
+  const r = await fetch(`${API_BASE}/vehicles?${params.toString()}`);
   if (!r.ok) throw new Error("Failed to fetch inventory");
   return r.json() as Promise<{ vehicles: InventoryVehicle[] }>;
 }
@@ -89,11 +92,11 @@ async function triggerProcess(vehicleId: number): Promise<void> {
   }
 }
 
-async function enqueueAll(): Promise<{ enqueued: number; skipped: number }> {
+async function enqueueAll(location?: string): Promise<{ enqueued: number; skipped: number }> {
   const r = await fetch(`${API_BASE}/photo-studio/enqueue-all`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dealerId: 1 }),
+    body: JSON.stringify({ dealerId: 1, ...(location ? { location } : {}) }),
   });
   if (!r.ok) throw new Error("Failed to enqueue");
   return r.json() as Promise<{ enqueued: number; skipped: number }>;
@@ -270,10 +273,11 @@ function InventoryBrowser({
 }) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(true);
+  const { selectedLocation } = useDealerLocation();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["inventory-for-studio"],
-    queryFn: fetchInventory,
+    queryKey: ["inventory-for-studio", selectedLocation],
+    queryFn: () => fetchInventory(selectedLocation),
     staleTime: 30_000,
   });
 
@@ -428,6 +432,7 @@ export function AIPhotoStudio() {
   const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { selectedLocation } = useDealerLocation();
 
   const { data: allJobs, isLoading } = useQuery({
     queryKey: ["photo-studio-jobs"],
@@ -452,7 +457,7 @@ export function AIPhotoStudio() {
   });
 
   const enqueueAllMutation = useMutation({
-    mutationFn: enqueueAll,
+    mutationFn: () => enqueueAll(selectedLocation),
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
       toast({

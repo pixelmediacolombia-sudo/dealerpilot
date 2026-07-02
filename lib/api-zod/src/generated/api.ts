@@ -308,7 +308,8 @@ export const ValidateMetaFieldsResponse = zod.object({
 export const ListVehiclesQueryParams = zod.object({
   "q": zod.coerce.string().optional().describe('Search by VIN, stock number, make, or model'),
   "status": zod.coerce.string().optional().describe('Filter by vehicle status'),
-  "sort": zod.enum(['newest', 'price_high', 'price_low', 'mileage_low']).optional()
+  "sort": zod.enum(['newest', 'price_high', 'price_low', 'mileage_low']).optional(),
+  "location": zod.coerce.string().optional().describe('Filter by lot location (e.g. Manassas, Fredericksburg)')
 })
 
 export const ListVehiclesResponse = zod.object({
@@ -343,6 +344,10 @@ export const ListVehiclesResponse = zod.object({
 /**
  * @summary Inventory counts by status
  */
+export const GetVehicleStatsQueryParams = zod.object({
+  "location": zod.coerce.string().optional().describe('Filter by lot location (e.g. Manassas, Fredericksburg)')
+})
+
 export const GetVehicleStatsResponse = zod.object({
   "total": zod.number(),
   "active": zod.number(),
@@ -684,7 +689,8 @@ export const ReportExtensionSessionResponse = zod.object({
  */
 export const ListListingWorkspacesQueryParams = zod.object({
   "q": zod.coerce.string().optional().describe('Search by VIN, stock number, make, or model'),
-  "status": zod.coerce.string().optional().describe('Filter by draft\/listing status')
+  "status": zod.coerce.string().optional().describe('Filter by draft\/listing status'),
+  "location": zod.coerce.string().optional().describe('Filter by lot location (e.g. Manassas, Fredericksburg)')
 })
 
 export const ListListingWorkspacesResponse = zod.object({
@@ -1659,7 +1665,8 @@ export const CreatePublishingBatchBody = zod.object({
   "dealerId": zod.number(),
   "mode": zod.enum(['Assisted', 'Controlled']).optional(),
   "count": zod.number().min(1).max(createPublishingBatchBodyCountMax).optional(),
-  "scheduledAt": zod.string().optional()
+  "scheduledAt": zod.string().optional(),
+  "lotLocation": zod.string().optional().describe('Filter eligible vehicles by lot location')
 })
 
 export const CreatePublishingBatchResponse = zod.object({
@@ -2953,6 +2960,10 @@ export const GetMarketplaceDashboardResponse = zod.object({
 /**
  * @summary Per-vehicle strategy recommendations
  */
+export const ListMarketplaceRecommendationsQueryParams = zod.object({
+  "location": zod.coerce.string().optional().describe('Filter by lot location (e.g. Manassas, Fredericksburg)')
+})
+
 export const ListMarketplaceRecommendationsResponse = zod.object({
   "recommendations": zod.array(zod.object({
   "vehicleId": zod.number(),

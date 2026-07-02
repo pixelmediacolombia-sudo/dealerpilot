@@ -354,6 +354,7 @@ const CreateBatchBody = z.object({
   mode: z.enum(["Assisted", "Controlled"]).optional().default("Assisted"),
   count: z.number().int().min(1).max(20).optional().default(4),
   scheduledAt: z.string().optional(),
+  lotLocation: z.string().optional(),
 });
 
 // POST /auto-publish/batches — select vehicles and create a publishing batch
@@ -363,9 +364,9 @@ router.post("/auto-publish/batches", async (req, res) => {
     res.status(400).json({ error: "Invalid batch request" });
     return;
   }
-  const { dealerId, mode, count, scheduledAt } = parsed.data;
+  const { dealerId, mode, count, scheduledAt, lotLocation } = parsed.data;
 
-  // Fetch all active/ready vehicles for this dealer (dealer_id = 1 = Alpha Motorsport).
+  // Fetch active/ready vehicles for this dealer, optionally scoped to a lot location.
   const vehicles = await db
     .select()
     .from(vehiclesTable)
@@ -376,6 +377,7 @@ router.post("/auto-publish/batches", async (req, res) => {
         ne(vehiclesTable.status, "Published"),
         ne(vehiclesTable.status, "Sold"),
         ne(vehiclesTable.status, "Removed"),
+        lotLocation ? eq(vehiclesTable.lotLocation, lotLocation) : undefined,
       ),
     );
 

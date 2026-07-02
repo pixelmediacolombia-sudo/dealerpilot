@@ -65,15 +65,17 @@ async function attachImages(vehicles: Vehicle[]) {
 
 const DEALER_ID = 1;
 
-// NOTE: lot_location for dealer_id=1 stores the dealer name ("Alpha Motorsports"),
-// not a city. Never filter stats by lot_location. Scope = dealer_id only.
 router.get("/vehicles/stats", async (req, res) => {
+  const location = typeof req.query.location === "string" ? req.query.location : "";
+  const conditions: SQL[] = [eq(vehiclesTable.dealerId, DEALER_ID)];
+  if (location) conditions.push(eq(vehiclesTable.lotLocation, location));
   const rows = await db
     .select({ status: vehiclesTable.status })
     .from(vehiclesTable)
-    .where(eq(vehiclesTable.dealerId, DEALER_ID));
+    .where(and(...conditions));
   const by = (s: string) => rows.filter((r) => r.status === s).length;
 
+  const locationLabel = location ? ` — ${location}` : "";
   res.json({
     total: rows.length,
     active: by("Active"),
@@ -82,7 +84,7 @@ router.get("/vehicles/stats", async (req, res) => {
     published: by("Published"),
     soldRemoved: by("Sold/Removed"),
     priceChanged: by("Price Changed"),
-    activeDealerLabel: "Alpha Motorsport",
+    activeDealerLabel: `Alpha Motorsport${locationLabel}`,
   });
 });
 
@@ -90,9 +92,11 @@ router.get("/vehicles", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status : "";
   const sort = typeof req.query.sort === "string" ? req.query.sort : "newest";
+  const location = typeof req.query.location === "string" ? req.query.location : "";
 
   const conditions: SQL[] = [eq(vehiclesTable.dealerId, DEALER_ID)];
   if (status) conditions.push(eq(vehiclesTable.status, status));
+  if (location) conditions.push(eq(vehiclesTable.lotLocation, location));
   if (q) {
     const like = `%${q}%`;
     const search = or(
