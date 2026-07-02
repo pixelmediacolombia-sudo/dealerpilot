@@ -14,3 +14,4 @@
 - [FAL.ai queued endpoint local images](falai-local-images-public.md) — queued endpoints need public URLs; use REPLIT_DEV_DOMAIN to expose /api/* paths (returns 200); never pass base64 (>2MB stalls queue silently); fallback: two-step storage initiate+PUT.
 - [AI Studio validate skips sharpness for AI outputs](ai-studio-validate.md) — skip sharpness regression (aiNotWorse) for BRIA product-shot results; AI scene change makes global stats incomparable to original; only apply regression when usedFallback=1.
 - [Production Refactor v4.0](production-refactor-v4.md) — Sales AI redesigned as Marketplace CRM; fake seed data removed; DB cleaned; intelligence seed uses local VehiclePerfRecord type (not ListingPerformance import).
+- [Marketplace AI location filter](marketplace-ai-location-filter.md) — vehicles.lot_location is NULL for ALL Alpha Motorsport vehicles; always use or(ilike(...manassas...), isNull(...)) or the filter returns zero results.

@@ -32,4 +32,6 @@ export interface PublishingJob {
   dealerName?: string | null;
   /** @nullable */
   listingTitle?: string | null;
+  /** @nullable */
+  listingUrl?: string | null;
 }

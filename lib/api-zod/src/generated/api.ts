@@ -867,7 +867,8 @@ export const GetListingDetailResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 })),
   "priorityScore": zod.number().optional()
 })
@@ -1053,7 +1054,8 @@ export const QueueListingVersionResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 })
 
 
@@ -1082,7 +1084,8 @@ export const ListPublishingJobsResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 }))
 })
 
@@ -1113,7 +1116,8 @@ export const PublishNowResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 }).optional(),
   "resumed": zod.boolean().optional().describe('true when returning an existing active job instead of creating a new one'),
   "message": zod.string().optional()
@@ -1141,7 +1145,8 @@ export const GetNextPublishingJobResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 }),zod.null()])
 })
 
@@ -1171,7 +1176,8 @@ export const GetPublishingJobPayloadResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 }),
   "fill": zod.object({
   "title": zod.string(),
@@ -1232,7 +1238,8 @@ export const ClaimPublishingJobResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 })
 
 
@@ -1268,7 +1275,8 @@ export const CompletePublishingJobResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 })
 
 
@@ -1304,7 +1312,8 @@ export const FailPublishingJobResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 })
 
 
@@ -1333,7 +1342,8 @@ export const RetryPublishingJobResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 }).optional()
 })
 
@@ -1444,7 +1454,8 @@ export const AssignPublishingJobResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 }).optional()
 })
 
@@ -1474,7 +1485,8 @@ export const GetAssignedPublishingJobResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 }),zod.null()]).optional()
 })
 
@@ -1508,7 +1520,8 @@ export const CancelPublishingJobResponse = zod.object({
   "updatedAt": zod.string(),
   "vehicleLabel": zod.string().nullish(),
   "dealerName": zod.string().nullish(),
-  "listingTitle": zod.string().nullish()
+  "listingTitle": zod.string().nullish(),
+  "listingUrl": zod.string().nullish()
 }).optional()
 })
 
@@ -2946,8 +2959,15 @@ export const ListMarketplaceRecommendationsResponse = zod.object({
   "year": zod.number().nullish(),
   "make": zod.string(),
   "model": zod.string(),
+  "trim": zod.string().nullish(),
   "price": zod.number().nullish(),
+  "mileage": zod.number().nullish(),
+  "vin": zod.string().nullish(),
   "bodyStyle": zod.string().nullish(),
+  "thumbnailUrl": zod.string().nullish(),
+  "photoCount": zod.number().optional(),
+  "estimatedMessages": zod.number().optional(),
+  "estimatedDaysToSell": zod.number().optional(),
   "recommendedPriceStrategy": zod.string(),
   "recommendedDownPayment": zod.number().nullish(),
   "recommendedPhotoStrategy": zod.string(),

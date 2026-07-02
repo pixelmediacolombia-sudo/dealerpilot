@@ -497,6 +497,8 @@ export interface PublishingJob {
   dealerName?: string | null;
   /** @nullable */
   listingTitle?: string | null;
+  /** @nullable */
+  listingUrl?: string | null;
 }
 
 export interface ListingDetail {
@@ -1500,9 +1502,20 @@ export interface VehicleRecommendation {
   make: string;
   model: string;
   /** @nullable */
+  trim?: string | null;
+  /** @nullable */
   price?: number | null;
   /** @nullable */
+  mileage?: number | null;
+  /** @nullable */
+  vin?: string | null;
+  /** @nullable */
   bodyStyle?: string | null;
+  /** @nullable */
+  thumbnailUrl?: string | null;
+  photoCount?: number;
+  estimatedMessages?: number;
+  estimatedDaysToSell?: number;
   recommendedPriceStrategy: string;
   /** @nullable */
   recommendedDownPayment?: number | null;

@@ -2454,6 +2454,7 @@ components:
         vehicleLabel: { type: ["string", "null"] }
         dealerName: { type: ["string", "null"] }
         listingTitle: { type: ["string", "null"] }
+        listingUrl: { type: ["string", "null"] }
     PublishingJobList:
       type: object
       required: [jobs]
@@ -3641,8 +3642,15 @@ components:
         year: { type: ["integer", "null"] }
         make: { type: string }
         model: { type: string }
+        trim: { type: ["string", "null"] }
         price: { type: ["integer", "null"] }
+        mileage: { type: ["integer", "null"] }
+        vin: { type: ["string", "null"] }
         bodyStyle: { type: ["string", "null"] }
+        thumbnailUrl: { type: ["string", "null"] }
+        photoCount: { type: integer }
+        estimatedMessages: { type: integer }
+        estimatedDaysToSell: { type: integer }
         recommendedPriceStrategy: { type: string }
         recommendedDownPayment: { type: ["integer", "null"] }
         recommendedPhotoStrategy: { type: string }

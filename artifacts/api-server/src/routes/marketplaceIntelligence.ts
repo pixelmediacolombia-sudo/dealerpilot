@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { eq, and, desc, ilike, isNull, isNotNull, sql, count } from "drizzle-orm";
+import { eq, and, or, desc, ilike, isNull, isNotNull, sql, count, inArray } from "drizzle-orm";
 import {
   vehiclesTable,
+  vehicleImagesTable,
   listingPerformanceTable,
   vehicleIntelligenceTable,
   listingsTable,
@@ -466,6 +467,17 @@ function parseV2Explanation(explanation: string | null): {
   return null;
 }
 
+function computeEstimatedMessages(confidenceScore: number, bodyStyle: string | null): number {
+  const bs = bodyStyle?.toLowerCase() ?? "";
+  const base = bs.includes("truck") ? 8 : bs.includes("suv") ? 7 : bs.includes("van") ? 5 : 4;
+  return Math.max(1, Math.round(base * (confidenceScore / 100)));
+}
+
+function computeEstimatedDaysToSell(price: number | null, confidenceScore: number): number {
+  const base = !price ? 21 : price < 12000 ? 7 : price < 20000 ? 12 : price < 35000 ? 18 : price < 55000 ? 28 : 40;
+  return Math.max(3, Math.round(base * (1 - (confidenceScore - 50) / 200)));
+}
+
 // GET /api/marketplace-intelligence/recommendations
 router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
   const intelligence = await db
@@ -479,11 +491,32 @@ router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
   const vehicles = await db
     .select()
     .from(vehiclesTable)
-    .where(and(eq(vehiclesTable.dealerId, DEALER_ID), ilike(vehiclesTable.lotLocation, "%manassas%")));
+    .where(and(eq(vehiclesTable.dealerId, DEALER_ID), or(ilike(vehiclesTable.lotLocation, "%manassas%"), isNull(vehiclesTable.lotLocation))));
 
+  const vehicleIds = vehicles.map((v) => v.id);
+  const vehicleSet = new Set(vehicleIds);
   const vehicleMap = new Map(vehicles.map((v) => [v.id, v]));
 
-  const recommendations = intelligence.map((vi) => {
+  // Only recommend vehicles that actually exist in the Manassas inventory
+  const filteredIntelligence = intelligence.filter((vi) => vehicleSet.has(vi.vehicleId));
+
+  // Parallel: fetch thumbnails (position=0) and photo counts
+  const [thumbnailRows, photoCountRows] = vehicleIds.length > 0
+    ? await Promise.all([
+        db.select({ vehicleId: vehicleImagesTable.vehicleId, url: vehicleImagesTable.url })
+          .from(vehicleImagesTable)
+          .where(and(inArray(vehicleImagesTable.vehicleId, vehicleIds), eq(vehicleImagesTable.position, 0))),
+        db.select({ vehicleId: vehicleImagesTable.vehicleId, cnt: count() })
+          .from(vehicleImagesTable)
+          .where(inArray(vehicleImagesTable.vehicleId, vehicleIds))
+          .groupBy(vehicleImagesTable.vehicleId),
+      ])
+    : [[], []];
+
+  const thumbnailMap = new Map(thumbnailRows.map((r) => [r.vehicleId, r.url]));
+  const photoCountMap = new Map(photoCountRows.map((r) => [r.vehicleId, Number(r.cnt)]));
+
+  const recommendations = filteredIntelligence.map((vi) => {
     const v = vehicleMap.get(vi.vehicleId);
     const v2 = parseV2Explanation(vi.explanation);
 
@@ -492,8 +525,15 @@ router.get("/marketplace-intelligence/recommendations", async (_req, res) => {
       year: v?.year ?? null,
       make: v?.make ?? "",
       model: v?.model ?? "",
+      trim: v?.trim ?? null,
       price: v?.price ?? null,
+      mileage: v?.mileage ?? null,
+      vin: v?.vin ?? null,
       bodyStyle: v?.bodyStyle ?? null,
+      thumbnailUrl: thumbnailMap.get(vi.vehicleId) ?? null,
+      photoCount: photoCountMap.get(vi.vehicleId) ?? 0,
+      estimatedMessages: computeEstimatedMessages(vi.confidenceScore, v?.bodyStyle ?? null),
+      estimatedDaysToSell: computeEstimatedDaysToSell(v?.price ?? null, vi.confidenceScore),
       recommendedPriceStrategy: vi.recommendedPriceStrategy,
       recommendedDownPayment: vi.recommendedDownPayment,
       recommendedPhotoStrategy: vi.recommendedPhotoStrategy,
