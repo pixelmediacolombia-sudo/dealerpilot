@@ -6,6 +6,7 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "test-enhance-v2": "tsx ./src/test-enhance-v2.ts",
+    "test-enhance-clean": "tsx ./src/test-enhance-clean.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
