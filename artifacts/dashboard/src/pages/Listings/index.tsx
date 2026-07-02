@@ -1331,17 +1331,8 @@ export function ListingsWorkspace() {
 
           {activeTab === "queue" && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-              <div className="glass-panel p-4 rounded-xl flex items-center justify-between gap-3 border border-border/50">
+              <div className="glass-panel p-4 rounded-xl flex items-center gap-3 border border-border/50">
                 <div className="font-medium px-2 shrink-0">Job Queue</div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleClearTestQueue}
-                  disabled={clearingQueue}
-                  className="text-destructive border-destructive/40 hover:bg-destructive/10 shrink-0"
-                >
-                  {clearingQueue ? "Clearing…" : "Clear Test Queue"}
-                </Button>
                 <Select value={jobStatusFilter} onValueChange={setJobStatusFilter}>
                   <SelectTrigger className="w-full sm:w-[200px] bg-background/50 border-border/50">
                     <SelectValue placeholder="All Statuses" />

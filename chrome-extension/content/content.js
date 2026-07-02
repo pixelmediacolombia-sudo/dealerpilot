@@ -22,7 +22,7 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.3";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.4";
 
   // ── Performance / fast-mode settings ────────────────────────────────────────
   // MARKETPLACE_FAST_MODE=true fills only the 9 required fields:
@@ -417,7 +417,7 @@
     <div id="mai-header">
       <span id="mai-dot"></span>
       <span id="mai-title">DealerPilot AI</span>
-      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.3</span>
+      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.4</span>
       <button id="mai-toggle" title="Collapse">_</button>
     </div>
     <div id="mai-body">
@@ -1057,21 +1057,34 @@
     send({ type: "SEND_JOB_EVENT", jobId, event: "photo_upload_complete",
            details: `${files.length} photos injected` }).catch(() => {});
 
-    // ── Wait for Facebook thumbnail confirmation ──────────────────────────
-    stateLog("Photo upload: waiting for Facebook thumbnails…");
+    // ── Fast check: file input has our injected files ─────────────────────
+    // If the DataTransfer injection succeeded the input.files array reflects
+    // the files immediately — this is the most reliable photo confirmation.
+    // Setting _photosConfirmed here prevents the false "thumbnails not
+    // confirmed" warning that fires when Facebook renders photos in a way
+    // our DOM selectors don't detect.
+    if (input.files && input.files.length > 0) {
+      stateLog(`Photo upload: ${input.files.length} file(s) confirmed on file input`);
+      _photosConfirmed = true;
+      send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_detected",
+             details: `${input.files.length} photos confirmed via file input` }).catch(() => {});
+    }
+
+    // ── Wait for Facebook to render thumbnails (gives Next button time to enable) ──
+    stateLog("Photo upload: waiting for Facebook thumbnail rendering…");
     setStatus(`Waiting for Facebook to process ${files.length} photo(s)…`);
     send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_wait_started" }).catch(() => {});
-
     const confirmed = await waitForPhotoThumbnails(files.length, BUDGET.THUMBNAIL_WAIT_MS);
-
-    if (!confirmed) {
-      warnings.push(`Photo upload: injected ${files.length} file(s); thumbnails not fully confirmed — form may still proceed`);
-      stateLog("Photo upload: thumbnail confirmation timed out — continuing anyway");
-    } else {
-      stateLog(`Photo upload: confirmed — ${files.length} photo(s) visible`);
-      _photosConfirmed = true; // validateBeforeNext will skip its own re-scan
+    if (confirmed && !_photosConfirmed) {
+      stateLog(`Photo upload: Facebook thumbnails visible`);
+      _photosConfirmed = true;
       send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_detected",
-             details: `${files.length} photos confirmed` }).catch(() => {});
+             details: `${files.length} photos confirmed via DOM` }).catch(() => {});
+    } else if (!confirmed) {
+      stateLog("Photo upload: thumbnail selectors did not match — photos may still be present in Facebook");
+      if (!_photosConfirmed) {
+        warnings.push(`Photo upload: injected ${files.length} file(s); thumbnails not detected — form may still proceed`);
+      }
     }
 
     send({ type: "SEND_JOB_EVENT", jobId, event: "photos_uploaded", details: `${files.length} photos` }).catch(() => {});
@@ -1317,7 +1330,12 @@
         '[role="presentation"] img[src^="blob:"]',
       ];
       while (Date.now() - photoStart < PHOTO_POLL_MS) {
-        // Collect all matching elements, deduped
+        // Check file input directly — most reliable (files present = injection worked)
+        const fileInputs = [...document.querySelectorAll('input[type="file"]')].filter(
+          (inp) => inp.files && inp.files.length > 0,
+        );
+        if (fileInputs.length > 0) { hasPhoto = true; break; }
+        // Collect all matching DOM thumbnail elements, deduped
         const thumbs = [
           ...new Set(THUMB_SELECTORS.flatMap((sel) => [...document.querySelectorAll(sel)])),
         ];
@@ -1846,5 +1864,5 @@
     );
   }
 
-  log("Panel loaded v1.3.3", { isMessenger, isMarketplaceCreate });
+  log("Panel loaded v1.3.4", { isMessenger, isMarketplaceCreate });
 })();

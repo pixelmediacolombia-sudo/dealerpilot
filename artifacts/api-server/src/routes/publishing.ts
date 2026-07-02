@@ -289,37 +289,23 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
   const autoTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
 
   // Generate Alpha Motorsport Marketplace sales copy.
-  // Spanish-first bilingual format: financing options, buyer qualifications,
-  // serious-buyer filter, and direct CTA. No guaranteed-approval language.
+  // Spanish-only, short, sales-focused. No English block, no "---" separator.
+  // No guaranteed-approval language, no "bad credit", no long dealer boilerplate.
   function buildAISalesCopy(): string {
     const name         = autoTitle;
     const modelKeyword = vehicle.model.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-    // Spanish block (primary — Latino buyer audience)
-    const es = [
+    return [
       `🔥 ${name} lista para manejar`,
       "",
-      "💰 Opciones de financiamiento desde $1,000, $2,000 o $3,000 de inicial",
-      "✅ Solo necesitas identificación válida y cuenta de banco activa",
+      "💰 Financiamiento desde $1,000, $2,000 o $3,000 de inicial",
+      "✅ Identificación válida",
+      "✅ Cuenta de banco activa",
       "✅ Precios bajos para compradores serios",
       "⏳ Solo personas interesadas en comprar este mes",
       "",
       `📩 Escríbenos "${modelKeyword}" hoy y te damos más detalles.`,
     ].join("\n");
-
-    // English block (secondary)
-    const en = [
-      `🔥 ${name} ready to drive`,
-      "",
-      "💰 Financing options from $1,000, $2,000 or $3,000 down",
-      "✅ Valid ID and active bank account required",
-      "✅ Low prices for serious buyers",
-      "⏳ Only for buyers looking to purchase this month",
-      "",
-      `📩 Message us "${modelKeyword}" today for details.`,
-    ].join("\n");
-
-    return `${es}\n\n---\n\n${en}`;
   }
 
   if (version) {
@@ -801,19 +787,20 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     return;
   }
 
-  // Cancel stale active jobs (>10 min old) for this vehicle before creating a new one.
-  // A stuck job would otherwise block publish-now indefinitely.
+  // Cancel stale active jobs (>10 min old) for this DEALER before creating a new one.
+  // Any stale job from any vehicle blocks the extension queue — clear them all.
+  // Failed jobs are intentionally excluded; they do not block the queue.
   const STALE_THRESHOLD = new Date(Date.now() - 10 * 60 * 1000);
   await db
     .update(publishingJobsTable)
     .set({ status: "Cancelled", failedReason: "Auto-cancelled: stale job older than 10 minutes" })
     .where(
       and(
-        eq(publishingJobsTable.vehicleId, vehicleId),
         eq(publishingJobsTable.dealerId, DEALER_ID),
         inArray(publishingJobsTable.status, [
-          "Queued", "Scheduled", "Claimed", "Publishing",
+          "Queued", "Retry", "Assigned", "Scheduled", "Claimed", "Publishing",
           "Opening Facebook", "Filling Form", "Auto Publishing",
+          "Downloading Photos", "Uploading Photos", "Waiting For Thumbnails",
         ]),
         lt(publishingJobsTable.createdAt, STALE_THRESHOLD),
       ),

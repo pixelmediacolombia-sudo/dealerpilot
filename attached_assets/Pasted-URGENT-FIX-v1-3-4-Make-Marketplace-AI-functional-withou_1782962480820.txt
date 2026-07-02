@@ -1,0 +1,178 @@
+URGENT FIX v1.3.4 — Make Marketplace AI functional without manual queue cleanup
+
+Current problem:
+The system is finally opening Facebook and filling data, but it is still not product-ready because:
+- I have to click Clear Test Queue manually for Publish Now to work
+- old Failed/Retry/Queued jobs block new publish_now jobs
+- extension still shows warnings for fields we do not care about
+- photo validation still says thumbnails not confirmed even when photos are visible
+- description is better but still not the final Alpha sales copy
+- client should never see or manage a messy Job Queue
+
+Fix only these issues.
+
+====================================================
+1. Auto-clean queue before Publish Now
+====================================================
+
+Before creating a new publish_now job:
+
+Automatically cancel or archive stale jobs for the same dealer that are:
+- Queued
+- Retry
+- Assigned
+- Claimed
+- Publishing
+- Opening Facebook
+- Downloading Photos
+- Uploading Photos
+- Waiting For Thumbnails
+- Filling Form
+
+Rules:
+- If job is older than 10 minutes → cancel/archive automatically
+- If job is failed → do not block Publish Now
+- If job belongs to a different vehicle but is stale → cancel/archive
+- If same vehicle has an active fresh job → resume it instead of creating duplicate
+
+The user should NOT need to click Clear Test Queue.
+
+Acceptance:
+Click Publish Now always works without manually clearing queue.
+
+====================================================
+2. Remove Clear Test Queue from normal user flow
+====================================================
+
+Keep Clear Test Queue only in Dev/Admin mode.
+
+Do not show it to normal operators.
+
+The queue should self-heal.
+
+====================================================
+3. Simplify Marketplace field flow
+====================================================
+
+Only fill these fields:
+
+REQUIRED / IMPORTANT:
+- Photos
+- Vehicle Type
+- Year
+- Make
+- Model
+- Mileage
+- Price
+- Title
+- Description
+- Location
+
+Completely remove from fill loop, warnings, missing fields, and overlay:
+- VIN
+- Transmission
+- Fuel Type
+- Exterior Color
+- Interior Color
+- Body Style
+- Drivetrain
+
+Do not show warnings for removed fields.
+
+Acceptance:
+Overlay never mentions VIN, transmission, fuel, color, body style, drivetrain.
+
+====================================================
+4. Fix photo validation
+====================================================
+
+Photos should be considered successful if ANY of these are true:
+- input[type=file].files.length > 0
+- Facebook preview image is visible
+- Facebook thumbnail carousel is visible
+- uploaded image tiles are visible
+
+Do NOT fail because text counter says 0.
+Do NOT wait extra if photos are visibly present.
+
+Acceptance:
+If photos are visible in Facebook preview, continue immediately.
+
+====================================================
+5. Final Alpha Motorsport description template
+====================================================
+
+For Alpha Motorsport, always use this Marketplace description.
+Never use XML feed description, stock number, VIN, raw mileage-only text, or dealer boilerplate.
+
+Template:
+
+🔥 {YEAR} {MAKE} {MODEL} lista para manejar
+
+💰 Financiamiento desde $1,000, $2,000 o $3,000 de inicial
+✅ Identificación válida
+✅ Cuenta de banco activa
+✅ Precios bajos para compradores serios
+⏳ Solo personas interesadas en comprar este mes
+
+📩 Escríbenos “{MODEL}” hoy y te damos más detalles.
+
+Rules:
+- Spanish first
+- Emojis required
+- Short and sales-focused
+- No fake guaranteed approval
+- No “bad credit”
+- No long dealer boilerplate
+
+Acceptance:
+Facebook description field contains this exact structure.
+
+====================================================
+6. Failed job handling
+====================================================
+
+Do not leave the operator staring at a messy queue full of Failed jobs.
+
+If a job fails:
+- auto-retry once
+- if it fails again, mark Needs Review
+- do not block new Publish Now jobs
+- show exact failure reason
+- keep queue clean
+
+Acceptance:
+Failed jobs do not block new Publish Now jobs.
+
+====================================================
+7. Version/package
+====================================================
+
+Package as:
+
+DealerPilot-AI-Extension-v1.3.4.zip
+
+Update:
+- manifest version = 1.3.4
+- BUILD_LABEL = APP_CONTROLLED_PUBLISHING_1.3.4
+- popup shows 1.3.4
+- overlay shows 1.3.4
+- no old version strings
+
+====================================================
+Final acceptance test
+====================================================
+
+Before saying complete, test:
+
+1. Queue has stale/failed jobs
+2. User clicks Publish Now
+3. System auto-cleans stale blockers
+4. New publish_now job is created or existing fresh job is resumed
+5. Extension claims job under 2 seconds
+6. Facebook opens
+7. Photos upload
+8. Description uses Alpha template
+9. Only required/important fields are attempted
+10. Next becomes enabled
+11. No manual Clear Test Queue required
