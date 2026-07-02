@@ -27,7 +27,7 @@ async function getVehiclePhotos(
   aiPhotoSetId: number | null,
   aiPhotoStatus: string | null,
 ): Promise<Array<{ url: string | null; position: number | null; source: "ai" | "raw" }>> {
-  if (aiPhotoStatus === "Done" && aiPhotoSetId !== null) {
+  if ((aiPhotoStatus === "Ready" || aiPhotoStatus === "Done") && aiPhotoSetId !== null) {
     const aiImages = await db
       .select()
       .from(aiPhotoImagesTable)
