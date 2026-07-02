@@ -144,10 +144,12 @@ const handlers = {
     const body = { extensionId };
     if (message.listingUrl) body.listingUrl = message.listingUrl;
     const result = await apiPost(`/api/publishing/jobs/${message.jobId}/complete`, body);
+    const finishedAt = new Date().toISOString();
     await chrome.storage.local.set({
+      lastJobFinishedAt: finishedAt,
       lastPublishedJob: {
         id: message.jobId,
-        completedAt: new Date().toISOString(),
+        completedAt: finishedAt,
         listingUrl: message.listingUrl || null,
       },
     });
@@ -158,7 +160,9 @@ const handlers = {
     const extensionId = await getExtensionId();
     const body = { extensionId };
     if (message.reason) body.reason = message.reason;
-    return apiPost(`/api/publishing/jobs/${message.jobId}/fail`, body);
+    const result = await apiPost(`/api/publishing/jobs/${message.jobId}/fail`, body);
+    await chrome.storage.local.set({ lastJobFinishedAt: new Date().toISOString() });
+    return result;
   },
 
   async CANCEL_JOB(message) {
@@ -349,6 +353,29 @@ const handlers = {
 
     const now = new Date().toISOString();
     await chrome.storage.local.set({ lastPollTime: now });
+
+    // ── Sequential queue: 2-minute inter-job cooldown ────────────────────────
+    // After a job finishes (Published or Failed), wait 2 minutes before picking
+    // up the next one.  This prevents opening multiple Marketplace tabs in
+    // parallel and gives Facebook time to settle.
+    const INTER_JOB_DELAY_MS = 2 * 60_000;
+    const { lastJobFinishedAt } = await chrome.storage.local.get("lastJobFinishedAt");
+    if (lastJobFinishedAt) {
+      const finishedMs  = new Date(lastJobFinishedAt).getTime();
+      const cooldownEnd = finishedMs + INTER_JOB_DELAY_MS;
+      const remaining   = cooldownEnd - Date.now();
+      if (remaining > 0) {
+        const remainingSec = Math.round(remaining / 1000);
+        console.log(`[DealerPilot AI] Sequential queue: cooling down ${remainingSec}s before next job`);
+        await chrome.storage.local.set({
+          queueCooldownUntil: new Date(cooldownEnd).toISOString(),
+          queueCooldownRemainingS: remainingSec,
+        });
+        return { skipped: true, reason: "cooldown", cooldownRemainingS: remainingSec };
+      }
+      // Cooldown expired — clear the indicator
+      await chrome.storage.local.remove(["queueCooldownUntil", "queueCooldownRemainingS"]);
+    }
 
     try {
       const connectStatus = await apiGet("/api/extension/connect-status");

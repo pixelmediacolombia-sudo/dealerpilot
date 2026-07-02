@@ -1,0 +1,91 @@
+PERFORMANCE SPRINT — Marketplace Publishing Speed
+
+The current flow is too slow.
+
+Target:
+- 1 vehicle should publish in 90 seconds to 3 minutes max.
+- 3 vehicles/day should run sequentially, not at the same time.
+- Do not attempt 3 Marketplace forms in parallel.
+
+Main causes of slowness:
+1. Too many optional fields.
+2. Too long thumbnail waits.
+3. Slow photo processing.
+4. Repeated dropdown attempts.
+5. Waiting for fields that are not required.
+6. Retrying full flow instead of resuming from failed step.
+
+Fix requirements:
+
+1. Fast mode default
+Create MARKETPLACE_FAST_MODE=true.
+
+Fast mode fills only:
+- photos
+- vehicle type
+- year
+- make
+- model
+- price
+- title
+- description
+- location
+
+Skip everything else.
+
+2. Photo optimization
+- Use 6 photos default.
+- But selection must include:
+  3 exterior
+  2 interior if available
+  1 dashboard/extra
+- Download 3 concurrently.
+- Stop waiting as soon as Facebook preview/thumbnails appear.
+- Max thumbnail wait: 20 seconds, not 60.
+
+3. Dropdown timeout reduction
+For make/model/year:
+- max wait 5 seconds per dropdown
+- if Make fails, pause and ask operator
+- if Model fails, use text input if available or pause
+- do not loop forever.
+
+4. No optional validation
+Do not validate:
+- VIN
+- transmission
+- fuel
+- color
+- body style
+- drivetrain
+- condition unless Facebook requires it.
+
+5. Sequential queue
+If user schedules 3 vehicles:
+- publish one at a time
+- wait until current job is Published or Failed
+- then start next
+- add 2-minute delay between jobs.
+
+6. Progress accuracy
+Show actual duration:
+- Downloading photos 2/6
+- Uploading photos 6/6
+- Waiting for thumbnails
+- Filling Make
+- Filling Model
+- Clicking Next
+
+7. Performance budget
+If a step exceeds:
+- photo download > 20 sec → fail or retry once
+- thumbnail wait > 20 sec → continue if preview visible, otherwise fail
+- make/model > 10 sec → pause for operator
+- total job time > 4 min → fail with reason
+
+Acceptance:
+- One vehicle completes under 3 minutes in normal conditions.
+- No long waits on optional fields.
+- Three vehicles run sequentially.
+- No parallel Marketplace tabs for multiple jobs.
+- Progress panel shows real timing.

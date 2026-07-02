@@ -22,7 +22,22 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.2.9";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.0";
+
+  // ── Performance / fast-mode settings ────────────────────────────────────────
+  // MARKETPLACE_FAST_MODE=true fills only the 9 required fields:
+  //   photos → vehicle type → year → make → model → price → title →
+  //   description → location
+  // Mileage, condition, and all other optional fields are skipped entirely.
+  // Target: one vehicle published in 90 s – 3 min.
+  const MARKETPLACE_FAST_MODE = true;
+
+  const BUDGET = {
+    THUMBNAIL_WAIT_MS:   20_000,       // stop polling thumbnails after 20 s
+    COMBOBOX_WAIT_MS:     5_000,       // max time to find year / make / model combobox
+    COMBOBOX_OPTIONS_MS:  8_000,       // max time for option list to appear
+    TOTAL_JOB_MS:        4 * 60_000,   // 4-minute hard cap on the full job
+  };
 
   // ── Per-job photo cache ───────────────────────────────────────────────────
   // Keyed by "${jobId}-${index}" → { base64, type }
@@ -501,6 +516,15 @@
       return;
     }
 
+    // ── Performance budget tracking ──────────────────────────────────────────
+    const _jobStartMs = Date.now();
+    function elapsed() { return Math.round((Date.now() - _jobStartMs) / 1000); }
+    function checkBudget(label) {
+      if (Date.now() - _jobStartMs > BUDGET.TOTAL_JOB_MS) {
+        throw new Error(`Job exceeded 4-minute budget at step "${label}" (${elapsed()}s elapsed)`);
+      }
+    }
+
     jobBoxEl.innerHTML = `
       <div class="mai-job">
         <div class="mai-job-title">${escapeHtml(job.listingTitle || "Publishing job")}</div>
@@ -549,7 +573,7 @@
       }
 
       setStatus(`Waiting for "${label}" combobox…`);
-      const combobox = await waitForCombobox(keywords);
+      const combobox = await waitForCombobox(keywords, BUDGET.COMBOBOX_WAIT_MS);
       if (!combobox) {
         stateError(`Could not find ${label} combobox`);
         missed.push(label);
@@ -763,13 +787,19 @@
       );
 
       setStatus("Selecting make…");
-      await selectComboboxStep(
+      const makeFilled = await selectComboboxStep(
         "make",
         ["make"],
         fill.make,
         "generic",
         false,
       );
+      if (!makeFilled && fill.make) {
+        // Make failed — model cascade won't appear; notify operator and continue
+        stateLog(`⚠️ Make "${fill.make}" not matched — operator should verify manually`);
+        setStatus(`⚠️ Make not matched — continuing without it (check form)`, "err");
+        await sleep(1500);
+      }
 
       // Model — text input that appears after Make cascade
       setStatus("Filling model…");
@@ -827,24 +857,26 @@
       await fillStep("description", ["description", "describe", "details"], fill.description);
       await fillStep("location", ["location", "city", "where"], fill.location);
 
-      // ---- Phase 4: Important non-blocking fields — attempt, skip on failure ----
-      // Mileage is buyer-relevant; attempt it.
-      // VIN / transmission / fuel / color / body style are SKIPPED — unreliable
-      // dropdowns that block publishing when they fail to match.
-      stateLog("Phase 4: mileage (important, non-blocking)");
-      await fillStep("mileage", [
-        "mileage", "odometer", "miles", "vehicle mileage",
-        "number of miles", "mileage (optional)", "odometer reading",
-      ], fill.mileage);
+      if (!MARKETPLACE_FAST_MODE) {
+        // ---- Phase 4: Mileage (important, non-blocking) ----
+        // Skipped in fast mode — not required for Next button.
+        stateLog("Phase 4: mileage (important, non-blocking)");
+        await fillStep("mileage", [
+          "mileage", "odometer", "miles", "vehicle mileage",
+          "number of miles", "mileage (optional)", "odometer reading",
+        ], fill.mileage);
 
-      // ---- Phase 5: Condition dropdown — strict match only, skip if no match ----
-      // All other optional dropdowns (transmission, fuel type, color, body style,
-      // drivetrain) are intentionally skipped per MVP field-priority rules.
-      // The only gate that matters is whether Facebook enables the Next button.
-      stateLog("Phase 5: condition (important, non-blocking)");
-      await selectComboboxStep("condition", ["condition"], fill.condition, false, false);
+        // ---- Phase 5: Condition dropdown — strict match only, skip if no match ----
+        // All other optional dropdowns (transmission, fuel type, color, body style,
+        // drivetrain) are intentionally skipped per MVP field-priority rules.
+        stateLog("Phase 5: condition (important, non-blocking)");
+        await selectComboboxStep("condition", ["condition"], fill.condition, false, false);
+      } else {
+        stateLog("Fast mode: skipping mileage + condition (not required for Next)");
+      }
 
-      stateLog("Workflow Complete");
+      checkBudget("workflow complete");
+      stateLog(`Workflow Complete — ${elapsed()}s elapsed`);
 
     } catch (err) {
       stateError("Unexpected error in publishing workflow", err);
@@ -1011,7 +1043,7 @@
     setStatus(`Waiting for Facebook to process ${files.length} photo(s)…`);
     send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_wait_started" }).catch(() => {});
 
-    const confirmed = await waitForPhotoThumbnails(files.length, 60000);
+    const confirmed = await waitForPhotoThumbnails(files.length, BUDGET.THUMBNAIL_WAIT_MS);
 
     if (!confirmed) {
       warnings.push(`Photo upload: injected ${files.length} file(s); thumbnails not fully confirmed — form may still proceed`);
@@ -1053,16 +1085,13 @@
         const imgs = uploadArea.querySelectorAll("img");
         if (imgs.length >= 1) return true;
       }
-      // Emit progress messages so the dashboard stays informative during long waits
+      // Emit progress messages — thresholds tuned for the 20 s budget
       const elapsed = Date.now() - start;
       if (elapsed > 5000 && lastMsg < 5000) {
         setStatus("Facebook is processing thumbnails…");
         lastMsg = elapsed;
-      } else if (elapsed > 15000 && lastMsg < 15000) {
-        setStatus("Still waiting for Facebook to confirm photos…");
-        lastMsg = elapsed;
-      } else if (elapsed > 30000 && lastMsg < 30000) {
-        setStatus("Facebook photo processing is taking a while — still waiting…");
+      } else if (elapsed > 12000 && lastMsg < 12000) {
+        setStatus("Still waiting for Facebook thumbnails (12 s)…");
         lastMsg = elapsed;
       }
       await sleep(500);
