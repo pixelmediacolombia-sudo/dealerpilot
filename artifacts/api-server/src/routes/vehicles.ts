@@ -7,7 +7,7 @@ import {
   vehicleChangesTable,
   type Vehicle,
 } from "@workspace/db";
-import { and, asc, desc, eq, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -65,19 +65,14 @@ async function attachImages(vehicles: Vehicle[]) {
 
 const DEALER_ID = 1;
 
+// NOTE: lot_location for dealer_id=1 stores the dealer name ("Alpha Motorsports"),
+// not a city. Never filter stats by lot_location. Scope = dealer_id only.
 router.get("/vehicles/stats", async (req, res) => {
   const rows = await db
-    .select({ status: vehiclesTable.status, lotLocation: vehiclesTable.lotLocation })
+    .select({ status: vehiclesTable.status })
     .from(vehiclesTable)
     .where(eq(vehiclesTable.dealerId, DEALER_ID));
   const by = (s: string) => rows.filter((r) => r.status === s).length;
-
-  // Location breakdown — only count active inventory (not sold/removed/archived)
-  const active = rows.filter((r) => !["Sold/Removed", "Removed", "Archived"].includes(r.status));
-  // null lot_location = default Manassas lot (feed never sets this field)
-  const manassas = active.filter((r) => !r.lotLocation || r.lotLocation.toLowerCase().includes("manassas")).length;
-  const fredericksburg = active.filter((r) => r.lotLocation && r.lotLocation.toLowerCase().includes("fredericksburg")).length;
-  const unknownLocation = active.filter((r) => r.lotLocation && !r.lotLocation.toLowerCase().includes("manassas") && !r.lotLocation.toLowerCase().includes("fredericksburg")).length;
 
   res.json({
     total: rows.length,
@@ -87,7 +82,7 @@ router.get("/vehicles/stats", async (req, res) => {
     published: by("Published"),
     soldRemoved: by("Sold/Removed"),
     priceChanged: by("Price Changed"),
-    locationBreakdown: { manassas, fredericksburg, unknownLocation },
+    activeDealerLabel: "Alpha Motorsport",
   });
 });
 

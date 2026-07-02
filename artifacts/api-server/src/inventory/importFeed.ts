@@ -301,11 +301,10 @@ export async function importFeed(
     })
     .where(eq(feedRunsTable.id, feedRunId));
 
-  const manassasCount = locationBreakdown["Manassas"] ?? 0;
-  const fredericksburgCount = locationBreakdown["Fredericksburg"] ?? 0;
-  const unknownCount = locationBreakdown["unknown"] ?? 0;
-  const otherLocations = Object.entries(locationBreakdown)
-    .filter(([k]) => k !== "Manassas" && k !== "Fredericksburg" && k !== "unknown")
+  // NOTE: for dealer_id=1 (Alpha Motorsport), lot_location stores the dealer name
+  // ("Alpha Motorsports"), not a city — so location keys here are dealer names, not cities.
+  // Do not use these counts for city-based filtering or "Manassas vs Fredericksburg" logic.
+  const locationSummary = Object.entries(locationBreakdown)
     .map(([k, v]) => `${k}:${v}`)
     .join(", ");
 
@@ -313,12 +312,8 @@ export async function importFeed(
     {
       dealerId, feedRunId, rawCount, parseErrors, created, updated, removed, active, totalImages,
       locations: locationBreakdown,
-      manassas: manassasCount,
-      fredericksburg: fredericksburgCount,
-      unknownLocation: unknownCount,
-      ...(otherLocations ? { otherLocations } : {}),
     },
-    `Feed import complete — ${parsed.length} vehicles (Manassas: ${manassasCount}, Fredericksburg: ${fredericksburgCount}, unknown: ${unknownCount})`,
+    `Feed import complete — ${parsed.length} vehicles (locations: ${locationSummary || "none"})`,
   );
 
   return {
