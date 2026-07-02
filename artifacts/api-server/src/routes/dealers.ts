@@ -8,10 +8,17 @@ import {
   type Dealer,
   type FeedRun,
 } from "@workspace/db";
-import { count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, ilike, isNull, or } from "drizzle-orm";
 import { fetchFeedXml } from "../inventory/feedSource";
 import { importFeed } from "../inventory/importFeed";
 import { autoEnqueueAfterImport } from "../photo/autoEnqueue";
+
+// All UI queries are scoped to the Manassas store only.
+// null lot_location = default Manassas lot (feed never sets this field).
+const MANASSAS_FILTER = or(
+  ilike(vehiclesTable.lotLocation, "%manassas%"),
+  isNull(vehiclesTable.lotLocation),
+)!;
 
 const router: IRouter = Router();
 
@@ -42,7 +49,7 @@ async function toDealer(dealer: Dealer) {
   const [{ value: total }] = await db
     .select({ value: count() })
     .from(vehiclesTable)
-    .where(eq(vehiclesTable.dealerId, dealer.id));
+    .where(and(eq(vehiclesTable.dealerId, dealer.id), MANASSAS_FILTER));
 
   const lastSyncAt = latest
     ? (latest.finishedAt ?? latest.startedAt).toISOString()

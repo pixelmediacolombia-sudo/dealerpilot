@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, desc, and } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, or } from "drizzle-orm";
 import {
   db,
   conversationsTable,
@@ -10,6 +10,13 @@ import {
   listingsTable,
 } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
+
+// All UI queries are scoped to the Manassas store only.
+// null lot_location = default Manassas lot (feed never sets this field).
+const MANASSAS_FILTER = or(
+  ilike(vehiclesTable.lotLocation, "%manassas%"),
+  isNull(vehiclesTable.lotLocation),
+)!;
 
 const router = Router();
 
@@ -178,7 +185,7 @@ router.post("/conversations/intake", async (req, res) => {
     const vRow = await db
       .select()
       .from(vehiclesTable)
-      .where(eq(vehiclesTable.dealerId, DEALER_ID))
+      .where(and(eq(vehiclesTable.dealerId, DEALER_ID), MANASSAS_FILTER))
       .limit(20);
 
     const match = vRow.find((v) => {

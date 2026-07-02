@@ -13,10 +13,17 @@ import {
   type ListingVersion,
   type ListingScore,
 } from "@workspace/db";
-import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
 import { generateListing } from "../listings/generator";
 import { scoreListing } from "../listings/scoring";
 import { priorityScore } from "../listings/rules";
+
+// All UI queries are scoped to the Manassas store only.
+// null lot_location = default Manassas lot (feed never sets this field).
+const MANASSAS_FILTER = or(
+  ilike(vehiclesTable.lotLocation, "%manassas%"),
+  isNull(vehiclesTable.lotLocation),
+)!;
 
 const router: IRouter = Router();
 
@@ -163,7 +170,7 @@ router.get("/listings", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status : "";
 
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [MANASSAS_FILTER];
   if (q) {
     const like = `%${q}%`;
     const search = or(
@@ -179,7 +186,7 @@ router.get("/listings", async (req, res) => {
   const vehicles = await db
     .select()
     .from(vehiclesTable)
-    .where(conditions.length ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(desc(vehiclesTable.createdAt));
 
   const vehicleIds = vehicles.map((v) => v.id);
