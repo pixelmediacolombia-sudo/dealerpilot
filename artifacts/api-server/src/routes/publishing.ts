@@ -256,31 +256,67 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
   const pricing = getMarketplacePricing(vehicle, intel?.recommendedDownPayment ?? null);
 
   // Build fill content — prefer an existing listing version; auto-generate from inventory otherwise.
+  //
+  // Description priority:
+  //   1. listingVersion.descriptionEn (+ callToAction) — only if it is real prose
+  //      (not a bare number, stock ID, or other raw data artifact).
+  //   2. vehicle.description — the XML feed's human-readable description, if present.
+  //   3. Auto-generated sentence assembled from structured vehicle fields.
+  //
+  // "Real prose" test: non-empty after trim, ≥ 15 chars, contains at least one
+  // space, and is not all-digits.  This guards against garbage like "149829"
+  // (a raw mileage or stock number accidentally stored in descriptionEn).
+  function isProseText(s: string | null | undefined): s is string {
+    if (!s) return false;
+    const t = s.trim();
+    return t.length >= 15 && /\s/.test(t) && !/^\d+$/.test(t);
+  }
+
   let fillTitle: string;
   let fillDescription: string;
   let fillDescriptionEs: string | null = null;
   let fillDownPayment: number | null = null;
 
-  if (version) {
-    const descriptionParts = [version.descriptionEn?.trim(), version.callToAction?.trim()].filter(
-      (p): p is string => !!p,
-    );
-    fillTitle = version.title;
-    fillDescription = descriptionParts.join("\n\n");
-    fillDescriptionEs = version.descriptionEs ?? null;
-    fillDownPayment = version.downPayment ?? null;
-  } else {
-    // Auto-generate minimal copy from inventory data — no listing version required.
-    const yr = vehicle.year ?? "";
-    const trimStr = vehicle.trim ? ` ${vehicle.trim}` : "";
-    fillTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
+  const yr = vehicle.year ?? "";
+  const trimStr = vehicle.trim ? ` ${vehicle.trim}` : "";
+  const autoTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
+
+  // Build the structured fallback description once — used when stored copy is absent or bad.
+  function buildAutoDescription(): string {
     const parts: string[] = [];
     if (vehicle.mileage != null) parts.push(`${vehicle.mileage.toLocaleString()} miles`);
     if (vehicle.transmission) parts.push(vehicle.transmission);
     if (vehicle.fuelType) parts.push(vehicle.fuelType);
     if (vehicle.exteriorColor) parts.push(vehicle.exteriorColor);
+    if (vehicle.vin) parts.push(`VIN: ${vehicle.vin}`);
     if (dealer?.name) parts.push(`Listed by ${dealer.name}`);
-    fillDescription = parts.length > 0 ? parts.join(" · ") : fillTitle;
+    return parts.length > 0
+      ? `${autoTitle} — ${parts.join(" · ")}`
+      : autoTitle;
+  }
+
+  if (version) {
+    const rawEn  = version.descriptionEn?.trim()  ?? "";
+    const rawCta = version.callToAction?.trim()   ?? "";
+    const descParts = [rawEn, rawCta].filter(isProseText);
+    fillTitle         = version.title;
+    fillDescriptionEs = version.descriptionEs ?? null;
+    fillDownPayment   = version.downPayment ?? null;
+
+    if (descParts.length > 0) {
+      fillDescription = descParts.join("\n\n");
+    } else if (isProseText(vehicle.description)) {
+      // listingVersion copy is bad/missing — fall back to the XML feed description
+      fillDescription = vehicle.description;
+    } else {
+      fillDescription = buildAutoDescription();
+    }
+  } else {
+    // No listing version at all — use XML feed description or auto-generate.
+    fillTitle = autoTitle;
+    fillDescription = isProseText(vehicle.description)
+      ? vehicle.description
+      : buildAutoDescription();
   }
 
   const [enriched] = await enrich([job]);

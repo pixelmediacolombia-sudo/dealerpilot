@@ -29,6 +29,11 @@
   // Survives multiple uploadPhotos calls within the same page load.
   const _photoCache = new Map();
 
+  // Set to true once waitForPhotoThumbnails confirms at least one thumbnail.
+  // validateBeforeNext skips its own photo re-scan when this is already true,
+  // preventing false "0 photos" failures when photos are clearly visible.
+  let _photosConfirmed = false;
+
   function _runtimeAlive() {
     try {
       const id = (typeof chrome !== "undefined") && chrome.runtime && chrome.runtime.id;
@@ -1012,6 +1017,7 @@
       stateLog("Photo upload: thumbnail confirmation timed out — continuing anyway");
     } else {
       stateLog(`Photo upload: confirmed — ${files.length} photo(s) visible`);
+      _photosConfirmed = true; // validateBeforeNext will skip its own re-scan
       send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_detected",
              details: `${files.length} photos confirmed` }).catch(() => {});
     }
@@ -1233,22 +1239,57 @@
   // validateBeforeNext — checks the form has the minimum required data before
   // we try to click Next. Returns { ok, reason }.
   async function validateBeforeNext() {
-    // 1. Wait up to 15 s for at least one photo thumbnail (Facebook may still be
-    //    processing when we arrive here — give it more time before failing).
-    const PHOTO_POLL_MS = 15000;
-    const photoStart = Date.now();
-    let hasPhoto = false;
-    while (Date.now() - photoStart < PHOTO_POLL_MS) {
-      const thumbs = [
-        ...document.querySelectorAll('img[src^="blob:"]'),
-        ...document.querySelectorAll('[data-testid="media-attachment-delete-button"]'),
+    // 1. Confirm at least one photo thumbnail is visible.
+    //
+    //    If uploadPhotos already confirmed thumbnails (via waitForPhotoThumbnails),
+    //    skip the re-scan entirely — we trust the earlier result.  This prevents
+    //    the false "0 photos" failure that fires when Facebook renders thumbnails
+    //    in a way that only the earlier, broader scan detects.
+    //
+    //    If _photosConfirmed is false (e.g. upload was skipped or thumbnails timed
+    //    out), run our own expanded scan with a short 15 s window.
+    let hasPhoto = _photosConfirmed;
+
+    if (!hasPhoto) {
+      const PHOTO_POLL_MS = 15000;
+      const photoStart = Date.now();
+      // Expanded selector list — Facebook uses many different DOM patterns for
+      // uploaded photo thumbnails and preview tiles.
+      const THUMB_SELECTORS = [
+        'img[src^="blob:"]',
+        '[data-testid="media-attachment-delete-button"]',
+        '[data-testid="media-attachment-preview"]',
+        '[data-imagelocation]',
+        '[data-visualcompletion*="media"]',
+        '[aria-label*="photo" i] img',
+        '[aria-label*="image" i] img',
+        '[aria-label*="upload" i] img',
+        'img[style*="object-fit"]',
+        '[role="presentation"] img[src^="blob:"]',
       ];
-      if (thumbs.length > 0) { hasPhoto = true; break; }
-      // Also accept Facebook's text counter ("1 photo", "3 photos")
-      const countText = (document.body.innerText || "").match(/(\d+)\s*photo/i);
-      if (countText && parseInt(countText[1], 10) > 0) { hasPhoto = true; break; }
-      await sleep(600);
+      while (Date.now() - photoStart < PHOTO_POLL_MS) {
+        // Collect all matching elements, deduped
+        const thumbs = [
+          ...new Set(THUMB_SELECTORS.flatMap((sel) => [...document.querySelectorAll(sel)])),
+        ];
+        if (thumbs.length > 0) { hasPhoto = true; break; }
+        // Also accept Facebook's text counter ("1 photo", "3 photos")
+        const countText = (document.body.innerText || "").match(/(\d+)\s*photo/i);
+        if (countText && parseInt(countText[1], 10) > 0) { hasPhoto = true; break; }
+        // Accept any naturally loaded image inside a photo container
+        const uploadZone = document.querySelector(
+          '[aria-label*="photo" i], [aria-label*="image" i], [aria-label*="upload" i]',
+        );
+        if (uploadZone) {
+          const loaded = [...uploadZone.querySelectorAll("img")].filter(
+            (img) => img.naturalWidth > 0 || img.src,
+          );
+          if (loaded.length > 0) { hasPhoto = true; break; }
+        }
+        await sleep(600);
+      }
     }
+
     if (!hasPhoto) {
       return { ok: false, reason: "Photo upload failed: Facebook still shows 0 photos after waiting 15 s — upload may not have been accepted" };
     }
