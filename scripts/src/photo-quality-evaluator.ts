@@ -1,10 +1,13 @@
-// DealerPilot Photo Quality Evaluator
-// Uses GPT-5-mini vision to assess photographic quality using the language
-// of professional automotive photography — not image processing metrics.
+// DealerPilot Photo Quality Evaluator — Phase 1.5
+// Uses GPT-5-mini vision to score photos like a professional automotive photographer.
+// Scoring scale: 0–100 per dimension.
+// Also generates business-language AI analysis bullets and enforces the quality gate.
 //
-// Evaluates 10 dimensions for Original vs Enhanced side-by-side.
-// Returns a structured scorecard with per-dimension scores (1–10),
-// delta, a headline verdict, and a brief photographer's note per dimension.
+// Quality Gate (enhanced must pass ALL to earn "Use Enhanced"):
+//   Marketplace Ready Score  >= 85
+//   Naturalness              >= 85
+//   Artifact Detection       >= 85
+//   Improvement Delta        >= +5  (overallEnhanced - overallOriginal)
 
 import OpenAI from "openai";
 
@@ -15,90 +18,141 @@ const openai = new OpenAI({
 
 const MODEL = "gpt-5-mini";
 
-// The 10 dimensions from the spec.
-// Each has a label (shown in the report) and a scope note for the prompt.
+// 10 scoring dimensions — spec order.
 export const QUALITY_DIMENSIONS = [
-  { key: "lighting",          label: "Lighting",                 scope: "Quality and direction of light. Does the car look well-lit, evenly exposed, free of harsh shadows or blown hotspots?" },
-  { key: "exposure",          label: "Exposure",                 scope: "Overall brightness. Is it too dark, too bright, or balanced? Are shadow areas visible without being muddy?" },
-  { key: "whiteBalance",      label: "White Balance",            scope: "Color temperature accuracy. Does the image look neutral, or is it too warm (orange cast) or too cool (blue cast)?" },
-  { key: "dynamicRange",      label: "Dynamic Range",            scope: "Detail retained in both highlights and shadows simultaneously. Can you see paint detail in bright reflections AND shadow areas?" },
-  { key: "paintQuality",      label: "Paint Quality",            scope: "Gloss, depth, and richness of the paint finish. Does the color look deep and saturated, or flat and dull? (Mark N/A for technical photos)" },
-  { key: "glassQuality",      label: "Glass Quality",            scope: "Clarity of windows, windshield. Do the windows look clean and transparent? (Mark N/A for interior/technical photos)" },
-  { key: "materialQuality",   label: "Interior Material Quality", scope: "Leather, fabric, trim, stitching texture. Does the interior look premium and detailed? (Mark N/A for exterior photos)" },
-  { key: "naturalness",       label: "Naturalness",              scope: "Does the image look like a real photograph or like a filter was applied? No HDR halos, no plastic paint, no artificial glow." },
-  { key: "artifactDetection", label: "Artifact Detection",       scope: "Absence of JPEG blocking, color banding, crunchy noise, sharpening halos, or processing artifacts. Higher score = fewer artifacts." },
-  { key: "marketplaceReady",  label: "Marketplace Readiness",    scope: "Would a car buyer looking at Facebook Marketplace or AutoTrader stop scrolling for this photo? Professional confidence score." },
+  { key: "lighting",          label: "Lighting" },
+  { key: "exposure",          label: "Exposure" },
+  { key: "whiteBalance",      label: "White Balance" },
+  { key: "dynamicRange",      label: "Dynamic Range" },
+  { key: "paintQuality",      label: "Paint Quality" },
+  { key: "glassQuality",      label: "Glass Quality" },
+  { key: "materialQuality",   label: "Interior Material Quality" },
+  { key: "naturalness",       label: "Naturalness" },
+  { key: "artifactDetection", label: "Artifact Detection" },
+  { key: "marketplaceReady",  label: "Marketplace Ready" },
 ] as const;
 
 export type DimensionKey = (typeof QUALITY_DIMENSIONS)[number]["key"];
 
 export interface DimensionScore {
-  original: number | null;    // 1–10, null if N/A
-  enhanced: number | null;    // 1–10, null if N/A
-  delta: number | null;       // enhanced - original, null if either N/A
-  note: string;               // Photographer's 1-sentence observation
+  original: number | null;    // 0–100, null if N/A for this photo type
+  enhanced: number | null;
+  delta: number | null;
+}
+
+export interface QualityGateResult {
+  passed: boolean;
+  recommendation: "Use Enhanced" | "Use Original";
+  failReasons: string[];       // empty when passed
 }
 
 export interface PhotoQualityReport {
   photoType: "exterior" | "interior" | "technical";
   vehicleLabel: string;
   caption: string;
-  overallOriginal: number;    // mean of applicable dimension scores
+
+  // Dimension scores
+  dimensions: Record<DimensionKey, DimensionScore>;
+
+  // Overall (mean of applicable dimensions)
+  overallOriginal: number;
   overallEnhanced: number;
   overallDelta: number;
-  verdict: string;            // One sentence headline
-  dimensions: Record<DimensionKey, DimensionScore>;
+
+  // Marketplace Ready Score (for badge, same as marketplaceReady.enhanced)
+  marketplaceReadyScore: number | null;
+
+  // AI analysis bullets — business/photo language only
+  originalAnalysis: string[];   // flaws found in original
+  enhancedAnalysis: string[];   // improvements in enhanced
+
+  // Quality gate
+  gate: QualityGateResult;
+
   evalModel: string;
 }
 
 // ── Prompt ────────────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are a professional automotive photographer and photo editor with 20 years of experience shooting inventory for luxury dealerships including Mercedes-Benz, BMW, Porsche, and Audi.
+const SYSTEM_PROMPT = `You are a professional automotive photographer and photo editor with 20 years of experience at luxury car dealerships.
 
-You are evaluating vehicle photos for a car dealership's online marketplace listings. Your job is to compare the ORIGINAL photo (left/first) against an AI-ENHANCED version (right/second) and score both on professional photography criteria.
+You evaluate vehicle listing photos and compare an ORIGINAL (first/left image) against an AI-ENHANCED version (second/right image).
 
-Score each dimension from 1 to 10:
-  1–3  = poor, would hurt the listing
-  4–6  = acceptable, typical dealer photo
-  7–8  = good, professional quality
-  9–10 = excellent, luxury dealership standard
+SCORING SCALE 0–100:
+  0–40   = poor — hurts the listing
+  41–60  = acceptable — typical dealer photo
+  61–80  = good — professional quality
+  81–100 = excellent — luxury dealership standard
 
-If a dimension does not apply to the photo type, output null for both original and enhanced scores.
+Evaluate 10 dimensions. If a dimension does not apply to this photo type, output null for both scores.
 
-Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.
+ANALYSIS LANGUAGE RULES — critical:
+- Write like a photographer or car buyer, NOT an engineer
+- Forbidden words: sharpness ratio, CLAHE, gamma, m2, provider, Sharp.js, algorithm, pixel, kernel, sigma, convolution, threshold, JPEG artifact
+- Good words: exposure, lighting, gloss, depth, reflections, color cast, shadow detail, highlight, white balance, paint richness, glass clarity, material texture, natural, processed
+
+Respond ONLY with valid JSON. No markdown fences, no extra text.
 
 Required format:
 {
-  "verdict": "One sentence: is the enhancement a meaningful improvement?",
   "dimensions": {
-    "lighting":        { "original": <1-10 or null>, "enhanced": <1-10 or null>, "note": "<1 sentence photographer observation>" },
-    "exposure":        { "original": <1-10 or null>, "enhanced": <1-10 or null>, "note": "<1 sentence>" },
-    "whiteBalance":    { "original": <1-10 or null>, "enhanced": <1-10 or null>, "note": "<1 sentence>" },
-    "dynamicRange":    { "original": <1-10 or null>, "enhanced": <1-10 or null>, "note": "<1 sentence>" },
-    "paintQuality":    { "original": <1-10 or null>, "enhanced": <1-10 or null>, "note": "<1 sentence>" },
-    "glassQuality":    { "original": <1-10 or null>, "enhanced": <1-10 or null>, "note": "<1 sentence>" },
-    "materialQuality": { "original": <1-10 or null>, "enhanced": <1-10 or null>, "note": "<1 sentence>" },
-    "naturalness":     { "original": <1-10 or null>, "enhanced": <1-10 or null>, "note": "<1 sentence>" },
-    "artifactDetection": { "original": <1-10 or null>, "enhanced": <1-10 or null>, "note": "<1 sentence>" },
-    "marketplaceReady": { "original": <1-10 or null>, "enhanced": <1-10 or null>, "note": "<1 sentence>" }
-  }
-}`;
+    "lighting":           { "original": <0-100 or null>, "enhanced": <0-100 or null> },
+    "exposure":           { "original": <0-100 or null>, "enhanced": <0-100 or null> },
+    "whiteBalance":       { "original": <0-100 or null>, "enhanced": <0-100 or null> },
+    "dynamicRange":       { "original": <0-100 or null>, "enhanced": <0-100 or null> },
+    "paintQuality":       { "original": <0-100 or null>, "enhanced": <0-100 or null> },
+    "glassQuality":       { "original": <0-100 or null>, "enhanced": <0-100 or null> },
+    "materialQuality":    { "original": <0-100 or null>, "enhanced": <0-100 or null> },
+    "naturalness":        { "original": <0-100 or null>, "enhanced": <0-100 or null> },
+    "artifactDetection":  { "original": <0-100 or null>, "enhanced": <0-100 or null> },
+    "marketplaceReady":   { "original": <0-100 or null>, "enhanced": <0-100 or null> }
+  },
+  "originalAnalysis": [
+    "Brief observation about a flaw or weakness in the original (1 short sentence, photography language)"
+  ],
+  "enhancedAnalysis": [
+    "Brief observation about an improvement in the enhanced version (1 short sentence, photography language)"
+  ]
+}
+
+Provide 3–6 bullets in each analysis array. Be honest — if the enhancement did not improve a dimension, say so. Only claim improvements that are visually real.`;
 
 function buildUserPrompt(photoType: "exterior" | "interior" | "technical", caption: string): string {
-  const context = photoType === "exterior"
-    ? "This is an EXTERIOR vehicle photo. Evaluate paint, glass, and overall presentation."
-    : photoType === "interior"
-    ? "This is an INTERIOR vehicle photo. Evaluate material quality, lighting, and cabin presentation."
-    : "This is a TECHNICAL/DOCUMENT photo (odometer, VIN, gauge cluster, etc.). Evaluate readability and clarity. Mark paint, glass, and material dimensions as null.";
+  const context =
+    photoType === "exterior"
+      ? "EXTERIOR vehicle photo — evaluate paint gloss, lighting, glass clarity, and overall presentation."
+      : photoType === "interior"
+      ? "INTERIOR vehicle photo — evaluate cabin lighting, material quality, and seat/trim presentation. Paint, glass, and exterior dimensions are not applicable (null)."
+      : "TECHNICAL/DOCUMENT photo (odometer, VIN, gauge cluster, or similar). Evaluate readability and clarity only. Paint, glass, material, and most aesthetic dimensions are not applicable (null).";
 
   return `${context}
-
 Photo: ${caption}
 
-The FIRST image is the ORIGINAL (unprocessed dealer photo).
-The SECOND image is the AI-ENHANCED version.
+First image = ORIGINAL (unprocessed). Second image = AI-ENHANCED.
+Score both versions. Be honest — only reward genuine improvements.`;
+}
 
-Score both using the 10 photography dimensions. Be honest — if the enhancement is not an improvement on a dimension, score it the same or lower. Only reward genuine improvements.`;
+// ── Quality Gate ──────────────────────────────────────────────────────────────
+
+const GATE_MARKETPLACE_READY = 85;
+const GATE_NATURALNESS        = 85;
+const GATE_ARTIFACT_DETECTION = 85;
+const GATE_DELTA              = 5;
+
+function applyQualityGate(report: Omit<PhotoQualityReport, "gate">): QualityGateResult {
+  const failReasons: string[] = [];
+
+  const mr  = report.dimensions.marketplaceReady.enhanced;
+  const nat = report.dimensions.naturalness.enhanced;
+  const art = report.dimensions.artifactDetection.enhanced;
+
+  if (mr  !== null && mr  < GATE_MARKETPLACE_READY) failReasons.push(`Marketplace Ready score ${mr} is below ${GATE_MARKETPLACE_READY}`);
+  if (nat !== null && nat < GATE_NATURALNESS)        failReasons.push(`Naturalness score ${nat} is below ${GATE_NATURALNESS}`);
+  if (art !== null && art < GATE_ARTIFACT_DETECTION) failReasons.push(`Artifact Detection score ${art} is below ${GATE_ARTIFACT_DETECTION}`);
+  if (report.overallDelta < GATE_DELTA)              failReasons.push(`Improvement delta +${report.overallDelta.toFixed(0)} is below required +${GATE_DELTA}`);
+
+  const passed = failReasons.length === 0;
+  return { passed, recommendation: passed ? "Use Enhanced" : "Use Original", failReasons };
 }
 
 // ── Evaluator ─────────────────────────────────────────────────────────────────
@@ -110,21 +164,19 @@ export async function evaluatePhotoQuality(
   vehicleLabel: string,
   caption: string,
 ): Promise<PhotoQualityReport> {
-  const origB64  = originalBuf.toString("base64");
-  const enhB64   = enhancedBuf.toString("base64");
+  const origB64 = originalBuf.toString("base64");
+  const enhB64  = enhancedBuf.toString("base64");
 
   const response = await openai.chat.completions.create({
     model: MODEL,
-    max_completion_tokens: 2048,
+    max_completion_tokens: 4096,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
         content: [
           { type: "text", text: buildUserPrompt(photoType, caption) },
-          // Original — always first
           { type: "image_url", image_url: { url: `data:image/jpeg;base64,${origB64}`, detail: "high" } },
-          // Enhanced — always second
           { type: "image_url", image_url: { url: `data:image/jpeg;base64,${enhB64}`, detail: "high" } },
         ],
       },
@@ -132,45 +184,51 @@ export async function evaluatePhotoQuality(
   });
 
   const raw = response.choices[0]?.message?.content || "";
-
-  // Parse — strip possible markdown fences
   const jsonStr = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
   const parsed = JSON.parse(jsonStr) as {
-    verdict: string;
-    dimensions: Record<string, { original: number | null; enhanced: number | null; note: string }>;
+    dimensions: Record<string, { original: number | null; enhanced: number | null }>;
+    originalAnalysis: string[];
+    enhancedAnalysis: string[];
   };
 
-  // Build typed dimension map
+  // Build typed dimension map — clamp to 0–100
   const dimensions = {} as Record<DimensionKey, DimensionScore>;
   for (const dim of QUALITY_DIMENSIONS) {
-    const d = parsed.dimensions[dim.key] ?? { original: null, enhanced: null, note: "" };
-    const orig = typeof d.original === "number" ? Math.max(1, Math.min(10, d.original)) : null;
-    const enh  = typeof d.enhanced === "number" ? Math.max(1, Math.min(10, d.enhanced))  : null;
+    const d = parsed.dimensions[dim.key] ?? { original: null, enhanced: null };
+    const clamp = (v: unknown): number | null =>
+      typeof v === "number" ? Math.max(0, Math.min(100, Math.round(v))) : null;
+    const orig = clamp(d.original);
+    const enh  = clamp(d.enhanced);
     dimensions[dim.key] = {
       original: orig,
       enhanced: enh,
       delta:    orig !== null && enh !== null ? enh - orig : null,
-      note:     d.note ?? "",
     };
   }
 
-  // Overall scores: mean of applicable (non-null) dimensions
+  // Overall scores
   const origScores = QUALITY_DIMENSIONS.map(d => dimensions[d.key].original).filter((v): v is number => v !== null);
   const enhScores  = QUALITY_DIMENSIONS.map(d => dimensions[d.key].enhanced).filter((v): v is number => v !== null);
   const mean = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
 
   const overallOriginal = parseFloat(mean(origScores).toFixed(1));
   const overallEnhanced = parseFloat(mean(enhScores).toFixed(1));
+  const overallDelta    = parseFloat((overallEnhanced - overallOriginal).toFixed(1));
 
-  return {
+  const partial = {
     photoType,
     vehicleLabel,
     caption,
+    dimensions,
     overallOriginal,
     overallEnhanced,
-    overallDelta: parseFloat((overallEnhanced - overallOriginal).toFixed(1)),
-    verdict: parsed.verdict || "No verdict provided.",
-    dimensions,
+    overallDelta,
+    marketplaceReadyScore: dimensions.marketplaceReady.enhanced,
+    originalAnalysis: parsed.originalAnalysis ?? [],
+    enhancedAnalysis: parsed.enhancedAnalysis ?? [],
     evalModel: MODEL,
   };
+
+  const gate = applyQualityGate(partial);
+  return { ...partial, gate };
 }

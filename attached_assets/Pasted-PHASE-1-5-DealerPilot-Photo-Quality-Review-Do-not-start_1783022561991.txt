@@ -1,0 +1,163 @@
+PHASE 1.5 — DealerPilot Photo Quality Review
+
+Do not start RC1 yet.
+
+The enhancement pipeline improved technically, but the validation is still engineering-focused.
+
+Do not validate photo quality by sharpness percentage.
+
+Sharpness ratio does not prove the image looks professional.
+
+We need a photography-oriented quality review.
+
+====================================================
+GOAL
+====================================================
+
+DealerPilot must prove that the enhanced photo looks more valuable, more professional, and more marketplace-ready than the original.
+
+Replace:
+
+Sharpness Ratio
+
+with:
+
+DealerPilot Photo Quality Report
+
+====================================================
+QUALITY SCORE CATEGORIES
+====================================================
+
+For every enhanced image, evaluate Original vs Enhanced across:
+
+1. Lighting
+2. Exposure
+3. White Balance
+4. Dynamic Range
+5. Paint Quality
+6. Glass Quality
+7. Interior Material Quality
+8. Naturalness
+9. Artifact Detection
+10. Marketplace Readiness
+
+Each category should score 0–100.
+
+Also generate:
+
+Overall Photo Quality Score
+Marketplace Ready Score
+Improvement Delta
+
+Example:
+
+Original:
+Lighting 72
+Exposure 75
+Paint Quality 68
+Naturalness 88
+Marketplace Ready 74
+
+Enhanced:
+Lighting 91
+Exposure 92
+Paint Quality 89
+Naturalness 94
+Marketplace Ready 93
+
+Improvement:
++19 points
+
+====================================================
+AI ANALYSIS TEXT
+====================================================
+
+For each image generate a short AI explanation.
+
+Example:
+
+Original:
+- Slight underexposure
+- Cool white balance
+- Weak paint reflections
+- Windshield haze
+- JPEG compression visible
+
+Enhanced:
+✓ Corrected white balance
+✓ Improved exposure
+✓ Increased paint depth
+✓ Reduced compression artifacts
+✓ Improved glass clarity
+
+====================================================
+IMPORTANT
+====================================================
+
+Do NOT show technical terms like:
+- Sharpness ratio
+- CLAHE
+- gamma
+- m2
+- provider
+- Sharp.js
+
+The dealer should see business/photo language, not engineering language.
+
+====================================================
+QUALITY GATE
+====================================================
+
+Enhanced image passes only if:
+
+- Marketplace Ready Score >= 85
+- Naturalness >= 85
+- Artifact Detection >= 85
+- Improvement Delta >= +5
+
+If enhanced image fails:
+
+- keep original
+- mark image Needs Review
+- show reason
+
+Do not let bad enhanced photos become default.
+
+====================================================
+PHOTO STUDIO UI
+====================================================
+
+Update the before/after review page.
+
+For each image show:
+
+- Original
+- Enhanced
+- Quality Report
+- AI Analysis
+- Marketplace Ready badge
+- Use Enhanced / Use Original indicator
+
+Remove Sharpness Ratio from UI.
+
+Replace with:
+
+Photo Quality Report
+
+====================================================
+PHASE 1.5 ACCEPTANCE
+====================================================
+
+Process the same 5 vehicles again.
+
+For each show:
+
+- Original image
+- Enhanced image
+- Original quality scores
+- Enhanced quality scores
+- Improvement delta
+- AI analysis
+- Pass / Needs Review
+
+Only when Phase 1.5 passes visual and score review should we move to RC1.
