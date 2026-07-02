@@ -71,9 +71,10 @@ router.get("/vehicles/stats", async (req, res) => {
 
   // Location breakdown — only count active inventory (not sold/removed/archived)
   const active = rows.filter((r) => !["Sold/Removed", "Removed", "Archived"].includes(r.status));
-  const manassas = active.filter((r) => r.lotLocation && r.lotLocation.toLowerCase().includes("manassas")).length;
+  // null lot_location = default Manassas lot (feed never sets this field)
+  const manassas = active.filter((r) => !r.lotLocation || r.lotLocation.toLowerCase().includes("manassas")).length;
   const fredericksburg = active.filter((r) => r.lotLocation && r.lotLocation.toLowerCase().includes("fredericksburg")).length;
-  const unknownLocation = active.filter((r) => !r.lotLocation || (!r.lotLocation.toLowerCase().includes("manassas") && !r.lotLocation.toLowerCase().includes("fredericksburg"))).length;
+  const unknownLocation = active.filter((r) => r.lotLocation && !r.lotLocation.toLowerCase().includes("manassas") && !r.lotLocation.toLowerCase().includes("fredericksburg")).length;
 
   res.json({
     total: rows.length,
@@ -92,7 +93,13 @@ router.get("/vehicles", async (req, res) => {
   const status = typeof req.query.status === "string" ? req.query.status : "";
   const sort = typeof req.query.sort === "string" ? req.query.sort : "newest";
 
-  const conditions: SQL[] = [];
+  // Always scope to Manassas store (null lot_location = default Manassas lot)
+  const manassasFilter = or(
+    ilike(vehiclesTable.lotLocation, "%manassas%"),
+    isNull(vehiclesTable.lotLocation),
+  )!;
+
+  const conditions: SQL[] = [manassasFilter];
   if (status) conditions.push(eq(vehiclesTable.status, status));
   if (q) {
     const like = `%${q}%`;

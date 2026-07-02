@@ -31,9 +31,12 @@ import {
   sql,
 } from "drizzle-orm";
 
-// Only Manassas-confirmed vehicles are eligible for publishing/recommendations.
-// Unknown or null lot locations go to Inventory Review.
-const MANASSAS_FILTER = ilike(vehiclesTable.lotLocation, "%manassas%");
+// Only Manassas vehicles are eligible. null lot_location = default Manassas lot
+// (the CDN feed never sets this field, so null IS Manassas).
+const MANASSAS_FILTER = or(
+  ilike(vehiclesTable.lotLocation, "%manassas%"),
+  isNull(vehiclesTable.lotLocation),
+)!;
 
 const router: IRouter = Router();
 
