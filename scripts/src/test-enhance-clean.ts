@@ -30,7 +30,9 @@ import {
   evaluatePhotoQuality,
   QUALITY_DIMENSIONS,
   type PhotoQualityReport,
+  type QualityProfile,
 } from "./photo-quality-evaluator";
+import { loadActiveProfile } from "./profileLoader";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = path.resolve(__dirname, "../..");
@@ -90,6 +92,9 @@ const TEST_CASES: Array<{
 async function run() {
   fs.mkdirSync(REVIEW_DEST_DIR, { recursive: true });
 
+  // Load the active quality profile from DB once.
+  const profile: QualityProfile = await loadActiveProfile();
+
   // Verify source files exist
   const missing = TEST_CASES.filter(t => !fs.existsSync(path.join(REVIEW_SRC_DIR, t.origFile)));
   if (missing.length > 0) {
@@ -100,6 +105,7 @@ async function run() {
 
   console.log("=".repeat(64));
   console.log("DealerPilot Phase 1.5 — Clean Photo Test");
+  console.log(`Quality Profile: ${profile.name} (MR≥${profile.marketplaceReadyThreshold} Nat≥${profile.naturalnessThreshold} Art≥${profile.artifactThreshold} Δ≥+${profile.improvementDelta})`);
   console.log("Method: crop overlay bands from Alpha Motorsports photos");
   console.log(`  Removing top ${(TOP_CROP_PCT * 100).toFixed(0)}% (logo/badges) and`);
   console.log(`           bottom ${(BOTTOM_CROP_PCT * 100).toFixed(0)}% (yellow promo banner)`);
@@ -148,6 +154,7 @@ async function run() {
         tc.type,
         tc.vehicleLabel,
         tc.caption,
+        profile,
       );
       reports.push(report);
 
@@ -165,7 +172,7 @@ async function run() {
   }
 
   // Generate and copy report
-  const html = buildReportHtml(reports, croppedFiles, enhFiles);
+  const html = buildReportHtml(reports, croppedFiles, enhFiles, profile);
   fs.writeFileSync(path.join(REVIEW_DEST_DIR, "report-clean.html"), html);
 
   const serverDir = path.join(
@@ -199,12 +206,12 @@ async function run() {
     console.log(`   The enhancement pipeline is working correctly.`);
     console.log(`   Next step: add overlay detector → limit/skip enhancement on overlay photos.`);
   } else {
-    const natFail = reports.filter(r => r.dimensions.naturalness.enhanced !== null && (r.dimensions.naturalness.enhanced ?? 0) < 85).length;
-    const artFail = reports.filter(r => r.dimensions.artifactDetection.enhanced !== null && (r.dimensions.artifactDetection.enhanced ?? 0) < 85).length;
-    console.log(`\n⚠️  ANSWER: Even clean photos fail`);
-    console.log(`   Naturalness <85: ${natFail}/${reports.length} photos`);
-    console.log(`   Artifact Det <85: ${artFail}/${reports.length} photos`);
-    console.log(`   → Recommend adjusting quality gate thresholds.`);
+    const natFail = reports.filter(r => r.dimensions.naturalness.enhanced !== null && (r.dimensions.naturalness.enhanced ?? 0) < profile.naturalnessThreshold).length;
+    const artFail = reports.filter(r => r.dimensions.artifactDetection.enhanced !== null && (r.dimensions.artifactDetection.enhanced ?? 0) < profile.artifactThreshold).length;
+    console.log(`\n⚠️  ANSWER: Even clean photos fail (profile: ${profile.name})`);
+    console.log(`   Naturalness <${profile.naturalnessThreshold}: ${natFail}/${reports.length} photos`);
+    console.log(`   Artifact Det <${profile.artifactThreshold}: ${artFail}/${reports.length} photos`);
+    console.log(`   → Recommend adjusting quality gate thresholds in the active profile.`);
   }
   console.log(`\n  Report: /api/static/ai-photos/review-clean/report-clean.html`);
 }
@@ -263,11 +270,13 @@ function buildAnalysisBullets(items: string[], isEnhanced: boolean): string {
   ).join("\n");
 }
 
-function buildSection(report: PhotoQualityReport, cropFile: string, enhFile: string): string {
+function buildSection(report: PhotoQualityReport, cropFile: string, enhFile: string, profile: QualityProfile): string {
   const passed  = report.gate.passed;
   const delta   = fmtDelta(report.overallDelta);
   const mrScore = report.marketplaceReadyScore;
-  const mrColor = mrScore !== null && mrScore >= 85 ? "#22c55e" : mrScore !== null && mrScore >= 70 ? "#f59e0b" : "#ef4444";
+  const mrColor = mrScore !== null && mrScore >= profile.marketplaceReadyThreshold ? "#22c55e"
+                : mrScore !== null && mrScore >= profile.marketplaceReadyThreshold - 10 ? "#f59e0b"
+                : "#ef4444";
   const badge   = passed
     ? `<span style="background:#052e16;border:1px solid #16a34a;color:#22c55e;font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px">✓ PASS — Use Enhanced</span>`
     : `<span style="background:#1c0505;border:1px solid #b91c1c;color:#f87171;font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px">✗ NEEDS REVIEW — Use Original</span>`;
@@ -356,6 +365,7 @@ function buildReportHtml(
   reports: PhotoQualityReport[],
   croppedFiles: string[],
   enhFiles: string[],
+  profile: QualityProfile,
 ): string {
   const pass    = reports.filter(r => r.gate.passed).length;
   const fail    = reports.length - pass;
@@ -373,10 +383,10 @@ function buildReportHtml(
     : `<div style="background:#1c0505;border:2px solid #ef4444;border-radius:10px;padding:20px 24px;margin-top:24px">
         <p style="margin:0 0 4px;font-size:12px;color:#f87171;text-transform:uppercase;font-weight:700">Diagnostic Answer</p>
         <p style="margin:0;font-size:18px;font-weight:700;color:#f1f5f9">⚠️ Option A — Even clean photos fail</p>
-        <p style="margin:8px 0 0;color:#fca5a5;font-size:14px">Recommend adjusting quality gate thresholds. Pipeline tuning alone cannot achieve 85/85/85 on these photos.</p>
+        <p style="margin:8px 0 0;color:#fca5a5;font-size:14px">Recommend adjusting quality gate thresholds in the active profile (${profile.name}). Pipeline tuning alone cannot achieve the current thresholds on these photos.</p>
       </div>`;
 
-  const sections = reports.map((r, i) => buildSection(r, croppedFiles[i] ?? "", enhFiles[i] ?? "")).join("\n");
+  const sections = reports.map((r, i) => buildSection(r, croppedFiles[i] ?? "", enhFiles[i] ?? "", profile)).join("\n");
 
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -416,10 +426,11 @@ function buildReportHtml(
   <div style="margin-top:20px;background:#0a1628;border:1px solid #1e3a5f;border-radius:8px;padding:16px 20px">
     <p style="font-size:11px;color:#3b82f6;font-weight:700;text-transform:uppercase;margin-bottom:8px">Quality Gate</p>
     <div style="display:flex;gap:32px;flex-wrap:wrap">
-      <span style="font-size:13px;color:#93c5fd">Marketplace Ready ≥ 85</span>
-      <span style="font-size:13px;color:#93c5fd">Naturalness ≥ 85</span>
-      <span style="font-size:13px;color:#93c5fd">Artifact Detection ≥ 85</span>
-      <span style="font-size:13px;color:#93c5fd">Overall Improvement ≥ +5 pts</span>
+      <span style="font-size:13px;color:#93c5fd">Marketplace Ready ≥ ${profile.marketplaceReadyThreshold}</span>
+      <span style="font-size:13px;color:#93c5fd">Naturalness ≥ ${profile.naturalnessThreshold}</span>
+      <span style="font-size:13px;color:#93c5fd">Artifact Detection ≥ ${profile.artifactThreshold}</span>
+      <span style="font-size:13px;color:#93c5fd">Overall Improvement ≥ +${profile.improvementDelta} pts</span>
+      <span style="font-size:12px;color:#475569;margin-left:8px">— ${profile.name}</span>
     </div>
   </div>
 

@@ -1,88 +1,184 @@
 // DealerPilot Photo Quality Evaluator — Phase 1.5
-// Uses GPT-5-mini vision to score photos like a professional automotive photographer.
-// Scoring scale: 0–100 per dimension.
-// Also generates business-language AI analysis bullets and enforces the quality gate.
 //
-// Quality Gate (enhanced must pass ALL to earn "Use Enhanced"):
-//   Marketplace Ready Score  >= 85
-//   Naturalness              >= 85
-//   Artifact Detection       >= 85
-//   Improvement Delta        >= +5  (overallEnhanced - overallOriginal)
+// Pure evaluator — no database imports. DB-loading lives in profileLoader.ts.
+// Thresholds come from a QualityProfile object passed in by the caller.
+//
+// Rating tiers (absolute, profile-independent — for dealer communication):
+//   Excellent    ≥ 90
+//   Good         ≥ 80
+//   Acceptable   ≥ 70
+//   Needs Review ≥ 60
+//   Rejected      < 60
 
 import OpenAI from "openai";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? "placeholder",
+  apiKey:  process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? "placeholder",
 });
 
 const MODEL = "gpt-5-mini";
 
-// 10 scoring dimensions — spec order.
+// ── Quality profile (minimal interface — DB shape compatible) ─────────────────
+
+export interface QualityProfile {
+  id:   number;
+  name: string;
+  description:               string | null;
+  marketplaceReadyThreshold: number;
+  naturalnessThreshold:      number;
+  artifactThreshold:         number;
+  improvementDelta:          number;
+  isActive:                  boolean;
+}
+
+// Hardcoded fallback for when the DB is unavailable.
+// Matches the "Dealer Lot Photography" profile seeded in photo_quality_profiles.
+export const DEALER_LOT_FALLBACK: QualityProfile = {
+  id:                        0,
+  name:                      "Dealer Lot Photography",
+  description:               "Fallback — DB unavailable",
+  marketplaceReadyThreshold: 78,
+  naturalnessThreshold:      70,
+  artifactThreshold:         65,
+  improvementDelta:          5,
+  isActive:                  true,
+};
+
+// ── Rating tiers ──────────────────────────────────────────────────────────────
+
+export type PhotoRating = "Excellent" | "Good" | "Acceptable" | "Needs Review" | "Rejected";
+
+export function rateScore(score: number | null): PhotoRating | null {
+  if (score === null) return null;
+  if (score >= 90) return "Excellent";
+  if (score >= 80) return "Good";
+  if (score >= 70) return "Acceptable";
+  if (score >= 60) return "Needs Review";
+  return "Rejected";
+}
+
+export const RATING_COLOR: Record<PhotoRating, string> = {
+  Excellent:       "#22c55e",
+  Good:            "#84cc16",
+  Acceptable:      "#f59e0b",
+  "Needs Review":  "#f97316",
+  Rejected:        "#ef4444",
+};
+
+export const RATING_BG: Record<PhotoRating, string> = {
+  Excellent:       "#052e16",
+  Good:            "#1a2e05",
+  Acceptable:      "#1c1204",
+  "Needs Review":  "#1c0a00",
+  Rejected:        "#1c0505",
+};
+
+// ── Dimensions ────────────────────────────────────────────────────────────────
+
 export const QUALITY_DIMENSIONS = [
-  { key: "lighting",          label: "Lighting" },
-  { key: "exposure",          label: "Exposure" },
-  { key: "whiteBalance",      label: "White Balance" },
-  { key: "dynamicRange",      label: "Dynamic Range" },
-  { key: "paintQuality",      label: "Paint Quality" },
-  { key: "glassQuality",      label: "Glass Quality" },
-  { key: "materialQuality",   label: "Interior Material Quality" },
-  { key: "naturalness",       label: "Naturalness" },
-  { key: "artifactDetection", label: "Artifact Detection" },
-  { key: "marketplaceReady",  label: "Marketplace Ready" },
+  { key: "lighting",           label: "Lighting" },
+  { key: "exposure",           label: "Exposure" },
+  { key: "whiteBalance",       label: "White Balance" },
+  { key: "dynamicRange",       label: "Dynamic Range" },
+  { key: "paintQuality",       label: "Paint Quality" },
+  { key: "glassQuality",       label: "Glass Quality" },
+  { key: "materialQuality",    label: "Interior Material Quality" },
+  { key: "naturalness",        label: "Naturalness" },
+  { key: "artifactDetection",  label: "Artifact Detection" },
+  { key: "marketplaceReady",   label: "Marketplace Ready" },
 ] as const;
 
 export type DimensionKey = (typeof QUALITY_DIMENSIONS)[number]["key"];
 
 export interface DimensionScore {
-  original: number | null;    // 0–100, null if N/A for this photo type
-  enhanced: number | null;
-  delta: number | null;
+  original:       number | null;
+  enhanced:       number | null;
+  delta:          number | null;
+  originalRating: PhotoRating | null;
+  enhancedRating: PhotoRating | null;
 }
+
+// ── Gate result ───────────────────────────────────────────────────────────────
 
 export interface QualityGateResult {
-  passed: boolean;
+  passed:         boolean;
   recommendation: "Use Enhanced" | "Use Original";
-  failReasons: string[];       // empty when passed
+  failReasons:    string[];
+  profile:        { id: number; name: string; description: string | null };
 }
 
-export interface PhotoQualityReport {
-  photoType: "exterior" | "interior" | "technical";
-  vehicleLabel: string;
-  caption: string;
+// ── Report ────────────────────────────────────────────────────────────────────
 
-  // Dimension scores
+export interface PhotoQualityReport {
+  photoType:    "exterior" | "interior" | "technical";
+  vehicleLabel: string;
+  caption:      string;
+
   dimensions: Record<DimensionKey, DimensionScore>;
 
-  // Overall (mean of applicable dimensions)
   overallOriginal: number;
   overallEnhanced: number;
-  overallDelta: number;
+  overallDelta:    number;
 
-  // Marketplace Ready Score (for badge, same as marketplaceReady.enhanced)
-  marketplaceReadyScore: number | null;
+  overallOriginalRating: PhotoRating | null;
+  overallEnhancedRating: PhotoRating | null;
 
-  // AI analysis bullets — business/photo language only
-  originalAnalysis: string[];   // flaws found in original
-  enhancedAnalysis: string[];   // improvements in enhanced
+  marketplaceReadyScore:  number | null;
+  marketplaceReadyRating: PhotoRating | null;
 
-  // Quality gate
-  gate: QualityGateResult;
+  originalAnalysis: string[];
+  enhancedAnalysis: string[];
 
+  gate:      QualityGateResult;
   evalModel: string;
 }
 
-// ── Prompt ────────────────────────────────────────────────────────────────────
+// ── Gate logic ────────────────────────────────────────────────────────────────
+
+function applyQualityGate(
+  report:  Omit<PhotoQualityReport, "gate">,
+  profile: QualityProfile,
+): QualityGateResult {
+  const failReasons: string[] = [];
+
+  const mr  = report.dimensions.marketplaceReady.enhanced;
+  const nat = report.dimensions.naturalness.enhanced;
+  const art = report.dimensions.artifactDetection.enhanced;
+
+  if (mr  !== null && mr  < profile.marketplaceReadyThreshold)
+    failReasons.push(`Marketplace Ready ${mr} (${rateScore(mr)}) is below threshold ${profile.marketplaceReadyThreshold}`);
+
+  if (nat !== null && nat < profile.naturalnessThreshold)
+    failReasons.push(`Naturalness ${nat} (${rateScore(nat)}) is below threshold ${profile.naturalnessThreshold}`);
+
+  if (art !== null && art < profile.artifactThreshold)
+    failReasons.push(`Artifact Detection ${art} (${rateScore(art)}) is below threshold ${profile.artifactThreshold}`);
+
+  if (report.overallDelta < profile.improvementDelta)
+    failReasons.push(`Improvement delta +${report.overallDelta.toFixed(0)} is below required +${profile.improvementDelta}`);
+
+  const passed = failReasons.length === 0;
+  return {
+    passed,
+    recommendation: passed ? "Use Enhanced" : "Use Original",
+    failReasons,
+    profile: { id: profile.id, name: profile.name, description: profile.description },
+  };
+}
+
+// ── GPT prompt ────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are a professional automotive photographer and photo editor with 20 years of experience at luxury car dealerships.
 
 You evaluate vehicle listing photos and compare an ORIGINAL (first/left image) against an AI-ENHANCED version (second/right image).
 
 SCORING SCALE 0–100:
-  0–40   = poor — hurts the listing
-  41–60  = acceptable — typical dealer photo
-  61–80  = good — professional quality
-  81–100 = excellent — luxury dealership standard
+  0–59   = poor — hurts or does not help the listing
+  60–69  = needs review — below typical dealership standard
+  70–79  = acceptable — typical dealer photo
+  80–89  = good — professional quality
+  90–100 = excellent — luxury dealership standard
 
 Evaluate 10 dimensions. If a dimension does not apply to this photo type, output null for both scores.
 
@@ -132,37 +228,15 @@ First image = ORIGINAL (unprocessed). Second image = AI-ENHANCED.
 Score both versions. Be honest — only reward genuine improvements.`;
 }
 
-// ── Quality Gate ──────────────────────────────────────────────────────────────
-
-const GATE_MARKETPLACE_READY = 85;
-const GATE_NATURALNESS        = 85;
-const GATE_ARTIFACT_DETECTION = 85;
-const GATE_DELTA              = 5;
-
-function applyQualityGate(report: Omit<PhotoQualityReport, "gate">): QualityGateResult {
-  const failReasons: string[] = [];
-
-  const mr  = report.dimensions.marketplaceReady.enhanced;
-  const nat = report.dimensions.naturalness.enhanced;
-  const art = report.dimensions.artifactDetection.enhanced;
-
-  if (mr  !== null && mr  < GATE_MARKETPLACE_READY) failReasons.push(`Marketplace Ready score ${mr} is below ${GATE_MARKETPLACE_READY}`);
-  if (nat !== null && nat < GATE_NATURALNESS)        failReasons.push(`Naturalness score ${nat} is below ${GATE_NATURALNESS}`);
-  if (art !== null && art < GATE_ARTIFACT_DETECTION) failReasons.push(`Artifact Detection score ${art} is below ${GATE_ARTIFACT_DETECTION}`);
-  if (report.overallDelta < GATE_DELTA)              failReasons.push(`Improvement delta +${report.overallDelta.toFixed(0)} is below required +${GATE_DELTA}`);
-
-  const passed = failReasons.length === 0;
-  return { passed, recommendation: passed ? "Use Enhanced" : "Use Original", failReasons };
-}
-
-// ── Evaluator ─────────────────────────────────────────────────────────────────
+// ── Main evaluator ────────────────────────────────────────────────────────────
 
 export async function evaluatePhotoQuality(
   originalBuf: Buffer,
   enhancedBuf: Buffer,
-  photoType: "exterior" | "interior" | "technical",
+  photoType:   "exterior" | "interior" | "technical",
   vehicleLabel: string,
-  caption: string,
+  caption:     string,
+  profile:     QualityProfile,
 ): Promise<PhotoQualityReport> {
   const origB64 = originalBuf.toString("base64");
   const enhB64  = enhancedBuf.toString("base64");
@@ -183,37 +257,38 @@ export async function evaluatePhotoQuality(
     ],
   });
 
-  const raw = response.choices[0]?.message?.content || "";
+  const raw     = response.choices[0]?.message?.content || "";
   const jsonStr = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-  const parsed = JSON.parse(jsonStr) as {
+  const parsed  = JSON.parse(jsonStr) as {
     dimensions: Record<string, { original: number | null; enhanced: number | null }>;
     originalAnalysis: string[];
     enhancedAnalysis: string[];
   };
 
-  // Build typed dimension map — clamp to 0–100
   const dimensions = {} as Record<DimensionKey, DimensionScore>;
   for (const dim of QUALITY_DIMENSIONS) {
-    const d = parsed.dimensions[dim.key] ?? { original: null, enhanced: null };
+    const d     = parsed.dimensions[dim.key] ?? { original: null, enhanced: null };
     const clamp = (v: unknown): number | null =>
       typeof v === "number" ? Math.max(0, Math.min(100, Math.round(v))) : null;
     const orig = clamp(d.original);
     const enh  = clamp(d.enhanced);
     dimensions[dim.key] = {
-      original: orig,
-      enhanced: enh,
-      delta:    orig !== null && enh !== null ? enh - orig : null,
+      original:       orig,
+      enhanced:       enh,
+      delta:          orig !== null && enh !== null ? enh - orig : null,
+      originalRating: rateScore(orig),
+      enhancedRating: rateScore(enh),
     };
   }
 
-  // Overall scores
   const origScores = QUALITY_DIMENSIONS.map(d => dimensions[d.key].original).filter((v): v is number => v !== null);
   const enhScores  = QUALITY_DIMENSIONS.map(d => dimensions[d.key].enhanced).filter((v): v is number => v !== null);
-  const mean = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  const mean       = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
 
   const overallOriginal = parseFloat(mean(origScores).toFixed(1));
   const overallEnhanced = parseFloat(mean(enhScores).toFixed(1));
   const overallDelta    = parseFloat((overallEnhanced - overallOriginal).toFixed(1));
+  const mrEnh           = dimensions.marketplaceReady.enhanced;
 
   const partial = {
     photoType,
@@ -223,12 +298,15 @@ export async function evaluatePhotoQuality(
     overallOriginal,
     overallEnhanced,
     overallDelta,
-    marketplaceReadyScore: dimensions.marketplaceReady.enhanced,
+    overallOriginalRating: rateScore(overallOriginal),
+    overallEnhancedRating: rateScore(overallEnhanced),
+    marketplaceReadyScore:  mrEnh,
+    marketplaceReadyRating: rateScore(mrEnh),
     originalAnalysis: parsed.originalAnalysis ?? [],
     enhancedAnalysis: parsed.enhancedAnalysis ?? [],
     evalModel: MODEL,
   };
 
-  const gate = applyQualityGate(partial);
+  const gate = applyQualityGate(partial, profile);
   return { ...partial, gate };
 }
