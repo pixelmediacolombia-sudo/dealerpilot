@@ -1,0 +1,187 @@
+UX + Performance Sprint — Marketplace Publishing
+
+Current issue:
+The publish flow works more than before, but the user experience is still not good.
+
+Problems:
+1. Image processing takes too long.
+2. The progress modal says generic steps like “Extension picking up job...” but does not show what is actually happening.
+3. The popup/modal feels disconnected from the app.
+4. The dashboard progress does not match the extension overlay state.
+5. The user cannot clearly tell whether DealerPilot is:
+   - waiting for extension
+   - opening Facebook
+   - downloading photos
+   - uploading photos
+   - waiting for Facebook thumbnails
+   - filling price
+   - filling title
+   - filling description
+   - clicking Next
+   - clicking Publish
+   - capturing URL
+   - done
+
+Goal:
+Make Marketplace publishing feel native, fast, and transparent.
+
+====================================================
+PART 1 — Replace popup modal with in-app progress panel
+====================================================
+
+Do not use a centered popup modal as the primary experience.
+
+Instead, create an in-page publishing panel inside Marketplace AI.
+
+When user clicks Publish Now:
+- keep the user on the Marketplace AI page
+- show a right-side or inline progress panel
+- show the selected vehicle
+- show live status
+- show real current step
+- show Retry / Cancel buttons
+
+The panel should look like part of the app, not an alert popup.
+
+Suggested UI:
+
+Marketplace Publishing
+
+2012 Mercedes-Benz GLK 350
+
+Status:
+Preparing job...
+
+Live steps:
+✓ Job created
+✓ Extension connected
+⏳ Downloading photos 3/8
+⏳ Uploading photos to Facebook
+⏳ Waiting for thumbnails
+⏳ Filling price
+⏳ Filling title
+⏳ Filling description
+⏳ Clicking Next
+⏳ Publishing
+⏳ Capturing listing URL
+
+====================================================
+PART 2 — Real progress events
+====================================================
+
+The extension must send granular events to backend:
+
+photo_download_started
+photo_download_progress
+photo_download_complete
+photo_upload_started
+photo_upload_progress
+photo_upload_complete
+thumbnail_wait_started
+thumbnail_detected
+field_fill_started
+field_fill_success
+field_fill_skipped
+next_enabled
+next_clicked
+publish_clicked
+listing_url_captured
+job_complete
+job_failed
+
+Each event should include:
+- jobId
+- vehicleId
+- step
+- message
+- progressPercent
+- meta data, e.g. photosUploaded: 4, totalPhotos: 8
+
+Dashboard should poll or subscribe and display the latest event.
+
+====================================================
+PART 3 — Speed up photo processing
+====================================================
+
+Optimize image processing.
+
+Current issue:
+Images are downloaded/converted slowly.
+
+Implement:
+
+1. Limit photos for MVP:
+- use first 6 photos by default
+- max 8 photos
+- do not process all 20 unless user chooses “Use all photos”
+
+2. Parallel download:
+- download 3 photos concurrently
+- do not download one-by-one
+
+3. Compress/resize before injecting:
+- max width 1600 px
+- JPEG quality 0.82
+- reduce file size
+- keep aspect ratio
+
+4. Cache within job:
+- once image is downloaded/converted, store it in memory for that job
+- retry should not re-download the same image
+
+5. Use backend proxy endpoint if needed:
+- /api/publishing/jobs/:id/photo/:index
+- optional /api/publishing/jobs/:id/photo-bundle?limit=6
+
+====================================================
+PART 4 — Better timeout behavior
+====================================================
+
+Do not sit silently.
+
+If photo download takes more than 5 seconds:
+show:
+“Downloading photos 2/6…”
+
+If upload takes more than 10 seconds:
+show:
+“Facebook is processing thumbnails…”
+
+If waiting over 30 seconds:
+show:
+“Still waiting for Facebook to confirm photos…”
+
+Only fail after a clear max timeout.
+
+====================================================
+PART 5 — Dashboard and extension state must match
+====================================================
+
+The app progress panel and Facebook overlay must show the same:
+
+- jobId
+- vehicle
+- current step
+- progress percent
+- error reason
+
+If they mismatch:
+- clear stale local state
+- reload current job from backend
+
+====================================================
+PART 6 — Final acceptance
+====================================================
+
+Acceptance:
+- User clicks Publish Now once.
+- No centered popup required.
+- In-app panel shows real progress.
+- Photos process faster: first 6 images under reasonable time.
+- User sees “Downloading photos X/6”.
+- User sees “Uploading photos X/6”.
+- User sees “Waiting for thumbnails”.
+- Progress bar reflects real steps.
+- If it fails, error is specific and actionable.
+- Retry resumes without re-downloading everything if possible.
+- No manual refresh required.
