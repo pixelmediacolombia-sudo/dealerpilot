@@ -21,3 +21,8 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+FAL_KEY = "4b90d801-6da8-472d-9ccf-f67051aabf03:bc9a4771e3a3a4e3eba63617247a8269"

@@ -1,0 +1,134 @@
+URGENT — Audit the FAL.ai integration before we process any production vehicles.
+
+Do not assume the FAL_KEY is correct.
+
+Perform a complete audit of the FAL.ai integration and return PASS/FAIL for each item.
+
+====================================================
+1. Environment Variable
+====================================================
+
+Verify:
+
+- FAL_KEY exists
+- FAL_KEY is not empty
+- FAL_KEY is loaded into the server process
+- FAL_KEY is available inside the photo worker
+- FAL_KEY is not being shadowed by another env var
+
+Print:
+
+FAL_KEY detected: YES/NO
+Length:
+Prefix (first 8 chars only)
+
+Never print the full key.
+
+====================================================
+2. Authentication
+====================================================
+
+Make a real authenticated request to FAL.ai.
+
+Verify:
+
+- key accepted
+- authentication successful
+- account active
+- no 401
+- no 403
+
+Return the exact response.
+
+====================================================
+3. Model
+====================================================
+
+Verify the BRIA RMBG model endpoint exists.
+
+Confirm the endpoint configured in DealerPilot matches the current FAL.ai documentation.
+
+If deprecated,
+update it.
+
+====================================================
+4. Test Inference
+====================================================
+
+Run ONE real background-removal test on a sample vehicle image.
+
+Verify:
+
+- upload succeeds
+- inference starts
+- inference completes
+- output image URL returned
+- image downloadable
+
+Report:
+
+processing time
+resolution
+cost if available
+
+====================================================
+5. Failure Handling
+====================================================
+
+Disconnect FAL temporarily.
+
+Verify:
+
+- fallback works
+- pipeline continues
+- original image used
+
+====================================================
+6. Performance
+====================================================
+
+Measure:
+
+Average processing time per exterior image.
+
+Target:
+
+< 5 seconds
+
+====================================================
+7. Cost
+====================================================
+
+Return:
+
+Estimated cost:
+
+per image
+
+per vehicle
+
+100 vehicles
+
+500 vehicles
+
+1000 vehicles
+
+====================================================
+8. Final Verdict
+====================================================
+
+Return only:
+
+PASS
+
+or
+
+FAIL
+
+If FAIL:
+
+Explain exactly what must be corrected before enabling "Process All Vehicles."
+
+Do not guess.
+
+Run real tests against the configured FAL.ai account.
