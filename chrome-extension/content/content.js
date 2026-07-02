@@ -712,6 +712,18 @@
         "other":  ["other"],
       };
 
+      // Body style map — normalize vehicle body type to Facebook's option labels
+      const BODY_STYLE_MAP = {
+        "suv":         ["suv", "sport utility", "sport-utility"],
+        "sedan":       ["sedan", "saloon"],
+        "truck":       ["truck", "pickup", "pick-up", "pick up"],
+        "coupe":       ["coupe", "2-door", "2door"],
+        "hatchback":   ["hatchback", "hatch", "5-door"],
+        "van":         ["van", "minivan", "mini-van"],
+        "wagon":       ["wagon", "estate", "touring"],
+        "convertible": ["convertible", "cabriolet", "roadster", "cabrio"],
+      };
+
       let pick =
         options.find((o) => getText(o) === needle) ||
         options.find((o) => getText(o).includes(needle)) ||
@@ -721,10 +733,22 @@
         (label === "vehicle type"
           ? options.find((o) => VT_ALIASES.some((a) => getText(o).includes(a)))
           : undefined) ||
-        // Color mapping — normalize common color names to Facebook's labels
-        (label === "color"
+        // Color matching — fires for "color", "exterior color", "interior color"
+        (label.toLowerCase().includes("color")
           ? (() => {
               for (const [canonical, aliases] of Object.entries(COLOR_MAP)) {
+                if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
+                  const found = options.find((o) => getText(o).includes(canonical));
+                  if (found) return found;
+                }
+              }
+              return undefined;
+            })()
+          : undefined) ||
+        // Body style matching
+        (label === "body style"
+          ? (() => {
+              for (const [canonical, aliases] of Object.entries(BODY_STYLE_MAP)) {
                 if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
                   const found = options.find((o) => getText(o).includes(canonical));
                   if (found) return found;
@@ -990,9 +1014,84 @@
         }
       }
 
+      // ---- Phase 5a: Body Style (required) ──────────────────────────────
+      stateLog("Phase 5a: body style (required)");
+      {
+        let bodyStyleValue = fill.bodyStyle;
+        if (!bodyStyleValue || bodyStyleValue.toLowerCase() === "unknown") {
+          // Infer a safe default from vehicle type so Next can enable
+          const vt = (fill.vehicleType || "").toLowerCase();
+          bodyStyleValue = (vt.includes("truck") || vt.includes("pickup")) ? "Truck" : "Sedan";
+          stateLog(`Body style unknown — defaulting to "${bodyStyleValue}" based on vehicle type`);
+        }
+        const bsOk = await selectComboboxStep(
+          "body style",
+          ["body style", "vehicle style", "body type", "style"],
+          bodyStyleValue,
+          null,
+          false,
+        );
+        if (!bsOk && !missed.includes("body style")) {
+          missed.push("body style");
+          warnings.push(`body style: "${bodyStyleValue}" not found in Facebook options`);
+        }
+      }
+
+      // ---- Phase 5b: Exterior Color (required) ───────────────────────────
+      stateLog("Phase 5b: exterior color (required)");
+      {
+        const extColor = fill.exteriorColor || fill.color || null;
+        if (!extColor) {
+          missed.push("exterior color");
+          warnings.push("exterior color: missing from vehicle data");
+        } else {
+          const ecOk = await selectComboboxStep(
+            "exterior color",
+            ["exterior color", "exterior", "color"],
+            extColor,
+            null,
+            false,
+          );
+          if (!ecOk && !missed.includes("exterior color")) {
+            missed.push("exterior color");
+            warnings.push(`exterior color: "${extColor}" not found in Facebook options`);
+          }
+        }
+      }
+
+      // ---- Phase 5c: Interior Color (required — fallback: Black → Gray → Other) ─
+      stateLog("Phase 5c: interior color (required, with fallbacks)");
+      {
+        const interiorCandidates = fill.interiorColor
+          ? [fill.interiorColor, "Black", "Gray", "Other"]
+          : ["Black", "Gray", "Other"];
+        let interiorFilled = false;
+        for (const candidate of interiorCandidates) {
+          const missedBefore  = missed.length;
+          const warnsBefore   = warnings.length;
+          const ok = await selectComboboxStep(
+            "interior color",
+            ["interior color", "interior"],
+            candidate,
+            null,
+            false,
+          );
+          if (ok) { interiorFilled = true; break; }
+          // Not the final fallback — undo spurious missed/warning entries and retry
+          if (candidate !== interiorCandidates[interiorCandidates.length - 1]) {
+            missed.splice(missedBefore);
+            warnings.splice(warnsBefore);
+          }
+        }
+        if (!interiorFilled && !missed.includes("interior color")) {
+          missed.push("interior color");
+          warnings.push("interior color: no fallback color (Black/Gray/Other) available in Facebook options");
+        }
+      }
+
       if (!MARKETPLACE_FAST_MODE) {
-        // ---- Phase 5: Condition dropdown (non-blocking, skipped in fast mode) ----
-        stateLog("Phase 5: condition (non-blocking)");
+        // ---- Phase 6: Condition dropdown (non-blocking, skipped in fast mode) ----
+        stateLog("Phase 6: condition (non-blocking)");
         await selectComboboxStep("condition", ["condition"], fill.condition, false, false);
       } else {
         stateLog("Fast mode: skipping condition");
@@ -1678,16 +1777,18 @@
               year:         listing.year        ?? null,
               make:         listing.make        ?? "",
               model:        listing.model       ?? "",
-              mileage:      listing.mileage     != null ? String(listing.mileage) : null,
-              price:        listing.price       != null ? String(listing.price)   : null,
-              title:        listing.title       ?? "",
-              description:  listing.description ?? "",
-              location:     listing.location    ?? null,
-              condition:    listing.condition   ?? null,
-              transmission: listing.transmission ?? null,
-              fuelType:     listing.fuelType    ?? null,
-              color:        listing.color       ?? null,
-              bodyStyle:    listing.bodyStyle   ?? null,
+              mileage:       listing.mileage      != null ? String(listing.mileage) : null,
+              price:         listing.price        != null ? String(listing.price)   : null,
+              title:         listing.title        ?? "",
+              description:   listing.description  ?? "",
+              location:      listing.location     ?? null,
+              condition:     listing.condition    ?? null,
+              transmission:  listing.transmission ?? null,
+              fuelType:      listing.fuelType     ?? null,
+              color:         listing.color        ?? null,
+              bodyStyle:     listing.bodyStyle    ?? null,
+              exteriorColor: listing.exteriorColor ?? listing.color ?? null,
+              interiorColor: listing.interiorColor ?? null,
             };
 
             const syntheticJob = {
