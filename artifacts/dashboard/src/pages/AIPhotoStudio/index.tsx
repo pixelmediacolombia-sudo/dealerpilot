@@ -366,13 +366,14 @@ export function AIPhotoStudio() {
   const vehicles = allJobs ? dedupeByVehicle(allJobs.jobs) : [];
   const readyCount = vehicles.filter((v) => v.vehicleAiStatus === "Ready" || (v.status === "Completed" && v.outputSetId !== null)).length;
   const processingCount = vehicles.filter((v) => v.status === "Processing" || v.status === "Queued").length;
-  const totalCount = stats?.vehicles.total ?? vehicles.length;
+  const failedCount = vehicles.filter((v) => v.status === "Failed" || v.status === "Cancelled").length;
+  const totalProcessed = vehicles.length;
 
   const kpis = [
-    { label: "Total Vehicles", value: totalCount, icon: Camera, color: "text-white" },
+    { label: "Processed", value: totalProcessed, icon: Camera, color: "text-white" },
     { label: "AI Enhanced", value: readyCount, icon: Sparkles, color: "text-green-400" },
     { label: "In Progress", value: processingCount, icon: Loader2, color: "text-blue-400", spin: processingCount > 0 },
-    { label: "Not Started", value: Math.max(0, totalCount - readyCount - processingCount), icon: Clock, color: "text-white/40" },
+    { label: "Need Retry", value: failedCount, icon: Clock, color: failedCount > 0 ? "text-red-400" : "text-white/40" },
   ];
 
   if (openVehicleId !== null) {
