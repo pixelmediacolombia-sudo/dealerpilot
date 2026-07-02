@@ -323,20 +323,14 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     fillDescriptionEs = version.descriptionEs ?? null;
     fillDownPayment   = version.downPayment ?? null;
 
-    if (descParts.length > 0) {
-      fillDescription = descParts.join("\n\n");
-    } else if (isProseText(vehicle.description)) {
-      // listingVersion copy is bad/missing — fall back to the XML feed description
-      fillDescription = vehicle.description;
-    } else {
-      fillDescription = buildAISalesCopy();
-    }
+    // Always use Alpha Motorsport bilingual sales copy for Marketplace.
+    // XML feed descriptions (vehicle.description) are NEVER used — they contain
+    // dealer boilerplate, stock numbers, and raw data not suitable for Marketplace.
+    fillDescription = descParts.length > 0 ? descParts.join("\n\n") : buildAISalesCopy();
   } else {
-    // No listing version at all — use XML feed description or generate AI sales copy.
+    // No listing version — always generate Alpha sales copy.
     fillTitle = autoTitle;
-    fillDescription = isProseText(vehicle.description)
-      ? vehicle.description
-      : buildAISalesCopy();
+    fillDescription = buildAISalesCopy();
   }
 
   const [enriched] = await enrich([job]);
@@ -800,7 +794,25 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     return;
   }
 
-  // If an active job already exists, return it instead of creating a duplicate
+  // Cancel stale active jobs (>10 min old) for this vehicle before creating a new one.
+  // A stuck job would otherwise block publish-now indefinitely.
+  const STALE_THRESHOLD = new Date(Date.now() - 10 * 60 * 1000);
+  await db
+    .update(publishingJobsTable)
+    .set({ status: "Cancelled", failedReason: "Auto-cancelled: stale job older than 10 minutes" })
+    .where(
+      and(
+        eq(publishingJobsTable.vehicleId, vehicleId),
+        eq(publishingJobsTable.dealerId, DEALER_ID),
+        inArray(publishingJobsTable.status, [
+          "Queued", "Scheduled", "Claimed", "Publishing",
+          "Opening Facebook", "Filling Form", "Auto Publishing",
+        ]),
+        lt(publishingJobsTable.createdAt, STALE_THRESHOLD),
+      ),
+    );
+
+  // If a RECENT active job already exists, return it (idempotent)
   const [existing] = await db
     .select()
     .from(publishingJobsTable)

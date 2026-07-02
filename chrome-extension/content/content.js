@@ -22,7 +22,7 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.0";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.1";
 
   // ── Performance / fast-mode settings ────────────────────────────────────────
   // MARKETPLACE_FAST_MODE=true fills only the 9 required fields:
@@ -417,7 +417,7 @@
     <div id="mai-header">
       <span id="mai-dot"></span>
       <span id="mai-title">DealerPilot AI</span>
-      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.0</span>
+      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.1</span>
       <button id="mai-toggle" title="Collapse">_</button>
     </div>
     <div id="mai-body">
@@ -798,7 +798,6 @@
         // Make failed — model cascade won't appear; notify operator and continue
         stateLog(`⚠️ Make "${fill.make}" not matched — operator should verify manually`);
         setStatus(`⚠️ Make not matched — continuing without it (check form)`, "err");
-        await sleep(1500);
       }
 
       // Model — text input that appears after Make cascade
@@ -1057,7 +1056,7 @@
 
     send({ type: "SEND_JOB_EVENT", jobId, event: "photos_uploaded", details: `${files.length} photos` }).catch(() => {});
     setStatus(`Photos uploaded (${files.length}). Continuing…`);
-    await sleep(800);
+    await sleep(200);
 
     return { uploaded: files.length, failed: false };
   }
@@ -1146,7 +1145,7 @@
     setStatus("Auto-publishing — validating form before clicking Next…");
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_starting" }).catch(() => {});
 
-    await sleep(800);
+    await sleep(300);
 
     // ---- Pre-Next validation ----
     // Ensure the form is ready before we click Next. If the Next button is
@@ -1185,7 +1184,7 @@
     setStatus("Auto-publishing — waiting for Publish button…");
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "next_clicked" }).catch(() => {});
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_next" }).catch(() => {});
-    await sleep(2000);
+    await sleep(500);
 
     const publishClicked = await clickButtonByText(
       ["publish listing", "publish", "post listing", "post"],
@@ -1207,7 +1206,7 @@
     setStatus("Auto-publishing — waiting for Marketplace to confirm…");
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "publish_clicked" }).catch(() => {});
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_publish" }).catch(() => {});
-    await sleep(2500);
+    await sleep(700);
 
     const listingUrl = await waitForPublishSuccess(20000);
     stateLog("Auto-publish: complete — " + (listingUrl || "no URL detected"));
@@ -1321,7 +1320,11 @@
     }
 
     if (!hasPhoto) {
-      return { ok: false, reason: "Photo upload failed: Facebook still shows 0 photos after waiting 15 s — upload may not have been accepted" };
+      // Do not hard-fail on photo detection — our selectors may miss Facebook's
+      // rendering. Log a warning and let Facebook's own Next-button validation
+      // catch a genuinely missing photo. False negatives abort valid publishes.
+      stateLog("⚠️ Photo thumbnails not detected by extension selectors — proceeding; Facebook will block Next if truly missing");
+      warnings.push("Photo detection: thumbnails not detected after 15 s scan — form proceeding anyway");
     }
 
     // 2. Check Next button exists and is not disabled
@@ -1823,5 +1826,5 @@
     );
   }
 
-  log("Panel loaded v1.3.0", { isMessenger, isMarketplaceCreate });
+  log("Panel loaded v1.3.1", { isMessenger, isMarketplaceCreate });
 })();

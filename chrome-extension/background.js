@@ -331,15 +331,14 @@ const handlers = {
   },
 
   async POLL_ASSIGNED_JOB() {
-    // Self-heal: if activeJob is set, verify it is still in-progress on the backend.
-    // A stuck/finished job in storage would otherwise block all future polling forever.
+    // Self-heal: verify activeJob is still in-progress on the backend.
+    // A stuck/terminal job in storage blocks all future polling.
     const { activeJob } = await chrome.storage.local.get("activeJob");
     if (activeJob) {
       try {
         const progress = await apiGet(`/api/publishing/jobs/${activeJob.id}/progress`);
         const terminal = ["Published", "Failed", "Cancelled"];
         if (terminal.includes(progress.status)) {
-          // Job finished — clear it so the next queued job can be picked up
           await chrome.storage.local.remove("activeJob");
           // fall through to normal poll
         } else {
@@ -354,29 +353,7 @@ const handlers = {
     const now = new Date().toISOString();
     await chrome.storage.local.set({ lastPollTime: now });
 
-    // ── Sequential queue: 2-minute inter-job cooldown ────────────────────────
-    // After a job finishes (Published or Failed), wait 2 minutes before picking
-    // up the next one.  This prevents opening multiple Marketplace tabs in
-    // parallel and gives Facebook time to settle.
-    const INTER_JOB_DELAY_MS = 2 * 60_000;
-    const { lastJobFinishedAt } = await chrome.storage.local.get("lastJobFinishedAt");
-    if (lastJobFinishedAt) {
-      const finishedMs  = new Date(lastJobFinishedAt).getTime();
-      const cooldownEnd = finishedMs + INTER_JOB_DELAY_MS;
-      const remaining   = cooldownEnd - Date.now();
-      if (remaining > 0) {
-        const remainingSec = Math.round(remaining / 1000);
-        console.log(`[DealerPilot AI] Sequential queue: cooling down ${remainingSec}s before next job`);
-        await chrome.storage.local.set({
-          queueCooldownUntil: new Date(cooldownEnd).toISOString(),
-          queueCooldownRemainingS: remainingSec,
-        });
-        return { skipped: true, reason: "cooldown", cooldownRemainingS: remainingSec };
-      }
-      // Cooldown expired — clear the indicator
-      await chrome.storage.local.remove(["queueCooldownUntil", "queueCooldownRemainingS"]);
-    }
-
+    // Check connect-status — handles the connection flow if operator requested it
     try {
       const connectStatus = await apiGet("/api/extension/connect-status");
       if (connectStatus.connectRequested) {
@@ -397,7 +374,6 @@ const handlers = {
     }
     const assignedJob = data && data.job && data.job.id ? data.job : null;
     if (assignedJob) {
-      // Pass createdAt + mode so AUTO_START_ASSIGNED can apply its safety guards
       return handlers.AUTO_START_ASSIGNED({
         jobId: assignedJob.id,
         createdAt: assignedJob.createdAt || null,
@@ -408,10 +384,8 @@ const handlers = {
     }
 
     // Check the general queue for any Queued/Retry job.
-    // SAFETY: Only report availability here — do NOT auto-start general queue jobs.
-    // General queue jobs are auto-started ONLY if they are very recent (< 5 min),
-    // because a "Publish Now" job lands here seconds after the user clicks the button.
-    // Older jobs require an explicit user action from the popup.
+    // General queue jobs auto-start only if very recent (<5 min) — a "Publish Now"
+    // job lands here seconds after the operator clicks the button.
     let nextData;
     try {
       nextData = await apiGet("/api/publishing/jobs/next");
@@ -432,10 +406,9 @@ const handlers = {
     const nextJob = nextData && nextData.job && nextData.job.id ? nextData.job : null;
     if (!nextJob) return { job: null };
 
-    // SAFETY GATE: Only auto-start a job if it was created by a direct user action
-    // (source=publish_now, bulk_schedule, or queue_from_listing) AND is very recent (< 5 min).
-    // auto_publish_batch jobs and old jobs require explicit user action from the popup.
-    const RECENT_JOB_MS = 5 * 60 * 1000; // 5 minutes
+    // SAFETY GATE: Only auto-start recent jobs from direct user actions.
+    // auto_publish_batch and stale jobs require explicit popup approval.
+    const RECENT_JOB_MS = 5 * 60 * 1000;
     const jobAge = nextJob.createdAt ? Date.now() - new Date(nextJob.createdAt).getTime() : Infinity;
     const jobSource = nextJob.source || null;
     const isAutoPublishBatch = jobSource === "auto_publish_batch";
@@ -452,7 +425,6 @@ const handlers = {
         source: jobSource,
         reason,
       });
-      // Overwrite lastNextResponse so popup shows the job exists but is blocked
       const staleLabel = isAutoPublishBatch
         ? `[needs approval] job #${nextJob.id} — ${nextJob.vehicleLabel || nextJob.status}`
         : `[stale] job #${nextJob.id} — ${nextJob.vehicleLabel || nextJob.status}`;
@@ -463,6 +435,30 @@ const handlers = {
       return { job: null, skipped: "stale", jobId: nextJob.id };
     }
 
+    // ── Sequential queue: 2-minute inter-job cooldown ────────────────────────
+    // SKIPPED for publish_now jobs — operator triggered, must start immediately.
+    // Applied only to scheduled/queued batch jobs to prevent opening multiple tabs.
+    const isPublishNow = jobSource === "publish_now";
+    if (!isPublishNow) {
+      const { lastJobFinishedAt } = await chrome.storage.local.get("lastJobFinishedAt");
+      if (lastJobFinishedAt) {
+        const INTER_JOB_DELAY_MS = 2 * 60_000;
+        const finishedMs  = new Date(lastJobFinishedAt).getTime();
+        const cooldownEnd = finishedMs + INTER_JOB_DELAY_MS;
+        const remaining   = cooldownEnd - Date.now();
+        if (remaining > 0) {
+          const remainingSec = Math.round(remaining / 1000);
+          console.log(`[DealerPilot AI] Sequential queue: cooling down ${remainingSec}s before next job`);
+          await chrome.storage.local.set({
+            queueCooldownUntil: new Date(cooldownEnd).toISOString(),
+            queueCooldownRemainingS: remainingSec,
+          });
+          return { skipped: true, reason: "cooldown", cooldownRemainingS: remainingSec };
+        }
+        await chrome.storage.local.remove(["queueCooldownUntil", "queueCooldownRemainingS"]);
+      }
+    }
+
     return handlers.AUTO_START_ASSIGNED({
       jobId: nextJob.id,
       createdAt: nextJob.createdAt || null,
@@ -470,6 +466,12 @@ const handlers = {
       source: jobSource || "publish_now",
       approvedByUser: true,
     });
+  },
+
+  // ── Instant wake: called by the dashboard immediately after Publish Now ──
+  // Bypasses the alarm interval so the job is claimed in under 2 seconds.
+  async POLL_NOW() {
+    return handlers.POLL_ASSIGNED_JOB();
   },
 
   async GET_EXTENSION_ID() {
@@ -727,6 +729,14 @@ const STATE_KEYS_TO_CLEAR = [
     console.log(`[DealerPilot AI] Version ${storedVersion ?? "none"} → ${currentVersion}: state cleared, installedAt reset`);
   }
 })();
+
+// ── Immediate poll on browser startup ────────────────────────────────────────
+// The alarm persists across service worker restarts, but the first tick after
+// browser launch may be up to 60 s away.  Polling immediately on startup
+// ensures any pending publish_now job is claimed without the full alarm delay.
+chrome.runtime.onStartup.addListener(() => {
+  handlers.POLL_ASSIGNED_JOB().catch((err) => saveLastError(err));
+});
 
 // ---- App-controlled polling alarm ----
 chrome.runtime.onInstalled.addListener(async (details) => {

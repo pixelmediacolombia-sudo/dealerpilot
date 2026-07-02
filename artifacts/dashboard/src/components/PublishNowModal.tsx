@@ -76,11 +76,36 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
   const [createError, setCreateError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
 
+  // After the job is created, try to wake the extension immediately via
+  // chrome.runtime.sendMessage (requires externally_connectable in the manifest).
+  // Falls back silently to alarm polling if the extension is not connected.
+  async function tryWakeExtension() {
+    try {
+      const status = await fetch("/api/extension/connect-status")
+        .then((r) => r.json())
+        .catch(() => null);
+      const extId: string | undefined = status?.extensionId;
+      if (!extId) return;
+      // chrome.runtime is available in Chrome when externally_connectable is configured
+      const cr = (window as { chrome?: { runtime?: { sendMessage?: Function; lastError?: unknown } } })
+        .chrome?.runtime;
+      if (!cr?.sendMessage) return;
+      cr.sendMessage(extId, { type: "POLL_NOW" }, () => {
+        // Suppress "Could not establish connection" — extension may be unloaded
+        void cr.lastError;
+      });
+    } catch {
+      // Non-critical — alarm polling is the fallback
+    }
+  }
+
   const { mutate: publishNow, isPending: isCreating } = usePublishNow({
     mutation: {
       onSuccess: (data) => {
         setJobId(data.jobId ?? null);
         setCreateError(null);
+        // Instant wake: tell the extension to poll now instead of waiting for the alarm
+        void tryWakeExtension();
       },
       onError: (err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to create publishing job";
