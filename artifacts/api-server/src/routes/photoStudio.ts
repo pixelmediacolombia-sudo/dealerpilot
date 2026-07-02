@@ -63,6 +63,10 @@ router.get("/photo-studio/jobs", async (req: Request, res: Response) => {
         completedAt: aiPhotoJobsTable.completedAt,
         failedReason: aiPhotoJobsTable.failedReason,
         createdAt: aiPhotoJobsTable.createdAt,
+        // Per-set image breakdown (correlated subqueries on outputSetId)
+        exteriorCount: sql<number>`coalesce((select count(*) from ai_photo_images where set_id = ${aiPhotoJobsTable.outputSetId} and is_exterior = 1), 0)`,
+        interiorCount: sql<number>`coalesce((select count(*) from ai_photo_images where set_id = ${aiPhotoJobsTable.outputSetId} and is_exterior = 0 and classification != 'Miscellaneous'), 0)`,
+        fallbackCount: sql<number>`coalesce((select count(*) from ai_photo_images where set_id = ${aiPhotoJobsTable.outputSetId} and used_fallback = 1), 0)`,
         // Vehicle fields
         vehicleYear: vehiclesTable.year,
         vehicleMake: vehiclesTable.make,
@@ -512,6 +516,68 @@ router.get("/photo-studio/vehicles/:vehicleId/sets", async (req: Request, res: R
   } catch (err) {
     req.log.error({ err }, "GET /photo-studio/vehicles/:vehicleId/sets failed");
     res.status(500).json({ error: "Failed to list photo sets" });
+  }
+});
+
+// ── Combined set + images for a vehicle (active/latest set) ──────────────────
+// GET /photo-studio/sets/:vehicleId  — returns the latest set plus all images
+// with summary stats and a marketplace-active flag.
+router.get("/photo-studio/sets/:vehicleId", async (req: Request, res: Response) => {
+  try {
+    const vehicleId = Number(req.params.vehicleId);
+
+    const [vehicle] = await db
+      .select()
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.id, vehicleId))
+      .limit(1);
+
+    if (!vehicle) {
+      res.status(404).json({ error: "Vehicle not found" });
+      return;
+    }
+
+    // Get the latest set for this vehicle
+    const [set] = await db
+      .select()
+      .from(aiPhotoSetsTable)
+      .where(and(eq(aiPhotoSetsTable.vehicleId, vehicleId), eq(aiPhotoSetsTable.isLatest, true)))
+      .orderBy(desc(aiPhotoSetsTable.version))
+      .limit(1);
+
+    if (!set) {
+      res.json({
+        set: null,
+        images: [],
+        summary: null,
+        vehicle: { id: vehicle.id, year: vehicle.year, make: vehicle.make, model: vehicle.model, trim: vehicle.trim, vin: vehicle.vin, aiPhotoStatus: vehicle.aiPhotoStatus },
+        isActiveForMarketplace: false,
+      });
+      return;
+    }
+
+    const images = await db
+      .select()
+      .from(aiPhotoImagesTable)
+      .where(eq(aiPhotoImagesTable.setId, set.id))
+      .orderBy(asc(aiPhotoImagesTable.position));
+
+    const exteriorCount = images.filter((i) => i.isExterior === 1).length;
+    const interiorCount = images.filter((i) => i.isExterior === 0 && i.classification !== "Miscellaneous").length;
+    const miscCount = images.filter((i) => i.classification === "Miscellaneous").length;
+    const fallbackCount = images.filter((i) => i.usedFallback === 1).length;
+    const compositedCount = images.filter((i) => i.compositedUrl && i.compositedUrl !== i.originalUrl).length;
+
+    res.json({
+      set,
+      images,
+      summary: { total: images.length, exteriorCount, interiorCount, miscCount, fallbackCount, compositedCount },
+      vehicle: { id: vehicle.id, year: vehicle.year, make: vehicle.make, model: vehicle.model, trim: vehicle.trim, vin: vehicle.vin, aiPhotoStatus: vehicle.aiPhotoStatus },
+      isActiveForMarketplace: vehicle.aiPhotoSetId === set.id,
+    });
+  } catch (err) {
+    req.log.error({ err }, "GET /photo-studio/sets/:vehicleId failed");
+    res.status(500).json({ error: "Failed to get vehicle photo set" });
   }
 });
 

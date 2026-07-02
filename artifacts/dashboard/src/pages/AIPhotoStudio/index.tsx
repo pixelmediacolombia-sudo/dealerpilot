@@ -17,6 +17,8 @@ import {
   ShieldAlert,
   CircleSlash,
   RotateCcw,
+  Eye,
+  Layers,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { PhotoSetViewer } from "./PhotoSetViewer";
 
 const API_BASE = "/api";
 
@@ -37,6 +40,9 @@ interface PhotoJob {
   totalPhotos: number;
   processedPhotos: number;
   failedPhotos: number;
+  exteriorCount: number;
+  interiorCount: number;
+  fallbackCount: number;
   currentStage: string | null;
   progressPercent: number;
   outputSetId: number | null;
@@ -51,6 +57,12 @@ interface PhotoJob {
   vehicleTrim: string | null;
   vehicleStatus: string;
   vehicleAiStatus: string | null;
+}
+
+interface ViewSetJob {
+  vehicleId: number;
+  jobId: number;
+  processingTimeMs: number | null;
 }
 
 interface SetupInfo {
@@ -181,7 +193,15 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function JobCard({ job, onReprocess }: { job: PhotoJob; onReprocess: (vehicleId: number) => void }) {
+function JobCard({
+  job,
+  onReprocess,
+  onViewSet,
+}: {
+  job: PhotoJob;
+  onReprocess: (vehicleId: number) => void;
+  onViewSet: (job: ViewSetJob) => void;
+}) {
   const title = `${job.vehicleYear ?? ""} ${job.vehicleMake} ${job.vehicleModel}${job.vehicleTrim ? ` ${job.vehicleTrim}` : ""}`.trim();
   const isLive = job.status === "Processing";
   const durationMs =
@@ -189,15 +209,17 @@ function JobCard({ job, onReprocess }: { job: PhotoJob; onReprocess: (vehicleId:
       ? new Date(job.completedAt).getTime() - new Date(job.startedAt).getTime()
       : null;
 
+  const hasSet = job.status === "Completed" && job.outputSetId !== null;
+
   return (
     <div className="bg-card border border-white/[0.06] rounded-xl p-4 space-y-3 hover:border-white/10 transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <StatusBadge status={job.status} />
-            {job.failedPhotos > 0 && (
-              <span className="text-[11px] text-yellow-400/80">
-                {job.failedPhotos} fallback{job.failedPhotos !== 1 ? "s" : ""}
+            {job.fallbackCount > 0 && (
+              <span className="text-[11px] text-amber-400/80">
+                {job.fallbackCount} fallback{job.fallbackCount !== 1 ? "s" : ""}
               </span>
             )}
           </div>
@@ -230,16 +252,46 @@ function JobCard({ job, onReprocess }: { job: PhotoJob; onReprocess: (vehicleId:
       )}
 
       {job.status === "Completed" && (
-        <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <ImageIcon className="w-3 h-3" />
-            {job.processedPhotos} photos processed
-          </span>
-          {job.modelVersion && (
-            <span className="flex items-center gap-1">
-              <Cpu className="w-3 h-3" />
-              {job.modelVersion}
-            </span>
+        <div className="space-y-3">
+          {/* Breakdown stats */}
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+            {job.exteriorCount > 0 && (
+              <span className="flex items-center gap-1">
+                <Layers className="w-3 h-3 text-primary/70" />
+                <span className="text-primary/90">{job.exteriorCount}</span> ext
+              </span>
+            )}
+            {job.interiorCount > 0 && (
+              <span className="flex items-center gap-1">
+                <ImageIcon className="w-3 h-3" />
+                {job.interiorCount} int
+              </span>
+            )}
+            {job.modelVersion && (
+              <span className="flex items-center gap-1">
+                <Cpu className="w-3 h-3" />
+                {job.modelVersion}
+              </span>
+            )}
+          </div>
+
+          {/* View set button */}
+          {hasSet && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs w-full"
+              onClick={() =>
+                onViewSet({
+                  vehicleId: job.vehicleId,
+                  jobId: job.id,
+                  processingTimeMs: durationMs,
+                })
+              }
+            >
+              <Eye className="w-3 h-3 mr-1.5" />
+              Review AI Photos
+            </Button>
           )}
         </div>
       )}
@@ -541,6 +593,7 @@ function SetupComplete({
 
 export function AIPhotoStudio() {
   const [activeTab, setActiveTab] = useState("all");
+  const [viewSetJob, setViewSetJob] = useState<ViewSetJob | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -878,6 +931,7 @@ export function AIPhotoStudio() {
                         key={job.id}
                         job={job}
                         onReprocess={(vid) => reprocessMutation.mutate(vid)}
+                        onViewSet={setViewSetJob}
                       />
                     ))}
                   </div>
@@ -887,6 +941,16 @@ export function AIPhotoStudio() {
           </Tabs>
         </div>
       </div>
+
+      {/* Photo set viewer — full-screen overlay */}
+      {viewSetJob && (
+        <PhotoSetViewer
+          vehicleId={viewSetJob.vehicleId}
+          jobId={viewSetJob.jobId}
+          processingTimeMs={viewSetJob.processingTimeMs}
+          onClose={() => setViewSetJob(null)}
+        />
+      )}
     </AppLayout>
   );
 }
