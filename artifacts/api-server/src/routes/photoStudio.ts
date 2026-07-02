@@ -12,7 +12,7 @@ import {
   vehiclesTable,
   vehicleImagesTable,
 } from "@workspace/db";
-import { and, asc, count, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { computePhotoHash, hasChanged } from "../photo/changeDetection";
 
 // ── Multer: background image upload ─────────────────────────────────────────
@@ -226,10 +226,51 @@ router.post("/photo-studio/enqueue-all", async (req: Request, res: Response) => 
     let enqueued = 0;
     let skipped = 0;
 
+    // For Ready vehicles, check if their latest set's studioVersion is stale.
+    // We load all latest sets in one query to avoid N+1 inside the loop.
+    const currentVersion = defaultPack?.backgroundVersion ?? "v1";
+
+    const readyVehicleIds = vehicles
+      .filter((v) => v.aiPhotoStatus === "Ready")
+      .map((v) => v.id);
+
+    const latestSets =
+      readyVehicleIds.length > 0
+        ? await db
+            .select({
+              vehicleId: aiPhotoSetsTable.vehicleId,
+              setId: aiPhotoSetsTable.id,
+              studioVersion: aiPhotoSetsTable.studioVersion,
+            })
+            .from(aiPhotoSetsTable)
+            .where(
+              and(
+                inArray(aiPhotoSetsTable.vehicleId, readyVehicleIds),
+                eq(aiPhotoSetsTable.isLatest, true),
+              ),
+            )
+        : [];
+
+    const latestSetByVehicle = new Map(latestSets.map((s) => [s.vehicleId, s]));
+
     for (const v of vehicles) {
-      if (v.aiPhotoStatus === "Ready" || v.aiPhotoStatus === "Pending" || v.aiPhotoStatus === "Processing") {
+      // Always skip in-flight vehicles
+      if (v.aiPhotoStatus === "Pending" || v.aiPhotoStatus === "Processing") {
         skipped++;
         continue;
+      }
+
+      // For Ready vehicles: skip if up-to-date, enqueue with sourceSetId if stale
+      let sourceSetId: number | null = null;
+      if (v.aiPhotoStatus === "Ready") {
+        const latest = latestSetByVehicle.get(v.id);
+        const setVersion = latest?.studioVersion ?? null;
+        if (setVersion === currentVersion) {
+          skipped++;
+          continue;
+        }
+        // Stale background — re-composite only; Stages 1+2 will re-use prior results
+        sourceSetId = latest?.setId ?? null;
       }
 
       const images = await db
@@ -242,7 +283,7 @@ router.post("/photo-studio/enqueue-all", async (req: Request, res: Response) => 
 
       const imageHash = computePhotoHash({
         photoUrls: images.map((i) => i.url),
-        backgroundVersion: defaultPack?.backgroundVersion ?? "v1",
+        backgroundVersion: currentVersion,
         modelVersion: "bria-rmbg-2.0",
         presetVersion: "v1",
       });
@@ -253,10 +294,11 @@ router.post("/photo-studio/enqueue-all", async (req: Request, res: Response) => 
         status: "Queued",
         imageHash,
         studioPackId: defaultPack?.id ?? null,
-        studioVersion: defaultPack?.backgroundVersion ?? "v1",
+        studioVersion: currentVersion,
         modelVersion: "bria-rmbg-2.0",
         presetVersion: "v1",
         priority: 0,
+        ...(sourceSetId !== null ? { sourceSetId } : {}),
       });
 
       await db
@@ -267,11 +309,171 @@ router.post("/photo-studio/enqueue-all", async (req: Request, res: Response) => 
       enqueued++;
     }
 
-    req.log.info({ enqueued, skipped, dealerId }, "photo:bulk enqueue");
-    res.json({ enqueued, skipped });
+    req.log.info({ enqueued, skipped, dealerId, currentVersion }, "photo:bulk enqueue");
+    res.json({ enqueued, skipped, staleRequeued: enqueued });
   } catch (err) {
     req.log.error({ err }, "POST /photo-studio/enqueue-all failed");
     res.status(500).json({ error: "Failed to bulk enqueue" });
+  }
+});
+
+// ── Stale vehicle count (background version changed) ─────────────────────────
+// GET /api/photo-studio/stale-count
+// Returns how many Ready vehicles have AI photos built with an older backgroundVersion
+// than the current studio pack.  Used by the dashboard to show the reprocess banner.
+router.get("/photo-studio/stale-count", async (req: Request, res: Response) => {
+  try {
+    const { dealerId = 1 } = req.query as { dealerId?: number };
+
+    const [defaultPack] = await db
+      .select({ backgroundVersion: aiStudioPacksTable.backgroundVersion })
+      .from(aiStudioPacksTable)
+      .where(and(eq(aiStudioPacksTable.dealerId, dealerId), eq(aiStudioPacksTable.isDefault, true)))
+      .limit(1);
+
+    const currentVersion = defaultPack?.backgroundVersion ?? "v1";
+
+    // Find Ready vehicles whose latest set was built with a different (or null) studioVersion
+    const stale = await db
+      .select({ vehicleId: vehiclesTable.id })
+      .from(vehiclesTable)
+      .innerJoin(
+        aiPhotoSetsTable,
+        and(
+          eq(aiPhotoSetsTable.vehicleId, vehiclesTable.id),
+          eq(aiPhotoSetsTable.isLatest, true),
+        ),
+      )
+      .where(
+        and(
+          eq(vehiclesTable.dealerId, dealerId),
+          eq(vehiclesTable.aiPhotoStatus, "Ready"),
+          or(
+            isNull(aiPhotoSetsTable.studioVersion),
+            ne(aiPhotoSetsTable.studioVersion, currentVersion),
+          ),
+        ),
+      );
+
+    res.json({ staleCount: stale.length, currentVersion });
+  } catch (err) {
+    req.log.error({ err }, "GET /photo-studio/stale-count failed");
+    res.status(500).json({ error: "Failed to get stale count" });
+  }
+});
+
+// ── Reprocess stale vehicles (background changed) ────────────────────────────
+// POST /api/photo-studio/reprocess-stale
+// Finds all Ready vehicles whose AI photos were built with an older backgroundVersion
+// and re-queues them using sourceSetId so Stages 1+2 (classify + bg-removal) are
+// skipped — only compositing and later stages run, at zero extra OpenAI/Fal.ai cost.
+router.post("/photo-studio/reprocess-stale", async (req: Request, res: Response) => {
+  try {
+    const { dealerId = 1 } = req.body as { dealerId?: number };
+
+    const [defaultPack] = await db
+      .select()
+      .from(aiStudioPacksTable)
+      .where(and(eq(aiStudioPacksTable.dealerId, dealerId), eq(aiStudioPacksTable.isDefault, true)))
+      .limit(1);
+
+    if (!defaultPack?.backgroundUrl) {
+      res.status(400).json({ error: "No studio background configured — upload the background first" });
+      return;
+    }
+
+    const currentVersion = defaultPack.backgroundVersion ?? "v1";
+
+    // Load all Ready vehicles with stale studioVersion in their latest set
+    const staleRows = await db
+      .select({
+        vehicleId: vehiclesTable.id,
+        setId: aiPhotoSetsTable.id,
+        setStudioVersion: aiPhotoSetsTable.studioVersion,
+      })
+      .from(vehiclesTable)
+      .innerJoin(
+        aiPhotoSetsTable,
+        and(
+          eq(aiPhotoSetsTable.vehicleId, vehiclesTable.id),
+          eq(aiPhotoSetsTable.isLatest, true),
+        ),
+      )
+      .where(
+        and(
+          eq(vehiclesTable.dealerId, dealerId),
+          eq(vehiclesTable.aiPhotoStatus, "Ready"),
+          or(
+            isNull(aiPhotoSetsTable.studioVersion),
+            ne(aiPhotoSetsTable.studioVersion, currentVersion),
+          ),
+        ),
+      );
+
+    if (staleRows.length === 0) {
+      res.json({ enqueued: 0, message: "All vehicles are up-to-date with the current background" });
+      return;
+    }
+
+    let enqueued = 0;
+
+    for (const row of staleRows) {
+      // Load vehicle photos for the image hash
+      const images = await db
+        .select({ url: vehicleImagesTable.url })
+        .from(vehicleImagesTable)
+        .where(eq(vehicleImagesTable.vehicleId, row.vehicleId))
+        .orderBy(asc(vehicleImagesTable.position));
+
+      if (images.length === 0) continue;
+
+      // Cancel any existing Queued jobs so we don't double-enqueue
+      await db
+        .update(aiPhotoJobsTable)
+        .set({ status: "Cancelled" })
+        .where(
+          and(
+            eq(aiPhotoJobsTable.vehicleId, row.vehicleId),
+            eq(aiPhotoJobsTable.status, "Queued"),
+          ),
+        );
+
+      const imageHash = computePhotoHash({
+        photoUrls: images.map((i) => i.url),
+        backgroundVersion: currentVersion,
+        modelVersion: "bria-rmbg-2.0",
+        presetVersion: "v1",
+      });
+
+      await db.insert(aiPhotoJobsTable).values({
+        vehicleId: row.vehicleId,
+        dealerId,
+        status: "Queued",
+        imageHash,
+        studioPackId: defaultPack.id,
+        studioVersion: currentVersion,
+        modelVersion: "bria-rmbg-2.0",
+        presetVersion: "v1",
+        priority: 0,
+        sourceSetId: row.setId,
+      });
+
+      await db
+        .update(vehiclesTable)
+        .set({ aiPhotoStatus: "Pending" })
+        .where(eq(vehiclesTable.id, row.vehicleId));
+
+      enqueued++;
+    }
+
+    req.log.info(
+      { enqueued, dealerId, currentVersion },
+      "photo:reprocess-stale queued",
+    );
+    res.json({ enqueued, currentVersion });
+  } catch (err) {
+    req.log.error({ err }, "POST /photo-studio/reprocess-stale failed");
+    res.status(500).json({ error: "Failed to reprocess stale vehicles" });
   }
 });
 
@@ -591,11 +793,40 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
         ? "env"
         : null;
     const falKey = !!process.env["FAL_KEY"];
+    const currentVersion = defaultPack?.backgroundVersion ?? "v1";
+
+    // Count Ready vehicles with stale studioVersion (background changed since last process)
+    const staleVehicles =
+      backgroundConfigured && (vehicleCounts?.ready ?? 0) > 0
+        ? await db
+            .select({ vehicleId: vehiclesTable.id })
+            .from(vehiclesTable)
+            .innerJoin(
+              aiPhotoSetsTable,
+              and(
+                eq(aiPhotoSetsTable.vehicleId, vehiclesTable.id),
+                eq(aiPhotoSetsTable.isLatest, true),
+              ),
+            )
+            .where(
+              and(
+                eq(vehiclesTable.dealerId, 1),
+                eq(vehiclesTable.aiPhotoStatus, "Ready"),
+                or(
+                  isNull(aiPhotoSetsTable.studioVersion),
+                  ne(aiPhotoSetsTable.studioVersion, currentVersion),
+                ),
+              ),
+            )
+        : [];
+
+    const staleCount = staleVehicles.length;
 
     res.json({
       jobs: statusCounts ?? { queued: 0, processing: 0, completed: 0, failed: 0, cancelled: 0 },
       vehicles: vehicleCounts ?? { ready: 0, processing: 0, pending: 0, failed: 0, total: 0 },
       images: imageStats ?? { total: 0, withAI: 0 },
+      staleCount,
       defaultPack: defaultPack ?? null,
       setup: {
         backgroundConfigured,

@@ -20,6 +20,7 @@ export const aiPhotoSetsTable = pgTable("ai_photo_sets", {
   status: text("status").notNull().default("Processing"),
   imageHash: text("image_hash"),
   studioPackId: integer("studio_pack_id"),
+  studioVersion: text("studio_version"),
   modelVersion: text("model_version"),
   presetVersion: text("preset_version"),
   totalPhotos: integer("total_photos").notNull().default(0),

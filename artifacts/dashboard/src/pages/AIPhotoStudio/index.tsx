@@ -16,6 +16,7 @@ import {
   ImageOff,
   ShieldAlert,
   CircleSlash,
+  RotateCcw,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -77,6 +78,7 @@ interface StudioStats {
     total: number;
   };
   images: { total: number; withAI: number };
+  staleCount: number;
   defaultPack: {
     backgroundUrl: string | null;
     backgroundVersion: string;
@@ -107,6 +109,19 @@ async function fetchJobs(status?: string): Promise<{ jobs: PhotoJob[] }> {
   const r = await fetch(url);
   if (!r.ok) throw new Error("Failed to fetch jobs");
   return r.json() as Promise<{ jobs: PhotoJob[] }>;
+}
+
+async function reprocessStale(): Promise<{ enqueued: number; currentVersion: string }> {
+  const r = await fetch(`${API_BASE}/photo-studio/reprocess-stale`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dealerId: 1 }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? "Reprocess failed");
+  }
+  return r.json() as Promise<{ enqueued: number; currentVersion: string }>;
 }
 
 async function enqueueAll(): Promise<{ enqueued: number; skipped: number }> {
@@ -552,6 +567,23 @@ export function AIPhotoStudio() {
     },
   });
 
+  const reprocessStaleMutation = useMutation({
+    mutationFn: reprocessStale,
+    onSuccess: (data) => {
+      toast({
+        title: "Reprocess queued",
+        description: data.enqueued > 0
+          ? `${data.enqueued} vehicle${data.enqueued !== 1 ? "s" : ""} queued for background update (Stages 1–2 skipped — no extra API cost)`
+          : "All vehicles are already up-to-date",
+      });
+      void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
+      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const reprocessMutation = useMutation({
     mutationFn: (vehicleId: number) =>
       fetch(`${API_BASE}/photo-studio/vehicles/${vehicleId}/process`, { method: "POST" }).then(
@@ -568,6 +600,7 @@ export function AIPhotoStudio() {
   const setup = stats?.setup;
   const isBgConfigured = setup?.backgroundConfigured ?? false;
   const isBgRemovalReady = stats?.providers.backgroundRemoval?.startsWith("fal.ai") ?? false;
+  const staleCount = stats?.staleCount ?? 0;
 
   return (
     <AppLayout>
@@ -642,6 +675,38 @@ export function AIPhotoStudio() {
                 removal.
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Stale background banner — shown when Ready vehicles have old composite versions */}
+        {isBgConfigured && staleCount > 0 && (
+          <div className="flex items-center gap-4 p-4 rounded-xl border border-amber-500/25 bg-amber-500/[0.06]">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
+              <RotateCcw className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-amber-300">
+                {staleCount} vehicle{staleCount !== 1 ? "s" : ""} need background update
+              </div>
+              <div className="text-xs text-amber-400/70 mt-0.5">
+                Studio background changed. Exterior photos will be re-composited with the new background.
+                Classification and background removal are skipped — no extra API cost.
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10 hover:text-amber-200 shrink-0"
+              onClick={() => reprocessStaleMutation.mutate()}
+              disabled={reprocessStaleMutation.isPending}
+            >
+              {reprocessStaleMutation.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+              )}
+              Reprocess {staleCount} Vehicle{staleCount !== 1 ? "s" : ""}
+            </Button>
           </div>
         )}
 

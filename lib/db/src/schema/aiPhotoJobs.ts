@@ -32,6 +32,7 @@ export const aiPhotoJobsTable = pgTable("ai_photo_jobs", {
   currentStage: text("current_stage"),
   progressPercent: integer("progress_percent").notNull().default(0),
   outputSetId: integer("output_set_id"),
+  sourceSetId: integer("source_set_id"),
   startedAt: timestamp("started_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   failedReason: text("failed_reason"),

@@ -8,3 +8,4 @@
 - [OpenAI Chat Completions token param](openai-token-param.md) — gpt-5-mini requires max_completion_tokens (not max_tokens); empty content means 200 tokens too low — use 1024+; also use || not ?? to catch empty-string replies.
 - [Sprint 10 Inventory Engine](sprint10-inventory-engine.md) — Meta catalog adapter, 24h scheduler, feed health endpoint; shared component prop names to remember.
 - [Meta AIA feed spec](meta-aia-feed-spec.md) — AIA XML uses <listings>/<listing> (not RSS); condition=EXCELLENT/GOOD/FAIR/POOR; state_of_vehicle=NEW/USED/CPO; availability=AVAILABLE; address is nested <component> in XML, JSON object in CSV; images are separate image[N].url columns.
+- [AI Photo Studio staleness pattern](photo-studio-staleness.md) — studioVersion on ai_photo_sets drives stale detection; sourceSetId on ai_photo_jobs triggers cheap reprocess (skip Stages 1+2); lib declarations must be rebuilt with typecheck:libs before leaf packages see new columns.
