@@ -281,60 +281,38 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
   const trimStr = vehicle.trim ? ` ${vehicle.trim}` : "";
   const autoTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
 
-  // Generate AI-style sales copy with emojis and a CTA.
-  // Used when no stored listing-version prose is available.
-  // Format mirrors what a human agent would write for Facebook Marketplace:
-  //
-  //   🔥 2016 Ford Explorer — Alpha Motorsport
-  //   ✅ SUV espaciosa y cómoda — ideal para familia
-  //   ✅ 45,000 millas
-  //   ✅ Buen precio — no pierdas esta oportunidad
-  //   ✅ Financiamiento disponible
-  //   📩 Escríbenos "EXPLORER" hoy y te damos más detalles.
+  // Generate Alpha Motorsport Marketplace sales copy.
+  // Spanish-first bilingual format: financing options, buyer qualifications,
+  // serious-buyer filter, and direct CTA. No guaranteed-approval language.
   function buildAISalesCopy(): string {
-    const name = autoTitle;
+    const name         = autoTitle;
     const modelKeyword = vehicle.model.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    const bodyStyle  = (vehicle.bodyStyle ?? "").toLowerCase();
-    const modelLower = vehicle.model.toLowerCase();
 
-    // Body-type bullet — pick the closest match
-    let bodyBullet: string;
-    if (
-      /suv|crossover|sport utility/i.test(bodyStyle) ||
-      /explorer|expedition|escalade|tahoe|navigator|pilot|highlander|4runner|pathfinder|murano|rogue|tucson|santa\s?fe|equinox|traverse|suburban|yukon/i.test(modelLower)
-    ) {
-      bodyBullet = "✅ SUV espaciosa y cómoda — ideal para familia";
-    } else if (
-      /truck|pickup/i.test(bodyStyle) ||
-      /f-?150|f-?250|f-?350|silverado|ram\b|sierra|tundra|tacoma|titan|ranger|colorado|canyon/i.test(modelLower)
-    ) {
-      bodyBullet = "✅ Camioneta lista para trabajar";
-    } else if (/van|minivan/i.test(bodyStyle) || /odyssey|sienna|caravan|town.?country|quest/i.test(modelLower)) {
-      bodyBullet = "✅ Van amplia — perfecta para la familia";
-    } else if (/coupe|convertible|sport/i.test(bodyStyle)) {
-      bodyBullet = "✅ Diseño deportivo y elegante";
-    } else if (/sedan/i.test(bodyStyle)) {
-      bodyBullet = "✅ Sedán cómodo y eficiente en gasolina";
-    } else {
-      bodyBullet = "✅ Auto en excelentes condiciones";
-    }
-
-    const bullets: string[] = [bodyBullet];
-    if (vehicle.mileage != null) {
-      bullets.push(`✅ ${vehicle.mileage.toLocaleString()} millas`);
-    }
-    bullets.push("✅ Buen precio — no pierdas esta oportunidad");
-    bullets.push("✅ Financiamiento disponible");
-
-    const dealerSuffix = dealer?.name ? ` — ${dealer.name}` : "";
-
-    return [
-      `🔥 ${name}${dealerSuffix}`,
+    // Spanish block (primary — Latino buyer audience)
+    const es = [
+      `🔥 ${name} lista para manejar`,
       "",
-      ...bullets,
+      "💰 Opciones de financiamiento desde $1,000, $2,000 o $3,000 de inicial",
+      "✅ Solo necesitas identificación válida y cuenta de banco activa",
+      "✅ Precios bajos para compradores serios",
+      "⏳ Solo personas interesadas en comprar este mes",
       "",
       `📩 Escríbenos "${modelKeyword}" hoy y te damos más detalles.`,
     ].join("\n");
+
+    // English block (secondary)
+    const en = [
+      `🔥 ${name} ready to drive`,
+      "",
+      "💰 Financing options from $1,000, $2,000 or $3,000 down",
+      "✅ Valid ID and active bank account required",
+      "✅ Low prices for serious buyers",
+      "⏳ Only for buyers looking to purchase this month",
+      "",
+      `📩 Message us "${modelKeyword}" today for details.`,
+    ].join("\n");
+
+    return `${es}\n\n---\n\n${en}`;
   }
 
   if (version) {
