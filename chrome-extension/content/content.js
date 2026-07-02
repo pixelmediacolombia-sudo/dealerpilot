@@ -22,7 +22,7 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.4";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.5";
 
   // ── Performance / fast-mode settings ────────────────────────────────────────
   // MARKETPLACE_FAST_MODE=true fills only the 9 required fields:
@@ -417,7 +417,7 @@
     <div id="mai-header">
       <span id="mai-dot"></span>
       <span id="mai-title">DealerPilot AI</span>
-      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.4</span>
+      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.5</span>
       <button id="mai-toggle" title="Collapse">_</button>
     </div>
     <div id="mai-body">
@@ -944,8 +944,8 @@
   // =====================================================================
 
   async function uploadPhotos(imageUrls, jobId, warnings) {
-    // Default: first 6 photos. Keeps processing fast for typical listings.
-    const DEFAULT_MAX = 6;
+    // Upload up to 20 photos — Facebook's per-listing maximum.
+    const DEFAULT_MAX = 20;
     const toUpload = imageUrls.slice(0, DEFAULT_MAX);
     const totalPhotos = toUpload.length;
 
@@ -977,10 +977,10 @@
     // ── Parallel download (3 concurrent) with in-memory cache ────────────
     send({ type: "SEND_JOB_EVENT", jobId, event: "photo_download_started",
            details: `Downloading ${totalPhotos} photos` }).catch(() => {});
-    stateLog(`Photo download: fetching ${totalPhotos} photo(s) in parallel batches of 3`);
+    stateLog(`Photo download: fetching ${totalPhotos} photo(s) in parallel batches of 5`);
     setStatus(`Downloading photos 0 / ${totalPhotos}…`);
 
-    const BATCH = 3;
+    const BATCH = 5;
     const rawFiles = new Array(totalPhotos).fill(null);
     let downloaded = 0;
 
@@ -1864,5 +1864,5 @@
     );
   }
 
-  log("Panel loaded v1.3.4", { isMessenger, isMarketplaceCreate });
+  log("Panel loaded v1.3.5", { isMessenger, isMarketplaceCreate });
 })();

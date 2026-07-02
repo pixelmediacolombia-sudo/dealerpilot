@@ -249,6 +249,7 @@ export function ListingsWorkspace() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jobStatusFilter, setJobStatusFilter] = useState<string>("all");
+  const [queueTab, setQueueTab] = useState<"active" | "needs-review" | "completed" | "failed-history">("active");
   const [batchRefreshKey, setBatchRefreshKey] = useState(0);
   const [markPublishedVehicle, setMarkPublishedVehicle] = useState<{ id: number; label: string } | null>(null);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<Set<number>>(new Set());
@@ -310,7 +311,7 @@ export function ListingsWorkspace() {
   });
 
   const { data: jobsData, isLoading: jobsLoading } = useListPublishingJobs(
-    { status: jobStatusFilter === "all" ? undefined : jobStatusFilter },
+    {},
     { query: { refetchInterval: 5000 } as never },
   );
 
@@ -429,6 +430,20 @@ export function ListingsWorkspace() {
   const allCount = workspaces.length;
 
   const jobs = jobsData?.jobs ?? [];
+  const ACTIVE_STATUSES = new Set([
+    "Queued", "Retry", "Assigned", "Claimed", "Publishing",
+    "Opening Facebook", "Downloading Photos", "Uploading Photos",
+    "Waiting For Thumbnails", "Filling Form", "Ready for Review", "Ready For Review",
+  ]);
+  const displayedJobs = jobs.filter((job) => {
+    if (queueTab === "active")         return ACTIVE_STATUSES.has(job.status);
+    if (queueTab === "needs-review")   return job.status === "Needs Review";
+    if (queueTab === "completed")      return job.status === "Published";
+    if (queueTab === "failed-history") return job.status === "Failed" || job.status === "Cancelled";
+    return true;
+  });
+  const activeJobCount        = jobs.filter((j) => ACTIVE_STATUSES.has(j.status)).length;
+  const queueNeedsReviewCount = jobs.filter((j) => j.status === "Needs Review").length;
   const queuedJobs = jobs.filter((j) => j.status === "Queued" || j.status === "Scheduled").length;
 
   const filteredWorkspaces = workspaces.filter((w) => {
@@ -1331,27 +1346,36 @@ export function ListingsWorkspace() {
 
           {activeTab === "queue" && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-              <div className="glass-panel p-4 rounded-xl flex items-center gap-3 border border-border/50">
-                <div className="font-medium px-2 shrink-0">Job Queue</div>
-                <Select value={jobStatusFilter} onValueChange={setJobStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-[200px] bg-background/50 border-border/50">
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="Queued">Queued</SelectItem>
-                    <SelectItem value="Scheduled">Scheduled</SelectItem>
-                    <SelectItem value="Assigned">Assigned</SelectItem>
-                    <SelectItem value="Publishing">Publishing</SelectItem>
-                    <SelectItem value="Opening Facebook">Opening Facebook</SelectItem>
-                    <SelectItem value="Filling Form">Filling Form</SelectItem>
-                    <SelectItem value="Ready for Review">Ready for Review</SelectItem>
-                    <SelectItem value="Published">Published</SelectItem>
-                    <SelectItem value="Retry">Retry</SelectItem>
-                    <SelectItem value="Failed">Failed</SelectItem>
-                    <SelectItem value="Needs Review">Needs Review</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex items-center gap-3">
+                <div className="font-medium text-sm shrink-0 text-foreground/80">Job Queue</div>
+                <div className="flex gap-0.5 rounded-lg bg-secondary/40 p-1">
+                  {(
+                    [
+                      { value: "active",         label: "Active",       count: activeJobCount   },
+                      { value: "needs-review",   label: "Needs Review", count: queueNeedsReviewCount },
+                      { value: "completed",      label: "Completed",    count: 0                },
+                      { value: "failed-history", label: "History",      count: 0                },
+                    ] as { value: "active" | "needs-review" | "completed" | "failed-history"; label: string; count: number }[]
+                  ).map(({ value, label, count }) => (
+                    <button
+                      key={value}
+                      onClick={() => setQueueTab(value)}
+                      className={cn(
+                        "px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap",
+                        queueTab === value
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {label}
+                      {count > 0 && (
+                        <span className="ml-1.5 bg-primary/20 text-primary rounded-full px-1.5 text-[10px]">
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <SectionCard className="p-0 overflow-hidden border-border/50">
@@ -1359,11 +1383,20 @@ export function ListingsWorkspace() {
                   <div className="py-20 flex justify-center">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
                   </div>
-                ) : jobs.length === 0 ? (
+                ) : displayedJobs.length === 0 ? (
                   <EmptyState
                     icon={<Share className="w-8 h-8" />}
-                    title="No publishing jobs"
-                    description="Queue a generated listing from its detail page to add it here."
+                    title={
+                      queueTab === "active"         ? "No active jobs" :
+                      queueTab === "needs-review"   ? "No jobs need review" :
+                      queueTab === "completed"      ? "No published jobs yet" :
+                                                      "No failed or cancelled jobs"
+                    }
+                    description={
+                      queueTab === "active"
+                        ? "Click Publish Now on any vehicle to start publishing."
+                        : "Jobs will appear here as they are processed."
+                    }
                   />
                 ) : (
                   <Table>
@@ -1381,7 +1414,7 @@ export function ListingsWorkspace() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {jobs.map((job) => (
+                      {displayedJobs.map((job) => (
                         <TableRow
                           key={job.id}
                           className="border-border/30 hover:bg-secondary/20 transition-colors"
@@ -1500,7 +1533,7 @@ export function ListingsWorkspace() {
                                   Cancel
                                 </Button>
                               )}
-                              {job.status === "Failed" && (
+                              {(job.status === "Failed" || job.status === "Needs Review") && (
                                 <>
                                   <Button
                                     size="sm"
