@@ -6,9 +6,11 @@ import {
   vehicleChangesTable,
   type Vehicle,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { Logger } from "pino";
 import { parseInventoryXml, type FeedImage } from "./xmlEngine";
+import { scrapeAlphaLocationMapping } from "./locationScraper";
+import { ALPHA_DEALER_ID } from "../lib/dealer";
 
 const ACTIVE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish", "Published"];
 
@@ -301,9 +303,41 @@ export async function importFeed(
     })
     .where(eq(feedRunsTable.id, feedRunId));
 
-  // NOTE: for dealer_id=1 (Alpha Motorsport), lot_location stores the dealer name
-  // ("Alpha Motorsports"), not a city — so location keys here are dealer names, not cities.
-  // Do not use these counts for city-based filtering or "Manassas vs Fredericksburg" logic.
+  // For Alpha Motorsport: the combined XML feed does NOT contain VehicleLocationID.
+  // Scrape the website's location-filtered pages to determine which lot each vehicle
+  // is physically parked at (Fredericksburg vs Manassas) and write it to lot_location.
+  if (dealerId === ALPHA_DEALER_ID) {
+    try {
+      const locationMap = await scrapeAlphaLocationMapping(log);
+      const byLocation = new Map<string, string[]>();
+      for (const [stock, loc] of locationMap) {
+        const list = byLocation.get(loc) ?? [];
+        list.push(stock);
+        byLocation.set(loc, list);
+      }
+      for (const [loc, stocks] of byLocation) {
+        if (stocks.length === 0) continue;
+        await db
+          .update(vehiclesTable)
+          .set({ lotLocation: loc })
+          .where(
+            and(
+              eq(vehiclesTable.dealerId, dealerId),
+              inArray(vehiclesTable.stockNumber, stocks),
+            ),
+          );
+        // Reflect in breakdown for logging
+        locationBreakdown[loc] = stocks.length;
+      }
+      log.info(
+        { dealerId, locationMap: Object.fromEntries([...byLocation].map(([k, v]) => [k, v.length])) },
+        "Alpha Motorsport lot_location updated from website location scrape",
+      );
+    } catch (err) {
+      log.warn({ dealerId, err }, "Location scrape failed — lot_location may be stale for this sync");
+    }
+  }
+
   const locationSummary = Object.entries(locationBreakdown)
     .map(([k, v]) => `${k}:${v}`)
     .join(", ");
