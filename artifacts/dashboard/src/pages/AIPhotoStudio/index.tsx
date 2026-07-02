@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Camera,
@@ -6,12 +6,14 @@ import {
   Clock,
   Loader2,
   RefreshCw,
-  ImageOff,
   Sparkles,
   Store,
   AlertTriangle,
   RotateCcw,
   Image as ImageIcon,
+  Search,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/shared";
@@ -47,37 +49,32 @@ interface PhotoJob {
   vehicleThumbnailUrl: string | null;
 }
 
-interface StudioStats {
-  vehicles: {
-    ready: number;
-    processing: number;
-    pending: number;
-    failed: number;
-    total: number;
-  };
-  images: { total: number; withAI: number };
-  staleCount: number;
-  processingMode?: string;
-  setup: {
-    backgroundConfigured: boolean;
-    backgroundSource: "upload" | "env" | null;
-    compositingEnabled: boolean;
-    readyForProduction: boolean;
-  };
+interface InventoryVehicle {
+  id: number;
+  year: number | null;
+  make: string;
+  model: string;
+  trim: string | null;
+  vin: string;
+  primaryImageUrl: string | null;
+  imageCount: number;
+  status: string;
+  price: number | null;
+  mileage: number | null;
 }
 
 // ── API calls ─────────────────────────────────────────────────────────────────
-
-async function fetchStats(): Promise<StudioStats> {
-  const r = await fetch(`${API_BASE}/photo-studio/stats`);
-  if (!r.ok) throw new Error("Failed to fetch stats");
-  return r.json() as Promise<StudioStats>;
-}
 
 async function fetchJobs(): Promise<{ jobs: PhotoJob[] }> {
   const r = await fetch(`${API_BASE}/photo-studio/jobs?limit=200`);
   if (!r.ok) throw new Error("Failed to fetch jobs");
   return r.json() as Promise<{ jobs: PhotoJob[] }>;
+}
+
+async function fetchInventory(): Promise<{ vehicles: InventoryVehicle[] }> {
+  const r = await fetch(`${API_BASE}/vehicles?sort=newest`);
+  if (!r.ok) throw new Error("Failed to fetch inventory");
+  return r.json() as Promise<{ vehicles: InventoryVehicle[] }>;
 }
 
 async function triggerProcess(vehicleId: number): Promise<void> {
@@ -104,7 +101,6 @@ async function enqueueAll(): Promise<{ enqueued: number; skipped: number }> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Deduplicate jobs by vehicleId — keep the most recent per vehicle */
 function dedupeByVehicle(jobs: PhotoJob[]): PhotoJob[] {
   const seen = new Map<number, PhotoJob>();
   for (const job of jobs) {
@@ -112,19 +108,16 @@ function dedupeByVehicle(jobs: PhotoJob[]): PhotoJob[] {
     if (!existing) {
       seen.set(job.vehicleId, job);
     } else {
-      // Prefer Completed > Processing > others; otherwise latest createdAt
       const rank = (s: string) =>
         s === "Completed" ? 3 : s === "Processing" ? 2 : s === "Queued" ? 1 : 0;
-      if (rank(job.status) > rank(existing.status)) {
-        seen.set(job.vehicleId, job);
-      }
+      if (rank(job.status) > rank(existing.status)) seen.set(job.vehicleId, job);
     }
   }
   return Array.from(seen.values());
 }
 
-function vehicleName(job: PhotoJob): string {
-  return `${job.vehicleYear ?? ""} ${job.vehicleMake} ${job.vehicleModel}${job.vehicleTrim ? ` ${job.vehicleTrim}` : ""}`.trim();
+function vName(year: number | null, make: string, model: string, trim: string | null) {
+  return `${year ?? ""} ${make} ${model}${trim ? ` ${trim}` : ""}`.trim();
 }
 
 function timeAgo(iso: string): string {
@@ -139,11 +132,11 @@ function timeAgo(iso: string): string {
 // ── AI Status badge ───────────────────────────────────────────────────────────
 
 const AI_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  Ready: { label: "AI Enhanced", color: "text-green-400 bg-green-400/10 border-green-400/20" },
-  Processing: { label: "Processing", color: "text-blue-400 bg-blue-400/10 border-blue-400/20" },
-  Queued: { label: "In Queue", color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
-  Failed: { label: "Needs Retry", color: "text-red-400 bg-red-400/10 border-red-400/20" },
-  Pending: { label: "Not Started", color: "text-white/30 bg-white/[0.04] border-white/[0.08]" },
+  Ready:      { label: "AI Enhanced",  color: "text-green-400 bg-green-400/10 border-green-400/20" },
+  Processing: { label: "Processing",   color: "text-blue-400 bg-blue-400/10 border-blue-400/20" },
+  Queued:     { label: "In Queue",     color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
+  Failed:     { label: "Needs Retry",  color: "text-red-400 bg-red-400/10 border-red-400/20" },
+  Pending:    { label: "Not Started",  color: "text-white/30 bg-white/[0.04] border-white/[0.08]" },
 };
 
 function AiStatusBadge({ status }: { status: string }) {
@@ -155,7 +148,7 @@ function AiStatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── Vehicle Card ──────────────────────────────────────────────────────────────
+// ── Processed Vehicle Card ────────────────────────────────────────────────────
 
 function VehicleCard({
   job,
@@ -166,7 +159,7 @@ function VehicleCard({
   onOpenStudio: (vehicleId: number) => void;
   onReprocess: (vehicleId: number) => void;
 }) {
-  const name = vehicleName(job);
+  const name = vName(job.vehicleYear, job.vehicleMake, job.vehicleModel, job.vehicleTrim);
   const isProcessing = job.status === "Processing";
   const isDone = job.status === "Completed";
   const isFailed = job.status === "Failed" || job.status === "Cancelled";
@@ -176,32 +169,22 @@ function VehicleCard({
 
   return (
     <div className="group relative bg-card border border-white/[0.06] rounded-2xl overflow-hidden hover:border-white/[0.12] transition-all duration-200">
-      {/* Thumbnail */}
       <div className="relative aspect-[16/9] bg-white/[0.03] overflow-hidden">
         {job.vehicleThumbnailUrl ? (
-          <img
-            src={job.vehicleThumbnailUrl}
-            alt={name}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-            loading="lazy"
-          />
+          <img src={job.vehicleThumbnailUrl} alt={name}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <ImageIcon className="w-8 h-8 text-white/10" />
           </div>
         )}
-
-        {/* Marketplace Ready badge overlay */}
         {isMarketplaceReady && (
           <div className="absolute top-3 left-3">
             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-green-500/90 text-black backdrop-blur-sm">
-              <Store className="w-3 h-3" />
-              Marketplace Ready
+              <Store className="w-3 h-3" />Marketplace Ready
             </span>
           </div>
         )}
-
-        {/* Processing overlay */}
         {isProcessing && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <div className="flex flex-col items-center gap-2">
@@ -211,10 +194,7 @@ function VehicleCard({
           </div>
         )}
       </div>
-
-      {/* Content */}
       <div className="p-4 space-y-3">
-        {/* Title + AI status */}
         <div className="space-y-1.5">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-semibold text-white text-sm leading-tight">{name}</h3>
@@ -224,8 +204,6 @@ function VehicleCard({
             <div className="text-[11px] text-white/30 font-mono tracking-wide">{job.vehicleVin}</div>
           )}
         </div>
-
-        {/* Stats row */}
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2.5 text-center">
             <div className="text-sm font-semibold text-white">{job.totalPhotos}</div>
@@ -240,55 +218,35 @@ function VehicleCard({
           <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2.5 text-center">
             <div className="text-sm font-semibold text-white">
               {enhancedCount > 0 && job.totalPhotos > 0
-                ? `${Math.round((enhancedCount / job.totalPhotos) * 100)}%`
-                : "—"}
+                ? `${Math.round((enhancedCount / job.totalPhotos) * 100)}%` : "—"}
             </div>
             <div className="text-[10px] text-white/40 mt-0.5">Coverage</div>
           </div>
         </div>
-
-        {/* Last processed */}
         {job.completedAt && (
           <div className="flex items-center gap-1.5 text-[11px] text-white/30">
-            <Clock className="w-3 h-3" />
-            Processed {timeAgo(job.completedAt)}
+            <Clock className="w-3 h-3" />Processed {timeAgo(job.completedAt)}
           </div>
         )}
-
-        {/* Actions */}
         <div className="flex items-center gap-2 pt-0.5">
           {isDone && job.outputSetId !== null ? (
-            <Button
-              size="sm"
-              className="flex-1 h-8 text-xs premium-gradient-btn"
-              onClick={() => onOpenStudio(job.vehicleId)}
-            >
-              <Sparkles className="w-3 h-3 mr-1.5" />
-              Open Studio
+            <Button size="sm" className="flex-1 h-8 text-xs premium-gradient-btn"
+              onClick={() => onOpenStudio(job.vehicleId)}>
+              <Sparkles className="w-3 h-3 mr-1.5" />Open Studio
             </Button>
           ) : isFailed ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 h-8 text-xs"
-              onClick={() => onReprocess(job.vehicleId)}
-            >
-              <RotateCcw className="w-3 h-3 mr-1.5" />
-              Retry
+            <Button variant="outline" size="sm" className="flex-1 h-8 text-xs"
+              onClick={() => onReprocess(job.vehicleId)}>
+              <RotateCcw className="w-3 h-3 mr-1.5" />Retry
             </Button>
           ) : isProcessing ? (
             <div className="flex-1 h-8 flex items-center justify-center">
               <span className="text-xs text-blue-400/70">Processing…</span>
             </div>
           ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 h-8 text-xs"
-              onClick={() => onReprocess(job.vehicleId)}
-            >
-              <Sparkles className="w-3 h-3 mr-1.5" />
-              Enhance Photos
+            <Button variant="outline" size="sm" className="flex-1 h-8 text-xs"
+              onClick={() => onReprocess(job.vehicleId)}>
+              <Sparkles className="w-3 h-3 mr-1.5" />Enhance Photos
             </Button>
           )}
         </div>
@@ -297,22 +255,168 @@ function VehicleCard({
   );
 }
 
-// ── Empty State ───────────────────────────────────────────────────────────────
+// ── Inventory Browser ─────────────────────────────────────────────────────────
 
-function EmptyState({ onEnhanceAll, isPending }: { onEnhanceAll: () => void; isPending: boolean }) {
+function InventoryBrowser({
+  jobsByVehicleId,
+  onEnhance,
+  onOpenStudio,
+  pendingVehicleIds,
+}: {
+  jobsByVehicleId: Map<number, PhotoJob>;
+  onEnhance: (vehicleId: number) => void;
+  onOpenStudio: (vehicleId: number) => void;
+  pendingVehicleIds: Set<number>;
+}) {
+  const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState(true);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["inventory-for-studio"],
+    queryFn: fetchInventory,
+    staleTime: 30_000,
+  });
+
+  const filtered = useMemo(() => {
+    const all = data?.vehicles ?? [];
+    if (!search.trim()) return all;
+    const q = search.toLowerCase();
+    return all.filter(
+      (v) =>
+        `${v.year ?? ""} ${v.make} ${v.model} ${v.trim ?? ""} ${v.vin}`.toLowerCase().includes(q),
+    );
+  }, [data?.vehicles, search]);
+
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
-      <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
-        <Camera className="w-7 h-7 text-white/20" />
-      </div>
-      <div>
-        <p className="text-white/60 font-medium text-sm">No vehicles processed yet</p>
-        <p className="text-white/30 text-xs mt-1">Enhance all your inventory photos with one click</p>
-      </div>
-      <Button onClick={onEnhanceAll} disabled={isPending} className="premium-gradient-btn">
-        {isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
-        Enhance All Photos
-      </Button>
+    <div className="border border-white/[0.06] rounded-2xl overflow-hidden">
+      {/* Section header */}
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <Search className="w-4 h-4 text-white/40" />
+          <span className="text-sm font-semibold text-white/80">Select a Vehicle to Enhance</span>
+          {data && (
+            <span className="text-xs text-white/30">{data.vehicles.length} vehicles in inventory</span>
+          )}
+        </div>
+        {expanded ? (
+          <ChevronUp className="w-4 h-4 text-white/30" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-white/30" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="border-t border-white/[0.06]">
+          {/* Search bar */}
+          <div className="px-5 py-3 border-b border-white/[0.04]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+              <input
+                type="text"
+                placeholder="Search by year, make, model, VIN…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-primary/40 focus:bg-white/[0.06] transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Vehicle list */}
+          <div className="max-h-[420px] overflow-y-auto divide-y divide-white/[0.04]">
+            {isLoading && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-white/30" />
+              </div>
+            )}
+
+            {!isLoading && filtered.length === 0 && (
+              <div className="py-8 text-center text-sm text-white/30">No vehicles found</div>
+            )}
+
+            {filtered.map((vehicle) => {
+              const job = jobsByVehicleId.get(vehicle.id);
+              const name = vName(vehicle.year, vehicle.make, vehicle.model, vehicle.trim);
+              const isEnhanced = job?.status === "Completed" && job.outputSetId !== null;
+              const isActive = job?.status === "Processing" || job?.status === "Queued";
+              const isPending = pendingVehicleIds.has(vehicle.id);
+
+              return (
+                <div
+                  key={vehicle.id}
+                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.02] transition-colors"
+                >
+                  {/* Thumbnail */}
+                  <div className="w-14 h-10 rounded-lg overflow-hidden bg-white/[0.04] border border-white/[0.06] shrink-0">
+                    {vehicle.primaryImageUrl ? (
+                      <img
+                        src={vehicle.primaryImageUrl}
+                        alt={name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageIcon className="w-4 h-4 text-white/15" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-white truncate">{name}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[11px] text-white/30 font-mono">{vehicle.vin}</span>
+                      <span className="text-white/15">·</span>
+                      <span className="text-[11px] text-white/30">{vehicle.imageCount} photo{vehicle.imageCount !== 1 ? "s" : ""}</span>
+                    </div>
+                  </div>
+
+                  {/* Status + action */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isEnhanced ? (
+                      <>
+                        <span className="text-[11px] text-green-400 font-medium">✓ Enhanced</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => onOpenStudio(vehicle.id)}
+                        >
+                          Open Studio
+                        </Button>
+                      </>
+                    ) : isActive ? (
+                      <span className="flex items-center gap-1.5 text-[11px] text-blue-400">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        {job?.status === "Queued" ? "In queue…" : "Processing…"}
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs premium-gradient-btn"
+                        disabled={isPending}
+                        onClick={() => onEnhance(vehicle.id)}
+                      >
+                        {isPending ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <>
+                            <Sparkles className="w-3 h-3 mr-1" />
+                            Enhance
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -321,14 +425,9 @@ function EmptyState({ onEnhanceAll, isPending }: { onEnhanceAll: () => void; isP
 
 export function AIPhotoStudio() {
   const [openVehicleId, setOpenVehicleId] = useState<number | null>(null);
+  const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const qc = useQueryClient();
-
-  const { data: stats } = useQuery({
-    queryKey: ["photo-studio-stats"],
-    queryFn: fetchStats,
-    refetchInterval: 8000,
-  });
 
   const { data: allJobs, isLoading } = useQuery({
     queryKey: ["photo-studio-jobs"],
@@ -338,12 +437,16 @@ export function AIPhotoStudio() {
 
   const reprocessMutation = useMutation({
     mutationFn: triggerProcess,
-    onSuccess: () => {
+    onMutate: (vehicleId) => {
+      setPendingIds((prev) => new Set(prev).add(vehicleId));
+    },
+    onSuccess: (_data, vehicleId) => {
+      setPendingIds((prev) => { const s = new Set(prev); s.delete(vehicleId); return s; });
       void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
-      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
       toast({ title: "Enhancement started", description: "Photos are being processed." });
     },
-    onError: (err: Error) => {
+    onError: (err: Error, vehicleId) => {
+      setPendingIds((prev) => { const s = new Set(prev); s.delete(vehicleId); return s; });
       toast({ title: "Failed to start enhancement", description: err.message, variant: "destructive" });
     },
   });
@@ -352,7 +455,6 @@ export function AIPhotoStudio() {
     mutationFn: enqueueAll,
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
-      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
       toast({
         title: "Enhancement queued",
         description: `${data.enqueued} vehicle${data.enqueued !== 1 ? "s" : ""} added to the queue.`,
@@ -363,14 +465,25 @@ export function AIPhotoStudio() {
     },
   });
 
-  const vehicles = allJobs ? dedupeByVehicle(allJobs.jobs) : [];
-  const readyCount = vehicles.filter((v) => v.vehicleAiStatus === "Ready" || (v.status === "Completed" && v.outputSetId !== null)).length;
-  const processingCount = vehicles.filter((v) => v.status === "Processing" || v.status === "Queued").length;
-  const failedCount = vehicles.filter((v) => v.status === "Failed" || v.status === "Cancelled").length;
-  const totalProcessed = vehicles.length;
+  const processedVehicles = allJobs ? dedupeByVehicle(allJobs.jobs) : [];
+  const jobsByVehicleId = useMemo(() => {
+    const map = new Map<number, PhotoJob>();
+    for (const j of processedVehicles) map.set(j.vehicleId, j);
+    return map;
+  }, [processedVehicles]);
+
+  const readyCount = processedVehicles.filter(
+    (v) => v.vehicleAiStatus === "Ready" || (v.status === "Completed" && v.outputSetId !== null),
+  ).length;
+  const processingCount = processedVehicles.filter(
+    (v) => v.status === "Processing" || v.status === "Queued",
+  ).length;
+  const failedCount = processedVehicles.filter(
+    (v) => v.status === "Failed" || v.status === "Cancelled",
+  ).length;
 
   const kpis = [
-    { label: "Processed", value: totalProcessed, icon: Camera, color: "text-white" },
+    { label: "Processed", value: processedVehicles.length, icon: Camera, color: "text-white" },
     { label: "AI Enhanced", value: readyCount, icon: Sparkles, color: "text-green-400" },
     { label: "In Progress", value: processingCount, icon: Loader2, color: "text-blue-400", spin: processingCount > 0 },
     { label: "Need Retry", value: failedCount, icon: Clock, color: failedCount > 0 ? "text-red-400" : "text-white/40" },
@@ -411,6 +524,7 @@ export function AIPhotoStudio() {
             </Button>
           }
         />
+
         {/* KPI row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {kpis.map((kpi) => {
@@ -426,55 +540,21 @@ export function AIPhotoStudio() {
         </div>
 
         {/* Stale warning */}
-        {(stats?.staleCount ?? 0) > 0 && (
+        {(allJobs?.jobs ?? []).some((j) => j.status === "Failed") && (
           <div className="flex items-center gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.04]">
             <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-            <div className="flex-1 text-sm">
-              <span className="font-medium text-amber-300">{stats!.staleCount} vehicle{stats!.staleCount !== 1 ? "s" : ""}</span>
-              <span className="text-amber-400/70 ml-1.5">have new photos since their last enhancement.</span>
+            <div className="flex-1 text-sm text-amber-300/80">
+              Some vehicles failed to process. Use the inventory below to retry them.
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10 shrink-0"
-              onClick={async () => {
-                try {
-                  const r = await fetch(`${API_BASE}/photo-studio/reprocess-stale`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ dealerId: 1 }),
-                  });
-                  if (!r.ok) throw new Error("Failed");
-                  const d = (await r.json()) as { enqueued: number };
-                  void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
-                  void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
-                  toast({ title: "Re-enhancement queued", description: `${d.enqueued} vehicle${d.enqueued !== 1 ? "s" : ""} queued.` });
-                } catch {
-                  toast({ title: "Failed to queue", variant: "destructive" });
-                }
-              }}
-            >
-              <RefreshCw className="w-3 h-3 mr-1" />
-              Re-enhance
-            </Button>
           </div>
         )}
 
-        {/* Vehicle grid */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 animate-spin text-white/30" />
-          </div>
-        ) : vehicles.length === 0 ? (
-          <EmptyState
-            onEnhanceAll={() => enqueueAllMutation.mutate()}
-            isPending={enqueueAllMutation.isPending}
-          />
-        ) : (
+        {/* Processed vehicles grid (only shown if any exist) */}
+        {!isLoading && processedVehicles.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-white/70">
-                {vehicles.length} vehicle{vehicles.length !== 1 ? "s" : ""}
+                {processedVehicles.length} processed vehicle{processedVehicles.length !== 1 ? "s" : ""}
               </h2>
               <div className="flex items-center gap-1.5 text-[11px] text-white/30">
                 <CheckCircle2 className="w-3 h-3 text-green-400/70" />
@@ -488,7 +568,7 @@ export function AIPhotoStudio() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {vehicles.map((job) => (
+              {processedVehicles.map((job) => (
                 <VehicleCard
                   key={job.vehicleId}
                   job={job}
@@ -499,6 +579,14 @@ export function AIPhotoStudio() {
             </div>
           </div>
         )}
+
+        {/* Always-visible inventory browser */}
+        <InventoryBrowser
+          jobsByVehicleId={jobsByVehicleId}
+          onEnhance={(id) => reprocessMutation.mutate(id)}
+          onOpenStudio={setOpenVehicleId}
+          pendingVehicleIds={pendingIds}
+        />
       </div>
     </AppLayout>
   );
