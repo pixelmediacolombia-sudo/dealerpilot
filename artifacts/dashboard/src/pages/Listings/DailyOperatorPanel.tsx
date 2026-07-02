@@ -36,6 +36,7 @@ import {
   MoreHorizontal,
   Target,
   Plus,
+  PlayCircle,
 } from "lucide-react";
 
 const DUPE_VISIBLE = 5;
@@ -230,6 +231,7 @@ export function DailyOperatorPanel({
   activeJobs,
   onPublish,
   onAddToBatch,
+  onPublishBatch,
   publishingId,
   isPending,
 }: {
@@ -238,6 +240,7 @@ export function DailyOperatorPanel({
   activeJobs: PlanJob[];
   onPublish: (id: number) => void;
   onAddToBatch: (id: number) => void;
+  onPublishBatch?: (vehicleIds: number[]) => void;
   publishingId: number | null;
   isPending: boolean;
 }) {
@@ -250,6 +253,7 @@ export function DailyOperatorPanel({
   const hasRecs = plan.recommendedToday.length > 0;
   const recCount = plan.recommendedToday.length;
   const queuedCount = plan.alreadyQueued.length;
+  const canBatch = recCount >= 3 && !!onPublishBatch;
 
   return (
     <div className="rounded-xl border border-primary/15 bg-primary/[0.02] overflow-hidden mb-6">
@@ -268,6 +272,16 @@ export function DailyOperatorPanel({
             <p className="text-[10px] text-muted-foreground">{plan.summary}</p>
           </div>
         </div>
+        {canBatch && (
+          <Button
+            size="sm"
+            className="h-7 px-2.5 gap-1.5 bg-primary hover:bg-primary/90 text-white text-[10px] font-bold uppercase tracking-widest whitespace-nowrap flex-shrink-0"
+            onClick={() => onPublishBatch!(plan.recommendedToday.slice(0, 3).map((r) => r.vehicleId))}
+          >
+            <PlayCircle className="w-3 h-3" />
+            Publish Today's 3
+          </Button>
+        )}
         <Badge className="text-[9px] font-bold uppercase tracking-widest bg-amber-500/10 text-amber-400 border-amber-500/20 flex-shrink-0">
           Estimated Strategy
         </Badge>

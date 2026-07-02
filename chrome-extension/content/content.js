@@ -22,7 +22,7 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.1";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.2";
 
   // ── Performance / fast-mode settings ────────────────────────────────────────
   // MARKETPLACE_FAST_MODE=true fills only the 9 required fields:
@@ -417,7 +417,7 @@
     <div id="mai-header">
       <span id="mai-dot"></span>
       <span id="mai-title">DealerPilot AI</span>
-      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.1</span>
+      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.2</span>
       <button id="mai-toggle" title="Collapse">_</button>
     </div>
     <div id="mai-body">
@@ -478,6 +478,26 @@
       setStatus("Backend unreachable. Set the URL in the extension popup.", "err");
     }
   });
+
+  // ---- Login page: show resume message if there is an active job ----
+  // When Facebook is not logged in, AUTO_START_ASSIGNED opens the login URL.
+  // After the user logs in, Facebook redirects to /marketplace/create and the
+  // content script on that page auto-resumes the flow.  Show a helpful status
+  // here so the operator knows publishing is waiting — not broken.
+  const _isLoginPage = /\/(login|checkpoint|recover|two_step_verification)/.test(location.pathname)
+    || (location.pathname === "/login.php")
+    || location.search.includes("next=%2Fmarketplace");
+  if (_isLoginPage) {
+    chrome.storage.local.get("activeJob").then(({ activeJob }) => {
+      if (activeJob && activeJob.id) {
+        setStatus("Log in to continue — publishing will resume automatically.", "ok");
+        jobBoxEl.innerHTML = `<div class="mai-job">
+          <div class="mai-job-title">Job #${escapeHtml(String(activeJob.id))} waiting</div>
+          <div class="mai-job-meta">Sign in to Facebook. DealerPilot will open Marketplace and continue publishing automatically after login.</div>
+        </div>`;
+      }
+    }).catch(() => {});
+  }
 
   // ---- Safety: stop on Facebook login / checkpoint / captcha ----
   function detectSecurityGate() {
@@ -1826,5 +1846,5 @@
     );
   }
 
-  log("Panel loaded v1.3.1", { isMessenger, isMarketplaceCreate });
+  log("Panel loaded v1.3.2", { isMessenger, isMarketplaceCreate });
 })();

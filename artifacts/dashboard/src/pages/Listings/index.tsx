@@ -86,6 +86,7 @@ import { PublishedCard } from "./PublishedCard";
 import { MarkPublishedModal } from "./MarkPublishedModal";
 import { BatchReviewPanel } from "./BatchReviewPanel";
 import { DailyOperatorPanel } from "./DailyOperatorPanel";
+import { BatchTodayPanel, type BatchVehicle } from "./BatchTodayPanel";
 import { PublishNowModal } from "@/components/PublishNowModal";
 import { toast } from "@/hooks/use-toast";
 
@@ -256,6 +257,8 @@ export function ListingsWorkspace() {
   const [sortBy, setSortBy] = useState<"priority" | "photo_count" | "price" | "newest" | "needs_review">("priority");
   const [publishingId, setPublishingId] = useState<number | null>(null);
   const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
+  const [batchTodayOpen, setBatchTodayOpen] = useState(false);
+  const [batchTodayVehicles, setBatchTodayVehicles] = useState<BatchVehicle[]>([]);
   const [photoFilter, setPhotoFilter] = useState<string | null>(null);
   const [clearingQueue, setClearingQueue] = useState(false);
 
@@ -639,6 +642,14 @@ export function ListingsWorkspace() {
                 bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } }, {
                   onSuccess: () => { toast({ title: "Added to batch", description: "Vehicle added to publishing queue." }); invalidateWorkspaces(); },
                 });
+              }}
+              onPublishBatch={(vehicleIds) => {
+                const vehicles: BatchVehicle[] = vehicleIds.map((id) => {
+                  const ws = workspacesData?.workspaces.find((w) => w.vehicleId === id);
+                  return { id, label: ws?.label ?? `Vehicle #${id}` };
+                });
+                setBatchTodayVehicles(vehicles);
+                setBatchTodayOpen(true);
               }}
               publishingId={publishingId}
               isPending={bulkSchedule.isPending}
@@ -1588,6 +1599,12 @@ export function ListingsWorkspace() {
         vehicleId={publishNowVehicleId}
         vehicleLabel={workspacesData?.workspaces.find((w) => w.vehicleId === publishNowVehicleId)?.label}
         onClose={() => { setPublishNowVehicleId(null); invalidateWorkspaces(); }}
+      />
+
+      <BatchTodayPanel
+        isOpen={batchTodayOpen}
+        vehicles={batchTodayVehicles}
+        onClose={() => { setBatchTodayOpen(false); invalidateWorkspaces(); }}
       />
     </AppLayout>
   );

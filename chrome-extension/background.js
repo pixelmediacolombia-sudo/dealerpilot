@@ -270,13 +270,20 @@ const handlers = {
       timestamp: new Date().toISOString(),
     });
 
+    // If the user is not logged in, open the Facebook login URL with ?next= pointing to
+    // marketplace/create so Facebook auto-redirects after login. Without this, an
+    // unauthenticated navigation to MARKETPLACE_CREATE_URL lands on a bare login page
+    // (no ?next= param) and after login Facebook goes to the home feed, not Marketplace.
+    const { fbLoggedIn } = await chrome.storage.local.get("fbLoggedIn");
+    const targetUrl = fbLoggedIn ? MARKETPLACE_CREATE_URL : FACEBOOK_LOGIN_URL;
+
     const [existing] = await chrome.tabs.query({ url: MARKETPLACE_CREATE_URL + "*" });
     let tab;
-    if (existing) {
+    if (existing && fbLoggedIn) {
       tab = await chrome.tabs.update(existing.id, { active: true });
       await chrome.windows.update(existing.windowId, { focused: true });
     } else {
-      tab = await chrome.tabs.create({ url: MARKETPLACE_CREATE_URL, active: true });
+      tab = await chrome.tabs.create({ url: targetUrl, active: true });
     }
     return { ok: true, jobId: job.id, tabId: tab.id };
   },
@@ -353,16 +360,6 @@ const handlers = {
     const now = new Date().toISOString();
     await chrome.storage.local.set({ lastPollTime: now });
 
-    // Check connect-status — handles the connection flow if operator requested it
-    try {
-      const connectStatus = await apiGet("/api/extension/connect-status");
-      if (connectStatus.connectRequested) {
-        return handlers.CONNECT_MARKETPLACE({ action: connectStatus.connectAction || "marketplace" });
-      }
-    } catch {
-      // ignore — don't block job polling
-    }
-
     const extensionId = await getExtensionId();
 
     // Check for a job explicitly assigned to this extension
@@ -404,7 +401,19 @@ const handlers = {
       return { job: null };
     }
     const nextJob = nextData && nextData.job && nextData.job.id ? nextData.job : null;
-    if (!nextJob) return { job: null };
+    if (!nextJob) {
+      // No publish job in queue — only now check connect-status so it never
+      // interrupts an active Publish Now flow.
+      try {
+        const connectStatus = await apiGet("/api/extension/connect-status");
+        if (connectStatus.connectRequested) {
+          return handlers.CONNECT_MARKETPLACE({ action: connectStatus.connectAction || "marketplace" });
+        }
+      } catch {
+        // ignore — don't block polling
+      }
+      return { job: null };
+    }
 
     // SAFETY GATE: Only auto-start recent jobs from direct user actions.
     // auto_publish_batch and stale jobs require explicit popup approval.
