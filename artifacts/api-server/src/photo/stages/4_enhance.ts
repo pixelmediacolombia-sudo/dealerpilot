@@ -1,24 +1,25 @@
 // Stage 4: Enhance — applies luxury dealership-quality image processing.
 //
-// Primary exterior composites (studio background photos):
-//   Full professional treatment:
-//   - CLAHE local contrast (makes paint reflections pop)
-//   - Dynamic range expansion (normalise)
-//   - Saturation + brightness lift (richer paint colours)
-//   - Contrast curve (deeper blacks, brighter highlights)
-//   - High-quality unsharp mask (crisp, no artifacts)
+// Studio Exterior composites (have a studio background):
+//   Professional studio treatment:
+//   1. CLAHE local contrast (paint reflections / panel lines pop)
+//   2. Normalise dynamic range
+//   3. Saturation + brightness lift for richer paint
+//   4. Contrast curve (deeper blacks, brighter highlights)
+//   5. Unsharp mask (crisp detail, no halos)
+//   6. Studio overhead light overlay — soft radial gradient at 12 % opacity
+//      to simulate a real studio ceiling fixture
 //
-// Secondary exterior (Wheel, Engine, Bed, Tailgate — no studio bg):
+// Secondary Exterior (Wheel, Engine, Bed, Tailgate — no studio bg):
 //   Moderate: normalise + saturation + sharpen.
 //
 // Interior:
 //   Gentle: normalise + subtle saturation + soft sharpen.
-//   Preserves natural cabin tones.
 //
 // Technical / Dealer:
-//   Light sharpen only — clarity without colour distortion.
+//   Light sharpen only.
 //
-// Output: JPEG at quality 95 with 4:4:4 chroma (no colour bleed).
+// Output: JPEG 95, 4:4:4 chroma.
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
@@ -45,6 +46,22 @@ async function fetchBuffer(urlOrPath: string): Promise<Buffer> {
   return fs.readFileSync(urlOrPath);
 }
 
+// Build a soft radial gradient PNG that simulates a studio overhead light.
+// Centred at the upper-middle of the image, fades to transparent toward edges.
+async function buildStudioLightOverlay(w: number, h: number): Promise<Buffer> {
+  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+  <defs>
+    <radialGradient id="light" cx="50%" cy="18%" rx="55%" ry="38%">
+      <stop offset="0%"   stop-color="white" stop-opacity="0.14"/>
+      <stop offset="60%"  stop-color="white" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="${w}" height="${h}" fill="url(#light)"/>
+</svg>`;
+  return sharp(Buffer.from(svgStr)).png().toBuffer();
+}
+
 export async function stageEnhance(ctx: PipelineContext): Promise<void> {
   const uploadDir = getAiPhotosDir();
 
@@ -60,41 +77,56 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
       const isStudioExterior   = STUDIO_EXTERIOR_CLASSIFICATIONS.has(classification);
       const isSecondaryExterior = EXTERIOR_CLASSIFICATIONS.has(classification) && !isStudioExterior;
 
-      let pipeline = sharp(buf);
+      let enhanced: Buffer;
 
       if (isStudioExterior) {
         // ── Luxury studio exterior treatment ─────────────────────────────────
-        // 1. CLAHE — local contrast adaptation (paint reflections, panel lines pop)
-        // 2. Normalise — expand dynamic range to full 0–255 without clipping
-        // 3. Saturation + brightness lift — richer paint, warm studio feel
-        // 4. Contrast curve — deeper blacks, clean highlights
-        // 5. Unsharp mask — crisp detail without halos
-        pipeline = pipeline
+        // Steps 1–5: standard Sharp chain
+        const processed = await sharp(buf)
           .clahe({ width: 64, height: 64, maxSlope: 3 })
           .normalise({ lower: 0.5, upper: 99.5 })
-          .modulate({ brightness: 1.04, saturation: 1.20, hue: 0 })
-          .linear(1.06, -6)
-          .sharpen({ sigma: 0.85, m1: 0.6, m2: 3.5, x1: 3, y2: 15, y3: 22 });
+          .modulate({ brightness: 1.03, saturation: 1.18, hue: 0 })
+          .linear(1.05, -5)
+          .sharpen({ sigma: 0.85, m1: 0.6, m2: 3.5, x1: 3, y2: 15, y3: 22 })
+          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+          .toBuffer();
+
+        // Step 6: composite studio overhead light overlay
+        const meta = await sharp(processed).metadata();
+        const w = meta.width  ?? 1536;
+        const h = meta.height ?? 1024;
+        const lightOverlay = await buildStudioLightOverlay(w, h);
+
+        enhanced = await sharp(processed)
+          .composite([{ input: lightOverlay, blend: "screen" }])
+          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+          .toBuffer();
+
       } else if (isSecondaryExterior) {
-        // ── Secondary exterior (detail shots — no composite bg) ───────────────
-        pipeline = pipeline
+        // ── Secondary exterior ────────────────────────────────────────────────
+        enhanced = await sharp(buf)
           .normalise({ lower: 1, upper: 99 })
           .modulate({ brightness: 1.02, saturation: 1.10 })
-          .sharpen({ sigma: 0.75, m1: 0.5, m2: 2.5 });
+          .sharpen({ sigma: 0.75, m1: 0.5, m2: 2.5 })
+          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+          .toBuffer();
+
       } else if (classification.startsWith("Interior")) {
         // ── Interior — preserve natural cabin lighting ────────────────────────
-        pipeline = pipeline
+        enhanced = await sharp(buf)
           .normalise({ lower: 1, upper: 99 })
           .modulate({ brightness: 1.01, saturation: 1.06 })
-          .sharpen({ sigma: 0.65, m1: 0.4, m2: 1.8 });
+          .sharpen({ sigma: 0.65, m1: 0.4, m2: 1.8 })
+          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+          .toBuffer();
+
       } else {
         // ── Technical / Dealer / Misc — clarity only ─────────────────────────
-        pipeline = pipeline.sharpen({ sigma: 0.5, m1: 0.3, m2: 1.2 });
+        enhanced = await sharp(buf)
+          .sharpen({ sigma: 0.5, m1: 0.3, m2: 1.2 })
+          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+          .toBuffer();
       }
-
-      const enhanced = await pipeline
-        .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
-        .toBuffer();
 
       const filename = `enh-${ctx.job.vehicleId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
       fs.writeFileSync(path.join(uploadDir, filename), enhanced);

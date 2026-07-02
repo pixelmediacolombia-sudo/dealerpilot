@@ -14,6 +14,7 @@ import {
   aiPhotoImagesTable,
   aiStudioPacksTable,
   vehicleImagesTable,
+  vehiclesTable,
   type AiPhotoJob,
   type AiStudioPack,
 } from "@workspace/db";
@@ -49,6 +50,10 @@ export interface PipelineImage {
   totalProcessingTimeMs?: number;
   qualityScore?: number;
   qualityFlags?: string;
+  /** Set by Stage 3 when logo zone is significantly obscured by the vehicle */
+  logoObscured?: boolean;
+  /** Set by Stage 5 when AI output is measurably worse than the original */
+  aiWorseThanOriginal?: boolean;
 }
 
 export interface PipelineContext {
@@ -58,6 +63,8 @@ export interface PipelineContext {
   images: PipelineImage[];
   startedAt: Date;
   log: Logger;
+  /** Normalized body style of the vehicle (e.g. "SEDAN", "SUV", "TRUCK") */
+  vehicleBodyStyle?: string;
   /** Set to true by the validate stage when a critical quality check fails.
    *  The export stage uses this to mark the photo set "Needs Review" instead of "Ready". */
   qualityGateFailed?: boolean;
@@ -89,6 +96,14 @@ export async function runPhotoPipeline(job: AiPhotoJob, log: Logger): Promise<vo
     .from(aiStudioPacksTable)
     .where(and(eq(aiStudioPacksTable.dealerId, job.dealerId), eq(aiStudioPacksTable.isDefault, true)))
     .limit(1);
+
+  // Load vehicle body style for dynamic scale matrix
+  const [vehicleData] = await db
+    .select({ bodyStyle: vehiclesTable.bodyStyle })
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.id, job.vehicleId))
+    .limit(1);
+  const vehicleBodyStyle = vehicleData?.bodyStyle?.toUpperCase() ?? "OTHER";
 
   // Load vehicle photos
   const rawImages = await db
@@ -190,6 +205,7 @@ export async function runPhotoPipeline(job: AiPhotoJob, log: Logger): Promise<vo
     images: pipelineImages,
     startedAt,
     log,
+    vehicleBodyStyle,
   };
 
   // Run all 7 stages

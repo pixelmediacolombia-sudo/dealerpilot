@@ -1,24 +1,42 @@
-// Stage 3: Composite — places the background-removed vehicle onto the studio background.
+// Stage 3: Composite v3.1 — clean bbox-crop approach.
 //
-// v2 — Alpha-aware placement engine:
-//   • Analyzes the BRIA alpha channel to find the actual vehicle bounding box.
-//     (BRIA outputs may have transparent padding — this corrects for it.)
-//   • Aligns the vehicle's wheel contact line to the configured floor position.
-//   • Centers by vehicle mass center (bbox center), not the PNG image center.
-//   • Applies angle-based scaling: Side > 45° > Front/Rear.
-//   • Generates a soft contact shadow under the vehicle at the floor line.
-//   • Studio background is applied ONLY to primary exterior angles:
-//     Front, Front 45, Side, Rear 45, Rear.
-//   • Everything else (Wheel, Engine, Interior, Technical, Dealer) is passed through.
+// ALGORITHM:
+//   1. Analyse alpha channel to find the exact vehicle bounding box.
+//   2. CROP the background-removed PNG to just the vehicle bbox (eliminates all
+//      transparent padding math and makes placement trivially correct).
+//   3. Scale the cropped vehicle so its HEIGHT equals the target fraction of
+//      the canvas height (40–50 %, driven by body style × angle matrix).
+//      Width is clamped to safe horizontal margins.
+//   4. Place:
+//        top  = floorOnBg − vehicleH  (wheels touch floor line)
+//        left = targetCenterX − vehicleW/2 (horizontal centre)
+//   5. Logo zone avoidance: if vehicle roof would intrude into the logo band,
+//      nudge vehicle down.  If floor-clamped, reduce scale instead.
+//   6. Composite order: background → floor reflection → contact shadow → vehicle.
 //
-// Quality gate flags set here:
-//   floatingRisk — alpha analysis failed; fell back to image-edge alignment
-//   shadowGenerated — contact shadow was successfully composited
+// FLOOR REFLECTION:
+//   Lower 20 % of the scaled vehicle, flipped vertically, alpha-faded 28 % → 0 %,
+//   placed just below the floor contact line.
+//
+// CONTACT SHADOW:
+//   SVG radial gradient ellipse at the wheel contact line.
+//
+// NON-STUDIO SHOTS: passed through unchanged.
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 import type { PipelineContext } from "../pipeline";
 import { STUDIO_EXTERIOR_CLASSIFICATIONS } from "../providers/types";
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+/** Horizontal safe margin — vehicle stays inside this band */
+const MARGIN_X_FRAC = 0.05;
+
+/** Default logo protection band (upper fraction of canvas).
+ *  The vehicle roof must NOT appear above this line.
+ *  Alpha Motorsport logo occupies roughly the upper 22 % of the background. */
+const DEFAULT_LOGO_BOTTOM_FRAC = 0.22;
 
 function getAiPhotosDir(): string {
   const dir = path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos");
@@ -45,114 +63,107 @@ async function fetchBuffer(urlOrPath: string): Promise<Buffer> {
 // ── Alpha bounding box ────────────────────────────────────────────────────────
 
 interface AlphaBbox {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-  bboxW: number;
-  bboxH: number;
-  // Fractions of the full PNG dimensions — used for scaled placement
-  centerXFrac: number;   // horizontal center of bbox (0..1 of PNG width)
-  bottomYFrac: number;   // bottom edge of bbox (0..1 of PNG height) — wheel contact
-  topYFrac: number;      // top edge of bbox (0..1 of PNG height)
-  valid: boolean;        // false if no opaque pixels found → fallback mode
+  left: number; top: number; right: number; bottom: number;
+  bboxW: number; bboxH: number;
+  valid: boolean;
 }
 
 async function analyzeAlphaBbox(pngBuffer: Buffer): Promise<AlphaBbox> {
-  const ALPHA_THRESHOLD = 15;
-
+  const THRESHOLD = 15;
   try {
-    const { data, info } = await sharp(pngBuffer)
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-
+    const { data, info } = await sharp(pngBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     const { width, height } = info;
-    let minX = width, maxX = 0, minY = height, maxY = 0;
-    let found = false;
-
+    let minX = width, maxX = 0, minY = height, maxY = 0, found = false;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const alpha = data[(y * width + x)! * 4 + 3]!;
-        if (alpha > ALPHA_THRESHOLD) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
+        if (data[(y * width + x) * 4 + 3]! > THRESHOLD) {
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
           found = true;
         }
       }
     }
-
-    if (!found) {
-      return { left: 0, right: width - 1, top: 0, bottom: height - 1,
-               bboxW: width, bboxH: height,
-               centerXFrac: 0.5, bottomYFrac: 1.0, topYFrac: 0.0, valid: false };
-    }
-
-    return {
-      left: minX, right: maxX, top: minY, bottom: maxY,
-      bboxW: maxX - minX, bboxH: maxY - minY,
-      centerXFrac: (minX + maxX) / 2 / width,
-      bottomYFrac: maxY / height,
-      topYFrac: minY / height,
-      valid: true,
-    };
+    if (!found) return { left: 0, top: 0, right: width - 1, bottom: height - 1, bboxW: width, bboxH: height, valid: false };
+    return { left: minX, top: minY, right: maxX, bottom: maxY, bboxW: maxX - minX, bboxH: maxY - minY, valid: true };
   } catch {
-    // Fallback if Sharp can't read alpha (non-PNG input, etc.)
     const meta = await sharp(pngBuffer).metadata();
-    return { left: 0, right: (meta.width ?? 800) - 1, top: 0, bottom: (meta.height ?? 600) - 1,
-             bboxW: meta.width ?? 800, bboxH: meta.height ?? 600,
-             centerXFrac: 0.5, bottomYFrac: 1.0, topYFrac: 0.0, valid: false };
+    const w = meta.width ?? 800; const h = meta.height ?? 600;
+    return { left: 0, top: 0, right: w - 1, bottom: h - 1, bboxW: w, bboxH: h, valid: false };
   }
 }
 
-// ── Angle-based scale factor ──────────────────────────────────────────────────
-// Side views show the car at full width; front/rear are narrower.
-// Scale the vehicle bbox to fill the appropriate fraction of the background.
+// ── Body style → target height fraction ───────────────────────────────────────
+// Vehicle HEIGHT as fraction of canvas height (40–50 %).
 
-function angleScaleFactor(classification: string): number {
-  switch (classification) {
-    case "Exterior Side":        return 1.00;   // widest — full scale
-    case "Exterior Front 45":
-    case "Exterior Rear 45":     return 0.85;   // 3/4 angle — slightly smaller
-    case "Exterior Front":
-    case "Exterior Rear":        return 0.70;   // head-on — narrowest angle
-    default:                     return 0.80;
-  }
+function bodyStyleHeightFrac(bodyStyle: string): number {
+  const s = (bodyStyle ?? "OTHER").toUpperCase();
+  if (s === "CONVERTIBLE")                    return 0.40;
+  if (s === "COUPE")                          return 0.42;
+  if (s === "SEDAN" || s === "SALOON")        return 0.44;
+  if (s === "HATCHBACK")                      return 0.45;
+  if (s === "TRUCK" || s === "PICKUP")        return 0.46;
+  if (s === "SUV"   || s === "CROSSOVER")     return 0.48;
+  if (s === "VAN"   || s === "MINIVAN")       return 0.48;
+  return 0.44;
+}
+
+// Angle modifier — adjusts apparent height based on perspective.
+function angleModifier(classification: string): number {
+  if (classification === "Exterior Side")                                   return 1.00;
+  if (classification === "Exterior Front 45" || classification === "Exterior Rear 45") return 0.93;
+  return 0.87; // Front / Rear head-on
 }
 
 // ── Contact shadow ────────────────────────────────────────────────────────────
 
-async function buildContactShadow(
-  shadowWidthPx: number,
-  bgWidth: number,
-): Promise<Buffer> {
-  // SVG radial gradient ellipse — the only reliable way to produce a soft
-  // contact shadow regardless of canvas size / blur-sigma interactions.
-  // The ellipse is 85% of car width, ~22px tall at centre, fades to transparent.
-  const ellipseW = Math.min(Math.round(shadowWidthPx * 0.85), bgWidth);
-  const ellipseH = 22;  // peak height of the shadow ellipse (px)
-  const canvasW  = Math.min(ellipseW + 80, bgWidth); // horizontal padding
-  const canvasH  = ellipseH + 60;                    // vertical padding for fade
-
-  const cx = Math.round(canvasW / 2);
-  const cy = Math.round(canvasH / 2);
-  const rx = Math.round(ellipseW / 2);
-  const ry = Math.round(ellipseH / 2);
-
+async function buildContactShadow(carWidthPx: number, bgWidth: number): Promise<Buffer> {
+  const ellipseW = Math.min(Math.round(carWidthPx * 0.80), bgWidth);
+  const ellipseH = 18;
+  const canvasW  = Math.min(ellipseW + 80, bgWidth);
+  const canvasH  = ellipseH + 64;
   const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}">
   <defs>
     <radialGradient id="sg" cx="50%" cy="50%" rx="50%" ry="50%">
-      <stop offset="0%"   stop-color="black" stop-opacity="0.38"/>
-      <stop offset="60%"  stop-color="black" stop-opacity="0.18"/>
+      <stop offset="0%"   stop-color="black" stop-opacity="0.42"/>
+      <stop offset="55%"  stop-color="black" stop-opacity="0.18"/>
       <stop offset="100%" stop-color="black" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="url(#sg)"/>
+  <ellipse cx="${Math.round(canvasW / 2)}" cy="${Math.round(canvasH / 2)}"
+           rx="${Math.round(ellipseW / 2)}" ry="${Math.round(ellipseH / 2)}"
+           fill="url(#sg)"/>
 </svg>`;
-
   return sharp(Buffer.from(svgStr)).png().toBuffer();
+}
+
+// ── Floor reflection ──────────────────────────────────────────────────────────
+// Lower 20 % of the (already-cropped, already-scaled) vehicle — flipped
+// vertically and faded from 28 % → 0 % alpha, placed below the floor line.
+
+async function buildFloorReflection(scaledVehicle: Buffer, vW: number, vH: number): Promise<Buffer> {
+  const stripH = Math.max(8, Math.round(vH * 0.20));
+
+  // Extract the bottom strip of the scaled vehicle, flip it
+  const bottomStrip = await sharp(scaledVehicle)
+    .extract({ left: 0, top: vH - stripH, width: vW, height: stripH })
+    .flip()
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const { data, info } = bottomStrip;
+  const { width, height } = info;
+
+  // Fade: 72/255 ≈ 28 % at y=0 (nearest to floor), 0 at y=height
+  for (let y = 0; y < height; y++) {
+    const fade = Math.round(72 * (1 - y / height));
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      data[idx + 3] = Math.min(data[idx + 3]!, fade);
+    }
+  }
+
+  return sharp(Buffer.from(data), { raw: { width, height, channels: 4 } }).png().toBuffer();
 }
 
 // ── Main composite stage ──────────────────────────────────────────────────────
@@ -161,14 +172,8 @@ export async function stageComposite(ctx: PipelineContext): Promise<void> {
   const backgroundUrl = ctx.pack?.backgroundUrl ?? process.env["AI_STUDIO_BACKGROUND"] ?? null;
 
   if (!backgroundUrl) {
-    ctx.log.warn(
-      { jobId: ctx.job.id },
-      "photo:composite DISABLED — no studio background. Upload the Alpha Motorsport background to enable compositing.",
-    );
-    for (const img of ctx.images) {
-      img.compositedUrl = img.backgroundRemovedUrl ?? img.originalUrl;
-      img.usedFallback = 1;
-    }
+    ctx.log.warn({ jobId: ctx.job.id }, "photo:composite DISABLED — no studio background configured.");
+    for (const img of ctx.images) { img.compositedUrl = img.backgroundRemovedUrl ?? img.originalUrl; img.usedFallback = 1; }
     return;
   }
 
@@ -177,35 +182,48 @@ export async function stageComposite(ctx: PipelineContext): Promise<void> {
     backgroundBuffer = await fetchBuffer(backgroundUrl);
   } catch (err) {
     ctx.log.warn({ err, backgroundUrl }, "photo:composite failed to load background — skipping");
-    for (const img of ctx.images) {
-      img.compositedUrl = img.backgroundRemovedUrl ?? img.originalUrl;
-    }
+    for (const img of ctx.images) { img.compositedUrl = img.backgroundRemovedUrl ?? img.originalUrl; }
     return;
   }
 
-  const bgMeta = await sharp(backgroundBuffer).metadata();
-  const bgWidth  = bgMeta.width  ?? 1536;
-  const bgHeight = bgMeta.height ?? 1024;
-
+  const bgMeta   = await sharp(backgroundBuffer).metadata();
+  const bgW      = bgMeta.width  ?? 1536;
+  const bgH      = bgMeta.height ?? 1024;
   const uploadDir = getAiPhotosDir();
-  const backgroundVersion = ctx.pack?.backgroundVersion ?? "v1";
+  const bgVersion = ctx.pack?.backgroundVersion ?? "v1";
 
-  // Placement mask from studio pack (configured via Settings)
-  type PlacementMask = { cx?: number; bottomY?: number; maxW?: number };
+  // Placement mask from pack
+  type PlacementMask = { cx?: number; bottomY?: number };
   const mask: PlacementMask = ctx.pack?.placementMaskJson
     ? (JSON.parse(ctx.pack.placementMaskJson) as PlacementMask)
     : {};
 
-  // Logo safe zone — used for a placement sanity check
-  type LogoZone = { x: number; y: number; w: number; h: number; label?: string };
-  const logoZones: LogoZone[] = ctx.pack?.logoSafeZoneJson
+  // Logo safe zone — vehicle roof must stay BELOW this line
+  type LogoZone = { x: number; y: number; w: number; h: number };
+  const rawZones: LogoZone[] = ctx.pack?.logoSafeZoneJson
     ? (JSON.parse(ctx.pack.logoSafeZoneJson) as LogoZone[])
     : [];
+  const logoBottomFrac = rawZones.length > 0
+    ? Math.max(...rawZones.map((z) => z.y + z.h))
+    : DEFAULT_LOGO_BOTTOM_FRAC;
+
+  const floorOnBg     = Math.round((mask.bottomY ?? 0.76) * bgH);
+  const targetCenterX = Math.round((mask.cx ?? 0.5) * bgW);
+  const logoBottomPx  = Math.round(logoBottomFrac * bgH);
+
+  // Safe horizontal band
+  const marginX = Math.round(MARGIN_X_FRAC * bgW);
+  const safeW   = bgW - 2 * marginX;
+
+  const packOffX = Math.round((ctx.pack?.vehicleOffsetX ?? 0) * bgW);
+  const packOffY = Math.round((ctx.pack?.vehicleOffsetY ?? 0) * bgH);
+
+  const bodyStyle = ctx.vehicleBodyStyle ?? "OTHER";
 
   for (const img of ctx.images) {
     if (img.processingStatus === "Failed") continue;
 
-    // Only composite primary exterior shots that had background removal
+    // Non-studio shots pass through
     if (!STUDIO_EXTERIOR_CLASSIFICATIONS.has(img.classification ?? "") || img.usedFallback === 1) {
       img.compositedUrl = img.backgroundRemovedUrl ?? img.originalUrl;
       continue;
@@ -219,149 +237,136 @@ export async function stageComposite(ctx: PipelineContext): Promise<void> {
       const imgW = vehicleMeta.width  ?? 800;
       const imgH = vehicleMeta.height ?? 600;
 
-      // ── Step 1: Alpha bbox analysis ─────────────────────────────────────────
+      // ── Step 1: Find vehicle bounding box ────────────────────────────────────
       const bbox = await analyzeAlphaBbox(vehicleBuffer);
-      const floatingRisk = !bbox.valid;
 
-      // ── Step 2: Calculate target size (angle + pack scale) ──────────────────
-      const packScale     = ctx.pack?.vehicleScale ?? 1.0;
-      const maxWFrac      = mask.maxW ?? 0.72;
-      const angleFactor   = angleScaleFactor(img.classification ?? "");
-      const targetBboxW   = Math.round(bgWidth * maxWFrac * angleFactor * packScale);
+      // ── Step 2: Crop vehicle to its bbox (removes transparent padding) ────────
+      const cropL = Math.max(0, bbox.left   - 2);
+      const cropT = Math.max(0, bbox.top    - 2);
+      const cropW = Math.min(imgW - cropL, bbox.bboxW + 4);
+      const cropH = Math.min(imgH - cropT, bbox.bboxH + 4);
 
-      // Scale the whole PNG so the vehicle bbox fills targetBboxW pixels on the background.
-      // Also enforce a height cap (85% of bgHeight) so portrait-orientation photos don't
-      // exceed the background dimensions — Sharp requires overlay ≤ base image.
-      const scaleByWidth  = bbox.bboxW > 0 ? targetBboxW / bbox.bboxW : targetBboxW / imgW;
-      const maxBboxH      = Math.round(bgHeight * 0.85);
-      const scaleByHeight = bbox.bboxH > 0 ? maxBboxH / bbox.bboxH : maxBboxH / imgH;
-      const scaleFactor   = Math.min(scaleByWidth, scaleByHeight);
+      const vehicleCropped = bbox.valid
+        ? await sharp(vehicleBuffer).extract({ left: cropL, top: cropT, width: cropW, height: cropH }).png().toBuffer()
+        : vehicleBuffer;
 
-      // Compute final image dimensions — guaranteed ≤ background
-      const resizedImgW  = Math.max(1, Math.min(Math.round(imgW * scaleFactor), bgWidth));
-      const resizedImgH  = Math.max(1, Math.min(Math.round(imgH * scaleFactor), bgHeight));
+      const croppedW = bbox.valid ? cropW : imgW;
+      const croppedH = bbox.valid ? cropH : imgH;
 
-      // fit:fill stretches to EXACTLY the requested dimensions so bbox fractions remain valid.
-      const vehicleResized = await sharp(vehicleBuffer)
-        .resize(resizedImgW, resizedImgH, {
-          fit: "fill",
-          kernel: "lanczos3",
-          background: { r: 0, g: 0, b: 0, alpha: 0 },
-        })
+      // ── Step 3: Target dimensions (height-first, width-clamped) ──────────────
+      const targetH = Math.round(bodyStyleHeightFrac(bodyStyle) * angleModifier(img.classification ?? "") * bgH);
+      const aspectR = croppedW / croppedH;
+      let   targetW = Math.round(targetH * aspectR);
+
+      // Clamp width to safe horizontal band
+      if (targetW > safeW) {
+        targetW = safeW;
+      }
+      // Recalculate actual height to maintain aspect ratio after width clamp
+      const finalH = Math.min(targetH, Math.round(targetW / aspectR));
+      const finalW = Math.min(targetW, Math.round(finalH * aspectR));
+
+      // ── Step 4: Resize cropped vehicle ───────────────────────────────────────
+      const vehicleScaled = await sharp(vehicleCropped)
+        .resize(finalW, finalH, { fit: "fill", kernel: "lanczos3", background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png()
         .toBuffer();
 
-      // ── Step 3: Placement — align wheel contact to floor line ───────────────
-      // After scaling, where is the bbox on the resized image?
-      const bboxCenterXOnResized = Math.round(bbox.centerXFrac * resizedImgW);
-      const bboxBottomOnResized  = Math.round(bbox.bottomYFrac  * resizedImgH);
+      // ── Step 5: Placement — wheels at floor line, centred horizontally ────────
+      let top  = floorOnBg - finalH + packOffY;
+      let left = targetCenterX - Math.round(finalW / 2) + packOffX;
 
-      const targetCenterX = Math.round((mask.cx ?? 0.5) * bgWidth);
-      const floorOnBg     = Math.round((mask.bottomY ?? 0.82) * bgHeight);
-
-      // Fine-tune via pack offset (operator override)
-      const packOffX = Math.round((ctx.pack?.vehicleOffsetX ?? 0) * bgWidth);
-      const packOffY = Math.round((ctx.pack?.vehicleOffsetY ?? 0) * bgHeight);
-
-      let left = targetCenterX - bboxCenterXOnResized + packOffX;
-      let top  = floorOnBg - bboxBottomOnResized + packOffY;
-
-      // ── Step 4: Logo safe zone — shift vehicle horizontally if it would ──────
-      // cover more than 90 % of the horizontal logo span.
-      for (const zone of logoZones) {
-        const zoneLeft  = Math.round(zone.x * bgWidth);
-        const zoneRight = Math.round((zone.x + zone.w) * bgWidth);
-        const zoneTop   = Math.round(zone.y * bgHeight);
-        const zoneBot   = Math.round((zone.y + zone.h) * bgHeight);
-
-        // Vehicle bbox on background
-        const vLeft   = left + Math.round(bbox.left  * scaleFactor);
-        const vRight  = left + Math.round(bbox.right * scaleFactor);
-        const vTop    = top  + Math.round(bbox.top   * scaleFactor);
-        const vBot    = top  + Math.round(bbox.bottom * scaleFactor);
-
-        // Horizontal overlap
-        const overlapLeft  = Math.max(vLeft, zoneLeft);
-        const overlapRight = Math.min(vRight, zoneRight);
-        const overlapTop   = Math.max(vTop, zoneTop);
-        const overlapBot   = Math.min(vBot, zoneBot);
-
-        if (overlapRight > overlapLeft && overlapBot > overlapTop) {
-          const logoW       = zoneRight - zoneLeft;
-          const coverageRatio = (overlapRight - overlapLeft) / logoW;
-
-          if (coverageRatio > 0.92) {
-            // Vehicle covers almost entire logo width — not much we can do without
-            // drastically shrinking it; log the warning and continue.
-            ctx.log.warn(
-              { vehicleId: ctx.job.vehicleId, classification: img.classification, coverageRatio },
-              "photo:composite logo coverage high — consider increasing maxW or shifting vehicle",
-            );
-          }
+      // ── Step 6: Logo zone avoidance ──────────────────────────────────────────
+      // Vehicle roof is at `top` — it must NOT be above logoBottomPx.
+      if (top < logoBottomPx) {
+        // Nudge vehicle down to respect logo zone
+        top = logoBottomPx;
+        // After nudge: check the vehicle still fits above the canvas bottom
+        if (top + finalH > bgH) {
+          // Can't fit at this scale — reduce scale to fit between logo zone and canvas bottom
+          const maxH = bgH - logoBottomPx;
+          const reducedH = Math.min(maxH, finalH);
+          const reducedW = Math.round(reducedH * aspectR);
+          const reducedScaled = await sharp(vehicleCropped)
+            .resize(reducedW, reducedH, { fit: "fill", kernel: "lanczos3", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+            .png()
+            .toBuffer();
+          top  = bgH - reducedH;
+          left = Math.max(0, Math.min(bgW - reducedW, targetCenterX - Math.round(reducedW / 2) + packOffX));
+          // Floor reflection + contact shadow for reduced scale
+          const reflBuf  = await buildFloorReflection(reducedScaled, reducedW, reducedH);
+          const shadowBuf = await buildContactShadow(reducedW, bgW);
+          const shadowMeta = await sharp(shadowBuf).metadata();
+          const sW = shadowMeta.width ?? reducedW;
+          const sH = shadowMeta.height ?? 64;
+          const sLeft = Math.max(0, Math.min(bgW - sW, targetCenterX - Math.round(sW / 2) + packOffX));
+          const sTop  = Math.max(0, Math.min(bgH - sH, (top + reducedH) - Math.round(sH / 2)));
+          const cLeft = Math.max(0, left);
+          const cTop  = Math.max(0, top);
+          const reflTop = Math.min(bgH - reducedH, top + reducedH);
+          const composited = await sharp(backgroundBuffer)
+            .composite([
+              { input: reflBuf,      left: cLeft, top: Math.max(0, reflTop) },
+              { input: shadowBuf,    left: sLeft,  top: sTop, blend: "over" },
+              { input: reducedScaled,left: cLeft,  top: cTop },
+            ])
+            .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+            .toBuffer();
+          const filename = `${ctx.job.vehicleId}-${img.originalUrl.slice(-8).replace(/\W/g, "")}-${bgVersion}-${Date.now()}.jpg`;
+          fs.writeFileSync(path.join(uploadDir, filename), composited);
+          img.compositedUrl     = `/api/static/ai-photos/${filename}`;
+          img.backgroundVersion = bgVersion;
+          img.logoObscured      = false; // we made room
+          ctx.log.debug({ vehicleId: ctx.job.vehicleId, filename, classification: img.classification, reason: "logo-nudge+scale-reduce" }, "photo:composite v3");
+          continue;
         }
       }
 
-      // Clamp to background bounds
-      left = Math.max(0, Math.min(bgWidth  - resizedImgW, left));
-      top  = Math.max(0, Math.min(bgHeight - resizedImgH, top));
+      // ── Step 7: Clamp left/right (horizontal safe margins) ───────────────────
+      left = Math.max(marginX, Math.min(bgW - marginX - finalW, left));
 
-      // ── Step 5: Contact shadow ───────────────────────────────────────────────
-      // SVG radial gradient ellipse — centres exactly at the car's floor contact.
-      const bboxWidthOnBg = Math.round(bbox.bboxW * scaleFactor);
-      const shadowBuf  = await buildContactShadow(bboxWidthOnBg, bgWidth);
+      // ── Step 8: Ensure image fits within canvas (clamp top) ──────────────────
+      // top should be >= 0 in all normal cases since we've ensured finalH <= bgH - logoBottomPx
+      top  = Math.max(0, Math.min(bgH - finalH, top));
+      left = Math.max(0, Math.min(bgW - finalW, left));
+
+      // ── Step 9: Floor reflection ─────────────────────────────────────────────
+      const reflBuf  = await buildFloorReflection(vehicleScaled, finalW, finalH);
+      const floorContactPx = top + finalH; // absolute Y on background where wheels meet floor
+      const reflTop  = Math.min(bgH - finalH, floorContactPx);
+
+      // ── Step 10: Contact shadow ───────────────────────────────────────────────
+      const shadowBuf  = await buildContactShadow(finalW, bgW);
       const shadowMeta = await sharp(shadowBuf).metadata();
-      const shadowW    = shadowMeta.width  ?? bboxWidthOnBg;
-      const shadowH    = shadowMeta.height ?? 82;
+      const sW = shadowMeta.width  ?? finalW;
+      const sH = shadowMeta.height ?? 64;
+      const sLeft = Math.max(0, Math.min(bgW - sW, targetCenterX - Math.round(sW / 2) + packOffX));
+      const sTop  = Math.max(0, Math.min(bgH - sH, floorContactPx - Math.round(sH / 2)));
 
-      // Centre the shadow ellipse horizontally at car centre, vertically at floor line.
-      const shadowLeft = Math.max(0, Math.min(
-        bgWidth - shadowW,
-        targetCenterX - Math.round(shadowW / 2) + packOffX,
-      ));
-      const shadowTop = Math.max(0, Math.min(
-        bgHeight - shadowH,
-        floorOnBg - Math.round(shadowH / 2) + packOffY,
-      ));
-
-      // ── Step 6: Composite — background → shadow → vehicle ───────────────────
+      // ── Step 11: Composite ────────────────────────────────────────────────────
       const composited = await sharp(backgroundBuffer)
         .composite([
-          // Contact shadow — uses its own alpha channel; blend:over preserves it
-          {
-            input: shadowBuf,
-            left:  shadowLeft,
-            top:   shadowTop,
-            blend: "over",
-          },
-          // Vehicle (over everything)
-          {
-            input: vehicleResized,
-            left:  Math.max(0, left),
-            top:   Math.max(0, top),
-          },
+          { input: reflBuf,       left: Math.max(0, left), top: Math.max(0, reflTop) },
+          { input: shadowBuf,     left: sLeft,              top: sTop, blend: "over" },
+          { input: vehicleScaled, left: Math.max(0, left), top: Math.max(0, top) },
         ])
         .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
         .toBuffer();
 
-      const filename = `${ctx.job.vehicleId}-${img.originalUrl.slice(-8).replace(/\W/g, "")}-${backgroundVersion}-${Date.now()}.jpg`;
-      const filepath  = path.join(uploadDir, filename);
-      fs.writeFileSync(filepath, composited);
+      const filename = `${ctx.job.vehicleId}-${img.originalUrl.slice(-8).replace(/\W/g, "")}-${bgVersion}-${Date.now()}.jpg`;
+      fs.writeFileSync(path.join(uploadDir, filename), composited);
+      img.compositedUrl     = `/api/static/ai-photos/${filename}`;
+      img.backgroundVersion = bgVersion;
+      img.logoObscured      = top < logoBottomPx; // true only if clamping forced it
 
-      img.compositedUrl      = `/api/static/ai-photos/${filename}`;
-      img.backgroundVersion  = backgroundVersion;
+      ctx.log.debug({
+        vehicleId: ctx.job.vehicleId, filename,
+        classification: img.classification, bodyStyle,
+        targetH, finalH, finalW,
+        placement: { left, top, floorContactPx, logoBottomPx },
+        logoObscured: img.logoObscured,
+      }, "photo:composite v3");
 
-      ctx.log.debug(
-        {
-          vehicleId: ctx.job.vehicleId,
-          filename,
-          classification: img.classification,
-          bboxValid: bbox.valid,
-          floatingRisk,
-          scaleFactor: scaleFactor.toFixed(3),
-          placement: { left, top, bboxW: bboxWidthOnBg },
-        },
-        "photo:composite",
-      );
     } catch (err) {
       img.compositedUrl = img.backgroundRemovedUrl ?? img.originalUrl;
       img.usedFallback = 1;
