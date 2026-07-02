@@ -1,0 +1,221 @@
+PROMPT PARA REPLIT — AI PHOTO STUDIO v2.0
+
+Estamos entrando en la fase de IA. La publicación automática ya funciona. Ahora el objetivo es transformar automáticamente las fotos antes de publicar.
+
+Flujo completo
+
+Cuando un vehículo pase a estado Ready o cuando el operador haga clic en Publish Now, el sistema debe ejecutar automáticamente este pipeline:
+
+Paso 1
+
+Obtener las 20 fotos originales del inventario.
+
+Paso 2
+
+Clasificar automáticamente cada foto mediante IA.
+
+Clasificaciones:
+
+Exterior Front
+Exterior Front 45°
+Exterior Side
+Exterior Rear
+Exterior Rear 45°
+Wheels
+Engine
+Interior Front
+Interior Dashboard
+Interior Rear Seats
+Trunk
+Miscellaneous
+
+No usar reglas por posición.
+La IA debe reconocer el tipo de foto.
+
+Paso 3
+
+Separar automáticamente
+
+Exterior Photos
+
+↓
+
+Procesar IA
+
+Interior Photos
+
+↓
+
+NO modificar fondo
+
+Solo mejorar:
+
+exposición
+contraste
+nitidez
+ruido
+balance de blancos
+Paso 4
+
+Para TODAS las fotos exteriores:
+
+La IA debe:
+
+• eliminar completamente el fondo original
+
+• conservar exactamente:
+
+vehículo
+ruedas
+sombras reales
+
+• NO cortar espejos
+
+• NO cortar antenas
+
+• NO deformar carrocería
+
+Paso 5
+
+Usar SIEMPRE este fondo oficial de Alpha Motorsport.
+
+(No generar fondos distintos.)
+
+Background ID:
+
+Alpha Motorsport Studio White
+
+Características:
+
+pared blanca
+iluminación LED vertical
+plataforma blanca
+logo Alpha Motorsport
+Paso 6
+
+El logo NUNCA puede quedar tapado.
+
+La IA debe calcular automáticamente:
+
+logo bounding box
+
+↓
+
+reposicionar vehículo
+
+↓
+
+dejar el logo completamente visible.
+
+Nunca centrar el vehículo encima del logo.
+
+Paso 7
+
+Aplicar automáticamente:
+
+Lighting Enhancement
+
+HDR
+mejor contraste
+reflejos limpios
+pintura brillante
+sombras suaves
+mejor color
+
+No parecer CGI.
+
+Debe verse como fotografía profesional.
+
+Paso 8
+
+Conservar exactamente:
+
+color original
+rines
+placas
+stickers
+accesorios
+
+No inventar partes.
+
+Paso 9
+
+Ordenar automáticamente las fotos.
+
+Orden recomendado:
+
+1 Front Hero
+
+2 Front 45°
+
+3 Side
+
+4 Rear 45°
+
+5 Rear
+
+6 Wheel
+
+7 Engine
+
+8 Dashboard
+
+9 Driver Seat
+
+10 Passenger
+
+11 Rear Seats
+
+12 Trunk
+
+...
+
+Hasta completar las 20.
+
+Paso 10
+
+Guardar las imágenes procesadas.
+
+No sobrescribir originales.
+
+Crear:
+
+AI Photo Set
+
+Original Set
+
+Paso 11
+
+Publicar SIEMPRE usando el AI Photo Set.
+
+Nunca usar las fotos originales si existe un AI Photo Set válido.
+
+Paso 12
+
+Cuando el vehículo se publique correctamente:
+
+eliminarlo automáticamente de Recommendations
+eliminarlo de Ready
+moverlo a Published
+refrescar la lista sin recargar la página
+mostrar solamente las oportunidades restantes
+Performance
+
+Procesar hasta 20 fotos en paralelo usando una cola de IA.
+
+Objetivo:
+
+20 fotos procesadas en menos de 30 segundos.
+
+Reglas
+
+No pedir aprobación del operador.
+
+Todo debe ser automático.
+
+Si una foto falla:
+
+usar la original solamente para esa foto
+continuar el pipeline
+
+Nunca detener toda la publicación por una sola imagen.
