@@ -33,7 +33,7 @@ export class OpenAiClassifier implements IClassificationProvider {
   async classify(imageUrl: string): Promise<ClassificationResult> {
     const response = await openai.chat.completions.create({
       model: MODEL,
-      max_completion_tokens: 64,
+      max_completion_tokens: 1024,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
@@ -48,7 +48,7 @@ export class OpenAiClassifier implements IClassificationProvider {
       ],
     });
 
-    const raw = response.choices[0]?.message?.content ?? "";
+    const raw = response.choices[0]?.message?.content || "";
     let label = "Miscellaneous";
     let confidence = 0.5;
 

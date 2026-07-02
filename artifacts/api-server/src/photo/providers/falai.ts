@@ -1,28 +1,40 @@
 // fal.ai BRIA RMBG 2.0 — background removal provider.
-// Calls the fal.ai queue REST API directly using FAL_KEY env var.
-// Gracefully skips (returns null) if FAL_KEY is not set.
+// Uses the DIRECT (non-queue) fal.run endpoint which returns in ~750ms.
+// Images are downloaded locally and submitted as base64 data URLs because
+// the dealer CDN (cdnimages.dealersgpt.com) is not reachable from fal.ai's
+// inference servers; using a raw CDN URL causes every job to time out.
 import type { BackgroundRemovalResult, IBackgroundRemovalProvider } from "./types";
 
-const FAL_QUEUE_BASE = "https://queue.fal.run";
+const FAL_DIRECT_BASE = "https://fal.run";
 const MODEL_PATH = "fal-ai/bria/background/remove";
-const POLL_INTERVAL_MS = 1500;
-const MAX_POLL_ATTEMPTS = 40; // ~60 seconds max
 
-interface FalSubmitResponse {
-  request_id: string;
-  status?: string;
-}
-
-interface FalStatusResponse {
-  status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
-}
-
-interface FalResultResponse {
+interface FalDirectResponse {
   image?: { url: string; content_type?: string };
 }
 
 function getApiKey(): string | null {
   return process.env["FAL_KEY"] ?? null;
+}
+
+/**
+ * Download image from any URL and return as a base64 data URL.
+ * Required because fal.ai inference servers cannot reach protected dealer CDNs.
+ */
+async function toDataUrl(imageUrl: string): Promise<string> {
+  let fetchUrl = imageUrl;
+  if (imageUrl.startsWith("/api/")) {
+    fetchUrl = `http://localhost:${process.env["PORT"] ?? 8080}${imageUrl}`;
+  }
+
+  const res = await fetch(fetchUrl);
+  if (!res.ok) {
+    throw new Error(`Failed to download image (${res.status}): ${fetchUrl}`);
+  }
+
+  const contentType = res.headers.get("content-type") ?? "image/jpeg";
+  const buf = await res.arrayBuffer();
+  const b64 = Buffer.from(buf).toString("base64");
+  return `data:${contentType};base64,${b64}`;
 }
 
 export class FalAiBackgroundRemoval implements IBackgroundRemovalProvider {
@@ -41,73 +53,37 @@ export class FalAiBackgroundRemoval implements IBackgroundRemovalProvider {
       );
     }
 
-    const headers = {
-      Authorization: `Key ${apiKey}`,
-      "Content-Type": "application/json",
-    };
-
     const start = Date.now();
 
-    // 1. Submit to queue
-    const submitRes = await fetch(`${FAL_QUEUE_BASE}/${MODEL_PATH}`, {
+    // Convert to base64 data URL so fal.ai can access the image regardless
+    // of CDN hotlink protection or regional restrictions.
+    const dataUrl = await toDataUrl(imageUrl);
+
+    // Use the direct (non-queue) endpoint — returns the result in ~750ms.
+    // No polling required.
+    const res = await fetch(`${FAL_DIRECT_BASE}/${MODEL_PATH}`, {
       method: "POST",
-      headers,
-      body: JSON.stringify({ image_url: imageUrl }),
+      headers: {
+        Authorization: `Key ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ image_url: dataUrl }),
     });
 
-    if (!submitRes.ok) {
-      const body = await submitRes.text();
-      throw new Error(`fal.ai submit failed (${submitRes.status}): ${body}`);
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`fal.ai inference failed (${res.status}): ${body}`);
     }
 
-    const submitData = (await submitRes.json()) as FalSubmitResponse;
-    const requestId = submitData.request_id;
-    if (!requestId) throw new Error("fal.ai submit returned no request_id");
+    const data = (await res.json()) as FalDirectResponse;
+    const url = data.image?.url;
+    if (!url) throw new Error("fal.ai response contained no image URL");
 
-    // 2. Poll for completion
-    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
-      await sleep(POLL_INTERVAL_MS);
-
-      const statusRes = await fetch(
-        `${FAL_QUEUE_BASE}/${MODEL_PATH}/requests/${requestId}/status`,
-        { headers },
-      );
-
-      if (!statusRes.ok) continue;
-      const statusData = (await statusRes.json()) as FalStatusResponse;
-
-      if (statusData.status === "FAILED") {
-        throw new Error(`fal.ai job ${requestId} failed`);
-      }
-
-      if (statusData.status === "COMPLETED") {
-        // 3. Fetch result
-        const resultRes = await fetch(
-          `${FAL_QUEUE_BASE}/${MODEL_PATH}/requests/${requestId}`,
-          { headers },
-        );
-
-        if (!resultRes.ok) {
-          throw new Error(`fal.ai result fetch failed (${resultRes.status})`);
-        }
-
-        const resultData = (await resultRes.json()) as FalResultResponse;
-        const url = resultData.image?.url;
-        if (!url) throw new Error("fal.ai result contained no image URL");
-
-        return {
-          url,
-          provider: this.name,
-          model: this.model,
-          timeMs: Date.now() - start,
-        };
-      }
-    }
-
-    throw new Error(`fal.ai job ${requestId} timed out after ${MAX_POLL_ATTEMPTS} polls`);
+    return {
+      url,
+      provider: this.name,
+      model: this.model,
+      timeMs: Date.now() - start,
+    };
   }
-}
-
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }

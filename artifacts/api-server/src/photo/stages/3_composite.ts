@@ -16,11 +16,24 @@ function getAiPhotosDir(): string {
   return dir;
 }
 
-// Fetch an image from a URL or file path → Buffer
+// Fetch an image from a URL or file path → Buffer.
+// Handles three forms:
+//   http(s)://…      — external URL, fetched directly
+//   /api/static/…    — served by this server; resolve to localhost so we don't
+//                       rely on the filesystem path (which differs by env)
+//   /absolute/path   — raw filesystem path (legacy; prefer the above)
 async function fetchBuffer(urlOrPath: string): Promise<Buffer> {
   if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
     const res = await fetch(urlOrPath);
     if (!res.ok) throw new Error(`Failed to fetch ${urlOrPath}: ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
+  }
+  // /api/static/… paths are served by this Express process — fetch via localhost
+  if (urlOrPath.startsWith("/api/static/")) {
+    const port = process.env["PORT"] ?? "8080";
+    const localUrl = `http://localhost:${port}${urlOrPath}`;
+    const res = await fetch(localUrl);
+    if (!res.ok) throw new Error(`Failed to fetch local static file ${urlOrPath}: ${res.status}`);
     return Buffer.from(await res.arrayBuffer());
   }
   return fs.readFileSync(urlOrPath);

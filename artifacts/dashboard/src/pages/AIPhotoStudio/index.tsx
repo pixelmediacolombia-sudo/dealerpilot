@@ -79,6 +79,13 @@ interface StudioStats {
   };
   images: { total: number; withAI: number };
   staleCount: number;
+  fal?: {
+    imagesProcessed: number;
+    estimatedSpendUsd: number;
+    lowBalanceWarning: boolean;
+    thresholdUsd: number;
+    costPerImageUsd: number;
+  };
   defaultPack: {
     backgroundUrl: string | null;
     backgroundVersion: string;
@@ -707,6 +714,21 @@ export function AIPhotoStudio() {
               )}
               Reprocess {staleCount} Vehicle{staleCount !== 1 ? "s" : ""}
             </Button>
+          </div>
+        )}
+
+        {/* FAL.ai low-balance warning — cumulative spend estimate (no balance API available) */}
+        {isBgRemovalReady && stats?.fal?.lowBalanceWarning && (
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/25 text-sm">
+            <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-medium text-amber-300">FAL.ai balance may be running low</span>
+              <span className="text-amber-400/80 ml-2">
+                Estimated spend: <span className="font-mono text-amber-300">${stats.fal.estimatedSpendUsd.toFixed(2)}</span>
+                {" "}({stats.fal.imagesProcessed.toLocaleString()} images × ${stats.fal.costPerImageUsd}/image).
+                Threshold: ${stats.fal.thresholdUsd}. Top up your FAL.ai account to avoid interruptions.
+              </span>
+            </div>
           </div>
         )}
 

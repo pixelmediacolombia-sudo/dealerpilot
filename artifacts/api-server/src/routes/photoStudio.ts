@@ -780,6 +780,22 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
       })
       .from(aiPhotoImagesTable);
 
+    // FAL.ai has no public balance API — estimate spend from processed image count.
+    const [falUsageRow] = await db
+      .select({
+        imagesProcessed: sql<number>`count(*) filter (
+          where ${aiPhotoImagesTable.removalProvider} = 'falai'
+          and ${aiPhotoImagesTable.usedFallback} = 0
+        )`,
+      })
+      .from(aiPhotoImagesTable);
+
+    const falCostPerImageUsd = parseFloat(process.env["FAL_COST_PER_IMAGE_USD"] ?? "0.01");
+    const falThresholdUsd = parseFloat(process.env["FAL_LOW_BALANCE_THRESHOLD_USD"] ?? "10");
+    const falImagesProcessed = Number(falUsageRow?.imagesProcessed ?? 0);
+    const falEstimatedSpendUsd = Math.round(falImagesProcessed * falCostPerImageUsd * 100) / 100;
+    const falLowBalanceWarning = falEstimatedSpendUsd >= falThresholdUsd;
+
     const [defaultPack] = await db
       .select()
       .from(aiStudioPacksTable)
@@ -827,6 +843,13 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
       vehicles: vehicleCounts ?? { ready: 0, processing: 0, pending: 0, failed: 0, total: 0 },
       images: imageStats ?? { total: 0, withAI: 0 },
       staleCount,
+      fal: {
+        imagesProcessed: falImagesProcessed,
+        estimatedSpendUsd: falEstimatedSpendUsd,
+        lowBalanceWarning: falLowBalanceWarning,
+        thresholdUsd: falThresholdUsd,
+        costPerImageUsd: falCostPerImageUsd,
+      },
       defaultPack: defaultPack ?? null,
       setup: {
         backgroundConfigured,
