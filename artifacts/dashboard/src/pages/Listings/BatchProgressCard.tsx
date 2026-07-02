@@ -225,18 +225,19 @@ function BatchCard({ batch, onCancel, onDismiss, isMutating }: BatchCardProps) {
 interface BatchProgressCardProps {
   dealerId: number;
   refreshKey?: number;
+  location?: string;
 }
 
-export function BatchProgressCard({ dealerId, refreshKey }: BatchProgressCardProps) {
+export function BatchProgressCard({ dealerId, refreshKey, location }: BatchProgressCardProps) {
   const qc = useQueryClient();
   const [confirmCancel, setConfirmCancel] = useState<number | null>(null);
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
 
   const { data, isLoading } = useListPublishingBatches(
-    { dealerId },
+    { dealerId, location },
     {
       query: {
-        queryKey: [...getListPublishingBatchesQueryKey({ dealerId }), refreshKey],
+        queryKey: [...getListPublishingBatchesQueryKey({ dealerId, location }), refreshKey],
         refetchInterval: 8000,
       },
     },
@@ -245,7 +246,7 @@ export function BatchProgressCard({ dealerId, refreshKey }: BatchProgressCardPro
   const updateBatch = useUpdatePublishingBatch({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getListPublishingBatchesQueryKey({ dealerId }) });
+        qc.invalidateQueries({ queryKey: getListPublishingBatchesQueryKey({ dealerId, location }) });
         toast({ title: "Batch cancelled", description: "Publishing batch has been cancelled." });
       },
       onError: () => toast({ title: "Error", description: "Failed to cancel batch", variant: "destructive" }),
@@ -329,7 +330,7 @@ export function BatchProgressCard({ dealerId, refreshKey }: BatchProgressCardPro
               variant="ghost"
               size="sm"
               className="text-xs text-muted-foreground h-7"
-              onClick={() => qc.invalidateQueries({ queryKey: getListPublishingBatchesQueryKey({ dealerId }) })}
+              onClick={() => qc.invalidateQueries({ queryKey: getListPublishingBatchesQueryKey({ dealerId, location }) })}
             >
               Refresh
             </Button>

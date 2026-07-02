@@ -562,6 +562,7 @@ router.post("/auto-publish/batches", async (req, res) => {
       totalVehicles: eligible.length,
       needsReviewCount,
       scheduledAt: schedAt ?? undefined,
+      lotLocation: lotLocation ?? null,
     })
     .returning();
 
@@ -603,13 +604,19 @@ router.post("/auto-publish/batches", async (req, res) => {
   });
 });
 
-// GET /auto-publish/batches — list batches for a dealer (always scoped to dealer_id=1)
+// GET /auto-publish/batches — list batches for a dealer, optionally scoped to a lot location.
 router.get("/auto-publish/batches", async (req, res) => {
   const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : DEALER_ID;
+  const location = typeof req.query.location === "string" ? req.query.location : "";
   const rows = await db
     .select()
     .from(publishingBatchesTable)
-    .where(eq(publishingBatchesTable.dealerId, dealerId))
+    .where(
+      and(
+        eq(publishingBatchesTable.dealerId, dealerId),
+        location ? eq(publishingBatchesTable.lotLocation, location) : undefined,
+      ),
+    )
     .orderBy(desc(publishingBatchesTable.createdAt));
   res.json({ batches: rows });
 });

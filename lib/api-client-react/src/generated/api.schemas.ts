@@ -1834,6 +1834,10 @@ export type ListPublishingJobsParams = {
  * Filter by job status
  */
 status?: string;
+/**
+ * Filter by lot location (e.g. Manassas, Fredericksburg)
+ */
+location?: string;
 };
 
 export type PublishNowBody = {
@@ -1906,6 +1910,10 @@ export type BulkSchedulePublishing202 = {
 
 export type ListPublishingBatchesParams = {
 dealerId?: number;
+/**
+ * Filter by lot location (e.g. Manassas, Fredericksburg)
+ */
+location?: string;
 };
 
 export type ListVehiclePhotoScoresParams = {

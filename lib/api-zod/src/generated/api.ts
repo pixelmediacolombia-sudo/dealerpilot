@@ -1069,7 +1069,8 @@ export const QueueListingVersionResponse = zod.object({
  * @summary List publishing jobs for the queue UI
  */
 export const ListPublishingJobsQueryParams = zod.object({
-  "status": zod.coerce.string().optional().describe('Filter by job status')
+  "status": zod.coerce.string().optional().describe('Filter by job status'),
+  "location": zod.coerce.string().optional().describe('Filter by lot location (e.g. Manassas, Fredericksburg)')
 })
 
 export const ListPublishingJobsResponse = zod.object({
@@ -1629,7 +1630,8 @@ export const UpdateAutoPublishSettingsResponse = zod.object({
  * @summary List publishing batches for a dealer
  */
 export const ListPublishingBatchesQueryParams = zod.object({
-  "dealerId": zod.coerce.number().optional()
+  "dealerId": zod.coerce.number().optional(),
+  "location": zod.coerce.string().optional().describe('Filter by lot location (e.g. Manassas, Fredericksburg)')
 })
 
 export const ListPublishingBatchesResponse = zod.object({

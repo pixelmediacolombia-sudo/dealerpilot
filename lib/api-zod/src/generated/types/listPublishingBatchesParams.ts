@@ -8,4 +8,8 @@
 
 export type ListPublishingBatchesParams = {
 dealerId?: number;
+/**
+ * Filter by lot location (e.g. Manassas, Fredericksburg)
+ */
+location?: string;
 };

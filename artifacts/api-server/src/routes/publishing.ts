@@ -133,10 +133,30 @@ async function enrich(jobs: PublishingJob[]) {
 // GET /publishing/jobs — full queue for the UI.
 router.get("/publishing/jobs", async (req, res) => {
   const status = typeof req.query.status === "string" ? req.query.status : "";
+  const location = typeof req.query.location === "string" ? req.query.location : "";
+
+  let vehicleIdSet: Set<number> | null = null;
+  if (location) {
+    const matching = await db
+      .select({ id: vehiclesTable.id })
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.lotLocation, location));
+    vehicleIdSet = new Set(matching.map((v) => v.id));
+  }
+
   const rows = await db
     .select()
     .from(publishingJobsTable)
-    .where(status ? eq(publishingJobsTable.status, status) : undefined)
+    .where(
+      and(
+        status ? eq(publishingJobsTable.status, status) : undefined,
+        vehicleIdSet !== null
+          ? vehicleIdSet.size > 0
+            ? inArray(publishingJobsTable.vehicleId, [...vehicleIdSet])
+            : sql`false`
+          : undefined,
+      ),
+    )
     .orderBy(desc(publishingJobsTable.priority), asc(publishingJobsTable.createdAt));
   res.json({ jobs: await enrich(rows) });
 });

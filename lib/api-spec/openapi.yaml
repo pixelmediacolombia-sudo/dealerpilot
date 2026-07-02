@@ -669,6 +669,11 @@ paths:
           required: false
           schema: { type: string }
           description: Filter by job status
+        - name: location
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by lot location (e.g. Manassas, Fredericksburg)
       responses:
         "200":
           description: Publishing jobs
@@ -1157,6 +1162,11 @@ paths:
           in: query
           required: false
           schema: { type: integer }
+        - name: location
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by lot location (e.g. Manassas, Fredericksburg)
       responses:
         "200":
           description: Batches

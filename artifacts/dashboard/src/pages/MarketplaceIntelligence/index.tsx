@@ -310,7 +310,7 @@ export function MarketplaceIntelligence() {
 
   const { selectedLocation } = useDealerLocation();
   const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations({ location: selectedLocation });
-  const { data: jobsData, isLoading: jobsLoading } = useListPublishingJobs();
+  const { data: jobsData, isLoading: jobsLoading } = useListPublishingJobs({ location: selectedLocation });
   const { data: settingsData } = useGetAutoPublishSettings(1);
   const updateSettings = useUpdateAutoPublishSettings();
 

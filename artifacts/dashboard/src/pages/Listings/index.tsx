@@ -315,7 +315,7 @@ export function ListingsWorkspace() {
   });
 
   const { data: jobsData, isLoading: jobsLoading } = useListPublishingJobs(
-    {},
+    { location: selectedLocation },
     { query: { refetchInterval: 5000 } as never },
   );
 
@@ -682,7 +682,7 @@ export function ListingsWorkspace() {
           />
 
           {/* Batch Progress */}
-          <BatchProgressCard dealerId={DEALER_ID} refreshKey={batchRefreshKey} />
+          <BatchProgressCard dealerId={DEALER_ID} refreshKey={batchRefreshKey} location={selectedLocation} />
 
           {/* ── Published / Needs Update / Sold tabs — engagement-rich cards ── */}
           {isPublishedTab && (

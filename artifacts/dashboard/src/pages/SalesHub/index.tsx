@@ -314,7 +314,7 @@ export function SalesHub() {
   const { data: vehicleStats } = useGetVehicleStats({ location: selectedLocation });
   const { data: workspacesData, isLoading: workspacesLoading } = useListListingWorkspaces({ location: selectedLocation });
   const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations({ location: selectedLocation });
-  const { data: jobsData } = useListPublishingJobs();
+  const { data: jobsData } = useListPublishingJobs({ location: selectedLocation });
   const { data: creativeJobs } = useListCreativeJobs();
   const { data: leads } = useGetLeads();
   const { data: connections } = useGetConnectionStatus();

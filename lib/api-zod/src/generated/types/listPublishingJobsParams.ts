@@ -11,4 +11,8 @@ export type ListPublishingJobsParams = {
  * Filter by job status
  */
 status?: string;
+/**
+ * Filter by lot location (e.g. Manassas, Fredericksburg)
+ */
+location?: string;
 };
