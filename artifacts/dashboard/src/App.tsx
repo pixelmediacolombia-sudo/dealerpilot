@@ -21,6 +21,7 @@ import { SalesAIWorkspace } from "@/pages/SalesAI";
 import { ConversationDetail } from "@/pages/SalesAI/ConversationDetail";
 import { LeadsCRM } from "@/pages/SalesAI/LeadsCRM";
 import { LeadDetail } from "@/pages/SalesAI/LeadDetail";
+import { MarketplaceListings } from "@/pages/SalesAI/MarketplaceListings";
 import { MarketplaceIntelligence } from "@/pages/MarketplaceIntelligence";
 import { InventoryEngine } from "@/pages/InventoryEngine";
 import { AIPhotoStudio } from "@/pages/AIPhotoStudio";
@@ -55,6 +56,7 @@ function Router() {
 
       {/* Sales AI */}
       <Route path="/sales-ai" component={SalesAIWorkspace} />
+      <Route path="/sales-ai/marketplace-listings" component={MarketplaceListings} />
       <Route path="/conversations/:id" component={ConversationDetail} />
       <Route path="/leads" component={LeadsCRM} />
       <Route path="/leads/:id" component={LeadDetail} />

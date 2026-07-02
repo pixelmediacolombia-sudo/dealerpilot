@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
   useListConversations,
@@ -32,6 +33,7 @@ import {
   DollarSign,
   Car,
   Phone,
+  Radio,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -160,6 +162,24 @@ export function SalesAIWorkspace() {
               valueColor="text-green-400"
             />
           </div>
+
+          {/* Marketplace Listings quick-access card */}
+          <Link href="/sales-ai/marketplace-listings">
+            <div className="group flex items-center gap-4 p-4 rounded-xl border border-white/[0.06] bg-card hover:border-green-500/20 hover:bg-green-500/[0.02] transition-all cursor-pointer">
+              <div className="w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center shrink-0">
+                <Radio className="w-5 h-5 text-green-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-white group-hover:text-green-300 transition-colors">
+                  Marketplace Listings
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  View live listings, track messages, and manage sold vehicles
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-green-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </div>
+          </Link>
 
           {lastResult && (
             <div className="p-5 rounded-2xl border border-green-500/20 bg-green-500/5">

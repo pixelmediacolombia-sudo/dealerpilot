@@ -10,6 +10,7 @@ import {
   listingVersionsTable,
   publishingJobsTable,
   vehicleIntelligenceTable,
+  marketplaceListingsTable,
   type PublishingJob,
 } from "@workspace/db";
 import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
@@ -594,6 +595,26 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
     .onConflictDoUpdate({
       target: [listingsTable.vehicleId, listingsTable.channel],
       set: conflictSet,
+    });
+
+  // Create or update the Sales AI marketplace_listings record so the published
+  // vehicle immediately appears in Sales AI → Marketplace Listings.
+  await db
+    .insert(marketplaceListingsTable)
+    .values({
+      vehicleId: updated.vehicleId,
+      dealerId: updated.dealerId,
+      listingUrl: listingUrl ?? null,
+      publishedAt: now,
+      status: "Live",
+    })
+    .onConflictDoUpdate({
+      target: [marketplaceListingsTable.vehicleId],
+      set: {
+        listingUrl: listingUrl ?? null,
+        publishedAt: now,
+        status: "Live",
+      },
     });
 
   req.log.info({ jobId: id, listingUrl, previousStatus: job.status }, "complete: job Published successfully");

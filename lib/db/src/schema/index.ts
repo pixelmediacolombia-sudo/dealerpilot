@@ -31,3 +31,4 @@ export * from "./aiPhotoJobs";
 export * from "./aiPhotoSets";
 export * from "./aiPhotoImages";
 export * from "./aiStudioPacks";
+export * from "./marketplaceListings";

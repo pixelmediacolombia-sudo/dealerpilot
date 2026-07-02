@@ -29,7 +29,7 @@ const ACTIVE_PATHS: Record<string, string[]> = {
   "/listings": ["/listings", "/inventory", "/publishing"],
   "/inventory-engine": ["/inventory-engine"],
   "/ai-photo-studio": ["/ai-photo-studio", "/creative-studio"],
-  "/sales-ai": ["/sales-ai", "/conversations", "/leads"],
+  "/sales-ai": ["/sales-ai", "/conversations", "/leads", "/sales-ai/marketplace-listings"],
   "/marketplace-intelligence": ["/marketplace-intelligence"],
   "/dealer-dna": ["/dealer-dna"],
   "/settings": ["/settings"],
