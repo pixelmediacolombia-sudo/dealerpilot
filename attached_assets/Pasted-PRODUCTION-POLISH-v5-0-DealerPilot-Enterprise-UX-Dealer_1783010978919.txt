@@ -1,0 +1,372 @@
+PRODUCTION POLISH v5.0 — DealerPilot Enterprise UX
+
+DealerPilot is feature-complete.
+
+No new features.
+
+This sprint is exclusively focused on product quality, usability, consistency and enterprise UI.
+
+====================================================
+1. MARKETPLACE AI REDESIGN
+====================================================
+
+Marketplace AI is currently too dense.
+
+Simplify the experience.
+
+This page should answer one question:
+
+"What should I publish today?"
+
+REMOVE
+
+• Inventory table
+• List/Grid toggle
+• Search bar
+• Select All
+• Priority dropdown
+• Duplicate Publish buttons
+• Duplicate inventory cards
+
+Inventory belongs inside Inventory.
+
+Marketplace AI becomes only the publishing workspace.
+
+====================================================
+
+TOP AREA
+
+====================================================
+
+Single KPI row
+
+Eligible
+
+Ready
+
+Publishing
+
+Published Today
+
+Messages Generated Today
+
+Live Listings
+
+Compact.
+
+====================================================
+
+TODAY'S RECOMMENDATIONS
+
+====================================================
+
+Maximum 3 premium recommendation cards.
+
+Each card contains:
+
+Vehicle Hero Photo
+
+Year Make Model
+
+Price
+
+Mileage
+
+AI Score
+
+Expected Marketplace Messages
+
+Estimated Days to Sell
+
+Demand Trend
+
+Reason why DealerPilot selected this vehicle
+
+Buttons
+
+Publish
+
+Preview Listing
+
+Skip Recommendation
+
+More Details
+
+Cards should feel like Apple / Stripe / Linear.
+
+Large spacing.
+
+Rounded corners.
+
+No table layout.
+
+====================================================
+
+PUBLISHING QUEUE
+
+====================================================
+
+Compact timeline only.
+
+Vehicle
+
+Status
+
+ETA
+
+Current step
+
+====================================================
+
+RECENTLY PUBLISHED
+
+====================================================
+
+Last 10 vehicles.
+
+Vehicle thumbnail
+
+Published time
+
+Messages
+
+Views
+
+Lead temperature
+
+Open Listing
+
+====================================================
+
+AUTO PUBLISH
+
+====================================================
+
+Small settings card.
+
+Not a full-width section.
+
+====================================================
+
+2. SALES AI REDESIGN
+====================================================
+
+Current layout still feels like an inbox.
+
+Make it feel like a Marketplace CRM.
+
+Conversation cards should include:
+
+Vehicle Thumbnail
+
+Buyer Avatar
+
+Buyer Name
+
+Vehicle Name
+
+Marketplace Badge
+
+Unread Count
+
+Lead Temperature
+
+AI Priority
+
+Last Message
+
+Buttons
+
+Reply
+
+Appointment
+
+Sold
+
+Listing
+
+Large spacing.
+
+====================================================
+
+3. INVENTORY PAGE
+====================================================
+
+Inventory is now the source of truth.
+
+Only Inventory contains:
+
+Search
+
+Filters
+
+Grid
+
+List
+
+Bulk Actions
+
+Marketplace Status
+
+AI Photo Status
+
+Publishing Status
+
+Photo Count
+
+====================================================
+
+4. AI PHOTO STUDIO
+====================================================
+
+Redesign completely.
+
+Top summary:
+
+Vehicle
+
+VIN
+
+Price
+
+Mileage
+
+AI Status
+
+Processing Time
+
+Quality Score
+
+Marketplace Ready
+
+Below:
+
+Original Photos
+
+↓
+
+Enhanced Photos
+
+↓
+
+Before / After Slider
+
+↓
+
+Quality Report
+
+↓
+
+AI Decisions
+
+↓
+
+Export
+
+↓
+
+Reprocess
+
+Every image should display:
+
+Original
+
+Enhanced
+
+Classification
+
+Enhancement Level
+
+Processing Time
+
+Resolution
+
+====================================================
+
+5. DESIGN SYSTEM
+====================================================
+
+Standardize everything.
+
+One button style.
+
+One card style.
+
+One badge style.
+
+One spacing system.
+
+One typography scale.
+
+One icon style.
+
+No inconsistent paddings.
+
+No duplicated components.
+
+====================================================
+
+6. REMOVE VISUAL CLUTTER
+====================================================
+
+Audit every page.
+
+If something does not help a dealer sell more cars...
+
+remove it.
+
+====================================================
+
+7. DEALERPILOT PERSONALITY
+====================================================
+
+DealerPilot should feel like:
+
+Apple Business
+
+Stripe Dashboard
+
+Linear
+
+Vercel
+
+Not like an admin panel.
+
+Minimal.
+
+Premium.
+
+High whitespace.
+
+Enterprise.
+
+====================================================
+
+8. FINAL PRODUCT AUDIT
+====================================================
+
+Run a complete UI audit.
+
+Look for:
+
+duplicate cards
+
+duplicate buttons
+
+duplicate actions
+
+dead sections
+
+developer-only information
+
+unused filters
+
+unused tabs
+
+old labels
+
+visual inconsistencies
+
+Fix everything.
+
+The final result should look like a commercial SaaS ready to sell to dealership groups.
