@@ -22,7 +22,7 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.6";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.7";
 
   // ── Performance / fast-mode settings ────────────────────────────────────────
   // MARKETPLACE_FAST_MODE=true fills the 10 required fields:
@@ -426,7 +426,7 @@
     <div id="mai-header">
       <span id="mai-dot"></span>
       <span id="mai-title">DealerPilot AI</span>
-      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.6</span>
+      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.7</span>
       <button id="mai-toggle" title="Collapse">_</button>
     </div>
     <div id="mai-body">
@@ -1452,13 +1452,22 @@
     }
 
     const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl: listingUrl || undefined });
+
+    // Always clear activeJob — Facebook published, so the slot is done regardless of
+    // whether the backend acknowledged it cleanly. A 409/500 here must never leave
+    // the extension stuck with a ghost activeJob that blocks the next vehicle.
+    await chrome.storage.local.remove("activeJob");
+
     if (!r || !r.ok) {
       if (r?.error === CTXI) return;
-      setStatus("Published but failed to record result: " + (r?.error ?? "unknown error"), "err");
+      setStatus(
+        "✓ Published on Facebook — backend sync issue (moved to Needs Review). " +
+        "Open the popup to claim the next job.",
+        "err",
+      );
       return;
     }
 
-    await chrome.storage.local.remove("activeJob");
     setStatus("✓ Published successfully!" + (listingUrl ? " Listing is live." : ""), "ok");
     clearOutput();
     jobBoxEl.innerHTML = `
@@ -2071,5 +2080,5 @@
     );
   }
 
-  log("Panel loaded v1.3.6", { isMessenger, isMarketplaceCreate });
+  log("Panel loaded v1.3.7", { isMessenger, isMarketplaceCreate });
 })();

@@ -438,6 +438,9 @@ const CompleteBody = z.object({
 });
 
 // POST /publishing/jobs/:id/complete — extension reports success.
+// Idempotent: Facebook publish is the source of truth. Never returns 409 after a
+// successful Facebook publish. Accepts any non-terminal status so a mid-flight
+// status transition never blocks completion.
 router.post("/publishing/jobs/:id/complete", async (req, res) => {
   const id = Number(req.params.id);
   const parsed = CompleteBody.safeParse(req.body ?? {});
@@ -456,32 +459,85 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
     return;
   }
 
+  // Debug: always log pre-update state for post-mortem analysis.
+  req.log.info({
+    jobId: id,
+    currentStatus: job.status,
+    claimedByExtension: job.claimedByExtension,
+    extensionId,
+    listingUrl: listingUrl ?? null,
+    attempts: job.attempts,
+  }, "complete: pre-update state");
+
   // Ownership: only the extension that claimed the job may finalize it.
+  // Skip ownership check if the job was never claimed (safety valve for edge cases).
   if (job.claimedByExtension && job.claimedByExtension !== extensionId) {
+    req.log.warn({ jobId: id, claimedByExtension: job.claimedByExtension, extensionId },
+      "complete: ownership mismatch");
     res.status(403).json({ error: "Job is claimed by another extension" });
     return;
   }
 
-  // Atomic, ownership-scoped transition: accepts Publishing, Filling Form, or
-  // Ready for Review so the operator can confirm from any in-progress state.
+  // ── Already Published → idempotent 200 ───────────────────────────────────
+  // Covers duplicate complete calls (e.g. retry after a network timeout).
+  if (job.status === "Published") {
+    req.log.info({ jobId: id, extensionId }, "complete: already Published — idempotent 200");
+    const [enriched] = await enrich([job]);
+    res.json(enriched);
+    return;
+  }
+
+  // ── Terminal non-Published (Failed / Cancelled / Needs Review) ───────────
+  // If the extension provides a listingUrl, Facebook published successfully —
+  // trust that as the source of truth and force-mark Published.
+  // If no listingUrl, we cannot confirm the publish; move to Needs Review so
+  // the operator can resolve manually without blocking the queue.
+  const TERMINAL_NON_PUBLISHED = ["Failed", "Cancelled", "Needs Review"];
+  if (TERMINAL_NON_PUBLISHED.includes(job.status)) {
+    if (!listingUrl) {
+      req.log.warn({ jobId: id, status: job.status, extensionId },
+        "complete: terminal job with no listingUrl — moving to Needs Review");
+      await db
+        .update(publishingJobsTable)
+        .set({
+          status: "Needs Review",
+          needsReview: true,
+          reviewReason: `Published on Facebook but result recording failed — job was "${job.status}" when complete was called`,
+        })
+        .where(eq(publishingJobsTable.id, id));
+      res.json({
+        ok: true,
+        needsReview: true,
+        message:
+          `Job moved to Needs Review (was "${job.status}"). ` +
+          "Verify the Facebook listing manually and use Mark Published in the extension.",
+      });
+      return;
+    }
+    // Has listingUrl → Facebook published → fall through to the publish block.
+    req.log.warn({ jobId: id, status: job.status, extensionId, listingUrl },
+      "complete: terminal job has listingUrl — Facebook is source of truth; force-publishing");
+  }
+
+  // ── Mark Published (any active state, or terminal-but-has-listingUrl) ────
+  // Use an ID-only WHERE since ownership was already verified above.
+  // This accepts any intermediate status (Queued, Claimed, Filling Form,
+  // Publishing, Clicking Publish, Capturing URL, Retry, etc.) without 409.
+  const now = new Date();
   const [updated] = await db
     .update(publishingJobsTable)
-    .set({ status: "Published", completedAt: new Date(), failedReason: null })
-    .where(
-      and(
-        eq(publishingJobsTable.id, id),
-        or(
-          eq(publishingJobsTable.status, "Publishing"),
-          eq(publishingJobsTable.status, "Filling Form"),
-          eq(publishingJobsTable.status, "Ready for Review"),
-        ),
-        eq(publishingJobsTable.claimedByExtension, extensionId),
-      ),
-    )
+    .set({
+      status: "Published",
+      completedAt: now,
+      failedReason: null,
+      listingUrl: listingUrl ?? job.listingUrl,
+    })
+    .where(eq(publishingJobsTable.id, id))
     .returning();
 
   if (!updated) {
-    res.status(409).json({ error: "Job is not in a publishing state" });
+    req.log.error({ jobId: id, extensionId }, "complete: update returned 0 rows — job may have been deleted");
+    res.status(500).json({ error: "Failed to update job — it may have been deleted" });
     return;
   }
 
@@ -490,11 +546,8 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
     .set({ status: "Published" })
     .where(eq(vehiclesTable.id, updated.vehicleId));
 
-  // Record the published Marketplace listing. Atomic upsert keyed by the
-  // (vehicle_id, channel) unique constraint so concurrent completions cannot
-  // create duplicates; omit externalUrl from the conflict update so a re-publish
-  // without a URL keeps the previously stored one.
-  const now = new Date();
+  // Upsert listing record. Keyed by (vehicle_id, channel) so concurrent
+  // completions cannot create duplicates.
   const conflictSet: { status: string; externalUrl?: string; publishedAt: Date; publishedByExtensionId?: string } = {
     status: "Published",
     publishedAt: now,
@@ -516,7 +569,7 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
       set: conflictSet,
     });
 
-  req.log.info({ jobId: id, listingUrl }, "Publishing job completed");
+  req.log.info({ jobId: id, listingUrl, previousStatus: job.status }, "complete: job Published successfully");
   const [enriched] = await enrich([updated]);
   res.json(enriched);
 });
