@@ -25,10 +25,10 @@
   const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.5";
 
   // ── Performance / fast-mode settings ────────────────────────────────────────
-  // MARKETPLACE_FAST_MODE=true fills only the 9 required fields:
-  //   photos → vehicle type → year → make → model → price → title →
-  //   description → location
-  // Mileage, condition, and all other optional fields are skipped entirely.
+  // MARKETPLACE_FAST_MODE=true fills the 10 required fields:
+  //   photos → vehicle type → year → make → model → mileage → price →
+  //   title → description → location
+  // Condition and all other optional fields are skipped in fast mode.
   // Target: one vehicle published in 90 s – 3 min.
   const MARKETPLACE_FAST_MODE = true;
 
@@ -965,22 +965,37 @@
       await fillStep("description", ["description", "describe", "details"], fill.description);
       await fillStep("location", ["location", "city", "where"], fill.location);
 
-      if (!MARKETPLACE_FAST_MODE) {
-        // ---- Phase 4: Mileage (important, non-blocking) ----
-        // Skipped in fast mode — not required for Next button.
-        stateLog("Phase 4: mileage (important, non-blocking)");
-        await fillStep("mileage", [
-          "mileage", "odometer", "miles", "vehicle mileage",
-          "number of miles", "mileage (optional)", "odometer reading",
-        ], fill.mileage);
+      // ---- Phase 4: Mileage (required for Next button) ──────────────────
+      // Always attempted regardless of FAST_MODE — Facebook requires mileage.
+      // Normalize: strip commas, "miles", "mi" text — numbers only.
+      // "119,548 miles" → "119548"
+      stateLog("Phase 4: mileage (required for Next button)");
+      {
+        const rawMileage = fill.mileage;
+        if (rawMileage === null || rawMileage === undefined || rawMileage === "") {
+          stateError("Mileage missing from vehicle data");
+          setStatus("Mileage missing from vehicle data", "err");
+          missed.push("mileage");
+          warnings.push("mileage: Mileage missing from vehicle data");
+        } else {
+          const normalizedMileage = String(rawMileage)
+            .replace(/,/g, "")
+            .replace(/\s*(miles?|mi)\b/gi, "")
+            .trim();
+          stateLog(`Mileage: raw="${rawMileage}" → normalized="${normalizedMileage}"`);
+          await fillStep("mileage", [
+            "mileage", "odometer", "miles", "vehicle mileage",
+            "number of miles", "mileage (optional)", "odometer reading",
+          ], normalizedMileage);
+        }
+      }
 
-        // ---- Phase 5: Condition dropdown — strict match only, skip if no match ----
-        // All other optional dropdowns (transmission, fuel type, color, body style,
-        // drivetrain) are intentionally skipped per MVP field-priority rules.
-        stateLog("Phase 5: condition (important, non-blocking)");
+      if (!MARKETPLACE_FAST_MODE) {
+        // ---- Phase 5: Condition dropdown (non-blocking, skipped in fast mode) ----
+        stateLog("Phase 5: condition (non-blocking)");
         await selectComboboxStep("condition", ["condition"], fill.condition, false, false);
       } else {
-        stateLog("Fast mode: skipping mileage + condition (not required for Next)");
+        stateLog("Fast mode: skipping condition");
       }
 
       checkBudget("workflow complete");
