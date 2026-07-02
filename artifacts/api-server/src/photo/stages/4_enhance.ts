@@ -1,25 +1,35 @@
-// Stage 4: Enhance — applies luxury dealership-quality image processing.
+// Stage 4: Enhance — applies premium image processing per photo category.
 //
-// Studio Exterior composites (have a studio background):
-//   Professional studio treatment:
-//   1. CLAHE local contrast (paint reflections / panel lines pop)
+// STUDIO EXTERIOR  (Front / Front 45 / Side / Rear 45 / Rear)
+//   — Full luxury dealership treatment:
+//   1. CLAHE local contrast  (paint, panel lines, wheel spokes pop)
 //   2. Normalise dynamic range
-//   3. Saturation + brightness lift for richer paint
+//   3. Saturation + brightness lift for richer paint / deeper colour
 //   4. Contrast curve (deeper blacks, brighter highlights)
-//   5. Unsharp mask (crisp detail, no halos)
-//   6. Studio overhead light overlay — soft radial gradient at 12 % opacity
-//      to simulate a real studio ceiling fixture
+//   5. Unsharp mask (crisp paint, glass, badges — no halos)
+//   6. Studio overhead light overlay — soft radial gradient 12 % opacity
 //
-// Secondary Exterior (Wheel, Engine, Bed, Tailgate — no studio bg):
-//   Moderate: normalise + saturation + sharpen.
+// SECONDARY EXTERIOR  (Wheel / Engine / Bed / Tailgate)
+//   — Exterior detail treatment, no studio bg:
+//   1. CLAHE
+//   2. Normalise
+//   3. Saturation + moderate brightness lift
+//   4. Sharpen for crisp wheel / engine detail
 //
-// Interior:
-//   Gentle: normalise + subtle saturation + soft sharpen.
+// INTERIOR  (all Interior_* labels)
+//   — Premium showroom cabin treatment:
+//   1. CLAHE small-block (fine leather / stitching / screen detail)
+//   2. Normalise (broad tonal range, recover shadows)
+//   3. Saturation + gentle brightness lift (richer colour depth)
+//   4. Linear contrast curve (deeper blacks, cleaner whites)
+//   5. Premium sharpen (leather texture, knobs, buttons, screens)
 //
-// Technical / Dealer:
-//   Light sharpen only.
+// TECHNICAL / DEALER / MISC
+//   — Readability-only; preserve original framing / colours:
+//   1. Normalise (gentle — keep full information range)
+//   2. Light sharpen (text, numbers, VIN digits)
 //
-// Output: JPEG 95, 4:4:4 chroma.
+// Output: JPEG 95, 4:4:4 chroma (maximum colour fidelity).
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
@@ -46,8 +56,7 @@ async function fetchBuffer(urlOrPath: string): Promise<Buffer> {
   return fs.readFileSync(urlOrPath);
 }
 
-// Build a soft radial gradient PNG that simulates a studio overhead light.
-// Centred at the upper-middle of the image, fades to transparent toward edges.
+// Soft radial gradient — simulates a studio ceiling overhead light fixture.
 async function buildStudioLightOverlay(w: number, h: number): Promise<Buffer> {
   const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
   <defs>
@@ -74,14 +83,16 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
       const buf = await fetchBuffer(src);
       const classification = img.classification ?? "";
 
-      const isStudioExterior   = STUDIO_EXTERIOR_CLASSIFICATIONS.has(classification);
+      const isStudioExterior    = STUDIO_EXTERIOR_CLASSIFICATIONS.has(classification);
       const isSecondaryExterior = EXTERIOR_CLASSIFICATIONS.has(classification) && !isStudioExterior;
+      const isInterior          = classification.startsWith("Interior");
+      const isTechnical         = classification.startsWith("Technical") || classification.startsWith("Dealer");
 
       let enhanced: Buffer;
 
       if (isStudioExterior) {
-        // ── Luxury studio exterior treatment ─────────────────────────────────
-        // Steps 1–5: standard Sharp chain
+        // ── Premium studio exterior ───────────────────────────────────────────
+        // Full pipeline: CLAHE → normalise → colour lift → contrast curve → sharpen → overhead light
         const processed = await sharp(buf)
           .clahe({ width: 64, height: 64, maxSlope: 3 })
           .normalise({ lower: 0.5, upper: 99.5 })
@@ -91,7 +102,6 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
           .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
           .toBuffer();
 
-        // Step 6: composite studio overhead light overlay
         const meta = await sharp(processed).metadata();
         const w = meta.width  ?? 1536;
         const h = meta.height ?? 1024;
@@ -103,27 +113,54 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
           .toBuffer();
 
       } else if (isSecondaryExterior) {
-        // ── Secondary exterior ────────────────────────────────────────────────
+        // ── Secondary exterior (Wheel / Engine / Bed / Tailgate) ──────────────
+        // CLAHE for fine detail, normalise, saturation lift, crisp sharpen
         enhanced = await sharp(buf)
+          .clahe({ width: 48, height: 48, maxSlope: 3 })
           .normalise({ lower: 1, upper: 99 })
-          .modulate({ brightness: 1.02, saturation: 1.10 })
-          .sharpen({ sigma: 0.75, m1: 0.5, m2: 2.5 })
+          .modulate({ brightness: 1.02, saturation: 1.14 })
+          .linear(1.04, -4)
+          .sharpen({ sigma: 0.80, m1: 0.5, m2: 3.0, x1: 3, y2: 12, y3: 18 })
           .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
           .toBuffer();
 
-      } else if (classification.startsWith("Interior")) {
-        // ── Interior — preserve natural cabin lighting ────────────────────────
+      } else if (isInterior) {
+        // ── Premium interior cabin treatment ──────────────────────────────────
+        // Goal: clean showroom photo — rich leather/fabric, crisp screens,
+        //       deep blacks, no muddy shadows, accurate colour depth.
+        //
+        // CLAHE with small tile (32×32) to recover fine stitching / knob detail
+        // without blowing out bright spots (e.g. sun coming through windows).
+        // Normalise with generous headroom to recover underexposed shadows.
+        // Saturation lift brings out leather, wood trim, and screen colours.
+        // Linear curve deepens blacks (removes milky shadow) and lifts mids.
+        // Premium sharpen: high flat-region floor (m1), high slope (m2) so
+        // leather grain, buttons, and infotainment text come through sharply.
         enhanced = await sharp(buf)
-          .normalise({ lower: 1, upper: 99 })
-          .modulate({ brightness: 1.01, saturation: 1.06 })
-          .sharpen({ sigma: 0.65, m1: 0.4, m2: 1.8 })
+          .clahe({ width: 32, height: 32, maxSlope: 3 })
+          .normalise({ lower: 0.5, upper: 99.5 })
+          .modulate({ brightness: 1.04, saturation: 1.16, hue: 0 })
+          .linear(1.07, -7)
+          .sharpen({ sigma: 0.90, m1: 0.55, m2: 4.0, x1: 4, y2: 18, y3: 26 })
+          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+          .toBuffer();
+
+      } else if (isTechnical) {
+        // ── Technical & Dealer docs — readability only ────────────────────────
+        // Gentle normalise to recover washed-out or dim screens/stickers.
+        // Light sharpen for crisp text, VIN digits, gauge numbers.
+        // No colour manipulation — preserve exact information content.
+        enhanced = await sharp(buf)
+          .normalise({ lower: 1.5, upper: 98.5 })
+          .sharpen({ sigma: 0.60, m1: 0.35, m2: 1.8, x1: 3, y2: 10, y3: 14 })
           .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
           .toBuffer();
 
       } else {
-        // ── Technical / Dealer / Misc — clarity only ─────────────────────────
+        // ── Miscellaneous — gentle improvement ────────────────────────────────
         enhanced = await sharp(buf)
-          .sharpen({ sigma: 0.5, m1: 0.3, m2: 1.2 })
+          .normalise({ lower: 1, upper: 99 })
+          .sharpen({ sigma: 0.55, m1: 0.3, m2: 1.5 })
           .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
           .toBuffer();
       }
@@ -133,7 +170,7 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
       img.processedUrl = `/api/static/ai-photos/${filename}`;
 
       ctx.log.debug(
-        { vehicleId: ctx.job.vehicleId, filename, classification, isStudioExterior },
+        { vehicleId: ctx.job.vehicleId, filename, classification, isStudioExterior, isInterior, isTechnical },
         "photo:enhance",
       );
     } catch (err) {
