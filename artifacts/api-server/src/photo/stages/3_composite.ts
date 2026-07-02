@@ -88,9 +88,23 @@ export async function stageComposite(ctx: PipelineContext): Promise<void> {
       const vw = vehicleMeta.width ?? 800;
       const vh = vehicleMeta.height ?? 600;
 
-      // Scale vehicle to fill ~85% of background width while preserving aspect ratio
+      // Determine vehicle size and position.
+      // Priority: placement mask from studio pack > generic formula.
+      //
+      // Placement mask format: { cx, bottomY, maxW }
+      //   cx      — horizontal center (0–1 fraction of bg width)
+      //   bottomY — where the vehicle's wheel-line lands (0–1 fraction of bg height, from top)
+      //   maxW    — maximum vehicle width as fraction of bg width
+      //
+      // If no mask is present, fall back to the old "fill 85% width, 5% bottom margin" logic.
+      type PlacementMask = { cx?: number; bottomY?: number; maxW?: number };
+      const mask: PlacementMask | null = ctx.pack?.placementMaskJson
+        ? (JSON.parse(ctx.pack.placementMaskJson) as PlacementMask)
+        : null;
+
       const scale = ctx.pack?.vehicleScale ?? 1.0;
-      const targetW = Math.round(bgWidth * 0.85 * scale);
+      const maxWidthFraction = mask?.maxW ?? 0.85;
+      const targetW = Math.round(bgWidth * maxWidthFraction * scale);
       const targetH = Math.round((vh / vw) * targetW);
 
       // Resize vehicle
@@ -99,11 +113,24 @@ export async function stageComposite(ctx: PipelineContext): Promise<void> {
         .png()
         .toBuffer();
 
-      // Center horizontally; place wheels near bottom of background
+      // Position vehicle
       const offsetX = ctx.pack?.vehicleOffsetX ?? 0;
       const offsetY = ctx.pack?.vehicleOffsetY ?? 0;
-      const left = Math.round((bgWidth - targetW) / 2 + offsetX * bgWidth);
-      const top = Math.round(bgHeight - targetH - bgHeight * 0.05 + offsetY * bgHeight);
+
+      let left: number;
+      let top: number;
+
+      if (mask?.bottomY !== undefined) {
+        // Mask-guided placement: wheels land exactly on bottomY
+        const cx = mask.cx ?? 0.5;
+        const wheelY = Math.round(mask.bottomY * bgHeight);
+        left = Math.round(cx * bgWidth - targetW / 2 + offsetX * bgWidth);
+        top = wheelY - targetH + Math.round(offsetY * bgHeight);
+      } else {
+        // Legacy: center horizontally, bottom edge at 95% of bg height
+        left = Math.round((bgWidth - targetW) / 2 + offsetX * bgWidth);
+        top = Math.round(bgHeight - targetH - bgHeight * 0.05 + offsetY * bgHeight);
+      }
 
       // Composite: background → vehicle (OVER)
       const composited = await sharp(backgroundBuffer)

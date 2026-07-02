@@ -350,7 +350,7 @@ router.get("/photo-studio/packs", async (req: Request, res: Response) => {
 router.patch("/photo-studio/packs/:id", async (req: Request, res: Response) => {
   try {
     const packId = Number(req.params.id);
-    const { backgroundUrl, lightingPreset, vehicleScale, vehicleOffsetX, vehicleOffsetY, logoSafeZoneJson } =
+    const { backgroundUrl, lightingPreset, vehicleScale, vehicleOffsetX, vehicleOffsetY, logoSafeZoneJson, placementMaskJson } =
       req.body as {
         backgroundUrl?: string;
         lightingPreset?: string;
@@ -358,6 +358,7 @@ router.patch("/photo-studio/packs/:id", async (req: Request, res: Response) => {
         vehicleOffsetX?: number;
         vehicleOffsetY?: number;
         logoSafeZoneJson?: string;
+        placementMaskJson?: string;
       };
 
     const [existing] = await db
@@ -387,6 +388,7 @@ router.patch("/photo-studio/packs/:id", async (req: Request, res: Response) => {
         vehicleOffsetX: vehicleOffsetX ?? existing.vehicleOffsetX,
         vehicleOffsetY: vehicleOffsetY ?? existing.vehicleOffsetY,
         logoSafeZoneJson: logoSafeZoneJson ?? existing.logoSafeZoneJson,
+        placementMaskJson: placementMaskJson ?? existing.placementMaskJson,
       })
       .where(eq(aiStudioPacksTable.id, packId))
       .returning();
@@ -426,7 +428,13 @@ router.post(
 
       // Placement mask: the area where vehicles should be composited.
       //   Center 85% of width, occupying the bottom 78% of height (below logo strip).
-      const placementMask = { cx: 0.5, cy: 0.61, w: 0.85, h: 0.78 };
+      // Placement mask for the compositing stage: { cx, bottomY, maxW }
+      //   cx      — horizontal center (0–1 of bg width)
+      //   bottomY — where the vehicle's wheel-line lands (0–1 from top)
+      //   maxW    — max vehicle width as fraction of bg width
+      // Default: center frame, bottom 5% margin, fill 60% of width.
+      // Override per-upload based on the actual background's podium/floor geometry.
+      const placementMask = { cx: 0.5, bottomY: 0.95, maxW: 0.60 };
 
       // Serve via /api/static/ai-photos/backgrounds/<filename>
       const servedUrl = `/api/static/ai-photos/backgrounds/${req.file.filename}`;
