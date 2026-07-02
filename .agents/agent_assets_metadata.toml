@@ -245,3 +245,9 @@ id = "XBcDmvRvffVAK95bGa2fm"
 uri = "file://DealerPilot-AI-Extension-v1.3.0.zip"
 type = "unspecified"
 title = "DealerPilot AI Extension v1.3.0 — Performance Sprint"
+
+[[outputs]]
+id = "GNfYiiViKg6kpxdMY_ZFG"
+uri = "file://DealerPilot-AI-Extension-v1.3.0-FRESH.zip"
+type = "unspecified"
+title = "DealerPilot AI Extension v1.3.0 FRESH"

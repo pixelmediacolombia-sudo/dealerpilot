@@ -417,7 +417,7 @@
     <div id="mai-header">
       <span id="mai-dot"></span>
       <span id="mai-title">DealerPilot AI</span>
-      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.2</span>
+      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.0</span>
       <button id="mai-toggle" title="Collapse">_</button>
     </div>
     <div id="mai-body">
@@ -1823,5 +1823,5 @@
     );
   }
 
-  log("Panel loaded v1.2", { isMessenger, isMarketplaceCreate });
+  log("Panel loaded v1.3.0", { isMessenger, isMarketplaceCreate });
 })();
