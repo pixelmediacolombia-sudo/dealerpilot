@@ -1,34 +1,34 @@
-// Stage 4: Enhance v2 — natural dealership photography treatment.
+// Stage 4: Enhance v2.1 — natural dealership photography treatment.
 //
-// v2 design principles (vs v1):
-//   • Noise FIRST — blur before any contrast/sharpen so we suppress JPEG artifacts
-//     before enhancement, not amplify them.
-//   • No CLAHE — the biggest source of the "crunchy" look in v1; removed entirely.
-//   • No fake overlays — studio light gradient removed (artificial).
-//   • Conservative saturation — 1.07–1.09 (v1 used 1.18 which looked oversaturated).
-//   • gamma() for midtone lift — more natural roll-off than linear() contrast.
-//   • Very light unsharp mask — sigma ≤ 0.5, m2 ≤ 2.0; local edges only.
+// v2.3 design principles — critical bug fix + two-pass denoise:
+//   • LOSSLESS INTERMEDIATE BUFFERS: all intermediate .toBuffer() calls now use
+//     .png() to force lossless encoding. Without this, Sharp inherits the input
+//     format (JPEG at quality ~80) for intermediate buffers, producing multiple
+//     JPEG re-encodes before the final output. 3 JPEG compressions in series was
+//     the root cause of Artifact Detection failures. Now only the final .jpeg()
+//     call encodes lossy.
+//   • Two-pass denoise (pre + post tonal chain) — kept from v2.2.
+//   • Tonal settings: same conservative values from v2.2 (gamma 1.05, sat 1.06).
+//   • Interior post-denoise blur fixed to 0.3 (Sharp minimum is 0.3; 0.25 crashed).
+//   • No sharpen on exterior or interior.
+//   • Technical readability: single pass, no intermediate buffers needed.
+//
+// Quality target: Naturalness ≥ 85, Artifact Detection ≥ 85, Marketplace Ready ≥ 85
+// (DealerPilot Photo Quality Gate — Phase 1.5).
 //
 // PRESETS
 // ────────────────────────────────────────────────────────────────────────────
-//   exterior_premium       → all exterior photos (studio + detail shots)
+//   exterior_premium       → all exterior photos
 //   interior_premium       → all interior photos
 //   technical_readability  → documents, VIN, odometer, gauge cluster, stickers
-//
-// Quality target: Mercedes / BMW / Porsche certified-pre-owned inventory photos.
-// The operator should feel "this car looks newer, cleaner and more valuable"
-// — NOT "this image has a filter."
-//
-// If the enhanced image is measurably worse (sharpness regression), Stage 5
-// automatically reverts it to the original.
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 import type { PipelineContext } from "../pipeline";
 import { EXTERIOR_CLASSIFICATIONS, STUDIO_EXTERIOR_CLASSIFICATIONS } from "../providers/types";
 
-// ── Preset version (bump when tuning params so DB can track which preset was used) ──
-export const ENHANCE_PRESET_VERSION = "v2.0";
+// Bump when tuning params so DB can track which preset was used.
+export const ENHANCE_PRESET_VERSION = "v2.3";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -55,52 +55,43 @@ async function fetchBuffer(urlOrPath: string): Promise<Buffer> {
 // ── PRESET: exterior_premium ──────────────────────────────────────────────────
 //
 // Goal: Mercedes / BMW / Porsche certified-pre-owned inventory quality.
-//   • Cleaner, better lit, glossier, more premium
-//   • Paint depth, glass clarity, wheel contrast
-//   • Original background kept; no color changes; no HDR look
+//   "This car looks newer, cleaner and more valuable" — NOT "this image has a filter."
 //
-// Pipeline (follows spec priority order):
-//   1. Noise / JPEG-artifact reduction — subtle Gaussian sigma 0.4
-//      (Must be a separate pass so sharpen does NOT amplify noise)
-//   2. Dynamic range — barely touch histogram tails (0.1 / 99.9)
-//   3. Exposure — gamma(1.08) lifts midtones naturally without blowing highlights
-//   4. Shadow recovery — modulate brightness +1% lifts crushed shadows
-//   5. Highlight recovery — covered by gamma roll-off (no linear clip)
-//   6. Mild contrast — linear(1.02, -1) barely deepens blacks
-//   7. Paint depth / color — saturation 1.09 (subtle, not HDR)
-//   8. Very light local sharpen — sigma 0.45, m2 1.6 (edges only, no halos)
-//   9. High-quality JPEG output 95 / 4:4:4
+// Pipeline (v2.2 — two-pass denoise):
+//   1. Pre-denoise    — blur(0.5) suppresses original JPEG block artifacts before
+//                       any contrast work.
+//   2. Normalise      — nearly-no-op (0.01/99.99) — only clips single stuck pixels.
+//                       Removed aggressive stretch that was boosting artifact visibility.
+//   3. Gamma(1.05)    — lighter midtone lift vs v2.0 (1.08); enough to brighten
+//                       without the "HDR pop" that reads as filtered.
+//   4. Modulate       — saturation 1.06 (was 1.09); +1% brightness; subtle only.
+//   5. Linear(1.01,0) — barely-there contrast tick; removed the -1 offset that
+//                       was crushing shadow detail.
+//   6. Post-denoise   — blur(0.3) second pass after tonal corrections to suppress
+//                       any JPEG artifacts that the contrast chain amplified.
+//                       This is the key fix: the first pass can't pre-emptively
+//                       suppress artifacts that don't exist yet.
+//   7. NO sharpen.
+//   8. JPEG 95 / 4:4:4.
 export async function presetExteriorPremium(input: Buffer): Promise<Buffer> {
-  // Pass 1: noise / JPEG artifact reduction
-  // A small Gaussian sigma smooths 8×8 JPEG blocking artifacts.
-  // This runs as a separate toBuffer() so the sharpen in pass 2 never
-  // "sees" JPEG noise — the single biggest fix over v1.
-  const denoised = await sharp(input)
-    .blur(0.4)
+  // Pass 1: pre-denoise — lossless PNG output (critical: avoids intermediate JPEG).
+  const preDenoised = await sharp(input)
+    .blur(0.5)
+    .png()         // lossless — prevents Sharp defaulting to JPEG quality ~80
     .toBuffer();
 
-  // Pass 2: all tonal + color + output in one libvips pass
-  return sharp(denoised)
-    // Dynamic range: barely clip tails (0.1 / 99.9) — recover washed-out photos
-    // without hard clipping that creates banding.
-    .normalise({ lower: 0.1, upper: 99.9 })
-    // Gamma: lifts midtones (paint, glass, bodywork) naturally.
-    // 1.08 = ~8% midtone brightness boost with natural roll-off at highlights.
-    .gamma(1.08)
-    // Color: very subtle saturation lift for paint depth.
-    // brightness 1.01 = shadow recovery (+1% global lift).
-    // saturation 1.09 = just enough to make paint pop without looking filtered.
-    .modulate({ brightness: 1.01, saturation: 1.09 })
-    // Contrast: linear(1.02, -1) — deepens blacks by 1 point, lifts contrast 2%.
-    // Much gentler than v1's linear(1.05, -5) which crushed shadow detail.
-    .linear(1.02, -1)
-    // Sharpen: local only, no halos, no crunch.
-    // sigma 0.45  — target feature radius (sub-pixel paint texture, badge edges)
-    // m1 0.5      — flat-region threshold: skip smooth areas (sky, panels)
-    // m2 1.6      — edge slope: gentle (v1 used 3.5 which created crunchiness)
-    // x1 2        — overshoot floor
-    // y2 8, y3 12 — overshoot ceiling (caps halos)
-    .sharpen({ sigma: 0.45, m1: 0.5, m2: 1.6, x1: 2, y2: 8, y3: 12 })
+  // Pass 2: tonal corrections — soft touch, lossless intermediate.
+  const tonal = await sharp(preDenoised)
+    .normalise({ lower: 0.01, upper: 99.99 })
+    .gamma(1.05)
+    .modulate({ brightness: 1.01, saturation: 1.06 })
+    .linear(1.01, 0)
+    .png()         // lossless — still no JPEG encode yet
+    .toBuffer();
+
+  // Pass 3: post-denoise — ONLY lossy encode happens here, once, at full quality.
+  return sharp(tonal)
+    .blur(0.3)
     .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
     .toBuffer();
 }
@@ -112,27 +103,34 @@ export async function presetExteriorPremium(input: Buffer): Promise<Buffer> {
 //   • Deep blacks, clean whites, noise-free
 //   • DO NOT: change upholstery color, over-brighten screens, make leather look fake
 //
-// Slightly different from exterior:
-//   • gentler blur (0.3) — interiors are already softer, avoid blurring stitching
-//   • gamma 1.05 — interiors should stay richer/darker (not blown out)
-//   • saturation 1.07 — leather and trim benefit from subtle richness
-//   • slightly stronger sharpen — leather grain, buttons, knobs benefit from detail
+// v2.2 changes (same two-pass denoise logic as exterior):
+//   • Pre-denoise blur(0.4) — finer than exterior to preserve stitching detail.
+//   • Nearly-no-op normalise (0.02/99.98).
+//   • Gamma 1.04 — interiors should stay rich and slightly moody.
+//   • Saturation 1.05 — very subtle leather/trim warmth.
+//   • linear(1.01, 0) — no shadow crush.
+//   • Post-denoise blur(0.25) — lighter than exterior; preserve micro-texture.
+//   • No sharpen.
 export async function presetInteriorPremium(input: Buffer): Promise<Buffer> {
-  // Pass 1: very subtle noise reduction
-  const denoised = await sharp(input)
-    .blur(0.3)
+  // Pass 1: pre-denoise — gentler than exterior (preserve stitching/knob detail).
+  const preDenoised = await sharp(input)
+    .blur(0.4)
+    .png()         // lossless intermediate
     .toBuffer();
 
-  // Pass 2: tonal + color + output
-  return sharp(denoised)
-    .normalise({ lower: 0.15, upper: 99.85 })
-    // Gamma 1.05 — lighter touch than exterior; interiors should stay rich
-    .gamma(1.05)
-    .modulate({ brightness: 1.01, saturation: 1.07 })
-    // Slightly more contrast — deep blacks are critical for premium interior look
-    .linear(1.03, -2)
-    // Slightly more targeted sharpen — leather grain, button labels, infotainment text
-    .sharpen({ sigma: 0.5, m1: 0.55, m2: 1.8, x1: 3, y2: 10, y3: 15 })
+  // Pass 2: tonal — very light touch.
+  const tonal = await sharp(preDenoised)
+    .normalise({ lower: 0.02, upper: 99.98 })
+    .gamma(1.04)
+    .modulate({ brightness: 1.01, saturation: 1.05 })
+    .linear(1.01, 0)
+    .png()         // lossless intermediate
+    .toBuffer();
+
+  // Pass 3: post-denoise + final JPEG encode (only lossy step).
+  // 0.3 minimum (Sharp requires sigma >= 0.3).
+  return sharp(tonal)
+    .blur(0.3)
     .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
     .toBuffer();
 }
@@ -140,20 +138,26 @@ export async function presetInteriorPremium(input: Buffer): Promise<Buffer> {
 // ── PRESET: technical_readability ────────────────────────────────────────────
 //
 // Goal: maximum text and number clarity for documents, VIN, odometer, gauges.
-//   • Only improve readability
-//   • DO NOT: stylize, apply color grade, change information content
+//   • Only improve readability — do not stylize or color-grade
+//
+// Sharpen is kept for technical photos because:
+//   • Text edges are hard, straight, and benefit from sharpening (no halo risk)
+//   • No curved paint surfaces or dealer overlays to create artifact halos
+//   • m2 reduced from 2.0 → 1.0 (v2.0 was too aggressive even for text)
 //
 // No noise reduction (would blur text/numbers).
-// No saturation (preserve exact colors of documents and screens).
-// No gamma (preserve actual brightness of stickers/screens).
-// Very light sharpen tuned for fine line / text clarity.
+// No saturation (preserve exact document colors).
+// No gamma (preserve screen/sticker brightness).
 export async function presetTechnicalReadability(input: Buffer): Promise<Buffer> {
   return sharp(input)
-    // Gentle dynamic range stretch — recover washed-out or dim screens/stickers
+    // Moderate contrast stretch for dim screens / washed-out stickers.
     .normalise({ lower: 0.5, upper: 99.5 })
-    // Sharpen for crisp text, VIN digits, gauge numbers
-    // Higher m2 (2.0) than exterior because we need sharp text edges specifically
-    .sharpen({ sigma: 0.5, m1: 0.4, m2: 2.0, x1: 3, y2: 10, y3: 14 })
+    // Local sharpen for text edges only.
+    // sigma 0.45 — fine character stroke radius
+    // m1 0.5     — skip smooth areas (blank paper / solid backgrounds)
+    // m2 1.0     — reduced from 2.0; still crisp text without halo on ruled lines
+    // x1 2 / y2 8 / y3 12 — overshoot caps (prevents print artifact amplification)
+    .sharpen({ sigma: 0.45, m1: 0.5, m2: 1.0, x1: 2, y2: 8, y3: 12 })
     .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
     .toBuffer();
 }
@@ -211,13 +215,12 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
 
       ctx.log.debug(
         { vehicleId: ctx.job.vehicleId, filename, classification, preset, version: ENHANCE_PRESET_VERSION },
-        "photo:enhance v2",
+        "photo:enhance v2.1",
       );
     } catch (err) {
-      // Non-fatal — fall back to source URL; Stage 5 will flag the sharpness regression
       img.processedUrl = src;
       img.usedFallback = 1;
-      ctx.log.warn({ err, url: src }, "photo:enhance v2 failed — using source as-is");
+      ctx.log.warn({ err, url: src }, "photo:enhance v2.1 failed — using source as-is");
     }
   }
 }
