@@ -1,0 +1,283 @@
+URGENT — Marketplace AI Connection + Latency Audit
+
+Stop adding features.
+
+I need a deep audit of why Marketplace AI takes so long to pick up and run a publishing job.
+
+Goal:
+Find the exact bottlenecks in the connection chain and make the AI operator always active, fast, and reliable.
+
+Do NOT propose assisted mode.
+Do NOT propose beta mode.
+Do NOT propose Fan Page or Ads.
+This is only Marketplace AI autopublish.
+
+====================================================
+PART 1 — END-TO-END TIMING TRACE
+====================================================
+
+Add timing logs for one Publish Now job.
+
+Measure exact milliseconds for:
+
+1. User clicks Publish Now
+2. Dashboard calls POST /publishing/jobs/publish-now
+3. Backend creates job
+4. Dashboard receives job response
+5. Extension next poll fires
+6. Extension calls GET /publishing/jobs/next
+7. Backend returns job
+8. Extension claims job
+9. activeJob saved to chrome.storage.local
+10. Facebook tab opened/reused
+11. content.js loads
+12. payload fetched
+13. photos start downloading
+14. photos injected
+15. thumbnails detected
+16. fields filled
+17. Next clicked
+18. Publish clicked
+19. listing URL captured
+20. backend marked Published
+
+Output a table:
+
+Step | Start time | End time | Duration ms | Status | Notes
+
+I need to know exactly where we are losing time.
+
+====================================================
+PART 2 — CONNECTION MAP
+====================================================
+
+Audit all connections:
+
+Dashboard → Backend
+Backend → DB
+Extension Popup → Backend
+Extension Background → Backend
+Background → Content Script
+Content Script → Facebook DOM
+Extension → image proxy/photo endpoint
+Content Script → progress endpoint
+Dashboard → progress polling endpoint
+
+For each connection show:
+
+- endpoint/message name
+- frequency
+- timeout
+- retry behavior
+- last observed latency
+- failure mode
+- whether it blocks publishing
+
+====================================================
+PART 3 — POLLING DELAY AUDIT
+====================================================
+
+The extension should not wait 15 seconds to pick up a job.
+
+Audit:
+- chrome.alarms polling interval
+- manual poll triggers
+- whether Publish Now can notify extension immediately
+- whether background can poll instantly after dashboard creates job
+- whether popup/backend status refresh is causing delays
+
+Required fix:
+When Publish Now creates a job, the extension should pick it up in under 2 seconds.
+
+Options:
+- reduce polling interval if safe
+- add immediate wake/ping endpoint
+- use extension long-polling
+- use server-sent events if possible
+- have dashboard trigger extension wake if extension is connected
+
+Acceptance:
+Publish Now → extension claims job in under 2 seconds.
+
+====================================================
+PART 4 — EXTENSION STATE AUDIT
+====================================================
+
+Audit:
+
+chrome.storage.local:
+- activeJob
+- lastClaimedJob
+- lastNextResponse
+- installedAt
+- storedVersion
+- auditLog
+- lastJobFinishedAt
+
+Questions:
+1. Which values are source of truth?
+2. Which are cache only?
+3. When are they cleared?
+4. Can any stale value delay or block a new job?
+5. Can any old Facebook tab keep stale state?
+6. How is overlay reset?
+
+Required:
+DB must be source of truth.
+chrome.storage.local must be cache only.
+Any mismatch must clear local state automatically.
+
+====================================================
+PART 5 — FACEBOOK TAB + CONTENT SCRIPT AUDIT
+====================================================
+
+Audit why old Facebook tabs keep stale overlays or jobs.
+
+Check:
+- content.js injection on existing tabs
+- version mismatch behavior
+- overlay DOM cleanup
+- timers/intervals still running
+- RESET_OVERLAY broadcast
+- activeJob validation before render
+- activeJob validation before runPublishingFlow
+
+Acceptance:
+Dashboard jobId and Facebook overlay jobId always match.
+Old overlay never survives extension update/reset.
+
+====================================================
+PART 6 — PHOTO PIPELINE LATENCY AUDIT
+====================================================
+
+Measure:
+
+- photo payload fetch time
+- image proxy fetch time per photo
+- base64/blob conversion time
+- resize/compression time
+- DataTransfer injection time
+- Facebook thumbnail processing time
+
+Output:
+
+Photo # | download ms | conversion ms | inject ms | thumbnail detected yes/no
+
+Required:
+Use only the fastest reliable set:
+- 6 to 8 photos
+- 3 concurrent downloads
+- no 60 second waits if preview is visible
+- pass photo validation as soon as preview/thumbnails are visible
+
+Acceptance:
+Photo stage should finish in under 30 seconds.
+
+====================================================
+PART 7 — FORM FIELD LATENCY AUDIT
+====================================================
+
+Measure time spent filling:
+
+- Vehicle type
+- Year
+- Make
+- Model
+- Price
+- Title
+- Description
+- Location
+- Mileage
+- Condition
+
+Do not touch:
+- VIN
+- transmission
+- fuel
+- color
+- body style
+- drivetrain
+
+For each field show:
+Field | required? | attempted? | duration | success/fail | reason
+
+Required:
+No field should loop for more than 5 seconds.
+If Make/Model dropdown fails, show exact reason.
+Do not waste time on optional fields.
+
+====================================================
+PART 8 — DESCRIPTION PAYLOAD AUDIT
+====================================================
+
+Audit why description is still wrong.
+
+Trace:
+DB vehicle fields
+→ listing copy generation
+→ payload endpoint
+→ extension payload
+→ Facebook description textarea
+
+Acceptance:
+Description must be exactly Alpha-style copy:
+
+🔥 {YEAR} {MAKE} {MODEL} lista para manejar
+
+💰 Financiamiento desde $1,000, $2,000 o $3,000 de inicial
+✅ Identificación válida
+✅ Cuenta de banco activa
+✅ Precios bajos para compradores serios
+⏳ Solo compradores interesados en comprar este mes
+
+📩 Escríbenos “{MODEL}” hoy y te damos más detalles.
+
+Never use:
+- stock number only
+- mileage only
+- dealer boilerplate
+- raw vehicle description from feed
+- VIN
+- random numeric text
+
+====================================================
+PART 9 — PERFORMANCE TARGETS
+====================================================
+
+Set hard performance targets:
+
+Publish Now → job claimed: under 2 seconds
+Open/reuse Facebook tab: under 5 seconds
+Payload loaded: under 2 seconds
+Photo upload stage: under 30 seconds
+Form fill stage: under 45 seconds
+Next click: under 90 seconds total
+Full publish: under 3 minutes
+
+If a step exceeds target:
+- log warning
+- show exact reason
+- do not silently keep spinning
+
+====================================================
+PART 10 — FINAL OUTPUT
+====================================================
+
+Do not write code first.
+
+Return:
+
+1. Timing table
+2. Bottleneck ranking from worst to smallest
+3. Root causes
+4. Exact fixes needed
+5. Which fixes are backend
+6. Which fixes are extension
+7. Which fixes are dashboard
+8. Estimated time saved by each fix
+9. The smallest patch to make publish smooth
+
+I need the truth.
+No more guessing.
+No new features.
+Only fix the connection speed and reliability.
