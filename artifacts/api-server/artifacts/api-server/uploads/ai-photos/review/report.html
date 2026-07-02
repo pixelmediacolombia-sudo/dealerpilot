@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>DealerPilot — AI Photo Quality Report</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#030712;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:56px 48px;max-width:1400px;margin:0 auto}
+    tr:nth-child(even){background:#0a1220}
+    tr:hover{background:#111827}
+  </style>
+</head>
+<body>
+
+  <!-- Report header -->
+  <div style="margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid #1e293b">
+    <p style="font-size:11px;color:#3b82f6;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:8px">DealerPilot AI Photo Studio</p>
+    <h1 style="font-size:32px;font-weight:800;color:#f8fafc;margin-bottom:8px">Photo Quality Report</h1>
+    <p style="color:#64748b;font-size:15px">AI Enhancement v2 · 15 photos across 5 vehicles · July 2, 2026</p>
+
+    <!-- Summary strip -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:32px">
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:20px">
+        <p style="font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Avg Original Score</p>
+        <p style="font-size:28px;font-weight:800;color:#f1f5f9">6.0<span style="font-size:14px;color:#475569"> / 10</span></p>
+      </div>
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:20px">
+        <p style="font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Avg Enhanced Score</p>
+        <p style="font-size:28px;font-weight:800;color:#f1f5f9">6.7<span style="font-size:14px;color:#475569"> / 10</span></p>
+      </div>
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:20px">
+        <p style="font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Avg Improvement</p>
+        <p style="font-size:28px;font-weight:800;color:#22c55e">+0.65<span style="font-size:14px;color:#475569"> pts</span></p>
+      </div>
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:20px">
+        <p style="font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Photos Improved</p>
+        <p style="font-size:28px;font-weight:800;color:#f1f5f9">15<span style="font-size:14px;color:#475569"> / 15</span></p>
+      </div>
+    </div>
+  </div>
+
+  
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2024 Mercedes-Benz EQE</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">exterior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Exterior Front</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">Yes — the AI-enhanced image provides a modest, usable improvement in exposure, contrast, and paint clarity while remaining natural.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.4</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">7</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.6</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has flat indoor lighting with cool tint; enhanced evens highlights and adds contrast for more punch.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is slightly underexposed in shadow areas; enhanced lifts shadows and brightens the subject overall.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original leans cool/blue from showroom lighting; enhanced neutralizes the tone slightly for a more natural white.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original loses some detail in deeper shadows and highlights; enhanced recovers a bit more shadow detail without blowing highlights.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows decent paint reflections but appears a little flat; enhanced increases specular highlight and clarity on the paint surface.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#94a3b8">0</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Tint and reflections are acceptable in both; enhancement cleans edges slightly but shows no major improvement.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Trim and wheel details are clearer in the enhanced version, giving a more premium feel to materials.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#94a3b8">0</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Both images remain believable and not over-processed; enhancement is restrained and still natural.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">9</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean; enhanced shows minor sharpening/haloing on edges but no major artifacts.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is acceptable for listings; the enhanced image is slightly more polished and more appealing for a marketplace.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v184-1.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v184-1.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2024 Mercedes-Benz EQE</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">exterior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Exterior Angle</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">Yes — the enhancement is a meaningful improvement, with better exposure, contrast and paint/gloss clarity while remaining largely natural.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#ef4444">5.7</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.8</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+1.1</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original lighting is flat and even; enhanced image has slightly stronger, more directional contrast that improves form.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is a touch underexposed in the shadows; enhanced brightens midtones and recovers more detail on the front fascia.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original leans slightly cool/green from indoor lighting; enhanced corrects it a bit toward neutral while keeping headlights cool.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original loses detail in grille and lower shadow areas; enhanced recovers shadow detail and separates highlights better.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows acceptable gloss but looks muted; enhanced increases sheen and clarity of reflections, improving perceived paint quality.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Windshield and windows are reflective and somewhat dim in the original; enhanced cleans up reflections slightly and improves contrast.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Trim and grille are somewhat flat in the original; enhanced brings out texture and contrast in plastic and chrome elements.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original looks natural and true to scene; enhanced is slightly processed (brighter highlights, cooler headlights) but still plausible.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean with minimal artifacts; enhanced shows mild sharpening/processing artifacts around highlights and edges.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is serviceable for listing; enhanced is more polished and showroom-ready, improving appeal for an online marketplace.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v184-2.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v184-2.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2024 Mercedes-Benz EQE</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">interior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Interior</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">Yes — the AI enhancement makes a modest but meaningful improvement in exposure, contrast, and perceived material clarity, though it slightly over-processes highlights and headlight color.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.2</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.7</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.5</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original lighting is flat and a bit dim in the shadow areas; enhanced brightens the scene and evens out illumination.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is slightly underexposed in the lower body and wheels; enhanced raises midtones and recovers detail.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has a cool/green cast from showroom lights; enhanced moves toward a more neutral tone but still leans cool.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original crushes some shadow detail in the wheels and lower bumper; enhancement recovers some shadow detail but clips bright highlights slightly.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows reflections and gloss but looks a touch flat; enhanced increases specular highlights and makes the paint look glossier and cleaner.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#94a3b8">0</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Windshield and windows show reflections in both; enhancement sharpens them slightly but doesn't materially improve clarity.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Trim and wheel details are visible but muted in the original; the enhanced image brings out textures and contrast in trim and wheels.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original looks natural and true to life; enhanced appears slightly over-processed with boosted contrast and exaggerated headlight blue.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean with minimal artifacts; enhanced introduces slight sharpening halos and minor color fringing around bright lights.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is acceptable for a listing but a touch flat; enhanced is more eye-catching and showroom-ready, despite modest over-processing.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v184-3.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v184-3.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2023 Tesla Model Y</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">exterior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Exterior Front</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">The AI edit produces only a marginal improvement in exposure and contrast but introduces slight processing artifacts and a subtle loss of naturalness, so it is not a meaningful overall upgrade.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#ef4444">5.7</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.1</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.4</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has even indoor lighting but a bit flat; enhanced adds contrast and punch to highlights and shadows.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is slightly underexposed in shadow areas; enhanced brightens midtones and recovers some detail.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#94a3b8">0</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Both images have a cool/blue cast from showroom lighting; the enhancement did not correct color balance significantly.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original holds most highlights but shadows are crushed; enhancement lifts shadow detail and separates highlights a bit more.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows good reflections and gloss; enhanced increases clarity and specular contrast, making the paint look glossier.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Glass reflections are visible but slightly muted in the original; enhancement slightly improves clarity and reduces distracting glare.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Trim, wheels and plastics are acceptable in the original; enhancement sharpens surfaces and boosts perceived material quality slightly.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original looks natural and honest for a dealer shot; the enhanced version feels a touch over-processed with boosted contrast.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean with minimal artifacts; enhanced shows mild halos and edge sharpening artifacts around reflections and edges.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is acceptable for a listing; enhancement improves visual appeal slightly but doesn't fix busy background or composition.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v294-4.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v294-4.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2023 Tesla Model Y</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">exterior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Exterior Side</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">Yes — the AI enhancement modestly improves exposure and paint clarity, but it slightly over-brightens the headlights and reduces naturalness.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.7</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.8</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.1</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original lighting is flat but even; enhanced brightens shadows and adds contrast for more presence.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Enhanced image lifts shadow detail on the lower bumper and grille, improving visibility.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#94a3b8">0</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Color temperature remains neutral-cool in both images with no clear correction change.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Enhanced recovers shadow detail but clips highlight areas in the headlights, reducing overall range.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Enhanced boosts contrast and saturation, making the paint look glossier and reflections crisper.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#94a3b8">0</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Windshield and windows show clear reflections in both; enhancement does not materially change glass clarity.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Trim and bumper textures are slightly clearer in the enhanced version, improving perceived material quality.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original looks more natural; the enhancement leans toward processing artifacts (over-bright headlights, increased saturation).</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">No major artifacts in either, though the enhanced image shows minor haloing/over-sharpening around highlights.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Enhanced image is more striking for listings due to improved paint and shadow detail, but watch highlight clipping.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v294-5.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v294-5.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2023 Tesla Model Y</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">interior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Interior</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">Yes — the AI enhancement produces a modest but meaningful improvement in exposure, contrast, and paint/glass clarity while introducing only minor processing artifacts.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#ef4444">5.9</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.9</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+1</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original lighting is flat and a bit dim; the enhanced image has stronger fill and contrast that improves visibility of the cabin silhouette and body contours.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is slightly underexposed in the shadows; the enhanced version lifts shadow detail and brightens the scene for better visibility.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has a subtle cool/green cast from the studio lighting; the enhancement moves toward a more neutral tone but is slightly cool.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Enhanced image recovers more shadow detail and preserves highlights better, increasing perceived dynamic range compared to the flatter original.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Reflections and specular highlights on the paint are clearer and more defined in the enhanced image, improving perceived surface quality.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Enhanced version reduces distracting glare and shows cleaner reflections on the rear glass and windows.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Interior materials are not visible in this shot—exterior trim and wheel finishes are slightly sharper and cleaner in the enhanced image.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original looks natural but a bit flat; the enhancement improves clarity at the cost of a slightly over-processed feel.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean; the enhanced image shows minor sharpening/haloing and subtle processing artifacts around high-contrast reflections.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is acceptable for listings; the enhanced image is more appealing and listing-ready but should be checked for over-processing on high-resolution views.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v294-6.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v294-6.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2012 Chevrolet Corvette</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">exterior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Exterior Front</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">The AI enhancement offers a modest, market-useful improvement in exposure, paint pop and overall clarity, but introduces slight over-processing artifacts that reduce naturalness.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.4</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">7</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.6</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original lighting is serviceable with even studio illumination; enhancement lifts midtones and evens overall light distribution.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is slightly underexposed in shadow areas; the enhanced version brightens shadows and recovers detail.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has a cool/neutral tint from showroom lights; enhanced corrects warmth and produces a more natural yellow paint tone.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original clips some shadow detail and has bright highlights from the headlights; enhancement recovers shadow detail while holding highlights better.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows accurate color but looks flatter; enhanced increases gloss and saturation making the yellow paint appear more vibrant and reflective.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Windshield and side glass show showroom reflections in both, with the enhanced image reducing distracting glare slightly.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Trim and interior materials are readable in the original; enhancement clarifies textures and contrast on wheels and trim pieces.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original looks natural and true to the scene; enhanced begins to look slightly over-processed with smoother surfaces and boosted color.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean with minimal editing artifacts; the enhanced image shows subtle sharpening/haloing and localized smoothing around reflections.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is an acceptable dealer shot but busy background and flat color limit appeal; the enhanced file is more eye-catching and better suited for listings despite mild processing cues.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v52-7.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v52-7.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2012 Chevrolet Corvette</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">exterior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Exterior Angle</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">The AI enhancement provides a modest improvement in color, contrast and clarity but introduces minor sharpening/halo artifacts and still leaves blown headlights, so it's only a slight overall improvement.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#ef4444">5.7</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.3</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has flat indoor fluorescent lighting with mixed headlight color; enhancement added contrast and punch for better visual separation.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Shadows are a bit underexposed and headlights are clipped in the original; the enhanced file lifts shadows slightly but highlights (headlights/reflections) remain blown.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows a cool/green indoor cast against yellow paint; enhancement neutralizes the cast a bit but leans slightly cool.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Limited DR in the original with clipped highlights and muted shadows; the enhancement recovers some shadow detail but cannot fully recover headlight blowout.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original paint looks slightly flat under the lighting; enhancement increases gloss and clarity, revealing more reflections and surface shape.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Windshield shows strong internal reflections in both, with the enhanced image slightly cleaner but still reflective.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Trim and bumper details are somewhat soft in the original; the enhancement sharpens and clarifies those materials modestly.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original feels authentic and true to the scene; the enhancement looks slightly over-processed with increased saturation and contrast that reduce natural appearance.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-3</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is relatively clean; enhancement introduces minor halos/over-sharpening and subtle edge artifacts around the roof and reflections.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is an acceptable dealer shot; the enhanced image is more eye-catching for listings but needs cleanup of headlight blowout and minor artifacts for luxury-level presentation.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v52-8.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v52-8.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2012 Chevrolet Corvette</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">interior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Interior</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">The AI enhancement is a meaningful improvement in exposure, contrast and paint/glass clarity, though it introduces a slightly over-processed look and minor artifacts.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#ef4444">5.2</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.7</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+1.5</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has flat, cool showroom lighting; enhanced brightens the scene and adds more directional contrast.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is a touch underexposed in shadows with blown headlights; enhanced lifts shadows and evens overall exposure.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">4</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has a cool/blue cast from indoor lighting; enhanced shifts toward a more neutral tone but remains slightly cool.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original loses detail in deep shadows and highlights; enhanced recovers shadow detail while keeping highlights controlled (headlights still clipped).</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows reflections and decent color; enhanced improves gloss, color pop and surface separation for the yellow paint.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original windshield and windows have distracting reflections and low contrast; enhanced reduces some reflections and increases clarity of glass and chrome.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#475569">—</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#475569">—</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#475569">—</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Not applicable — interior materials/cabin surfaces are not visible enough in this exterior-oriented shot.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original looks natural though flat; enhanced improves presentation but veers slightly toward an over-processed appearance.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has mild compression/noise but is clean; enhanced shows some sharpening halos and minor processing artifacts around edges.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+3</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is acceptable for a listing but underwhelming; enhanced is markedly more retail-ready and attention-grabbing despite small processing issues.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v52-9.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v52-9.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2012 Dodge Challenger</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">exterior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Exterior Front</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">Yes — the AI enhancement is a meaningful improvement in exposure, color and paint clarity, with minor signs of processing.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.3</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">7.1</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.8</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original lighting is flat indoor showroom light; enhanced brightens and evens highlights for better subject separation.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is slightly under in the shadows around the wheels; enhanced lifts shadows and improves midtones.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has a cool/blue cast that mutes the yellow; enhanced corrects warmth making the paint tone truer.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original clips some shadow detail and looks flat; enhanced recovers shadow detail and preserves highlights better.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows decent gloss but looks dull; enhanced increases contrast and clarity, making the paint appear glossier and more defined.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original windshield and windows have reflections and slight haze; enhanced reduces distraction and improves clarity of the glass.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original rims, trim and rubber show acceptable detail; enhanced brings out texture and edge definition in metal and trim.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original looks natural and true to scene; enhanced is mostly natural but shows a touch of oversaturation/processing.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean with minimal artifacts; enhanced introduces subtle sharpening/haloing and slight processing artifacts around edges.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is acceptable for listings; enhanced is more attractive and showroom-ready but should be checked for minor processing artifacts.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v68-10.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v68-10.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2012 Dodge Challenger</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">exterior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Exterior Angle</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">Yes — the AI enhancement produces a modest, marketable improvement in exposure and paint pop, but it introduces slight processing artifacts and reduces naturalness.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.4</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.4</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original lighting is flat and even from the showroom; enhancement brightens and adds contrast for more presence.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is slightly underexposed in shadow areas; the enhanced version lifts shadows and improves midtones.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has a cool/blue tint from indoor lighting; the enhancement warms it slightly for more accurate yellow paint.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original loses detail in deep grille shadows and some highlight reflections; enhancement recovers a bit more detail.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows decent gloss but looks muted; the enhanced image increases saturation and contrast so the yellow reads richer.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#94a3b8">0</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Both images show windshield reflections and some streaking with no clear improvement in clarity from the enhancement.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Interior and trim details are soft and a bit shadowed in the original; the enhanced file brings modest additional definition.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original feels more natural and true to the scene; the enhancement looks slightly over-processed due to boosted contrast/saturation.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean with minimal processing artifacts; the enhanced version shows mild haloing and increased sharpening noise.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is acceptable for listings; the enhancement is more eye-catching and dealer-ready but not flawless due to minor artifacts.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v68-11.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v68-11.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2012 Dodge Challenger</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">interior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Interior</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">The AI enhancement provides a modest, overall improvement in brightness and clarity but introduces mild processing artifacts and a slightly less natural look.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#ef4444">5.8</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.2</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.4</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has flat indoor lighting with visible ceiling reflections; enhanced is brighter and more even across the body.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is slightly underexposed in shadow areas; enhanced lifts shadows and recovers some detail without blowing highlights.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has a cool/green tint from indoor lights; enhanced moves tones toward a more neutral balance.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original loses detail in darker wheel wells and windshield reflections; enhanced recovers shadow detail while containing highlights better.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows the gloss and reflections but looks a bit muted; enhanced increases vibrance and clarity of the yellow paint.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has strong ceiling reflections and glare on the windshield; enhanced reduces some reflections and appears cleaner.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#475569">—</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#475569">—</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#475569">—</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Not applicable — the provided image is exterior/front 3/4, so interior material assessment isn't possible.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original renders colors and tones reasonably naturally; enhanced is slightly over-processed with boosted saturation and contrast.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean with minimal processing artifacts; enhanced shows mild sharpening/processing artifacts and a touch more noise in shadow areas.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is an acceptable dealer shot but could be improved; enhanced is brighter and clearer and closer to listing quality despite minor processing issues.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v68-12.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v68-12.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2022 Tesla Model S</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">exterior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Exterior Front</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">The AI enhancement is a modest, overall improvement—brighter exposure and clearer reflections—though it slightly reduces naturalness and introduces minimal processing artifacts.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.4</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">7</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.6</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has even but flat showroom lighting; enhanced lifts midtones and balances highlights slightly better.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is slightly underexposed in shadow areas around the wheels; enhanced brightens shadows for better detail.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original leans a touch cool from showroom lights; enhanced corrects the tint toward a more neutral look.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original compresses some shadow detail; enhanced recovers shadow and highlight detail improving perceived dynamic range.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows reflections but lacks pop; enhanced increases sheen and clarity of the blue paint without obvious color shift.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original glass reflections are fine; enhanced yields slightly cleaner window reflections and reduced glare.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original trim and wheel details are readable but muted; enhanced brings out more texture in wheels and trim.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original looks natural and true to scene; enhanced is slightly processed (more contrast/saturation) which reduces natural feel.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean; enhanced shows minor sharpening/haloing around highlights and edges indicating light processing artifacts.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is acceptable for listings; enhanced is more attention-grabbing and slightly better suited for a marketplace hero shot.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v267-13.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v267-13.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2022 Tesla Model S</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">exterior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Exterior Side</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">Yes — the AI enhancement is a modest, meaningful improvement overall, with cleaner white balance, slightly better exposure and paint pop, though it introduces mild processing artifacts and a touch of over-brightening in the highlights.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.5</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">7.1</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.6</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has flat showroom speculars; enhanced improves local contrast so the car reads more three‑dimensional.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Shadows in the bumper/grille are a bit underexposed in the original; the enhanced version lifts those areas for more visible detail.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has a slight cool/green cast from fluorescent lights; enhanced neutralizes whites for a more accurate color balance.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original loses detail in deep shadows and has bright highlights; enhanced recovers shadow detail but still shows some highlight clipping.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows good gloss and reflections; enhanced brings out richer blue saturation and crisper reflections, improving perceived paint finish.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#94a3b8">0</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Windshield reflections and streaks remain in both images with little corrective change from the enhancement.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Plastics and trim are a bit muddy in the original; enhancement increases contrast and clarity of trim surfaces.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original looks natural and true to life; enhanced is slightly more processed with brighter highlights that reduce absolute realism.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean; the enhanced image shows minor sharpening/haloing around highlights and edges, especially near the headlights.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is acceptable for listings; enhanced is more eye‑catching and marketable thanks to improved color and exposure, despite small artifacts.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v267-14.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v267-14.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+<section style="margin:56px 0;border-top:1px solid #1e293b;padding-top:48px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+    <h2 style="font-size:20px;font-weight:700;color:#f1f5f9;margin:0">2022 Tesla Model S</h2>
+    <span style="font-size:12px;color:#475569;font-family:monospace">interior_premium</span>
+  </div>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px">Interior</p>
+
+  <!-- Verdict -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid #22c55e;border-radius:6px;padding:14px 20px;margin-bottom:24px">
+    <span style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600">AI Photographer Assessment</span>
+    <p style="margin:6px 0 0;color:#e2e8f0;font-size:15px">Yes — the AI-enhanced image is a meaningful improvement, brightening the scene and clarifying paint and shadow detail while remaining only slightly more processed.</p>
+  </div>
+
+  <!-- Overall score bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Original Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#ef4444">5.5</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Enhanced Overall</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#eab308">6.4</p>
+      <p style="margin:0;font-size:11px;color:#475569">/ 10</p>
+    </div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 4px;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em">Overall Improvement</p>
+      <p style="margin:0;font-size:36px;font-weight:800;color:#22c55e">+0.9</p>
+      <p style="margin:0;font-size:11px;color:#475569">points</p>
+    </div>
+  </div>
+
+  <!-- Dimension scorecard table -->
+  <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#0d1526;border-bottom:1px solid #1e293b">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Dimension</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Original</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Enhanced</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Δ</th>
+          <th style="padding:10px 16px;text-align:left;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Photographer's Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Lighting</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is dim with heavy shadowing; enhanced raises overall light and improves visibility of the cabin area.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Exposure</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">4</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is underexposed in shadow areas (wheels, lower body); enhanced opens shadows and reveals more detail.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">White Balance</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original has a cool/green tint; enhanced shifts toward a slightly more neutral tone without over-warming.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Dynamic Range</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original clips some deep shadows and muffles highlights; enhanced recovers shadow detail and preserves highlights better.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Paint Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original shows good gloss but is muted by low light; enhanced improves color depth and surface reflections clarity.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Glass Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original windows are dark and indistinct; enhanced brings slightly more definition and reduces distracting glare.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Interior Material Quality</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Interior/exterior trim and tire textures are under-rendered in the original; enhanced brings modestly better texture separation.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Naturalness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">6</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original looks natural though underexposed; enhanced is more processed (contrast/clarity boost) which slightly reduces natural feel.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Artifact Detection</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#22c55e">8</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#ef4444">-1</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original is clean; enhanced shows mild sharpening and slight processing artifacts in high-contrast reflection edges.</td>
+    </tr>
+<tr>
+      <td style="padding:8px 12px;color:#cbd5e1;font-size:13px">Marketplace Readiness</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#ef4444">5</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#eab308">7</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:#22c55e">+2</td>
+      <td style="padding:8px 16px;color:#94a3b8;font-size:12px;font-style:italic">Original would benefit from correction before listing; enhanced is closer to showroom-ready with improved visibility and contrast.</td>
+    </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side photos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Original Photo</p>
+      <img src="orig-v267-15.jpg" style="width:100%;border-radius:8px;border:1px solid #1e293b;display:block" loading="lazy"/>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Enhanced Photo — v2</p>
+      <img src="enh-v267-15.jpg" style="width:100%;border-radius:8px;border:1px solid #334155;display:block" loading="lazy"/>
+    </div>
+  </div>
+
+</section>
+
+  <footer style="margin-top:80px;padding-top:24px;border-top:1px solid #0f172a;text-align:center;color:#1e293b;font-size:12px">
+    DealerPilot AI Photo Studio · Enhancement v2 · Evaluated by gpt-5-mini
+  </footer>
+
+</body>
+</html>
