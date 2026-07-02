@@ -122,22 +122,33 @@ export async function stageValidate(ctx: PipelineContext): Promise<void> {
     }
 
     // ── 2. Sharpness comparison for primary exterior shots ───────────────────
+    // NOTE: the sharpness regression check is SKIPPED for AI Studio outputs.
+    // BRIA Product Shot creates an entirely different scene (new background,
+    // lighting, reflections) whose global image stats are incomparable to the
+    // original dealer CDN photo.  Only apply the regression check when Stage 3
+    // fell back to the background-removed image or the original (usedFallback=1).
     let aiSharpness   = 0;
     let origSharpness = 0;
-    let aiNotWorse    = true; // default pass for non-primary
+    let aiNotWorse    = true; // default pass for non-primary / AI Studio
 
-    if (isPrimaryExterior && buf) {
+    const isAiStudioOutput =
+      isPrimaryExterior &&
+      !!img.compositedUrl &&
+      img.compositedUrl.startsWith("/api/static/ai-photos/studio-") &&
+      img.usedFallback === 0;
+
+    if (isPrimaryExterior && !isAiStudioOutput && buf) {
+      // Fallback path: compare sharpness against original
       aiSharpness = await measureSharpness(buf);
       const origBuf = await resolveBuffer(img.originalUrl);
       if (origBuf) {
         origSharpness = await measureSharpness(origBuf);
       }
-      // AI must reach at least MIN_SHARPNESS_RATIO of original
       if (origSharpness > 0) {
         aiNotWorse = aiSharpness >= origSharpness * MIN_SHARPNESS_RATIO;
       }
 
-      // AUTO-REJECT: revert to original if AI is measurably worse
+      // AUTO-REJECT: revert to original if fallback result is measurably worse
       if (!aiNotWorse) {
         img.aiWorseThanOriginal = true;
         img.processedUrl        = img.originalUrl;

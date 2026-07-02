@@ -73,7 +73,7 @@ export interface PipelineContext {
 const STAGES = [
   { name: "Classify", fn: stageClassify, async: true },
   { name: "Remove Background", fn: stageRemoveBackground, async: true },
-  { name: "Composite", fn: stageComposite, async: true },
+  { name: "AI Studio", fn: stageComposite, async: true },
   { name: "Enhance", fn: stageEnhance, async: true },
   { name: "Validate", fn: stageValidate, async: true },
   { name: "Order", fn: (ctx: PipelineContext) => Promise.resolve(stageOrder(ctx)), async: true },
