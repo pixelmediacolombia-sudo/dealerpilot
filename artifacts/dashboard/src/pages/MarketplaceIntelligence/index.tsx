@@ -525,9 +525,9 @@ function DashboardHealthPanel({
                 <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Data Integrity</div>
                 <div className="text-xs space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-muted-foreground">Mock analytics records</span>
+                    <span className="text-muted-foreground">Historical performance records</span>
                     <span className={cn("font-semibold", health.mockRecordCount > 0 ? "text-amber-400" : "text-success")}>
-                      {health.mockRecordCount > 0 ? `${health.mockRecordCount} (excluded from KPIs)` : "None"}
+                      {health.mockRecordCount > 0 ? `${health.mockRecordCount} (pending review)` : "None"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
@@ -801,7 +801,7 @@ export function MarketplaceIntelligence() {
                 <div className="text-muted-foreground text-sm py-8 text-center">Loading recommendations…</div>
               ) : recs.length === 0 ? (
                 <div className="text-muted-foreground text-sm py-8 text-center">
-                  No recommendations yet. Run the seed endpoint to generate data.
+                  No recommendations yet. Vehicle strategies are generated automatically once inventory syncs.
                 </div>
               ) : (
                 <div className="space-y-2">
