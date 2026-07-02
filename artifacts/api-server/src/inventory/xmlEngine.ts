@@ -21,6 +21,9 @@ export type NormalizedVehicle = {
   fuelType: string | null;
   description: string | null;
   vdpUrl: string | null;
+  // Dealer branch/lot location parsed from the feed (e.g. "Manassas", "Fredericksburg").
+  // null = not provided by this feed format.
+  lotLocation: string | null;
   images: FeedImage[];
   sourceRaw: string;
 };
@@ -243,6 +246,21 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
     else return null;
   }
 
+  const vdpUrl = firstString(lookup, ["vdpurl", "vdp", "detailurl", "detailspageurl", "link", "url"]);
+
+  // Parse dealer branch/lot location.
+  // Tries explicit feed fields first, then falls back to extracting a city name
+  // from the VDP URL path (e.g. "manassas" in /inventory/manassas/...).
+  let lotLocation: string | null = firstString(lookup, [
+    "location", "locationname", "storelocation", "dealerlocation",
+    "lot", "branch", "lotnumber", "lotname", "dealername",
+  ]);
+  if (!lotLocation && vdpUrl) {
+    const urlLower = vdpUrl.toLowerCase();
+    if (urlLower.includes("manassas")) lotLocation = "Manassas";
+    else if (urlLower.includes("fredericksburg")) lotLocation = "Fredericksburg";
+  }
+
   return {
     vin,
     stockNumber,
@@ -264,7 +282,8 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
       "description", "comments", "sellercomments", "dealercomments",
       "details", "vehiclecomments",
     ]),
-    vdpUrl: firstString(lookup, ["vdpurl", "vdp", "detailurl", "detailspageurl", "link", "url"]),
+    vdpUrl,
+    lotLocation,
     images: extractImages(node),
     sourceRaw: JSON.stringify(node),
   };

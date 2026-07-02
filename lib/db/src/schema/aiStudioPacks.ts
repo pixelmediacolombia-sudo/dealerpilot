@@ -36,6 +36,9 @@ export const aiStudioPacksTable = pgTable("ai_studio_packs", {
   vehicleScale: real("vehicle_scale").notNull().default(1.0),
   // studio_white | outdoor_cloudy | sunset | showroom | none
   lightingPreset: text("lighting_preset").notNull().default("studio_white"),
+  // enhance_only = improve originals, no background swap (default)
+  // studio = remove background + composite onto studio background
+  processingMode: text("processing_mode").notNull().default("enhance_only"),
   isDefault: boolean("is_default").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -7,7 +7,7 @@ import {
   vehicleChangesTable,
   type Vehicle,
 } from "@workspace/db";
-import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -34,6 +34,7 @@ function toVehicle(
     fuelType: v.fuelType ?? null,
     description: v.description ?? null,
     vdpUrl: v.vdpUrl ?? null,
+    lotLocation: v.lotLocation ?? null,
     status: v.status,
     primaryImageUrl,
     imageCount,

@@ -166,7 +166,7 @@ function ExteriorCard({ img }: { img: PhotoSetImage }) {
           label="AI Output"
           sublabel={
             img.compositedUrl && img.compositedUrl !== img.originalUrl
-              ? "Studio background"
+              ? "AI enhanced"
               : img.backgroundRemovedUrl && img.backgroundRemovedUrl !== img.originalUrl
                 ? "Background removed"
                 : "Fallback — unchanged"

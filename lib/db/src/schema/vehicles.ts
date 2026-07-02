@@ -30,6 +30,9 @@ export const vehiclesTable = pgTable(
     description: text("description"),
     vdpUrl: text("vdp_url"),
     sourceRaw: text("source_raw"),
+    // Dealer lot / branch location parsed from the feed (e.g. "Manassas", "Fredericksburg").
+    // null = not provided by feed or feed predates this field.
+    lotLocation: text("lot_location"),
     status: text("status").notNull().default("New"),
     // AI Photo Studio
     // null | Pending | Processing | Ready | Failed | Skipped

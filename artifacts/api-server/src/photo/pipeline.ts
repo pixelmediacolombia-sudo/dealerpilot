@@ -70,15 +70,27 @@ export interface PipelineContext {
   qualityGateFailed?: boolean;
 }
 
-const STAGES = [
-  { name: "Classify", fn: stageClassify, async: true },
-  { name: "Remove Background", fn: stageRemoveBackground, async: true },
-  { name: "AI Studio", fn: stageComposite, async: true },
-  { name: "Enhance", fn: stageEnhance, async: true },
-  { name: "Validate", fn: stageValidate, async: true },
-  { name: "Order", fn: (ctx: PipelineContext) => Promise.resolve(stageOrder(ctx)), async: true },
-  { name: "Export", fn: stageExport, async: true },
-];
+// Build the active stage list based on the pack's processing mode.
+// enhance_only (default): Classify → Enhance → Validate → Order → Export
+//   — original background is kept; Stages 2 & 3 (BRIA removal + compositing) are skipped.
+// studio: Classify → Remove Background → AI Studio → Enhance → Validate → Order → Export
+//   — full pipeline with background swap onto studio scene.
+function buildStages(processingMode: string) {
+  const isStudio = processingMode === "studio";
+  return [
+    { name: "Classify", fn: stageClassify },
+    ...(isStudio
+      ? [
+          { name: "Remove Background", fn: stageRemoveBackground },
+          { name: "AI Studio", fn: stageComposite },
+        ]
+      : []),
+    { name: "Enhance", fn: stageEnhance },
+    { name: "Validate", fn: stageValidate },
+    { name: "Order", fn: (ctx: PipelineContext) => Promise.resolve(stageOrder(ctx)) },
+    { name: "Export", fn: stageExport },
+  ];
+}
 
 async function updateJobProgress(jobId: number, stage: string, percent: number) {
   await db
@@ -208,7 +220,16 @@ export async function runPhotoPipeline(job: AiPhotoJob, log: Logger): Promise<vo
     vehicleBodyStyle,
   };
 
-  // Run all 7 stages
+  // Build stage list based on processing mode (enhance_only skips BRIA stages)
+  const processingMode = pack?.processingMode ?? "enhance_only";
+  const STAGES = buildStages(processingMode);
+
+  log.info(
+    { jobId: job.id, vehicleId: job.vehicleId, processingMode, stageCount: STAGES.length },
+    "photo:pipeline starting",
+  );
+
+  // Run all stages
   for (let i = 0; i < STAGES.length; i++) {
     const stage = STAGES[i]!;
     const percent = Math.round(((i + 0.5) / STAGES.length) * 100);

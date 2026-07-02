@@ -904,6 +904,9 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
 
     const staleCount = staleVehicles.length;
 
+    const processingMode = defaultPack?.processingMode ?? "enhance_only";
+    const isEnhanceOnly = processingMode !== "studio";
+
     res.json({
       jobs: statusCounts ?? { queued: 0, processing: 0, completed: 0, failed: 0, cancelled: 0 },
       vehicles: vehicleCounts ?? { ready: 0, processing: 0, pending: 0, failed: 0, total: 0 },
@@ -916,19 +919,22 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
         thresholdUsd: falThresholdUsd,
         costPerImageUsd: falCostPerImageUsd,
       },
+      processingMode,
       defaultPack: defaultPack ?? null,
       setup: {
         backgroundConfigured,
         backgroundSource,
-        compositingEnabled: backgroundConfigured,
+        // In enhance_only mode compositing is intentionally off — always ready for production
+        compositingEnabled: !isEnhanceOnly && backgroundConfigured,
         backgroundWidth: defaultPack?.backgroundWidth ?? null,
         backgroundHeight: defaultPack?.backgroundHeight ?? null,
-        readyForProduction: backgroundConfigured,
+        readyForProduction: isEnhanceOnly ? true : backgroundConfigured,
       },
       providers: {
-        backgroundRemoval: falKey ? "fal.ai (BRIA RMBG 2.0)" : "Not configured",
+        backgroundRemoval: isEnhanceOnly ? "Disabled (enhancement only)" : (falKey ? "fal.ai (BRIA RMBG 2.0)" : "Not configured"),
         classification: "OpenAI GPT-5-mini vision",
-        compositing: backgroundConfigured ? "Sharp.js" : "Disabled — background not uploaded",
+        compositing: isEnhanceOnly ? "Disabled (original background preserved)" : (backgroundConfigured ? "Sharp.js" : "Disabled — background not uploaded"),
+        enhancement: "Sharp.js",
       },
     });
   } catch (err) {

@@ -65,6 +65,8 @@ export type ImportSummary = {
   removed: number;
   active: number;
   totalImages: number;
+  /** Count of vehicles by lot location (key = location name or "unknown") */
+  locationBreakdown: Record<string, number>;
 };
 
 export async function importFeed(
@@ -113,8 +115,13 @@ export async function importFeed(
   let updated = 0;
   let removed = 0;
   let totalImages = 0;
+  const locationBreakdown: Record<string, number> = {};
 
   for (const n of parsed) {
+    // Track location counts for logging
+    const locationKey = n.lotLocation ?? "unknown";
+    locationBreakdown[locationKey] = (locationBreakdown[locationKey] ?? 0) + 1;
+
     seenVins.add(n.vin);
     const prior = existingByVin.get(n.vin);
 
@@ -138,6 +145,7 @@ export async function importFeed(
           fuelType: n.fuelType,
           description: n.description,
           vdpUrl: n.vdpUrl,
+          lotLocation: n.lotLocation,
           sourceRaw: n.sourceRaw,
           status: "New",
           firstSeenAt: now,
@@ -220,6 +228,7 @@ export async function importFeed(
         fuelType: n.fuelType,
         description: n.description,
         vdpUrl: n.vdpUrl,
+        lotLocation: n.lotLocation,
         sourceRaw: n.sourceRaw,
         status: nextStatus,
         lastSeenAt: now,
@@ -292,9 +301,24 @@ export async function importFeed(
     })
     .where(eq(feedRunsTable.id, feedRunId));
 
+  const manassasCount = locationBreakdown["Manassas"] ?? 0;
+  const fredericksburgCount = locationBreakdown["Fredericksburg"] ?? 0;
+  const unknownCount = locationBreakdown["unknown"] ?? 0;
+  const otherLocations = Object.entries(locationBreakdown)
+    .filter(([k]) => k !== "Manassas" && k !== "Fredericksburg" && k !== "unknown")
+    .map(([k, v]) => `${k}:${v}`)
+    .join(", ");
+
   log.info(
-    { dealerId, feedRunId, rawCount, parseErrors, created, updated, removed, active, totalImages },
-    `Feed import complete — imported ${parsed.length} vehicles and ${totalImages} total images`,
+    {
+      dealerId, feedRunId, rawCount, parseErrors, created, updated, removed, active, totalImages,
+      locations: locationBreakdown,
+      manassas: manassasCount,
+      fredericksburg: fredericksburgCount,
+      unknownLocation: unknownCount,
+      ...(otherLocations ? { otherLocations } : {}),
+    },
+    `Feed import complete — ${parsed.length} vehicles (Manassas: ${manassasCount}, Fredericksburg: ${fredericksburgCount}, unknown: ${unknownCount})`,
   );
 
   return {
@@ -307,5 +331,6 @@ export async function importFeed(
     removed,
     active,
     totalImages,
+    locationBreakdown,
   };
 }

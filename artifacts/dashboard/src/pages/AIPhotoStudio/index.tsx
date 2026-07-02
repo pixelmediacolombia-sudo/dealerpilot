@@ -91,6 +91,8 @@ interface StudioStats {
   };
   images: { total: number; withAI: number };
   staleCount: number;
+  /** enhance_only | studio */
+  processingMode?: string;
   fal?: {
     imagesProcessed: number;
     estimatedSpendUsd: number;
@@ -110,6 +112,7 @@ interface StudioStats {
     backgroundRemoval: string;
     classification: string;
     compositing: string;
+    enhancement?: string;
   };
 }
 
@@ -557,7 +560,25 @@ function SetupGate({
   );
 }
 
-// ── Setup Complete Banner ────────────────────────────────────────────────────
+// ── AI Photo Enhancement Active Banner (enhance_only mode) ──────────────────
+
+function EnhancementActiveBanner() {
+  return (
+    <div className="flex items-center gap-4 p-4 rounded-xl border border-green-500/20 bg-green-500/[0.04]">
+      <div className="w-8 h-8 rounded-lg bg-green-500/15 border border-green-500/25 flex items-center justify-center shrink-0">
+        <CheckCircle2 className="w-4 h-4 text-green-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-green-300">AI Photo Enhancement active</div>
+        <div className="text-[11px] text-muted-foreground/60 mt-0.5">
+          Original dealership backgrounds preserved · Lighting, contrast, sharpness, color &amp; detail enhanced · Classification enabled
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Setup Complete Banner (studio mode only) ─────────────────────────────────
 
 function SetupComplete({
   pack,
@@ -570,12 +591,12 @@ function SetupComplete({
         <CheckCircle2 className="w-4 h-4 text-green-400" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-green-300">Studio background configured</div>
+        <div className="text-sm font-medium text-green-300">AI Photo Enhancement active</div>
         <div className="text-[11px] text-muted-foreground/60 mt-0.5">
           {pack.name} · {pack.backgroundWidth && pack.backgroundHeight
             ? `${pack.backgroundWidth}×${pack.backgroundHeight} px · `
             : ""}
-          v{pack.backgroundVersion} · Compositing enabled
+          v{pack.backgroundVersion} · Studio compositing enabled
         </div>
       </div>
       {pack.backgroundUrl && (
@@ -661,6 +682,7 @@ export function AIPhotoStudio() {
   const isBgConfigured = setup?.backgroundConfigured ?? false;
   const isBgRemovalReady = stats?.providers.backgroundRemoval?.startsWith("fal.ai") ?? false;
   const staleCount = stats?.staleCount ?? 0;
+  const isEnhanceOnly = (stats?.processingMode ?? "enhance_only") !== "studio";
 
   return (
     <AppLayout>
@@ -673,32 +695,29 @@ export function AIPhotoStudio() {
                 <Camera className="w-4 h-4 text-primary" />
               </div>
               <h1 className="text-xl font-semibold text-white tracking-tight">AI Photo Studio</h1>
-              {!isBgConfigured && !statsLoading && (
+              {!isEnhanceOnly && !isBgConfigured && !statsLoading && (
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 uppercase tracking-wide">
                   Setup Required
                 </span>
               )}
             </div>
             <p className="text-sm text-muted-foreground ml-11">
-              Automated background removal, studio compositing, and intelligent photo ordering.
+              {isEnhanceOnly
+                ? "Automated photo enhancement and intelligent photo ordering."
+                : "Automated background removal, studio compositing, and intelligent photo ordering."}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            {!isBgConfigured && !statsLoading && (
+            {!isEnhanceOnly && !isBgConfigured && !statsLoading && (
               <div className="text-xs text-amber-400/70 text-right max-w-[160px] leading-tight">
                 Upload background to enable compositing
               </div>
             )}
             <Button
               onClick={() => enqueueAllMutation.mutate()}
-              disabled={enqueueAllMutation.isPending || (!isBgConfigured && !statsLoading)}
-              title={
-                !isBgConfigured
-                  ? "Upload the studio background before processing"
-                  : "Enqueue all vehicles for AI photo processing"
-              }
-              className={cn(!isBgConfigured && !statsLoading && "opacity-50 cursor-not-allowed")}
+              disabled={enqueueAllMutation.isPending || (!isEnhanceOnly && !isBgConfigured && !statsLoading)}
+              title="Enqueue all vehicles for AI photo enhancement"
             >
               {enqueueAllMutation.isPending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -710,8 +729,10 @@ export function AIPhotoStudio() {
           </div>
         </div>
 
-        {/* Setup gate / completion banner */}
-        {statsLoading ? null : isBgConfigured ? (
+        {/* Status banner */}
+        {statsLoading ? null : isEnhanceOnly ? (
+          <EnhancementActiveBanner />
+        ) : isBgConfigured ? (
           stats?.defaultPack ? (
             <SetupComplete pack={stats.defaultPack} />
           ) : null
@@ -722,8 +743,8 @@ export function AIPhotoStudio() {
           />
         )}
 
-        {/* FAL_KEY banner (only show after bg is configured, so it's not buried under the gate) */}
-        {isBgConfigured && !isBgRemovalReady && (
+        {/* FAL_KEY banner — only relevant in studio mode */}
+        {!isEnhanceOnly && isBgConfigured && !isBgRemovalReady && (
           <div className="flex items-start gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-sm">
             <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
             <div>
@@ -738,8 +759,8 @@ export function AIPhotoStudio() {
           </div>
         )}
 
-        {/* Stale background banner — shown when Ready vehicles have old composite versions */}
-        {isBgConfigured && staleCount > 0 && (
+        {/* Stale background banner — only relevant in studio mode */}
+        {!isEnhanceOnly && isBgConfigured && staleCount > 0 && (
           <div className="flex items-center gap-4 p-4 rounded-xl border border-amber-500/25 bg-amber-500/[0.06]">
             <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
               <RotateCcw className="w-4 h-4 text-amber-400" />
@@ -906,12 +927,10 @@ export function AIPhotoStudio() {
                     <Camera className="w-10 h-10 text-muted-foreground/30 mb-3" />
                     <div className="text-sm text-muted-foreground">
                       {tab === "all"
-                        ? isBgConfigured
-                          ? 'No jobs yet. Click "Process All Vehicles" to start.'
-                          : "Upload the studio background to begin processing."
+                        ? 'No jobs yet. Click "Process All Vehicles" to start.'
                         : `No ${tab} jobs.`}
                     </div>
-                    {tab === "all" && isBgConfigured && (
+                    {tab === "all" && (
                       <Button
                         variant="outline"
                         size="sm"
