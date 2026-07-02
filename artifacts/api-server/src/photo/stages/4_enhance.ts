@@ -1,40 +1,36 @@
-// Stage 4: Enhance — applies premium image processing per photo category.
+// Stage 4: Enhance v2 — natural dealership photography treatment.
 //
-// STUDIO EXTERIOR  (Front / Front 45 / Side / Rear 45 / Rear)
-//   — Full luxury dealership treatment:
-//   1. CLAHE local contrast  (paint, panel lines, wheel spokes pop)
-//   2. Normalise dynamic range
-//   3. Saturation + brightness lift for richer paint / deeper colour
-//   4. Contrast curve (deeper blacks, brighter highlights)
-//   5. Unsharp mask (crisp paint, glass, badges — no halos)
-//   6. Studio overhead light overlay — soft radial gradient 12 % opacity
+// v2 design principles (vs v1):
+//   • Noise FIRST — blur before any contrast/sharpen so we suppress JPEG artifacts
+//     before enhancement, not amplify them.
+//   • No CLAHE — the biggest source of the "crunchy" look in v1; removed entirely.
+//   • No fake overlays — studio light gradient removed (artificial).
+//   • Conservative saturation — 1.07–1.09 (v1 used 1.18 which looked oversaturated).
+//   • gamma() for midtone lift — more natural roll-off than linear() contrast.
+//   • Very light unsharp mask — sigma ≤ 0.5, m2 ≤ 2.0; local edges only.
 //
-// SECONDARY EXTERIOR  (Wheel / Engine / Bed / Tailgate)
-//   — Exterior detail treatment, no studio bg:
-//   1. CLAHE
-//   2. Normalise
-//   3. Saturation + moderate brightness lift
-//   4. Sharpen for crisp wheel / engine detail
+// PRESETS
+// ────────────────────────────────────────────────────────────────────────────
+//   exterior_premium       → all exterior photos (studio + detail shots)
+//   interior_premium       → all interior photos
+//   technical_readability  → documents, VIN, odometer, gauge cluster, stickers
 //
-// INTERIOR  (all Interior_* labels)
-//   — Premium showroom cabin treatment:
-//   1. CLAHE small-block (fine leather / stitching / screen detail)
-//   2. Normalise (broad tonal range, recover shadows)
-//   3. Saturation + gentle brightness lift (richer colour depth)
-//   4. Linear contrast curve (deeper blacks, cleaner whites)
-//   5. Premium sharpen (leather texture, knobs, buttons, screens)
+// Quality target: Mercedes / BMW / Porsche certified-pre-owned inventory photos.
+// The operator should feel "this car looks newer, cleaner and more valuable"
+// — NOT "this image has a filter."
 //
-// TECHNICAL / DEALER / MISC
-//   — Readability-only; preserve original framing / colours:
-//   1. Normalise (gentle — keep full information range)
-//   2. Light sharpen (text, numbers, VIN digits)
-//
-// Output: JPEG 95, 4:4:4 chroma (maximum colour fidelity).
+// If the enhanced image is measurably worse (sharpness regression), Stage 5
+// automatically reverts it to the original.
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 import type { PipelineContext } from "../pipeline";
-import { STUDIO_EXTERIOR_CLASSIFICATIONS, EXTERIOR_CLASSIFICATIONS } from "../providers/types";
+import { EXTERIOR_CLASSIFICATIONS, STUDIO_EXTERIOR_CLASSIFICATIONS } from "../providers/types";
+
+// ── Preset version (bump when tuning params so DB can track which preset was used) ──
+export const ENHANCE_PRESET_VERSION = "v2.0";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getAiPhotosDir(): string {
   const dir = path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos");
@@ -43,33 +39,149 @@ function getAiPhotosDir(): string {
 }
 
 async function fetchBuffer(urlOrPath: string): Promise<Buffer> {
-  if (urlOrPath.startsWith("/api/static/")) {
+  if (urlOrPath.startsWith("/api/static/ai-photos/")) {
     const filename = urlOrPath.replace("/api/static/ai-photos/", "");
     const dir = path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos");
     return fs.readFileSync(path.join(dir, filename));
   }
   if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
-    const res = await fetch(urlOrPath);
-    if (!res.ok) throw new Error(`Failed to fetch ${urlOrPath}: ${res.status}`);
+    const res = await fetch(urlOrPath, { signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) throw new Error(`Fetch failed ${urlOrPath}: ${res.status}`);
     return Buffer.from(await res.arrayBuffer());
   }
   return fs.readFileSync(urlOrPath);
 }
 
-// Soft radial gradient — simulates a studio ceiling overhead light fixture.
-async function buildStudioLightOverlay(w: number, h: number): Promise<Buffer> {
-  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-  <defs>
-    <radialGradient id="light" cx="50%" cy="18%" rx="55%" ry="38%">
-      <stop offset="0%"   stop-color="white" stop-opacity="0.14"/>
-      <stop offset="60%"  stop-color="white" stop-opacity="0.05"/>
-      <stop offset="100%" stop-color="white" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="${w}" height="${h}" fill="url(#light)"/>
-</svg>`;
-  return sharp(Buffer.from(svgStr)).png().toBuffer();
+// ── PRESET: exterior_premium ──────────────────────────────────────────────────
+//
+// Goal: Mercedes / BMW / Porsche certified-pre-owned inventory quality.
+//   • Cleaner, better lit, glossier, more premium
+//   • Paint depth, glass clarity, wheel contrast
+//   • Original background kept; no color changes; no HDR look
+//
+// Pipeline (follows spec priority order):
+//   1. Noise / JPEG-artifact reduction — subtle Gaussian sigma 0.4
+//      (Must be a separate pass so sharpen does NOT amplify noise)
+//   2. Dynamic range — barely touch histogram tails (0.1 / 99.9)
+//   3. Exposure — gamma(1.08) lifts midtones naturally without blowing highlights
+//   4. Shadow recovery — modulate brightness +1% lifts crushed shadows
+//   5. Highlight recovery — covered by gamma roll-off (no linear clip)
+//   6. Mild contrast — linear(1.02, -1) barely deepens blacks
+//   7. Paint depth / color — saturation 1.09 (subtle, not HDR)
+//   8. Very light local sharpen — sigma 0.45, m2 1.6 (edges only, no halos)
+//   9. High-quality JPEG output 95 / 4:4:4
+export async function presetExteriorPremium(input: Buffer): Promise<Buffer> {
+  // Pass 1: noise / JPEG artifact reduction
+  // A small Gaussian sigma smooths 8×8 JPEG blocking artifacts.
+  // This runs as a separate toBuffer() so the sharpen in pass 2 never
+  // "sees" JPEG noise — the single biggest fix over v1.
+  const denoised = await sharp(input)
+    .blur(0.4)
+    .toBuffer();
+
+  // Pass 2: all tonal + color + output in one libvips pass
+  return sharp(denoised)
+    // Dynamic range: barely clip tails (0.1 / 99.9) — recover washed-out photos
+    // without hard clipping that creates banding.
+    .normalise({ lower: 0.1, upper: 99.9 })
+    // Gamma: lifts midtones (paint, glass, bodywork) naturally.
+    // 1.08 = ~8% midtone brightness boost with natural roll-off at highlights.
+    .gamma(1.08)
+    // Color: very subtle saturation lift for paint depth.
+    // brightness 1.01 = shadow recovery (+1% global lift).
+    // saturation 1.09 = just enough to make paint pop without looking filtered.
+    .modulate({ brightness: 1.01, saturation: 1.09 })
+    // Contrast: linear(1.02, -1) — deepens blacks by 1 point, lifts contrast 2%.
+    // Much gentler than v1's linear(1.05, -5) which crushed shadow detail.
+    .linear(1.02, -1)
+    // Sharpen: local only, no halos, no crunch.
+    // sigma 0.45  — target feature radius (sub-pixel paint texture, badge edges)
+    // m1 0.5      — flat-region threshold: skip smooth areas (sky, panels)
+    // m2 1.6      — edge slope: gentle (v1 used 3.5 which created crunchiness)
+    // x1 2        — overshoot floor
+    // y2 8, y3 12 — overshoot ceiling (caps halos)
+    .sharpen({ sigma: 0.45, m1: 0.5, m2: 1.6, x1: 2, y2: 8, y3: 12 })
+    .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+    .toBuffer();
 }
+
+// ── PRESET: interior_premium ──────────────────────────────────────────────────
+//
+// Goal: luxury dealer brochure photography.
+//   • Leather texture, seat stitching, dashboard detail, screen clarity
+//   • Deep blacks, clean whites, noise-free
+//   • DO NOT: change upholstery color, over-brighten screens, make leather look fake
+//
+// Slightly different from exterior:
+//   • gentler blur (0.3) — interiors are already softer, avoid blurring stitching
+//   • gamma 1.05 — interiors should stay richer/darker (not blown out)
+//   • saturation 1.07 — leather and trim benefit from subtle richness
+//   • slightly stronger sharpen — leather grain, buttons, knobs benefit from detail
+export async function presetInteriorPremium(input: Buffer): Promise<Buffer> {
+  // Pass 1: very subtle noise reduction
+  const denoised = await sharp(input)
+    .blur(0.3)
+    .toBuffer();
+
+  // Pass 2: tonal + color + output
+  return sharp(denoised)
+    .normalise({ lower: 0.15, upper: 99.85 })
+    // Gamma 1.05 — lighter touch than exterior; interiors should stay rich
+    .gamma(1.05)
+    .modulate({ brightness: 1.01, saturation: 1.07 })
+    // Slightly more contrast — deep blacks are critical for premium interior look
+    .linear(1.03, -2)
+    // Slightly more targeted sharpen — leather grain, button labels, infotainment text
+    .sharpen({ sigma: 0.5, m1: 0.55, m2: 1.8, x1: 3, y2: 10, y3: 15 })
+    .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+    .toBuffer();
+}
+
+// ── PRESET: technical_readability ────────────────────────────────────────────
+//
+// Goal: maximum text and number clarity for documents, VIN, odometer, gauges.
+//   • Only improve readability
+//   • DO NOT: stylize, apply color grade, change information content
+//
+// No noise reduction (would blur text/numbers).
+// No saturation (preserve exact colors of documents and screens).
+// No gamma (preserve actual brightness of stickers/screens).
+// Very light sharpen tuned for fine line / text clarity.
+export async function presetTechnicalReadability(input: Buffer): Promise<Buffer> {
+  return sharp(input)
+    // Gentle dynamic range stretch — recover washed-out or dim screens/stickers
+    .normalise({ lower: 0.5, upper: 99.5 })
+    // Sharpen for crisp text, VIN digits, gauge numbers
+    // Higher m2 (2.0) than exterior because we need sharp text edges specifically
+    .sharpen({ sigma: 0.5, m1: 0.4, m2: 2.0, x1: 3, y2: 10, y3: 14 })
+    .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+    .toBuffer();
+}
+
+// ── Classification → Preset routing ──────────────────────────────────────────
+
+function routePreset(classification: string): "exterior_premium" | "interior_premium" | "technical_readability" {
+  if (
+    EXTERIOR_CLASSIFICATIONS.has(classification) ||
+    STUDIO_EXTERIOR_CLASSIFICATIONS.has(classification)
+  ) {
+    return "exterior_premium";
+  }
+  if (classification.startsWith("Interior")) {
+    return "interior_premium";
+  }
+  if (
+    classification.startsWith("Technical") ||
+    classification.startsWith("Dealer") ||
+    classification === "Miscellaneous"
+  ) {
+    return "technical_readability";
+  }
+  // Default: exterior treatment (safe for unknown labels)
+  return "exterior_premium";
+}
+
+// ── Stage entry point ─────────────────────────────────────────────────────────
 
 export async function stageEnhance(ctx: PipelineContext): Promise<void> {
   const uploadDir = getAiPhotosDir();
@@ -81,88 +193,16 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
 
     try {
       const buf = await fetchBuffer(src);
-      const classification = img.classification ?? "";
-
-      const isStudioExterior    = STUDIO_EXTERIOR_CLASSIFICATIONS.has(classification);
-      const isSecondaryExterior = EXTERIOR_CLASSIFICATIONS.has(classification) && !isStudioExterior;
-      const isInterior          = classification.startsWith("Interior");
-      const isTechnical         = classification.startsWith("Technical") || classification.startsWith("Dealer");
+      const classification = img.classification ?? "Miscellaneous";
+      const preset = routePreset(classification);
 
       let enhanced: Buffer;
-
-      if (isStudioExterior) {
-        // ── Premium studio exterior ───────────────────────────────────────────
-        // Full pipeline: CLAHE → normalise → colour lift → contrast curve → sharpen → overhead light
-        const processed = await sharp(buf)
-          .clahe({ width: 64, height: 64, maxSlope: 3 })
-          .normalise({ lower: 0.5, upper: 99.5 })
-          .modulate({ brightness: 1.03, saturation: 1.18, hue: 0 })
-          .linear(1.05, -5)
-          .sharpen({ sigma: 0.85, m1: 0.6, m2: 3.5, x1: 3, y2: 15, y3: 22 })
-          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
-          .toBuffer();
-
-        const meta = await sharp(processed).metadata();
-        const w = meta.width  ?? 1536;
-        const h = meta.height ?? 1024;
-        const lightOverlay = await buildStudioLightOverlay(w, h);
-
-        enhanced = await sharp(processed)
-          .composite([{ input: lightOverlay, blend: "screen" }])
-          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
-          .toBuffer();
-
-      } else if (isSecondaryExterior) {
-        // ── Secondary exterior (Wheel / Engine / Bed / Tailgate) ──────────────
-        // CLAHE for fine detail, normalise, saturation lift, crisp sharpen
-        enhanced = await sharp(buf)
-          .clahe({ width: 48, height: 48, maxSlope: 3 })
-          .normalise({ lower: 1, upper: 99 })
-          .modulate({ brightness: 1.02, saturation: 1.14 })
-          .linear(1.04, -4)
-          .sharpen({ sigma: 0.80, m1: 0.5, m2: 3.0, x1: 3, y2: 12, y3: 18 })
-          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
-          .toBuffer();
-
-      } else if (isInterior) {
-        // ── Premium interior cabin treatment ──────────────────────────────────
-        // Goal: clean showroom photo — rich leather/fabric, crisp screens,
-        //       deep blacks, no muddy shadows, accurate colour depth.
-        //
-        // CLAHE with small tile (32×32) to recover fine stitching / knob detail
-        // without blowing out bright spots (e.g. sun coming through windows).
-        // Normalise with generous headroom to recover underexposed shadows.
-        // Saturation lift brings out leather, wood trim, and screen colours.
-        // Linear curve deepens blacks (removes milky shadow) and lifts mids.
-        // Premium sharpen: high flat-region floor (m1), high slope (m2) so
-        // leather grain, buttons, and infotainment text come through sharply.
-        enhanced = await sharp(buf)
-          .clahe({ width: 32, height: 32, maxSlope: 3 })
-          .normalise({ lower: 0.5, upper: 99.5 })
-          .modulate({ brightness: 1.04, saturation: 1.16, hue: 0 })
-          .linear(1.07, -7)
-          .sharpen({ sigma: 0.90, m1: 0.55, m2: 4.0, x1: 4, y2: 18, y3: 26 })
-          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
-          .toBuffer();
-
-      } else if (isTechnical) {
-        // ── Technical & Dealer docs — readability only ────────────────────────
-        // Gentle normalise to recover washed-out or dim screens/stickers.
-        // Light sharpen for crisp text, VIN digits, gauge numbers.
-        // No colour manipulation — preserve exact information content.
-        enhanced = await sharp(buf)
-          .normalise({ lower: 1.5, upper: 98.5 })
-          .sharpen({ sigma: 0.60, m1: 0.35, m2: 1.8, x1: 3, y2: 10, y3: 14 })
-          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
-          .toBuffer();
-
+      if (preset === "exterior_premium") {
+        enhanced = await presetExteriorPremium(buf);
+      } else if (preset === "interior_premium") {
+        enhanced = await presetInteriorPremium(buf);
       } else {
-        // ── Miscellaneous — gentle improvement ────────────────────────────────
-        enhanced = await sharp(buf)
-          .normalise({ lower: 1, upper: 99 })
-          .sharpen({ sigma: 0.55, m1: 0.3, m2: 1.5 })
-          .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
-          .toBuffer();
+        enhanced = await presetTechnicalReadability(buf);
       }
 
       const filename = `enh-${ctx.job.vehicleId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
@@ -170,13 +210,14 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
       img.processedUrl = `/api/static/ai-photos/${filename}`;
 
       ctx.log.debug(
-        { vehicleId: ctx.job.vehicleId, filename, classification, isStudioExterior, isInterior, isTechnical },
-        "photo:enhance",
+        { vehicleId: ctx.job.vehicleId, filename, classification, preset, version: ENHANCE_PRESET_VERSION },
+        "photo:enhance v2",
       );
     } catch (err) {
+      // Non-fatal — fall back to source URL; Stage 5 will flag the sharpness regression
       img.processedUrl = src;
       img.usedFallback = 1;
-      ctx.log.warn({ err, url: src }, "photo:enhance failed — using source as-is");
+      ctx.log.warn({ err, url: src }, "photo:enhance v2 failed — using source as-is");
     }
   }
 }

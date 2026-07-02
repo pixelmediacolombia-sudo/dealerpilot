@@ -1,0 +1,481 @@
+DEALERPILOT — AI PHOTO ENHANCEMENT + v1.0 RC1 PREP
+
+Before entering full Release Candidate polish, we must fix AI Photo Enhancement quality.
+
+Do NOT start the general RC1 audit yet.
+
+First complete AI Photo Enhancement v2.
+
+====================================================
+PHASE 1 — AI PHOTO ENHANCEMENT v2
+====================================================
+
+Current problem:
+The enhancement looks over-processed.
+It relies too much on sharpening / CLAHE / normalize.
+The images look crunchy, artificial, and filtered.
+
+The goal is NOT sharper images.
+
+The goal is professional dealership photography.
+
+The enhanced version should look like the dealer hired a professional photographer.
+
+Keep original background.
+Do NOT replace background.
+Do NOT remove background.
+Do NOT change the vehicle.
+
+====================================================
+ENHANCEMENT PRIORITY ORDER
+====================================================
+
+1. Noise reduction
+2. JPEG artifact reduction
+3. White balance correction
+4. Exposure correction
+5. Shadow recovery
+6. Highlight recovery
+7. Dynamic range improvement
+8. Paint depth enhancement
+9. Glass clarity enhancement
+10. Chrome clarity
+11. Tire/wheel contrast
+12. Very subtle local sharpening
+13. Final luxury dealership color grade
+
+====================================================
+EXTERIOR PHOTO RULES
+====================================================
+
+Exterior photos should look:
+
+- cleaner
+- better lit
+- glossier
+- more premium
+- more detailed
+- more realistic
+
+Improve:
+
+- paint gloss
+- reflections
+- headlights
+- taillights
+- wheels
+- tires
+- glass
+- chrome
+- black levels
+- contrast
+- color temperature
+
+Do NOT:
+- oversharpen
+- oversaturate
+- change paint color
+- invent reflections
+- make the photo look HDR/fake
+- create halos around edges
+- make the car look like a filter was applied
+
+====================================================
+INTERIOR PHOTO RULES
+====================================================
+
+Interior photos should look like luxury dealer brochure photography.
+
+Improve:
+
+- leather texture
+- seat stitching
+- dashboard detail
+- screen clarity
+- steering wheel texture
+- black levels
+- shadow detail
+- white balance
+- noise reduction
+- button/control clarity
+- cabin lighting
+
+Do NOT:
+- change upholstery color
+- alter dashboard layout
+- invent buttons
+- remove controls
+- over-brighten screens
+- make leather look fake
+
+====================================================
+TECHNICAL PHOTO RULES
+====================================================
+
+For:
+- backup camera
+- odometer
+- gauge cluster
+- VIN sticker
+- window sticker
+- documents
+- keys
+- screen closeups
+
+Only improve readability.
+
+Do NOT stylize.
+Do NOT apply luxury color grade.
+Do NOT change information.
+
+====================================================
+SHARPNESS RULE
+====================================================
+
+Sharpening must be subtle and local.
+
+Do NOT use heavy global sharpen.
+
+Avoid:
+- crunchy edges
+- JPEG noise sharpened
+- white halos
+- artificial texture
+- over-processed look
+
+If an enhanced photo looks worse than the original, keep the original.
+
+====================================================
+QUALITY TARGET
+====================================================
+
+Target references:
+
+- Mercedes-Benz inventory photos
+- BMW certified inventory photos
+- Porsche dealer photography
+- Audi showroom photos
+- Tesla inventory photography
+
+The operator should simply feel:
+
+“This car looks newer, cleaner and more valuable.”
+
+Not:
+
+“This image has a filter.”
+
+====================================================
+IMPLEMENTATION REQUIREMENTS
+====================================================
+
+Rebuild the Sharp enhancement pipeline to be more natural.
+
+Suggested order:
+
+1. Decode image
+2. Reduce noise/artifacts
+3. White balance
+4. Exposure correction
+5. Shadow/highlight recovery
+6. Mild contrast curve
+7. Color correction
+8. Paint/glass/wheel-specific enhancement if possible
+9. Very light local sharpen
+10. Export high-quality JPEG/WebP
+
+Add presets:
+
+- exterior_premium
+- interior_premium
+- technical_readability
+
+Classification decides which preset to use.
+
+====================================================
+VISUAL REVIEW REQUIRED
+====================================================
+
+Before marking this complete:
+
+Process 5 vehicles.
+
+For each show:
+- original exterior
+- enhanced exterior
+- original interior
+- enhanced interior
+- technical photo if available
+
+We must visually confirm the enhanced photo is better.
+
+====================================================
+PHASE 2 — DEALERPILOT v1.0 RELEASE CANDIDATE RC1
+====================================================
+
+Only after AI Photo Enhancement v2 passes visual review, proceed to RC1.
+
+DealerPilot has reached feature completion.
+
+From this point forward we are entering Release Candidate mode.
+
+The objective is no longer to add features.
+
+The objective is to make DealerPilot feel like an enterprise SaaS ready for real dealership groups.
+
+====================================================
+RC1 MISSION
+====================================================
+
+Perform a complete production audit of the application.
+
+Think like:
+
+- Apple software QA
+- Stripe product team
+- Linear engineering
+- Vercel UX
+
+Every screen must feel intentional.
+Every button must have a purpose.
+Every interaction must feel polished.
+
+====================================================
+APPLICATION AUDIT
+====================================================
+
+Audit every page:
+
+- Inventory
+- Marketplace AI
+- Sales AI
+- AI Photo Studio
+- Marketplace Listings
+- Intelligence
+- Settings
+- Dashboard
+
+For every page identify:
+
+- duplicated information
+- duplicated buttons
+- unnecessary sections
+- dead actions
+- old developer widgets
+- inconsistent spacing
+- inconsistent typography
+- inconsistent card layouts
+- inconsistent icon usage
+- inconsistent button colors
+- unused filters
+- empty states
+- unnecessary scrolling
+- poor hierarchy
+
+====================================================
+REMOVE DEVELOPER UI
+====================================================
+
+Users should never see:
+
+- Job IDs
+- Pipeline names
+- Provider names
+- Sharp.js
+- GPT provider names
+- BRIA
+- Fallback counters
+- Processing internals
+- Debug values
+- Technical implementation details
+- Developer metrics
+
+Replace them with business language.
+
+====================================================
+CONSISTENCY
+====================================================
+
+Entire application must use one design system:
+
+- one spacing scale
+- one button style
+- one typography scale
+- one badge style
+- one card style
+- one icon family
+- one border radius
+- one shadow system
+
+No visual inconsistencies.
+
+====================================================
+LOCATION CONSISTENCY
+====================================================
+
+Global Dealer Location selector is the source of truth.
+
+Every page must respect it:
+
+- Publishing Queue
+- Recently Published
+- Publishing History
+- Marketplace Listings
+- Sales AI
+- Inventory
+- Marketplace AI
+- AI Photo Studio
+- Intelligence
+- Stats
+
+No mixed-location information.
+
+====================================================
+EMPTY STATES
+====================================================
+
+Every module must have a professional empty state.
+
+Never show:
+- placeholder data
+- lorem ipsum
+- demo text
+- simulator text
+- fake stats
+- fake conversations
+- fake vehicles
+
+====================================================
+PERFORMANCE AUDIT
+====================================================
+
+Audit:
+
+- duplicate queries
+- polling
+- cache
+- React renders
+- memory leaks
+- unused state
+- large components
+- code splitting
+- lazy loading
+- optimistic updates
+- network waterfalls
+
+====================================================
+DATABASE AUDIT
+====================================================
+
+Audit:
+
+- unused tables
+- unused columns
+- unused indexes
+- old migrations
+- orphan records
+- demo records
+- seed data
+
+====================================================
+CODE CLEANUP
+====================================================
+
+Remove:
+
+- unused routes
+- unused APIs
+- unused hooks
+- unused components
+- unused imports
+- duplicate helpers
+- dead code
+- commented code
+- obsolete feature flags
+
+====================================================
+UX POLISH
+====================================================
+
+Improve:
+
+- loading states
+- animations
+- transitions
+- hover states
+- button feedback
+- empty states
+- success states
+- error states
+- notifications
+- scroll behavior
+
+====================================================
+BUSINESS LANGUAGE
+====================================================
+
+DealerPilot should speak business language.
+
+Examples:
+
+Instead of “Processing Job”
+say “Enhancing Photos”
+
+Instead of “Publishing Queue”
+say “Publishing”
+
+Instead of “Provider”
+say “AI Enhancement”
+
+Everything should sound like dealership software.
+
+====================================================
+QUALITY GATE
+====================================================
+
+Every screen must answer:
+
+1. What is happening?
+2. What should I do next?
+3. What value am I getting?
+
+If any section cannot answer those questions, remove or redesign it.
+
+====================================================
+FINAL PRODUCT AUDIT
+====================================================
+
+Run a complete audit and produce a report:
+
+Category | Score | Issues | Recommendations
+
+Categories:
+- UI
+- UX
+- Performance
+- Code Quality
+- Architecture
+- Business Value
+- Accessibility
+- Maintainability
+- Production Readiness
+
+For every issue found include:
+- severity
+- location
+- recommendation
+- estimated effort
+- priority
+
+====================================================
+STOP RULE
+====================================================
+
+Do NOT add new modules.
+Do NOT invent new features.
+Do NOT change Marketplace publishing unless broken.
+
+First fix AI Photo Enhancement quality.
+Then enter RC1 polish.
+
+DealerPilot v1.0 RC1 should feel like a commercial enterprise platform ready to present to dealership owners.
