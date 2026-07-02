@@ -227,6 +227,43 @@ function findVehicleNodes(value: unknown): Record<string, unknown>[] {
   return best;
 }
 
+// Extract the city from a Google Base <g:address> block.
+// The parsed structure is: address → { component: [{ "@_name": "city", "#text": "FREDERICKSBURG" }, ...] }
+// Keys may carry the "g:" namespace prefix before normalizeKey strips it.
+function extractAddressCity(node: Record<string, unknown>): string | null {
+  // Find the address object (key may be "address" or "g:address")
+  let addressObj: unknown = null;
+  for (const [key, val] of Object.entries(node)) {
+    if (normalizeKey(key) === "address") { addressObj = val; break; }
+  }
+  if (!addressObj || typeof addressObj !== "object" || Array.isArray(addressObj)) return null;
+
+  // Find the component array inside the address object
+  let components: unknown = null;
+  for (const [key, val] of Object.entries(addressObj as Record<string, unknown>)) {
+    if (normalizeKey(key) === "component") { components = val; break; }
+  }
+  if (!components) return null;
+
+  const arr = Array.isArray(components) ? components : [components];
+  for (const comp of arr) {
+    if (typeof comp !== "object" || comp === null) continue;
+    const c = comp as Record<string, unknown>;
+    let nameAttr: string | null = null;
+    let textVal: string | null = null;
+    for (const [k, v] of Object.entries(c)) {
+      const nk = normalizeKey(k);
+      if (nk === "name") nameAttr = String(v).toLowerCase();
+      if (k === "#text") textVal = String(v).trim();
+    }
+    if (nameAttr === "city" && textVal) {
+      // Title-case: "FREDERICKSBURG" → "Fredericksburg"
+      return textVal.charAt(0).toUpperCase() + textVal.slice(1).toLowerCase();
+    }
+  }
+  return null;
+}
+
 function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null {
   const lookup = buildLookup(node);
 
@@ -249,12 +286,22 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
   const vdpUrl = firstString(lookup, ["vdpurl", "vdp", "detailurl", "detailspageurl", "link", "url"]);
 
   // Parse dealer branch/lot location.
-  // Tries explicit feed fields first, then falls back to extracting a city name
-  // from the VDP URL path (e.g. "manassas" in /inventory/manassas/...).
+  // Priority order:
+  //   1. Explicit feed fields (location, lot, branch, etc.)
+  //   2. <g:address><g:component name="city"> — Google Base / AIA format
+  //   3. City name in the VDP URL path (e.g. "fredericksburg" in the URL slug)
+  //
+  // NOTE: "dealername" is intentionally EXCLUDED from this lookup.
+  // The Alpha Motorsport feed stores the dealer name ("Alpha Motorsports") in
+  // <g:dealer_name>, which after key normalization becomes "dealername". Using
+  // it as lot_location would store the business name instead of the physical city.
   let lotLocation: string | null = firstString(lookup, [
     "location", "locationname", "storelocation", "dealerlocation",
-    "lot", "branch", "lotnumber", "lotname", "dealername",
+    "lot", "branch", "lotnumber", "lotname",
   ]);
+  if (!lotLocation) {
+    lotLocation = extractAddressCity(node);
+  }
   if (!lotLocation && vdpUrl) {
     const urlLower = vdpUrl.toLowerCase();
     if (urlLower.includes("manassas")) lotLocation = "Manassas";
