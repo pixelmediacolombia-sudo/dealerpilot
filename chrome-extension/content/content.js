@@ -226,8 +226,17 @@
       const interval = 150;
       let elapsed = 0;
       const tick = () => {
-        const opts = Array.from(document.querySelectorAll('[role="option"]'))
+        // Primary check: visible non-fixed elements
+        let opts = Array.from(document.querySelectorAll('[role="option"]'))
           .filter((el) => el.offsetParent !== null);
+        // Fallback: Facebook renders option lists in fixed-position portals where
+        // offsetParent is always null — detect them via getBoundingClientRect instead.
+        if (opts.length === 0) {
+          opts = Array.from(document.querySelectorAll('[role="option"]')).filter((el) => {
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+          });
+        }
         if (opts.length > 0) {
           console.log(`[OPTIONS] ${tag}: ${opts.length} options found at ${elapsed}ms`);
           opts.forEach((o, i) => {
@@ -610,9 +619,66 @@
       stateLog(`${label} — combobox clicked, waiting for options`);
       setStatus(`Opened "${label}" — waiting for options…`);
 
-      const options = await waitForOptions(undefined, label);
+      let options = await waitForOptions(undefined, label);
+
+      // ── Retry stage 1: synthetic MouseEvent sequence ──────────────────
       if (!options.length) {
-        stateError(`No [role="option"] elements appeared for ${label}`);
+        stateLog(`${label} — no options on first click; retrying with synthetic mouse events`);
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        await sleep(350);
+        const cb2 = (await waitForCombobox(keywords, 3000)) || combobox;
+        cb2.focus();
+        await sleep(200);
+        cb2.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
+        cb2.dispatchEvent(new MouseEvent("mouseup",   { bubbles: true, cancelable: true, view: window }));
+        cb2.dispatchEvent(new MouseEvent("click",     { bubbles: true, cancelable: true, view: window }));
+        await sleep(500);
+        options = await waitForOptions(6000, `${label}-retry1`);
+      }
+
+      // ── Retry stage 2: keyboard ArrowDown / Space to open dropdown ────
+      if (!options.length) {
+        stateLog(`${label} — still no options; trying keyboard ArrowDown`);
+        const cb3 = (await waitForCombobox(keywords, 2000)) || combobox;
+        cb3.focus();
+        await sleep(200);
+        cb3.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
+        await sleep(400);
+        cb3.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
+        await sleep(400);
+        options = await waitForOptions(5000, `${label}-retry2`);
+      }
+
+      // ── Retry stage 3 (year / make only): type value + Enter ──────────
+      if (!options.length && (label === "year" || label === "make")) {
+        stateLog(`${label} — keyboard type fallback`);
+        const cb4 = (await waitForCombobox(keywords, 2000)) || combobox;
+        cb4.focus();
+        await sleep(200);
+        for (const ch of String(targetValue)) {
+          cb4.dispatchEvent(new KeyboardEvent("keydown",  { key: ch, bubbles: true }));
+          cb4.dispatchEvent(new KeyboardEvent("keypress", { key: ch, bubbles: true }));
+          cb4.dispatchEvent(new KeyboardEvent("keyup",    { key: ch, bubbles: true }));
+          await sleep(60);
+        }
+        await sleep(700);
+        options = await waitForOptions(4000, `${label}-type`);
+        if (!options.length) {
+          // Final attempt: press Enter and verify combobox text changed
+          cb4.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+          await sleep(500);
+          const cbText = (cb4.innerText || cb4.textContent || "").trim().toLowerCase();
+          const expected = String(targetValue).toLowerCase().trim();
+          if (cbText && cbText.includes(expected)) {
+            stateLog(`${label} — keyboard Enter selected: "${cbText}"`);
+            filled.push(label);
+            return true;
+          }
+        }
+      }
+
+      if (!options.length) {
+        stateError(`No [role="option"] elements appeared for ${label} (all retries exhausted)`);
         missed.push(label);
         warnings.push(`${label}: no options appeared after clicking combobox`);
         return false;
@@ -706,6 +772,20 @@
       filled.push(label);
       log(`${label} → "${pickedText}"`);
 
+      // ---- Post-selection verification (year / make) ─────────────────
+      if (label === "year" || label === "make") {
+        await sleep(400);
+        const cbNow = (await waitForCombobox(keywords, 2000)) || combobox;
+        const displayedNow = (cbNow.innerText || cbNow.textContent || "").trim();
+        const expectedNorm = String(targetValue).toLowerCase().trim();
+        if (displayedNow.toLowerCase().includes(expectedNorm)) {
+          stateLog(`${label} verified — combobox shows "${displayedNow}"`);
+        } else {
+          stateLog(`${label} — combobox shows "${displayedNow}" (expected "${targetValue}") — proceeding`);
+          warnings.push(`${label}: selected "${pickedText}" but combobox shows "${displayedNow}" — verify manually`);
+        }
+      }
+
       // ---- Post-selection wait ----
       if (afterWait === "generic") {
         stateLog(`Waiting for next combobox after ${label} (generic count wait)`);
@@ -794,16 +874,21 @@
         true,   // required — fallback to first option if no exact match
       );
 
-      // ---- Phase 2: Year / Make / Model (optional — skip if no exact match) ----
-      stateLog("Phase 2: year / make / model (optional)");
+      // ---- Phase 2: Year / Make / Model ──────────────────────────────────
+      // Year and Make are required for Facebook to enable the Next button.
+      // We try a robust 3-stage retry (click → synthetic events → keyboard).
+      // If they still fail we continue filling the rest of the form (so the
+      // operator can review a fully-filled form) and then let validateBeforeNext
+      // surface the specific "Year / Make not selected" error.
+      stateLog("Phase 2: year / make / model");
 
       setStatus("Selecting year…");
-      await selectComboboxStep(
+      const yearFilled = await selectComboboxStep(
         "year",
         ["year"],
         fill.year ? String(fill.year) : null,
         "generic",
-        false,  // optional
+        false,  // false = don't auto-pick first option on no-match
       );
 
       setStatus("Selecting make…");
@@ -814,10 +899,14 @@
         "generic",
         false,
       );
-      if (!makeFilled && fill.make) {
-        // Make failed — model cascade won't appear; notify operator and continue
-        stateLog(`⚠️ Make "${fill.make}" not matched — operator should verify manually`);
-        setStatus(`⚠️ Make not matched — continuing without it (check form)`, "err");
+
+      if (!yearFilled || !makeFilled) {
+        const failing = [!yearFilled && fill.year ? "Year" : null, !makeFilled && fill.make ? "Make" : null]
+          .filter(Boolean).join(" and ");
+        if (failing) {
+          stateLog(`⚠️ ${failing} not selected — filling remaining fields then pausing for operator`);
+          setStatus(`⚠️ Action needed: select ${failing} manually on the form`, "err");
+        }
       }
 
       // Model — text input that appears after Make cascade
@@ -1396,7 +1485,9 @@
         ok: false,
         reason: fbErrors
           ? `Next button is disabled: ${fbErrors}`
-          : "Next button is disabled — a required field may be missing (price, title, description, or location)",
+          : missed.length > 0
+            ? `Next button is disabled — required fields not selected: ${missed.join(", ")}. Check those fields on the form.`
+            : "Next button is disabled — Year and Make may not have been selected. Check those fields on the form.",
       };
     }
 

@@ -1,0 +1,87 @@
+CRITICAL BUG v1.3.5 — Year and Make dropdowns are not being selected
+
+Current evidence:
+Overlay says:
+- Filled: photos, vehicle type, model, price, title, description, location
+- Missing: year, make
+- Warnings:
+  year: no options appeared after clicking combobox
+  make: no options appeared after clicking combobox
+
+Facebook Next button stays disabled.
+
+Root cause:
+Year and Make are required dropdown fields. The extension is clicking/opening the combobox but not selecting the option, so Facebook does not accept the value.
+
+Fix only this.
+
+Requirements:
+
+1. Year selector
+For year, do not rely only on text search after clicking.
+Use a robust dropdown selection strategy:
+
+- click the Year combobox
+- wait for the options list
+- find option matching exact year as text, e.g. "2021"
+- scroll inside the option list if needed
+- click the matching option
+- verify the combobox now displays "2021"
+
+If options do not appear:
+- retry once
+- click field again
+- use keyboard fallback:
+  type year
+  press ArrowDown / Enter
+- verify selected value
+
+2. Make selector
+For make, use safe normalized matching:
+
+Expected: NISSAN
+Allowed matches:
+- Nissan
+- NISSAN
+
+Rules:
+- case-insensitive
+- trim whitespace
+- exact normalized match preferred
+- do not select random first option
+- verify combobox displays Nissan after selection
+
+If options do not appear:
+- retry once
+- click field again
+- type make
+- press ArrowDown / Enter
+- verify selected value
+
+3. Do not continue if Year or Make missing
+Year and Make are required for Facebook to enable Next.
+If they fail:
+- pause job
+- show "Action needed: select Year/Make"
+- do not continue to fake publish
+- do not say price/title/description/location missing when those are filled
+
+4. Correct error message
+If Next is disabled and missing fields are Year/Make, show:
+
+"Next disabled because Year and Make were not selected."
+
+Do NOT show:
+"required field may be missing (price, title, description, or location)"
+when those fields are already filled.
+
+5. Overlay validation
+Overlay should read actual field state after every selection.
+If price/title/description/location are filled, do not list them as possible blockers.
+
+Acceptance:
+- Year selected and visible in Facebook field
+- Make selected and visible in Facebook field
+- Missing list no longer shows year/make
+- Next button becomes enabled
+- Extension proceeds to Next
