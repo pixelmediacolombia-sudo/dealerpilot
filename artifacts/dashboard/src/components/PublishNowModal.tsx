@@ -75,37 +75,62 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
   const [jobId, setJobId] = useState<number | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [wakeDebug, setWakeDebug] = useState<string | null>(null);
+  const [jobVisibleToExt, setJobVisibleToExt] = useState<boolean | null>(null);
 
   // After the job is created, try to wake the extension immediately via
   // chrome.runtime.sendMessage (requires externally_connectable in the manifest).
-  // Falls back silently to alarm polling if the extension is not connected.
-  async function tryWakeExtension() {
+  // Also checks /jobs/next to confirm the job is visible to the extension.
+  async function tryWakeExtension(newJobId: number) {
+    setWakeDebug(null);
+    setJobVisibleToExt(null);
+
+    // Check whether the job is visible to the extension right now.
+    try {
+      const nextData = await fetch("/api/publishing/jobs/next")
+        .then((r) => r.json())
+        .catch(() => null);
+      setJobVisibleToExt(nextData?.job?.id === newJobId);
+    } catch {
+      // ignore — visibility check is diagnostic only
+    }
+
     try {
       const status = await fetch("/api/extension/connect-status")
         .then((r) => r.json())
         .catch(() => null);
       const extId: string | undefined = status?.extensionId;
-      if (!extId) return;
-      // chrome.runtime is available in Chrome when externally_connectable is configured
-      const cr = (window as { chrome?: { runtime?: { sendMessage?: Function; lastError?: unknown } } })
+      if (!extId) {
+        setWakeDebug("Extension wake failed: no extensionId on file (extension may not be connected)");
+        return;
+      }
+      const cr = (window as { chrome?: { runtime?: { sendMessage?: Function; lastError?: { message?: string } } } })
         .chrome?.runtime;
-      if (!cr?.sendMessage) return;
+      if (!cr?.sendMessage) {
+        setWakeDebug("Extension wake failed: chrome.runtime not available in this browser");
+        return;
+      }
       cr.sendMessage(extId, { type: "POLL_NOW" }, () => {
-        // Suppress "Could not establish connection" — extension may be unloaded
-        void cr.lastError;
+        const err = cr.lastError;
+        if (err) {
+          setWakeDebug(`Extension wake failed: ${err.message ?? String(err)}`);
+        } else {
+          setWakeDebug("Extension wake sent ✓");
+        }
       });
-    } catch {
-      // Non-critical — alarm polling is the fallback
+    } catch (e) {
+      setWakeDebug(`Extension wake failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
   const { mutate: publishNow, isPending: isCreating } = usePublishNow({
     mutation: {
       onSuccess: (data) => {
-        setJobId(data.jobId ?? null);
+        const newJobId = data.jobId ?? null;
+        setJobId(newJobId);
         setCreateError(null);
         // Instant wake: tell the extension to poll now instead of waiting for the alarm
-        void tryWakeExtension();
+        if (newJobId) void tryWakeExtension(newJobId);
       },
       onError: (err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to create publishing job";
@@ -149,12 +174,16 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
   function handleRetry() {
     setJobId(null);
     setCreateError(null);
+    setWakeDebug(null);
+    setJobVisibleToExt(null);
     setRetryKey((k) => k + 1);
   }
 
   function handleClose() {
     setJobId(null);
     setCreateError(null);
+    setWakeDebug(null);
+    setJobVisibleToExt(null);
     onClose();
   }
 
@@ -226,6 +255,28 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
                   );
                 })}
               </div>
+
+              {/* Extension wake + visibility debug */}
+              {(wakeDebug !== null || jobVisibleToExt !== null) && (
+                <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 space-y-1">
+                  {jobVisibleToExt !== null && (
+                    <p className={[
+                      "text-[10px] font-mono",
+                      jobVisibleToExt ? "text-emerald-400" : "text-amber-400",
+                    ].join(" ")}>
+                      Job visible to extension: {jobVisibleToExt ? "yes ✓" : "no ✗"}
+                    </p>
+                  )}
+                  {wakeDebug !== null && (
+                    <p className={[
+                      "text-[10px] font-mono break-all",
+                      wakeDebug.startsWith("Extension wake sent") ? "text-emerald-400" : "text-amber-400",
+                    ].join(" ")}>
+                      {wakeDebug}
+                    </p>
+                  )}
+                </div>
+              )}
             </>
           )}
 

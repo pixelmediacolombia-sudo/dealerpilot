@@ -11,7 +11,7 @@ import {
   vehicleIntelligenceTable,
   type PublishingJob,
 } from "@workspace/db";
-import { and, asc, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { getMarketplacePricing } from "../listings/pricing";
 
 const router: IRouter = Router();
@@ -189,6 +189,9 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
 });
 
 // GET /publishing/jobs/next — next claimable job for the Chrome extension.
+// Sort: publish_now first (direct operator action), then by priority DESC,
+// then by created_at ASC (FIFO). This prevents stale Retry jobs from
+// blocking fresh publish_now jobs that share the same priority value.
 router.get("/publishing/jobs/next", async (req, res) => {
   const [row] = await db
     .select()
@@ -202,7 +205,11 @@ router.get("/publishing/jobs/next", async (req, res) => {
         isNull(publishingJobsTable.claimedByExtension),
       ),
     )
-    .orderBy(desc(publishingJobsTable.priority), asc(publishingJobsTable.createdAt))
+    .orderBy(
+      sql`CASE WHEN ${publishingJobsTable.source} = 'publish_now' THEN 0 ELSE 1 END`,
+      desc(publishingJobsTable.priority),
+      asc(publishingJobsTable.createdAt),
+    )
     .limit(1);
   if (!row) {
     res.json({ job: null });

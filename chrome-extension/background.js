@@ -417,13 +417,15 @@ const handlers = {
 
     // SAFETY GATE: Only auto-start recent jobs from direct user actions.
     // auto_publish_batch and stale jobs require explicit popup approval.
+    // publish_now jobs bypass the age check — they are direct operator clicks.
     const RECENT_JOB_MS = 5 * 60 * 1000;
     const jobAge = nextJob.createdAt ? Date.now() - new Date(nextJob.createdAt).getTime() : Infinity;
     const jobSource = nextJob.source || null;
+    const isPublishNow = jobSource === "publish_now";
     const isAutoPublishBatch = jobSource === "auto_publish_batch";
     const isTooOld = jobAge > RECENT_JOB_MS;
 
-    if (isTooOld || isAutoPublishBatch) {
+    if ((isTooOld && !isPublishNow) || isAutoPublishBatch) {
       const reason = isAutoPublishBatch
         ? "Job source is auto_publish_batch — user must approve from popup"
         : "Job is older than 5 minutes — user must trigger from popup";
@@ -447,7 +449,6 @@ const handlers = {
     // ── Sequential queue: 2-minute inter-job cooldown ────────────────────────
     // SKIPPED for publish_now jobs — operator triggered, must start immediately.
     // Applied only to scheduled/queued batch jobs to prevent opening multiple tabs.
-    const isPublishNow = jobSource === "publish_now";
     if (!isPublishNow) {
       const { lastJobFinishedAt } = await chrome.storage.local.get("lastJobFinishedAt");
       if (lastJobFinishedAt) {
