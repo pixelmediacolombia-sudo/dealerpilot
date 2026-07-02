@@ -22,7 +22,7 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.5";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.6";
 
   // ── Performance / fast-mode settings ────────────────────────────────────────
   // MARKETPLACE_FAST_MODE=true fills the 10 required fields:
@@ -426,7 +426,7 @@
     <div id="mai-header">
       <span id="mai-dot"></span>
       <span id="mai-title">DealerPilot AI</span>
-      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.5</span>
+      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.6</span>
       <button id="mai-toggle" title="Collapse">_</button>
     </div>
     <div id="mai-body">
@@ -2071,5 +2071,5 @@
     );
   }
 
-  log("Panel loaded v1.3.5", { isMessenger, isMarketplaceCreate });
+  log("Panel loaded v1.3.6", { isMessenger, isMarketplaceCreate });
 })();
