@@ -487,7 +487,10 @@ router.get("/marketplace-intelligence/recommendations", async (req, res) => {
     .where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID))
     .orderBy(desc(vehicleIntelligenceTable.confidenceScore));
 
-  const vehicleConditions = [eq(vehiclesTable.dealerId, DEALER_ID)];
+  const vehicleConditions = [
+    eq(vehiclesTable.dealerId, DEALER_ID),
+    eq(vehiclesTable.status, "Active"),
+  ];
   if (location) vehicleConditions.push(eq(vehiclesTable.lotLocation, location));
   const vehicles = await db
     .select()

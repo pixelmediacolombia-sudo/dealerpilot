@@ -205,6 +205,13 @@ export async function stageValidate(ctx: PipelineContext): Promise<void> {
       ...flags,
       aiSharpness:   aiSharpness   > 0 ? parseFloat(aiSharpness.toFixed(2))   : undefined,
       origSharpness: origSharpness > 0 ? parseFloat(origSharpness.toFixed(2)) : undefined,
+      ...(img.enhancementDelta
+        ? {
+            improvementLevel:  img.enhancementDelta.improvementLevel,
+            brightnessDelta:   img.enhancementDelta.brightnessDelta,
+            contrastDelta:     img.enhancementDelta.contrastDelta,
+          }
+        : {}),
     });
 
     ctx.log.debug(

@@ -1,0 +1,157 @@
+URGENT PRODUCT AUDIT — DealerPilot is still showing questionable data and AI photos do not look enhanced enough
+
+Issues observed:
+
+1. AI Photo Studio says photos are “enhanced”, but visually they look almost identical to the originals.
+This means we are spending AI/FAL/OpenAI money without visible value.
+
+2. Marketplace shows a Tesla in Today’s Picks.
+I need to know exactly where that Tesla came from:
+- real inventory?
+- test seed?
+- stale job?
+- fake/demo data?
+- recommendation cache?
+- old database row?
+
+No fake/test/demo vehicles should appear in production unless Demo Mode is explicitly enabled.
+
+====================================================
+1. Audit Marketplace recommendation source
+====================================================
+
+For every vehicle shown in Today’s Picks, display/debug:
+
+- vehicleId
+- VIN
+- source
+- dealerId
+- lotLocation
+- inventory import timestamp
+- recommendation reason
+- AI score source
+- whether it exists in real inventory table
+- whether it is test/demo/seed data
+
+If a vehicle is not from real inventory:
+REMOVE it from production recommendations.
+
+Acceptance:
+Tesla only appears if it is a real Alpha Motorsport inventory vehicle.
+
+====================================================
+2. Add “Real Inventory Only” guard
+====================================================
+
+Marketplace recommendations must only use:
+
+- active vehicles
+- real imported inventory
+- correct dealer
+- correct lot location
+- not sold
+- not published
+- not archived
+- not demo
+- not test seed
+- not fake
+
+====================================================
+3. AI Photo Enhancement is not strong enough
+====================================================
+
+Current enhanced output is too subtle.
+
+If AI Photo Studio says “Enhanced”, the improvement must be visually obvious.
+
+Exterior enhancement must improve:
+- lighting
+- exposure
+- color temperature
+- contrast
+- paint gloss
+- reflections
+- glass clarity
+- wheel/tire contrast
+- sharpness
+- shadows
+- overall premium look
+
+Interior enhancement must improve:
+- clarity
+- exposure
+- dashboard texture
+- leather/fabric texture
+- screen readability
+- black levels
+- sharpness
+- noise reduction
+
+If enhanced image looks the same as original:
+DO NOT mark it as Enhanced.
+Mark as “No visible improvement”.
+
+====================================================
+4. Add Before/After quality delta
+====================================================
+
+For every processed image calculate:
+
+- brightness delta
+- contrast delta
+- sharpness delta
+- saturation delta
+- file size/resolution delta
+- AI provider used
+- processing cost
+
+Show in UI:
+“Improvement: Low / Medium / High”
+
+If improvement is Low:
+- do not count it as enhanced
+- do not charge/queue future similar enhancement until pipeline is fixed
+
+====================================================
+5. Stop spending money on weak enhancement
+====================================================
+
+Before processing more vehicles, run a test on 1 vehicle only.
+
+Show:
+- original
+- enhanced
+- delta score
+- provider used
+- cost
+- whether Marketplace will use it
+
+Do not process bulk inventory until enhanced photos are clearly better than originals.
+
+====================================================
+6. UI still feels generic
+====================================================
+
+The layout improved, but the visual identity still feels like a generic AI dashboard.
+
+Need stronger automotive identity:
+- more vehicle imagery
+- less empty dark space
+- more cockpit-style data density
+- stronger module differentiation
+- less generic KPI cards
+- more operational flow
+- more premium dealership atmosphere
+
+Do not just restyle components.
+Change workflows and visual structure.
+
+====================================================
+Acceptance
+====================================================
+
+- No fake/test vehicles in Marketplace recommendations
+- Tesla source is explained
+- AI enhanced photos look clearly better than originals
+- Low-improvement images are not marked enhanced
+- No bulk AI spending until quality is approved

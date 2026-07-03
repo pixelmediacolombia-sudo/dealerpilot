@@ -68,6 +68,8 @@ router.get("/photo-studio/jobs", async (req: Request, res: Response) => {
         exteriorCount: sql<number>`coalesce((select count(*) from ai_photo_images where set_id = ${aiPhotoJobsTable.outputSetId} and is_exterior = 1), 0)`,
         interiorCount: sql<number>`coalesce((select count(*) from ai_photo_images where set_id = ${aiPhotoJobsTable.outputSetId} and is_exterior = 0 and classification != 'Miscellaneous'), 0)`,
         fallbackCount: sql<number>`coalesce((select count(*) from ai_photo_images where set_id = ${aiPhotoJobsTable.outputSetId} and used_fallback = 1), 0)`,
+        noImprovementCount: sql<number>`coalesce((select count(*) from ai_photo_images where set_id = ${aiPhotoJobsTable.outputSetId} and quality_flags is not null and quality_flags::jsonb->>'improvementLevel' = 'none'), 0)`,
+        lowImprovementCount: sql<number>`coalesce((select count(*) from ai_photo_images where set_id = ${aiPhotoJobsTable.outputSetId} and quality_flags is not null and quality_flags::jsonb->>'improvementLevel' = 'low'), 0)`,
         // Vehicle fields
         vehicleYear: vehiclesTable.year,
         vehicleMake: vehiclesTable.make,

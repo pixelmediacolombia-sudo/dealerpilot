@@ -54,6 +54,12 @@ export interface PipelineImage {
   logoObscured?: boolean;
   /** Set by Stage 5 when AI output is measurably worse than the original */
   aiWorseThanOriginal?: boolean;
+  /** Set by Stage 4 — brightness/contrast delta between original and enhanced */
+  enhancementDelta?: {
+    brightnessDelta: number;
+    contrastDelta: number;
+    improvementLevel: "none" | "low" | "medium" | "high";
+  };
 }
 
 export interface PipelineContext {

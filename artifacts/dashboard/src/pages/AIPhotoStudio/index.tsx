@@ -48,6 +48,9 @@ interface PhotoJob {
   vehicleStatus: string;
   vehicleAiStatus: string | null;
   vehicleThumbnailUrl: string | null;
+  noImprovementCount: number;
+  lowImprovementCount: number;
+  fallbackCount: number;
 }
 
 interface InventoryVehicle {
@@ -199,20 +202,35 @@ function VehicleCard({
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-semibold text-white/75 truncate">{name}</p>
         <div className="flex items-center gap-3 mt-1">
-          {/* Photo counts as chips */}
           <span className="text-[10px] text-white/30 font-mono">{job.totalPhotos} orig</span>
           {enhancedCount > 0 && (
             <span className="text-[10px] text-amber-400/70 font-mono">{enhancedCount} enhanced</span>
+          )}
+          {/* Improvement quality indicator — only shown for completed jobs with delta data */}
+          {isDone && job.noImprovementCount > 0 && (
+            <span className="text-[9px] font-black uppercase tracking-[0.18em] text-orange-400/70 border border-orange-500/20 rounded px-1.5 py-0.5">
+              {job.noImprovementCount} no change
+            </span>
+          )}
+          {isDone && job.noImprovementCount === 0 && job.lowImprovementCount > 0 && (
+            <span className="text-[9px] font-black uppercase tracking-[0.18em] text-yellow-400/50 border border-yellow-500/15 rounded px-1.5 py-0.5">
+              {job.lowImprovementCount} low
+            </span>
           )}
           {job.completedAt && (
             <span className="text-[10px] text-white/18 font-mono">{timeAgo(job.completedAt)}</span>
           )}
         </div>
-        {/* Progress bar */}
+        {/* Progress bar — amber = enhanced, orange = low/no improvement */}
         {job.totalPhotos > 0 && (
           <div className="mt-1.5 h-[2px] w-32 bg-white/[0.06] rounded-full overflow-hidden">
             <div
-              className={cn("h-full rounded-full transition-all", isDone ? "bg-amber-400" : isProcessing ? "bg-blue-400" : "bg-white/10")}
+              className={cn(
+                "h-full rounded-full transition-all",
+                isDone && job.noImprovementCount > job.totalPhotos * 0.5 ? "bg-orange-400" :
+                isDone ? "bg-amber-400" :
+                isProcessing ? "bg-blue-400" : "bg-white/10",
+              )}
               style={{ width: isProcessing ? "60%" : `${pct}%` }}
             />
           </div>

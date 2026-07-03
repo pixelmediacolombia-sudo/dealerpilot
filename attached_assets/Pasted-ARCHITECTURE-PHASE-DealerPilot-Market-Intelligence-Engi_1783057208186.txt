@@ -1,0 +1,178 @@
+ARCHITECTURE PHASE — DealerPilot Market Intelligence Engine v1.0
+
+DealerPilot must stop recommending vehicles using simple inventory rules.
+
+Instead, build a true Market Intelligence Engine that ranks vehicles by probability of generating leads, appointments, and sales.
+
+====================================================
+NEW CORE ENGINE
+====================================================
+
+Create a DealerPilot Opportunity Engine.
+
+Every inventory vehicle receives:
+
+• Opportunity Score (0–100)
+• Market Demand Score
+• Price Competitiveness Score
+• Seasonality Score
+• Dealer Performance Score
+• Buyer Demand Score
+• Inventory Health Score
+• Creative Performance Score
+
+Weighted into one Opportunity Score.
+
+====================================================
+MARKET DEMAND ENGINE (30%)
+====================================================
+
+Estimate demand using:
+
+• vehicle make
+• model
+• trim
+• body type
+• fuel type
+• historical popularity
+• regional trends
+
+Generate a normalized score.
+
+====================================================
+PRICE ENGINE (20%)
+====================================================
+
+Compare dealer price against local market.
+
+Output:
+
+Below Market
+
+Market Average
+
+Above Market
+
+Convert to score.
+
+====================================================
+SEASONAL ENGINE (10%)
+====================================================
+
+Adjust score using:
+
+current month
+
+weather
+
+holiday season
+
+truck season
+
+SUV season
+
+tax season
+
+convertible season
+
+====================================================
+DEALER ENGINE (15%)
+====================================================
+
+Learn from DealerPilot history.
+
+Higher CTR
+
+More appointments
+
+More sales
+
+Higher score.
+
+====================================================
+BUYER DEMAND ENGINE (10%)
+====================================================
+
+Use:
+
+Marketplace conversations
+
+Lead history
+
+Vehicle searches
+
+Saved listings
+
+Buyer interest
+
+====================================================
+INVENTORY HEALTH (10%)
+====================================================
+
+Increase urgency for aging inventory.
+
+====================================================
+CREATIVE ENGINE (5%)
+====================================================
+
+Higher CTR creatives increase score.
+
+====================================================
+OUTPUT
+====================================================
+
+Every vehicle displays:
+
+Opportunity Score
+
+★★★★★
+
+AI explanation
+
+Example:
+
+High truck demand
+
+Price 5% below market
+
+Summer season
+
+Historically high engagement
+
+Predicted sale within 14 days
+
+====================================================
+NEW PAGE
+====================================================
+
+Create Market Intelligence.
+
+Show:
+
+Hot Vehicles
+
+Cooling Vehicles
+
+Fastest Sellers
+
+Most Competitive Prices
+
+Highest Opportunity
+
+Market Trends
+
+Regional Demand
+
+Dealer Insights
+
+====================================================
+GOAL
+====================================================
+
+DealerPilot should no longer answer:
+
+"What cars do I have?"
+
+DealerPilot should answer:
+
+"What should I sell next, and why?"
