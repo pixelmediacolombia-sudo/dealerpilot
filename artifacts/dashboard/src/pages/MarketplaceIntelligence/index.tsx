@@ -7,10 +7,14 @@ import { formatCurrency } from "@/lib/format";
 import {
   Flame, TrendingDown, DollarSign, Clock, MapPin, BarChart3,
   Car, Zap, Star, ChevronRight, RefreshCw, ArrowUp, ArrowDown,
-  Minus, Target, Trophy, AlertTriangle, Calendar,
+  Minus, Target, Trophy, AlertTriangle, Calendar, Camera,
+  SendHorizontal, Eye, CheckCircle2,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+type OpportunityLabel = "Hot" | "Strong" | "Watch" | "Low";
+type RecommendedAction = "Publish Today" | "Hold" | "Review Price" | "Needs Better Photos";
 
 interface OpportunityVehicle {
   vehicleId: number;
@@ -25,6 +29,8 @@ interface OpportunityVehicle {
   lotLocation: string | null;
   thumbnailUrl: string | null;
   opportunityScore: number;
+  opportunityLabel: OpportunityLabel;
+  recommendedAction: RecommendedAction;
   marketDemandScore: number;
   priceScore: number;
   seasonalScore: number;
@@ -110,26 +116,70 @@ function useOpportunityData() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function scoreColor(score: number): string {
-  if (score >= 80) return "text-green-400";
-  if (score >= 65) return "text-amber-400";
-  if (score >= 50) return "text-yellow-400/80";
-  return "text-red-400/70";
+  if (score >= 75) return "text-green-400";
+  if (score >= 60) return "text-amber-400";
+  if (score >= 45) return "text-yellow-400/70";
+  return "text-red-400/60";
 }
 
 function scoreBg(score: number): string {
-  if (score >= 80) return "bg-green-500";
-  if (score >= 65) return "bg-amber-400";
-  if (score >= 50) return "bg-yellow-400/80";
-  return "bg-red-400/60";
+  if (score >= 75) return "bg-green-500";
+  if (score >= 60) return "bg-amber-400";
+  if (score >= 45) return "bg-yellow-400/70";
+  return "bg-red-400/50";
 }
 
-function scoreLabel(score: number): string {
-  if (score >= 85) return "ELITE";
-  if (score >= 80) return "HOT";
-  if (score >= 70) return "STRONG";
-  if (score >= 60) return "WARM";
-  if (score >= 50) return "FAIR";
-  return "COLD";
+function labelColor(label: OpportunityLabel): string {
+  if (label === "Hot") return "text-green-400";
+  if (label === "Strong") return "text-amber-400";
+  if (label === "Watch") return "text-yellow-400/70";
+  return "text-red-400/60";
+}
+
+const ACTION_CONFIG: Record<RecommendedAction, {
+  icon: React.ElementType;
+  bg: string;
+  text: string;
+  border: string;
+}> = {
+  "Publish Today": {
+    icon: SendHorizontal,
+    bg: "bg-green-500/15",
+    text: "text-green-400",
+    border: "border-green-500/25",
+  },
+  "Hold": {
+    icon: Eye,
+    bg: "bg-white/[0.04]",
+    text: "text-white/35",
+    border: "border-white/[0.08]",
+  },
+  "Review Price": {
+    icon: DollarSign,
+    bg: "bg-red-500/10",
+    text: "text-red-400/70",
+    border: "border-red-500/20",
+  },
+  "Needs Better Photos": {
+    icon: Camera,
+    bg: "bg-amber-500/10",
+    text: "text-amber-400/80",
+    border: "border-amber-500/20",
+  },
+};
+
+function ActionBadge({ action }: { action: RecommendedAction }) {
+  const cfg = ACTION_CONFIG[action];
+  const Icon = cfg.icon;
+  return (
+    <div className={cn(
+      "flex items-center gap-1 px-2 py-1 rounded border text-[9px] font-black uppercase tracking-[0.16em] shrink-0 whitespace-nowrap",
+      cfg.bg, cfg.text, cfg.border,
+    )}>
+      <Icon className="w-2.5 h-2.5" />
+      {action}
+    </div>
+  );
 }
 
 function pricingIcon(position: string) {
@@ -257,14 +307,14 @@ function VehicleRow({
           )}
         </div>
 
-        {/* Opportunity Score */}
+        {/* Opportunity Score + Label */}
         <div className="shrink-0 flex flex-col items-center gap-1 w-20">
           <Stars score={vehicle.opportunityScore} />
           <div className={cn("text-2xl font-black tabular-nums leading-none", scoreColor(vehicle.opportunityScore))}>
             {vehicle.opportunityScore}
           </div>
-          <span className={cn("text-[8px] font-black uppercase tracking-[0.2em]", scoreColor(vehicle.opportunityScore))}>
-            {scoreLabel(vehicle.opportunityScore)}
+          <span className={cn("text-[8px] font-black uppercase tracking-[0.2em]", labelColor(vehicle.opportunityLabel))}>
+            {vehicle.opportunityLabel}
           </span>
           <div className="h-[2px] w-16 bg-white/[0.06] rounded-full overflow-hidden mt-0.5">
             <div className={cn("h-full rounded-full", scoreBg(vehicle.opportunityScore))}
@@ -272,41 +322,71 @@ function VehicleRow({
           </div>
         </div>
 
-        {/* Pricing position */}
-        <div className="shrink-0 hidden md:flex flex-col items-center gap-1 w-20">
-          {pricingIcon(vehicle.pricingPosition)}
-          <span className={cn("text-[9px] font-black uppercase tracking-[0.14em] text-center leading-tight", pricingColor(vehicle.pricingPosition))}>
-            {vehicle.pricingPosition}
-          </span>
-          <span className="text-[9px] text-white/20 font-mono">{vehicle.daysOnLot}d lot</span>
+        {/* Recommended Action + pricing */}
+        <div className="shrink-0 hidden md:flex flex-col items-end gap-1.5">
+          <ActionBadge action={vehicle.recommendedAction} />
+          <div className="flex items-center gap-1">
+            {pricingIcon(vehicle.pricingPosition)}
+            <span className={cn("text-[9px] font-mono", pricingColor(vehicle.pricingPosition))}>
+              {vehicle.daysOnLot}d lot
+            </span>
+          </div>
         </div>
 
         <ChevronRight className={cn("w-3.5 h-3.5 text-white/15 shrink-0 transition-transform", expanded && "rotate-90")} />
       </div>
 
-      {/* Expanded sub-scores */}
+      {/* Expanded: reason bullets + sub-score bars */}
       {expanded && (
-        <div className="px-5 pb-4 pl-[68px]">
-          <div className="border border-white/[0.05] rounded-lg p-4 bg-white/[0.01] space-y-2">
-            <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/25 mb-3">Score Breakdown</p>
-            <SubScoreBar label="Mkt Demand" score={vehicle.marketDemandScore} accentClass="bg-green-500/70" />
-            <SubScoreBar label="Price" score={vehicle.priceScore} accentClass="bg-blue-500/70" />
-            <SubScoreBar label="Seasonal" score={vehicle.seasonalScore} accentClass="bg-cyan-500/70" />
-            <SubScoreBar label="Dlr Perf" score={vehicle.dealerPerformanceScore} accentClass="bg-violet-500/70" />
-            <SubScoreBar label="Buyer" score={vehicle.buyerDemandScore} accentClass="bg-pink-500/70" />
-            <SubScoreBar label="Inv Health" score={vehicle.inventoryHealthScore} accentClass="bg-orange-500/70" />
-            <SubScoreBar label="Creative" score={vehicle.creativePerformanceScore} accentClass="bg-amber-500/70" />
-            {vehicle.strategyName && (
-              <div className="mt-3 pt-3 border-t border-white/[0.05] flex items-center gap-2">
-                <Zap className="w-3 h-3 text-green-400/60 shrink-0" />
-                <span className="text-[10px] text-white/40">{vehicle.strategyName}</span>
-                {vehicle.recommendedDayLabel && vehicle.recommendedTimeLabel && (
-                  <span className="text-[10px] text-white/20 ml-auto">
-                    Post {vehicle.recommendedDayLabel} at {vehicle.recommendedTimeLabel}
-                  </span>
-                )}
+        <div className="px-5 pb-4 pl-[98px]">
+          <div className="border border-white/[0.05] rounded-lg p-4 bg-white/[0.01] space-y-4">
+            {/* Why this vehicle */}
+            {vehicle.opportunityFactors.length > 0 && (
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/25 mb-2">Why This Vehicle</p>
+                <ul className="space-y-1.5">
+                  {vehicle.opportunityFactors.map((factor, i) => {
+                    const isEstimate = factor.includes("internal estimate");
+                    const cleanText = factor.replace(" (internal estimate)", "");
+                    return (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className={cn("w-1 h-1 rounded-full shrink-0 mt-1.5", isEstimate ? "bg-white/20" : "bg-green-500/60")} />
+                        <span className={cn("text-[11px] leading-relaxed", isEstimate ? "text-white/30" : "text-white/55")}>
+                          {cleanText}
+                          {isEstimate && (
+                            <span className="ml-1 text-[9px] text-white/20 font-mono">[est]</span>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             )}
+            {/* Score breakdown bars */}
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/25 mb-2">Score Breakdown</p>
+              <div className="space-y-1.5">
+                <SubScoreBar label="Mkt Demand" score={vehicle.marketDemandScore} accentClass="bg-green-500/70" />
+                <SubScoreBar label="Price" score={vehicle.priceScore} accentClass="bg-blue-500/70" />
+                <SubScoreBar label="Dlr Perf" score={vehicle.dealerPerformanceScore} accentClass="bg-violet-500/70" />
+                <SubScoreBar label="Seasonal" score={vehicle.seasonalScore} accentClass="bg-cyan-500/70" />
+                <SubScoreBar label="Buyer" score={vehicle.buyerDemandScore} accentClass="bg-pink-500/70" />
+                <SubScoreBar label="Inv Age" score={vehicle.inventoryHealthScore} accentClass="bg-orange-500/70" />
+                <SubScoreBar label="Photos" score={vehicle.creativePerformanceScore} accentClass="bg-amber-500/70" />
+              </div>
+            </div>
+            {/* Action row */}
+            <div className="pt-2 border-t border-white/[0.05] flex items-center gap-2">
+              <CheckCircle2 className="w-3 h-3 text-white/20 shrink-0" />
+              <span className="text-[10px] text-white/30">Recommended:</span>
+              <ActionBadge action={vehicle.recommendedAction} />
+              {vehicle.recommendedDayLabel && vehicle.recommendedTimeLabel && (
+                <span className="text-[10px] text-white/20 ml-auto font-mono">
+                  Post {vehicle.recommendedDayLabel} @ {vehicle.recommendedTimeLabel}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -783,12 +863,10 @@ export default function MarketIntelligencePage() {
                     >
                       <div className="px-5 py-4 space-y-3">
                         {[
-                          { label: "Elite (85–100)", count: data.vehicles.filter(v => v.opportunityScore >= 85).length, color: "bg-green-500/80", textColor: "text-green-400" },
-                          { label: "Hot (80–84)", count: data.vehicles.filter(v => v.opportunityScore >= 80 && v.opportunityScore < 85).length, color: "bg-green-500/50", textColor: "text-green-400/70" },
-                          { label: "Strong (70–79)", count: data.vehicles.filter(v => v.opportunityScore >= 70 && v.opportunityScore < 80).length, color: "bg-amber-400/70", textColor: "text-amber-400" },
-                          { label: "Warm (60–69)", count: data.vehicles.filter(v => v.opportunityScore >= 60 && v.opportunityScore < 70).length, color: "bg-yellow-400/50", textColor: "text-yellow-400/70" },
-                          { label: "Fair (50–59)", count: data.vehicles.filter(v => v.opportunityScore >= 50 && v.opportunityScore < 60).length, color: "bg-white/20", textColor: "text-white/40" },
-                          { label: "Cold (<50)", count: data.vehicles.filter(v => v.opportunityScore < 50).length, color: "bg-red-500/40", textColor: "text-red-400/60" },
+                          { label: "Hot (75–100)", count: data.vehicles.filter(v => v.opportunityScore >= 75).length, color: "bg-green-500/70", textColor: "text-green-400" },
+                          { label: "Strong (60–74)", count: data.vehicles.filter(v => v.opportunityScore >= 60 && v.opportunityScore < 75).length, color: "bg-amber-400/70", textColor: "text-amber-400" },
+                          { label: "Watch (45–59)", count: data.vehicles.filter(v => v.opportunityScore >= 45 && v.opportunityScore < 60).length, color: "bg-yellow-400/50", textColor: "text-yellow-400/70" },
+                          { label: "Low (<45)", count: data.vehicles.filter(v => v.opportunityScore < 45).length, color: "bg-red-500/40", textColor: "text-red-400/60" },
                         ].map((row) => {
                           const pct = ins.totalVehicles > 0 ? Math.round((row.count / ins.totalVehicles) * 100) : 0;
                           return (

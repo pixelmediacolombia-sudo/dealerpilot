@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 import { db } from "@workspace/db";
-import { eq, count, isNull, and } from "drizzle-orm";
+import { eq, count, isNull, or, and } from "drizzle-orm";
 import {
   vehiclesTable,
   creativeVersionsTable,
@@ -9,6 +9,9 @@ import {
   listingPerformanceTable,
   conversationsTable,
   leadsTable,
+  vehicleImagesTable,
+  aiPhotoJobsTable,
+  listingsTable,
   type Vehicle,
 } from "@workspace/db";
 import {
@@ -347,14 +350,17 @@ function generateVehicleStrategy(
 // ── Opportunity Score Seed ────────────────────────────────────────────────────
 
 export async function seedOpportunityScores(logger: Logger): Promise<void> {
-  // Check if already scored: any vehicle_intelligence row with null opportunityScore
+  // Check if any rows are missing opportunityScore or recommendedAction (new column)
   const [nullCheck] = await db
     .select({ cnt: count() })
     .from(vehicleIntelligenceTable)
     .where(
       and(
         eq(vehicleIntelligenceTable.dealerId, DEALER_ID),
-        isNull(vehicleIntelligenceTable.opportunityScore),
+        or(
+          isNull(vehicleIntelligenceTable.opportunityScore),
+          isNull(vehicleIntelligenceTable.recommendedAction),
+        ),
       ),
     );
 
@@ -374,26 +380,51 @@ export async function seedOpportunityScores(logger: Logger): Promise<void> {
 
   if (vehicles.length === 0) return;
 
-  // Batch-fetch supporting data
-  const [allPerf, allConvos, allLeads, allCreativeVersions, allCreativeScores] = await Promise.all([
+  // Batch-fetch all supporting data in one round-trip
+  const [
+    allPerf,
+    allConvos,
+    allLeads,
+    allCreativeVersions,
+    allCreativeScores,
+    allPhotoCounts,
+    allAiJobs,
+    allPublishedListings,
+  ] = await Promise.all([
     db.select().from(listingPerformanceTable).where(eq(listingPerformanceTable.dealerId, DEALER_ID)),
-    db.select({
-      vehicleId: conversationsTable.vehicleId,
-      id: conversationsTable.id,
-    }).from(conversationsTable).where(eq(conversationsTable.dealerId, DEALER_ID)),
-    db.select({
-      vehicleId: leadsTable.vehicleId,
-      temperature: leadsTable.temperature,
-    }).from(leadsTable).where(eq(leadsTable.dealerId, DEALER_ID)),
+    db.select({ vehicleId: conversationsTable.vehicleId, id: conversationsTable.id })
+      .from(conversationsTable).where(eq(conversationsTable.dealerId, DEALER_ID)),
+    db.select({ vehicleId: leadsTable.vehicleId, temperature: leadsTable.temperature })
+      .from(leadsTable).where(eq(leadsTable.dealerId, DEALER_ID)),
     db.select({ vehicleId: creativeVersionsTable.vehicleId, id: creativeVersionsTable.id })
       .from(creativeVersionsTable).where(eq(creativeVersionsTable.dealerId, DEALER_ID)),
-    db.select({
-      creativeVersionId: creativeScoresTable.creativeVersionId,
-      overallScore: creativeScoresTable.overall,
-    }).from(creativeScoresTable),
+    db.select({ creativeVersionId: creativeScoresTable.creativeVersionId, overallScore: creativeScoresTable.overall })
+      .from(creativeScoresTable),
+    // Photo counts per vehicle
+    db.select({ vehicleId: vehicleImagesTable.vehicleId, id: vehicleImagesTable.id })
+      .from(vehicleImagesTable),
+    // AI photo jobs — only Completed ones signal actual enhanced photos
+    db.select({ vehicleId: aiPhotoJobsTable.vehicleId, status: aiPhotoJobsTable.status })
+      .from(aiPhotoJobsTable),
+    // Currently Published Marketplace listings
+    db.select({ vehicleId: listingsTable.vehicleId })
+      .from(listingsTable)
+      .where(eq(listingsTable.status, "Published")),
   ]);
 
   // Build lookup maps
+  const photoCountByVehicle = new Map<number, number>();
+  for (const r of allPhotoCounts) {
+    photoCountByVehicle.set(r.vehicleId, (photoCountByVehicle.get(r.vehicleId) ?? 0) + 1);
+  }
+
+  const aiPhotosCompletedByVehicle = new Set<number>();
+  for (const r of allAiJobs) {
+    if (r.status === "Completed") aiPhotosCompletedByVehicle.add(r.vehicleId);
+  }
+
+  const publishedVehicleIds = new Set<number>(allPublishedListings.map((r) => r.vehicleId));
+
   const perfByVehicle = new Map<number, PerfRecord[]>();
   for (const r of allPerf) {
     const arr = perfByVehicle.get(r.vehicleId) ?? [];
@@ -457,6 +488,9 @@ export async function seedOpportunityScores(logger: Logger): Promise<void> {
       hotLeadCount: hotLeadsByVehicle.get(vehicle.id) ?? 0,
       leadCount: leadsByVehicle.get(vehicle.id) ?? 0,
       avgCreativeScore: avgCreativeScoreForVehicle(vehicle.id),
+      photoCount: photoCountByVehicle.get(vehicle.id) ?? 0,
+      hasAiPhotos: aiPhotosCompletedByVehicle.has(vehicle.id),
+      isCurrentlyPublished: publishedVehicleIds.has(vehicle.id),
       now,
     });
 
@@ -472,6 +506,8 @@ export async function seedOpportunityScores(logger: Logger): Promise<void> {
         target: vehicleIntelligenceTable.vehicleId,
         set: {
           opportunityScore: scores.opportunityScore,
+          opportunityLabel: scores.opportunityLabel,
+          recommendedAction: scores.recommendedAction,
           marketDemandScore: scores.marketDemandScore,
           priceScore: scores.priceScore,
           seasonalScore: scores.seasonalScore,

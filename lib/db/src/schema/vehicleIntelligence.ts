@@ -47,6 +47,8 @@ export const vehicleIntelligenceTable = pgTable(
     pricingPosition: text("pricing_position"),
     daysOnLot: integer("days_on_lot"),
     opportunityFactors: text("opportunity_factors"),
+    opportunityLabel: text("opportunity_label"),
+    recommendedAction: text("recommended_action"),
   },
   (table) => [uniqueIndex("vehicle_intelligence_vehicle_idx").on(table.vehicleId)],
 );

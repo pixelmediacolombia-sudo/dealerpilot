@@ -713,6 +713,8 @@ router.get("/marketplace-intelligence/opportunity", async (req, res) => {
         thumbnailUrl: thumbnailMap.get(v.id) ?? null,
         // Opportunity scores
         opportunityScore: intel.opportunityScore,
+        opportunityLabel: intel.opportunityLabel ?? "Watch",
+        recommendedAction: intel.recommendedAction ?? "Hold",
         marketDemandScore: intel.marketDemandScore ?? 0,
         priceScore: intel.priceScore ?? 0,
         seasonalScore: intel.seasonalScore ?? 0,
