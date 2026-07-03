@@ -3,7 +3,6 @@ import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,24 +31,35 @@ import { toast } from "@/hooks/use-toast";
 import {
   buildDailyMarketplacePlan,
   generateReason,
+  generateReasoning,
+  generateMorningBrief,
+  computeConfidence,
+  computeRisk,
+  computeExpectedResults,
+  computeWaitingCost,
+  computeCreativeRecommendation,
+  buildHoldReasons,
   type DailyVehicleRec,
   type DailyMarketplacePlan,
+  type DuplicateGroup,
 } from "@/lib/dailyPlan";
 import {
   UploadCloud,
-  Loader2,
   MoreHorizontal,
   ChevronDown,
   ChevronUp,
   Car,
   ImageIcon,
   CheckCircle2,
-  AlertTriangle,
   ShieldCheck,
-  Zap,
+  Brain,
+  TrendingDown,
+  MessageSquare,
+  CalendarDays,
+  Sparkles,
 } from "lucide-react";
 
-// ─── Score colour ────────────────────────────────────────────────────────────
+// ─── Colour helpers ───────────────────────────────────────────────────────────
 
 function scoreColor(score: number | null) {
   if (score == null) return { pill: "bg-white/[0.06] border-white/10 text-white/25", label: "" };
@@ -64,52 +74,141 @@ function langBadgeClass(lang: string) {
   return "text-white/20";
 }
 
-// ─── Executive Summary ────────────────────────────────────────────────────────
+function riskColor(level: "LOW" | "MEDIUM" | "HIGH") {
+  if (level === "LOW") return "text-emerald-400";
+  if (level === "MEDIUM") return "text-amber-400";
+  return "text-red-400";
+}
 
-function ExecutiveSummary({ plan }: { plan: DailyMarketplacePlan }) {
-  const selected = plan.recommendedToday.length + plan.nextBest.length;
-  const protected_ = plan.duplicateGroups.reduce((sum, g) => sum + g.holdOthers.length, 0);
-  const skipped = Math.max(0, plan.totalEligible - selected - protected_ - plan.holdToday.length);
+function roiColor(roi: "HIGH" | "MEDIUM" | "LOW") {
+  if (roi === "HIGH") return "text-emerald-400";
+  if (roi === "MEDIUM") return "text-amber-400";
+  return "text-white/30";
+}
 
+// ─── Morning Brief ────────────────────────────────────────────────────────────
+
+function MorningBrief({ plan }: { plan: DailyMarketplacePlan }) {
+  const brief = generateMorningBrief(plan);
   return (
-    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.01] p-5 mb-7">
-      <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.26em] mb-4">
-        Today's Strategy
+    <div className="rounded-2xl border border-blue-500/10 bg-blue-500/[0.018] p-6 mb-7">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="relative flex h-[6px] w-[6px] shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-40" />
+          <span className="relative inline-flex rounded-full h-[6px] w-[6px] bg-blue-400" />
+        </span>
+        <p className="text-[9px] font-black text-blue-400/40 uppercase tracking-[0.28em]">
+          DealerPilot · Morning Brief
+        </p>
+      </div>
+      <p className="text-[20px] font-semibold text-white/72 mb-3 leading-snug">
+        {brief.greeting}
       </p>
-      <div className="grid grid-cols-4 gap-6 mb-4">
-        <div>
-          <div className="text-[32px] font-black text-white/50 leading-none tabular-nums">
-            {plan.totalEligible}
-          </div>
-          <div className="text-[9px] text-white/22 uppercase tracking-wider mt-1.5">Analyzed</div>
-        </div>
-        <div>
-          <div className="text-[32px] font-black text-blue-400 leading-none tabular-nums">
-            {selected}
-          </div>
-          <div className="text-[9px] text-white/22 uppercase tracking-wider mt-1.5">Selected</div>
-        </div>
-        <div>
-          <div className="text-[32px] font-black text-amber-400 leading-none tabular-nums">
-            {protected_}
-          </div>
-          <div className="text-[9px] text-white/22 uppercase tracking-wider mt-1.5">Protected</div>
-          {protected_ > 0 && (
-            <div className="text-[9px] text-amber-400/40 mt-0.5">duplicate guard</div>
+      <p className="text-[13px] text-white/38 leading-relaxed max-w-xl mb-0">
+        {brief.body}
+      </p>
+      {brief.primaryVehicle && (
+        <div className="mt-4 pt-4 border-t border-white/[0.05]">
+          <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em] mb-1.5">
+            Primary Opportunity
+          </p>
+          <p className="text-[14px] font-bold text-white/65">{brief.primaryVehicle}</p>
+          {brief.primaryReason && (
+            <p className="text-[11px] text-white/32 mt-1 italic leading-relaxed max-w-lg">
+              {brief.primaryReason}
+            </p>
           )}
         </div>
-        <div>
-          <div className="text-[32px] font-black text-white/20 leading-none tabular-nums">
-            {skipped}
-          </div>
-          <div className="text-[9px] text-white/22 uppercase tracking-wider mt-1.5">Skipped</div>
-          <div className="text-[9px] text-white/15 mt-0.5">lower priority</div>
-        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Publishing Schedule ──────────────────────────────────────────────────────
+
+const TODAY_SLOTS = ["09:00", "11:30", "14:00", "17:30"];
+
+function PublishingSchedule({ plan }: { plan: DailyMarketplacePlan }) {
+  const all10 = [...plan.recommendedToday, ...plan.nextBest];
+  if (all10.length === 0) return null;
+  const todayVehicles = all10.slice(0, 4);
+  const tomorrowVehicles = all10.slice(4, 7);
+  const weekVehicles = all10.slice(7);
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center gap-3 mb-4">
+        <CalendarDays className="w-3.5 h-3.5 text-white/18" />
+        <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">
+          Campaign Schedule
+        </p>
+        <div className="flex-1 h-px bg-white/[0.04]" />
       </div>
-      <p className="text-[11px] text-white/28 italic leading-relaxed max-w-lg">
-        DealerPilot recommends publishing these {selected} vehicles today based on buyer demand,
-        inventory quality, pricing, and audience fit.
-      </p>
+      <div className="rounded-2xl border border-white/[0.05] overflow-hidden">
+        {/* Today */}
+        <div className="px-5 py-2 bg-white/[0.008] border-b border-white/[0.04]">
+          <p className="text-[9px] font-black text-blue-400/50 uppercase tracking-[0.22em]">Today</p>
+        </div>
+        {todayVehicles.map((v, i) => (
+          <div key={v.vehicleId} className="flex items-center gap-4 px-5 py-2.5 border-b border-white/[0.025] last:border-b-0 hover:bg-white/[0.015] transition-colors">
+            <span className="text-[11px] font-bold text-blue-400/40 font-mono w-[42px] shrink-0">
+              {TODAY_SLOTS[i]}
+            </span>
+            <div className="w-8 h-6 rounded-md overflow-hidden shrink-0 bg-white/[0.03]">
+              {v.primaryImageUrl
+                ? <img src={v.primaryImageUrl} alt={v.label} className="w-full h-full object-cover" />
+                : <div className="w-full h-full" />}
+            </div>
+            <p className="flex-1 text-[12px] font-semibold text-white/60 truncate">{v.label}</p>
+            {v.primarySegment !== "General" && (
+              <span className="text-[9px] font-bold text-white/20 uppercase tracking-wide shrink-0 hidden lg:block">
+                {v.primarySegment}
+              </span>
+            )}
+            <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0", scoreColor(v.opportunityScore).pill)}>
+              {v.opportunityScore ?? "—"}
+            </span>
+          </div>
+        ))}
+        {/* Tomorrow */}
+        {tomorrowVehicles.length > 0 && (
+          <>
+            <div className="px-5 py-2 bg-white/[0.005] border-y border-white/[0.04]">
+              <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em]">Tomorrow</p>
+            </div>
+            {tomorrowVehicles.map((v) => (
+              <div key={v.vehicleId} className="flex items-center gap-4 px-5 py-2.5 border-b border-white/[0.025] last:border-b-0 opacity-55">
+                <span className="text-[11px] font-bold text-white/12 font-mono w-[42px] shrink-0">—</span>
+                <div className="w-8 h-6 rounded-md overflow-hidden shrink-0 bg-white/[0.03]">
+                  {v.primaryImageUrl
+                    ? <img src={v.primaryImageUrl} alt={v.label} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full" />}
+                </div>
+                <p className="flex-1 text-[12px] font-semibold text-white/45 truncate">{v.label}</p>
+              </div>
+            ))}
+          </>
+        )}
+        {/* This Week */}
+        {weekVehicles.length > 0 && (
+          <>
+            <div className="px-5 py-2 bg-white/[0.005] border-y border-white/[0.04]">
+              <p className="text-[9px] font-black text-white/12 uppercase tracking-[0.22em]">This Week</p>
+            </div>
+            {weekVehicles.map((v) => (
+              <div key={v.vehicleId} className="flex items-center gap-4 px-5 py-2.5 border-b border-white/[0.025] last:border-b-0 opacity-35">
+                <span className="text-[11px] font-bold text-white/10 font-mono w-[42px] shrink-0">—</span>
+                <div className="w-8 h-6 rounded-md overflow-hidden shrink-0 bg-white/[0.03]">
+                  {v.primaryImageUrl
+                    ? <img src={v.primaryImageUrl} alt={v.label} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full" />}
+                </div>
+                <p className="flex-1 text-[12px] font-semibold text-white/30 truncate">{v.label}</p>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -119,11 +218,13 @@ function ExecutiveSummary({ plan }: { plan: DailyMarketplacePlan }) {
 function StrategyRow({
   rec,
   rank,
+  duplicateGroups,
   onPublish,
   onAddToBatch,
 }: {
   rec: DailyVehicleRec;
   rank: number;
+  duplicateGroups: DuplicateGroup[];
   onPublish: (id: number) => void;
   onAddToBatch: (id: number) => void;
 }) {
@@ -134,8 +235,24 @@ function StrategyRow({
   const reason = generateReason(rec);
   const hasSegment = rec.primarySegment && rec.primarySegment !== "General";
 
+  // Pre-compute all GM intelligence (only needed when expanded)
+  const intelligence = useMemo(() => {
+    if (!expanded) return null;
+    const confidence = computeConfidence(rec);
+    const risk = computeRisk(rec);
+    const results = computeExpectedResults(rec);
+    const cost = computeWaitingCost(rec);
+    const reasoning = generateReasoning(rec, duplicateGroups);
+    const creative = computeCreativeRecommendation(rec);
+    const group = duplicateGroups.find(
+      g => g.make.toLowerCase() === rec.make.toLowerCase() && g.model.toLowerCase() === rec.model.toLowerCase(),
+    );
+    return { confidence, risk, results, cost, reasoning, creative, group };
+  }, [expanded, rec, duplicateGroups]);
+
   return (
     <div>
+      {/* ── Row ────────────────────────────────────────────────────────────── */}
       <div
         className={cn(
           "flex items-center gap-0 border-b border-white/[0.035] hover:bg-white/[0.018] transition-colors group",
@@ -175,8 +292,7 @@ function StrategyRow({
               ) : null}
               {rec.imageCount > 0 && (
                 <span className="flex items-center gap-0.5 text-white/15">
-                  <ImageIcon className="w-2.5 h-2.5" />
-                  {rec.imageCount}
+                  <ImageIcon className="w-2.5 h-2.5" />{rec.imageCount}
                 </span>
               )}
             </p>
@@ -187,9 +303,7 @@ function StrategyRow({
         <div className="py-3 pr-5 w-[148px] shrink-0">
           {hasSegment ? (
             <>
-              <p className="text-[11px] font-semibold text-white/55 leading-tight truncate">
-                {rec.primarySegment}
-              </p>
+              <p className="text-[11px] font-semibold text-white/55 leading-tight truncate">{rec.primarySegment}</p>
               <p className={cn("text-[9px] font-bold mt-0.5 uppercase tracking-wide", langBadgeClass(rec.suggestedLanguage))}>
                 {rec.suggestedLanguage}
               </p>
@@ -209,6 +323,7 @@ function StrategyRow({
           <button
             className="text-white/12 hover:text-white/35 p-1 transition-colors"
             onClick={() => setExpanded(v => !v)}
+            title="DealerPilot Analysis"
           >
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
@@ -237,53 +352,182 @@ function StrategyRow({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem onClick={() => onAddToBatch(rec.vehicleId)}>Add to Batch</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLocation("/marketplace-intelligence")}>
-                Market Intelligence
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.open(`/creative-studio/${rec.vehicleId}`, "_self")}>
-                Open Vehicle
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/marketplace-intelligence")}>Market Intelligence</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(`/creative-studio/${rec.vehicleId}`, "_self")}>Open Vehicle</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
-      {/* Expanded: Why this vehicle? */}
-      {expanded && (
-        <div className="border-b border-white/[0.04] bg-white/[0.008] px-6 py-4 space-y-3">
-          <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.24em]">
-            Why this vehicle?
-          </p>
+      {/* ── GM Intelligence Panel ──────────────────────────────────────────── */}
+      {expanded && intelligence && (
+        <div className="border-b border-white/[0.04] bg-white/[0.006]">
+          <div className="px-6 py-5 space-y-4 max-w-[820px]">
 
-          {/* Narrative */}
-          {rec.whyThisAudience ? (
-            <p className="text-[12px] text-white/42 leading-relaxed max-w-2xl">
-              {rec.whyThisAudience}
-            </p>
-          ) : rec.adAngle ? (
-            <p className="text-[12px] text-white/42 italic max-w-2xl">"{rec.adAngle}"</p>
-          ) : null}
-
-          {/* Reason chips */}
-          {rec.reasons.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {rec.reasons.map((r, i) => (
-                <span
-                  key={i}
-                  className="text-[10px] text-white/35 bg-white/[0.03] border border-white/[0.07] px-2.5 py-0.5 rounded-full"
-                >
-                  {r}
-                </span>
-              ))}
+            {/* DealerPilot Reasoning */}
+            <div className="rounded-xl border border-blue-500/12 bg-blue-500/[0.025] p-4">
+              <div className="flex items-center gap-2 mb-2.5">
+                <Brain className="w-3.5 h-3.5 text-blue-400/50 shrink-0" />
+                <p className="text-[9px] font-black text-blue-400/40 uppercase tracking-[0.24em]">
+                  DealerPilot Reasoning
+                </p>
+              </div>
+              <p className="text-[12px] text-white/48 leading-relaxed">{intelligence.reasoning}</p>
             </div>
-          )}
 
-          {/* Segment context */}
-          {hasSegment && rec.adAngle && (
-            <p className="text-[10px] text-white/22 italic">
-              Suggested angle: "{rec.adAngle}"
-            </p>
-          )}
+            {/* Confidence + Risk */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-white/[0.05] bg-white/[0.018] p-3.5">
+                <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em] mb-2">
+                  Confidence
+                </p>
+                <div className={cn(
+                  "text-[30px] font-black leading-none tabular-nums",
+                  intelligence.confidence >= 90 ? "text-emerald-400" : intelligence.confidence >= 75 ? "text-blue-400" : "text-amber-400",
+                )}>
+                  {intelligence.confidence}%
+                </div>
+                <p className="text-[10px] text-white/22 mt-1.5 leading-relaxed">
+                  Calculated from inventory quality, pricing, audience match, creative data, and duplicate protection.
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/[0.05] bg-white/[0.018] p-3.5">
+                <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em] mb-2">Risk</p>
+                <div className={cn("text-[20px] font-black leading-none", riskColor(intelligence.risk.level))}>
+                  {intelligence.risk.level}
+                </div>
+                <p className="text-[10px] text-white/25 mt-1.5 leading-relaxed">
+                  {intelligence.risk.explanation}
+                </p>
+              </div>
+            </div>
+
+            {/* Expected Results */}
+            <div className="rounded-xl border border-white/[0.05] bg-white/[0.018] p-3.5">
+              <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em] mb-3">
+                Expected Results <span className="text-white/10 font-normal normal-case tracking-normal">(projections — not guarantees)</span>
+              </p>
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <div className="text-[20px] font-black text-blue-400 leading-none tabular-nums">
+                    {intelligence.results.conversations[0]}–{intelligence.results.conversations[1]}
+                  </div>
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <MessageSquare className="w-2.5 h-2.5 text-white/20" />
+                    <span className="text-[9px] text-white/22 uppercase tracking-wide">Conversations</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[20px] font-black text-blue-400/70 leading-none tabular-nums">
+                    {intelligence.results.appointments[0]}–{intelligence.results.appointments[1]}
+                  </div>
+                  <div className="text-[9px] text-white/22 uppercase tracking-wide mt-1.5">Appointments</div>
+                </div>
+                <div>
+                  <div className="text-[20px] font-black text-emerald-400/70 leading-none tabular-nums">
+                    {intelligence.results.saleProbability}%
+                  </div>
+                  <div className="text-[9px] text-white/22 uppercase tracking-wide mt-1.5">Sale Probability</div>
+                </div>
+                <div>
+                  <div className={cn("text-[20px] font-black leading-none", roiColor(intelligence.results.roi))}>
+                    {intelligence.results.roi}
+                  </div>
+                  <div className="text-[9px] text-white/22 uppercase tracking-wide mt-1.5">Expected ROI</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Cost of Waiting */}
+            <div className="rounded-xl border border-red-500/[0.10] bg-red-500/[0.018] p-3.5">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingDown className="w-3 h-3 text-red-400/40 shrink-0" />
+                <p className="text-[9px] font-black text-red-400/35 uppercase tracking-[0.22em]">
+                  Cost of Waiting — If Delayed 48 Hours
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <div className="text-[18px] font-black text-red-400/50 leading-none tabular-nums">
+                    {intelligence.cost.reachLoss.toLocaleString()}
+                  </div>
+                  <div className="text-[9px] text-white/18 mt-1">Buyers missed</div>
+                </div>
+                <div>
+                  <div className="text-[18px] font-black text-red-400/50 leading-none tabular-nums">
+                    {intelligence.cost.conversationsLost}
+                  </div>
+                  <div className="text-[9px] text-white/18 mt-1">Conversations lost</div>
+                </div>
+                <div>
+                  <div className="text-[18px] font-black text-red-400/50 leading-none tabular-nums">
+                    ${intelligence.cost.revenueLoss.toLocaleString()}
+                  </div>
+                  <div className="text-[9px] text-white/18 mt-1">Revenue opportunity</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Creative Recommendation */}
+            <div className="rounded-xl border border-white/[0.05] bg-white/[0.018] p-3.5">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-3 h-3 text-violet-400/40 shrink-0" />
+                <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em]">
+                  Creative Recommendation
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3 mb-2">
+                {intelligence.creative.formats.map((f, i) => (
+                  <div key={f.name} className={cn("flex items-center gap-1.5", i > 0 && "opacity-60")}>
+                    <span className="text-[10px] text-white/40">{f.name}</span>
+                    <span className={cn("text-[10px] font-black", i === 0 ? "text-violet-400/70" : "text-white/20")}>
+                      {f.score}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-white/30 leading-relaxed">
+                Hook: <span className="text-white/48 italic">"{intelligence.creative.hook}"</span>
+                <span className="text-white/18 ml-2">· CTR est. {intelligence.creative.ctr}</span>
+                <span className="text-white/18 mx-2">·</span>
+                <span className="text-white/30">Audience: {intelligence.creative.audience}</span>
+                <span className="text-white/18 mx-2">·</span>
+                <span className="text-white/30">Language: {intelligence.creative.language}</span>
+              </p>
+            </div>
+
+            {/* Counter Analysis — Why not the other model? */}
+            {intelligence.group && intelligence.group.holdOthers.length > 0 && (
+              <div className="rounded-xl border border-amber-500/10 bg-amber-500/[0.015] p-3.5">
+                <p className="text-[9px] font-black text-amber-400/35 uppercase tracking-[0.22em] mb-3">
+                  Counter Analysis — Why Not the Other {rec.make} {rec.model}{intelligence.group.holdOthers.length > 1 ? "s" : ""}?
+                </p>
+                <div className="space-y-2.5">
+                  {intelligence.group.holdOthers.map(v => {
+                    const holdReasons = buildHoldReasons(v, rec);
+                    return (
+                      <div key={v.vehicleId}>
+                        <p className="text-[11px] font-bold text-white/45 mb-1">{v.label}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {holdReasons.slice(0, 3).map((r, i) => (
+                            <span key={i} className="text-[10px] text-amber-400/40 bg-amber-500/[0.06] border border-amber-500/10 px-2 py-0.5 rounded-full">
+                              {r}
+                            </span>
+                          ))}
+                        </div>
+                        {holdReasons.length > 3 && (
+                          <p className="text-[10px] text-white/18 mt-1">
+                            Recommended publishing date: after this campaign matures.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+          </div>
         </div>
       )}
     </div>
@@ -302,30 +546,30 @@ function StrategyTable({
   onAddToBatch: (id: number) => void;
 }) {
   const all10 = [...plan.recommendedToday, ...plan.nextBest];
-
   return (
     <div className="rounded-2xl border border-white/[0.05] overflow-hidden">
       {/* Table header */}
-      <div className="flex items-center gap-0 px-0 py-2.5 border-b border-white/[0.05] bg-white/[0.008]">
+      <div className="flex items-center gap-0 border-b border-white/[0.05] bg-white/[0.008]">
         <div className="w-[58px] shrink-0" />
-        <div className="flex-[2.2] pr-5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Vehicle</div>
-        <div className="w-[148px] shrink-0 pr-5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Audience</div>
-        <div className="flex-[1.8] pr-5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em] hidden lg:block">Reason</div>
-        <div className="w-[130px] shrink-0 pr-4 text-[9px] font-black text-white/18 uppercase tracking-[0.22em] text-right">Action</div>
+        <div className="flex-[2.2] pr-5 py-2.5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Vehicle</div>
+        <div className="w-[148px] shrink-0 pr-5 py-2.5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Audience</div>
+        <div className="flex-[1.8] pr-5 py-2.5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em] hidden lg:block">Reason</div>
+        <div className="w-[130px] shrink-0 pr-4 py-2.5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em] text-right">Action</div>
       </div>
 
-      {/* Today's Top 3 */}
+      {/* Top 3 — Publish Today */}
       {plan.recommendedToday.map((rec, i) => (
         <StrategyRow
           key={rec.vehicleId}
           rec={rec}
           rank={i + 1}
+          duplicateGroups={plan.duplicateGroups}
           onPublish={onPublish}
           onAddToBatch={onAddToBatch}
         />
       ))}
 
-      {/* Divider: Next Best 4–10 */}
+      {/* Divider: Next Best */}
       {plan.nextBest.length > 0 && (
         <div className="flex items-center gap-3 px-5 py-2 border-y border-white/[0.04] bg-white/[0.004]">
           <div className="h-px flex-1 bg-white/[0.04]" />
@@ -342,6 +586,7 @@ function StrategyTable({
           key={rec.vehicleId}
           rec={rec}
           rank={i + 4}
+          duplicateGroups={plan.duplicateGroups}
           onPublish={onPublish}
           onAddToBatch={onAddToBatch}
         />
@@ -385,14 +630,13 @@ function HoldCard({ rec }: { rec: DailyVehicleRec }) {
   );
 }
 
-// ─── Command Center v2 ────────────────────────────────────────────────────────
+// ─── Command Center ───────────────────────────────────────────────────────────
 
 export function SalesHub() {
   const [, setLocation] = useLocation();
   const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
   const [showHold, setShowHold] = useState(false);
 
-  // Dealer
   const { data: dealersData } = useListDealers();
   const dealerId = dealersData?.dealers?.[0]?.id;
   const { data: dealer } = useGetDealer(dealerId!, {
@@ -401,7 +645,6 @@ export function SalesHub() {
 
   const { selectedLocation } = useDealerLocation();
 
-  // Data fetches
   const { data: vehicleStats } = useGetVehicleStats({ location: selectedLocation });
   const { data: workspacesData, isLoading: workspacesLoading } = useListListingWorkspaces({ location: selectedLocation });
   const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations({ location: selectedLocation });
@@ -412,7 +655,6 @@ export function SalesHub() {
     query: { enabled: !!dealerId, queryKey: getListFeedRunsQueryKey(dealerId!) },
   });
 
-  // Publish mutation
   const bulkSchedule = useBulkSchedulePublishing({
     mutation: {
       onSuccess: (result) => {
@@ -428,14 +670,12 @@ export function SalesHub() {
   });
 
   const handlePublish = (vehicleId: number) => setPublishNowVehicleId(vehicleId);
-
   const handleAddToBatch = (vehicleId: number) => {
     bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } }, {
-      onSuccess: () => toast({ title: "Added to batch", description: "Vehicle added to publishing queue." }),
+      onSuccess: () => toast({ title: "Added to batch" }),
     });
   };
 
-  // Build daily plan
   const plan = useMemo((): DailyMarketplacePlan | null => {
     if (!workspacesData?.workspaces || !recsData?.recommendations || !jobsData?.jobs) return null;
     return buildDailyMarketplacePlan(
@@ -447,8 +687,6 @@ export function SalesHub() {
 
   const isLoading = workspacesLoading || recsLoading;
   const top10Count = plan ? plan.recommendedToday.length + plan.nextBest.length : 0;
-
-  // Derived counts
   const pendingLeads = leads?.leads.filter(l => l.status === "new").length ?? 0;
   const priceChanges = vehicleStats?.priceChanged ?? 0;
   const queuedCount = (jobsData?.jobs ?? []).filter(j => ["Queued", "Scheduled", "Publishing", "Assigned"].includes(j.status)).length;
@@ -459,74 +697,22 @@ export function SalesHub() {
   const issueCount = failedJobs + (priceChanges > 0 ? 1 : 0);
   const duplicateGroupCount = plan?.duplicateGroups.length ?? 0;
 
-  // Activity items
   const activityItems = useMemo(() => {
     type Item = { id: string; label: string; sub: string; date: Date; color: string; action?: string; actionPath?: string };
     const items: Item[] = [];
-
     feedRuns?.feedRuns?.forEach(run => {
-      if (run.finishedAt) {
-        items.push({
-          id: `feed-${run.id}`,
-          label: "Inventory synced",
-          sub: `${run.vehiclesNew ?? 0} new · ${run.vehiclesUpdated ?? 0} updated · ${run.vehiclesRemoved ?? 0} removed`,
-          date: new Date(run.finishedAt),
-          color: "bg-primary",
-          action: "View Inventory",
-          actionPath: "/inventory",
-        });
-      }
+      if (run.finishedAt) items.push({ id: `feed-${run.id}`, label: "Inventory synced", sub: `${run.vehiclesNew ?? 0} new · ${run.vehiclesUpdated ?? 0} updated · ${run.vehiclesRemoved ?? 0} removed`, date: new Date(run.finishedAt), color: "bg-primary", action: "View Inventory", actionPath: "/inventory" });
     });
-
     creativeJobs?.jobs?.forEach(job => {
-      if (job.completedAt) {
-        items.push({
-          id: `creative-${job.id}`,
-          label: "Creative generated",
-          sub: job.vehicleLabel ?? "Vehicle",
-          date: new Date(job.completedAt),
-          color: "bg-accent",
-        });
-      }
+      if (job.completedAt) items.push({ id: `creative-${job.id}`, label: "Creative generated", sub: job.vehicleLabel ?? "Vehicle", date: new Date(job.completedAt), color: "bg-accent" });
     });
-
     jobsData?.jobs?.forEach(job => {
-      if (job.completedAt && job.status === "Published") {
-        items.push({
-          id: `pub-${job.id}`,
-          label: "Listing published",
-          sub: job.vehicleLabel ?? "Vehicle",
-          date: new Date(job.completedAt),
-          color: "bg-success",
-          action: "View Queue",
-          actionPath: "/listings?tab=publishing",
-        });
-      }
-      if (job.status === "Failed") {
-        items.push({
-          id: `fail-${job.id}`,
-          label: "Publish failed",
-          sub: `${job.vehicleLabel ?? "Vehicle"} — ${job.failedReason ?? "unknown reason"}`,
-          date: new Date(job.updatedAt ?? job.createdAt),
-          color: "bg-destructive",
-          action: "Retry",
-          actionPath: "/listings?tab=failed",
-        });
-      }
+      if (job.completedAt && job.status === "Published") items.push({ id: `pub-${job.id}`, label: "Listing published", sub: job.vehicleLabel ?? "Vehicle", date: new Date(job.completedAt), color: "bg-success", action: "View Queue", actionPath: "/listings?tab=publishing" });
+      if (job.status === "Failed") items.push({ id: `fail-${job.id}`, label: "Publish failed", sub: `${job.vehicleLabel ?? "Vehicle"} — ${job.failedReason ?? "unknown reason"}`, date: new Date(job.updatedAt ?? job.createdAt), color: "bg-destructive", action: "Retry", actionPath: "/listings?tab=failed" });
     });
-
     leads?.leads?.slice(0, 5).forEach(lead => {
-      items.push({
-        id: `lead-${lead.id}`,
-        label: "Buyer message received",
-        sub: lead.status === "new" ? "Awaiting reply" : `Status: ${lead.status}`,
-        date: new Date(lead.createdAt),
-        color: "bg-warning",
-        action: "Reply",
-        actionPath: "/sales-ai",
-      });
+      items.push({ id: `lead-${lead.id}`, label: "Buyer message received", sub: lead.status === "new" ? "Awaiting reply" : `Status: ${lead.status}`, date: new Date(lead.createdAt), color: "bg-warning", action: "Reply", actionPath: "/sales-ai" });
     });
-
     return items.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 15);
   }, [feedRuns, creativeJobs, jobsData, leads]);
 
@@ -538,21 +724,18 @@ export function SalesHub() {
         <div className="flex-1 overflow-y-auto">
           <div className="p-8 max-w-[960px]">
 
-            {/* ── Mission Header ──────────────────────────────────────────────── */}
+            {/* Mission Header */}
             <div className="mb-8 pt-1">
               <p className="text-[9px] font-black text-blue-400/32 uppercase tracking-[0.28em] mb-5">
                 Command · {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
               </p>
-              <div className="flex items-end gap-6 mb-0">
+              <div className="flex items-end gap-6">
                 <div className="flex-1">
                   <h1 className="text-[52px] font-black text-white tracking-tight leading-[0.9] mb-3">
                     {isLoading ? (
                       <span className="text-white/12">Loading…</span>
                     ) : top10Count > 0 ? (
-                      <>
-                        <span className="text-blue-400">{top10Count}</span>
-                        {" "}Opportunit{top10Count !== 1 ? "ies" : "y"}{"\n"}Today
-                      </>
+                      <><span className="text-blue-400">{top10Count}</span>{" "}Opportunit{top10Count !== 1 ? "ies" : "y"}{"\n"}Today</>
                     ) : (
                       "All Clear"
                     )}
@@ -572,7 +755,7 @@ export function SalesHub() {
               </div>
             </div>
 
-            {/* ── Metric strip ──────────────────────────────────────────────── */}
+            {/* Metric strip */}
             <div className="flex items-stretch border-y border-white/[0.04] mb-8 -mx-8 px-8">
               {[
                 { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? top10Count), label: "Ready", accent: "text-blue-400", path: "/listings" },
@@ -580,19 +763,15 @@ export function SalesHub() {
                 { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", accent: pendingLeads > 0 ? "text-violet-400" : "text-white/15", path: "/sales-ai" },
                 { value: "0", label: "Appts", accent: "text-white/15", path: "/sales-ai" },
                 { value: isLoading ? "—" : String(issueCount), label: "Issues", accent: issueCount > 0 ? "text-red-400" : "text-white/15", path: "/listings?tab=failed" },
-              ].map((m) => (
-                <button
-                  key={m.label}
-                  onClick={() => setLocation(m.path)}
-                  className="flex-1 py-5 px-4 text-left hover:bg-white/[0.02] transition-colors border-r border-white/[0.04] last:border-r-0 first:pl-0 last:pr-0"
-                >
+              ].map(m => (
+                <button key={m.label} onClick={() => setLocation(m.path)} className="flex-1 py-5 px-4 text-left hover:bg-white/[0.02] transition-colors border-r border-white/[0.04] last:border-r-0 first:pl-0 last:pr-0">
                   <div className={cn("text-[40px] font-black leading-none mb-1.5 tracking-tighter", m.accent)}>{m.value}</div>
                   <div className="text-[9px] font-bold text-white/18 uppercase tracking-[0.18em]">{m.label}</div>
                 </button>
               ))}
             </div>
 
-            {/* ── Publishing Conflicts notice ───────────────────────────────── */}
+            {/* Publishing Conflicts notice */}
             {!isLoading && duplicateGroupCount > 0 && (
               <button
                 onClick={() => setLocation("/marketplace-intelligence/publishing-conflicts")}
@@ -609,12 +788,10 @@ export function SalesHub() {
               </button>
             )}
 
-            {/* ── Executive Summary ─────────────────────────────────────────── */}
-            {!isLoading && plan && top10Count > 0 && (
-              <ExecutiveSummary plan={plan} />
-            )}
+            {/* Morning Brief */}
+            {!isLoading && plan && top10Count > 0 && <MorningBrief plan={plan} />}
 
-            {/* ── Today's Publishing Strategy Table ─────────────────────────── */}
+            {/* Today's Publishing Strategy */}
             <div className="mb-8">
               <div className="flex items-center gap-3 mb-4">
                 <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">
@@ -646,13 +823,14 @@ export function SalesHub() {
               )}
             </div>
 
-            {/* ── Hold Today (collapsed) ────────────────────────────────────── */}
+            {/* Campaign Schedule */}
+            {!isLoading && plan && top10Count > 0 && <PublishingSchedule plan={plan} />}
+
+            {/* Hold Today */}
             {plan && plan.holdToday.length > 0 && (
               <div className="mb-8">
                 <button className="flex items-center gap-2 w-full mb-3" onClick={() => setShowHold(v => !v)}>
-                  <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">
-                    Hold Today · {plan.holdToday.length}
-                  </p>
+                  <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Hold Today · {plan.holdToday.length}</p>
                   <div className="flex-1 h-px bg-white/[0.04]" />
                   {showHold ? <ChevronUp className="w-3 h-3 text-white/18" /> : <ChevronDown className="w-3 h-3 text-white/18" />}
                 </button>
@@ -667,7 +845,7 @@ export function SalesHub() {
           </div>
         </div>
 
-        {/* ── RIGHT: System Timeline ────────────────────────────────────────── */}
+        {/* ── System Timeline ────────────────────────────────────────────────── */}
         <div className="w-[260px] shrink-0 border-l border-white/[0.04] flex flex-col h-full">
           <div className="px-5 pt-5 pb-3.5 border-b border-white/[0.04] shrink-0">
             <div className="flex items-center gap-2">
@@ -694,10 +872,7 @@ export function SalesHub() {
                         <div className="flex items-center gap-2 mt-0.5">
                           <p className="text-[9px] text-white/12 font-mono">{format(item.date, "HH:mm")}</p>
                           {item.action && item.actionPath && (
-                            <button
-                              className="text-[9px] text-blue-400/40 hover:text-blue-400 font-bold uppercase tracking-wider transition-colors"
-                              onClick={() => setLocation(item.actionPath!)}
-                            >
+                            <button className="text-[9px] text-blue-400/40 hover:text-blue-400 font-bold uppercase tracking-wider transition-colors" onClick={() => setLocation(item.actionPath!)}>
                               {item.action} →
                             </button>
                           )}
@@ -712,10 +887,7 @@ export function SalesHub() {
         </div>
 
       </div>
-      <PublishNowModal
-        vehicleId={publishNowVehicleId}
-        onClose={() => setPublishNowVehicleId(null)}
-      />
+      <PublishNowModal vehicleId={publishNowVehicleId} onClose={() => setPublishNowVehicleId(null)} />
     </AppLayout>
   );
 }

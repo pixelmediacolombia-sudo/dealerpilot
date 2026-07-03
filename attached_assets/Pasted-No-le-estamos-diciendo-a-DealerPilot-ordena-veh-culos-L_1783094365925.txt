@@ -1,0 +1,404 @@
+No le estamos diciendo a DealerPilot "ordena vehículos".
+
+Le estamos diciendo:
+
+Compórtate como el General Manager con mejor desempeño del país.
+
+Yo lo llamaría:
+
+ARCHITECTURE PHASE — DealerPilot AI General Manager v2.0
+Vision
+
+DealerPilot is no longer a Marketplace dashboard.
+
+DealerPilot is no longer an inventory manager.
+
+DealerPilot is no longer a publishing assistant.
+
+DealerPilot is the dealership's AI General Manager.
+
+Every morning DealerPilot should already have analyzed:
+
+inventory
+pricing
+buyer demand
+vehicle quality
+previous performance
+AI creative quality
+audience fit
+duplicate conflicts
+conversations
+appointments
+seasonality
+
+The operator should never need to analyze data.
+
+DealerPilot already did.
+
+The operator only approves decisions.
+
+Core Principle
+
+Every recommendation must answer:
+
+Why this vehicle?
+
+Why today?
+
+Why before every other vehicle?
+
+What happens if I don't publish it?
+
+If DealerPilot cannot answer those four questions, it should not recommend the vehicle.
+
+Morning Briefing
+
+When DealerPilot opens every morning it should automatically generate an Executive Brief.
+
+Not static.
+
+Generated fresh every day.
+
+Example:
+
+Good morning.
+
+I analyzed 312 active vehicles overnight.
+
+After evaluating pricing, buyer demand, vehicle quality, audience fit, duplicate conflicts, creative quality and historical performance...
+
+I recommend publishing these 10 vehicles today.
+
+Primary opportunity:
+
+2025 Toyota Tacoma
+
+Reason:
+
+Construction trucks and Spanish-speaking family buyers are currently the strongest audience segment.
+
+This Tacoma combines:
+
+• excellent mileage
+
+• below-market pricing
+
+• premium AI photos
+
+• excellent buyer fit
+
+Expected performance:
+
+26–34 Marketplace conversations
+
+7–10 appointments
+
+Highest probability vehicle today.
+
+The briefing must read like an experienced dealership General Manager.
+
+Never like an analytics report.
+
+Opportunity Narrative
+
+Every recommended vehicle must include a written explanation.
+
+Never only numbers.
+
+Example:
+
+2025 Toyota Tacoma
+
+Opportunity Score
+
+95
+
+Confidence
+
+97%
+
+DealerPilot Analysis
+
+"This vehicle is currently your strongest truck opportunity.
+
+Buyer demand is exceptionally strong among Hispanic families and construction professionals.
+
+Its mileage is significantly lower than competing trucks.
+
+The asking price is competitive inside your own inventory.
+
+AI photography is complete.
+
+Publishing this listing today is expected to outperform every other truck currently available."
+
+Counter Analysis
+
+DealerPilot must also explain why similar vehicles were NOT selected.
+
+Example:
+
+Why not the other Tacoma?
+
+The 2024 Tacoma was not selected because:
+
+• higher asking price
+
+• weaker buyer segment match
+
+• lower AI creative score
+
+• duplicates today's audience
+
+Recommended publishing date:
+
+Friday after the current Tacoma campaign finishes.
+
+DealerPilot must always justify exclusions.
+
+Confidence Engine
+
+Every recommendation must include a confidence percentage.
+
+Example:
+
+Confidence
+
+96%
+
+Confidence is calculated using:
+
+Inventory quality
+
+Pricing confidence
+
+Audience confidence
+
+Creative confidence
+
+Historical performance
+
+Duplicate protection
+
+Data completeness
+
+The operator should immediately understand how certain DealerPilot is.
+
+Risk Analysis
+
+Every recommendation includes risk.
+
+Example:
+
+Risk
+
+LOW
+
+or
+
+HIGH
+
+Explanation:
+
+High mileage may reduce buyer confidence.
+
+Consider stronger creative before publishing.
+
+DealerPilot must proactively identify weaknesses.
+
+Expected Results
+
+DealerPilot should predict outcomes.
+
+Instead of saying:
+
+Publish Today
+
+Show:
+
+Expected Conversations
+
+24–31
+
+Expected Appointments
+
+7–9
+
+Expected Sale Probability
+
+18%
+
+Expected ROI
+
+HIGH
+
+These are predictive estimates.
+
+Clearly labeled as projections.
+
+Cost of Waiting
+
+DealerPilot should explain opportunity cost.
+
+Example:
+
+If you delay this publication 48 hours:
+
+Estimated reach loss:
+
+4,200 buyers
+
+Estimated conversations lost:
+
+16
+
+Expected revenue opportunity:
+
+$3,900
+
+This creates urgency.
+
+Creative Recommendation
+
+DealerPilot should recommend the best creative before publishing.
+
+Example:
+
+Recommended Format
+
+Static Image
+
+94%
+
+Carousel
+
+82%
+
+Video
+
+73%
+
+Recommended Hook
+
+"Only 29k Miles"
+
+Expected CTR
+
+4.8%
+
+Recommended Audience
+
+Spanish-speaking families
+
+Recommended Language
+
+Spanish
+
+DealerPilot should tell operators HOW to win.
+
+Not just WHAT to publish.
+
+Publishing Strategy
+
+DealerPilot should think in campaigns.
+
+Never isolated vehicles.
+
+Example:
+
+Today
+
+09:00
+
+Tacoma
+
+11:30
+
+CR-V
+
+14:00
+
+Corolla
+
+17:30
+
+Model 3
+
+Tomorrow
+
+RAV4
+
+Friday
+
+Highlander
+
+Next Week
+
+F-150
+
+DealerPilot should avoid self-competition while maximizing visibility.
+
+Learning Engine
+
+Every published vehicle becomes training data.
+
+Example:
+
+Vehicle sold.
+
+DealerPilot Learning Updated.
+
+Tacoma demand increased.
+
+Spanish Family audience weight increased.
+
+Photo quality impact confirmed.
+
+Pricing model refined.
+
+The engine continuously improves.
+
+Never static.
+
+Explainability
+
+DealerPilot must never behave like a black box.
+
+Every score.
+
+Every prediction.
+
+Every recommendation.
+
+Every exclusion.
+
+Must be explainable in plain language.
+
+The operator should always understand why DealerPilot reached a decision.
+
+Executive Mindset
+
+DealerPilot should think like a Top 1% General Manager.
+
+Not like software.
+
+Not like ChatGPT.
+
+Not like a reporting dashboard.
+
+Every screen should make the operator feel:
+
+"I have a seasoned dealership executive working overnight on my inventory."
+
+DealerPilot should proactively identify opportunities, defend every recommendation with evidence, explain trade-offs, anticipate operator questions before they are asked, and continuously optimize the dealership's publishing strategy through learning.
+
+Mi recomendación adicional (esto puede convertirse en la característica más difícil de copiar)
+
+Añadir un concepto llamado "DealerPilot Reasoning".
+
+No mostrar solo una respuesta, sino el razonamiento ejecutivo:
+
+DealerPilot Reasoning
+
+I considered 17 Toyota Tacomas for today's campaign. Although the 2024 Tacoma is newer, the 2025 Tacoma offers a stronger combination of buyer demand, mileage, pricing, AI photo quality, and Hispanic family appeal. Publishing both today would split Marketplace exposure, so I recommend leading with the 2025 model and scheduling the 2024 for Friday after the current campaign matures.
+
+Eso es lo que transforma la aplicación de un dashboard con IA a un AI General Manager que parece estar tomando decisiones reales. Es una experiencia muy distinta y mucho más difícil de replicar.

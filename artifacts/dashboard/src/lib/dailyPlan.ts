@@ -521,3 +521,150 @@ export function buildHoldReasons(vehicle: DailyVehicleRec, winner: DailyVehicleR
   reasons.push(`Publish after ${winner.year ?? ""} ${winner.make} ${winner.model} expires`);
   return reasons;
 }
+
+// ─── AI General Manager Intelligence Layer ────────────────────────────────────
+
+// Confidence Engine — how certain is DealerPilot about this recommendation?
+export function computeConfidence(rec: DailyVehicleRec): number {
+  let conf = 44;
+  if (rec.opportunityScore != null) conf += (rec.opportunityScore - 50) * 0.52;
+  if (rec.imageCount >= 15) conf += 12;
+  else if (rec.imageCount >= 10) conf += 8;
+  else if (rec.imageCount >= 5) conf += 4;
+  if (rec.whyThisAudience) conf += 8;
+  if (rec.adAngle) conf += 5;
+  if (rec.primarySegment && rec.primarySegment !== "General") conf += 5;
+  if (rec.actualPrice != null) conf += 3;
+  if (rec.mileage != null) conf += 4;
+  return Math.min(99, Math.max(40, Math.round(conf)));
+}
+
+// Risk Analysis — proactively identify weaknesses
+export function computeRisk(rec: DailyVehicleRec): {
+  level: "LOW" | "MEDIUM" | "HIGH";
+  explanation: string;
+} {
+  const risks: string[] = [];
+  if (rec.imageCount < 6) risks.push("Limited photos may reduce buyer confidence");
+  else if (rec.imageCount < 10) risks.push("Consider adding more photos before publishing");
+  if (rec.mileage != null && rec.mileage > 100_000) risks.push("High mileage — consider stronger creative to counter buyer hesitation");
+  else if (rec.mileage != null && rec.mileage > 75_000) risks.push("Above-average mileage — pricing must remain competitive");
+  if (rec.actualPrice != null && rec.actualPrice > 40_000) risks.push("Above-market price range for Facebook Marketplace buyers");
+  else if (rec.actualPrice != null && rec.actualPrice > 28_000) risks.push("Price-sensitive segment — highlight financing options");
+  if (!rec.whyThisAudience && !rec.adAngle) risks.push("AI creative analysis incomplete — run Creative Studio first");
+  if (risks.length === 0) return { level: "LOW", explanation: "No significant risk factors detected. This vehicle is well-positioned to perform." };
+  if (risks.length === 1) return { level: "LOW", explanation: risks[0]! };
+  if (risks.length === 2) return { level: "MEDIUM", explanation: risks.join(". ") + "." };
+  return { level: "HIGH", explanation: risks.join(". ") + "." };
+}
+
+// Expected Results — predictive performance projections
+export function computeExpectedResults(rec: DailyVehicleRec): {
+  conversations: [number, number];
+  appointments: [number, number];
+  saleProbability: number;
+  roi: "HIGH" | "MEDIUM" | "LOW";
+} {
+  const score = rec.opportunityScore ?? 50;
+  const segBoost = rec.primarySegment && rec.primarySegment !== "General" ? 1.2 : 1.0;
+  const base = (score / 100) * 28 * segBoost;
+  const minConv = Math.max(2, Math.round(base * 0.75));
+  const maxConv = Math.round(base * 1.15);
+  const minAppt = Math.max(1, Math.round(minConv * 0.28));
+  const maxAppt = Math.round(maxConv * 0.28);
+  const saleProbability = Math.min(35, Math.round(score * 0.22));
+  const roi: "HIGH" | "MEDIUM" | "LOW" = score >= 80 ? "HIGH" : score >= 65 ? "MEDIUM" : "LOW";
+  return { conversations: [minConv, maxConv], appointments: [minAppt, maxAppt], saleProbability, roi };
+}
+
+// Cost of Waiting — opportunity cost of a 48-hour delay
+export function computeWaitingCost(rec: DailyVehicleRec): {
+  reachLoss: number;
+  conversationsLost: number;
+  revenueLoss: number;
+} {
+  const score = rec.opportunityScore ?? 50;
+  const dailyReach = Math.round((score / 100) * 1_850);
+  const reachLoss = dailyReach * 2;
+  const conversationsLost = Math.max(1, Math.round(reachLoss * 0.0038));
+  const avgGross = (rec.actualPrice ?? 18_000) * 0.085;
+  const revenueLoss = Math.round(conversationsLost * avgGross * 0.18);
+  return { reachLoss, conversationsLost, revenueLoss };
+}
+
+// DealerPilot Reasoning — executive narrative for why this vehicle was selected
+export function generateReasoning(rec: DailyVehicleRec, duplicateGroups: DuplicateGroup[]): string {
+  const group = duplicateGroups.find(
+    g => g.make.toLowerCase() === rec.make.toLowerCase() && g.model.toLowerCase() === rec.model.toLowerCase(),
+  );
+  if (group && group.holdOthers.length > 0) {
+    const total = 1 + group.holdOthers.length;
+    const runner = group.holdOthers[0]!;
+    const advantages = [
+      (rec.opportunityScore ?? 0) > (runner.opportunityScore ?? 0) ? "opportunity score" : null,
+      (rec.mileage ?? Infinity) < (runner.mileage ?? Infinity) ? "lower mileage" : null,
+      (rec.actualPrice ?? Infinity) < (runner.actualPrice ?? Infinity) ? "competitive pricing" : null,
+      rec.imageCount > runner.imageCount ? "stronger photo set" : null,
+      rec.primarySegment !== "General" && rec.primarySegment !== runner.primarySegment ? `${rec.primarySegment} audience fit` : null,
+    ].filter(Boolean);
+    return `I considered ${total} ${rec.make} ${rec.model}s for today's campaign. Although the ${runner.year ?? ""} ${rec.model} was evaluated, the ${rec.year ?? ""} unit offers a stronger combination of ${advantages.length > 0 ? advantages.join(", ") : "overall signals"}. Publishing both today would split Marketplace exposure and reduce visibility for each. I recommend leading with the ${rec.year ?? ""} model and scheduling the ${runner.label} after this campaign matures.`;
+  }
+  if (rec.whyThisAudience) {
+    return `Among ${rec.make} ${rec.model}s in your inventory, this ${rec.year ?? ""} unit stands out. ${rec.whyThisAudience}`;
+  }
+  const parts = [`I selected this ${rec.year ?? ""} ${rec.make} ${rec.model} based on its opportunity score (${rec.opportunityScore ?? "—"})`];
+  if (rec.imageCount > 0) parts.push(`${rec.imageCount} photos ready`);
+  if (rec.mileage != null && rec.mileage < 40_000) parts.push(`low mileage (${rec.mileage.toLocaleString()} mi)`);
+  if (rec.primarySegment !== "General") parts.push(`strong ${rec.primarySegment} buyer segment match`);
+  return parts.join(", ") + ".";
+}
+
+// Morning Brief — executive narrative generated fresh from today's plan
+export function generateMorningBrief(plan: DailyMarketplacePlan): {
+  greeting: string;
+  body: string;
+  primaryVehicle: string | null;
+  primaryReason: string | null;
+} {
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning." : hour < 18 ? "Good afternoon." : "Good evening.";
+  const top = plan.recommendedToday[0] ?? plan.nextBest[0] ?? null;
+  const selected = plan.recommendedToday.length + plan.nextBest.length;
+  const protected_ = plan.duplicateGroups.reduce((sum, g) => sum + g.holdOthers.length, 0);
+  const body = [
+    `I analyzed ${plan.totalEligible} active vehicles overnight.`,
+    `After evaluating pricing, buyer demand, vehicle quality, audience fit, duplicate conflicts, and AI creative performance — I identified ${selected} vehicle${selected !== 1 ? "s" : ""} worth publishing today.`,
+    protected_ > 0 ? `${protected_} vehicle${protected_ !== 1 ? "s" : ""} are protected from self-competition across ${plan.duplicateGroups.length} duplicate group${plan.duplicateGroups.length !== 1 ? "s" : ""}.` : null,
+  ].filter(Boolean).join(" ");
+  const primaryVehicle = top?.label ?? null;
+  const primaryReason = top?.whyThisAudience
+    ? top.whyThisAudience.split(".")[0]?.trim() ?? null
+    : top?.adAngle
+      ? `Recommended angle: "${top.adAngle}"`
+      : null;
+  return { greeting, body, primaryVehicle, primaryReason };
+}
+
+// Creative Recommendation — best format, hook, CTR, audience, language
+export function computeCreativeRecommendation(rec: DailyVehicleRec): {
+  formats: Array<{ name: string; score: number }>;
+  hook: string;
+  ctr: string;
+  audience: string;
+  language: string;
+} {
+  const hasPhotos = rec.imageCount >= 10;
+  const formats = [
+    { name: "Static Image", score: hasPhotos ? 94 : 78 },
+    { name: "Carousel", score: hasPhotos ? 86 : 64 },
+    { name: "Video", score: 71 },
+  ].sort((a, b) => b.score - a.score);
+  const hook = rec.adAngle && rec.adAngle.length > 0
+    ? rec.adAngle
+    : rec.mileage != null && rec.mileage < 35_000
+      ? `Only ${Math.round(rec.mileage / 1000)}k Miles — ${rec.year} ${rec.make} ${rec.model}`
+      : `${rec.year ?? ""} ${rec.make} ${rec.model}`.trim();
+  const ctr = `${(3.1 + ((rec.opportunityScore ?? 50) / 100) * 2.6).toFixed(1)}%`;
+  const language = rec.suggestedLanguage === "Spanish-first" ? "Spanish" : rec.suggestedLanguage === "Bilingual" ? "Bilingual" : "English";
+  return { formats, hook, ctr, audience: rec.primarySegment || "General", language };
+}
