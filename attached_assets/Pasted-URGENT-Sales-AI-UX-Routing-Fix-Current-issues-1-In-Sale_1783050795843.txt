@@ -1,0 +1,114 @@
+URGENT — Sales AI UX + Routing Fix
+
+Current issues:
+1. In Sales AI, clicking “Conversation” opens a 404.
+2. The Sales AI card is poorly designed.
+3. The new design system changed colors, but the product still feels like a generic AI dashboard.
+4. Sales AI should feel like a real inbox/CRM, not one floating card.
+
+Fix this now.
+
+====================================================
+1. Fix Conversation route
+====================================================
+
+Find the Conversation button in Sales AI.
+
+It must navigate to a real route, not 404.
+
+Required route:
+
+/sales-ai/conversations/:conversationId
+
+or, if conversationId is missing:
+
+/sales-ai
+
+and open the conversation inside the Sales AI page.
+
+Acceptance:
+Click Conversation → opens the buyer conversation thread.
+No 404.
+
+====================================================
+2. Redesign Sales AI as an inbox
+====================================================
+
+Replace the current single-card layout.
+
+Use 3-column layout:
+
+LEFT:
+Conversation list
+- buyer name
+- vehicle thumbnail
+- unread count
+- last message preview
+- hot/warm/cold badge
+
+CENTER:
+Conversation thread
+- messages like chat bubbles
+- AI suggested reply
+- quick reply box
+- button: Send Reply
+- button: Call Store
+
+RIGHT:
+Lead intelligence panel
+- vehicle
+- price
+- mileage
+- lead score
+- phone number if captured
+- appointment status
+- actions:
+  Appointment
+  Sold
+  Send listing
+  Mark contacted
+
+====================================================
+3. Improve the visual style
+====================================================
+
+This should NOT look like generic shadcn cards.
+
+Use:
+- larger cards
+- more breathing room
+- softer borders
+- less empty dead space
+- premium gradients
+- module accent violet for Sales AI
+- better typography
+- realistic inbox feel
+
+Make it feel like:
+DealerPilot Sales Command Inbox
+
+Not:
+A generic CRM card.
+
+====================================================
+4. Remove broken/empty state feel
+====================================================
+
+If there is only 1 conversation:
+- still show the full inbox layout
+- selected conversation open by default
+
+Do not show one lonely card in the middle of empty space.
+
+====================================================
+5. Acceptance
+====================================================
+
+- Sales AI opens as a full inbox
+- Conversation button works
+- No 404
+- One conversation opens automatically
+- Buyer thread visible
+- AI reply visible
+- Vehicle/lead panel visible
+- UI feels custom, not generic dashboard
