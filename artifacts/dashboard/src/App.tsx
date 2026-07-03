@@ -22,7 +22,6 @@ import { ConversationDetail } from "@/pages/SalesAI/ConversationDetail";
 import { LeadsCRM } from "@/pages/SalesAI/LeadsCRM";
 import { LeadDetail } from "@/pages/SalesAI/LeadDetail";
 import { MarketplaceListings } from "@/pages/SalesAI/MarketplaceListings";
-import { MarketplaceIntelligence } from "@/pages/MarketplaceIntelligence";
 import { InventoryEngine } from "@/pages/InventoryEngine";
 import { AIPhotoStudio } from "@/pages/AIPhotoStudio";
 
@@ -61,8 +60,10 @@ function Router() {
       <Route path="/leads" component={LeadsCRM} />
       <Route path="/leads/:id" component={LeadDetail} />
 
-      {/* Marketplace Intelligence */}
-      <Route path="/marketplace-intelligence" component={MarketplaceIntelligence} />
+      {/* Marketplace Intelligence — merged into Marketplace */}
+      <Route path="/marketplace-intelligence">
+        <Redirect to="/listings" />
+      </Route>
 
       <Route path="/inventory-engine" component={InventoryEngine} />
       <Route path="/ai-photo-studio" component={AIPhotoStudio} />

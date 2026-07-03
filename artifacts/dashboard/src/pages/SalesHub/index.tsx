@@ -20,7 +20,6 @@ import {
   useListPublishingJobs,
   useListCreativeJobs,
   useGetLeads,
-  useGetConnectionStatus,
   useListFeedRuns,
   getListFeedRunsQueryKey,
   useListMarketplaceRecommendations,
@@ -38,7 +37,6 @@ import {
   type DuplicateGroup,
 } from "@/lib/dailyPlan";
 import {
-  Command,
   UploadCloud,
   Loader2,
   MoreHorizontal,
@@ -48,12 +46,6 @@ import {
   Car,
   ImageIcon,
   Clock,
-  Activity,
-  Rss,
-  Puzzle,
-  Store,
-  Bot,
-  Settings,
   AlertTriangle,
   CheckCircle2,
   RefreshCw,
@@ -61,10 +53,7 @@ import {
   Zap,
   Eye,
   MessageSquare,
-  Users,
 } from "lucide-react";
-import { StatusPulse } from "@/components/shared";
-import { MarketplaceReadinessPanel } from "@/components/MarketplaceReadinessPanel";
 
 // ─── Duplicate Groups (capped at 5, sorted by size) ─────────────────────────
 
@@ -317,7 +306,6 @@ export function SalesHub() {
   const { data: jobsData } = useListPublishingJobs({ location: selectedLocation });
   const { data: creativeJobs } = useListCreativeJobs();
   const { data: leads } = useGetLeads();
-  const { data: connections } = useGetConnectionStatus();
   const { data: feedRuns } = useListFeedRuns(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getListFeedRunsQueryKey(dealerId!) },
   });
@@ -365,6 +353,11 @@ export function SalesHub() {
   const pendingLeads = leads?.leads.filter(l => l.status === "new").length ?? 0;
   const priceChanges = vehicleStats?.priceChanged ?? 0;
   const queuedCount = (jobsData?.jobs ?? []).filter(j => ["Queued","Scheduled","Publishing","Assigned"].includes(j.status)).length;
+  const listingsLive = (workspacesData?.workspaces ?? []).filter(
+    w => w.publishStatus === "published" || w.publishStatus === "published_with_changes"
+  ).length;
+  const failedJobs = (jobsData?.jobs ?? []).filter(j => j.status === "Failed").length;
+  const issueCount = failedJobs + (priceChanges > 0 ? 1 : 0);
 
   // Greeting
   const hour = new Date().getHours();
@@ -441,67 +434,124 @@ export function SalesHub() {
     return items.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 15);
   }, [feedRuns, creativeJobs, jobsData, leads]);
 
-  const getServiceColor = (s?: string) => {
-    switch (s?.toLowerCase()) {
-      case "connected": case "online": return "success";
-      case "offline": case "error": return "destructive";
-      case "not_synced": case "warning": return "warning";
-      default: return "muted";
-    }
-  };
-
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto">
         <div className="p-6 md:p-8 max-w-[1400px] mx-auto animate-in fade-in slide-in-from-bottom-2 duration-400">
 
-          {/* System Pulse bar */}
-          <div className="flex justify-between items-center pb-4 mb-6 border-b border-white/5">
-            <div>
-              <p className="text-[10px] font-bold text-primary uppercase tracking-widest">DealerPilot · Command Center</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
-                <Activity className="w-3 h-3" /> System
-              </span>
-              {[
-                { key: "xmlFeed", icon: Rss, name: "Feed" },
-                { key: "chromeExtension", icon: Puzzle, name: "Extension" },
-                { key: "marketplace", icon: Store, name: "Marketplace" },
-                { key: "openai", icon: Bot, name: "AI" },
-              ].map((svc) => (
-                <div key={svc.key} className="flex items-center gap-1.5 bg-black/20 px-2 py-1.5 rounded border border-white/5" title={svc.name}>
-                  <svc.icon className="w-3.5 h-3.5 text-muted-foreground" />
-                  <StatusPulse status={getServiceColor((connections?.[svc.key as keyof typeof connections] as { status?: string } | null | undefined)?.status)} />
-                </div>
-              ))}
-              <Button variant="ghost" size="icon" className="h-7 w-7 bg-white/5 hover:bg-white/10" onClick={() => setLocation("/settings")}>
-                <Settings className="w-3.5 h-3.5 text-muted-foreground" />
+          {/* ── MISSION HEADER ──────────────────────────────────────────────── */}
+          <div className="mb-6">
+            <p className="text-[10px] font-bold text-blue-400/50 uppercase tracking-[0.2em] mb-3">Command Center</p>
+            <div className="flex items-start justify-between gap-4 mb-2">
+              <div>
+                <p className="text-sm text-white/35 mb-1">{greeting}, Operator.</p>
+                <h1 className="text-[26px] font-bold text-white tracking-tight leading-tight">
+                  {isLoading ? "Loading opportunities…" : plan?.summary ?? `${dealer?.name ?? "Alpha Motorsport"}`}
+                </h1>
+              </div>
+              <Button
+                className="shrink-0 h-9 gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[13px] px-4 mt-1"
+                disabled={!plan?.recommendedToday[0] || isLoading}
+                onClick={() => plan?.recommendedToday[0] && setPublishNowVehicleId(plan.recommendedToday[0].vehicleId)}
+              >
+                <UploadCloud className="w-3.5 h-3.5" />
+                Publish Next Best
               </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[9px] uppercase tracking-widest gap-1">
+                <Zap className="w-2.5 h-2.5" /> Strategy Engine
+              </Badge>
+              <span className="text-[10px] text-white/25">Real inventory · DealerPilot AI</span>
             </div>
           </div>
 
-          {/* Marketplace Publishing Readiness */}
-          <MarketplaceReadinessPanel />
+          {/* ── MISSION CARDS ────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 mb-8">
+            <button
+              onClick={() => setLocation("/listings")}
+              className="glass-panel rounded-xl border border-white/[0.06] hover:border-blue-500/25 p-4 text-left transition-all"
+            >
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center mb-3">
+                <Car className="w-4 h-4 text-blue-400" />
+              </div>
+              <div className="text-[26px] font-bold text-white leading-none mb-1">
+                {isLoading ? "—" : (vehicleStats?.readyToPublish ?? plan?.recommendedToday.length ?? 0)}
+              </div>
+              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Vehicles Ready</div>
+            </button>
+
+            <button
+              onClick={() => setLocation("/listings?tab=publishing")}
+              className="glass-panel rounded-xl border border-white/[0.06] hover:border-green-500/25 p-4 text-left transition-all"
+            >
+              <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center mb-3">
+                <UploadCloud className="w-4 h-4 text-green-400" />
+              </div>
+              <div className="text-[26px] font-bold text-white leading-none mb-1">
+                {isLoading ? "—" : listingsLive}
+              </div>
+              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Listings Live</div>
+            </button>
+
+            <button
+              onClick={() => setLocation("/sales-ai")}
+              className={cn(
+                "glass-panel rounded-xl border p-4 text-left transition-all",
+                pendingLeads > 0
+                  ? "border-violet-500/25 hover:border-violet-500/40"
+                  : "border-white/[0.06] hover:border-violet-500/15",
+              )}
+            >
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center mb-3",
+                pendingLeads > 0 ? "bg-violet-500/15" : "bg-white/[0.04]",
+              )}>
+                <MessageSquare className={cn("w-4 h-4", pendingLeads > 0 ? "text-violet-400" : "text-white/25")} />
+              </div>
+              <div className={cn("text-[26px] font-bold leading-none mb-1", pendingLeads > 0 ? "text-violet-400" : "text-white/50")}>
+                {pendingLeads}
+              </div>
+              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Buyers Waiting</div>
+            </button>
+
+            <button
+              onClick={() => setLocation("/sales-ai")}
+              className="glass-panel rounded-xl border border-white/[0.06] hover:border-amber-500/15 p-4 text-left transition-all"
+            >
+              <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center mb-3">
+                <Clock className="w-4 h-4 text-white/25" />
+              </div>
+              <div className="text-[26px] font-bold text-white/40 leading-none mb-1">0</div>
+              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Appointments</div>
+            </button>
+
+            <button
+              onClick={() => setLocation("/listings?tab=failed")}
+              className={cn(
+                "glass-panel rounded-xl border p-4 text-left transition-all",
+                issueCount > 0
+                  ? "border-red-500/25 hover:border-red-500/40"
+                  : "border-white/[0.06] hover:border-white/10",
+              )}
+            >
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center mb-3",
+                issueCount > 0 ? "bg-red-500/10" : "bg-white/[0.04]",
+              )}>
+                <AlertTriangle className={cn("w-4 h-4", issueCount > 0 ? "text-red-400" : "text-white/25")} />
+              </div>
+              <div className={cn("text-[26px] font-bold leading-none mb-1", issueCount > 0 ? "text-red-400" : "text-white/40")}>
+                {issueCount}
+              </div>
+              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Issues</div>
+            </button>
+          </div>
 
           <div className="flex flex-col xl:flex-row gap-8">
 
-            {/* LEFT: Morning Brief */}
+            {/* LEFT: Today's Picks */}
             <div className="flex-1 flex flex-col gap-6 min-w-0">
-
-              {/* Header */}
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">{greeting}, Operator.</p>
-                <h1 className="text-3xl font-bold text-white tracking-tight">
-                  {isLoading ? "Loading opportunities…" : plan?.summary ?? `${dealer?.name ?? "Alpha Motorsport"}`}
-                </h1>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[9px] uppercase tracking-widest gap-1">
-                    <Zap className="w-2.5 h-2.5" /> Estimated Strategy
-                  </Badge>
-                  <span className="text-[10px] text-muted-foreground">Based on real inventory + DealerPilot Strategy Engine</span>
-                </div>
-              </div>
 
               {/* TODAY'S OPPORTUNITIES */}
               {isLoading ? (
@@ -571,83 +621,6 @@ export function SalesHub() {
                 </div>
               )}
 
-              {/* QUICK STATUS: Needs Reply / Price Changes / Needs Review */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Buyers needing reply */}
-                <div
-                  className={cn(
-                    "glass-panel p-4 rounded-xl border transition-colors cursor-pointer group",
-                    pendingLeads > 0 ? "border-destructive/25 hover:border-destructive/40" : "border-white/5 hover:border-white/10",
-                  )}
-                  onClick={() => setLocation("/sales-ai")}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <MessageSquare className={cn("w-4 h-4", pendingLeads > 0 ? "text-destructive" : "text-muted-foreground")} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Buyers</span>
-                  </div>
-                  {pendingLeads > 0 ? (
-                    <>
-                      <p className="font-bold text-white text-lg">{pendingLeads} waiting</p>
-                      <p className="text-xs text-muted-foreground">Marketplace buyers need reply</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-bold text-muted-foreground/60 text-lg">None waiting</p>
-                      <p className="text-xs text-muted-foreground/50">DealerPilot will surface conversations when Messenger connects</p>
-                    </>
-                  )}
-                </div>
-
-                {/* Price changes */}
-                <div
-                  className={cn(
-                    "glass-panel p-4 rounded-xl border transition-colors cursor-pointer group",
-                    priceChanges > 0 ? "border-warning/25 hover:border-warning/40" : "border-white/5 hover:border-white/10",
-                  )}
-                  onClick={() => setLocation("/inventory")}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <RefreshCw className={cn("w-4 h-4", priceChanges > 0 ? "text-warning" : "text-muted-foreground")} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Inventory</span>
-                  </div>
-                  {priceChanges > 0 ? (
-                    <>
-                      <p className="font-bold text-white text-lg">{priceChanges} changes</p>
-                      <p className="text-xs text-muted-foreground">Price changes since last sync</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-bold text-muted-foreground/60 text-lg">All current</p>
-                      <p className="text-xs text-muted-foreground/50">Inventory is up to date</p>
-                    </>
-                  )}
-                </div>
-
-                {/* Needs review */}
-                <div
-                  className={cn(
-                    "glass-panel p-4 rounded-xl border transition-colors cursor-pointer group",
-                    (plan?.needsReview.length ?? 0) > 0 ? "border-amber-500/25 hover:border-amber-500/40" : "border-white/5 hover:border-white/10",
-                  )}
-                  onClick={() => setLocation("/listings?tab=needs-review")}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Eye className={cn("w-4 h-4", (plan?.needsReview.length ?? 0) > 0 ? "text-amber-400" : "text-muted-foreground")} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Review</span>
-                  </div>
-                  {(plan?.needsReview.length ?? 0) > 0 ? (
-                    <>
-                      <p className="font-bold text-white text-lg">{plan!.needsReview.length} vehicles</p>
-                      <p className="text-xs text-muted-foreground">Need human review before publishing</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-bold text-muted-foreground/60 text-lg">None flagged</p>
-                      <p className="text-xs text-muted-foreground/50">All vehicles are ready or queued</p>
-                    </>
-                  )}
-                </div>
-              </div>
 
             </div>
 

@@ -1,0 +1,244 @@
+DEALERPILOT v4 — PRODUCT DESIGN REFACTOR
+
+Goal:
+DealerPilot must stop looking like a generic AI dashboard.
+It should feel like a premium AI operations cockpit for auto dealerships.
+
+Do not add new features.
+Redesign the information architecture and UI around a unique product identity.
+
+====================================================
+1. Reduce sidebar to 6 core modules
+====================================================
+
+Keep only:
+
+1. Command Center
+2. Marketplace
+3. Inventory
+4. AI Photo Studio
+5. Sales AI
+6. Dealer DNA
+
+Move Settings to the bottom avatar/user menu.
+
+Remove or merge:
+- Intelligence → merge into Marketplace
+- AI Vehicle Studio → merge into AI Photo Studio
+- AI Photo Review → replace with AI Photo Studio inside vehicle detail
+
+====================================================
+2. Command Center becomes the daily mission screen
+====================================================
+
+Replace the current dashboard with:
+
+Header:
+“Good evening, Operator.”
+
+Main mission cards:
+- Vehicles ready
+- Listings live
+- Buyers waiting
+- Appointments today
+- Issues needing attention
+
+Primary action:
+“Publish Next Best Vehicle”
+
+Daily mission section:
+- Publish 3 vehicles
+- Reply to new buyers
+- Review failed jobs
+- Check AI photos
+
+No clutter.
+No duplicate widgets.
+No technical queue unless expanded.
+
+====================================================
+3. Marketplace becomes the publishing cockpit
+====================================================
+
+Merge Marketplace AI + Intelligence into one module:
+
+Marketplace
+
+Sections:
+- Today’s Picks
+- Publishing Queue
+- Published
+- Needs Review
+- Marketplace Health
+
+Cards should be premium, wide, low clutter.
+
+Each vehicle card:
+- photo
+- vehicle
+- price
+- AI score
+- strategy badge
+- publish button
+- preview button
+
+No repeated dashboards.
+
+====================================================
+4. Inventory becomes visual and scannable
+====================================================
+
+Inventory cards/table should emphasize:
+
+- vehicle photo
+- price
+- mileage
+- photos count
+- AI photo status
+- marketplace status
+- lead activity
+
+Use badges instead of long text.
+
+====================================================
+5. AI Photo Studio becomes the media engine
+====================================================
+
+AI Photo Studio is the only place for:
+- classification
+- background replacement
+- enhancement
+- before/after
+- quality review
+- photo set versions
+
+Inside Vehicle Detail, replace AI Photo Review with embedded AI Photo Studio.
+
+Tabs:
+- Original
+- AI Enhanced
+- Before / After
+- Processing
+- Quality
+
+Show:
+- AI photo status
+- active photo set
+- marketplace uses AI photos yes/no
+- cost
+- processing time
+
+No “Coming Soon” placeholders.
+
+====================================================
+6. Sales AI becomes conversation-first
+====================================================
+
+Do not use ugly CRM cards.
+
+Make it feel like an inbox.
+
+Layout:
+Left column:
+- buyer conversations
+
+Center:
+- conversation thread
+
+Right:
+- vehicle, lead score, appointment, quick actions
+
+Quick actions:
+- Reply
+- Call
+- Appointment
+- Sold
+- Send listing
+
+====================================================
+7. Visual identity
+====================================================
+
+Keep dark mode, but make it premium.
+
+Inspiration:
+- Linear
+- Arc Browser
+- Apple Vision Pro
+- Stripe Dashboard
+- Tesla service software
+
+Style:
+- more spacing
+- fewer borders
+- larger typography
+- soft gradients
+- module-specific accent colors
+- smoother cards
+- less red unless critical
+- less clutter
+
+Module accents:
+- Command Center: electric blue
+- Marketplace: green
+- Inventory: cyan
+- AI Photo Studio: gold
+- Sales AI: violet
+- Dealer DNA: orange
+
+====================================================
+8. Sidebar redesign
+====================================================
+
+Sidebar should feel premium and minimal.
+
+Use:
+- clean icons
+- module names
+- active glow
+- no heavy boxes
+- bottom operator profile
+
+The app should not feel like a generic shadcn admin panel.
+
+====================================================
+9. Motion and feedback
+====================================================
+
+Add subtle motion:
+- processing steps animate
+- published success state
+- AI photo ready state
+- queue progress
+
+No distracting animation.
+Premium, soft, fast.
+
+====================================================
+10. Remove duplicated states
+====================================================
+
+Do not show the same data in 3 places.
+
+One source of truth:
+- Marketplace owns publishing
+- AI Photo Studio owns photos
+- Sales AI owns messages
+- Inventory owns vehicles
+- Command Center summarizes everything
+
+====================================================
+11. Acceptance
+====================================================
+
+After refactor:
+
+- Sidebar has only 6 modules
+- Command Center feels like a daily mission screen
+- Marketplace and Intelligence are merged
+- AI Vehicle Studio and AI Photo Studio are merged
+- Vehicle detail embeds AI Photo Studio
+- Sales AI feels like an inbox, not broken cards
+- App looks premium and custom, not generic AI dashboard
+- No fake Coming Soon panels
+- No duplicated modules
