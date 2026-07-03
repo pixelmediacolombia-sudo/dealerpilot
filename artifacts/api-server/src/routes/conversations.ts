@@ -16,38 +16,41 @@ const router = Router();
 
 const DEALER_ID = 1;
 
+const STORE_PHONES: Record<string, string> = {
+  manassas: "703-763-4675",
+  fredericksburg: "703-763-4675", // same until Fredericksburg number is confirmed
+};
+
+const DEFAULT_STORE_PHONE = "703-763-4675";
+
+function resolveStorePhone(lotLocation?: string | null): string {
+  if (!lotLocation) return DEFAULT_STORE_PHONE;
+  const key = lotLocation.toLowerCase().trim();
+  return STORE_PHONES[key] ?? DEFAULT_STORE_PHONE;
+}
+
 const ALPHA_RULES = `
 You are a professional car sales representative for Alpha Motorsport, a used car dealership.
-Qualification flow (ask ONE question at a time, in order):
-1. Confirm the vehicle is available
-2. Ask if they are buying this week or just checking options
-3. Ask what down payment they have available
-4. Ask if they have an ID or Tax ID (ITIN)
-5. Ask if they have proof of income
-6. Ask for their phone number
-7. Ask if they can come in today or tomorrow
 
-Down payment minimums by vehicle type:
-- Sedan: $1,000–$1,500
-- SUV: $2,000+
-- Truck: $2,500–$3,000
-- Luxury: $3,000+
-- $0 down only if fully qualified
+PHONE-FIRST STRATEGY:
+Your goal is to get the buyer to call the store. Every reply must:
+1. Briefly confirm the vehicle is available (or address their question in 1 sentence)
+2. Mention the specific vehicle by year, make, and model
+3. Direct them to call the store phone number provided
+4. Optionally ask if they want help scheduling a visit TODAY
 
-Preferred language:
-- Use "easy financing options"
-- Use "approval based on qualification"
-- Use "ID or Tax ID accepted"
-- Use "proof of income required"
-- Use "ready to buy this week" / "serious buyers"
+Language rules:
+- Match the buyer's language EXACTLY (English or Spanish — do not mix)
+- Use "easy financing options" / "opciones de financiamiento fáciles"
+- Use "approval based on qualification" / "aprobación basada en calificación"
+- If asked about financing details: say they can confirm all options by calling
 - NEVER say: guaranteed approval, everyone approved, bad credit, denied, rejected, disqualified
+- NEVER promise a loan or specific rate
 
-Rules:
-- Match the buyer's language (English or Spanish)
-- Sound like a real salesperson, not a robot
-- Keep replies short — 2–4 sentences max
-- Never promise loan approval
-- Move the conversation toward an appointment
+Reply format:
+- Keep it SHORT — 3–5 lines max including the phone number line
+- Include the phone number with 📞 emoji on its own line
+- End with one soft question (appointment or purchase timeline)
 `;
 
 function detectLanguage(text: string): "en" | "es" {
@@ -96,6 +99,7 @@ async function generateAiReply(
   vehicleTitle?: string,
   vehicleType?: string,
   publishedDownPayment?: number,
+  storePhone: string = DEFAULT_STORE_PHONE,
 ): Promise<string> {
   const langNote =
     language === "es"
@@ -108,9 +112,12 @@ async function generateAiReply(
 
   const history = visibleMessages.slice(-8).join("\n");
 
+  const phoneInstruction = `Store phone for this listing: ${storePhone} — ALWAYS include this number in your reply with a 📞 emoji.`;
+
   const prompt = `${ALPHA_RULES}
 
 ${vehicleContext}
+${phoneInstruction}
 
 Recent conversation:
 ${history}
@@ -118,7 +125,7 @@ ${history}
 Latest buyer message: "${currentMessage}"
 
 ${langNote}
-Write a short, natural reply (2–4 sentences). Ask ONE qualifying question if appropriate.`;
+Write a short phone-first reply. Must include 📞 ${storePhone} on its own line. Mention the vehicle. Keep it under 5 lines.`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-5-mini",
@@ -127,11 +134,18 @@ Write a short, natural reply (2–4 sentences). Ask ONE qualifying question if a
   });
 
   const raw = response.choices[0]?.message?.content?.trim();
-  return raw && raw.length > 0
-    ? raw
-    : language === "es"
-      ? "¡Hola! Gracias por tu interés. ¿Estás buscando comprar esta semana o solo explorando opciones?"
-      : "Hi! Thanks for reaching out. Are you looking to purchase this week or just exploring options?";
+
+  // Verify phone number is present; if AI omitted it, inject fallback template
+  if (raw && raw.length > 0 && raw.includes(storePhone)) {
+    return raw;
+  }
+
+  // Fallback phone-first template
+  const vehicle = vehicleTitle ?? "the vehicle";
+  if (language === "es") {
+    return `Sí, está disponible ✅\n\nPara info rápida y opciones de financiamiento, llama directo a nuestra tienda:\n\n📞 ${storePhone}\n\nDiles que preguntas por el ${vehicle} que viste en Marketplace. ¿Quieres apartar una cita para verlo hoy?`;
+  }
+  return `Yes, it's available ✅\n\nFor the fastest details and financing options, call our store directly:\n\n📞 ${storePhone}\n\nMention you're asking about the ${vehicle} from Marketplace. Would you like to set up a time to see it today?`;
 }
 
 router.post("/conversations/intake", async (req, res) => {
@@ -174,6 +188,7 @@ router.post("/conversations/intake", async (req, res) => {
 
   let vehicleId: number | undefined;
   let listingId: number | undefined;
+  let lotLocation: string | null = null;
 
   if (detectedVehicleTitle) {
     const vRow = await db
@@ -187,8 +202,13 @@ router.post("/conversations/intake", async (req, res) => {
       const vTitle = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ");
       return vTitle.toLowerCase().includes(detectedVehicleTitle.toLowerCase().slice(0, 10));
     });
-    if (match) vehicleId = match.id;
+    if (match) {
+      vehicleId = match.id;
+      lotLocation = match.lotLocation ?? null;
+    }
   }
+
+  const storePhone = resolveStorePhone(lotLocation);
 
   if (vehicleId) {
     const lRow = await db
@@ -275,6 +295,10 @@ router.post("/conversations/intake", async (req, res) => {
     }
   }
 
+  // Extract phone number if buyer included one in their message
+  const phoneMatch = inbound.match(/\b(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})\b/);
+  const extractedPhone = phoneMatch ? phoneMatch[1].replace(/[-.\s]/g, "-") : null;
+
   let suggestedReply: string | null = null;
   if (inbound) {
     suggestedReply = await generateAiReply(
@@ -284,6 +308,7 @@ router.post("/conversations/intake", async (req, res) => {
       detectedVehicleTitle,
       vehicleType,
       marketplaceDownPayment,
+      storePhone,
     );
 
     await db.insert(conversationMessagesTable).values({
@@ -302,15 +327,18 @@ router.post("/conversations/intake", async (req, res) => {
   let leadId: number;
   if (existingLead) {
     leadId = existingLead.id;
+    const resolvedPhone = extractedPhone ?? existingLead.phone;
     const { score, temperature } = computeLeadScore({
       buyerTimeline: existingLead.buyerTimeline,
       buyerAvailableDownPayment: existingLead.buyerAvailableDownPayment,
       publishedDownPayment: marketplaceDownPayment ?? existingLead.publishedDownPayment,
       hasId: existingLead.hasId,
       hasProofOfIncome: existingLead.hasProofOfIncome,
-      phone: existingLead.phone,
+      phone: resolvedPhone,
       appointmentIntent: existingLead.appointmentIntent,
     });
+    // Buyer providing phone number → force HOT, assign to BDC
+    const finalTemperature = extractedPhone ? "Hot" : temperature;
     await db
       .update(leadsTable)
       .set({
@@ -322,15 +350,19 @@ router.post("/conversations/intake", async (req, res) => {
         publishedDownPayment:
           marketplaceDownPayment ?? existingLead.publishedDownPayment,
         suggestedReply: suggestedReply ?? existingLead.suggestedReply,
-        leadScore: score,
-        temperature,
+        phone: resolvedPhone,
+        leadScore: extractedPhone ? Math.max(score, 70) : score,
+        temperature: finalTemperature,
+        status: extractedPhone ? "BDC Assigned" : existingLead.status,
         updatedAt: new Date(),
       })
       .where(eq(leadsTable.id, existingLead.id));
   } else {
     const { score, temperature } = computeLeadScore({
       publishedDownPayment: marketplaceDownPayment,
+      phone: extractedPhone,
     });
+    const finalTemperature = extractedPhone ? "Hot" : temperature;
     const [newLead] = await db
       .insert(leadsTable)
       .values({
@@ -343,9 +375,10 @@ router.post("/conversations/intake", async (req, res) => {
         sourceUrl,
         publishedDownPayment: marketplaceDownPayment,
         suggestedReply,
-        leadScore: score,
-        temperature,
-        status: "New",
+        phone: extractedPhone,
+        leadScore: extractedPhone ? Math.max(score, 70) : score,
+        temperature: finalTemperature,
+        status: extractedPhone ? "BDC Assigned" : "New",
       })
       .returning();
     leadId = newLead.id;
@@ -536,6 +569,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
 
   let vehicleTitle: string | undefined;
   let vehicleType: string | undefined;
+  let testStorePhone: string = DEFAULT_STORE_PHONE;
 
   if (vehicleId) {
     const [v] = await db
@@ -546,6 +580,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
     if (v) {
       vehicleTitle = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ");
       vehicleType = v.bodyStyle ?? undefined;
+      testStorePhone = resolveStorePhone(v.lotLocation);
     }
   }
 
@@ -555,6 +590,8 @@ router.post("/sales-ai/test-message", async (req, res) => {
     detectedLanguage,
     vehicleTitle,
     vehicleType,
+    undefined,
+    testStorePhone,
   );
 
   const { score: leadScore, temperature } = computeLeadScore({});
