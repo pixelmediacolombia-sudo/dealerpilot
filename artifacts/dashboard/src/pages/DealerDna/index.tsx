@@ -230,12 +230,11 @@ export function DealerDna() {
             {/* Form */}
             <div className="space-y-8">
               
-              <SectionCard 
-                title={<span className="font-bold tracking-tight text-xl">Brand Colors</span>}
+              <SectionCard
+                title="Brand Colors"
                 description="The colors DealerPilot uses to tint overlays and text in every creative."
                 icon={Palette}
                 module="dealer-dna"
-                className="border-white/5 bg-card/40 backdrop-blur-md"
               >
                 <div className="space-y-8 mt-2">
                   <ColorList
@@ -257,11 +256,10 @@ export function DealerDna() {
               </SectionCard>
 
               <SectionCard
-                title={<span className="font-bold tracking-tight text-xl">Store Identity</span>}
+                title="Store Identity"
                 description="Font and logo DealerPilot applies to your creatives."
                 icon={Type}
                 module="dealer-dna"
-                className="border-white/5 bg-card/40 backdrop-blur-md"
               >
                 <div className="space-y-8 mt-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
@@ -298,11 +296,10 @@ export function DealerDna() {
               </SectionCard>
 
               <SectionCard
-                title={<span className="font-bold tracking-tight text-xl">Offer Rules</span>}
+                title="Offer Rules"
                 description="Default style and layout DealerPilot uses for new creatives."
                 icon={LayoutTemplate}
                 module="dealer-dna"
-                className="border-white/5 bg-card/40 backdrop-blur-md"
               >
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-2">
                     <div className="space-y-3">
@@ -363,13 +360,13 @@ export function DealerDna() {
 
             {/* Live preview */}
             <div>
-              <div className="sticky top-8 space-y-6 glass-panel p-8 rounded-3xl border border-orange-500/15 bg-orange-500/[0.03] shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+              <div className="sticky top-8 space-y-6 border border-white/[0.05] bg-white/[0.01] rounded-xl p-6 relative overflow-hidden">
                 <div>
-                  <h3 className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-2 text-orange-400 mb-1">
-                    <div className="w-2 h-2 rounded-full bg-orange-400 animate-ping" /> Live Preview
-                  </h3>
-                  <p className="text-sm font-medium text-foreground/60 tracking-tight">Updates as you edit</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-ping" />
+                    <p className="text-[9px] font-black text-orange-400/70 uppercase tracking-[0.22em]">Live Preview</p>
+                  </div>
+                  <p className="text-[12px] text-white/22 mt-0.5">Updates as you edit</p>
                 </div>
                 
                 <div className="space-y-8 mt-6">

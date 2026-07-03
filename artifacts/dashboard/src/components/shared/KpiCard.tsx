@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 import { AnimatedCounter } from "./AnimatedCounter";
-import { renderIcon, type IconLike } from "./renderIcon";
 import { type ModuleKey, getModuleTheme } from "@/design-system/module-themes";
 
 interface KpiTrend {
@@ -13,7 +12,7 @@ interface KpiCardProps {
   title?: string;
   label?: string;
   value: number | string;
-  icon?: IconLike;
+  icon?: unknown;
   formatValue?: (val: number) => string;
   trend?: KpiTrend;
   delta?: KpiTrend;
@@ -23,79 +22,74 @@ interface KpiCardProps {
   iconClassName?: string;
   isLoading?: boolean;
   className?: string;
+  onClick?: () => void;
 }
 
-const legacyColorMap: Record<string, string> = {
-  blue: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  green: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-  orange: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-  purple: "text-violet-400 bg-violet-500/10 border-violet-500/20",
-  cyan: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
-  amber: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-  violet: "text-violet-400 bg-violet-500/10 border-violet-500/20",
+const legacyAccentText: Record<string, string> = {
+  blue: "text-blue-400",
+  green: "text-emerald-400",
+  orange: "text-orange-400",
+  purple: "text-violet-400",
+  cyan: "text-cyan-400",
+  amber: "text-amber-400",
+  violet: "text-violet-400",
 };
 
 export function KpiCard({
   title,
   label,
   value,
-  icon,
   formatValue,
   trend,
   delta,
   module,
   accentColor,
   valueColor,
-  iconClassName,
   isLoading,
   className,
+  onClick,
 }: KpiCardProps) {
   const heading = title ?? label ?? "";
+  const theme = module ? getModuleTheme(module) : null;
   const movement = trend ?? delta;
 
-  const theme = module ? getModuleTheme(module) : null;
-  const iconContainerClass = theme
-    ? theme.iconContainer
-    : legacyColorMap[accentColor ?? "blue"];
-  const glowClass = theme ? theme.glowBg : (legacyColorMap[accentColor ?? "blue"].split(" ")[1] ?? "");
+  const resolvedValueColor =
+    valueColor ??
+    (theme ? theme.textAccent : legacyAccentText[accentColor ?? "blue"] ?? "text-white/75");
+
+  const Wrapper = onClick ? "button" : "div";
 
   return (
-    <div
+    <Wrapper
+      onClick={onClick}
       className={cn(
-        "glass-panel hover-lift p-6 rounded-xl flex flex-col relative overflow-hidden group",
+        "flex flex-col border border-white/[0.05] bg-white/[0.01] rounded-xl px-5 py-4 text-left",
+        onClick && "hover:border-white/[0.09] hover:bg-white/[0.025] transition-all cursor-pointer",
         className,
       )}
     >
-      <div className={cn("absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl -z-10 transition-opacity opacity-10 group-hover:opacity-25", glowClass)} />
-      <div className="flex justify-between items-start mb-4">
-        <h3 className="text-sm font-medium text-muted-foreground">{heading}</h3>
-        {icon && (
-          <div className={cn("p-2.5 rounded-lg border", iconContainerClass, iconClassName)}>
-            {renderIcon(icon, "w-5 h-5")}
-          </div>
+      <div className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 mb-3">
+        {heading}
+      </div>
+      <div className={cn("text-[34px] font-black tracking-tight leading-none tabular-nums", resolvedValueColor)}>
+        {isLoading ? (
+          <div className="h-8 w-16 rounded bg-white/[0.04] animate-pulse" />
+        ) : typeof value === "number" ? (
+          <AnimatedCounter value={value} format={formatValue} />
+        ) : (
+          value
         )}
       </div>
-      <div className="mt-auto">
-        <div className={cn("text-3xl font-bold tracking-tight text-white mb-2 tabular-nums", valueColor)}>
-          {isLoading ? (
-            <div className="h-8 w-20 rounded-md bg-white/10 animate-pulse" />
-          ) : typeof value === "number" ? (
-            <AnimatedCounter value={value} format={formatValue} />
-          ) : (
-            value
+      {movement && (
+        <div className="text-[10px] mt-2">
+          <span className={movement.isPositive ? "text-emerald-400" : "text-red-400"}>
+            {movement.isPositive ? "+" : ""}{movement.value}%
+          </span>
+          {movement.label && (
+            <span className="text-white/20 ml-1">{movement.label}</span>
           )}
         </div>
-        {movement && (
-          <div className="flex items-center gap-2 text-sm">
-            <span className={cn("font-medium", movement.isPositive ? "text-emerald-400" : "text-red-400")}>
-              {movement.isPositive ? "+" : "-"}{movement.value}%
-            </span>
-            {movement.label && (
-              <span className="text-muted-foreground">{movement.label}</span>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    </Wrapper>
   );
 }

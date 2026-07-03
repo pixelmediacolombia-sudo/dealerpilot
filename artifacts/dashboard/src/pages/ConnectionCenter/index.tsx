@@ -358,17 +358,18 @@ export function ConnectionCenter() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-5xl mx-auto space-y-8 pb-20">
+        <div className="p-8 max-w-4xl mx-auto animate-in fade-in duration-400 pb-16">
 
           <PageHeader
+            eyebrow="System"
             title="Connection Center"
             description="Connect DealerPilot to Facebook Marketplace and monitor service health."
-            icon={Activity}
+            className="mb-8"
           />
 
           {isLoading ? (
             <div className="py-20 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              <Loader2 className="w-5 h-5 animate-spin text-white/20" />
             </div>
           ) : (
             <div className="space-y-8">
@@ -379,60 +380,41 @@ export function ConnectionCenter() {
                 onConnect={handleConnect}
               />
 
-              {/* Service health grid */}
+              {/* Service health telemetry */}
               <div>
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-                  Service Health
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {SERVICES.map(({ key, name, icon: Icon, description }) => {
+                <div className="flex items-center gap-3 mb-4">
+                  <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Service Health</p>
+                  <div className="flex-1 h-px bg-white/[0.04]" />
+                </div>
+                <div className="border border-white/[0.05] bg-white/[0.01] rounded-xl overflow-hidden">
+                  {SERVICES.map(({ key, name, icon: Icon, description }, idx) => {
                     const svc = status?.[key as keyof typeof status] as SvcStatus;
                     const color = svcColor(svc?.status);
                     const label = svcLabel(svc?.status);
 
                     return (
-                      <Card
+                      <div
                         key={key}
-                        className="glass-panel overflow-hidden border-white/5 transition-all hover:border-white/10 hover-lift relative group"
+                        className={cn(
+                          "flex items-center gap-5 px-5 py-4 transition-colors hover:bg-white/[0.015]",
+                          idx < SERVICES.length - 1 && "border-b border-white/[0.04]",
+                        )}
                       >
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
-
-                        <CardHeader className="pb-4 flex flex-row items-start justify-between space-y-0 relative z-10">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2.5 text-foreground">
-                              <Icon className="w-5 h-5 opacity-80" />
-                              <CardTitle className="text-base font-semibold tracking-tight">{name}</CardTitle>
-                            </div>
-                            <CardDescription className="text-sm text-muted-foreground line-clamp-1">
-                              {description}
-                            </CardDescription>
-                          </div>
-                          <div className="pl-4 pt-1">
-                            <StatusPulse status={color} label={label} />
-                          </div>
-                        </CardHeader>
-
-                        <CardContent className="relative z-10">
-                          <div className="space-y-3 pt-1">
-                            {svc?.detail && (
-                              <div className="text-xs px-3 py-2 bg-black/40 rounded border border-white/5 text-foreground/60 leading-relaxed">
-                                {svc.detail}
-                              </div>
-                            )}
-                            {svc?.lastHeartbeatAt && (
-                              <div className="space-y-1">
-                                <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Last Active</span>
-                                <span className="block font-medium text-foreground text-xs">{formatDate(svc.lastHeartbeatAt)}</span>
-                              </div>
-                            )}
-                            {!svc?.detail && !svc?.lastHeartbeatAt && (
-                              <div className="flex items-center justify-center py-4 text-xs text-muted-foreground bg-black/20 rounded border border-white/5 border-dashed">
-                                Awaiting telemetry…
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
+                        <div className="w-8 h-8 rounded-lg border border-white/[0.06] bg-white/[0.02] flex items-center justify-center shrink-0">
+                          <Icon className="w-3.5 h-3.5 text-white/30" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-white/70">{name}</p>
+                          <p className="text-[11px] text-white/22 mt-0.5">{description}</p>
+                          {svc?.lastHeartbeatAt && (
+                            <p className="text-[10px] text-white/18 font-mono mt-1">{formatDate(svc.lastHeartbeatAt)}</p>
+                          )}
+                        </div>
+                        {svc?.detail && (
+                          <p className="text-[11px] text-white/30 max-w-xs text-right hidden lg:block truncate">{svc.detail}</p>
+                        )}
+                        <StatusPulse status={color} label={label} />
+                      </div>
                     );
                   })}
                 </div>

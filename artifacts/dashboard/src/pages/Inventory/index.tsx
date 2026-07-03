@@ -161,74 +161,58 @@ export function InventoryDashboard() {
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-y-auto bg-background/50">
-        <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-8 max-w-[1600px] mx-auto animate-in fade-in duration-400">
 
           <PageHeader
             eyebrow="Inventory"
             module="inventory"
-            title="Inventory"
-            description="Your complete vehicle catalog."
-            action={
-              <div className="flex items-center gap-2">
-                <div className="bg-secondary/50 rounded-lg p-1 border border-border/50 flex">
-                  <div className="px-3 py-1.5 bg-card rounded-md shadow-sm border border-border text-sm font-medium flex items-center gap-2">
-                    <LayoutGrid className="w-4 h-4 text-primary" /> Grid
-                  </div>
-                </div>
-              </div>
-            }
+            title="Vehicle Catalog"
+            description="Complete inventory with status tracking and publishing controls."
+            className="mb-6"
           />
 
-          {/* Stats Row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Stats strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <KpiCard
-              title="DealerPilot Catalog"
+              title="Total Catalog"
               value={stats?.total || 0}
-              icon={Car}
               isLoading={statsLoading}
             />
             <KpiCard
-              title="Active Inventory"
+              title="Active"
               value={stats?.active || 0}
               module="inventory"
-              icon={Activity}
-              trend={{ value: 12, isPositive: true }}
               isLoading={statsLoading}
             />
             <KpiCard
               title="Ready to Publish"
               value={stats?.readyToPublish || 0}
               module="inventory"
-              icon={Tag}
               isLoading={statsLoading}
             />
             <KpiCard
               title="Live on Marketplace"
               value={stats?.published || 0}
               module="marketplace"
-              icon={Share}
               isLoading={statsLoading}
             />
           </div>
 
-          {/* Filters + selection toolbar */}
-          <div className="glass-panel p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between z-10 sticky top-0">
-            <div className="relative flex-1 max-w-md w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          {/* Filters toolbar */}
+          <div className="flex flex-col md:flex-row gap-3 items-center justify-between mb-6 py-3 border-y border-white/[0.04]">
+            <div className="relative flex-1 max-w-sm w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/22" />
               <Input
-                placeholder="Search VIN, stock, make, model..."
-                className="pl-9 bg-background/50 border-border/50 focus-visible:ring-primary/30"
+                placeholder="VIN, stock, make, model…"
+                className="pl-9 h-8 text-[13px] bg-transparent border-white/[0.08] focus-visible:ring-0 focus-visible:border-cyan-500/40 text-white/70 placeholder:text-white/18"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <div className="flex gap-3 w-full md:w-auto items-center">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground px-2">
-                <Filter className="w-4 h-4" /> Filters:
-              </div>
+            <div className="flex gap-2 w-full md:w-auto items-center">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[160px] bg-background/50 border-border/50">
+                <SelectTrigger className="w-[148px] h-8 text-[12px] bg-transparent border-white/[0.08] text-white/55">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -240,30 +224,28 @@ export function InventoryDashboard() {
                 </SelectContent>
               </Select>
               <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as ListVehiclesSort)}>
-                <SelectTrigger className="w-[160px] bg-background/50 border-border/50">
+                <SelectTrigger className="w-[148px] h-8 text-[12px] bg-transparent border-white/[0.08] text-white/55">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ListVehiclesSort.newest}>Newest First</SelectItem>
-                  <SelectItem value={ListVehiclesSort.price_high}>Price: High to Low</SelectItem>
-                  <SelectItem value={ListVehiclesSort.price_low}>Price: Low to High</SelectItem>
+                  <SelectItem value={ListVehiclesSort.price_high}>Price: High → Low</SelectItem>
+                  <SelectItem value={ListVehiclesSort.price_low}>Price: Low → High</SelectItem>
                   <SelectItem value={ListVehiclesSort.mileage_low}>Mileage: Lowest</SelectItem>
                 </SelectContent>
               </Select>
-
-              {/* Select All toggle */}
               {allVisibleIds.length > 0 && (
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={() => isSelectAll ? selection.clear() : selection.selectAll(allVisibleIds)}
                   className={cn(
-                    "gap-2 border-border/60 text-xs h-9",
-                    selection.selectionMode && "border-primary/50 text-primary bg-primary/5",
+                    "h-8 gap-1.5 text-[12px] text-white/35 hover:text-white/70",
+                    selection.selectionMode && "text-cyan-400 hover:text-cyan-400",
                   )}
                 >
                   <CheckSquare className="w-3.5 h-3.5" />
-                  {isSelectAll ? "Clear All" : selection.selectionMode ? `${selection.count} selected` : "Select All"}
+                  {isSelectAll ? "Clear" : selection.selectionMode ? `${selection.count} selected` : "Select All"}
                 </Button>
               )}
             </div>

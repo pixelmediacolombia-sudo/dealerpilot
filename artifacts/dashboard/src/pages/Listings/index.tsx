@@ -503,16 +503,11 @@ export function ListingsWorkspace() {
     ["ready", "generating", "scheduled", "publishing", "needs-review", "failed", "all"].includes(activeTab);
 
   const tabClass =
-    "rounded-full px-4 data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border-primary/30 border border-transparent flex gap-2 transition-all text-sm";
+    "text-[10px] font-bold uppercase tracking-[0.15em] px-3 py-1.5 rounded-none border-0 border-b-2 border-transparent data-[state=active]:border-green-400 data-[state=active]:text-green-400 data-[state=inactive]:text-white/30 data-[state=inactive]:hover:text-white/55 gap-1.5 transition-all bg-transparent data-[state=active]:bg-transparent shadow-none";
 
   const countBadge = (n: number) =>
     n > 0 ? (
-      <Badge
-        variant="secondary"
-        className="bg-background/50 text-foreground border-0 px-1.5 py-0"
-      >
-        {n}
-      </Badge>
+      <span className="text-[9px] font-black tabular-nums opacity-60">{n}</span>
     ) : null;
 
   const handleMarkPublished = (marketplaceUrl?: string) => {
@@ -548,114 +543,64 @@ export function ListingsWorkspace() {
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-y-auto bg-background/50">
-        <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-8 max-w-[1600px] mx-auto animate-in fade-in duration-400">
           <PageHeader
             eyebrow="Marketplace"
             module="marketplace"
-            title="Marketplace"
-            description={
-              <div className="flex flex-col gap-3">
-                <span className="text-muted-foreground text-sm">
-                  {allCount} listing workspaces
-                </span>
-                <div className="flex flex-wrap items-center gap-2">
-                  {publishedWorkspacesCount > 0 && (
-                    <Badge variant="secondary" className="bg-success/10 text-success border-success/20">
-                      {publishedWorkspacesCount} Live
-                    </Badge>
-                  )}
-                  {readyCount > 0 && (
-                    <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-green-500/20">
-                      {readyCount} Ready
-                    </Badge>
-                  )}
-                  {generatingCount > 0 && (
-                    <Badge variant="secondary" className="bg-secondary/50 text-secondary-foreground border-white/5">
-                      {generatingCount} Generating
-                    </Badge>
-                  )}
-                  {scheduledCount > 0 && (
-                    <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 border-purple-500/20">
-                      {scheduledCount} Scheduled
-                    </Badge>
-                  )}
-                  {publishingCount > 0 && (
-                    <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
-                      {publishingCount} Publishing
-                    </Badge>
-                  )}
-                  {needsUpdateCount > 0 && (
-                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-400 border-amber-500/20">
-                      {needsUpdateCount} Needs Update
-                    </Badge>
-                  )}
-                  {soldCount > 0 && (
-                    <Badge variant="secondary" className="bg-destructive/10 text-destructive border-destructive/20">
-                      {soldCount} Sold
-                    </Badge>
-                  )}
-                  {needsReviewCount > 0 && (
-                    <Badge variant="secondary" className="bg-warning/10 text-warning border-warning/20">
-                      {needsReviewCount} Needs Review
-                    </Badge>
-                  )}
-                  {failedCount > 0 && (
-                    <Badge variant="secondary" className="bg-destructive/10 text-destructive border-destructive/20">
-                      {failedCount} Failed
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            }
+            title="Publishing Cockpit"
+            description={`${allCount} listing workspaces · ${publishedWorkspacesCount} live · ${readyCount} ready`}
             action={
-              <div className="flex flex-col gap-3 items-end">
-                <Link href="/listings/readiness">
-                  <Button variant="outline" size="sm" className="gap-2 border-border/50 text-muted-foreground hover:text-primary hover:border-primary/40">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Production Readiness
-                  </Button>
-                </Link>
-                <Tabs value={activeTab} onValueChange={handleTabChange} className="w-auto max-w-[700px]">
-                  <TabsList className="bg-transparent border-0 gap-1 flex-nowrap overflow-x-auto whitespace-nowrap w-full">
-                    <TabsTrigger value="ready" className={tabClass}>
-                      Ready {countBadge(readyCount)}
-                    </TabsTrigger>
-                    <TabsTrigger value="generating" className={tabClass}>
-                      Generating {countBadge(generatingCount)}
-                    </TabsTrigger>
-                    <TabsTrigger value="scheduled" className={tabClass}>
-                      Scheduled {countBadge(scheduledCount)}
-                    </TabsTrigger>
-                    <TabsTrigger value="publishing" className={tabClass}>
-                      Publishing {countBadge(publishingCount)}
-                    </TabsTrigger>
-                    <TabsTrigger value="published" className={tabClass}>
-                      Published {countBadge(publishedWorkspacesCount)}
-                    </TabsTrigger>
-                    <TabsTrigger value="needs-update" className={cn(tabClass, needsUpdateCount > 0 && "data-[state=inactive]:text-amber-400/80")}>
-                      Needs Update {countBadge(needsUpdateCount)}
-                    </TabsTrigger>
-                    <TabsTrigger value="sold" className={tabClass}>
-                      Sold {countBadge(soldCount)}
-                    </TabsTrigger>
-                    <TabsTrigger value="needs-review" className={tabClass}>
-                      Needs Review {countBadge(needsReviewCount)}
-                    </TabsTrigger>
-                    <TabsTrigger value="failed" className={tabClass}>
-                      Failed {countBadge(failedCount)}
-                    </TabsTrigger>
-                    <TabsTrigger value="queue" className={tabClass}>
-                      Queue {countBadge(queuedJobs)}
-                    </TabsTrigger>
-                    <TabsTrigger value="all" className={tabClass}>
-                      All {countBadge(allCount)}
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
+              <Link href="/listings/readiness">
+                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-[11px] text-white/35 hover:text-white/70">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Readiness
+                </Button>
+              </Link>
             }
+            className="mb-0"
           />
+
+          {/* Tab rail */}
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-0">
+            <TabsList className="bg-transparent border-0 border-b border-white/[0.04] gap-0 flex-nowrap overflow-x-auto whitespace-nowrap w-full rounded-none h-auto px-0 pb-0 justify-start">
+              <TabsTrigger value="ready" className={tabClass}>
+                Ready {countBadge(readyCount)}
+              </TabsTrigger>
+              <TabsTrigger value="generating" className={tabClass}>
+                Generating {countBadge(generatingCount)}
+              </TabsTrigger>
+              <TabsTrigger value="scheduled" className={tabClass}>
+                Scheduled {countBadge(scheduledCount)}
+              </TabsTrigger>
+              <TabsTrigger value="publishing" className={tabClass}>
+                Publishing {countBadge(publishingCount)}
+              </TabsTrigger>
+              <TabsTrigger value="published" className={tabClass}>
+                Live {countBadge(publishedWorkspacesCount)}
+              </TabsTrigger>
+              <TabsTrigger value="needs-update" className={cn(tabClass, needsUpdateCount > 0 && "data-[state=inactive]:text-amber-400/60")}>
+                Needs Update {countBadge(needsUpdateCount)}
+              </TabsTrigger>
+              <TabsTrigger value="sold" className={tabClass}>
+                Sold {countBadge(soldCount)}
+              </TabsTrigger>
+              <TabsTrigger value="needs-review" className={tabClass}>
+                Needs Review {countBadge(needsReviewCount)}
+              </TabsTrigger>
+              <TabsTrigger value="failed" className={cn(tabClass, failedCount > 0 && "data-[state=inactive]:text-red-400/60")}>
+                Failed {countBadge(failedCount)}
+              </TabsTrigger>
+              <TabsTrigger value="queue" className={tabClass}>
+                Queue {countBadge(queuedJobs)}
+              </TabsTrigger>
+              <TabsTrigger value="all" className={tabClass}>
+                All {countBadge(allCount)}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <div className="space-y-6 mt-6">
 
           {/* AI Daily Operator Panel */}
           {activeTab !== "published" && activeTab !== "needs-update" && activeTab !== "sold" && activeTab !== "queue" && (
@@ -694,12 +639,12 @@ export function ListingsWorkspace() {
           {/* ── Published / Needs Update / Sold tabs — engagement-rich cards ── */}
           {isPublishedTab && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-              <div className="glass-panel p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-center border border-border/50 z-10 sticky top-0">
-                <div className="relative flex-1 w-full max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <div className="flex items-center gap-3 py-3 border-b border-white/[0.04]">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/22" />
                   <Input
-                    placeholder="Search VIN, make, model..."
-                    className="pl-9 bg-background/50 border-border/50 focus-visible:ring-primary/30"
+                    placeholder="VIN, make, model…"
+                    className="pl-9 h-8 text-[13px] bg-transparent border-white/[0.08] focus-visible:ring-0 focus-visible:border-green-500/40 text-white/70 placeholder:text-white/18"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -761,90 +706,59 @@ export function ListingsWorkspace() {
           {/* ── Ready / Generating / Scheduled / etc — standard workspace cards ── */}
           {isCardTab && (
             <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
-              {/* Toolbar row 1: search + selection + view toggle + sort */}
-              <div className="glass-panel p-4 rounded-xl flex flex-col sm:flex-row gap-3 items-center border border-border/50 z-10 sticky top-0">
-                <div className="relative flex-1 w-full max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              {/* Toolbar */}
+              <div className="flex flex-col sm:flex-row gap-3 items-center py-3 border-y border-white/[0.04]">
+                <div className="relative flex-1 w-full max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/22" />
                   <Input
-                    placeholder="Search VIN, make, model..."
-                    className="pl-9 bg-background/50 border-border/50 focus-visible:ring-primary/30"
+                    placeholder="VIN, make, model…"
+                    className="pl-9 h-8 text-[13px] bg-transparent border-white/[0.08] focus-visible:ring-0 focus-visible:border-green-500/40 text-white/70 placeholder:text-white/18"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
 
-                {/* Selection controls */}
-                {selectionCount > 0 ? (
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Badge className="bg-primary/20 text-primary border-primary/30 gap-1.5">
-                      <ListChecks className="w-3 h-3" />
-                      {selectionCount} selected
-                    </Badge>
-                    <Button size="sm" variant="ghost" onClick={selectAll} className="h-7 text-xs px-2 gap-1">
-                      All {filteredSortedWorkspaces.length}
+                <div className="flex items-center gap-2 shrink-0 ml-auto">
+                  {selectionCount > 0 ? (
+                    <>
+                      <span className="text-[11px] text-green-400 font-bold">{selectionCount} selected</span>
+                      <Button size="sm" variant="ghost" onClick={selectAll} className="h-7 text-[11px] px-2 text-white/40 hover:text-white/70">All</Button>
+                      <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 w-7 p-0 text-white/30 hover:text-white/60"><X className="w-3 h-3" /></Button>
+                    </>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={selectAll} className="h-7 text-[11px] px-2.5 gap-1.5 text-white/30 hover:text-white/60">
+                      <ListChecks className="w-3 h-3" /> Select All
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 text-xs px-2">
-                      <X className="w-3 h-3" />
-                    </Button>
+                  )}
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                    <SelectTrigger className="w-[140px] h-7 text-[12px] bg-transparent border-white/[0.08] text-white/45 gap-1">
+                      <ArrowUpDown className="w-3 h-3 text-white/22 shrink-0" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="priority">Priority Score</SelectItem>
+                      <SelectItem value="photo_count">Photo Count</SelectItem>
+                      <SelectItem value="price">Price</SelectItem>
+                      <SelectItem value="newest">Newest</SelectItem>
+                      <SelectItem value="needs_review">Needs Review First</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center rounded-lg border border-white/[0.07] overflow-hidden shrink-0">
+                    <button
+                      onClick={() => setViewMode("list")}
+                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold transition-colors", viewMode === "list" ? "bg-green-500/10 text-green-400" : "text-white/25 hover:text-white/50")}
+                    ><List className="w-3 h-3" /> List</button>
+                    <div className="w-px h-4 bg-white/[0.06]" />
+                    <button
+                      onClick={() => setViewMode("grid")}
+                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold transition-colors", viewMode === "grid" ? "bg-green-500/10 text-green-400" : "text-white/25 hover:text-white/50")}
+                    ><LayoutGrid className="w-3 h-3" /> Grid</button>
                   </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={selectAll}
-                    className="h-7 text-xs px-2.5 gap-1.5 text-muted-foreground hover:text-foreground flex-shrink-0"
-                  >
-                    <ListChecks className="w-3.5 h-3.5" />
-                    Select All
-                  </Button>
-                )}
-
-                {/* Sort */}
-                <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-                  <SelectTrigger className="w-full sm:w-[160px] bg-background/50 border-border/50 gap-1.5">
-                    <ArrowUpDown className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="priority">Priority Score</SelectItem>
-                    <SelectItem value="photo_count">Photo Count</SelectItem>
-                    <SelectItem value="price">Price</SelectItem>
-                    <SelectItem value="newest">Newest</SelectItem>
-                    <SelectItem value="needs_review">Needs Review First</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {/* View toggle */}
-                <div className="flex items-center rounded-lg border border-border/50 overflow-hidden flex-shrink-0">
-                  <button
-                    onClick={() => setViewMode("list")}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors",
-                      viewMode === "list" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <List className="w-3.5 h-3.5" />
-                    List
-                  </button>
-                  <div className="w-px h-5 bg-border/60" />
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors",
-                      viewMode === "grid" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <LayoutGrid className="w-3.5 h-3.5" />
-                    Grid
-                  </button>
                 </div>
               </div>
 
-              {/* Toolbar row 2: vehicle count */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] text-muted-foreground">
-                  {filteredSortedWorkspaces.length} vehicle{filteredSortedWorkspaces.length !== 1 ? "s" : ""}
-                </span>
+              <div className="text-[10px] text-white/18 font-mono">
+                {filteredSortedWorkspaces.length} vehicle{filteredSortedWorkspaces.length !== 1 ? "s" : ""}
               </div>
 
               {/* Vehicle list / grid */}
@@ -877,7 +791,7 @@ export function ListingsWorkspace() {
                 /* ── Compact List View ── */
                 <div className="rounded-xl border border-border/40 overflow-hidden">
                   {/* List header */}
-                  <div className="flex items-center gap-3 px-4 py-2.5 bg-muted/30 border-b border-border/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.04] text-[9px] font-black uppercase tracking-[0.18em] text-white/18">
                     <div className="w-5 flex-shrink-0">
                       <Checkbox
                         checked={selectionCount === filteredSortedWorkspaces.length && filteredSortedWorkspaces.length > 0}
@@ -886,7 +800,7 @@ export function ListingsWorkspace() {
                     </div>
                     <div className="w-[72px] flex-shrink-0">Photo</div>
                     <div className="flex-1 min-w-0">Vehicle</div>
-                    <div className="w-[90px] text-center flex-shrink-0 hidden lg:block">AI Score</div>
+                    <div className="w-[90px] text-center flex-shrink-0 hidden lg:block">Score</div>
                     <div className="w-[120px] flex-shrink-0 hidden md:block">Price</div>
                     <div className="w-[150px] flex-shrink-0 hidden xl:block">Strategy</div>
                     <div className="w-[120px] flex-shrink-0 text-right">Action</div>
@@ -913,8 +827,8 @@ export function ListingsWorkspace() {
                       <div
                         key={w.vehicleId}
                         className={cn(
-                          "flex items-center gap-3 px-4 py-2 min-h-[80px] border-b border-border/20 last:border-b-0 transition-colors hover:bg-muted/10",
-                          isSelected && "bg-primary/5 border-l-2 border-l-primary"
+                          "flex items-center gap-3 px-4 py-2.5 min-h-[72px] border-b border-white/[0.03] last:border-b-0 transition-colors hover:bg-white/[0.015]",
+                          isSelected && "bg-green-500/[0.04] border-l-2 border-l-green-500/40"
                         )}
                       >
                         <div className="w-5 flex-shrink-0">
@@ -1581,6 +1495,8 @@ export function ListingsWorkspace() {
               </SectionCard>
             </div>
           )}
+
+          </div>{/* /space-y-6 */}
         </div>
       </div>
 

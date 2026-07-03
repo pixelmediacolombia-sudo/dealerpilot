@@ -140,11 +140,10 @@ export function Settings() {
       <div className="flex-1 overflow-y-auto">
         <div className="p-8 max-w-5xl mx-auto space-y-8 pb-20 fade-in slide-in-from-bottom-4 duration-500 animate-in">
           
-          <PageHeader 
-            eyebrow="CONFIGURATION"
+          <PageHeader
+            eyebrow="Configuration"
             title="System Settings"
-            description="Manage your dealership profile, inventory feed, and verify DealerPilot's real-time telemetry."
-            icon={SettingsIcon}
+            description="Manage your dealership profile, inventory feed, and system connections."
           />
 
           <div className="grid gap-8">
@@ -153,7 +152,7 @@ export function Settings() {
               title="Dealership Profile" 
               description="General information about your active dealership."
               icon={Building2}
-              className="border-white/5"
+
             >
               <div className="space-y-6">
                 <div className="grid gap-6 sm:grid-cols-2">
@@ -194,7 +193,7 @@ export function Settings() {
               title="Inventory Feed Integration" 
               description="Configure your automated nightly XML inventory source."
               icon={RefreshCw}
-              className="border-white/5"
+
             >
               <div className="space-y-8">
                 <div className="space-y-3">
@@ -279,7 +278,7 @@ export function Settings() {
               title="System Connections" 
               description="Real-time telemetry for the DealerPilot operating system."
               icon={Activity}
-              className="border-white/5"
+
               action={
                 <Link href="/connection-center" className="text-[11px] text-muted-foreground hover:text-primary transition-colors">
                   Advanced connection diagnostics →
@@ -323,7 +322,7 @@ export function Settings() {
               title="Feed Run History"
               description="Last 5 inventory sync operations."
               icon={History}
-              className="border-white/5"
+
             >
               <div className="space-y-3">
                 {(!feedRunsData?.feedRuns || feedRunsData.feedRuns.length === 0) ? (
