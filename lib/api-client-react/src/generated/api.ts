@@ -125,6 +125,8 @@ import type {
   PublishingJobPayload,
   QueueListingInput,
   RetryPublishingJob200,
+  SalesAiTestMessageInput,
+  SalesAiTestMessageResult,
   SchemaAuditResult,
   SeedMarketplaceIntelligence200,
   SessionReportInput,
@@ -133,6 +135,8 @@ import type {
   SimulatorRunResponse,
   SimulatorScenariosResponse,
   TestListing,
+  UpdateConversationAutoReply200,
+  UpdateConversationAutoReplyBody,
   UpdateConversationStatus200,
   UpdateConversationStatusBody,
   ValidateMetaResult,
@@ -5765,6 +5769,77 @@ export function useGetConversation<TData = Awaited<ReturnType<typeof getConversa
 
 
 
+export const getUpdateConversationAutoReplyUrl = (id: number,) => {
+
+
+
+
+  return `/api/conversations/${id}/auto-reply`
+}
+
+/**
+ * @summary Enable or disable auto-reply for a conversation
+ */
+export const updateConversationAutoReply = async (id: number,
+    updateConversationAutoReplyBody: UpdateConversationAutoReplyBody, options?: RequestInit): Promise<UpdateConversationAutoReply200> => {
+
+  return customFetch<UpdateConversationAutoReply200>(getUpdateConversationAutoReplyUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateConversationAutoReplyBody)
+  }
+);}
+
+
+
+
+export const getUpdateConversationAutoReplyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConversationAutoReply>>, TError,{id: number;data: BodyType<UpdateConversationAutoReplyBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateConversationAutoReply>>, TError,{id: number;data: BodyType<UpdateConversationAutoReplyBody>}, TContext> => {
+
+const mutationKey = ['updateConversationAutoReply'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateConversationAutoReply>>, {id: number;data: BodyType<UpdateConversationAutoReplyBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateConversationAutoReply(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateConversationAutoReplyMutationResult = NonNullable<Awaited<ReturnType<typeof updateConversationAutoReply>>>
+    export type UpdateConversationAutoReplyMutationBody = BodyType<UpdateConversationAutoReplyBody>
+    export type UpdateConversationAutoReplyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enable or disable auto-reply for a conversation
+ */
+export const useUpdateConversationAutoReply = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConversationAutoReply>>, TError,{id: number;data: BodyType<UpdateConversationAutoReplyBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateConversationAutoReply>>,
+        TError,
+        {id: number;data: BodyType<UpdateConversationAutoReplyBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateConversationAutoReplyMutationOptions(options));
+    }
+
 export const getUpdateConversationStatusUrl = (id: number,) => {
 
 
@@ -5834,6 +5909,76 @@ export const useUpdateConversationStatus = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateConversationStatusMutationOptions(options));
+    }
+
+export const getSalesAiTestMessageUrl = () => {
+
+
+
+
+  return `/api/sales-ai/test-message`
+}
+
+/**
+ * @summary QA — test a buyer message through the AI engine without writing to DB
+ */
+export const salesAiTestMessage = async (salesAiTestMessageInput: SalesAiTestMessageInput, options?: RequestInit): Promise<SalesAiTestMessageResult> => {
+
+  return customFetch<SalesAiTestMessageResult>(getSalesAiTestMessageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(salesAiTestMessageInput)
+  }
+);}
+
+
+
+
+export const getSalesAiTestMessageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof salesAiTestMessage>>, TError,{data: BodyType<SalesAiTestMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof salesAiTestMessage>>, TError,{data: BodyType<SalesAiTestMessageInput>}, TContext> => {
+
+const mutationKey = ['salesAiTestMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof salesAiTestMessage>>, {data: BodyType<SalesAiTestMessageInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  salesAiTestMessage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SalesAiTestMessageMutationResult = NonNullable<Awaited<ReturnType<typeof salesAiTestMessage>>>
+    export type SalesAiTestMessageMutationBody = BodyType<SalesAiTestMessageInput>
+    export type SalesAiTestMessageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary QA — test a buyer message through the AI engine without writing to DB
+ */
+export const useSalesAiTestMessage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof salesAiTestMessage>>, TError,{data: BodyType<SalesAiTestMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof salesAiTestMessage>>,
+        TError,
+        {data: BodyType<SalesAiTestMessageInput>},
+        TContext
+      > => {
+      return useMutation(getSalesAiTestMessageMutationOptions(options));
     }
 
 export const getListLeadsUrl = (params?: ListLeadsParams,) => {

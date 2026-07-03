@@ -1199,6 +1199,30 @@ export interface LaunchChecklistResponse {
   checklist: LaunchChecklist;
 }
 
+export interface SalesAiTestMessageInput {
+  /** @nullable */
+  vehicleId?: number | null;
+  buyerMessage: string;
+  /** @nullable */
+  language?: string | null;
+}
+
+export type SalesAiTestMessageResultEscalationDecision = {
+  escalate: boolean;
+  /** @nullable */
+  reason?: string | null;
+};
+
+export interface SalesAiTestMessageResult {
+  detectedIntent: string;
+  detectedLanguage: string;
+  leadScore: number;
+  temperature: string;
+  suggestedReply: string;
+  escalationDecision: SalesAiTestMessageResultEscalationDecision;
+  missingFields: string[];
+}
+
 export interface ConversationIntakeInput {
   extensionId?: string;
   externalThreadRef: string;
@@ -1265,6 +1289,7 @@ export interface ConversationSummary {
   /** @nullable */
   vehicleType?: string | null;
   status: string;
+  autoReplyEnabled?: boolean;
   /** @nullable */
   lastMessageAt?: string | null;
   createdAt: string;
@@ -1967,6 +1992,15 @@ export type BulkGenerateCreative202 = {
 export type ListConversationsParams = {
 dealerId?: number;
 status?: string;
+};
+
+export type UpdateConversationAutoReplyBody = {
+  enabled: boolean;
+};
+
+export type UpdateConversationAutoReply200 = {
+  ok: boolean;
+  autoReplyEnabled: boolean;
 };
 
 export type UpdateConversationStatusBody = {

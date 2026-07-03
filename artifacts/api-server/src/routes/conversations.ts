@@ -441,4 +441,135 @@ router.patch("/conversations/:id/status", async (req, res) => {
   res.json({ ok: true });
 });
 
+router.patch("/conversations/:id/auto-reply", async (req, res) => {
+  const id = Number(req.params.id);
+  const { enabled } = req.body as { enabled: boolean };
+  await db
+    .update(conversationsTable)
+    .set({ autoReplyEnabled: enabled, updatedAt: new Date() })
+    .where(eq(conversationsTable.id, id));
+  res.json({ ok: true, autoReplyEnabled: enabled });
+});
+
+// ── Intent / escalation / qualification helpers ──────────────────────────────
+
+function detectIntent(message: string): string {
+  const m = message.toLowerCase();
+  if (/disponible|still.*for sale|still.*available|is it available|está disponible/.test(m)) return "availability";
+  if (/\bprecio\b|how much|what.*price|cuánto.*cuesta|cuanto.*cuesta/.test(m)) return "price_inquiry";
+  if (/financiamiento|financing|finance|monthly|mensual|payment plan/.test(m)) return "financing";
+  if (/dónde|donde|location|address|dirección|where.*are.*you|where.*located/.test(m)) return "location";
+  if (/\binicial\b|down.?payment|enganche|cuánto.*inicial|cuanto.*inicial/.test(m)) return "down_payment";
+  if (/\bitin\b|\bpasaporte\b|\bpassport\b|driver.*license|tax id|identificación/.test(m)) return "document_inquiry";
+  if (/cita|appointment|come.*in|ver.*hoy|see.*today|schedule/.test(m)) return "appointment_request";
+  if (/this week|esta semana|comprar.*semana|buy.*today|comprar.*hoy/.test(m)) return "purchase_timeline";
+  if (/qué.*necesito|what.*documents|what.*need|what.*bring|documentos/.test(m)) return "document_list";
+  if (/credit|crédito|bad.*credit|credit.*score/.test(m)) return "credit_inquiry";
+  return "general_inquiry";
+}
+
+function shouldEscalate(
+  message: string,
+  intent: string,
+): { escalate: boolean; reason?: string } {
+  const m = message.toLowerCase();
+
+  if (intent === "appointment_request" || /\b(appointment|come in|schedule a time|cita)\b/.test(m))
+    return { escalate: true, reason: "Buyer requesting appointment" };
+
+  if (/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/.test(message))
+    return { escalate: true, reason: "Buyer provided phone number" };
+
+  if (/guarant|everyone.*approv|no.*credit.*check|definitely.*approv/.test(m))
+    return { escalate: true, reason: "Buyer asking for approval guarantee" };
+
+  if (/\b(scam|fraud|lawsuit|bbb|complaint|terrible|angry|upset)\b/.test(m))
+    return { escalate: true, reason: "Buyer showing frustration" };
+
+  if (/\b(interest rate|apr|contract|cosigner|co-signer|repossess|legal|attorney)\b/.test(m))
+    return { escalate: true, reason: "Legal or financing detail inquiry" };
+
+  return { escalate: false };
+}
+
+function getMissingQualificationFields(lead?: {
+  buyerName?: string | null;
+  phone?: string | null;
+  buyerAvailableDownPayment?: number | null;
+  hasId?: boolean | null;
+  hasProofOfIncome?: boolean | null;
+  buyerTimeline?: string | null;
+  appointmentIntent?: boolean | null;
+}): string[] {
+  const missing: string[] = [];
+  if (!lead?.buyerName) missing.push("Buyer name");
+  if (!lead?.phone) missing.push("Phone number");
+  if (lead?.buyerAvailableDownPayment == null) missing.push("Down payment amount");
+  if (lead?.hasId == null) missing.push("ID / Tax ID");
+  if (lead?.hasProofOfIncome == null) missing.push("Proof of income");
+  if (!lead?.buyerTimeline) missing.push("Purchase timeline");
+  if (lead?.appointmentIntent == null) missing.push("Appointment availability");
+  return missing;
+}
+
+// ── Hidden QA test route — stateless, no DB writes ───────────────────────────
+router.post("/sales-ai/test-message", async (req, res) => {
+  const {
+    vehicleId,
+    buyerMessage,
+    language: inputLanguage,
+  } = req.body as {
+    vehicleId?: number;
+    buyerMessage: string;
+    language?: string;
+  };
+
+  if (!buyerMessage) {
+    res.status(400).json({ error: "buyerMessage required" });
+    return;
+  }
+
+  const detectedLanguage = (inputLanguage ?? detectLanguage(buyerMessage)) as "en" | "es";
+  const intent = detectIntent(buyerMessage);
+  const escalation = shouldEscalate(buyerMessage, intent);
+  const missingFields = getMissingQualificationFields();
+
+  let vehicleTitle: string | undefined;
+  let vehicleType: string | undefined;
+
+  if (vehicleId) {
+    const [v] = await db
+      .select()
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.id, vehicleId))
+      .limit(1);
+    if (v) {
+      vehicleTitle = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ");
+      vehicleType = v.bodyStyle ?? undefined;
+    }
+  }
+
+  const suggestedReply = await generateAiReply(
+    [],
+    buyerMessage,
+    detectedLanguage,
+    vehicleTitle,
+    vehicleType,
+  );
+
+  const { score: leadScore, temperature } = computeLeadScore({});
+
+  req.log.info({ intent, escalation, detectedLanguage }, "sales-ai:test-message");
+
+  res.json({
+    detectedIntent: intent,
+    detectedLanguage,
+    leadScore,
+    temperature,
+    suggestedReply,
+    escalationDecision: escalation,
+    missingFields,
+  });
+});
+
 export default router;

@@ -4,6 +4,7 @@ import {
   text,
   timestamp,
   integer,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -28,6 +29,7 @@ export const conversationsTable = pgTable("conversations", {
   marketplaceAskingPrice: integer("marketplace_asking_price"),
   vehicleType: text("vehicle_type"),
   status: text("status").notNull().default("active"),
+  autoReplyEnabled: boolean("auto_reply_enabled").notNull().default(false),
   lastMessageAt: timestamp("last_message_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

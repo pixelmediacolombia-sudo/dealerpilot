@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import {
   useGetConversation,
   useUpdateConversationStatus,
+  useUpdateConversationAutoReply,
   useUpdateLead,
 } from "@workspace/api-client-react";
 import { PageHeader, SectionCard } from "@/components/shared";
@@ -23,9 +24,12 @@ import {
   FileText,
   Clipboard,
   AlertCircle,
+  Zap,
+  ChevronRight,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +46,45 @@ function temperatureIcon(temp: string | null | undefined) {
   return <Snowflake className="w-3.5 h-3.5 text-blue-400" />;
 }
 
+function getNextBestAction(lead: {
+  buyerTimeline?: string | null;
+  buyerAvailableDownPayment?: number | null;
+  hasId?: boolean | null;
+  hasProofOfIncome?: boolean | null;
+  phone?: string | null;
+  appointmentIntent?: boolean | null;
+} | null): string {
+  if (!lead) return "Awaiting first message";
+  if (!lead.buyerTimeline) return "Ask about purchase timeline";
+  if (lead.buyerAvailableDownPayment == null) return "Ask about down payment amount";
+  if (lead.hasId == null) return "Confirm ID or Tax ID availability";
+  if (lead.hasProofOfIncome == null) return "Request proof of income";
+  if (!lead.phone) return "Request phone number";
+  if (lead.appointmentIntent == null) return "Schedule an appointment";
+  return "Escalate to human agent";
+}
+
+function getMissingFields(lead: {
+  buyerName?: string | null;
+  phone?: string | null;
+  buyerAvailableDownPayment?: number | null;
+  hasId?: boolean | null;
+  hasProofOfIncome?: boolean | null;
+  buyerTimeline?: string | null;
+  appointmentIntent?: boolean | null;
+} | null): string[] {
+  if (!lead) return ["Buyer name", "Phone number", "Down payment", "ID / Tax ID", "Proof of income", "Timeline", "Appointment"];
+  const missing: string[] = [];
+  if (!lead.buyerName) missing.push("Buyer name");
+  if (!lead.phone) missing.push("Phone number");
+  if (lead.buyerAvailableDownPayment == null) missing.push("Down payment amount");
+  if (lead.hasId == null) missing.push("ID / Tax ID");
+  if (lead.hasProofOfIncome == null) missing.push("Proof of income");
+  if (!lead.buyerTimeline) missing.push("Purchase timeline");
+  if (lead.appointmentIntent == null) missing.push("Appointment availability");
+  return missing;
+}
+
 export function ConversationDetail() {
   const [, params] = useRoute("/conversations/:id");
   const [, navigate] = useLocation();
@@ -50,11 +93,22 @@ export function ConversationDetail() {
 
   const { data, isLoading, refetch } = useGetConversation(id);
   const { mutateAsync: updateStatus } = useUpdateConversationStatus();
+  const { mutateAsync: updateAutoReply } = useUpdateConversationAutoReply();
   const { mutateAsync: updateLead } = useUpdateLead();
 
   const [copied, setCopied] = useState(false);
 
-  const conv = data?.conversation;
+  const conv = data?.conversation as {
+    id: number;
+    buyerName?: string | null;
+    status: string;
+    autoReplyEnabled?: boolean;
+    vehicleType?: string | null;
+    detectedVehicleTitle?: string | null;
+    marketplaceDownPayment?: number | null;
+    language?: string;
+  } | undefined;
+
   const messages = data?.messages ?? [];
   const lead = data?.lead as {
     id: number;
@@ -76,12 +130,23 @@ export function ConversationDetail() {
     .filter((m) => m.role === "assistant")
     .slice(-1)[0]?.content;
 
+  const autoReplyEnabled = conv?.autoReplyEnabled ?? false;
+  const missingFields = getMissingFields(lead);
+  const nextBestAction = getNextBestAction(lead);
+
   async function handleCopy() {
     if (!lastReply) return;
     await navigator.clipboard.writeText(lastReply);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast({ title: "Reply copied to clipboard" });
+  }
+
+  async function handleAutoReplyToggle(enabled: boolean) {
+    if (!conv) return;
+    await updateAutoReply({ id: conv.id, data: { enabled } });
+    toast({ title: enabled ? "Auto-reply enabled" : "Auto-reply paused" });
+    refetch();
   }
 
   async function handleMarkStatus(status: string) {
@@ -220,6 +285,28 @@ export function ConversationDetail() {
 
               {lastReply && (
                 <SectionCard title="AI Suggested Reply" icon={Bot}>
+                  {/* Auto-reply toggle */}
+                  <div className="flex items-center justify-between mb-4 px-1">
+                    <div>
+                      <div className="text-[11px] font-bold text-white/80">Auto-Reply</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {autoReplyEnabled ? "AI replies automatically" : "Manual copy & paste"}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-[10px] font-bold uppercase tracking-widest",
+                        autoReplyEnabled ? "text-primary" : "text-muted-foreground",
+                      )}>
+                        {autoReplyEnabled ? "ON" : "OFF"}
+                      </span>
+                      <Switch
+                        checked={autoReplyEnabled}
+                        onCheckedChange={handleAutoReplyToggle}
+                      />
+                    </div>
+                  </div>
+
                   <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-4">
                     <p className="text-sm text-foreground/90 leading-relaxed">{lastReply}</p>
                   </div>
@@ -245,6 +332,18 @@ export function ConversationDetail() {
             </div>
 
             <div className="space-y-4">
+              {/* Next Best Action */}
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Zap className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Next Best Action</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-sm font-medium text-white/90">
+                  <ChevronRight className="w-3.5 h-3.5 text-primary shrink-0" />
+                  {nextBestAction}
+                </div>
+              </div>
+
               {lead && (
                 <SectionCard title="Buyer Profile" icon={User}>
                   <div className="space-y-4">
@@ -346,6 +445,25 @@ export function ConversationDetail() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Missing fields */}
+                    {missingFields.length > 0 && (
+                      <div className="pt-2 border-t border-white/5">
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-orange-400/80 mb-2">
+                          Still needed
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {missingFields.map((f) => (
+                            <span
+                              key={f}
+                              className="text-[9px] px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400/80"
+                            >
+                              {f}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </SectionCard>
               )}

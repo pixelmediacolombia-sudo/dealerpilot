@@ -2603,6 +2603,7 @@ export const ListConversationsResponse = zod.object({
   "marketplaceAskingPrice": zod.number().nullish(),
   "vehicleType": zod.string().nullish(),
   "status": zod.string(),
+  "autoReplyEnabled": zod.boolean().optional(),
   "lastMessageAt": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -2639,6 +2640,7 @@ export const GetConversationResponse = zod.object({
   "marketplaceAskingPrice": zod.number().nullish(),
   "vehicleType": zod.string().nullish(),
   "status": zod.string(),
+  "autoReplyEnabled": zod.boolean().optional(),
   "lastMessageAt": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -2664,6 +2666,23 @@ export const GetConversationResponse = zod.object({
 
 
 /**
+ * @summary Enable or disable auto-reply for a conversation
+ */
+export const UpdateConversationAutoReplyParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateConversationAutoReplyBody = zod.object({
+  "enabled": zod.boolean()
+})
+
+export const UpdateConversationAutoReplyResponse = zod.object({
+  "ok": zod.boolean(),
+  "autoReplyEnabled": zod.boolean()
+})
+
+
+/**
  * @summary Update conversation status
  */
 export const UpdateConversationStatusParams = zod.object({
@@ -2676,6 +2695,29 @@ export const UpdateConversationStatusBody = zod.object({
 
 export const UpdateConversationStatusResponse = zod.object({
   "ok": zod.boolean().optional()
+})
+
+
+/**
+ * @summary QA — test a buyer message through the AI engine without writing to DB
+ */
+export const SalesAiTestMessageBody = zod.object({
+  "vehicleId": zod.number().nullish(),
+  "buyerMessage": zod.string(),
+  "language": zod.string().nullish()
+})
+
+export const SalesAiTestMessageResponse = zod.object({
+  "detectedIntent": zod.string(),
+  "detectedLanguage": zod.string(),
+  "leadScore": zod.number(),
+  "temperature": zod.string(),
+  "suggestedReply": zod.string(),
+  "escalationDecision": zod.object({
+  "escalate": zod.boolean(),
+  "reason": zod.string().nullish()
+}),
+  "missingFields": zod.array(zod.string())
 })
 
 

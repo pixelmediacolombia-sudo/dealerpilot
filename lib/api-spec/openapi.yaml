@@ -1723,6 +1723,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConversationDetailResponse"
 
+  /conversations/{id}/auto-reply:
+    patch:
+      operationId: updateConversationAutoReply
+      tags: [sales-ai]
+      summary: Enable or disable auto-reply for a conversation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, autoReplyEnabled]
+                properties:
+                  ok: { type: boolean }
+                  autoReplyEnabled: { type: boolean }
+
   /conversations/{id}/status:
     patch:
       operationId: updateConversationStatus
@@ -1751,6 +1782,25 @@ paths:
                 type: object
                 properties:
                   ok: { type: boolean }
+
+  /sales-ai/test-message:
+    post:
+      operationId: salesAiTestMessage
+      tags: [sales-ai]
+      summary: QA — test a buyer message through the AI engine without writing to DB
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalesAiTestMessageInput"
+      responses:
+        "200":
+          description: AI engine analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesAiTestMessageResult"
 
   /leads:
     get:
@@ -3319,6 +3369,33 @@ components:
         checklist:
           $ref: "#/components/schemas/LaunchChecklist"
 
+    SalesAiTestMessageInput:
+      type: object
+      required: [buyerMessage]
+      properties:
+        vehicleId: { type: ["integer", "null"] }
+        buyerMessage: { type: string }
+        language: { type: ["string", "null"] }
+
+    SalesAiTestMessageResult:
+      type: object
+      required: [detectedIntent, detectedLanguage, leadScore, temperature, suggestedReply, escalationDecision, missingFields]
+      properties:
+        detectedIntent: { type: string }
+        detectedLanguage: { type: string }
+        leadScore: { type: integer }
+        temperature: { type: string }
+        suggestedReply: { type: string }
+        escalationDecision:
+          type: object
+          required: [escalate]
+          properties:
+            escalate: { type: boolean }
+            reason: { type: ["string", "null"] }
+        missingFields:
+          type: array
+          items: { type: string }
+
     ConversationIntakeInput:
       type: object
       required: [externalThreadRef]
@@ -3364,6 +3441,7 @@ components:
         marketplaceAskingPrice: { type: ["integer", "null"] }
         vehicleType: { type: ["string", "null"] }
         status: { type: string }
+        autoReplyEnabled: { type: boolean }
         lastMessageAt: { type: ["string", "null"] }
         createdAt: { type: string }
         updatedAt: { type: string }

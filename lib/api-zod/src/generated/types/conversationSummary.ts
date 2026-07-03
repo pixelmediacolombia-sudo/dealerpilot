@@ -32,6 +32,7 @@ export interface ConversationSummary {
   /** @nullable */
   vehicleType?: string | null;
   status: string;
+  autoReplyEnabled?: boolean;
   /** @nullable */
   lastMessageAt?: string | null;
   createdAt: string;

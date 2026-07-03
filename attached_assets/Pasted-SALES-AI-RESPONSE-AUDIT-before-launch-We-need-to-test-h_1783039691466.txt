@@ -1,0 +1,105 @@
+SALES AI RESPONSE AUDIT — before launch
+
+We need to test how DealerPilot AI replies to real Marketplace buyers.
+
+Audit and implement/verify:
+
+1. Message intake
+- How does DealerPilot receive Facebook Marketplace messages?
+- Is Messenger connected?
+- Do we have webhook access?
+- Are messages real or only DB placeholders?
+- What fields are captured: buyer name, message, listing, vehicleId, timestamp?
+
+2. AI reply engine
+For every incoming message, Sales AI should:
+- identify vehicle
+- understand buyer intent
+- classify lead: HOT / WARM / COLD
+- detect language: Spanish / English
+- answer in same language
+- ask the next qualifying question
+- avoid overpromising approval
+
+3. Required reply style for Alpha
+Use this logic:
+
+If buyer asks "available?":
+"Sí, está disponible por ahora. ¿Estás buscando comprar este mes?"
+
+If buyer asks price:
+"The price is listed, but we also have financing options. How much are you planning to put down?"
+
+If buyer asks financing:
+"We work with options from $1,000, $2,000 or $3,000 down depending on the vehicle. Do you have valid ID and active bank account?"
+
+If buyer asks location:
+"We are in Manassas, VA. Do you want to schedule a time to see it?"
+
+4. Qualification flow
+AI must collect:
+- buyer name
+- phone number
+- down payment
+- valid ID
+- active bank account
+- purchase timeframe
+- vehicle of interest
+- appointment availability
+
+5. Safety rules
+Do NOT say:
+- guaranteed approval
+- everyone approved
+- bad credit no problem
+- no credit check
+- false payment promises
+
+6. Escalation rules
+Escalate to human if:
+- buyer wants appointment
+- buyer gives phone number
+- buyer asks for exact approval
+- buyer is angry/confused
+- buyer asks legal/financing details
+- AI confidence is low
+
+7. Sales AI UI
+Every conversation card must show:
+- suggested AI reply
+- auto-reply status ON/OFF
+- last AI response
+- lead score
+- missing qualification fields
+- next best action
+
+8. Test with simulated messages only for QA, not production UI
+Create a hidden dev test route:
+POST /api/sales-ai/test-message
+
+Inputs:
+- vehicleId
+- buyerMessage
+- language
+
+Returns:
+- detected intent
+- lead score
+- suggested reply
+- escalation decision
+- missing fields
+
+Acceptance test:
+Run 20 test buyer messages:
+- available?
+- cuánto de inicial?
+- aceptan ITIN?
+- tengo pasaporte
+- can I see it today?
+- where are you located?
+- is financing available?
+- I have $1000 down
+- I want to buy this week
+- what documents do I need?
+
+Return the AI reply for each.
