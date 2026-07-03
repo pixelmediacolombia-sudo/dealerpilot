@@ -3103,7 +3103,14 @@ export const GetVehicleIntelligenceResponse = zod.object({
   "confidenceScore": zod.number(),
   "explanation": zod.string().nullish(),
   "expectedLeadQuality": zod.string().nullish(),
-  "generatedAt": zod.coerce.date().optional()
+  "generatedAt": zod.coerce.date().optional(),
+  "opportunityScore": zod.number().nullish(),
+  "opportunityLabel": zod.string().nullish(),
+  "primarySegment": zod.string().nullish(),
+  "secondarySegment": zod.string().nullish(),
+  "adAngle": zod.string().nullish(),
+  "suggestedLanguage": zod.string().nullish(),
+  "whyThisAudience": zod.string().nullish()
 }).optional(),
   "performanceHistory": zod.array(zod.object({
   "id": zod.number(),

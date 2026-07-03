@@ -67,6 +67,14 @@ export type PlanRecommendation = {
   recommendedPriceStrategy: string;
   supportingSignals?: string[] | null;
   expectedImpact?: string | null;
+  // Opportunity Engine — single source of truth
+  opportunityScore?: number | null;
+  opportunityLabel?: string | null;
+  primarySegment?: string | null;
+  secondarySegment?: string | null;
+  adAngle?: string | null;
+  suggestedLanguage?: string | null;
+  whyThisAudience?: string | null;
 };
 
 export type PlanJob = {
@@ -99,6 +107,14 @@ export type DailyVehicleRec = {
   holdReason: string | null;
   isDuplicate: boolean;
   duplicateGroupKey: string | null;
+  // Opportunity Engine — single source of truth
+  opportunityScore: number | null;
+  opportunityLabel: string | null;
+  primarySegment: string;
+  secondarySegment: string | null;
+  adAngle: string;
+  suggestedLanguage: string;
+  whyThisAudience: string;
 };
 
 export type DuplicateGroup = {
@@ -199,9 +215,11 @@ export function buildDailyMarketplacePlan(
     const imageCount = w.imageCount ?? 0;
     const listingScore = w.listingScore ?? null;
     const priorityScore = w.priorityScore ?? null;
-    const planScore = compositeScore(
-      confidenceScore, imageCount, listingScore, priorityScore, actualPrice, priceMode,
-    );
+    // Opportunity Engine score is the single source of truth.
+    // Fall back to compositeScore only when intelligence hasn't run yet.
+    const planScore = rec?.opportunityScore != null
+      ? rec.opportunityScore
+      : compositeScore(confidenceScore, imageCount, listingScore, priorityScore, actualPrice, priceMode);
 
     // Build human-readable reason bullets from real signals
     const reasons: string[] = [];
@@ -247,6 +265,14 @@ export function buildDailyMarketplacePlan(
       holdReason,
       isDuplicate: false, // set below
       duplicateGroupKey: null,
+      // Opportunity Engine fields
+      opportunityScore: rec?.opportunityScore ?? null,
+      opportunityLabel: rec?.opportunityLabel ?? null,
+      primarySegment: rec?.primarySegment ?? "General",
+      secondarySegment: rec?.secondarySegment ?? null,
+      adAngle: rec?.adAngle ?? "",
+      suggestedLanguage: rec?.suggestedLanguage ?? "English-first",
+      whyThisAudience: rec?.whyThisAudience ?? "",
     };
   }
 

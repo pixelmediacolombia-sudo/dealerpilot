@@ -27,4 +27,18 @@ export interface VehicleIntelligenceDetail {
   /** @nullable */
   expectedLeadQuality?: string | null;
   generatedAt?: Date;
+  /** @nullable */
+  opportunityScore?: number | null;
+  /** @nullable */
+  opportunityLabel?: string | null;
+  /** @nullable */
+  primarySegment?: string | null;
+  /** @nullable */
+  secondarySegment?: string | null;
+  /** @nullable */
+  adAngle?: string | null;
+  /** @nullable */
+  suggestedLanguage?: string | null;
+  /** @nullable */
+  whyThisAudience?: string | null;
 }

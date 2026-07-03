@@ -3808,6 +3808,13 @@ components:
         explanation: { type: ["string", "null"] }
         expectedLeadQuality: { type: ["string", "null"] }
         generatedAt: { type: string, format: date-time }
+        opportunityScore: { type: ["integer", "null"] }
+        opportunityLabel: { type: ["string", "null"] }
+        primarySegment: { type: ["string", "null"] }
+        secondarySegment: { type: ["string", "null"] }
+        adAngle: { type: ["string", "null"] }
+        suggestedLanguage: { type: ["string", "null"] }
+        whyThisAudience: { type: ["string", "null"] }
 
     FeedHealthReport:
       type: object

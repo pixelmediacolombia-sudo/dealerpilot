@@ -481,15 +481,24 @@ function computeEstimatedDaysToSell(price: number | null, confidenceScore: numbe
 // GET /api/marketplace-intelligence/recommendations
 router.get("/marketplace-intelligence/recommendations", async (req, res) => {
   const location = typeof req.query.location === "string" ? req.query.location : "";
+
+  // Sort by opportunityScore DESC — this is the single source of truth ranking
   const intelligence = await db
     .select()
     .from(vehicleIntelligenceTable)
-    .where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID))
-    .orderBy(desc(vehicleIntelligenceTable.confidenceScore));
+    .where(and(
+      eq(vehicleIntelligenceTable.dealerId, DEALER_ID),
+      isNotNull(vehicleIntelligenceTable.opportunityScore),
+    ))
+    .orderBy(desc(vehicleIntelligenceTable.opportunityScore));
 
+  // Include both Active and Price Changed vehicles (same filter as market intelligence)
   const vehicleConditions = [
     eq(vehiclesTable.dealerId, DEALER_ID),
-    eq(vehiclesTable.status, "Active"),
+    or(
+      eq(vehiclesTable.status, "Active"),
+      eq(vehiclesTable.status, "Price Changed"),
+    )!,
   ];
   if (location) vehicleConditions.push(eq(vehiclesTable.lotLocation, location));
   const vehicles = await db
@@ -501,7 +510,7 @@ router.get("/marketplace-intelligence/recommendations", async (req, res) => {
   const vehicleSet = new Set(vehicleIds);
   const vehicleMap = new Map(vehicles.map((v) => [v.id, v]));
 
-  // Only recommend vehicles that belong to this dealer
+  // Only recommend vehicles that belong to this dealer + are active/price-changed
   const filteredIntelligence = intelligence.filter((vi) => vehicleSet.has(vi.vehicleId));
 
   // Parallel: fetch thumbnails (position=0) and photo counts
@@ -555,6 +564,14 @@ router.get("/marketplace-intelligence/recommendations", async (req, res) => {
       supportingSignals: v2?.supportingSignals ?? [],
       expectedImpact: v2?.expectedImpact ?? null,
       actionCta: v2?.actionCta ?? null,
+      // Opportunity Engine — single source of truth ranking
+      opportunityScore: vi.opportunityScore,
+      opportunityLabel: vi.opportunityLabel ?? "Watch",
+      primarySegment: vi.primarySegment ?? "General",
+      secondarySegment: vi.secondarySegment ?? null,
+      adAngle: vi.adAngle ?? "",
+      suggestedLanguage: vi.suggestedLanguage ?? "English-first",
+      whyThisAudience: vi.whyThisAudience ?? "",
     };
   });
 
@@ -613,6 +630,13 @@ router.get("/marketplace-intelligence/vehicles/:vehicleId", async (req, res) => 
           explanation: intelligence.explanation,
           expectedLeadQuality: intelligence.expectedLeadQuality,
           generatedAt: intelligence.generatedAt,
+          opportunityScore: intelligence.opportunityScore ?? null,
+          opportunityLabel: intelligence.opportunityLabel ?? null,
+          primarySegment: intelligence.primarySegment ?? null,
+          secondarySegment: intelligence.secondarySegment ?? null,
+          adAngle: intelligence.adAngle ?? null,
+          suggestedLanguage: intelligence.suggestedLanguage ?? null,
+          whyThisAudience: intelligence.whyThisAudience ?? null,
         }
       : null,
     performanceHistory: performanceHistory.map((p) => ({
@@ -754,7 +778,7 @@ router.get("/marketplace-intelligence/opportunity", async (req, res) => {
       // Secondary: price score descending (best value wins the tie)
       if (b.priceScore !== a.priceScore) return b.priceScore - a.priceScore;
       // Tertiary: vehicle id ascending (stable, deterministic)
-      return a.id - b.id;
+      return a.vehicleId - b.vehicleId;
     });
 
   // Market-level insights

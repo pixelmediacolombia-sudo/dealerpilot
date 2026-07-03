@@ -105,15 +105,17 @@ function CommandCenterDuplicates({ groups }: { groups: DuplicateGroup[] }) {
 
 // ─── Vehicle Recommendation Card ─────────────────────────────────────────────
 
-function strategyColor(name: string | null | undefined) {
-  if (!name) return { bg: "bg-primary/10", text: "text-primary", border: "border-primary/20" };
-  const n = name.toLowerCase();
-  if (n.includes("truck")) return { bg: "bg-amber-500/15", text: "text-amber-400", border: "border-amber-500/25" };
-  if (n.includes("luxury")) return { bg: "bg-violet-500/15", text: "text-violet-400", border: "border-violet-500/25" };
-  if (n.includes("suv") || n.includes("premium")) return { bg: "bg-blue-500/15", text: "text-blue-400", border: "border-blue-500/25" };
-  if (n.includes("fast turn")) return { bg: "bg-green-500/15", text: "text-green-400", border: "border-green-500/25" };
-  if (n.includes("price review")) return { bg: "bg-destructive/15", text: "text-destructive", border: "border-destructive/25" };
-  return { bg: "bg-primary/10", text: "text-primary", border: "border-primary/20" };
+function scoreColor(score: number | null) {
+  if (score == null) return { pill: "bg-white/[0.06] border-white/10 text-white/25", label: "" };
+  if (score >= 80) return { pill: "bg-green-500/15 border-green-500/25 text-green-400", label: "HOT" };
+  if (score >= 70) return { pill: "bg-amber-500/15 border-amber-500/25 text-amber-400", label: "WARM" };
+  return { pill: "bg-white/[0.06] border-white/10 text-white/35", label: "WATCH" };
+}
+
+function langBadgeClass(lang: string) {
+  if (lang === "Spanish-first") return "bg-orange-500/15 text-orange-400 border-orange-500/25";
+  if (lang === "Bilingual") return "bg-teal-500/15 text-teal-400 border-teal-500/25";
+  return "bg-white/[0.05] text-white/30 border-white/10";
 }
 
 function OpportunityCard({
@@ -131,78 +133,143 @@ function OpportunityCard({
   onViewStrategy: () => void;
   isPublishing: boolean;
 }) {
-  const colors = strategyColor(rec.strategyName);
+  const [expanded, setExpanded] = useState(false);
+  const sc = scoreColor(rec.opportunityScore);
+  const hasSegment = rec.primarySegment && rec.primarySegment !== "General";
 
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-white/[0.05] bg-white/[0.015] hover:border-white/[0.09] hover:bg-white/[0.022] transition-all p-4 group">
+    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.015] hover:border-white/[0.09] transition-all overflow-hidden group">
+      <div className="flex items-center gap-4 p-4">
 
-      {/* Rank */}
-      <div className="w-8 h-8 rounded-xl bg-blue-500/[0.08] border border-blue-500/[0.15] flex items-center justify-center shrink-0">
-        <span className="text-[12px] font-black text-blue-400/60">{index + 1}</span>
-      </div>
-
-      {/* Photo */}
-      <div className="w-[72px] h-[56px] rounded-xl overflow-hidden bg-white/[0.03] border border-white/[0.04] shrink-0">
-        {rec.primaryImageUrl ? (
-          <img src={rec.primaryImageUrl} alt={rec.label} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Car className="w-4 h-4 text-white/10" />
+        {/* Rank + score */}
+        <div className="flex flex-col items-center gap-1 shrink-0 w-10">
+          <div className="w-8 h-8 rounded-xl bg-blue-500/[0.08] border border-blue-500/[0.15] flex items-center justify-center">
+            <span className="text-[12px] font-black text-blue-400/60">{index + 1}</span>
           </div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          {rec.strategyName && (
-            <span className={cn("text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest shrink-0", colors.bg, colors.text, colors.border)}>
-              {rec.strategyName}
+          {rec.opportunityScore != null && (
+            <span className={cn("text-[9px] font-black px-1.5 py-0 rounded border", sc.pill)}>
+              {rec.opportunityScore}
             </span>
           )}
-          <span className="font-bold text-[14px] text-white/85 truncate">{rec.label}</span>
         </div>
-        <div className="flex items-center gap-3 text-[11px]">
-          {rec.priceMode === "DOWN_PAYMENT" && rec.marketplacePrice != null ? (
-            <span className="text-amber-400 font-semibold">{formatCurrency(rec.marketplacePrice)} down</span>
-          ) : rec.actualPrice != null ? (
-            <span className="text-emerald-400 font-semibold">{formatCurrency(rec.actualPrice)}</span>
-          ) : null}
-          {rec.imageCount > 0 && (
-            <span className="flex items-center gap-1 text-white/22">
-              <ImageIcon className="w-3 h-3" />{rec.imageCount}
-            </span>
+
+        {/* Photo */}
+        <div className="w-[72px] h-[56px] rounded-xl overflow-hidden bg-white/[0.03] border border-white/[0.04] shrink-0">
+          {rec.primaryImageUrl ? (
+            <img src={rec.primaryImageUrl} alt={rec.label} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Car className="w-4 h-4 text-white/10" />
+            </div>
           )}
-          {rec.reasons[0] && (
-            <span className="text-white/22 truncate hidden lg:block">· {rec.reasons[0]}</span>
-          )}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {rec.opportunityScore != null && (
+              <span className={cn("text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest shrink-0", sc.pill)}>
+                {sc.label}
+              </span>
+            )}
+            {hasSegment && (
+              <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-widest shrink-0", langBadgeClass(rec.suggestedLanguage))}>
+                {rec.primarySegment}
+              </span>
+            )}
+            <span className="font-bold text-[14px] text-white/85 truncate">{rec.label}</span>
+          </div>
+          <div className="flex items-center gap-3 text-[11px]">
+            {rec.priceMode === "DOWN_PAYMENT" && rec.marketplacePrice != null ? (
+              <span className="text-amber-400 font-semibold">{formatCurrency(rec.marketplacePrice)} down</span>
+            ) : rec.actualPrice != null ? (
+              <span className="text-emerald-400 font-semibold">{formatCurrency(rec.actualPrice)}</span>
+            ) : null}
+            {rec.imageCount > 0 && (
+              <span className="flex items-center gap-1 text-white/22">
+                <ImageIcon className="w-3 h-3" />{rec.imageCount}
+              </span>
+            )}
+            {rec.adAngle && (
+              <span className="text-white/25 truncate hidden lg:block italic">· "{rec.adAngle}"</span>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="text-white/15 hover:text-white/40 transition-colors p-1"
+          >
+            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+          <Button
+            size="sm"
+            className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[12px] font-bold px-4 shadow-lg shadow-blue-500/15 rounded-lg"
+            disabled={isPublishing}
+            onClick={() => onPublish(rec.vehicleId)}
+          >
+            {isPublishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
+            Publish
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white/20 hover:text-white/50 hover:bg-white/[0.04] rounded-lg">
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={() => onAddToBatch(rec.vehicleId)}>Add to Batch</DropdownMenuItem>
+              <DropdownMenuItem onClick={onViewStrategy}>Review Strategy</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(`/creative-studio/${rec.vehicleId}`, "_self")}>Open Vehicle</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-2 shrink-0">
-        <Button
-          size="sm"
-          className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[12px] font-bold px-4 shadow-lg shadow-blue-500/15 rounded-lg"
-          disabled={isPublishing}
-          onClick={() => onPublish(rec.vehicleId)}
-        >
-          {isPublishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
-          Publish
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white/20 hover:text-white/50 hover:bg-white/[0.04] rounded-lg">
-              <MoreHorizontal className="w-3.5 h-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onClick={() => onAddToBatch(rec.vehicleId)}>Add to Batch</DropdownMenuItem>
-            <DropdownMenuItem onClick={onViewStrategy}>Review Strategy</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => window.open(`/creative-studio/${rec.vehicleId}`, "_self")}>Open Vehicle</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      {/* Expanded detail */}
+      {expanded && (
+        <div className="px-5 pb-4 pt-0 border-t border-white/[0.04] space-y-3">
+          {/* Why this vehicle */}
+          {rec.reasons.length > 0 && (
+            <div className="pt-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/20 mb-2">Why This Vehicle</p>
+              <ul className="space-y-1">
+                {rec.reasons.map((r, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="w-1 h-1 rounded-full bg-blue-400/40 shrink-0 mt-1.5" />
+                    <span className="text-[11px] text-white/50">{r}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Buyer segment */}
+          {hasSegment && (
+            <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-3 space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-bold text-white/70">{rec.primarySegment} Buyers</span>
+                  {rec.secondarySegment && (
+                    <span className="text-[10px] text-white/25">· also {rec.secondarySegment}</span>
+                  )}
+                </div>
+                <span className={cn("shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wide", langBadgeClass(rec.suggestedLanguage))}>
+                  {rec.suggestedLanguage}
+                </span>
+              </div>
+              {rec.whyThisAudience && (
+                <p className="text-[10px] text-white/30 leading-relaxed">{rec.whyThisAudience}</p>
+              )}
+              {rec.adAngle && (
+                <p className="text-[10px] text-white/45 italic">"{rec.adAngle}"</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

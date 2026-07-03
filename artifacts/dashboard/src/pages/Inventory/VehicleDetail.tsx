@@ -425,9 +425,70 @@ export function VehicleDetail() {
                   icon={Brain}
                 >
                   <div className="space-y-4">
+                    {/* Opportunity Score — primary metric */}
+                    {intel.opportunityScore != null && (
+                      <div className="flex items-center justify-between p-3 rounded-xl border bg-white/[0.02]"
+                        style={{
+                          borderColor: intel.opportunityScore >= 80
+                            ? "rgba(34,197,94,0.2)"
+                            : intel.opportunityScore >= 70
+                            ? "rgba(245,158,11,0.2)"
+                            : "rgba(255,255,255,0.06)",
+                        }}
+                      >
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5">Opportunity Score</p>
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "text-3xl font-black leading-none",
+                              intel.opportunityScore >= 80 ? "text-green-400"
+                              : intel.opportunityScore >= 70 ? "text-amber-400"
+                              : "text-white/40",
+                            )}>
+                              {intel.opportunityScore}
+                            </span>
+                            <span className={cn(
+                              "text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest",
+                              intel.opportunityScore >= 80
+                                ? "bg-green-500/15 border-green-500/25 text-green-400"
+                                : intel.opportunityScore >= 70
+                                ? "bg-amber-500/15 border-amber-500/25 text-amber-400"
+                                : "bg-white/[0.06] border-white/10 text-white/35",
+                            )}>
+                              {intel.opportunityScore >= 80 ? "HOT" : intel.opportunityScore >= 70 ? "WARM" : "WATCH"}
+                            </span>
+                          </div>
+                        </div>
+                        {intel.primarySegment && intel.primarySegment !== "General" && (
+                          <div className="text-right">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5">Buyer Segment</p>
+                            <p className="text-sm font-bold text-white/70">{intel.primarySegment}</p>
+                            <span className={cn(
+                              "text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide",
+                              intel.suggestedLanguage === "Spanish-first"
+                                ? "bg-orange-500/15 text-orange-400 border-orange-500/25"
+                                : intel.suggestedLanguage === "Bilingual"
+                                ? "bg-teal-500/15 text-teal-400 border-teal-500/25"
+                                : "bg-white/[0.05] text-white/30 border-white/10",
+                            )}>
+                              {intel.suggestedLanguage}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Ad Angle */}
+                    {intel.adAngle && (
+                      <div className="px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Suggested Ad Angle</p>
+                        <p className="text-sm text-white/65 font-medium italic">"{intel.adAngle}"</p>
+                      </div>
+                    )}
+
                     {/* Confidence */}
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Confidence</span>
+                      <span className="text-muted-foreground">Strategy Confidence</span>
                       <div className="flex items-center gap-2">
                         <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
                           <div
