@@ -1,0 +1,300 @@
+ARCHITECTURE REFACTOR — Command Center v2 (Executive Decision Dashboard)
+
+The Command Center is not an inventory page.
+
+It is not a diagnostics page.
+
+It is the daily executive dashboard.
+
+When the General Manager opens DealerPilot, the only question being answered is:
+
+What should I do today to sell more vehicles?
+
+Everything on this page must support that goal.
+
+1. Remove Duplicate Groups from Command Center
+
+Delete the large Duplicate Groups section completely.
+
+Do not render:
+
+Tesla Model Y — 17 ready
+Tesla Model 3 — 15 ready
+Honda Civic — 4 ready
+
+This information is operational.
+
+It interrupts the decision flow.
+
+2. Create Marketplace → Publishing Conflicts
+
+Move Duplicate Groups into Marketplace.
+
+New collapsible panel:
+
+Publishing Conflicts
+
+DealerPilot automatically prevents inventory self-competition.
+
+Show:
+
+20 duplicate groups detected
+
+41 vehicles protected
+
+Estimated visibility improvement:
++18%
+
+Button:
+
+View Duplicate Groups →
+
+Collapsed by default.
+
+3. Duplicate Manager
+
+Clicking "View Duplicate Groups" opens a dedicated page.
+
+Each group becomes:
+
+TESLA MODEL Y
+
+Publish
+
+2020 Tesla Model Y
+
+Reason:
+
+Lowest price
+
+20 photos
+
+Highest Opportunity Score
+
+Highest AI Creative Score
+
+Highest Buyer Segment Match
+
+Hold
+
+2023 Tesla Model Y
+
+Reason:
+
+Too similar
+
+Would compete with published listing
+
+Hold
+
+2022 Tesla Model Y
+
+Reason:
+
+Lower Opportunity Score
+
+...
+
+Operator can manually override.
+
+4. Replace that space inside Command Center
+
+The empty area should become:
+
+Today's Publishing Strategy
+
+Instead of:
+
+Duplicate Groups
+
+show:
+
+Rank
+
+Vehicle
+
+Opportunity
+
+Audience
+
+Reason
+
+Action
+
+Example:
+
+#1
+
+2025 Toyota Tacoma
+
+Opportunity
+
+95
+
+Audience
+
+Spanish Families
+
+Reason
+
+Highest truck demand this week
+
+Publish
+
+#2
+
+2024 Honda CR-V
+
+Opportunity
+
+94
+
+Audience
+
+Families
+
+Reason
+
+Lowest mileage
+
+Publish
+
+#3
+
+2022 RAV4
+
+Opportunity
+
+93
+
+Audience
+
+Latino Families
+
+Reason
+
+Strong Facebook demand
+
+Publish
+
+...
+
+Show Top 10.
+
+Not Top 3.
+
+5. Executive Summary
+
+Above the table:
+
+Today's Strategy
+
+DealerPilot analyzed:
+
+312 vehicles
+
+Selected:
+
+10
+
+Protected:
+
+41 duplicates
+
+Skipped:
+
+261 lower opportunities
+
+Expected reach:
+
+Highest possible
+
+One sentence:
+
+DealerPilot recommends publishing these 10 vehicles today based on buyer demand, inventory quality, pricing, and audience fit.
+
+6. Duplicate Groups become operational only
+
+Marketplace
+
+↓
+
+Publishing Conflicts
+
+↓
+
+Duplicate Manager
+
+The Command Center should never expose operational complexity.
+
+It only presents the final recommendation.
+
+7. Better conflict explanations
+
+Instead of:
+
+Chosen because:
+
+higher strategy confidence
+
+Use real explanations.
+
+Publish:
+
+2025 Tacoma
+
+Because:
+
+Opportunity Score 95
+
+Highest Latino Family demand
+
+Lowest mileage
+
+Excellent photos
+
+Below market price
+
+AI Creative Ready
+
+Hold:
+
+2024 Tacoma
+
+Because:
+
+Similar audience
+
+Would compete
+
+Publish after Tacoma expires
+
+8. Goal
+
+The Command Center must feel like Bloomberg Terminal meets Tesla Mission Control.
+
+Operators shouldn't have to think.
+
+DealerPilot should already have made the decision.
+
+También haría un cambio más ambicioso (Phase 2)
+
+Aquí es donde DealerPilot empieza a parecer una IA de verdad y no un dashboard.
+
+En vez de simplemente decir:
+
+"Publish Today"
+
+Que explique como un estratega humano.
+
+Ejemplo:
+
+Why Tacoma?
+
+Latino families and construction workers are showing the strongest demand this week. This Tacoma combines low mileage, competitive pricing, excellent photo quality, and one of the highest buyer-segment matches in your inventory. Publishing it now is expected to outperform other trucks.
+
+O para un Corolla:
+
+Affordable monthly payment, extremely broad buyer pool, excellent first-car option for Hispanic buyers, and strong historical engagement. This is one of today's safest listings to publish.
+
+Eso es lo que hace que el usuario diga: "esta IA realmente está pensando", en lugar de sentir que solo está ordenando números. Creo que esa es la siguiente evolución importante de DealerPilot.
