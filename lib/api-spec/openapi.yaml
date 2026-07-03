@@ -2229,6 +2229,10 @@ components:
         spacingMinutes: { type: integer }
         priority: { type: integer }
         notes: { type: string }
+        gmOverrides:
+          type: array
+          items: { type: integer }
+          description: Vehicle IDs the operator has explicitly acknowledged a HOLD/RECONSIDER decision for and is overriding
     BulkCreativeGenerateRequest:
       type: object
       required: [vehicleIds]

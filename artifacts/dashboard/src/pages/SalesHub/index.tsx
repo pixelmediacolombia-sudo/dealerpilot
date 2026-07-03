@@ -635,8 +635,9 @@ function HoldCard({ rec }: { rec: DailyVehicleRec }) {
 
 export function SalesHub() {
   const [, setLocation] = useLocation();
-  // Two-step publish flow: GM Coach → confirm → PublishNowModal
-  const [coachVehicle, setCoachVehicle] = useState<{ id: number; label: string; price: number | null } | null>(null);
+  // Two-step publish flow: GM Coach → confirm → PublishNowModal or batch add
+  // mode: "publish" → opens PublishNowModal; "batch" → does bulk-schedule add
+  const [coachVehicle, setCoachVehicle] = useState<{ id: number; label: string; price: number | null; mode: "publish" | "batch" } | null>(null);
   const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
   const [showHold, setShowHold] = useState(false);
 
@@ -672,27 +673,34 @@ export function SalesHub() {
     },
   });
 
-  // Open GM Coach first; the Coach calls this on confirm
+  // GM Coach called this on confirm — dispatch based on what flow opened the modal
   const handlePublishConfirmed = (vehicleId: number) => {
+    const mode = coachVehicle?.mode ?? "publish";
     setCoachVehicle(null);
-    setPublishNowVehicleId(vehicleId);
+    if (mode === "batch") {
+      // The operator explicitly confirmed the GM review — pass the vehicleId as an override
+      // so the API guardrail knows this is an acknowledged decision
+      bulkSchedule.mutate(
+        { data: { vehicleIds: [vehicleId], spacingMinutes: 30, gmOverrides: [vehicleId] } },
+        { onSuccess: () => toast({ title: "Added to batch" }) },
+      );
+    } else {
+      setPublishNowVehicleId(vehicleId);
+    }
   };
 
-  // Clicking "Publish" on any row opens the GM Coach review gate
-  const handlePublish = (vehicleId: number) => {
+  // Helper: open GM Coach for a given vehicle (reused by Publish, Add to Batch, and Publish Next Best)
+  const openCoach = (vehicleId: number, mode: "publish" | "batch") => {
     const all = plan ? [...plan.recommendedToday, ...plan.nextBest] : [];
     const rec = all.find(r => r.vehicleId === vehicleId);
-    setCoachVehicle({
-      id: vehicleId,
-      label: rec?.label ?? "Vehicle",
-      price: rec?.actualPrice ?? null,
-    });
+    setCoachVehicle({ id: vehicleId, label: rec?.label ?? "Vehicle", price: rec?.actualPrice ?? null, mode });
   };
-  const handleAddToBatch = (vehicleId: number) => {
-    bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } }, {
-      onSuccess: () => toast({ title: "Added to batch" }),
-    });
-  };
+
+  // Clicking "Publish" on any row gates through GM Coach → PublishNowModal
+  const handlePublish = (vehicleId: number) => openCoach(vehicleId, "publish");
+
+  // Clicking "Add to Batch" on any row gates through GM Coach first
+  const handleAddToBatch = (vehicleId: number) => openCoach(vehicleId, "batch");
 
   const plan = useMemo((): DailyMarketplacePlan | null => {
     if (!workspacesData?.workspaces || !recsData?.recommendations || !jobsData?.jobs) return null;
@@ -765,7 +773,7 @@ export function SalesHub() {
                 <Button
                   className="shrink-0 h-11 gap-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[14px] px-7 shadow-xl shadow-blue-500/20 rounded-xl mb-0.5"
                   disabled={!plan?.recommendedToday[0] || isLoading}
-                  onClick={() => plan?.recommendedToday[0] && setPublishNowVehicleId(plan.recommendedToday[0].vehicleId)}
+                  onClick={() => plan?.recommendedToday[0] && handlePublish(plan.recommendedToday[0].vehicleId)}
                 >
                   <UploadCloud className="w-4 h-4" />
                   Publish Next Best

@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
+import { getCachedGmDecision } from "./gm";
 import {
   db,
   vehiclesTable,
@@ -355,6 +356,8 @@ const CreateBatchBody = z.object({
   count: z.number().int().min(1).max(20).optional().default(4),
   scheduledAt: z.string().optional(),
   lotLocation: z.string().optional(),
+  // Vehicle IDs the operator has explicitly acknowledged and overridden a HOLD/RECONSIDER decision for
+  gmOverrides: z.array(z.number().int()).optional().default([]),
 });
 
 // POST /auto-publish/batches — select vehicles and create a publishing batch
@@ -364,7 +367,8 @@ router.post("/auto-publish/batches", async (req, res) => {
     res.status(400).json({ error: "Invalid batch request" });
     return;
   }
-  const { dealerId, mode, count, scheduledAt, lotLocation } = parsed.data;
+  const { dealerId, mode, count, scheduledAt, lotLocation, gmOverrides } = parsed.data;
+  const gmOverrideSet = new Set(gmOverrides);
 
   // Fetch active/ready vehicles for this dealer, optionally scoped to a lot location.
   const vehicles = await db
@@ -522,10 +526,38 @@ router.post("/auto-publish/batches", async (req, res) => {
       });
   }
 
-  const eligible = scored
+  const prioritySorted = scored
     .filter((s) => s.eligible)
     .sort((a, b) => b.priorityScore - a.priorityScore)
     .slice(0, count);
+
+  // ── GM Coach guardrail ──────────────────────────────────────────────────────
+  // Any vehicle the GM has flagged HOLD or RECONSIDER is blocked from batch
+  // publish unless the operator explicitly listed it in gmOverrides.
+  const gmBlocked: { vehicleId: number; label: string; recommendation: string; confidence: number }[] = [];
+  const eligible = prioritySorted.filter((s) => {
+    const gm = getCachedGmDecision(s.vehicle.id);
+    const label = `${s.vehicle.year ?? ""} ${s.vehicle.make} ${s.vehicle.model}`.trim();
+    const overridden = gmOverrideSet.has(s.vehicle.id);
+
+    req.log.info({
+      vehicleId: s.vehicle.id,
+      label,
+      gmRecommendation: gm?.recommendation ?? "NO_REVIEW",
+      gmConfidence: gm?.confidence ?? null,
+      gmOverride: overridden,
+    }, "GM guardrail batch check");
+
+    if (gm && (gm.recommendation === "HOLD" || gm.recommendation === "RECONSIDER") && !overridden) {
+      gmBlocked.push({ vehicleId: s.vehicle.id, label, recommendation: gm.recommendation, confidence: gm.confidence });
+      return false;
+    }
+    return true;
+  });
+
+  if (gmBlocked.length > 0) {
+    req.log.warn({ gmBlocked }, "Batch blocked vehicles due to GM Coach recommendation");
+  }
 
   const ineligible = scored.filter((s) => !s.eligible);
   const needsReviewCount = ineligible.length;
@@ -533,6 +565,7 @@ router.post("/auto-publish/batches", async (req, res) => {
   if (eligible.length === 0) {
     res.status(422).json({
       error: "No vehicles pass validation for publishing",
+      gmBlocked: gmBlocked.length > 0 ? gmBlocked : undefined,
       details: ineligible.slice(0, 5).map((s) => ({
         vehicleId: s.vehicle.id,
         label: `${s.vehicle.year ?? ""} ${s.vehicle.make} ${s.vehicle.model}`.trim(),

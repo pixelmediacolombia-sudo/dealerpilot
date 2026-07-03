@@ -12,4 +12,6 @@ export interface BulkScheduleRequest {
   spacingMinutes?: number;
   priority?: number;
   notes?: string;
+  /** Vehicle IDs the operator has explicitly acknowledged a HOLD/RECONSIDER decision for and is overriding */
+  gmOverrides?: number[];
 }

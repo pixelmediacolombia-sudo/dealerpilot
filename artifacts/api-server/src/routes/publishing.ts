@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
+import { getCachedGmDecision } from "./gm";
 import {
   db,
   vehiclesTable,
@@ -813,6 +814,8 @@ const BulkScheduleBody = z.object({
   spacingMinutes: z.number().int().min(0).max(120).optional().default(30),
   priority: z.number().int().min(0).max(100).optional().default(50),
   notes: z.string().optional(),
+  // Vehicle IDs the operator has explicitly acknowledged and overridden a HOLD/RECONSIDER decision for
+  gmOverrides: z.array(z.number().int()).optional().default([]),
 });
 
 router.post("/publishing/bulk-schedule", async (req, res) => {
@@ -821,7 +824,8 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
     res.status(400).json({ error: "Invalid bulk-schedule request" });
     return;
   }
-  const { vehicleIds, scheduledAt: scheduledAtStr, spacingMinutes, priority, notes: _notes } = parsed.data;
+  const { vehicleIds, scheduledAt: scheduledAtStr, spacingMinutes, priority, notes: _notes, gmOverrides } = parsed.data;
+  const gmOverrideSet = new Set(gmOverrides);
 
   const vehicles = await db
     .select()
@@ -845,8 +849,35 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
 
-  const eligible = vehicles.filter((v) => !alreadyQueued.has(v.id));
-  const skipped = vehicles.length - eligible.length;
+  // ── GM Coach guardrail ──────────────────────────────────────────────────────
+  // Block any vehicle the GM has flagged HOLD or RECONSIDER unless the operator
+  // explicitly acknowledged and overrode the decision.
+  const gmBlocked: { vehicleId: number; recommendation: string; confidence: number }[] = [];
+  const eligible = vehicles.filter((v) => {
+    if (alreadyQueued.has(v.id)) return false;
+    const gm = getCachedGmDecision(v.id);
+    const overridden = gmOverrideSet.has(v.id);
+
+    req.log.info({
+      vehicleId: v.id,
+      gmRecommendation: gm?.recommendation ?? "NO_REVIEW",
+      gmConfidence: gm?.confidence ?? null,
+      gmOverride: overridden,
+      finalPublish: !gm || gm.recommendation === "PUBLISH" || overridden,
+    }, "GM guardrail bulk-schedule check");
+
+    if (gm && (gm.recommendation === "HOLD" || gm.recommendation === "RECONSIDER") && !overridden) {
+      gmBlocked.push({ vehicleId: v.id, recommendation: gm.recommendation, confidence: gm.confidence });
+      return false;
+    }
+    return true;
+  });
+
+  if (gmBlocked.length > 0) {
+    req.log.warn({ gmBlocked }, "Bulk-schedule blocked vehicles due to GM Coach recommendation");
+  }
+
+  const skipped = vehicles.length - eligible.length - gmBlocked.length;
 
   if (eligible.length === 0) {
     res.status(202).json({ enqueued: 0, skipped });

@@ -17,6 +17,16 @@ const DEALER_ID = 1;
 const analysisCache = new Map<number, { result: GmAnalysisResult; expiresAt: number }>();
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
+/**
+ * Read-only accessor for other route modules (e.g. batch creation guardrail).
+ * Returns the cached GM decision if still valid, or null if absent/expired.
+ */
+export function getCachedGmDecision(vehicleId: number): GmAnalysisResult | null {
+  const entry = analysisCache.get(vehicleId);
+  if (!entry || Date.now() > entry.expiresAt) return null;
+  return entry.result;
+}
+
 interface GmAnalysisResult {
   vehicleId: number;
   recommendation: "PUBLISH" | "HOLD" | "RECONSIDER";

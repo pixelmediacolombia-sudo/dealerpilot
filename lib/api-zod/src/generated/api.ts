@@ -1595,7 +1595,8 @@ export const BulkSchedulePublishingBody = zod.object({
   "scheduledAt": zod.string().optional(),
   "spacingMinutes": zod.number().optional(),
   "priority": zod.number().optional(),
-  "notes": zod.string().optional()
+  "notes": zod.string().optional(),
+  "gmOverrides": zod.array(zod.number()).optional().describe('Vehicle IDs the operator has explicitly acknowledged a HOLD\/RECONSIDER decision for and is overriding')
 })
 
 export const BulkSchedulePublishingResponse = zod.object({
