@@ -421,7 +421,8 @@ export function VehicleDetail() {
               {intel && (
                 <SectionCard
                   title="Strategy"
-                  icon={<Brain className="w-4 h-4 text-cyan-400" />}
+                  module="inventory"
+                  icon={Brain}
                 >
                   <div className="space-y-4">
                     {/* Confidence */}

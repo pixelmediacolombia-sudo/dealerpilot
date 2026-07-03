@@ -510,6 +510,7 @@ export function AIPhotoStudio() {
       <div className="max-w-5xl mx-auto px-6 py-6 space-y-8">
         <PageHeader
           eyebrow="AI Photo Studio"
+          module="photo-studio"
           title="AI Photo Studio"
           icon={Camera}
           action={

@@ -210,6 +210,7 @@ export function DealerDna() {
         <div className="p-8 max-w-7xl mx-auto w-full flex-1 overflow-y-auto animate-in fade-in duration-500">
           <PageHeader
             eyebrow="Dealer DNA"
+            module="dealer-dna"
             title={<>Dealer <span className="text-orange-400">DNA</span></>}
             description="Brand defaults that drive every creative DealerPilot generates."
             icon={Dna}
@@ -233,6 +234,7 @@ export function DealerDna() {
                 title={<span className="font-bold tracking-tight text-xl">Brand Colors</span>}
                 description="The colors DealerPilot uses to tint overlays and text in every creative."
                 icon={Palette}
+                module="dealer-dna"
                 className="border-white/5 bg-card/40 backdrop-blur-md"
               >
                 <div className="space-y-8 mt-2">
@@ -258,6 +260,7 @@ export function DealerDna() {
                 title={<span className="font-bold tracking-tight text-xl">Store Identity</span>}
                 description="Font and logo DealerPilot applies to your creatives."
                 icon={Type}
+                module="dealer-dna"
                 className="border-white/5 bg-card/40 backdrop-blur-md"
               >
                 <div className="space-y-8 mt-2">
@@ -298,6 +301,7 @@ export function DealerDna() {
                 title={<span className="font-bold tracking-tight text-xl">Offer Rules</span>}
                 description="Default style and layout DealerPilot uses for new creatives."
                 icon={LayoutTemplate}
+                module="dealer-dna"
                 className="border-white/5 bg-card/40 backdrop-blur-md"
               >
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-2">

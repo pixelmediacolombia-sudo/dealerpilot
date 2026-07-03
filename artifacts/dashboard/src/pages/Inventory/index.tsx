@@ -166,6 +166,7 @@ export function InventoryDashboard() {
 
           <PageHeader
             eyebrow="Inventory"
+            module="inventory"
             title="Inventory"
             description="Your complete vehicle catalog."
             action={
@@ -184,26 +185,29 @@ export function InventoryDashboard() {
             <KpiCard
               title="DealerPilot Catalog"
               value={stats?.total || 0}
-              icon={<Car className="w-4 h-4" />}
+              icon={Car}
               isLoading={statsLoading}
             />
             <KpiCard
               title="Active Inventory"
               value={stats?.active || 0}
-              icon={<Activity className="w-4 h-4 text-cyan-400" />}
+              module="inventory"
+              icon={Activity}
               trend={{ value: 12, isPositive: true }}
               isLoading={statsLoading}
             />
             <KpiCard
               title="Ready to Publish"
               value={stats?.readyToPublish || 0}
-              icon={<Tag className="w-4 h-4 text-cyan-400" />}
+              module="inventory"
+              icon={Tag}
               isLoading={statsLoading}
             />
             <KpiCard
               title="Live on Marketplace"
               value={stats?.published || 0}
-              icon={<Share className="w-4 h-4 text-success" />}
+              module="marketplace"
+              icon={Share}
               isLoading={statsLoading}
             />
           </div>

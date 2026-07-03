@@ -5,3 +5,4 @@ export * from "./EmptyState";
 export * from "./StatusPulse";
 export * from "./SectionCard";
 export * from "./renderIcon";
+export * from "@/design-system";

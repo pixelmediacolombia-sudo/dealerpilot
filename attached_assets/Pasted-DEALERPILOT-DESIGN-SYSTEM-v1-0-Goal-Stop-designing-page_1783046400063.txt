@@ -1,0 +1,290 @@
+DEALERPILOT DESIGN SYSTEM v1.0
+
+Goal:
+Stop designing page-by-page.
+Create one unified visual system for all current and future DealerPilot modules.
+
+Do not add features.
+Do not touch backend.
+This is product design system work only.
+
+====================================================
+1. Create a design system file
+====================================================
+
+Create:
+
+src/design-system/
+
+Include:
+- tokens.ts
+- typography.ts
+- colors.ts
+- spacing.ts
+- motion.ts
+- components.tsx
+
+All pages should use these shared tokens.
+
+====================================================
+2. Visual identity
+====================================================
+
+DealerPilot should feel like:
+
+AI operations cockpit
+premium dealership software
+Tesla service command center
+Linear-level polish
+Arc-level personality
+
+Not:
+generic shadcn dashboard
+random SaaS template
+Replit prototype
+
+====================================================
+3. Module color system
+====================================================
+
+Use official module accents everywhere:
+
+Command Center: electric blue
+Marketplace: green
+Inventory: cyan
+AI Photo Studio: amber/gold
+Sales AI: violet
+Dealer DNA: orange
+
+Create:
+
+getModuleTheme(module)
+
+Returns:
+- accent
+- accentSoft
+- border
+- glow
+- iconBg
+- textAccent
+
+====================================================
+4. Typography system
+====================================================
+
+Create fixed type scale:
+
+Display
+PageTitle
+SectionTitle
+CardTitle
+Body
+BodySmall
+Caption
+Metric
+
+Numbers should feel premium and strong.
+
+Metrics should use large, clean typography.
+
+====================================================
+5. Layout system
+====================================================
+
+Every major screen should follow:
+
+PageHeader
+Mission/KPI Strip
+Primary Workspace
+Secondary Workspace
+
+Do not invent custom structures per page unless necessary.
+
+Create reusable components:
+
+PageShell
+PageHeader
+KpiStrip
+WorkspaceSection
+ModuleCard
+MetricCard
+ActionBar
+
+====================================================
+6. Card system
+====================================================
+
+Only 3 card sizes:
+
+HeroCard
+StandardCard
+CompactCard
+
+Cards should have:
+- soft border
+- subtle gradient
+- module accent glow only when active
+- no heavy boxes
+- more whitespace
+
+====================================================
+7. Button system
+====================================================
+
+Only 4 button types:
+
+Primary
+Secondary
+Ghost
+Danger
+
+Primary button uses module accent.
+
+No random button colors.
+
+====================================================
+8. Badge system
+====================================================
+
+Create consistent badges:
+
+Success
+Warning
+Error
+Info
+Neutral
+Live
+Processing
+
+Live badge should have subtle pulse.
+
+Processing should animate softly.
+
+No aggressive animations.
+
+====================================================
+9. Motion system
+====================================================
+
+Motion durations:
+
+Fast: 150ms
+Normal: 250ms
+Slow: 400ms
+
+Use for:
+- hover
+- active card
+- processing state
+- published success
+- AI photo ready
+
+No distracting animations.
+
+====================================================
+10. Icon system
+====================================================
+
+Use one icon style only.
+
+Consistent:
+- stroke width
+- size
+- container shape
+- module color
+
+No mixed icon weights.
+
+====================================================
+11. Zero-state system
+====================================================
+
+Zero-value stats should be quiet.
+
+Rules:
+- dim icon
+- muted label
+- no bright color
+- no urgency style
+
+Only light up when action is needed.
+
+====================================================
+12. Live Pulse system
+====================================================
+
+Create a DealerPilot-specific visual language:
+
+LivePulse
+AIProcessingPulse
+PublishingPulse
+SyncPulse
+
+Small, premium, subtle.
+
+Use in:
+- Marketplace publishing
+- AI Photo Studio processing
+- Sales AI live monitoring
+- inventory sync
+
+====================================================
+13. Copy style
+====================================================
+
+Remove filler labels:
+- Strategy Engine
+- Real inventory
+- AI powered
+- DealerPilot AI everywhere
+
+Use operational language:
+- Ready
+- Publishing
+- Needs Review
+- Buyer Waiting
+- Photos Ready
+- Listing Live
+- Action Needed
+
+DealerPilot should sound like an operator, not a marketer.
+
+====================================================
+14. Apply system to current pages
+====================================================
+
+Update:
+
+Command Center
+Marketplace
+Inventory
+AI Photo Studio
+Sales AI
+Dealer DNA
+Vehicle Detail
+
+Each page must use:
+- PageShell
+- PageHeader
+- module theme
+- shared cards
+- shared buttons
+- shared badges
+- shared typography
+
+====================================================
+15. Acceptance
+====================================================
+
+After this:
+
+- all pages feel like one product
+- no default blue leaks into non-blue modules
+- no inconsistent card styles
+- no inconsistent buttons
+- no duplicated page structures
+- no random badge colors
+- zero states are quiet
+- live states feel premium
+- DealerPilot has its own visual language
+- future modules can be built from the design system

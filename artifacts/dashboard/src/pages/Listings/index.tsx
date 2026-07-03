@@ -552,6 +552,7 @@ export function ListingsWorkspace() {
         <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
           <PageHeader
             eyebrow="Marketplace"
+            module="marketplace"
             title="Marketplace"
             description={
               <div className="flex flex-col gap-3">
