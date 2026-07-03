@@ -1576,6 +1576,60 @@ export interface VehicleRecommendation {
   strategyEngineVersion?: string | null;
 }
 
+export interface GmAnalyzeRequest {
+  vehicleId: number;
+  /** @nullable */
+  priceDeltaPercent?: number | null;
+}
+
+export type GmAnalysisResultRecommendation = typeof GmAnalysisResultRecommendation[keyof typeof GmAnalysisResultRecommendation];
+
+
+export const GmAnalysisResultRecommendation = {
+  PUBLISH: 'PUBLISH',
+  HOLD: 'HOLD',
+  RECONSIDER: 'RECONSIDER',
+} as const;
+
+export interface GmAnalysisResult {
+  vehicleId: number;
+  recommendation: GmAnalysisResultRecommendation;
+  whyPublish: string;
+  /** @nullable */
+  riskWarning: string | null;
+  /** @nullable */
+  betterAlternative?: string | null;
+  hasBetterAlternative: boolean;
+  adAngle: string;
+  suggestedLanguage: string;
+  expectedImpact: string;
+  /** @nullable */
+  timingRecommendation?: string | null;
+  /** @nullable */
+  audienceOverlapWarning?: string | null;
+  /** @nullable */
+  duplicateConflictWarning?: string | null;
+  confidence: number;
+  cachedAt?: string;
+}
+
+export interface GmWhatIfRequest {
+  vehicleId: number;
+  priceDeltaPercent: number;
+}
+
+export interface GmWhatIfResult {
+  vehicleId: number;
+  currentPrice: number;
+  hypotheticalPrice: number;
+  priceDeltaPercent: number;
+  conversationsDeltaPct: number;
+  appointmentsDeltaPct: number;
+  saleProbabilityDelta: number;
+  confidence: number;
+  explanation: string;
+}
+
 export interface MarketplaceRecommendationsResponse {
   recommendations: VehicleRecommendation[];
 }

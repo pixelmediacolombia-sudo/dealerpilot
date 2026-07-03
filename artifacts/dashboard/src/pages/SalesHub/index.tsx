@@ -26,6 +26,7 @@ import {
 import { useDealerLocation } from "@/context/LocationContext";
 import { cn } from "@/lib/utils";
 import { PublishNowModal } from "@/components/PublishNowModal";
+import { GmCoachModal } from "@/components/GmCoachModal";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -634,6 +635,8 @@ function HoldCard({ rec }: { rec: DailyVehicleRec }) {
 
 export function SalesHub() {
   const [, setLocation] = useLocation();
+  // Two-step publish flow: GM Coach → confirm → PublishNowModal
+  const [coachVehicle, setCoachVehicle] = useState<{ id: number; label: string; price: number | null } | null>(null);
   const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
   const [showHold, setShowHold] = useState(false);
 
@@ -669,7 +672,22 @@ export function SalesHub() {
     },
   });
 
-  const handlePublish = (vehicleId: number) => setPublishNowVehicleId(vehicleId);
+  // Open GM Coach first; the Coach calls this on confirm
+  const handlePublishConfirmed = (vehicleId: number) => {
+    setCoachVehicle(null);
+    setPublishNowVehicleId(vehicleId);
+  };
+
+  // Clicking "Publish" on any row opens the GM Coach review gate
+  const handlePublish = (vehicleId: number) => {
+    const all = plan ? [...plan.recommendedToday, ...plan.nextBest] : [];
+    const rec = all.find(r => r.vehicleId === vehicleId);
+    setCoachVehicle({
+      id: vehicleId,
+      label: rec?.label ?? "Vehicle",
+      price: rec?.actualPrice ?? null,
+    });
+  };
   const handleAddToBatch = (vehicleId: number) => {
     bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } }, {
       onSuccess: () => toast({ title: "Added to batch" }),
@@ -887,6 +905,13 @@ export function SalesHub() {
         </div>
 
       </div>
+      <GmCoachModal
+        vehicleId={coachVehicle?.id ?? null}
+        vehicleLabel={coachVehicle?.label}
+        vehiclePrice={coachVehicle?.price}
+        onConfirmPublish={handlePublishConfirmed}
+        onClose={() => setCoachVehicle(null)}
+      />
       <PublishNowModal vehicleId={publishNowVehicleId} onClose={() => setPublishNowVehicleId(null)} />
     </AppLayout>
   );

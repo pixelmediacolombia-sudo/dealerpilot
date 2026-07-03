@@ -9,6 +9,60 @@ import * as zod from 'zod';
 
 
 /**
+ * Calls OpenAI to reason over real vehicle data and returns a GM-style
+ * recommendation — why publish, risk warnings, alternatives, ad angle,
+ * language recommendation, and expected impact. OpenAI never invents data;
+ * all inputs come from the Opportunity Engine.
+ * @summary AI GM pre-publish analysis
+ */
+export const GmAnalyzeVehicleBody = zod.object({
+  "vehicleId": zod.number(),
+  "priceDeltaPercent": zod.number().nullish()
+})
+
+export const GmAnalyzeVehicleResponse = zod.object({
+  "vehicleId": zod.number(),
+  "recommendation": zod.enum(['PUBLISH', 'HOLD', 'RECONSIDER']),
+  "whyPublish": zod.string(),
+  "riskWarning": zod.string().nullable(),
+  "betterAlternative": zod.string().nullish(),
+  "hasBetterAlternative": zod.boolean(),
+  "adAngle": zod.string(),
+  "suggestedLanguage": zod.string(),
+  "expectedImpact": zod.string(),
+  "timingRecommendation": zod.string().nullish(),
+  "audienceOverlapWarning": zod.string().nullish(),
+  "duplicateConflictWarning": zod.string().nullish(),
+  "confidence": zod.number(),
+  "cachedAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * Given a vehicle and a hypothetical price delta, returns a GM-style
+ * prediction of the impact on conversations, appointments, and sale
+ * probability. All deterministic from opportunity data; no OpenAI call.
+ * @summary AI GM what-if price analysis
+ */
+export const GmWhatIfBody = zod.object({
+  "vehicleId": zod.number(),
+  "priceDeltaPercent": zod.number()
+})
+
+export const GmWhatIfResponse = zod.object({
+  "vehicleId": zod.number(),
+  "currentPrice": zod.number(),
+  "hypotheticalPrice": zod.number(),
+  "priceDeltaPercent": zod.number(),
+  "conversationsDeltaPct": zod.number(),
+  "appointmentsDeltaPct": zod.number(),
+  "saleProbabilityDelta": zod.number(),
+  "confidence": zod.number(),
+  "explanation": zod.string()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

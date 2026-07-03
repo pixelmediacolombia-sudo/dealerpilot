@@ -26,7 +26,62 @@ tags:
     description: Creative Intelligence Engine
   - name: MarketplaceIntelligence
     description: Marketplace Intelligence Engine — listing performance and strategy
+  - name: gm
+    description: AI General Manager — pre-publish coaching and what-if analysis
 paths:
+  /gm/analyze:
+    post:
+      operationId: gmAnalyzeVehicle
+      tags: [gm]
+      summary: AI GM pre-publish analysis
+      description: |
+        Calls OpenAI to reason over real vehicle data and returns a GM-style
+        recommendation — why publish, risk warnings, alternatives, ad angle,
+        language recommendation, and expected impact. OpenAI never invents data;
+        all inputs come from the Opportunity Engine.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GmAnalyzeRequest"
+      responses:
+        "200":
+          description: GM analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GmAnalysisResult"
+        "422":
+          description: Missing required vehicle data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /gm/whatif:
+    post:
+      operationId: gmWhatIf
+      tags: [gm]
+      summary: AI GM what-if price analysis
+      description: |
+        Given a vehicle and a hypothetical price delta, returns a GM-style
+        prediction of the impact on conversations, appointments, and sale
+        probability. All deterministic from opportunity data; no OpenAI call.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GmWhatIfRequest"
+      responses:
+        "200":
+          description: What-if result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GmWhatIfResult"
+
   /healthz:
     get:
       operationId: healthCheck
@@ -3783,6 +3838,53 @@ components:
         expectedImpact: { type: ["string", "null"] }
         actionCta: { type: ["string", "null"] }
         strategyEngineVersion: { type: ["string", "null"] }
+
+    GmAnalyzeRequest:
+      type: object
+      required: [vehicleId]
+      properties:
+        vehicleId: { type: integer }
+        priceDeltaPercent: { type: ["number", "null"] }
+
+    GmAnalysisResult:
+      type: object
+      required: [vehicleId, recommendation, whyPublish, riskWarning, adAngle, suggestedLanguage, expectedImpact, confidence, hasBetterAlternative]
+      properties:
+        vehicleId: { type: integer }
+        recommendation: { type: string, enum: [PUBLISH, HOLD, RECONSIDER] }
+        whyPublish: { type: string }
+        riskWarning: { type: ["string", "null"] }
+        betterAlternative: { type: ["string", "null"] }
+        hasBetterAlternative: { type: boolean }
+        adAngle: { type: string }
+        suggestedLanguage: { type: string }
+        expectedImpact: { type: string }
+        timingRecommendation: { type: ["string", "null"] }
+        audienceOverlapWarning: { type: ["string", "null"] }
+        duplicateConflictWarning: { type: ["string", "null"] }
+        confidence: { type: integer }
+        cachedAt: { type: string, format: date-time }
+
+    GmWhatIfRequest:
+      type: object
+      required: [vehicleId, priceDeltaPercent]
+      properties:
+        vehicleId: { type: integer }
+        priceDeltaPercent: { type: number }
+
+    GmWhatIfResult:
+      type: object
+      required: [vehicleId, currentPrice, hypotheticalPrice, priceDeltaPercent, conversationsDeltaPct, appointmentsDeltaPct, saleProbabilityDelta, confidence, explanation]
+      properties:
+        vehicleId: { type: integer }
+        currentPrice: { type: integer }
+        hypotheticalPrice: { type: integer }
+        priceDeltaPercent: { type: number }
+        conversationsDeltaPct: { type: number }
+        appointmentsDeltaPct: { type: number }
+        saleProbabilityDelta: { type: number }
+        confidence: { type: integer }
+        explanation: { type: string }
 
     MarketplaceRecommendationsResponse:
       type: object

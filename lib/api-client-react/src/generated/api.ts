@@ -77,6 +77,10 @@ import type {
   GetLaunchChecklistParams,
   GetPublishingJobProgress200,
   GetVehicleStatsParams,
+  GmAnalysisResult,
+  GmAnalyzeRequest,
+  GmWhatIfRequest,
+  GmWhatIfResult,
   HealthStatus,
   HeartbeatInput,
   LaunchChecklistResponse,
@@ -176,6 +180,153 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGmAnalyzeVehicleUrl = () => {
+
+
+
+
+  return `/api/gm/analyze`
+}
+
+/**
+ * Calls OpenAI to reason over real vehicle data and returns a GM-style
+ * recommendation — why publish, risk warnings, alternatives, ad angle,
+ * language recommendation, and expected impact. OpenAI never invents data;
+ * all inputs come from the Opportunity Engine.
+ * @summary AI GM pre-publish analysis
+ */
+export const gmAnalyzeVehicle = async (gmAnalyzeRequest: GmAnalyzeRequest, options?: RequestInit): Promise<GmAnalysisResult> => {
+
+  return customFetch<GmAnalysisResult>(getGmAnalyzeVehicleUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(gmAnalyzeRequest)
+  }
+);}
+
+
+
+
+export const getGmAnalyzeVehicleMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gmAnalyzeVehicle>>, TError,{data: BodyType<GmAnalyzeRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof gmAnalyzeVehicle>>, TError,{data: BodyType<GmAnalyzeRequest>}, TContext> => {
+
+const mutationKey = ['gmAnalyzeVehicle'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof gmAnalyzeVehicle>>, {data: BodyType<GmAnalyzeRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  gmAnalyzeVehicle(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GmAnalyzeVehicleMutationResult = NonNullable<Awaited<ReturnType<typeof gmAnalyzeVehicle>>>
+    export type GmAnalyzeVehicleMutationBody = BodyType<GmAnalyzeRequest>
+    export type GmAnalyzeVehicleMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary AI GM pre-publish analysis
+ */
+export const useGmAnalyzeVehicle = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gmAnalyzeVehicle>>, TError,{data: BodyType<GmAnalyzeRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof gmAnalyzeVehicle>>,
+        TError,
+        {data: BodyType<GmAnalyzeRequest>},
+        TContext
+      > => {
+      return useMutation(getGmAnalyzeVehicleMutationOptions(options));
+    }
+
+export const getGmWhatIfUrl = () => {
+
+
+
+
+  return `/api/gm/whatif`
+}
+
+/**
+ * Given a vehicle and a hypothetical price delta, returns a GM-style
+ * prediction of the impact on conversations, appointments, and sale
+ * probability. All deterministic from opportunity data; no OpenAI call.
+ * @summary AI GM what-if price analysis
+ */
+export const gmWhatIf = async (gmWhatIfRequest: GmWhatIfRequest, options?: RequestInit): Promise<GmWhatIfResult> => {
+
+  return customFetch<GmWhatIfResult>(getGmWhatIfUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(gmWhatIfRequest)
+  }
+);}
+
+
+
+
+export const getGmWhatIfMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gmWhatIf>>, TError,{data: BodyType<GmWhatIfRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof gmWhatIf>>, TError,{data: BodyType<GmWhatIfRequest>}, TContext> => {
+
+const mutationKey = ['gmWhatIf'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof gmWhatIf>>, {data: BodyType<GmWhatIfRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  gmWhatIf(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GmWhatIfMutationResult = NonNullable<Awaited<ReturnType<typeof gmWhatIf>>>
+    export type GmWhatIfMutationBody = BodyType<GmWhatIfRequest>
+    export type GmWhatIfMutationError = ErrorType<unknown>
+
+    /**
+ * @summary AI GM what-if price analysis
+ */
+export const useGmWhatIf = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gmWhatIf>>, TError,{data: BodyType<GmWhatIfRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof gmWhatIf>>,
+        TError,
+        {data: BodyType<GmWhatIfRequest>},
+        TContext
+      > => {
+      return useMutation(getGmWhatIfMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 
