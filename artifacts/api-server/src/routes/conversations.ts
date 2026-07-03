@@ -430,7 +430,38 @@ router.get("/conversations", async (req, res) => {
         .where(eq(conversationMessagesTable.conversationId, c.id))
         .orderBy(desc(conversationMessagesTable.createdAt))
         .limit(1);
-      return { ...c, lead: lead ?? null, lastMessage: messages[0] ?? null };
+
+      let vehicle = null;
+      if (c.vehicleId) {
+        const [v] = await db
+          .select({
+            id: vehiclesTable.id,
+            year: vehiclesTable.year,
+            make: vehiclesTable.make,
+            model: vehiclesTable.model,
+            trim: vehiclesTable.trim,
+            price: vehiclesTable.price,
+            mileage: vehiclesTable.mileage,
+            stockNumber: vehiclesTable.stockNumber,
+            status: vehiclesTable.status,
+          })
+          .from(vehiclesTable)
+          .where(eq(vehiclesTable.id, c.vehicleId))
+          .limit(1);
+        vehicle = v ?? null;
+      }
+
+      let listingUrl: string | null = null;
+      if (c.listingId) {
+        const [listing] = await db
+          .select({ listingUrl: listingsTable.listingUrl })
+          .from(listingsTable)
+          .where(eq(listingsTable.id, c.listingId))
+          .limit(1);
+        listingUrl = listing?.listingUrl ?? null;
+      }
+
+      return { ...c, lead: lead ?? null, lastMessage: messages[0] ?? null, vehicle, listingUrl };
     }),
   );
 
@@ -461,7 +492,37 @@ router.get("/conversations/:id", async (req, res) => {
     .where(eq(leadsTable.conversationId, id))
     .limit(1);
 
-  res.json({ conversation: conv, messages, lead: lead ?? null });
+  let vehicle = null;
+  if (conv.vehicleId) {
+    const [v] = await db
+      .select({
+        id: vehiclesTable.id,
+        year: vehiclesTable.year,
+        make: vehiclesTable.make,
+        model: vehiclesTable.model,
+        trim: vehiclesTable.trim,
+        price: vehiclesTable.price,
+        mileage: vehiclesTable.mileage,
+        stockNumber: vehiclesTable.stockNumber,
+        status: vehiclesTable.status,
+      })
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.id, conv.vehicleId))
+      .limit(1);
+    vehicle = v ?? null;
+  }
+
+  let listingUrl: string | null = null;
+  if (conv.listingId) {
+    const [listing] = await db
+      .select({ listingUrl: listingsTable.listingUrl })
+      .from(listingsTable)
+      .where(eq(listingsTable.id, conv.listingId))
+      .limit(1);
+    listingUrl = listing?.listingUrl ?? null;
+  }
+
+  res.json({ conversation: conv, messages, lead: lead ?? null, vehicle, listingUrl });
 });
 
 router.patch("/conversations/:id/status", async (req, res) => {
