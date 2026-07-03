@@ -4,11 +4,12 @@ import { useDealerLocation } from "@/context/LocationContext";
 import { PageHeader } from "@/components/shared";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
+import { PublishNowModal } from "@/components/PublishNowModal";
 import {
   Flame, TrendingDown, DollarSign, Clock, MapPin, BarChart3,
   Car, Zap, Star, ChevronRight, RefreshCw, ArrowUp, ArrowDown,
   Minus, Target, Trophy, AlertTriangle, Calendar, Camera,
-  SendHorizontal, Eye, CheckCircle2,
+  SendHorizontal, Eye, CheckCircle2, ImageIcon, UploadCloud,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ interface OpportunityVehicle {
   status: string;
   lotLocation: string | null;
   thumbnailUrl: string | null;
+  photoCount: number;
   missingPrice: boolean;
   opportunityScore: number;
   opportunityLabel: OpportunityLabel;
@@ -242,29 +244,90 @@ function SubScoreBar({
   );
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function langBadgeCls(lang: string): string {
+  if (lang === "Spanish-first") return "bg-orange-500/15 text-orange-400 border-orange-500/25";
+  if (lang === "Bilingual") return "bg-teal-500/15 text-teal-400 border-teal-500/25";
+  return "bg-white/[0.05] text-white/30 border-white/10";
+}
+
+function segBadgeCls(seg: string): string {
+  const s = seg.toLowerCase();
+  if (s.includes("spanish")) return "bg-orange-500/15 text-orange-400 border-orange-500/25";
+  if (s.includes("ev") || s.includes("tech")) return "bg-cyan-500/15 text-cyan-400 border-cyan-500/25";
+  if (s.includes("truck") || s.includes("work")) return "bg-amber-500/15 text-amber-400 border-amber-500/25";
+  if (s.includes("family") || s.includes("suv")) return "bg-violet-500/15 text-violet-400 border-violet-500/25";
+  if (s.includes("payment") || s.includes("affordable")) return "bg-green-500/15 text-green-400 border-green-500/25";
+  return "bg-white/[0.05] text-white/25 border-white/10";
+}
+
+// ── Diversity guardrails (mirrors dailyPlan.ts logic for the Marketplace view) ─
+
+const MAINSTREAM_MAKES_MI = new Set([
+  "toyota", "honda", "ford", "chevrolet", "chevy", "gmc",
+  "ram", "nissan", "hyundai", "kia", "subaru", "mazda",
+]);
+const EV_MAKES_MI = new Set(["tesla", "rivian", "lucid", "polestar", "fisker"]);
+
+function applyDiversityTop10(sorted: OpportunityVehicle[]): OpportunityVehicle[] {
+  const modelSlots = new Map<string, number>();
+  let evCount = 0;
+  let mainstreamCount = 0;
+  const top10: OpportunityVehicle[] = [];
+  const deferred: OpportunityVehicle[] = [];
+
+  for (const v of sorted) {
+    const modelKey = `${v.make.toLowerCase()}_${v.model.toLowerCase()}`;
+    const slotsTaken = modelSlots.get(modelKey) ?? 0;
+    const isEV = EV_MAKES_MI.has(v.make.toLowerCase()) || v.primarySegment.toLowerCase().includes("ev");
+    if (top10.length >= 10) { deferred.push(v); continue; }
+    if (slotsTaken >= 2) { deferred.push(v); continue; }
+    if (isEV && evCount >= 3 && v.opportunityScore < 90) { deferred.push(v); continue; }
+    top10.push(v);
+    modelSlots.set(modelKey, slotsTaken + 1);
+    if (isEV) evCount++;
+    if (MAINSTREAM_MAKES_MI.has(v.make.toLowerCase())) mainstreamCount++;
+  }
+
+  // Mainstream backfill
+  if (mainstreamCount < 3) {
+    for (const v of deferred) {
+      if (top10.length >= 10 || mainstreamCount >= 3) break;
+      if (!MAINSTREAM_MAKES_MI.has(v.make.toLowerCase())) continue;
+      const modelKey = `${v.make.toLowerCase()}_${v.model.toLowerCase()}`;
+      if ((modelSlots.get(modelKey) ?? 0) >= 2) continue;
+      top10.push(v);
+      modelSlots.set(modelKey, (modelSlots.get(modelKey) ?? 0) + 1);
+      mainstreamCount++;
+    }
+  }
+  return top10;
+}
+
 // ── Vehicle Row ───────────────────────────────────────────────────────────────
 
 function VehicleRow({
   vehicle,
   rank,
-  showSubScores,
+  onPublish,
 }: {
   vehicle: OpportunityVehicle;
   rank: number;
-  showSubScores?: boolean;
+  onPublish?: (id: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const name = `${vehicle.year ?? ""} ${vehicle.make} ${vehicle.model}`.trim();
+  const hasSegment = vehicle.primarySegment && vehicle.primarySegment !== "General";
 
   return (
     <div
       className={cn(
-        "border-b border-white/[0.04] last:border-0 transition-colors hover:bg-white/[0.015] cursor-pointer",
+        "border-b border-white/[0.04] last:border-0 transition-colors hover:bg-white/[0.015]",
         vehicle.opportunityScore >= 80 && "border-l-2 border-l-green-500/40",
         vehicle.opportunityScore >= 65 && vehicle.opportunityScore < 80 && "border-l-2 border-l-amber-500/30",
         vehicle.daysOnLot >= 90 && "border-l-2 border-l-red-500/30",
       )}
-      onClick={() => setExpanded((e) => !e)}
     >
       <div className="flex items-center gap-4 px-5 py-3.5">
         {/* Rank */}
@@ -287,41 +350,51 @@ function VehicleRow({
         </div>
 
         {/* Vehicle info */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpanded((e) => !e)}>
+          {/* Inline badges */}
+          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+            {hasSegment && (
+              <span className={cn("text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-[0.14em] shrink-0", segBadgeCls(vehicle.primarySegment))}>
+                {vehicle.primarySegment}
+              </span>
+            )}
+            {vehicle.suggestedLanguage && vehicle.suggestedLanguage !== "English-first" && (
+              <span className={cn("text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-[0.14em] shrink-0", langBadgeCls(vehicle.suggestedLanguage))}>
+                {vehicle.suggestedLanguage}
+              </span>
+            )}
+          </div>
           <p className="text-[13px] font-semibold text-white/80 truncate">{name}</p>
           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
             <span className="text-[11px] text-white/35 font-mono">
               {vehicle.price != null ? formatCurrency(vehicle.price) : "—"}
               {vehicle.mileage != null ? ` · ${vehicle.mileage.toLocaleString()} mi` : ""}
+              {` · ${vehicle.daysOnLot}d lot`}
             </span>
-            {vehicle.missingPrice && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                No Price
+            {vehicle.photoCount > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] text-white/20">
+                <ImageIcon className="w-2.5 h-2.5" />{vehicle.photoCount}
               </span>
-            )}
-            {vehicle.bodyStyle && (
-              <span className="text-[10px] text-white/20">{vehicle.bodyStyle}</span>
             )}
             {vehicle.lotLocation && (
               <span className="flex items-center gap-0.5 text-[10px] text-white/20">
                 <MapPin className="w-2.5 h-2.5" />{vehicle.lotLocation}
               </span>
             )}
+            {vehicle.missingPrice && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                No Price
+              </span>
+            )}
           </div>
-          {/* Factors */}
-          {vehicle.opportunityFactors.length > 0 && (
-            <div className="flex gap-1.5 mt-1.5 flex-wrap">
-              {vehicle.opportunityFactors.slice(0, 3).map((f, i) => (
-                <span key={i} className="text-[9px] font-black uppercase tracking-[0.18em] text-white/30 border border-white/[0.06] rounded px-1.5 py-0.5">
-                  {f}
-                </span>
-              ))}
-            </div>
+          {/* Ad angle */}
+          {vehicle.adAngle && (
+            <p className="text-[10px] text-white/25 italic truncate mt-0.5">"{vehicle.adAngle}"</p>
           )}
         </div>
 
-        {/* Opportunity Score + Label */}
-        <div className="shrink-0 flex flex-col items-center gap-1 w-20">
+        {/* Opportunity Score */}
+        <div className="shrink-0 flex flex-col items-center gap-1 w-16" onClick={() => setExpanded((e) => !e)}>
           <Stars score={vehicle.opportunityScore} />
           <div className={cn("text-2xl font-black tabular-nums leading-none", scoreColor(vehicle.opportunityScore))}>
             {vehicle.opportunityScore}
@@ -329,24 +402,33 @@ function VehicleRow({
           <span className={cn("text-[8px] font-black uppercase tracking-[0.2em]", labelColor(vehicle.opportunityLabel))}>
             {vehicle.opportunityLabel}
           </span>
-          <div className="h-[2px] w-16 bg-white/[0.06] rounded-full overflow-hidden mt-0.5">
-            <div className={cn("h-full rounded-full", scoreBg(vehicle.opportunityScore))}
-              style={{ width: `${vehicle.opportunityScore}%` }} />
-          </div>
         </div>
 
-        {/* Recommended Action + pricing */}
+        {/* Actions */}
         <div className="shrink-0 hidden md:flex flex-col items-end gap-1.5">
-          <ActionBadge action={vehicle.recommendedAction} />
+          {onPublish && vehicle.recommendedAction === "Publish Today" ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPublish(vehicle.vehicleId); }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-500/15 border border-green-500/25 text-green-400 text-[10px] font-black uppercase tracking-[0.14em] hover:bg-green-500/25 transition-colors"
+            >
+              <UploadCloud className="w-3 h-3" />
+              Publish Today
+            </button>
+          ) : (
+            <ActionBadge action={vehicle.recommendedAction} />
+          )}
           <div className="flex items-center gap-1">
             {pricingIcon(vehicle.pricingPosition)}
             <span className={cn("text-[9px] font-mono", pricingColor(vehicle.pricingPosition))}>
-              {vehicle.daysOnLot}d lot
+              {vehicle.pricingPosition === "Below Market" ? "below mkt" : vehicle.pricingPosition === "Above Market" ? "above mkt" : "at mkt"}
             </span>
           </div>
         </div>
 
-        <ChevronRight className={cn("w-3.5 h-3.5 text-white/15 shrink-0 transition-transform", expanded && "rotate-90")} />
+        <ChevronRight
+          className={cn("w-3.5 h-3.5 text-white/15 shrink-0 transition-transform cursor-pointer", expanded && "rotate-90")}
+          onClick={() => setExpanded((e) => !e)}
+        />
       </div>
 
       {/* Expanded: reason bullets + sub-score bars */}
@@ -559,6 +641,7 @@ export default function MarketIntelligencePage() {
   const { data, loading, error, refresh } = useOpportunityData();
   const [activeSection, setActiveSection] = useState<ActiveSection>("opportunities");
   const [refreshing, setRefreshing] = useState(false);
+  const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
 
   const ins = data?.insights;
   const sections = data?.sections;
@@ -685,24 +768,34 @@ export default function MarketIntelligencePage() {
               {/* ── Best Opportunities tab ────────────────────────────────── */}
               {activeSection === "opportunities" && (
                 <div className="space-y-8">
-                  {/* Hot Vehicles — top opportunity scores */}
-                  <Section
-                    icon={Flame}
-                    eyebrow="HIGH OPPORTUNITY"
-                    title="Hot Vehicles"
-                    accentColor="text-green-400"
-                    count={sections?.hot.length ?? 0}
-                  >
-                    {sections?.hot.length === 0 ? (
-                      <div className="px-5 py-8 text-center text-white/30 text-sm">
-                        No vehicles scored yet — scores are computed on startup.
-                      </div>
-                    ) : (
-                      sections?.hot.map((v, i) => (
-                        <VehicleRow key={v.vehicleId} vehicle={v} rank={i + 1} />
-                      ))
-                    )}
-                  </Section>
+                  {/* Hot Vehicles — diversity-guardrailed Top 10 */}
+                  {(() => {
+                    const diverseTop10 = applyDiversityTop10(data.vehicles);
+                    return (
+                      <Section
+                        icon={Flame}
+                        eyebrow="TODAY'S SELLING PLAN · DIVERSITY BALANCED"
+                        title="Top 10 Opportunity Queue"
+                        accentColor="text-green-400"
+                        count={diverseTop10.length}
+                      >
+                        {diverseTop10.length === 0 ? (
+                          <div className="px-5 py-8 text-center text-white/30 text-sm">
+                            No vehicles scored yet — scores are computed on startup.
+                          </div>
+                        ) : (
+                          diverseTop10.map((v, i) => (
+                            <VehicleRow
+                              key={v.vehicleId}
+                              vehicle={v}
+                              rank={i + 1}
+                              onPublish={setPublishNowVehicleId}
+                            />
+                          ))
+                        )}
+                      </Section>
+                    );
+                  })()}
 
                   {/* Fastest Sellers — high dealer performance score */}
                   <Section
@@ -960,6 +1053,10 @@ export default function MarketIntelligencePage() {
           )}
         </div>
       </div>
+      <PublishNowModal
+        vehicleId={publishNowVehicleId}
+        onClose={() => setPublishNowVehicleId(null)}
+      />
     </AppLayout>
   );
 }

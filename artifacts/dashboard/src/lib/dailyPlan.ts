@@ -60,6 +60,8 @@ export type PlanRecommendation = {
   model: string;
   year?: number | null;
   price?: number | null;
+  mileage?: number | null;
+  photoCount?: number | null;
   confidenceScore: number;
   strategyName?: string | null;
   reason?: string | null;
@@ -95,6 +97,7 @@ export type DailyVehicleRec = {
   marketplacePrice: number | null;
   priceMode: "FULL_PRICE" | "DOWN_PAYMENT";
   recommendedDownPayment: number | null;
+  mileage: number | null;
   imageCount: number;
   strategyName: string | null;
   reasons: string[];
@@ -128,7 +131,8 @@ export type DuplicateGroup = {
 };
 
 export type DailyMarketplacePlan = {
-  recommendedToday: DailyVehicleRec[];
+  recommendedToday: DailyVehicleRec[];  // Top 3 — publish now
+  nextBest: DailyVehicleRec[];          // Positions 4–10 — visible, selectable
   holdToday: DailyVehicleRec[];
   needsReview: DailyVehicleRec[];
   alreadyQueued: DailyVehicleRec[];
@@ -253,6 +257,7 @@ export function buildDailyMarketplacePlan(
       marketplacePrice,
       priceMode,
       recommendedDownPayment: w.downPayment ?? rec?.recommendedDownPayment ?? null,
+      mileage: rec?.mileage ?? null,
       imageCount,
       strategyName: rec?.strategyName ?? null,
       reasons,
@@ -304,11 +309,42 @@ export function buildDailyMarketplacePlan(
     return toRec(w, reason);
   });
 
-  // Build eligible recs and sort by planScore descending
-  const eligible: DailyVehicleRec[] = eligibleWorkspaces.map((w) => toRec(w));
-  eligible.sort((a, b) => b.planScore - a.planScore);
+  // ── Diversity guardrail constants ───────────────────────────────────────────
+  const MAINSTREAM_MAKES = new Set([
+    "toyota", "honda", "ford", "chevrolet", "chevy", "gmc",
+    "ram", "nissan", "hyundai", "kia", "subaru", "mazda",
+  ]);
+  const EV_MAKES = new Set(["tesla", "rivian", "lucid", "polestar", "fisker"]);
 
-  // Duplicate detection: group by normalized make + model
+  function isEVRec(r: DailyVehicleRec): boolean {
+    const m = r.make.toLowerCase();
+    const seg = r.primarySegment.toLowerCase();
+    return EV_MAKES.has(m) || seg.includes("ev") || seg.includes("tech");
+  }
+  function isMainstreamRec(r: DailyVehicleRec): boolean {
+    return MAINSTREAM_MAKES.has(r.make.toLowerCase());
+  }
+
+  // ── Build eligible recs and apply tiebreaker sort ───────────────────────────
+  const eligible: DailyVehicleRec[] = eligibleWorkspaces.map((w) => toRec(w));
+  eligible.sort((a, b) => {
+    // 1. planScore descending (opportunityScore is the primary signal)
+    if (b.planScore !== a.planScore) return b.planScore - a.planScore;
+    // 2. Lower mileage wins (fresher vehicle)
+    const aMi = a.mileage ?? 999_999;
+    const bMi = b.mileage ?? 999_999;
+    if (aMi !== bMi) return aMi - bMi;
+    // 3. Lower price wins (better FB Marketplace fit)
+    const aP = a.actualPrice ?? 999_999;
+    const bP = b.actualPrice ?? 999_999;
+    if (aP !== bP) return aP - bP;
+    // 4. More photos wins
+    if (b.imageCount !== a.imageCount) return b.imageCount - a.imageCount;
+    // 5. Stable
+    return a.vehicleId - b.vehicleId;
+  });
+
+  // ── Duplicate detection: group by normalized make + model ───────────────────
   const groupMap = new Map<string, DailyVehicleRec[]>();
   for (const r of eligible) {
     const key = `${r.make.trim().toLowerCase()}_${r.model.trim().toLowerCase()}`;
@@ -316,37 +352,27 @@ export function buildDailyMarketplacePlan(
     bucket.push(r);
     groupMap.set(key, bucket);
   }
-
-  // Mark duplicates
   for (const [key, group] of groupMap.entries()) {
     if (group.length > 1) {
-      for (const r of group) {
-        r.isDuplicate = true;
-        r.duplicateGroupKey = key;
-      }
+      for (const r of group) { r.isDuplicate = true; r.duplicateGroupKey = key; }
     }
   }
 
-  // Build duplicate groups (for display)
+  // ── Duplicate groups for display ────────────────────────────────────────────
   const duplicateGroups: DuplicateGroup[] = [];
   for (const [, group] of groupMap.entries()) {
     if (group.length <= 1) continue;
     const sorted = [...group].sort((a, b) => b.planScore - a.planScore);
     const winner = sorted[0]!;
     const others = sorted.slice(1);
-
-    const winSignals: string[] = [];
     const runner = others[0];
+    const winSignals: string[] = [];
     if (runner) {
       if (winner.imageCount > runner.imageCount) winSignals.push(`${winner.imageCount} vs ${runner.imageCount} photos`);
       if ((winner.actualPrice ?? Infinity) < (runner.actualPrice ?? Infinity)) winSignals.push("lower price");
       if ((winner.year ?? 0) > (runner.year ?? 0)) winSignals.push("newer year");
-      if (winner.confidenceScore > runner.confidenceScore) winSignals.push("higher strategy confidence");
+      if (winner.confidenceScore > runner.confidenceScore) winSignals.push("higher confidence");
     }
-    const winReason = winSignals.length > 0
-      ? `Chosen because: ${winSignals.join(", ")}. Hold the others to avoid competing against yourself on Marketplace.`
-      : "Publish this unit first to avoid flooding Marketplace with the same model.";
-
     duplicateGroups.push({
       key: `${winner.make} ${winner.model}`,
       make: winner.make,
@@ -354,40 +380,85 @@ export function buildDailyMarketplacePlan(
       count: sorted.length,
       publishFirst: winner,
       holdOthers: others,
-      winReason,
+      winReason: winSignals.length > 0
+        ? `Chosen because: ${winSignals.join(", ")}. Hold the others to avoid competing against yourself on Marketplace.`
+        : "Publish this unit first to avoid flooding Marketplace with the same model.",
     });
   }
 
-  // Assign recommendedToday: top 3, max 1 per make+model group
-  const seenGroups = new Set<string>();
-  const recommendedToday: DailyVehicleRec[] = [];
-  const holdToday: DailyVehicleRec[] = [];
+  // ── Diversity-guardrailed Top 10 selection ──────────────────────────────────
+  // Rules:
+  //   • Max 2 vehicles per exact make+model
+  //   • Max 3 EVs unless score ≥ 90
+  //   • Mainstream backfill: if < 3 mainstream makes in top 10, inject from remainder
+  //   • Audience mix: naturally emerges from diversity pass; no hard quotas beyond above
+
+  const modelSlots = new Map<string, number>();  // model key → count picked
+  let evCount = 0;
+  let mainstreamCount = 0;
+  const top10: DailyVehicleRec[] = [];
+  const deferred: DailyVehicleRec[] = [];
 
   for (const rec of eligible) {
-    if (recommendedToday.length >= 3) {
-      holdToday.push({ ...rec, holdReason: "Lower priority for today" });
-      continue;
-    }
-    if (rec.isDuplicate && rec.duplicateGroupKey) {
-      if (seenGroups.has(rec.duplicateGroupKey)) {
-        holdToday.push({ ...rec, holdReason: `Hold — another ${rec.make} ${rec.model} is already recommended today. Rotate tomorrow.` });
-        continue;
-      }
-      seenGroups.add(rec.duplicateGroupKey);
-    }
-    recommendedToday.push(rec);
+    const modelKey = rec.duplicateGroupKey ?? `${rec.make.toLowerCase()}_${rec.model.toLowerCase()}`;
+    const slotsTaken = modelSlots.get(modelKey) ?? 0;
+    const ev = isEVRec(rec);
+
+    if (top10.length >= 10) { deferred.push(rec); continue; }
+    if (slotsTaken >= 2) { deferred.push(rec); continue; }
+    if (ev && evCount >= 3 && (rec.planScore ?? 0) < 90) { deferred.push(rec); continue; }
+
+    top10.push(rec);
+    modelSlots.set(modelKey, slotsTaken + 1);
+    if (ev) evCount++;
+    if (isMainstreamRec(rec)) mainstreamCount++;
   }
 
-  // Build summary
+  // Mainstream backfill: guarantee ≥ 3 mainstream makes when available
+  if (mainstreamCount < 3) {
+    for (const rec of deferred) {
+      if (top10.length >= 10) break;
+      if (!isMainstreamRec(rec)) continue;
+      const modelKey = rec.duplicateGroupKey ?? `${rec.make.toLowerCase()}_${rec.model.toLowerCase()}`;
+      const slotsTaken = modelSlots.get(modelKey) ?? 0;
+      if (slotsTaken >= 2) continue;
+      top10.push(rec);
+      modelSlots.set(modelKey, slotsTaken + 1);
+      mainstreamCount++;
+      if (mainstreamCount >= 3) break;
+    }
+  }
+
+  // Fill any remaining top-10 slots with next-best from deferred
+  if (top10.length < 10) {
+    const inTop10 = new Set(top10.map((r) => r.vehicleId));
+    for (const rec of deferred) {
+      if (top10.length >= 10) break;
+      if (!inTop10.has(rec.vehicleId)) top10.push(rec);
+    }
+  }
+
+  // ── Split top10 into Today's 3 + Next Best 7 ────────────────────────────────
+  const recommendedToday = top10.slice(0, 3);
+  const nextBest = top10.slice(3, 10);
+
+  // Everything else goes to holdToday
+  const top10Set = new Set(top10.map((r) => r.vehicleId));
+  const holdToday: DailyVehicleRec[] = eligible
+    .filter((r) => !top10Set.has(r.vehicleId))
+    .map((r) => ({ ...r, holdReason: "Lower priority — not in today's top 10" }));
+
+  // ── Build summary ───────────────────────────────────────────────────────────
   const total = eligibleWorkspaces.length;
-  const summary = recommendedToday.length > 0
-    ? `DealerPilot found ${recommendedToday.length} opportunit${recommendedToday.length === 1 ? "y" : "ies"} today from ${total} eligible vehicles.`
+  const summary = top10.length > 0
+    ? `DealerPilot found ${top10.length} opportunit${top10.length === 1 ? "y" : "ies"} today from ${total} eligible vehicles.`
     : alreadyQueuedRecs.length > 0
       ? `${alreadyQueuedRecs.length} vehicle${alreadyQueuedRecs.length !== 1 ? "s" : ""} already queued for publishing. No additional vehicles recommended right now.`
       : "No eligible vehicles ready to publish today. Check inventory sync or review the queue.";
 
   return {
     recommendedToday,
+    nextBest,
     holdToday,
     needsReview,
     alreadyQueued: alreadyQueuedRecs,

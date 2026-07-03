@@ -695,17 +695,22 @@ router.get("/marketplace-intelligence/opportunity", async (req, res) => {
   const vehicleIds = vehicles.map((v) => v.id);
   const vehicleMap = new Map(vehicles.map((v) => [v.id, v]));
 
-  const [intelligenceRows, thumbnailRows] = await Promise.all([
+  const [intelligenceRows, thumbnailRows, photoCountRows] = await Promise.all([
     db.select()
       .from(vehicleIntelligenceTable)
       .where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID)),
     db.select({ vehicleId: vehicleImagesTable.vehicleId, url: vehicleImagesTable.url })
       .from(vehicleImagesTable)
       .where(and(inArray(vehicleImagesTable.vehicleId, vehicleIds), eq(vehicleImagesTable.position, 0))),
+    db.select({ vehicleId: vehicleImagesTable.vehicleId, cnt: count() })
+      .from(vehicleImagesTable)
+      .where(inArray(vehicleImagesTable.vehicleId, vehicleIds))
+      .groupBy(vehicleImagesTable.vehicleId),
   ]);
 
   const intelligenceMap = new Map(intelligenceRows.map((r) => [r.vehicleId, r]));
   const thumbnailMap = new Map(thumbnailRows.map((r) => [r.vehicleId, r.url]));
+  const photoCountMap = new Map(photoCountRows.map((r) => [r.vehicleId, Number(r.cnt)]));
 
   // Parse v2 strategy name from explanation
   function parseStrategyName(explanation: string | null): string | null {
@@ -738,6 +743,7 @@ router.get("/marketplace-intelligence/opportunity", async (req, res) => {
         lotLocation: v.lotLocation ?? null,
         vin: v.vin ?? null,
         thumbnailUrl: thumbnailMap.get(v.id) ?? null,
+        photoCount: photoCountMap.get(v.id) ?? 0,
         missingPrice: !v.price || v.price <= 0,
         // Opportunity scores
         opportunityScore: intel.opportunityScore,

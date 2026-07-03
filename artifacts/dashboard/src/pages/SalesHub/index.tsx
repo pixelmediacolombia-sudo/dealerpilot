@@ -515,10 +515,10 @@ export function SalesHub() {
             ))}
           </div>
 
-          {/* ── Command queue ──────────────────────────────────────────────── */}
+          {/* ── Today's 3 Moves ────────────────────────────────────────────── */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-5">
-              <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Command Queue</p>
+              <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Today's 3 Moves</p>
               {plan && <span className="text-[9px] font-bold text-blue-400/38 font-mono">{plan.recommendedToday.length} vehicles</span>}
               <div className="flex-1 h-px bg-white/[0.04]" />
             </div>
@@ -550,26 +550,52 @@ export function SalesHub() {
                 ))}
               </div>
             )}
-
-            {plan && plan.duplicateGroups.length > 0 && (
-              <div className="mt-5"><CommandCenterDuplicates groups={plan.duplicateGroups} /></div>
-            )}
-
-            {plan && plan.holdToday.length > 0 && (
-              <div className="mt-5">
-                <button className="flex items-center gap-2 w-full mb-3" onClick={() => setShowHold(v => !v)}>
-                  <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Hold Today · {plan.holdToday.length}</p>
-                  <div className="flex-1 h-px bg-white/[0.04]" />
-                  {showHold ? <ChevronUp className="w-3 h-3 text-white/18" /> : <ChevronDown className="w-3 h-3 text-white/18" />}
-                </button>
-                {showHold && (
-                  <div className="space-y-1.5">
-                    {plan.holdToday.slice(0, 8).map(rec => <HoldCard key={rec.vehicleId} rec={rec} />)}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
+
+          {/* ── Next Best Opportunities (4–10) ─────────────────────────────── */}
+          {plan && plan.nextBest.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-4">
+                <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Next Best Opportunities</p>
+                <span className="text-[9px] font-bold text-white/20 font-mono">{plan.nextBest.length} vehicles</span>
+                <div className="flex-1 h-px bg-white/[0.04]" />
+              </div>
+              <div className="space-y-1.5">
+                {plan.nextBest.map((rec, i) => (
+                  <OpportunityCard
+                    key={rec.vehicleId}
+                    rec={rec}
+                    index={i + 3}
+                    onPublish={handlePublish}
+                    onAddToBatch={handleAddToBatch}
+                    onViewStrategy={() => setLocation("/marketplace-intelligence")}
+                    isPublishing={false}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Duplicate warnings ─────────────────────────────────────────── */}
+          {plan && plan.duplicateGroups.length > 0 && (
+            <div className="mb-8"><CommandCenterDuplicates groups={plan.duplicateGroups} /></div>
+          )}
+
+          {/* ── Hold Today ─────────────────────────────────────────────────── */}
+          {plan && plan.holdToday.length > 0 && (
+            <div className="mb-8">
+              <button className="flex items-center gap-2 w-full mb-3" onClick={() => setShowHold(v => !v)}>
+                <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Hold Today · {plan.holdToday.length}</p>
+                <div className="flex-1 h-px bg-white/[0.04]" />
+                {showHold ? <ChevronUp className="w-3 h-3 text-white/18" /> : <ChevronDown className="w-3 h-3 text-white/18" />}
+              </button>
+              {showHold && (
+                <div className="space-y-1.5">
+                  {plan.holdToday.slice(0, 8).map(rec => <HoldCard key={rec.vehicleId} rec={rec} />)}
+                </div>
+              )}
+            </div>
+          )}
 
           </div>
         </div>
