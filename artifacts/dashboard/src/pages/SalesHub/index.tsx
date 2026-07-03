@@ -3,7 +3,6 @@ import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -32,9 +31,9 @@ import { formatCurrency } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import {
   buildDailyMarketplacePlan,
+  generateReason,
   type DailyVehicleRec,
   type DailyMarketplacePlan,
-  type DuplicateGroup,
 } from "@/lib/dailyPlan";
 import {
   UploadCloud,
@@ -42,68 +41,15 @@ import {
   MoreHorizontal,
   ChevronDown,
   ChevronUp,
-  ArrowRight,
   Car,
   ImageIcon,
-  Clock,
-  AlertTriangle,
   CheckCircle2,
-  RefreshCw,
-  Target,
+  AlertTriangle,
+  ShieldCheck,
   Zap,
-  Eye,
-  MessageSquare,
 } from "lucide-react";
 
-// ─── Duplicate Groups (capped at 5, sorted by size) ─────────────────────────
-
-const CC_DUPE_VISIBLE = 5;
-
-function CommandCenterDuplicates({ groups }: { groups: DuplicateGroup[] }) {
-  const [showAll, setShowAll] = useState(false);
-  const sorted = [...groups].sort((a, b) => b.count - a.count);
-  const visible = showAll ? sorted : sorted.slice(0, CC_DUPE_VISIBLE);
-  const hidden = sorted.length - CC_DUPE_VISIBLE;
-
-  return (
-    <div className="space-y-2">
-      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-        Duplicate Groups · {groups.length} model{groups.length !== 1 ? "s" : ""} — hold to avoid self-competition
-      </p>
-      {visible.map((g) => (
-        <div key={g.key} className="glass-panel rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-bold text-amber-400">{g.make} {g.model} — {g.count} ready</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{g.winReason}</p>
-              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                <span className="text-[10px] text-amber-400 font-semibold">Publish: </span>
-                <span className="text-[10px] text-white">{g.publishFirst.label}</span>
-                {g.holdOthers.slice(0, 2).map((h) => (
-                  <span key={h.vehicleId} className="text-[10px] text-muted-foreground">· Hold: {h.label}</span>
-                ))}
-                {g.holdOthers.length > 2 && (
-                  <span className="text-[10px] text-muted-foreground">· +{g.holdOthers.length - 2} more</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      ))}
-      {!showAll && hidden > 0 && (
-        <button
-          onClick={() => setShowAll(true)}
-          className="w-full text-center text-[10px] text-muted-foreground hover:text-amber-400 py-1 transition-colors"
-        >
-          + {hidden} more group{hidden !== 1 ? "s" : ""} — click to show all
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ─── Vehicle Recommendation Card ─────────────────────────────────────────────
+// ─── Score colour ────────────────────────────────────────────────────────────
 
 function scoreColor(score: number | null) {
   if (score == null) return { pill: "bg-white/[0.06] border-white/10 text-white/25", label: "" };
@@ -113,161 +59,299 @@ function scoreColor(score: number | null) {
 }
 
 function langBadgeClass(lang: string) {
-  if (lang === "Spanish-first") return "bg-orange-500/15 text-orange-400 border-orange-500/25";
-  if (lang === "Bilingual") return "bg-teal-500/15 text-teal-400 border-teal-500/25";
-  return "bg-white/[0.05] text-white/30 border-white/10";
+  if (lang === "Spanish-first") return "text-orange-400/70";
+  if (lang === "Bilingual") return "text-teal-400/70";
+  return "text-white/20";
 }
 
-function OpportunityCard({
+// ─── Executive Summary ────────────────────────────────────────────────────────
+
+function ExecutiveSummary({ plan }: { plan: DailyMarketplacePlan }) {
+  const selected = plan.recommendedToday.length + plan.nextBest.length;
+  const protected_ = plan.duplicateGroups.reduce((sum, g) => sum + g.holdOthers.length, 0);
+  const skipped = Math.max(0, plan.totalEligible - selected - protected_ - plan.holdToday.length);
+
+  return (
+    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.01] p-5 mb-7">
+      <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.26em] mb-4">
+        Today's Strategy
+      </p>
+      <div className="grid grid-cols-4 gap-6 mb-4">
+        <div>
+          <div className="text-[32px] font-black text-white/50 leading-none tabular-nums">
+            {plan.totalEligible}
+          </div>
+          <div className="text-[9px] text-white/22 uppercase tracking-wider mt-1.5">Analyzed</div>
+        </div>
+        <div>
+          <div className="text-[32px] font-black text-blue-400 leading-none tabular-nums">
+            {selected}
+          </div>
+          <div className="text-[9px] text-white/22 uppercase tracking-wider mt-1.5">Selected</div>
+        </div>
+        <div>
+          <div className="text-[32px] font-black text-amber-400 leading-none tabular-nums">
+            {protected_}
+          </div>
+          <div className="text-[9px] text-white/22 uppercase tracking-wider mt-1.5">Protected</div>
+          {protected_ > 0 && (
+            <div className="text-[9px] text-amber-400/40 mt-0.5">duplicate guard</div>
+          )}
+        </div>
+        <div>
+          <div className="text-[32px] font-black text-white/20 leading-none tabular-nums">
+            {skipped}
+          </div>
+          <div className="text-[9px] text-white/22 uppercase tracking-wider mt-1.5">Skipped</div>
+          <div className="text-[9px] text-white/15 mt-0.5">lower priority</div>
+        </div>
+      </div>
+      <p className="text-[11px] text-white/28 italic leading-relaxed max-w-lg">
+        DealerPilot recommends publishing these {selected} vehicles today based on buyer demand,
+        inventory quality, pricing, and audience fit.
+      </p>
+    </div>
+  );
+}
+
+// ─── Strategy Row ─────────────────────────────────────────────────────────────
+
+function StrategyRow({
   rec,
-  index,
+  rank,
   onPublish,
   onAddToBatch,
-  onViewStrategy,
-  isPublishing,
 }: {
   rec: DailyVehicleRec;
-  index: number;
+  rank: number;
   onPublish: (id: number) => void;
   onAddToBatch: (id: number) => void;
-  onViewStrategy: () => void;
-  isPublishing: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [, setLocation] = useLocation();
   const sc = scoreColor(rec.opportunityScore);
+  const isTopMove = rank <= 3;
+  const reason = generateReason(rec);
   const hasSegment = rec.primarySegment && rec.primarySegment !== "General";
 
   return (
-    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.015] hover:border-white/[0.09] transition-all overflow-hidden group">
-      <div className="flex items-center gap-4 p-4">
-
-        {/* Rank + score */}
-        <div className="flex flex-col items-center gap-1 shrink-0 w-10">
-          <div className="w-8 h-8 rounded-xl bg-blue-500/[0.08] border border-blue-500/[0.15] flex items-center justify-center">
-            <span className="text-[12px] font-black text-blue-400/60">{index + 1}</span>
-          </div>
+    <div>
+      <div
+        className={cn(
+          "flex items-center gap-0 border-b border-white/[0.035] hover:bg-white/[0.018] transition-colors group",
+          isTopMove && "border-l-[2px] border-l-blue-500/25",
+        )}
+      >
+        {/* Rank + Score */}
+        <div className="w-[58px] shrink-0 py-3.5 pl-4 flex flex-col items-center gap-1.5">
+          <span className={cn("text-[12px] font-black leading-none", isTopMove ? "text-blue-400" : "text-white/18")}>
+            #{rank}
+          </span>
           {rec.opportunityScore != null && (
-            <span className={cn("text-[9px] font-black px-1.5 py-0 rounded border", sc.pill)}>
+            <span className={cn("text-[9px] font-black px-1.5 rounded border leading-[18px]", sc.pill)}>
               {rec.opportunityScore}
             </span>
           )}
         </div>
 
-        {/* Photo */}
-        <div className="w-[72px] h-[56px] rounded-xl overflow-hidden bg-white/[0.03] border border-white/[0.04] shrink-0">
-          {rec.primaryImageUrl ? (
-            <img src={rec.primaryImageUrl} alt={rec.label} className="w-full h-full object-cover" />
+        {/* Photo + Vehicle */}
+        <div className="flex items-center gap-3 py-3 pr-5 flex-[2.2] min-w-0">
+          <div className="w-[58px] h-[44px] rounded-lg overflow-hidden shrink-0 bg-white/[0.03] border border-white/[0.04]">
+            {rec.primaryImageUrl ? (
+              <img src={rec.primaryImageUrl} alt={rec.label} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Car className="w-3 h-3 text-white/10" />
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold text-white/85 truncate leading-snug">{rec.label}</p>
+            <p className="text-[10px] text-white/22 mt-0.5 flex items-center gap-2">
+              {rec.priceMode === "DOWN_PAYMENT" && rec.marketplacePrice != null ? (
+                <span className="text-amber-400/70">{formatCurrency(rec.marketplacePrice)} down</span>
+              ) : rec.actualPrice != null ? (
+                <span>{formatCurrency(rec.actualPrice)}</span>
+              ) : null}
+              {rec.imageCount > 0 && (
+                <span className="flex items-center gap-0.5 text-white/15">
+                  <ImageIcon className="w-2.5 h-2.5" />
+                  {rec.imageCount}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* Audience */}
+        <div className="py-3 pr-5 w-[148px] shrink-0">
+          {hasSegment ? (
+            <>
+              <p className="text-[11px] font-semibold text-white/55 leading-tight truncate">
+                {rec.primarySegment}
+              </p>
+              <p className={cn("text-[9px] font-bold mt-0.5 uppercase tracking-wide", langBadgeClass(rec.suggestedLanguage))}>
+                {rec.suggestedLanguage}
+              </p>
+            </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Car className="w-4 h-4 text-white/10" />
-            </div>
+            <p className="text-[11px] text-white/22">General</p>
           )}
         </div>
 
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            {rec.opportunityScore != null && (
-              <span className={cn("text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest shrink-0", sc.pill)}>
-                {sc.label}
-              </span>
-            )}
-            {hasSegment && (
-              <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-widest shrink-0", langBadgeClass(rec.suggestedLanguage))}>
-                {rec.primarySegment}
-              </span>
-            )}
-            <span className="font-bold text-[14px] text-white/85 truncate">{rec.label}</span>
-          </div>
-          <div className="flex items-center gap-3 text-[11px]">
-            {rec.priceMode === "DOWN_PAYMENT" && rec.marketplacePrice != null ? (
-              <span className="text-amber-400 font-semibold">{formatCurrency(rec.marketplacePrice)} down</span>
-            ) : rec.actualPrice != null ? (
-              <span className="text-emerald-400 font-semibold">{formatCurrency(rec.actualPrice)}</span>
-            ) : null}
-            {rec.imageCount > 0 && (
-              <span className="flex items-center gap-1 text-white/22">
-                <ImageIcon className="w-3 h-3" />{rec.imageCount}
-              </span>
-            )}
-            {rec.adAngle && (
-              <span className="text-white/25 truncate hidden lg:block italic">· "{rec.adAngle}"</span>
-            )}
-          </div>
+        {/* Reason */}
+        <div className="py-3 pr-5 flex-[1.8] min-w-0 hidden lg:block">
+          <p className="text-[11px] text-white/32 leading-relaxed line-clamp-2">{reason}</p>
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="py-3 pr-4 shrink-0 flex items-center gap-1.5">
           <button
+            className="text-white/12 hover:text-white/35 p-1 transition-colors"
             onClick={() => setExpanded(v => !v)}
-            className="text-white/15 hover:text-white/40 transition-colors p-1"
           >
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
           <Button
             size="sm"
-            className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[12px] font-bold px-4 shadow-lg shadow-blue-500/15 rounded-lg"
-            disabled={isPublishing}
+            className={cn(
+              "h-7 gap-1.5 text-[11px] font-bold px-3.5 rounded-lg",
+              isTopMove
+                ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20"
+                : "bg-white/[0.05] hover:bg-white/[0.09] text-white/50 border border-white/[0.06]",
+            )}
             onClick={() => onPublish(rec.vehicleId)}
           >
-            {isPublishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
-            Publish
+            <UploadCloud className="w-3 h-3" />
+            {isTopMove ? "Publish" : "Queue"}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white/20 hover:text-white/50 hover:bg-white/[0.04] rounded-lg">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 text-white/15 hover:text-white/40 hover:bg-white/[0.04] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+              >
                 <MoreHorizontal className="w-3.5 h-3.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem onClick={() => onAddToBatch(rec.vehicleId)}>Add to Batch</DropdownMenuItem>
-              <DropdownMenuItem onClick={onViewStrategy}>Review Strategy</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.open(`/creative-studio/${rec.vehicleId}`, "_self")}>Open Vehicle</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/marketplace-intelligence")}>
+                Market Intelligence
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(`/creative-studio/${rec.vehicleId}`, "_self")}>
+                Open Vehicle
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
-      {/* Expanded detail */}
+      {/* Expanded: Why this vehicle? */}
       {expanded && (
-        <div className="px-5 pb-4 pt-0 border-t border-white/[0.04] space-y-3">
-          {/* Why this vehicle */}
+        <div className="border-b border-white/[0.04] bg-white/[0.008] px-6 py-4 space-y-3">
+          <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.24em]">
+            Why this vehicle?
+          </p>
+
+          {/* Narrative */}
+          {rec.whyThisAudience ? (
+            <p className="text-[12px] text-white/42 leading-relaxed max-w-2xl">
+              {rec.whyThisAudience}
+            </p>
+          ) : rec.adAngle ? (
+            <p className="text-[12px] text-white/42 italic max-w-2xl">"{rec.adAngle}"</p>
+          ) : null}
+
+          {/* Reason chips */}
           {rec.reasons.length > 0 && (
-            <div className="pt-3">
-              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/20 mb-2">Why This Vehicle</p>
-              <ul className="space-y-1">
-                {rec.reasons.map((r, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="w-1 h-1 rounded-full bg-blue-400/40 shrink-0 mt-1.5" />
-                    <span className="text-[11px] text-white/50">{r}</span>
-                  </li>
-                ))}
-              </ul>
+            <div className="flex flex-wrap gap-1.5">
+              {rec.reasons.map((r, i) => (
+                <span
+                  key={i}
+                  className="text-[10px] text-white/35 bg-white/[0.03] border border-white/[0.07] px-2.5 py-0.5 rounded-full"
+                >
+                  {r}
+                </span>
+              ))}
             </div>
           )}
 
-          {/* Buyer segment */}
-          {hasSegment && (
-            <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-3 space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] font-bold text-white/70">{rec.primarySegment} Buyers</span>
-                  {rec.secondarySegment && (
-                    <span className="text-[10px] text-white/25">· also {rec.secondarySegment}</span>
-                  )}
-                </div>
-                <span className={cn("shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wide", langBadgeClass(rec.suggestedLanguage))}>
-                  {rec.suggestedLanguage}
-                </span>
-              </div>
-              {rec.whyThisAudience && (
-                <p className="text-[10px] text-white/30 leading-relaxed">{rec.whyThisAudience}</p>
-              )}
-              {rec.adAngle && (
-                <p className="text-[10px] text-white/45 italic">"{rec.adAngle}"</p>
-              )}
-            </div>
+          {/* Segment context */}
+          {hasSegment && rec.adAngle && (
+            <p className="text-[10px] text-white/22 italic">
+              Suggested angle: "{rec.adAngle}"
+            </p>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Strategy Table ───────────────────────────────────────────────────────────
+
+function StrategyTable({
+  plan,
+  onPublish,
+  onAddToBatch,
+}: {
+  plan: DailyMarketplacePlan;
+  onPublish: (id: number) => void;
+  onAddToBatch: (id: number) => void;
+}) {
+  const all10 = [...plan.recommendedToday, ...plan.nextBest];
+
+  return (
+    <div className="rounded-2xl border border-white/[0.05] overflow-hidden">
+      {/* Table header */}
+      <div className="flex items-center gap-0 px-0 py-2.5 border-b border-white/[0.05] bg-white/[0.008]">
+        <div className="w-[58px] shrink-0" />
+        <div className="flex-[2.2] pr-5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Vehicle</div>
+        <div className="w-[148px] shrink-0 pr-5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Audience</div>
+        <div className="flex-[1.8] pr-5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em] hidden lg:block">Reason</div>
+        <div className="w-[130px] shrink-0 pr-4 text-[9px] font-black text-white/18 uppercase tracking-[0.22em] text-right">Action</div>
+      </div>
+
+      {/* Today's Top 3 */}
+      {plan.recommendedToday.map((rec, i) => (
+        <StrategyRow
+          key={rec.vehicleId}
+          rec={rec}
+          rank={i + 1}
+          onPublish={onPublish}
+          onAddToBatch={onAddToBatch}
+        />
+      ))}
+
+      {/* Divider: Next Best 4–10 */}
+      {plan.nextBest.length > 0 && (
+        <div className="flex items-center gap-3 px-5 py-2 border-y border-white/[0.04] bg-white/[0.004]">
+          <div className="h-px flex-1 bg-white/[0.04]" />
+          <span className="text-[9px] font-black text-white/14 uppercase tracking-[0.24em]">
+            Next Best · Positions 4–{3 + plan.nextBest.length}
+          </span>
+          <div className="h-px flex-1 bg-white/[0.04]" />
+        </div>
+      )}
+
+      {/* Next Best 4–10 */}
+      {plan.nextBest.map((rec, i) => (
+        <StrategyRow
+          key={rec.vehicleId}
+          rec={rec}
+          rank={i + 4}
+          onPublish={onPublish}
+          onAddToBatch={onAddToBatch}
+        />
+      ))}
+
+      {all10.length === 0 && (
+        <div className="p-12 text-center">
+          <CheckCircle2 className="w-7 h-7 text-emerald-400/22 mx-auto mb-3" />
+          <p className="text-[14px] font-semibold text-white/30">Queue is clear</p>
+          <p className="text-[11px] text-white/18 mt-1.5">No vehicles require action right now</p>
         </div>
       )}
     </div>
@@ -278,7 +362,7 @@ function OpportunityCard({
 
 function HoldCard({ rec }: { rec: DailyVehicleRec }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-white/[0.04] bg-white/[0.015]">
+    <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-white/[0.04] bg-white/[0.012]">
       <div className="w-8 h-8 rounded-md overflow-hidden bg-secondary/40 flex-shrink-0">
         {rec.primaryImageUrl ? (
           <img src={rec.primaryImageUrl} alt={rec.label} className="w-full h-full object-cover" />
@@ -289,8 +373,8 @@ function HoldCard({ rec }: { rec: DailyVehicleRec }) {
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-white/70 truncate">{rec.label}</p>
-        {rec.holdReason && <p className="text-[10px] text-muted-foreground/60 truncate">{rec.holdReason}</p>}
+        <p className="text-xs font-semibold text-white/65 truncate">{rec.label}</p>
+        {rec.holdReason && <p className="text-[10px] text-muted-foreground/50 truncate">{rec.holdReason}</p>}
       </div>
       {rec.priceMode === "DOWN_PAYMENT" && rec.marketplacePrice != null ? (
         <span className="text-[10px] text-amber-400 flex-shrink-0">{formatCurrency(rec.marketplacePrice)} down</span>
@@ -301,11 +385,10 @@ function HoldCard({ rec }: { rec: DailyVehicleRec }) {
   );
 }
 
-// ─── Command Center ───────────────────────────────────────────────────────────
+// ─── Command Center v2 ────────────────────────────────────────────────────────
 
 export function SalesHub() {
   const [, setLocation] = useLocation();
-  const [publishingId, setPublishingId] = useState<number | null>(null);
   const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
   const [showHold, setShowHold] = useState(false);
 
@@ -333,22 +416,18 @@ export function SalesHub() {
   const bulkSchedule = useBulkSchedulePublishing({
     mutation: {
       onSuccess: (result) => {
-        setPublishingId(null);
         toast({
           title: "Publishing queued",
           description: `${result.enqueued} vehicle${result.enqueued !== 1 ? "s" : ""} added to the publishing queue.`,
         });
       },
       onError: () => {
-        setPublishingId(null);
         toast({ title: "Error", description: "Failed to queue vehicle for publishing.", variant: "destructive" });
       },
     },
   });
 
-  const handlePublish = (vehicleId: number) => {
-    setPublishNowVehicleId(vehicleId);
-  };
+  const handlePublish = (vehicleId: number) => setPublishNowVehicleId(vehicleId);
 
   const handleAddToBatch = (vehicleId: number) => {
     bulkSchedule.mutate({ data: { vehicleIds: [vehicleId], spacingMinutes: 30 } }, {
@@ -367,20 +446,18 @@ export function SalesHub() {
   }, [workspacesData, recsData, jobsData]);
 
   const isLoading = workspacesLoading || recsLoading;
+  const top10Count = plan ? plan.recommendedToday.length + plan.nextBest.length : 0;
 
   // Derived counts
   const pendingLeads = leads?.leads.filter(l => l.status === "new").length ?? 0;
   const priceChanges = vehicleStats?.priceChanged ?? 0;
-  const queuedCount = (jobsData?.jobs ?? []).filter(j => ["Queued","Scheduled","Publishing","Assigned"].includes(j.status)).length;
+  const queuedCount = (jobsData?.jobs ?? []).filter(j => ["Queued", "Scheduled", "Publishing", "Assigned"].includes(j.status)).length;
   const listingsLive = (workspacesData?.workspaces ?? []).filter(
-    w => w.publishStatus === "published" || w.publishStatus === "published_with_changes"
+    w => w.publishStatus === "published" || w.publishStatus === "published_with_changes",
   ).length;
   const failedJobs = (jobsData?.jobs ?? []).filter(j => j.status === "Failed").length;
   const issueCount = failedJobs + (priceChanges > 0 ? 1 : 0);
-
-  // Greeting
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const duplicateGroupCount = plan?.duplicateGroups.length ?? 0;
 
   // Activity items
   const activityItems = useMemo(() => {
@@ -391,7 +468,7 @@ export function SalesHub() {
       if (run.finishedAt) {
         items.push({
           id: `feed-${run.id}`,
-          label: `Inventory synced`,
+          label: "Inventory synced",
           sub: `${run.vehiclesNew ?? 0} new · ${run.vehiclesUpdated ?? 0} updated · ${run.vehiclesRemoved ?? 0} removed`,
           date: new Date(run.finishedAt),
           color: "bg-primary",
@@ -405,7 +482,7 @@ export function SalesHub() {
       if (job.completedAt) {
         items.push({
           id: `creative-${job.id}`,
-          label: `Creative generated`,
+          label: "Creative generated",
           sub: job.vehicleLabel ?? "Vehicle",
           date: new Date(job.completedAt),
           color: "bg-accent",
@@ -417,7 +494,7 @@ export function SalesHub() {
       if (job.completedAt && job.status === "Published") {
         items.push({
           id: `pub-${job.id}`,
-          label: `Listing published`,
+          label: "Listing published",
           sub: job.vehicleLabel ?? "Vehicle",
           date: new Date(job.completedAt),
           color: "bg-success",
@@ -428,7 +505,7 @@ export function SalesHub() {
       if (job.status === "Failed") {
         items.push({
           id: `fail-${job.id}`,
-          label: `Publish failed`,
+          label: "Publish failed",
           sub: `${job.vehicleLabel ?? "Vehicle"} — ${job.failedReason ?? "unknown reason"}`,
           date: new Date(job.updatedAt ?? job.createdAt),
           color: "bg-destructive",
@@ -441,7 +518,7 @@ export function SalesHub() {
     leads?.leads?.slice(0, 5).forEach(lead => {
       items.push({
         id: `lead-${lead.id}`,
-        label: `Buyer message received`,
+        label: "Buyer message received",
         sub: lead.status === "new" ? "Awaiting reply" : `Status: ${lead.status}`,
         date: new Date(lead.createdAt),
         color: "bg-warning",
@@ -457,145 +534,135 @@ export function SalesHub() {
     <AppLayout>
       <div className="h-full flex overflow-hidden">
 
-        {/* ── MAIN COLUMN ──────────────────────────────────────────────────── */}
+        {/* ── MAIN COLUMN ────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-8 max-w-[900px]">
+          <div className="p-8 max-w-[960px]">
 
-          {/* ── MISSION HEADER ─────────────────────────────────────────────── */}
-          <div className="mb-8 pt-1">
-            <p className="text-[9px] font-black text-blue-400/32 uppercase tracking-[0.28em] mb-5">
-              Command · {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-            </p>
-            <div className="flex items-end gap-6 mb-0">
-              <div className="flex-1">
-                <h1 className="text-[52px] font-black text-white tracking-tight leading-[0.9] mb-3">
-                  {isLoading ? (
-                    <span className="text-white/12">Loading…</span>
-                  ) : plan ? (
-                    <>
-                      <span className="text-blue-400">{plan.recommendedToday.length}</span>
-                      {" "}Move{plan.recommendedToday.length !== 1 ? "s" : ""}{"\n"}Today
-                    </>
-                  ) : (
-                    "All Clear"
-                  )}
-                </h1>
-                <p className="text-[16px] text-white/28 leading-relaxed font-normal max-w-lg">
-                  {isLoading ? "" : plan?.summary ?? `${dealer?.name ?? "Alpha Motorsport"} — no action required right now.`}
-                </p>
+            {/* ── Mission Header ──────────────────────────────────────────────── */}
+            <div className="mb-8 pt-1">
+              <p className="text-[9px] font-black text-blue-400/32 uppercase tracking-[0.28em] mb-5">
+                Command · {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </p>
+              <div className="flex items-end gap-6 mb-0">
+                <div className="flex-1">
+                  <h1 className="text-[52px] font-black text-white tracking-tight leading-[0.9] mb-3">
+                    {isLoading ? (
+                      <span className="text-white/12">Loading…</span>
+                    ) : top10Count > 0 ? (
+                      <>
+                        <span className="text-blue-400">{top10Count}</span>
+                        {" "}Opportunit{top10Count !== 1 ? "ies" : "y"}{"\n"}Today
+                      </>
+                    ) : (
+                      "All Clear"
+                    )}
+                  </h1>
+                  <p className="text-[16px] text-white/28 leading-relaxed font-normal max-w-lg">
+                    {isLoading ? "" : plan?.summary ?? `${dealer?.name ?? "Alpha Motorsport"} — no action required right now.`}
+                  </p>
+                </div>
+                <Button
+                  className="shrink-0 h-11 gap-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[14px] px-7 shadow-xl shadow-blue-500/20 rounded-xl mb-0.5"
+                  disabled={!plan?.recommendedToday[0] || isLoading}
+                  onClick={() => plan?.recommendedToday[0] && setPublishNowVehicleId(plan.recommendedToday[0].vehicleId)}
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  Publish Next Best
+                </Button>
               </div>
-              <Button
-                className="shrink-0 h-11 gap-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[14px] px-7 shadow-xl shadow-blue-500/20 rounded-xl mb-0.5"
-                disabled={!plan?.recommendedToday[0] || isLoading}
-                onClick={() => plan?.recommendedToday[0] && setPublishNowVehicleId(plan.recommendedToday[0].vehicleId)}
-              >
-                <UploadCloud className="w-4 h-4" />
-                Publish Next Best
-              </Button>
             </div>
-          </div>
 
-          {/* ── Metric strip ─────────────────────────────────────────────── */}
-          <div className="flex items-stretch border-y border-white/[0.04] mb-8 -mx-8 px-8">
-            {[
-              { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? plan?.recommendedToday.length ?? 0), label: "Ready", accent: "text-blue-400", path: "/listings" },
-              { value: isLoading ? "—" : String(listingsLive), label: "Live", accent: listingsLive > 0 ? "text-green-400" : "text-white/15", path: "/listings?tab=published" },
-              { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", accent: pendingLeads > 0 ? "text-violet-400" : "text-white/15", path: "/sales-ai" },
-              { value: "0", label: "Appts", accent: "text-white/15", path: "/sales-ai" },
-              { value: isLoading ? "—" : String(issueCount), label: "Issues", accent: issueCount > 0 ? "text-red-400" : "text-white/15", path: "/listings?tab=failed" },
-            ].map((m) => (
+            {/* ── Metric strip ──────────────────────────────────────────────── */}
+            <div className="flex items-stretch border-y border-white/[0.04] mb-8 -mx-8 px-8">
+              {[
+                { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? top10Count), label: "Ready", accent: "text-blue-400", path: "/listings" },
+                { value: isLoading ? "—" : String(listingsLive), label: "Live", accent: listingsLive > 0 ? "text-green-400" : "text-white/15", path: "/listings?tab=published" },
+                { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", accent: pendingLeads > 0 ? "text-violet-400" : "text-white/15", path: "/sales-ai" },
+                { value: "0", label: "Appts", accent: "text-white/15", path: "/sales-ai" },
+                { value: isLoading ? "—" : String(issueCount), label: "Issues", accent: issueCount > 0 ? "text-red-400" : "text-white/15", path: "/listings?tab=failed" },
+              ].map((m) => (
+                <button
+                  key={m.label}
+                  onClick={() => setLocation(m.path)}
+                  className="flex-1 py-5 px-4 text-left hover:bg-white/[0.02] transition-colors border-r border-white/[0.04] last:border-r-0 first:pl-0 last:pr-0"
+                >
+                  <div className={cn("text-[40px] font-black leading-none mb-1.5 tracking-tighter", m.accent)}>{m.value}</div>
+                  <div className="text-[9px] font-bold text-white/18 uppercase tracking-[0.18em]">{m.label}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* ── Publishing Conflicts notice ───────────────────────────────── */}
+            {!isLoading && duplicateGroupCount > 0 && (
               <button
-                key={m.label}
-                onClick={() => setLocation(m.path)}
-                className="flex-1 py-5 px-4 text-left hover:bg-white/[0.02] transition-colors border-r border-white/[0.04] last:border-r-0 first:pl-0 last:pr-0"
+                onClick={() => setLocation("/marketplace-intelligence/publishing-conflicts")}
+                className="w-full flex items-center gap-3 mb-6 px-4 py-3 rounded-xl border border-amber-500/15 bg-amber-500/[0.04] hover:bg-amber-500/[0.07] transition-colors text-left group"
               >
-                <div className={cn("text-[40px] font-black leading-none mb-1.5 tracking-tighter", m.accent)}>{m.value}</div>
-                <div className="text-[9px] font-bold text-white/18 uppercase tracking-[0.18em]">{m.label}</div>
+                <ShieldCheck className="w-4 h-4 text-amber-400/60 shrink-0" />
+                <span className="flex-1 text-[11px] text-amber-400/60">
+                  <span className="font-bold">{duplicateGroupCount} duplicate group{duplicateGroupCount !== 1 ? "s" : ""} detected</span>
+                  {" "}— DealerPilot is protecting these vehicles from self-competition.
+                </span>
+                <span className="text-[10px] font-bold text-amber-400/40 group-hover:text-amber-400/70 transition-colors uppercase tracking-wider">
+                  View →
+                </span>
               </button>
-            ))}
-          </div>
-
-          {/* ── Today's 3 Moves ────────────────────────────────────────────── */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-5">
-              <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Today's 3 Moves</p>
-              {plan && <span className="text-[9px] font-bold text-blue-400/38 font-mono">{plan.recommendedToday.length} vehicles</span>}
-              <div className="flex-1 h-px bg-white/[0.04]" />
-            </div>
-
-            {isLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => <div key={i} className="h-[84px] rounded-2xl bg-white/[0.015] animate-pulse" />)}
-              </div>
-            ) : !plan || plan.recommendedToday.length === 0 ? (
-              <div className="rounded-2xl border border-white/[0.04] bg-white/[0.01] p-12 text-center">
-                <CheckCircle2 className="w-7 h-7 text-emerald-400/22 mx-auto mb-3" />
-                <p className="text-[14px] font-semibold text-white/30">Queue is clear</p>
-                <p className="text-[11px] text-white/18 mt-1.5">
-                  {queuedCount > 0 ? `${queuedCount} vehicle${queuedCount !== 1 ? "s" : ""} already publishing` : "No vehicles require action right now"}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {plan.recommendedToday.map((rec, i) => (
-                  <OpportunityCard
-                    key={rec.vehicleId}
-                    rec={rec}
-                    index={i}
-                    onPublish={handlePublish}
-                    onAddToBatch={handleAddToBatch}
-                    onViewStrategy={() => setLocation("/marketplace-intelligence")}
-                    isPublishing={false}
-                  />
-                ))}
-              </div>
             )}
-          </div>
 
-          {/* ── Next Best Opportunities (4–10) ─────────────────────────────── */}
-          {plan && plan.nextBest.length > 0 && (
+            {/* ── Executive Summary ─────────────────────────────────────────── */}
+            {!isLoading && plan && top10Count > 0 && (
+              <ExecutiveSummary plan={plan} />
+            )}
+
+            {/* ── Today's Publishing Strategy Table ─────────────────────────── */}
             <div className="mb-8">
               <div className="flex items-center gap-3 mb-4">
-                <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Next Best Opportunities</p>
-                <span className="text-[9px] font-bold text-white/20 font-mono">{plan.nextBest.length} vehicles</span>
+                <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">
+                  Today's Publishing Strategy
+                </p>
+                {plan && (
+                  <span className="text-[9px] font-bold text-blue-400/38 font-mono">
+                    {top10Count} vehicle{top10Count !== 1 ? "s" : ""}
+                  </span>
+                )}
                 <div className="flex-1 h-px bg-white/[0.04]" />
               </div>
-              <div className="space-y-1.5">
-                {plan.nextBest.map((rec, i) => (
-                  <OpportunityCard
-                    key={rec.vehicleId}
-                    rec={rec}
-                    index={i + 3}
-                    onPublish={handlePublish}
-                    onAddToBatch={handleAddToBatch}
-                    onViewStrategy={() => setLocation("/marketplace-intelligence")}
-                    isPublishing={false}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* ── Duplicate warnings ─────────────────────────────────────────── */}
-          {plan && plan.duplicateGroups.length > 0 && (
-            <div className="mb-8"><CommandCenterDuplicates groups={plan.duplicateGroups} /></div>
-          )}
-
-          {/* ── Hold Today ─────────────────────────────────────────────────── */}
-          {plan && plan.holdToday.length > 0 && (
-            <div className="mb-8">
-              <button className="flex items-center gap-2 w-full mb-3" onClick={() => setShowHold(v => !v)}>
-                <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Hold Today · {plan.holdToday.length}</p>
-                <div className="flex-1 h-px bg-white/[0.04]" />
-                {showHold ? <ChevronUp className="w-3 h-3 text-white/18" /> : <ChevronDown className="w-3 h-3 text-white/18" />}
-              </button>
-              {showHold && (
-                <div className="space-y-1.5">
-                  {plan.holdToday.slice(0, 8).map(rec => <HoldCard key={rec.vehicleId} rec={rec} />)}
+              {isLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="h-[72px] rounded-xl bg-white/[0.015] animate-pulse" />
+                  ))}
+                </div>
+              ) : plan ? (
+                <StrategyTable plan={plan} onPublish={handlePublish} onAddToBatch={handleAddToBatch} />
+              ) : (
+                <div className="rounded-2xl border border-white/[0.04] bg-white/[0.01] p-12 text-center">
+                  <CheckCircle2 className="w-7 h-7 text-emerald-400/22 mx-auto mb-3" />
+                  <p className="text-[14px] font-semibold text-white/30">
+                    {queuedCount > 0 ? `${queuedCount} vehicle${queuedCount !== 1 ? "s" : ""} already publishing` : "No vehicles require action right now"}
+                  </p>
                 </div>
               )}
             </div>
-          )}
+
+            {/* ── Hold Today (collapsed) ────────────────────────────────────── */}
+            {plan && plan.holdToday.length > 0 && (
+              <div className="mb-8">
+                <button className="flex items-center gap-2 w-full mb-3" onClick={() => setShowHold(v => !v)}>
+                  <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">
+                    Hold Today · {plan.holdToday.length}
+                  </p>
+                  <div className="flex-1 h-px bg-white/[0.04]" />
+                  {showHold ? <ChevronUp className="w-3 h-3 text-white/18" /> : <ChevronDown className="w-3 h-3 text-white/18" />}
+                </button>
+                {showHold && (
+                  <div className="space-y-1.5">
+                    {plan.holdToday.slice(0, 8).map(rec => <HoldCard key={rec.vehicleId} rec={rec} />)}
+                  </div>
+                )}
+              </div>
+            )}
 
           </div>
         </div>

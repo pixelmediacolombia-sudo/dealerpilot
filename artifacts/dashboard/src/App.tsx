@@ -25,6 +25,7 @@ import { MarketplaceListings } from "@/pages/SalesAI/MarketplaceListings";
 import { InventoryEngine } from "@/pages/InventoryEngine";
 import { AIPhotoStudio } from "@/pages/AIPhotoStudio";
 import MarketIntelligencePage from "@/pages/MarketplaceIntelligence";
+import { PublishingConflictsPage } from "@/pages/MarketplaceIntelligence/PublishingConflicts";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/leads/:id" component={LeadDetail} />
 
       {/* Market Intelligence Engine */}
+      <Route path="/marketplace-intelligence/publishing-conflicts" component={PublishingConflictsPage} />
       <Route path="/marketplace-intelligence" component={MarketIntelligencePage} />
 
       <Route path="/inventory-engine" component={InventoryEngine} />

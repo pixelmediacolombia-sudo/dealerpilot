@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useDealerLocation } from "@/context/LocationContext";
 import { PageHeader } from "@/components/shared";
@@ -6,10 +7,19 @@ import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
 import { PublishNowModal } from "@/components/PublishNowModal";
 import {
+  useListListingWorkspaces,
+  useListPublishingJobs,
+  useListMarketplaceRecommendations,
+} from "@workspace/api-client-react";
+import {
+  buildDailyMarketplacePlan,
+} from "@/lib/dailyPlan";
+import {
   Flame, TrendingDown, DollarSign, Clock, MapPin, BarChart3,
   Car, Zap, Star, ChevronRight, RefreshCw, ArrowUp, ArrowDown,
   Minus, Target, Trophy, AlertTriangle, Calendar, Camera,
   SendHorizontal, Eye, CheckCircle2, ImageIcon, UploadCloud,
+  ShieldCheck, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -638,10 +648,30 @@ function InsightKpi({
 type ActiveSection = "opportunities" | "market" | "regional" | "insights";
 
 export default function MarketIntelligencePage() {
+  const [, setLocation] = useLocation();
   const { data, loading, error, refresh } = useOpportunityData();
   const [activeSection, setActiveSection] = useState<ActiveSection>("opportunities");
   const [refreshing, setRefreshing] = useState(false);
   const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
+  const [conflictsExpanded, setConflictsExpanded] = useState(false);
+
+  // Publishing conflicts data (React Query — cached, no extra API call)
+  const { selectedLocation } = useDealerLocation();
+  const { data: workspacesData } = useListListingWorkspaces({ location: selectedLocation });
+  const { data: recsData } = useListMarketplaceRecommendations({ location: selectedLocation });
+  const { data: jobsData } = useListPublishingJobs({ location: selectedLocation });
+
+  const conflictsPlan = useMemo(() => {
+    if (!workspacesData?.workspaces || !recsData?.recommendations || !jobsData?.jobs) return null;
+    return buildDailyMarketplacePlan(
+      workspacesData.workspaces,
+      recsData.recommendations as never,
+      jobsData.jobs,
+    );
+  }, [workspacesData, recsData, jobsData]);
+
+  const duplicateGroups = conflictsPlan?.duplicateGroups ?? [];
+  const protectedCount = duplicateGroups.reduce((sum, g) => sum + g.holdOthers.length, 0);
 
   const ins = data?.insights;
   const sections = data?.sections;
@@ -768,6 +798,71 @@ export default function MarketIntelligencePage() {
               {/* ── Best Opportunities tab ────────────────────────────────── */}
               {activeSection === "opportunities" && (
                 <div className="space-y-8">
+
+                  {/* Publishing Conflicts panel */}
+                  {duplicateGroups.length > 0 && (
+                    <div className="rounded-2xl border border-amber-500/15 overflow-hidden">
+                      <button
+                        onClick={() => setConflictsExpanded(v => !v)}
+                        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-amber-500/[0.04] transition-colors"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-amber-400/60 shrink-0" />
+                        <div className="flex-1 text-left">
+                          <p className="text-[12px] font-bold text-amber-400/70">
+                            Publishing Conflicts
+                          </p>
+                          <p className="text-[11px] text-white/30 mt-0.5">
+                            DealerPilot automatically prevents inventory self-competition.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4 shrink-0">
+                          <div className="text-right hidden sm:block">
+                            <p className="text-[11px] font-bold text-amber-400/60">
+                              {duplicateGroups.length} duplicate group{duplicateGroups.length !== 1 ? "s" : ""} detected
+                            </p>
+                            <p className="text-[10px] text-white/25">
+                              {protectedCount} vehicles protected · Est. +{Math.min(Math.round(protectedCount * 0.45), 28)}% visibility
+                            </p>
+                          </div>
+                          {conflictsExpanded
+                            ? <ChevronUp className="w-4 h-4 text-amber-400/40" />
+                            : <ChevronDown className="w-4 h-4 text-amber-400/40" />
+                          }
+                        </div>
+                      </button>
+
+                      {conflictsExpanded && (
+                        <div className="border-t border-amber-500/10 px-5 pb-4 pt-3 space-y-2">
+                          {duplicateGroups.slice(0, 5).map(g => (
+                            <div key={g.key} className="flex items-center gap-3 text-[11px]">
+                              <span className="text-amber-400/50 font-bold w-[140px] shrink-0 truncate">
+                                {g.make} {g.model}
+                              </span>
+                              <span className="text-white/35">
+                                Publish: {g.publishFirst.label}
+                              </span>
+                              <span className="text-white/18">·</span>
+                              <span className="text-white/22">
+                                Hold {g.holdOthers.length} other{g.holdOthers.length !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          ))}
+                          {duplicateGroups.length > 5 && (
+                            <p className="text-[10px] text-white/22">
+                              +{duplicateGroups.length - 5} more groups
+                            </p>
+                          )}
+                          <button
+                            onClick={() => setLocation("/marketplace-intelligence/publishing-conflicts")}
+                            className="mt-3 flex items-center gap-1.5 text-[11px] font-bold text-amber-400/50 hover:text-amber-400/80 transition-colors uppercase tracking-wider"
+                          >
+                            View Duplicate Groups →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Hot Vehicles — diversity-guardrailed Top 10 */}
                   {(() => {
                     const diverseTop10 = applyDiversityTop10(data.vehicles);

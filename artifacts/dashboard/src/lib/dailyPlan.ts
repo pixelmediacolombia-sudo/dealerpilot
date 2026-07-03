@@ -468,3 +468,56 @@ export function buildDailyMarketplacePlan(
     dataSource: "Estimated Strategy",
   };
 }
+
+// ─── Strategic Reason Generator ───────────────────────────────────────────────
+// Picks the best single-sentence reason to show in the strategy table.
+// Priority: whyThisAudience (narrative) → reasons[0] → adAngle → attribute-based
+export function generateReason(rec: DailyVehicleRec): string {
+  if (rec.whyThisAudience) {
+    const s = rec.whyThisAudience.split(".")[0].trim();
+    if (s.length > 8 && s.length < 130) return s;
+  }
+  if (rec.reasons.length > 0) {
+    const r = rec.reasons[0];
+    if (r && r.length < 120) return r;
+  }
+  if (rec.adAngle && rec.adAngle.length > 0) return `"${rec.adAngle}"`;
+  const parts: string[] = [];
+  if (rec.primarySegment && rec.primarySegment !== "General") parts.push(`${rec.primarySegment} demand`);
+  if (rec.opportunityScore != null && rec.opportunityScore >= 85) parts.push("top opportunity score");
+  if (rec.mileage != null && rec.mileage < 30_000) parts.push("low mileage");
+  if (rec.imageCount >= 15) parts.push(`${rec.imageCount} photos ready`);
+  return parts.join(" · ") || "High market opportunity";
+}
+
+// ─── Duplicate group publish/hold reason builders ─────────────────────────────
+export function buildPublishReasons(group: DuplicateGroup): string[] {
+  const winner = group.publishFirst;
+  const runner = group.holdOthers[0];
+  const reasons: string[] = [];
+  if (runner) {
+    if ((winner.opportunityScore ?? 0) > (runner.opportunityScore ?? 0)) {
+      reasons.push(`Highest Opportunity Score (${winner.opportunityScore ?? "—"})`);
+    }
+    if ((winner.actualPrice ?? Infinity) < (runner.actualPrice ?? Infinity)) reasons.push("Lowest price");
+    if (winner.imageCount > runner.imageCount) reasons.push(`Most photos (${winner.imageCount})`);
+    if ((winner.mileage ?? Infinity) < (runner.mileage ?? Infinity)) reasons.push("Lowest mileage");
+  }
+  if (winner.imageCount >= 10) reasons.push("AI Creative Ready");
+  if (winner.primarySegment && winner.primarySegment !== "General") {
+    reasons.push(`Highest ${winner.primarySegment} Buyer Match`);
+  }
+  if (reasons.length === 0) reasons.push("Best overall vehicle in this group");
+  return reasons;
+}
+
+export function buildHoldReasons(vehicle: DailyVehicleRec, winner: DailyVehicleRec): string[] {
+  const reasons: string[] = ["Too similar — would compete with published listing"];
+  if ((vehicle.opportunityScore ?? 0) < (winner.opportunityScore ?? 0)) {
+    reasons.push(`Lower Opportunity Score (${vehicle.opportunityScore ?? "—"} vs ${winner.opportunityScore ?? "—"})`);
+  }
+  if ((vehicle.actualPrice ?? 0) > (winner.actualPrice ?? 0)) reasons.push("Higher price");
+  if (vehicle.imageCount < winner.imageCount) reasons.push(`Fewer photos (${vehicle.imageCount})`);
+  reasons.push(`Publish after ${winner.year ?? ""} ${winner.make} ${winner.model} expires`);
+  return reasons;
+}
