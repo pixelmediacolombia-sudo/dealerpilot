@@ -151,7 +151,7 @@ function AiStatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── Processed Vehicle Card ────────────────────────────────────────────────────
+// ── Processing Queue Row ──────────────────────────────────────────────────────
 
 function VehicleCard({
   job,
@@ -163,96 +163,89 @@ function VehicleCard({
   onReprocess: (vehicleId: number) => void;
 }) {
   const name = vName(job.vehicleYear, job.vehicleMake, job.vehicleModel, job.vehicleTrim);
-  const isProcessing = job.status === "Processing";
+  const isProcessing = job.status === "Processing" || job.status === "Queued";
   const isDone = job.status === "Completed";
   const isFailed = job.status === "Failed" || job.status === "Cancelled";
   const aiStatus = job.vehicleAiStatus ?? (isDone ? "Ready" : isProcessing ? "Processing" : isFailed ? "Failed" : "Pending");
-  const isMarketplaceReady = aiStatus === "Ready";
   const enhancedCount = isDone ? job.processedPhotos : 0;
+  const pct = enhancedCount > 0 && job.totalPhotos > 0
+    ? Math.round((enhancedCount / job.totalPhotos) * 100)
+    : 0;
 
   return (
-    <div className="group relative bg-card border border-white/[0.06] rounded-2xl overflow-hidden hover:border-white/[0.12] transition-all duration-200">
-      <div className="relative aspect-[16/9] bg-white/[0.03] overflow-hidden">
+    <div className={cn(
+      "flex items-center gap-5 px-5 py-3.5 border-b border-white/[0.04] last:border-0 transition-colors hover:bg-white/[0.015]",
+      isFailed && "border-l-2 border-l-red-500/30",
+      isProcessing && "border-l-2 border-l-blue-500/30",
+      isDone && aiStatus === "Ready" && "border-l-2 border-l-amber-500/25",
+    )}>
+      {/* Thumbnail */}
+      <div className="w-[72px] h-[52px] shrink-0 rounded-lg overflow-hidden bg-white/[0.03] border border-white/[0.05] relative">
         {job.vehicleThumbnailUrl ? (
-          <img src={job.vehicleThumbnailUrl} alt={name}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" />
+          <img src={job.vehicleThumbnailUrl} alt={name} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <ImageIcon className="w-8 h-8 text-white/10" />
-          </div>
-        )}
-        {isMarketplaceReady && (
-          <div className="absolute top-3 left-3">
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-green-500/90 text-black backdrop-blur-sm">
-              <Store className="w-3 h-3" />Marketplace Ready
-            </span>
+            <ImageIcon className="w-4 h-4 text-white/10" />
           </div>
         )}
         {isProcessing && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
-              <span className="text-xs text-white/80 font-medium">Enhancing photos…</span>
-            </div>
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+            <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
           </div>
         )}
       </div>
-      <div className="p-4 space-y-3">
-        <div className="space-y-1.5">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-white text-sm leading-tight">{name}</h3>
-            <AiStatusBadge status={aiStatus} />
-          </div>
-          {job.vehicleTrim && (
-            <div className="text-[11px] text-white/40">{job.vehicleTrim}</div>
+
+      {/* Vehicle info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold text-white/75 truncate">{name}</p>
+        <div className="flex items-center gap-3 mt-1">
+          {/* Photo counts as chips */}
+          <span className="text-[10px] text-white/30 font-mono">{job.totalPhotos} orig</span>
+          {enhancedCount > 0 && (
+            <span className="text-[10px] text-amber-400/70 font-mono">{enhancedCount} enhanced</span>
+          )}
+          {job.completedAt && (
+            <span className="text-[10px] text-white/18 font-mono">{timeAgo(job.completedAt)}</span>
           )}
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2.5 text-center">
-            <div className="text-sm font-semibold text-white">{job.totalPhotos}</div>
-            <div className="text-[10px] text-white/40 mt-0.5">Original</div>
-          </div>
-          <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2.5 text-center">
-            <div className={cn("text-sm font-semibold", enhancedCount > 0 ? "text-green-400" : "text-white/30")}>
-              {enhancedCount}
-            </div>
-            <div className="text-[10px] text-white/40 mt-0.5">Enhanced</div>
-          </div>
-          <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2.5 text-center">
-            <div className="text-sm font-semibold text-white">
-              {enhancedCount > 0 && job.totalPhotos > 0
-                ? `${Math.round((enhancedCount / job.totalPhotos) * 100)}%` : "—"}
-            </div>
-            <div className="text-[10px] text-white/40 mt-0.5">Complete</div>
-          </div>
-        </div>
-        {job.completedAt && (
-          <div className="flex items-center gap-1.5 text-[11px] text-white/30">
-            <Clock className="w-3 h-3" />Processed {timeAgo(job.completedAt)}
+        {/* Progress bar */}
+        {job.totalPhotos > 0 && (
+          <div className="mt-1.5 h-[2px] w-32 bg-white/[0.06] rounded-full overflow-hidden">
+            <div
+              className={cn("h-full rounded-full transition-all", isDone ? "bg-amber-400" : isProcessing ? "bg-blue-400" : "bg-white/10")}
+              style={{ width: isProcessing ? "60%" : `${pct}%` }}
+            />
           </div>
         )}
-        <div className="flex items-center gap-2 pt-0.5">
-          {isDone && job.outputSetId !== null ? (
-            <Button size="sm" className="flex-1 h-8 text-xs premium-gradient-btn"
-              onClick={() => onOpenStudio(job.vehicleId)}>
-              <Sparkles className="w-3 h-3 mr-1.5" />Open Studio
-            </Button>
-          ) : isFailed ? (
-            <Button variant="outline" size="sm" className="flex-1 h-8 text-xs"
-              onClick={() => onReprocess(job.vehicleId)}>
-              <RotateCcw className="w-3 h-3 mr-1.5" />Retry
-            </Button>
-          ) : isProcessing ? (
-            <div className="flex-1 h-8 flex items-center justify-center">
-              <span className="text-xs text-blue-400/70">Processing…</span>
-            </div>
-          ) : (
-            <Button variant="outline" size="sm" className="flex-1 h-8 text-xs"
-              onClick={() => onReprocess(job.vehicleId)}>
-              <Sparkles className="w-3 h-3 mr-1.5" />Enhance Photos
-            </Button>
-          )}
-        </div>
+      </div>
+
+      {/* Status */}
+      <div className="shrink-0 hidden md:block">
+        <AiStatusBadge status={aiStatus} />
+      </div>
+
+      {/* Action */}
+      <div className="shrink-0">
+        {isDone && job.outputSetId !== null ? (
+          <Button size="sm" className="h-7 text-[11px] px-3 premium-gradient-btn"
+            onClick={() => onOpenStudio(job.vehicleId)}>
+            <Sparkles className="w-3 h-3 mr-1" />Open Studio
+          </Button>
+        ) : isFailed ? (
+          <Button variant="ghost" size="sm" className="h-7 text-[11px] px-3 text-red-400/70 hover:text-red-400"
+            onClick={() => onReprocess(job.vehicleId)}>
+            <RotateCcw className="w-3 h-3 mr-1" />Retry
+          </Button>
+        ) : isProcessing ? (
+          <span className="text-[11px] text-blue-400/60 font-mono">
+            {job.status === "Queued" ? "In queue…" : "Processing…"}
+          </span>
+        ) : (
+          <Button variant="ghost" size="sm" className="h-7 text-[11px] px-3 text-white/30 hover:text-amber-400"
+            onClick={() => onReprocess(job.vehicleId)}>
+            <Sparkles className="w-3 h-3 mr-1" />Enhance
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -555,25 +548,26 @@ export function AIPhotoStudio() {
           </div>
         )}
 
-        {/* Processed vehicles grid (only shown if any exist) */}
+        {/* Processing queue */}
         {!isLoading && processedVehicles.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-white/70">
-                {processedVehicles.length} processed vehicle{processedVehicles.length !== 1 ? "s" : ""}
-              </h2>
-              <div className="flex items-center gap-1.5 text-[11px] text-white/30">
-                <CheckCircle2 className="w-3 h-3 text-green-400/70" />
-                <span className="text-green-400/70">{readyCount} ready</span>
-                {processingCount > 0 && (
-                  <>
-                    <span>·</span>
-                    <span className="text-blue-400/70">{processingCount} processing</span>
-                  </>
-                )}
+            <div className="flex items-center gap-3 mb-3">
+              <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Processing Queue</p>
+              <div className="flex-1 h-px bg-white/[0.04]" />
+              <div className="flex items-center gap-3 text-[10px] font-mono">
+                <span className="text-amber-400/70">{readyCount} ready</span>
+                {processingCount > 0 && <span className="text-blue-400/70">{processingCount} active</span>}
+                {failedCount > 0 && <span className="text-red-400/50">{failedCount} failed</span>}
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Queue header */}
+            <div className="flex items-center gap-5 px-5 py-2 text-[9px] font-black uppercase tracking-[0.18em] text-white/18 border border-white/[0.05] rounded-t-xl">
+              <div className="w-[72px] shrink-0">Frame</div>
+              <div className="flex-1 min-w-0">Vehicle</div>
+              <div className="shrink-0 hidden md:block w-28">Status</div>
+              <div className="shrink-0 w-24 text-right">Action</div>
+            </div>
+            <div className="border border-t-0 border-white/[0.05] bg-white/[0.005] rounded-b-xl overflow-hidden">
               {processedVehicles.map((job) => (
                 <VehicleCard
                   key={job.vehicleId}
