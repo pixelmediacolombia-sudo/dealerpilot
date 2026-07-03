@@ -649,4 +649,192 @@ router.post("/marketplace-intelligence/seed", async (req, res) => {
   }
 });
 
+// ── GET /api/marketplace-intelligence/opportunity ─────────────────────────────
+// Returns all vehicles ranked by Opportunity Score with full sub-score breakdown.
+// Sections: hot (≥80), cooling (aging ≥60 days), competitive (best priceScore),
+//           byLot (regional breakdown), and market-level insights.
+router.get("/marketplace-intelligence/opportunity", async (req, res) => {
+  // Fetch active vehicles + intelligence in one pass
+  const vehicles = await db
+    .select()
+    .from(vehiclesTable)
+    .where(and(eq(vehiclesTable.dealerId, DEALER_ID), eq(vehiclesTable.status, "Active")));
+
+  if (vehicles.length === 0) {
+    res.json({ vehicles: [], insights: null, sections: { hot: [], cooling: [], competitive: [], byLot: [] } });
+    return;
+  }
+
+  const vehicleIds = vehicles.map((v) => v.id);
+  const vehicleMap = new Map(vehicles.map((v) => [v.id, v]));
+
+  const [intelligenceRows, thumbnailRows] = await Promise.all([
+    db.select()
+      .from(vehicleIntelligenceTable)
+      .where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID)),
+    db.select({ vehicleId: vehicleImagesTable.vehicleId, url: vehicleImagesTable.url })
+      .from(vehicleImagesTable)
+      .where(and(inArray(vehicleImagesTable.vehicleId, vehicleIds), eq(vehicleImagesTable.position, 0))),
+  ]);
+
+  const intelligenceMap = new Map(intelligenceRows.map((r) => [r.vehicleId, r]));
+  const thumbnailMap = new Map(thumbnailRows.map((r) => [r.vehicleId, r.url]));
+
+  // Parse v2 strategy name from explanation
+  function parseStrategyName(explanation: string | null): string | null {
+    if (!explanation) return null;
+    try {
+      const p = JSON.parse(explanation) as Record<string, unknown>;
+      if (p["v"] === 2) return (p["strategyName"] as string) ?? null;
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  // Build scored vehicle list (only for vehicles that have intelligence + opportunity score)
+  const scored = vehicles
+    .map((v) => {
+      const intel = intelligenceMap.get(v.id);
+      if (!intel || intel.opportunityScore == null) return null;
+      const factors: string[] = (() => {
+        try { return JSON.parse(intel.opportunityFactors ?? "[]") as string[]; } catch { return []; }
+      })();
+      return {
+        vehicleId: v.id,
+        year: v.year,
+        make: v.make,
+        model: v.model,
+        trim: v.trim ?? null,
+        price: v.price ?? null,
+        mileage: v.mileage ?? null,
+        bodyStyle: v.bodyStyle ?? null,
+        status: v.status,
+        lotLocation: v.lotLocation ?? null,
+        vin: v.vin ?? null,
+        thumbnailUrl: thumbnailMap.get(v.id) ?? null,
+        // Opportunity scores
+        opportunityScore: intel.opportunityScore,
+        marketDemandScore: intel.marketDemandScore ?? 0,
+        priceScore: intel.priceScore ?? 0,
+        seasonalScore: intel.seasonalScore ?? 0,
+        dealerPerformanceScore: intel.dealerPerformanceScore ?? 0,
+        buyerDemandScore: intel.buyerDemandScore ?? 0,
+        inventoryHealthScore: intel.inventoryHealthScore ?? 0,
+        creativePerformanceScore: intel.creativePerformanceScore ?? 0,
+        pricingPosition: intel.pricingPosition ?? "Market Average",
+        daysOnLot: intel.daysOnLot ?? 0,
+        opportunityFactors: factors,
+        // Strategy
+        strategyName: parseStrategyName(intel.explanation),
+        recommendedDayOfWeek: intel.recommendedDayOfWeek ?? null,
+        recommendedDayLabel: intel.recommendedDayOfWeek != null ? (DAY_NAMES[intel.recommendedDayOfWeek] ?? null) : null,
+        recommendedTimeOfDay: intel.recommendedTimeOfDay ?? null,
+        recommendedTimeLabel: intel.recommendedTimeOfDay != null ? timeLabel(intel.recommendedTimeOfDay) : null,
+        expectedLeadQuality: intel.expectedLeadQuality ?? "warm",
+        confidenceScore: intel.confidenceScore,
+      };
+    })
+    .filter((v): v is NonNullable<typeof v> => v !== null)
+    .sort((a, b) => b.opportunityScore - a.opportunityScore);
+
+  // Market-level insights
+  const scores = scored.map((v) => v.opportunityScore);
+  const avgScore = scores.length > 0 ? Math.round(scores.reduce((s, n) => s + n, 0) / scores.length) : 0;
+  const hotCount = scored.filter((v) => v.opportunityScore >= 75).length;
+  const warmCount = scored.filter((v) => v.opportunityScore >= 60 && v.opportunityScore < 80).length;
+  const coldCount = scored.filter((v) => v.opportunityScore < 60).length;
+  const agingCount = scored.filter((v) => v.daysOnLot >= 60).length;
+  const belowMarketCount = scored.filter((v) => v.pricingPosition === "Below Market").length;
+  const atMarketCount = scored.filter((v) => v.pricingPosition === "Market Average").length;
+  const aboveMarketCount = scored.filter((v) => v.pricingPosition === "Above Market").length;
+  const avgDaysOnLot = scored.length > 0
+    ? Math.round(scored.reduce((s, v) => s + v.daysOnLot, 0) / scored.length) : 0;
+
+  // Seasonal context for July (current month)
+  const month = new Date().getMonth() + 1;
+  const seasonContext =
+    month >= 6 && month <= 8 ? "Summer Peak — SUVs, Trucks & Convertibles lead demand" :
+    month >= 2 && month <= 4 ? "Tax Season — Economy vehicles and EVs surge" :
+    month >= 9 && month <= 11 ? "Fall Season — Trucks and AWD vehicles in demand" :
+    "Winter Season — 4WD and all-weather vehicles preferred";
+
+  // Top body type by avg opportunity score
+  const byBodyType = new Map<string, number[]>();
+  for (const v of scored) {
+    const bt = v.bodyStyle ?? "Other";
+    const arr = byBodyType.get(bt) ?? [];
+    arr.push(v.opportunityScore);
+    byBodyType.set(bt, arr);
+  }
+  let topBodyType = "Truck";
+  let topBodyScore = 0;
+  for (const [bt, btScores] of byBodyType.entries()) {
+    const a = Math.round(btScores.reduce((s, n) => s + n, 0) / btScores.length);
+    if (a > topBodyScore) { topBodyScore = a; topBodyType = bt; }
+  }
+
+  // Sections
+  const hot = scored.filter((v) => v.opportunityScore >= 75).slice(0, 10);
+  const cooling = [...scored]
+    .sort((a, b) => b.daysOnLot - a.daysOnLot)
+    .filter((v) => v.daysOnLot >= 30)
+    .slice(0, 10);
+  const competitive = [...scored]
+    .sort((a, b) => b.priceScore - a.priceScore)
+    .slice(0, 10);
+
+  // Regional breakdown by lot
+  const byLotMap = new Map<string, { count: number; scores: number[]; hot: number }>();
+  for (const v of scored) {
+    const loc = v.lotLocation ?? "Unknown";
+    const entry = byLotMap.get(loc) ?? { count: 0, scores: [], hot: 0 };
+    entry.count++;
+    entry.scores.push(v.opportunityScore);
+    if (v.opportunityScore >= 80) entry.hot++;
+    byLotMap.set(loc, entry);
+  }
+  const byLot = Array.from(byLotMap.entries())
+    .map(([location, data]) => ({
+      location,
+      count: data.count,
+      avgOpportunityScore: Math.round(data.scores.reduce((s, n) => s + n, 0) / data.scores.length),
+      hotCount: data.hot,
+    }))
+    .sort((a, b) => b.avgOpportunityScore - a.avgOpportunityScore);
+
+  // Body type demand for market trends
+  const bodyTypeTrend = Array.from(byBodyType.entries())
+    .map(([bodyType, btScores]) => ({
+      bodyType,
+      count: btScores.length,
+      avgScore: Math.round(btScores.reduce((s, n) => s + n, 0) / btScores.length),
+    }))
+    .sort((a, b) => b.avgScore - a.avgScore)
+    .slice(0, 6);
+
+  res.json({
+    vehicles: scored,
+    insights: {
+      avgOpportunityScore: avgScore,
+      hotCount,
+      warmCount,
+      coldCount,
+      agingCount,
+      belowMarketCount,
+      atMarketCount,
+      aboveMarketCount,
+      seasonContext,
+      topBodyType,
+      avgDaysOnLot,
+      totalVehicles: scored.length,
+    },
+    sections: {
+      hot,
+      cooling,
+      competitive,
+      byLot,
+      bodyTypeTrend,
+    },
+  });
+});
+
 export default router;

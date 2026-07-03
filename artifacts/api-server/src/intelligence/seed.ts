@@ -1,12 +1,21 @@
 import type { Logger } from "pino";
 import { db } from "@workspace/db";
-import { eq, count } from "drizzle-orm";
+import { eq, count, isNull, and } from "drizzle-orm";
 import {
   vehiclesTable,
   creativeVersionsTable,
+  creativeScoresTable,
   vehicleIntelligenceTable,
+  listingPerformanceTable,
+  conversationsTable,
+  leadsTable,
   type Vehicle,
 } from "@workspace/db";
+import {
+  computeOpportunityScores,
+  computePriceMedians,
+  type PerfRecord,
+} from "./opportunityEngine";
 
 // ── Strategy Engine v2 ───────────────────────────────────────────────────────
 export const STRATEGY_ENGINE_VERSION = "v2";
@@ -52,11 +61,6 @@ const TIME_WEIGHTS = Array.from({ length: 24 }, (_, h) =>
 
 // ── v2 Down Payment Logic ────────────────────────────────────────────────────
 
-/**
- * Calculate the recommended down payment for a vehicle.
- * Never returns $500. Minimum is $1,500.
- * Truck/SUV adds $500. Luxury/performance adds $500–$1,000.
- */
 function calculateDownPayment(price: number, truckSUV: boolean, luxury: boolean, performance: boolean): number {
   let base: number;
   if (price < 20000) {
@@ -72,17 +76,6 @@ function calculateDownPayment(price: number, truckSUV: boolean, luxury: boolean,
   if (luxury) base += price >= 50000 ? 1000 : 500;
   if (performance && !luxury) base += 500;
   return base;
-}
-
-/**
- * Historical down payment tiers used in listing_performance records.
- * Realistic variants around the recommended baseline.
- */
-function getHistoricalDownTiers(price: number, truckSUV: boolean, luxury: boolean): number[] {
-  if (price < 20000) return [1500, 1800, 2000];
-  if (price < 35000) return [2000, 2500, 3000];
-  if (price < 50000) return [3000, 3500, 4000];
-  return [4000, 5000, 6000];
 }
 
 // ── v2 Strategy Name Logic ───────────────────────────────────────────────────
@@ -166,7 +159,6 @@ function buildV2Explanation(params: {
   const body = vehicle.bodyStyle ?? "Vehicle";
   const dp = downPayment ? `$${downPayment.toLocaleString()}` : null;
 
-  // Supporting signals
   const signals: string[] = [];
   if (truckSUV) signals.push(`${body} — consistently top-performing on weekend sessions`);
   else if (body) signals.push(`${body} body style — ${price < 20000 ? "budget tier, high volume" : "mid-premium positioning"}`);
@@ -179,7 +171,6 @@ function buildV2Explanation(params: {
   if (hasCreative) signals.push("AI-enhanced photos on file — 35% higher conversation rate expected");
   else if (photoStrategy === "original") signals.push("Original dealer photos — consider AI Vehicle Studio enhancement for best results");
 
-  // Per-strategy reason
   let reason: string;
   if (strategyName === "Truck Demand Strategy") {
     reason = `Trucks and pickups are consistently the highest-demand vehicles on Facebook Marketplace. ${dp ? `A ${dp} down payment headline pre-qualifies buyers and signals financing readiness — filtering price-shoppers from serious buyers.` : `Full price works well here — buyers already know truck market values.`}`;
@@ -201,13 +192,11 @@ function buildV2Explanation(params: {
     reason = `Strategy optimized for ${body} at ${priceStr} based on historical Marketplace performance data for this dealer.`;
   }
 
-  // Expected impact
   const convEstimate = truckSUV ? "15–22" : luxury || performance ? "8–14" : price < 20000 ? "18–28" : "10–18";
   const hotEstimate = truckSUV ? "4–7" : luxury ? "2–5" : price < 20000 ? "5–9" : "3–6";
   const apptEstimate = truckSUV ? "2–4" : luxury ? "1–3" : "1–3";
   const expectedImpact = `${convEstimate} conversations expected · ${hotEstimate} hot leads · ${apptEstimate} appointments`;
 
-  // Action CTA
   let cta: string;
   if (dp) {
     cta = `Post ${dayLabel} at ${timeLabel} · Headline: "${dp} down — ${vehicle.year} ${vehicle.make} ${vehicle.model}" · Retail ${priceStr}`;
@@ -271,7 +260,6 @@ function generateVehicleStrategy(
   const luxury = isLuxury(vehicle.make);
   const performance = isPerformance(vehicle.make, vehicle.model);
 
-  // ── Price strategy ──────────────────────────────────────────────────────────
   let priceStrategy: string;
   if (price < 16000) {
     priceStrategy = "full_price";
@@ -291,36 +279,28 @@ function generateVehicleStrategy(
     priceStrategy = "full_price";
   }
 
-  // ── Down payment — v2 rules, never $500 ─────────────────────────────────────
   let recommendedDownPayment: number | null = null;
   if (priceStrategy === "down_payment") {
     recommendedDownPayment = calculateDownPayment(price, truckSUV, luxury, performance);
   }
 
-  // ── Low engagement detection — only flag if consistently zero conversations ───
-  // "Price Review Needed" is reserved for vehicles with MULTIPLE records showing
-  // near-zero engagement (0–1 conversations per record), not just a low score.
   const totalConvos = vehiclePerf.reduce((s, p) => s + p.conversationsCount, 0);
   const lowEngagement =
     vehiclePerf.length >= 2 &&
-    totalConvos <= vehiclePerf.length && // avg ≤1 convo per record
+    totalConvos <= vehiclePerf.length &&
     avg(vehiclePerf.map((p) => p.outcomeScore)) < 8;
 
-  // ── Strategy name + slug ─────────────────────────────────────────────────────
   const strategyName = getStrategyName(
     vehicle, truckSUV, luxury, performance,
     priceStrategy, vehiclePerf.length > 0, lowEngagement,
   );
   if (strategyName === "Price Review Needed") priceStrategy = "price_review";
 
-  // ── Photo strategy ───────────────────────────────────────────────────────────
   const photoStrategy = hasCreative ? "ai_creative" : "original";
 
-  // ── Posting time ──────────────────────────────────────────────────────────────
   const recommendedDayOfWeek = globalStats.bestDayOfWeek;
   const recommendedTimeOfDay = globalStats.bestTimeOfDay;
 
-  // ── Confidence score ─────────────────────────────────────────────────────────
   let confidenceScore = 42;
   if (vehiclePerf.length >= 1) confidenceScore += 15;
   if (vehiclePerf.length >= 3) confidenceScore += 10;
@@ -328,7 +308,6 @@ function generateVehicleStrategy(
   if (globalStats.sampleSize >= 20) confidenceScore += 10;
   confidenceScore = Math.min(95, confidenceScore);
 
-  // ── Build rich v2 explanation ─────────────────────────────────────────────────
   const dayLabel = DAY_NAMES[recommendedDayOfWeek] ?? "Saturday";
   const hour = recommendedTimeOfDay;
   const timeLabel = hour === 0 ? "12am" : hour < 12 ? `${hour}am` : hour === 12 ? "12pm" : `${hour - 12}pm`;
@@ -347,7 +326,6 @@ function generateVehicleStrategy(
     confidenceScore,
   });
 
-  // ── Expected lead quality ─────────────────────────────────────────────────────
   let expectedLeadQuality = "warm";
   if (truckSUV || (priceStrategy === "down_payment" && price < 30000)) expectedLeadQuality = "hot";
   else if (luxury && price >= 45000) expectedLeadQuality = "cold";
@@ -364,6 +342,152 @@ function generateVehicleStrategy(
     explanation,
     expectedLeadQuality,
   };
+}
+
+// ── Opportunity Score Seed ────────────────────────────────────────────────────
+
+export async function seedOpportunityScores(logger: Logger): Promise<void> {
+  // Check if already scored: any vehicle_intelligence row with null opportunityScore
+  const [nullCheck] = await db
+    .select({ cnt: count() })
+    .from(vehicleIntelligenceTable)
+    .where(
+      and(
+        eq(vehicleIntelligenceTable.dealerId, DEALER_ID),
+        isNull(vehicleIntelligenceTable.opportunityScore),
+      ),
+    );
+
+  const needsScoring = (nullCheck?.cnt ?? 0) > 0;
+  if (!needsScoring) {
+    logger.info("Opportunity scores already computed; skipping");
+    return;
+  }
+
+  logger.info("Computing Opportunity Scores for all vehicles…");
+
+  // Fetch all active vehicles
+  const vehicles = await db
+    .select()
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.dealerId, DEALER_ID));
+
+  if (vehicles.length === 0) return;
+
+  // Batch-fetch supporting data
+  const [allPerf, allConvos, allLeads, allCreativeVersions, allCreativeScores] = await Promise.all([
+    db.select().from(listingPerformanceTable).where(eq(listingPerformanceTable.dealerId, DEALER_ID)),
+    db.select({
+      vehicleId: conversationsTable.vehicleId,
+      id: conversationsTable.id,
+    }).from(conversationsTable).where(eq(conversationsTable.dealerId, DEALER_ID)),
+    db.select({
+      vehicleId: leadsTable.vehicleId,
+      temperature: leadsTable.temperature,
+    }).from(leadsTable).where(eq(leadsTable.dealerId, DEALER_ID)),
+    db.select({ vehicleId: creativeVersionsTable.vehicleId, id: creativeVersionsTable.id })
+      .from(creativeVersionsTable).where(eq(creativeVersionsTable.dealerId, DEALER_ID)),
+    db.select({
+      creativeVersionId: creativeScoresTable.creativeVersionId,
+      overallScore: creativeScoresTable.overall,
+    }).from(creativeScoresTable),
+  ]);
+
+  // Build lookup maps
+  const perfByVehicle = new Map<number, PerfRecord[]>();
+  for (const r of allPerf) {
+    const arr = perfByVehicle.get(r.vehicleId) ?? [];
+    arr.push({ outcomeScore: r.outcomeScore, conversationsCount: r.conversationsCount, hotLeadsCount: r.hotLeadsCount });
+    perfByVehicle.set(r.vehicleId, arr);
+  }
+
+  const convosByVehicle = new Map<number, number>();
+  for (const r of allConvos) {
+    if (r.vehicleId == null) continue;
+    convosByVehicle.set(r.vehicleId, (convosByVehicle.get(r.vehicleId) ?? 0) + 1);
+  }
+
+  const hotLeadsByVehicle = new Map<number, number>();
+  const leadsByVehicle = new Map<number, number>();
+  for (const r of allLeads) {
+    if (r.vehicleId == null) continue;
+    leadsByVehicle.set(r.vehicleId, (leadsByVehicle.get(r.vehicleId) ?? 0) + 1);
+    if (r.temperature === "Hot") {
+      hotLeadsByVehicle.set(r.vehicleId, (hotLeadsByVehicle.get(r.vehicleId) ?? 0) + 1);
+    }
+  }
+
+  // Creative scores: version → score
+  const creativeScoreByVersion = new Map<number, number>();
+  for (const cs of allCreativeScores) {
+    if (cs.overallScore != null) creativeScoreByVersion.set(cs.creativeVersionId, cs.overallScore);
+  }
+
+  // creative version id by vehicle
+  const creativeVersionsByVehicle = new Map<number, number[]>();
+  for (const cv of allCreativeVersions) {
+    const arr = creativeVersionsByVehicle.get(cv.vehicleId) ?? [];
+    arr.push(cv.id);
+    creativeVersionsByVehicle.set(cv.vehicleId, arr);
+  }
+
+  function avgCreativeScoreForVehicle(vehicleId: number): number | null {
+    const versionIds = creativeVersionsByVehicle.get(vehicleId) ?? [];
+    if (versionIds.length === 0) return null;
+    const scores = versionIds
+      .map((id) => creativeScoreByVersion.get(id))
+      .filter((s): s is number => s != null);
+    if (scores.length === 0) return null;
+    return scores.reduce((s, n) => s + n, 0) / scores.length;
+  }
+
+  // Compute price medians from all vehicles (Active + others for better median)
+  const priceMedians = computePriceMedians(vehicles);
+
+  const now = new Date();
+  let updated = 0;
+
+  for (const vehicle of vehicles) {
+    const medianKey = `${(vehicle.make ?? "").toLowerCase()}:${(vehicle.model ?? "").toLowerCase()}`;
+    const scores = computeOpportunityScores({
+      vehicle,
+      priceMedian: priceMedians.get(medianKey) ?? null,
+      perfRecords: perfByVehicle.get(vehicle.id) ?? [],
+      conversationCount: convosByVehicle.get(vehicle.id) ?? 0,
+      hotLeadCount: hotLeadsByVehicle.get(vehicle.id) ?? 0,
+      leadCount: leadsByVehicle.get(vehicle.id) ?? 0,
+      avgCreativeScore: avgCreativeScoreForVehicle(vehicle.id),
+      now,
+    });
+
+    await db
+      .insert(vehicleIntelligenceTable)
+      .values({
+        vehicleId: vehicle.id,
+        dealerId: DEALER_ID,
+        ...scores,
+        opportunityFactors: JSON.stringify(scores.opportunityFactors),
+      })
+      .onConflictDoUpdate({
+        target: vehicleIntelligenceTable.vehicleId,
+        set: {
+          opportunityScore: scores.opportunityScore,
+          marketDemandScore: scores.marketDemandScore,
+          priceScore: scores.priceScore,
+          seasonalScore: scores.seasonalScore,
+          dealerPerformanceScore: scores.dealerPerformanceScore,
+          buyerDemandScore: scores.buyerDemandScore,
+          inventoryHealthScore: scores.inventoryHealthScore,
+          creativePerformanceScore: scores.creativePerformanceScore,
+          pricingPosition: scores.pricingPosition,
+          daysOnLot: scores.daysOnLot,
+          opportunityFactors: JSON.stringify(scores.opportunityFactors),
+        },
+      });
+    updated++;
+  }
+
+  logger.info({ updated }, "Opportunity Scores seeded");
 }
 
 // ── Main seed function ────────────────────────────────────────────────────────
@@ -384,7 +508,9 @@ export async function seedMarketplaceIntelligence(logger: Logger): Promise<void>
 
     const isV2 = firstRec?.key?.startsWith(V2_MARKER) ?? false;
     if (isV2) {
-      logger.info("Marketplace intelligence already seeded with Strategy Engine v2; skipping");
+      logger.info("Marketplace intelligence already seeded with Strategy Engine v2; skipping strategy seed");
+      // Always run opportunity scoring (idempotent — skips if already scored)
+      await seedOpportunityScores(logger);
       return;
     }
 
@@ -409,12 +535,9 @@ export async function seedMarketplaceIntelligence(logger: Logger): Promise<void>
     .where(eq(creativeVersionsTable.dealerId, DEALER_ID));
   const creativeVehicleIds = new Set(creativeVersions.map((cv) => cv.vehicleId));
 
-  // Use statistical defaults — no fake historical performance records.
-  // Strategy is derived algorithmically from vehicle attributes (type, price, make).
-  // Real performance data will populate as vehicles are published and buyers engage.
   const globalStats = {
-    bestDayOfWeek: 6,   // Saturday — statistically peak Marketplace day
-    bestTimeOfDay: 18,  // 6 pm — peak engagement window
+    bestDayOfWeek: 6,   // Saturday
+    bestTimeOfDay: 18,  // 6pm
     sampleSize: 0,
   };
 
@@ -435,4 +558,7 @@ export async function seedMarketplaceIntelligence(logger: Logger): Promise<void>
     { vehicles: vehicles.length, engine: STRATEGY_ENGINE_VERSION },
     "Marketplace Intelligence seeded with Strategy Engine v2",
   );
+
+  // Always run opportunity scoring after strategy seed
+  await seedOpportunityScores(logger);
 }

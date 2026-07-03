@@ -14,6 +14,11 @@ import { z } from "zod/v4";
 // recommendedPriceStrategy: full_price | down_payment | starting_down
 // recommendedPhotoStrategy: original | ai_creative | mixed
 // expectedLeadQuality: hot | warm | cold
+//
+// Opportunity Engine v1 (added columns):
+// opportunityScore = weighted composite of 7 sub-scores (0–100)
+// pricingPosition: "Below Market" | "Market Average" | "Above Market"
+// opportunityFactors: JSON stringified string[]
 export const vehicleIntelligenceTable = pgTable(
   "vehicle_intelligence",
   {
@@ -30,6 +35,18 @@ export const vehicleIntelligenceTable = pgTable(
     explanation: text("explanation"),
     expectedLeadQuality: text("expected_lead_quality").default("warm"),
     generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
+    // ── Opportunity Engine v1 ─────────────────────────────────────────────────
+    opportunityScore: integer("opportunity_score"),
+    marketDemandScore: integer("market_demand_score"),
+    priceScore: integer("price_score"),
+    seasonalScore: integer("seasonal_score"),
+    dealerPerformanceScore: integer("dealer_performance_score"),
+    buyerDemandScore: integer("buyer_demand_score"),
+    inventoryHealthScore: integer("inventory_health_score"),
+    creativePerformanceScore: integer("creative_performance_score"),
+    pricingPosition: text("pricing_position"),
+    daysOnLot: integer("days_on_lot"),
+    opportunityFactors: text("opportunity_factors"),
   },
   (table) => [uniqueIndex("vehicle_intelligence_vehicle_idx").on(table.vehicleId)],
 );
