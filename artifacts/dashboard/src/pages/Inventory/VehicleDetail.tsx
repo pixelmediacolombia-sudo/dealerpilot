@@ -174,7 +174,7 @@ export function VehicleDetail() {
           
           {/* Header */}
           <div className="space-y-4">
-            <Link href="/inventory" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors font-medium">
+            <Link href="/inventory" className="inline-flex items-center text-sm text-cyan-400/60 hover:text-cyan-400 transition-colors font-medium">
               <ChevronLeft className="w-4 h-4 mr-1" /> Back to Inventory
             </Link>
             
@@ -198,35 +198,32 @@ export function VehicleDetail() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3 glass-panel p-2 rounded-xl">
-                <Button variant="ghost" className="gap-2 hover:bg-primary/10 hover:text-primary transition-colors" disabled>
-                  <Wand2 className="w-4 h-4" /> AI Generate
-                </Button>
-                <div className="w-px h-8 bg-border self-center" />
-                <Button variant="ghost" className="gap-2 hover:bg-success/10 hover:text-success transition-colors" disabled>
-                  <UploadCloud className="w-4 h-4" /> Queue Publish
-                </Button>
-                
-                <div className="w-px h-8 bg-border self-center" />
-                
+              <div className="flex flex-wrap gap-2 glass-panel p-2 rounded-xl">
                 {vehicle.status !== "Ready to Publish" && (
                   <Button 
-                    variant="outline"
-                    className="gap-2 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
+                    className="gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold"
                     onClick={() => handleStatusUpdate("Ready to Publish")}
                     disabled={updateStatus.isPending}
                   >
                     <CheckCircle2 className="w-4 h-4" /> Mark Ready
                   </Button>
                 )}
+                <Button variant="ghost" className="gap-2 hover:bg-success/10 hover:text-success transition-colors" disabled>
+                  <UploadCloud className="w-4 h-4" /> Queue Publish
+                </Button>
+                <Button variant="ghost" className="gap-2 hover:bg-cyan-500/10 hover:text-cyan-400 transition-colors" disabled>
+                  <Wand2 className="w-4 h-4" /> Generate Photos
+                </Button>
+                <div className="w-px h-8 bg-border self-center" />
                 {vehicle.status !== "Archived" && (
                   <Button 
                     variant="ghost" 
-                    className="gap-2 hover:bg-destructive/10 hover:text-destructive"
+                    size="sm"
+                    className="gap-1.5 text-xs hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
                     onClick={() => handleStatusUpdate("Archived")}
                     disabled={updateStatus.isPending}
                   >
-                    <Archive className="w-4 h-4" />
+                    <Archive className="w-3.5 h-3.5" /> Archive
                   </Button>
                 )}
               </div>
@@ -420,11 +417,11 @@ export function VehicleDetail() {
                 onPhotoModeChange={(mode) => { setPhotoMode(mode); setSelectedIdx(0); }}
               />
               
-              {/* AI Strategy Intelligence */}
+              {/* Strategy */}
               {intel && (
                 <SectionCard
-                  title="AI Strategy Intelligence"
-                  icon={<Brain className="w-4 h-4 text-primary" />}
+                  title="Strategy"
+                  icon={<Brain className="w-4 h-4 text-cyan-400" />}
                 >
                   <div className="space-y-4">
                     {/* Confidence */}

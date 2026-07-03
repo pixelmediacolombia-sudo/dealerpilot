@@ -551,23 +551,29 @@ export function ListingsWorkspace() {
       <div className="flex-1 overflow-y-auto bg-background/50">
         <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
           <PageHeader
-            eyebrow="AI Listing Generator"
-            title="Marketplace AI"
+            eyebrow="Marketplace"
+            title="Marketplace"
             description={
               <div className="flex flex-col gap-3">
                 <span className="text-muted-foreground text-sm">
-                  DealerPilot is managing {allCount} AI listing workspaces.
+                  {allCount} listing workspaces
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary" className="bg-success/10 text-success border-success/20">
-                    {publishedWorkspacesCount} Live
-                  </Badge>
-                  <Badge variant="secondary" className="bg-secondary/50 text-secondary-foreground border-white/5">
-                    {readyCount} Ready
-                  </Badge>
-                  <Badge variant="secondary" className="bg-secondary/50 text-secondary-foreground border-white/5">
-                    {generatingCount} Generating
-                  </Badge>
+                  {publishedWorkspacesCount > 0 && (
+                    <Badge variant="secondary" className="bg-success/10 text-success border-success/20">
+                      {publishedWorkspacesCount} Live
+                    </Badge>
+                  )}
+                  {readyCount > 0 && (
+                    <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-green-500/20">
+                      {readyCount} Ready
+                    </Badge>
+                  )}
+                  {generatingCount > 0 && (
+                    <Badge variant="secondary" className="bg-secondary/50 text-secondary-foreground border-white/5">
+                      {generatingCount} Generating
+                    </Badge>
+                  )}
                   {scheduledCount > 0 && (
                     <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 border-purple-500/20">
                       {scheduledCount} Scheduled
@@ -609,8 +615,8 @@ export function ListingsWorkspace() {
                     Production Readiness
                   </Button>
                 </Link>
-                <Tabs value={activeTab} onValueChange={handleTabChange} className="w-auto">
-                  <TabsList className="bg-transparent border-0 gap-1.5 flex-wrap justify-end">
+                <Tabs value={activeTab} onValueChange={handleTabChange} className="w-auto max-w-[700px]">
+                  <TabsList className="bg-transparent border-0 gap-1 flex-nowrap overflow-x-auto whitespace-nowrap w-full">
                     <TabsTrigger value="ready" className={tabClass}>
                       Ready {countBadge(readyCount)}
                     </TabsTrigger>

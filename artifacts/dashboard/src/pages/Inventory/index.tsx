@@ -165,9 +165,9 @@ export function InventoryDashboard() {
         <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
 
           <PageHeader
-            eyebrow="Marketplace AI"
+            eyebrow="Inventory"
             title="Inventory"
-            description="DealerPilot AI analyzed your catalog and identified these vehicles for review."
+            description="Your complete vehicle catalog."
             action={
               <div className="flex items-center gap-2">
                 <div className="bg-secondary/50 rounded-lg p-1 border border-border/50 flex">
@@ -188,16 +188,16 @@ export function InventoryDashboard() {
               isLoading={statsLoading}
             />
             <KpiCard
-              title="AI Active Inventory"
+              title="Active Inventory"
               value={stats?.active || 0}
-              icon={<Activity className="w-4 h-4" />}
+              icon={<Activity className="w-4 h-4 text-cyan-400" />}
               trend={{ value: 12, isPositive: true }}
               isLoading={statsLoading}
             />
             <KpiCard
-              title="AI Ready to Publish"
+              title="Ready to Publish"
               value={stats?.readyToPublish || 0}
-              icon={<Tag className="w-4 h-4 text-primary" />}
+              icon={<Tag className="w-4 h-4 text-cyan-400" />}
               isLoading={statsLoading}
             />
             <KpiCard
@@ -206,17 +206,6 @@ export function InventoryDashboard() {
               icon={<Share className="w-4 h-4 text-success" />}
               isLoading={statsLoading}
             />
-          </div>
-
-          {/* Active dealer badge */}
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-green-500/[0.06] border border-green-500/20">
-              <MapPin className="w-3.5 h-3.5 text-green-400 shrink-0" />
-              <div>
-                <div className="text-[10px] font-bold text-green-400 uppercase tracking-widest">Active Dealer</div>
-                <div className="text-sm font-bold text-white leading-tight">Alpha Motorsport</div>
-              </div>
-            </div>
           </div>
 
           {/* Filters + selection toolbar */}

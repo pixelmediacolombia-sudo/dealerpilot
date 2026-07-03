@@ -209,9 +209,9 @@ export function DealerDna() {
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <div className="p-8 max-w-7xl mx-auto w-full flex-1 overflow-y-auto animate-in fade-in duration-500">
           <PageHeader
-            eyebrow="BRAND IDENTITY"
-            title={<>Brand <span className="text-primary">DNA</span></>}
-            description="DealerPilot uses your brand defaults to drive every creative generated in the studio."
+            eyebrow="Dealer DNA"
+            title={<>Dealer <span className="text-orange-400">DNA</span></>}
+            description="Brand defaults that drive every creative DealerPilot generates."
             icon={Dna}
             action={
               <Button onClick={handleSave} disabled={update.isPending} className="gap-2 h-11 px-6 rounded-xl font-bold text-[11px] uppercase tracking-widest premium-gradient-btn shadow-lg">
@@ -225,13 +225,13 @@ export function DealerDna() {
             }
           />
 
-          <div className="grid grid-cols-1 xl:grid-cols-5 gap-10 items-start pt-6 pb-20">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-10 items-start pt-6 pb-20">
             {/* Form */}
-            <div className="xl:col-span-3 space-y-8">
+            <div className="space-y-8">
               
               <SectionCard 
-                title={<span className="font-bold tracking-tight text-xl">Color Palette</span>}
-                description="The core colors that tell DealerPilot how to tint overlays and text."
+                title={<span className="font-bold tracking-tight text-xl">Brand Colors</span>}
+                description="The colors DealerPilot uses to tint overlays and text in every creative."
                 icon={Palette}
                 className="border-white/5 bg-card/40 backdrop-blur-md"
               >
@@ -255,8 +255,8 @@ export function DealerDna() {
               </SectionCard>
 
               <SectionCard
-                title={<span className="font-bold tracking-tight text-xl">Typography & Assets</span>}
-                description="Font choices and logos DealerPilot applies to your creatives."
+                title={<span className="font-bold tracking-tight text-xl">Store Identity</span>}
+                description="Font and logo DealerPilot applies to your creatives."
                 icon={Type}
                 className="border-white/5 bg-card/40 backdrop-blur-md"
               >
@@ -295,8 +295,8 @@ export function DealerDna() {
               </SectionCard>
 
               <SectionCard
-                title={<span className="font-bold tracking-tight text-xl">Creative Defaults</span>}
-                description="Base styles DealerPilot uses when spinning up new studio variations."
+                title={<span className="font-bold tracking-tight text-xl">Offer Rules</span>}
+                description="Default style and layout DealerPilot uses for new creatives."
                 icon={LayoutTemplate}
                 className="border-white/5 bg-card/40 backdrop-blur-md"
               >
@@ -358,14 +358,14 @@ export function DealerDna() {
             </div>
 
             {/* Live preview */}
-            <div className="xl:col-span-2">
-              <div className="sticky top-8 space-y-6 glass-panel p-8 rounded-3xl border border-primary/20 bg-primary/5 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+            <div>
+              <div className="sticky top-8 space-y-6 glass-panel p-8 rounded-3xl border border-orange-500/15 bg-orange-500/[0.03] shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
                 <div>
-                  <h3 className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-2 text-primary mb-1">
-                    <div className="w-2 h-2 rounded-full bg-primary animate-ping" /> AI Live Preview
+                  <h3 className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-2 text-orange-400 mb-1">
+                    <div className="w-2 h-2 rounded-full bg-orange-400 animate-ping" /> Live Preview
                   </h3>
-                  <p className="text-sm font-medium text-foreground/80 tracking-tight">DealerPilot updates this preview as you edit</p>
+                  <p className="text-sm font-medium text-foreground/60 tracking-tight">Updates as you edit</p>
                 </div>
                 
                 <div className="space-y-8 mt-6">

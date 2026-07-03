@@ -138,7 +138,7 @@ function OpportunityCard({
     <div className="glass-panel rounded-xl border border-white/[0.06] hover:border-primary/20 transition-colors overflow-hidden">
       <div className="flex gap-4 p-4">
         {/* Photo */}
-        <div className="w-20 h-16 rounded-lg overflow-hidden bg-secondary/40 flex-shrink-0 relative">
+        <div className="w-24 h-20 rounded-lg overflow-hidden bg-secondary/40 flex-shrink-0 relative">
           {rec.primaryImageUrl ? (
             <img src={rec.primaryImageUrl} alt={rec.label} className="w-full h-full object-cover" />
           ) : (
@@ -181,15 +181,18 @@ function OpportunityCard({
             </span>
           </div>
 
-          {/* Reason bullets — top 2 always visible */}
+          {/* Reason bullets — skip any that duplicate the strategy badge */}
           {rec.reasons.length > 0 && (
             <ul className="space-y-0.5 mb-2">
-              {rec.reasons.slice(0, 2).map((r, i) => (
-                <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                  <span className="w-1 h-1 rounded-full bg-primary/60 mt-1.5 flex-shrink-0" />
-                  {r}
-                </li>
-              ))}
+              {rec.reasons
+                .filter((r) => r.trim() !== rec.strategyName?.trim())
+                .slice(0, 2)
+                .map((r, i) => (
+                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                    <span className="w-1 h-1 rounded-full bg-primary/60 mt-1.5 flex-shrink-0" />
+                    {r}
+                  </li>
+                ))}
             </ul>
           )}
 
@@ -458,41 +461,46 @@ export function SalesHub() {
                 Publish Next Best
               </Button>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[9px] uppercase tracking-widest gap-1">
-                <Zap className="w-2.5 h-2.5" /> Strategy Engine
-              </Badge>
-              <span className="text-[10px] text-white/25">Real inventory · DealerPilot AI</span>
-            </div>
           </div>
 
           {/* ── MISSION CARDS ────────────────────────────────────────────────── */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 mb-8">
-            <button
-              onClick={() => setLocation("/listings")}
-              className="glass-panel rounded-xl border border-white/[0.06] hover:border-blue-500/25 p-4 text-left transition-all"
-            >
-              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center mb-3">
-                <Car className="w-4 h-4 text-blue-400" />
-              </div>
-              <div className="text-[26px] font-bold text-white leading-none mb-1">
-                {isLoading ? "—" : (vehicleStats?.readyToPublish ?? plan?.recommendedToday.length ?? 0)}
-              </div>
-              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Vehicles Ready</div>
-            </button>
+            {(() => {
+              const vReady = vehicleStats?.readyToPublish ?? plan?.recommendedToday.length ?? 0;
+              const hasReady = !isLoading && vReady > 0;
+              return (
+                <button
+                  onClick={() => setLocation("/listings")}
+                  className={cn("glass-panel rounded-xl border p-4 text-left transition-all", hasReady ? "border-blue-500/25 hover:border-blue-500/40" : "border-white/[0.06] hover:border-white/10")}
+                >
+                  <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-3", hasReady ? "bg-blue-500/10" : "bg-white/[0.03]")}>
+                    <Car className={cn("w-4 h-4", hasReady ? "text-blue-400" : "text-white/20")} />
+                  </div>
+                  <div className={cn("text-[26px] font-bold leading-none mb-1", hasReady ? "text-blue-400" : "text-white/30")}>
+                    {isLoading ? "—" : vReady}
+                  </div>
+                  <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Vehicles Ready</div>
+                </button>
+              );
+            })()}
 
-            <button
-              onClick={() => setLocation("/listings?tab=publishing")}
-              className="glass-panel rounded-xl border border-white/[0.06] hover:border-green-500/25 p-4 text-left transition-all"
-            >
-              <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center mb-3">
-                <UploadCloud className="w-4 h-4 text-green-400" />
-              </div>
-              <div className="text-[26px] font-bold text-white leading-none mb-1">
-                {isLoading ? "—" : listingsLive}
-              </div>
-              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Listings Live</div>
-            </button>
+            {(() => {
+              const hasLive = !isLoading && listingsLive > 0;
+              return (
+                <button
+                  onClick={() => setLocation("/listings?tab=published")}
+                  className={cn("glass-panel rounded-xl border p-4 text-left transition-all", hasLive ? "border-green-500/25 hover:border-green-500/40" : "border-white/[0.06] hover:border-white/10")}
+                >
+                  <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-3", hasLive ? "bg-green-500/10" : "bg-white/[0.03]")}>
+                    <UploadCloud className={cn("w-4 h-4", hasLive ? "text-green-400" : "text-white/20")} />
+                  </div>
+                  <div className={cn("text-[26px] font-bold leading-none mb-1", hasLive ? "text-green-400" : "text-white/30")}>
+                    {isLoading ? "—" : listingsLive}
+                  </div>
+                  <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Listings Live</div>
+                </button>
+              );
+            })()}
 
             <button
               onClick={() => setLocation("/sales-ai")}
@@ -547,6 +555,8 @@ export function SalesHub() {
               <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Issues</div>
             </button>
           </div>
+
+          <div className="h-px bg-white/[0.04] mb-2" />
 
           <div className="flex flex-col xl:flex-row gap-8">
 

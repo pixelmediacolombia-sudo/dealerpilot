@@ -1,0 +1,231 @@
+DEALERPILOT v4 — VISUAL POLISH PASS
+
+Use the QA report as the source of truth.
+
+Do not add features.
+Do not change backend logic.
+Do not touch publishing automation.
+This is UI polish only.
+
+====================================================
+1. Apply module accents everywhere
+====================================================
+
+Sidebar accents must carry into every page.
+
+Command Center: blue
+Marketplace: green
+Inventory: cyan
+AI Photo Studio: amber/gold
+Sales AI: violet
+Dealer DNA: orange
+
+Apply accents to:
+- page eyebrow
+- page icon
+- section dividers
+- primary CTA
+- active badges
+- important metric highlights
+
+Stop using default blue everywhere.
+
+====================================================
+2. Fix wrong page labels
+====================================================
+
+Eyebrows must match module names exactly:
+
+Command Center
+Marketplace
+Inventory
+AI Photo Studio
+Sales AI
+Dealer DNA
+
+Remove:
+- AI Listing Generator
+- Marketplace AI on Inventory page
+- Marketplace CRM on Sales AI page
+
+====================================================
+3. Reduce “AI” overuse
+====================================================
+
+The product is already AI.
+
+Rename labels:
+- AI Active Inventory → Active Inventory
+- AI Ready to Publish → Ready to Publish
+- AI Enhanced → Enhanced
+- AI Generate → Generate
+- AI Strategy Intelligence → Strategy
+- AI Listing Generator → Marketplace
+
+Keep “AI Photo Studio” as module name only.
+
+====================================================
+4. Command Center cleanup
+====================================================
+
+Remove:
+- STRATEGY ENGINE badge
+- “Real inventory · DealerPilot AI”
+- duplicate “Fast Turn Strategy” bullet
+- duplicate photo count bullet
+
+Improve:
+- more space inside mission cards
+- make zero-value cards visually quiet
+- make #1 opportunity visually more dominant
+- add clear separator between mission cards and opportunities
+- thumbnails larger
+
+Command Center should answer:
+“What needs my attention today?”
+
+====================================================
+5. Marketplace cleanup
+====================================================
+
+Remove duplicate status pills when values are zero.
+
+Collapse the tab bar into one horizontal scrollable row.
+
+Remove duplicate strategy text under each vehicle if the badge already shows it.
+
+Make “Today’s Picks” the hero section.
+
+Use green accent, not amber, for Marketplace strategy badges unless urgent.
+
+====================================================
+6. Inventory cleanup
+====================================================
+
+Remove:
+- ACTIVE DEALER pill inside page
+- repeated “AI” prefixes
+- duplicate Catalog vs Active Inventory if they show same count
+
+Fix stat card alignment.
+
+Use cyan accent on page icon, metrics, active filters, and vehicle status.
+
+====================================================
+7. AI Photo Studio cleanup
+====================================================
+
+Make before/after the hero.
+
+Remove redundant stats:
+- if Processed and Enhanced are identical, keep only Enhanced.
+
+Use amber/gold accent.
+
+Vehicle cards should show:
+- Original
+- Enhanced
+- Status
+- Needs Review if applicable
+
+No tiny crowded badge rows.
+
+====================================================
+8. Sales AI redesign pass
+====================================================
+
+Rename page header:
+Sales AI
+
+Make it conversation-first.
+
+Use violet accent.
+
+Zero-value stats should be visually quiet or hidden.
+
+Conversation card should be primary.
+
+Remove orphan links:
+- ALSO: Leads CRM / All Listings
+
+Primary action should be:
+Open Conversation
+
+Secondary:
+Listing
+Appointment
+Sold
+
+Make it feel like an inbox, not broken CRM cards.
+
+====================================================
+9. Dealer DNA polish
+====================================================
+
+Use orange accent everywhere.
+
+Make AI Live Preview larger and dominant.
+
+Left settings form should feel secondary.
+
+Rename generic labels into more branded language:
+- Brand Colors
+- Market Voice
+- Offer Rules
+- Store Identity
+
+Save button should visually belong to the form.
+
+====================================================
+10. Vehicle Detail polish
+====================================================
+
+Use Inventory cyan accent.
+
+Replace AI Photo Review with embedded AI Photo Studio if not already done.
+
+Simplify action row:
+Primary: Publish / Queue
+Secondary: Generate Photos
+Tertiary actions in overflow menu.
+
+Remove unlabeled icon-only archive button or add clear tooltip.
+
+Add photo skeleton/loading fallback.
+
+Make AI Photo Studio panel stronger than strategy panel when photos are not ready.
+
+====================================================
+11. Global spacing and hierarchy
+====================================================
+
+Increase whitespace.
+Reduce borders.
+Use fewer equal-weight cards.
+Make important actions visually obvious.
+Make zero states quiet.
+
+The app should feel like:
+- Linear
+- Arc
+- Tesla service software
+- Apple Vision Pro operations console
+
+Not like:
+- generic shadcn dashboard
+- copied AI SaaS template
+
+====================================================
+Acceptance
+====================================================
+
+After polish:
+- each module has its own visual identity
+- page labels are consistent
+- duplicate text is removed
+- “AI” is not overused
+- Command Center feels like a mission screen
+- Marketplace feels like a publishing cockpit
+- Sales AI feels like an inbox
+- AI Photo Studio feels like the visual/media engine
+- DealerPilot feels custom, premium, and authentic

@@ -332,16 +332,16 @@ export function SalesAIWorkspace() {
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-                  <Bot className="w-4 h-4 text-primary" />
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                  <MessageSquare className="w-4 h-4 text-violet-400" />
                 </div>
                 <div>
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">SALES AI</div>
-                  <h1 className="text-xl font-semibold text-white tracking-tight leading-none">Marketplace CRM</h1>
+                  <div className="text-[10px] font-bold text-violet-400/60 uppercase tracking-widest">Sales AI</div>
+                  <h1 className="text-xl font-semibold text-white tracking-tight leading-none">Sales AI</h1>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground ml-10">
-                DealerPilot monitors your Marketplace listings and buyer conversations 24/7.
+                Buyer conversations from your Marketplace listings.
               </p>
             </div>
             <div className="flex gap-2">
@@ -357,22 +357,29 @@ export function SalesAIWorkspace() {
             </div>
           </div>
 
-          {/* KPI row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* KPI row — only show non-zero stats prominently */}
+          <div className="flex items-center gap-3 flex-wrap">
             {[
-              { label: "Live Listings", value: liveCount, icon: Radio, color: "text-green-400" },
-              { label: "New Messages", value: newMessages.length, icon: MessageSquare, color: newMessages.length > 0 ? "text-blue-400" : "text-muted-foreground" },
-              { label: "Appointments", value: appointments.length, icon: Calendar, color: appointments.length > 0 ? "text-amber-400" : "text-muted-foreground" },
-              { label: "Sold", value: sold.length, icon: CheckCircle2, color: sold.length > 0 ? "text-primary" : "text-muted-foreground" },
-            ].map((kpi) => (
-              <div key={kpi.label} className="bg-card border border-white/[0.06] rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wide">{kpi.label}</span>
-                  <kpi.icon className={cn("w-4 h-4", kpi.color)} />
+              { label: "Live", value: liveCount, icon: Radio, activeColor: "text-green-400", activeBg: "bg-green-500/10 border-green-500/20" },
+              { label: "New Messages", value: newMessages.length, icon: MessageSquare, activeColor: "text-violet-400", activeBg: "bg-violet-500/10 border-violet-500/20" },
+              { label: "Appointments", value: appointments.length, icon: Calendar, activeColor: "text-amber-400", activeBg: "bg-amber-500/10 border-amber-500/20" },
+              { label: "Sold", value: sold.length, icon: CheckCircle2, activeColor: "text-emerald-400", activeBg: "bg-emerald-500/10 border-emerald-500/20" },
+            ].map((kpi) => {
+              const active = kpi.value > 0;
+              return (
+                <div
+                  key={kpi.label}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold transition-colors",
+                    active ? kpi.activeBg : "bg-white/[0.02] border-white/[0.04] opacity-40",
+                  )}
+                >
+                  <kpi.icon className={cn("w-3.5 h-3.5", active ? kpi.activeColor : "text-white/20")} />
+                  <span className={active ? kpi.activeColor : "text-white/20"}>{kpi.value}</span>
+                  <span className={cn("text-[11px] font-medium", active ? "text-white/60" : "text-white/15")}>{kpi.label}</span>
                 </div>
-                <div className={cn("text-2xl font-bold tabular-nums", kpi.color)}>{kpi.value}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Body */}
@@ -404,7 +411,7 @@ export function SalesAIWorkspace() {
                 onClick={() => navigate("/listings")}
               >
                 <ChevronRight className="w-4 h-4" />
-                Open Marketplace AI
+                Open Marketplace
               </Button>
             </div>
           ) : !hasEngagement ? (
@@ -462,18 +469,7 @@ export function SalesAIWorkspace() {
             </div>
           )}
 
-          {/* Quick nav footer */}
-          {hasAny && (
-            <div className="flex items-center gap-3 pt-2 border-t border-white/[0.04]">
-              <span className="text-[10px] text-muted-foreground/40 uppercase tracking-widest">Also</span>
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground/60 hover:text-white/70" onClick={() => navigate("/leads")}>
-                <Inbox className="w-3 h-3 mr-1.5" /> Leads CRM
-              </Button>
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground/60 hover:text-white/70" onClick={() => navigate("/sales-ai/marketplace-listings")}>
-                <Radio className="w-3 h-3 mr-1.5" /> All Listings
-              </Button>
-            </div>
-          )}
+          {hasAny && <div className="h-4" />}
         </div>
       </div>
     </AppLayout>

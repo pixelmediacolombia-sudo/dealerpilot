@@ -490,10 +490,9 @@ export function AIPhotoStudio() {
   ).length;
 
   const kpis = [
-    { label: "Processed", value: processedVehicles.length, icon: Camera, color: "text-white" },
-    { label: "AI Enhanced", value: readyCount, icon: Sparkles, color: "text-green-400" },
-    { label: "In Progress", value: processingCount, icon: Loader2, color: "text-blue-400", spin: processingCount > 0 },
-    { label: "Needs Attention", value: failedCount, icon: Clock, color: failedCount > 0 ? "text-red-400" : "text-white/40" },
+    { label: "Enhanced", value: readyCount, icon: Sparkles, color: "text-amber-400" },
+    { label: "In Progress", value: processingCount, icon: Loader2, color: processingCount > 0 ? "text-blue-400" : "text-white/30", spin: processingCount > 0 },
+    { label: "Needs Attention", value: failedCount, icon: Clock, color: failedCount > 0 ? "text-red-400" : "text-white/30" },
   ];
 
   if (openVehicleId !== null) {
@@ -511,8 +510,7 @@ export function AIPhotoStudio() {
       <div className="max-w-5xl mx-auto px-6 py-6 space-y-8">
         <PageHeader
           eyebrow="AI Photo Studio"
-          title="Photo Studio"
-          subtitle="Your vehicle media library"
+          title="AI Photo Studio"
           icon={Camera}
           action={
             <Button
@@ -533,7 +531,7 @@ export function AIPhotoStudio() {
         />
 
         {/* KPI row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {kpis.map((kpi) => {
             const Icon = kpi.icon;
             return (
