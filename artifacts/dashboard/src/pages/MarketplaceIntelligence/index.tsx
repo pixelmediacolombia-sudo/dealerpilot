@@ -28,6 +28,7 @@ interface OpportunityVehicle {
   status: string;
   lotLocation: string | null;
   thumbnailUrl: string | null;
+  missingPrice: boolean;
   opportunityScore: number;
   opportunityLabel: OpportunityLabel;
   recommendedAction: RecommendedAction;
@@ -286,6 +287,11 @@ function VehicleRow({
               {vehicle.price != null ? formatCurrency(vehicle.price) : "—"}
               {vehicle.mileage != null ? ` · ${vehicle.mileage.toLocaleString()} mi` : ""}
             </span>
+            {vehicle.missingPrice && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                No Price
+              </span>
+            )}
             {vehicle.bodyStyle && (
               <span className="text-[10px] text-white/20">{vehicle.bodyStyle}</span>
             )}

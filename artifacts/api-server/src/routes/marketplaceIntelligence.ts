@@ -654,11 +654,14 @@ router.post("/marketplace-intelligence/seed", async (req, res) => {
 // Sections: hot (≥80), cooling (aging ≥60 days), competitive (best priceScore),
 //           byLot (regional breakdown), and market-level insights.
 router.get("/marketplace-intelligence/opportunity", async (req, res) => {
-  // Fetch active vehicles + intelligence in one pass
+  // Fetch available vehicles: Active + Price Changed (price updated but still in lot)
   const vehicles = await db
     .select()
     .from(vehiclesTable)
-    .where(and(eq(vehiclesTable.dealerId, DEALER_ID), eq(vehiclesTable.status, "Active")));
+    .where(and(
+      eq(vehiclesTable.dealerId, DEALER_ID),
+      inArray(vehiclesTable.status, ["Active", "Price Changed"]),
+    ));
 
   if (vehicles.length === 0) {
     res.json({ vehicles: [], insights: null, sections: { hot: [], cooling: [], competitive: [], byLot: [] } });
@@ -711,6 +714,7 @@ router.get("/marketplace-intelligence/opportunity", async (req, res) => {
         lotLocation: v.lotLocation ?? null,
         vin: v.vin ?? null,
         thumbnailUrl: thumbnailMap.get(v.id) ?? null,
+        missingPrice: !v.price || v.price <= 0,
         // Opportunity scores
         opportunityScore: intel.opportunityScore,
         opportunityLabel: intel.opportunityLabel ?? "Watch",
@@ -736,7 +740,14 @@ router.get("/marketplace-intelligence/opportunity", async (req, res) => {
       };
     })
     .filter((v): v is NonNullable<typeof v> => v !== null)
-    .sort((a, b) => b.opportunityScore - a.opportunityScore);
+    .sort((a, b) => {
+      // Primary: score descending
+      if (b.opportunityScore !== a.opportunityScore) return b.opportunityScore - a.opportunityScore;
+      // Secondary: price score descending (best value wins the tie)
+      if (b.priceScore !== a.priceScore) return b.priceScore - a.priceScore;
+      // Tertiary: vehicle id ascending (stable, deterministic)
+      return a.id - b.id;
+    });
 
   // Market-level insights
   const scores = scored.map((v) => v.opportunityScore);
