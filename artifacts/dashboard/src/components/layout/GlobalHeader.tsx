@@ -22,55 +22,39 @@ import {
   MapPin,
   ChevronDown,
   ShoppingBag,
-  Zap,
   Loader2,
   WifiOff,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useDealerLocation, type DealerLocation } from "@/context/LocationContext";
 
-// ─── Pill ──────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 type PillState = "ok" | "warn" | "error" | "unknown";
 
-function pilotDot(s: PillState) {
-  if (s === "ok") return "bg-emerald-400";
-  if (s === "warn") return "bg-amber-400";
-  if (s === "error") return "bg-red-400";
-  return "bg-white/20";
-}
+// ── Telemetry segment ─────────────────────────────────────────────────────────
 
-function Pill({
-  label,
-  state,
-  detail,
-}: {
-  label: string;
-  state: PillState;
-  detail: string;
-}) {
-  const dot = pilotDot(state);
+function TelSeg({ label, value, state }: { label: string; value: string; state: PillState }) {
+  const dot =
+    state === "ok" ? "bg-emerald-400" :
+    state === "warn" ? "bg-amber-400" :
+    state === "error" ? "bg-red-400/80" :
+    "bg-white/[0.12]";
+  const val =
+    state === "ok" ? "text-emerald-400" :
+    state === "warn" ? "text-amber-400" :
+    state === "error" ? "text-red-400/80" :
+    "text-white/[0.18]";
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
-      <span className="relative flex h-1.5 w-1.5 shrink-0">
-        {state === "ok" && (
-          <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-50", dot)} />
-        )}
-        <span className={cn("relative inline-flex rounded-full h-1.5 w-1.5", dot)} />
-      </span>
-      <span className="text-[10px] font-medium text-white/40 whitespace-nowrap">{label}</span>
-      <span className={cn(
-        "text-[10px] font-bold whitespace-nowrap",
-        state === "ok" ? "text-emerald-400/80" :
-        state === "warn" ? "text-amber-400/80" :
-        state === "error" ? "text-red-400/80" :
-        "text-white/20",
-      )}>{detail}</span>
+    <div className="flex items-center gap-[5px]">
+      <span className={cn("w-[5px] h-[5px] rounded-full shrink-0", dot)} />
+      <span className="text-[9px] text-white/[0.18] font-mono tracking-[0.12em] uppercase">{label}</span>
+      <span className={cn("text-[9px] font-mono font-bold tracking-[0.08em]", val)}>{value}</span>
     </div>
   );
 }
 
-// ─── Location selector ─────────────────────────────────────────────────────────
+// ── Location selector ─────────────────────────────────────────────────────────
 
 const LOCATIONS: DealerLocation[] = ["Manassas", "Fredericksburg"];
 
@@ -80,28 +64,27 @@ function LocationSelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-primary/20 hover:bg-white/[0.07] hover:border-primary/30 transition-colors outline-none cursor-pointer">
-          <MapPin className="w-3 h-3 text-primary/60 shrink-0" />
-          <span className="text-[10px] font-medium text-white/50 whitespace-nowrap">Alpha Motorsport</span>
-          <span className="text-[10px] font-bold text-primary/90 whitespace-nowrap">— {selectedLocation.toUpperCase()}</span>
-          <ChevronDown className="w-3 h-3 text-white/30 shrink-0" />
+        <button className="flex items-center gap-1.5 outline-none group">
+          <MapPin className="w-2.5 h-2.5 text-blue-400/40 shrink-0" />
+          <span className="text-[10px] font-semibold text-white/30 group-hover:text-white/50 transition-colors">
+            Alpha Motorsport
+          </span>
+          <span className="text-[10px] font-bold text-blue-400/60 group-hover:text-blue-400/90 transition-colors uppercase tracking-widest">
+            {selectedLocation}
+          </span>
+          <ChevronDown className="w-2.5 h-2.5 text-white/15 shrink-0" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[230px]">
+      <DropdownMenuContent align="start" className="min-w-[220px]">
         {LOCATIONS.map((loc) => (
           <DropdownMenuItem
             key={loc}
-            className={cn(
-              "text-xs cursor-pointer",
-              loc === selectedLocation && "text-primary font-semibold",
-            )}
+            className={cn("text-xs cursor-pointer", loc === selectedLocation && "text-primary font-semibold")}
             onClick={() => setSelectedLocation(loc)}
           >
             <MapPin className={cn("w-3.5 h-3.5 mr-2 shrink-0", loc === selectedLocation ? "text-primary" : "text-muted-foreground")} />
             Alpha Motorsport — {loc}
-            {loc === selectedLocation && (
-              <span className="ml-auto text-primary text-xs">✓</span>
-            )}
+            {loc === selectedLocation && <span className="ml-auto text-primary text-xs">✓</span>}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -109,29 +92,28 @@ function LocationSelector() {
   );
 }
 
-// ─── Derive connection state ───────────────────────────────────────────────────
+// ── Derive connection state ───────────────────────────────────────────────────
 
 function deriveConn(data: ConnectionStatus | undefined) {
   const extStatus = (data?.chromeExtension as { status?: string } | null | undefined)?.status?.toLowerCase() ?? "";
   const extOnline = extStatus === "connected" || extStatus === "online";
-
   const fbLoggedIn = (data?.facebookSession as { fbLoggedIn?: boolean | null } | undefined)?.fbLoggedIn ?? null;
   const mktConnected = (data?.marketplace as { marketplaceConnected?: boolean | null } | undefined)?.marketplaceConnected ?? null;
 
   const extState: PillState = extOnline ? "ok" : "error";
   const fbState: PillState = fbLoggedIn === true ? "ok" : fbLoggedIn === false ? "error" : "unknown";
   const mktState: PillState = mktConnected === true ? "ok" : mktConnected === false ? "error" : "unknown";
-
   const publishingReady = extOnline && fbLoggedIn === true && mktConnected === true;
   const pubState: PillState = publishingReady ? "ok" : extOnline ? "error" : "unknown";
 
-  const needsConnect = !publishingReady;
-  const connectPending = !!data?.connectRequestedAt;
-
-  return { extState, fbState, mktState, pubState, extOnline, publishingReady, needsConnect, connectPending };
+  return {
+    extState, fbState, mktState, pubState, extOnline, publishingReady,
+    needsConnect: !publishingReady,
+    connectPending: !!data?.connectRequestedAt,
+  };
 }
 
-// ─── GlobalHeader ─────────────────────────────────────────────────────────────
+// ── GlobalHeader ──────────────────────────────────────────────────────────────
 
 export function GlobalHeader() {
   const queryClient = useQueryClient();
@@ -141,15 +123,12 @@ export function GlobalHeader() {
   const { data: connData } = useGetConnectionStatus({
     query: { queryKey: getGetConnectionStatusQueryKey(), refetchInterval: 12000 },
   });
-
   const { data: feedRunsData } = useListFeedRuns(dealerId ?? 1, {
     query: { queryKey: getListFeedRunsQueryKey(dealerId ?? 1), enabled: true, staleTime: 60000 },
   });
-
   const { data: jobsData } = useListCreativeJobs(undefined, {
     query: { queryKey: getListCreativeJobsQueryKey(), refetchInterval: 10000 },
   });
-
   const { mutate: connectMarketplace, isPending } = useConnectMarketplace({
     mutation: {
       onSuccess: () => {
@@ -165,7 +144,6 @@ export function GlobalHeader() {
   const conn = deriveConn(connData);
   const isBusy = isPending || conn.connectPending;
 
-  // Last Sync
   const lastRun = feedRunsData?.feedRuns?.[0];
   let syncDetail = "NEVER";
   if (lastRun?.finishedAt) {
@@ -173,76 +151,57 @@ export function GlobalHeader() {
     syncDetail = mins < 1 ? "NOW" : mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
   }
 
-  // AI
   const jobs = jobsData?.jobs ?? [];
   const activeJobs = jobs.filter(j => j.status === "Queued" || j.status === "Generating").length;
   const aiDetail = activeJobs > 0 ? `${activeJobs} ACTIVE` : "IDLE";
 
-  return (
-    <header className="h-10 border-b border-white/[0.05] bg-background/80 backdrop-blur-sm flex items-center gap-2 px-5 shrink-0 relative z-30">
+  const dot = (s: string) => <span className="text-white/[0.06] text-[9px] select-none">·</span>;
+  const div = () => <div className="h-3 w-px bg-white/[0.05] mx-3" />;
 
-      {/* Location selector — left side */}
+  return (
+    <header className="h-9 border-b border-white/[0.04] bg-[#06040d]/90 backdrop-blur-md flex items-center gap-3 px-5 shrink-0 relative z-30">
+
+      {/* Location */}
       <LocationSelector />
 
-      {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Connection status pills */}
-      <Pill
-        label="Extension"
-        state={conn.extState}
-        detail={conn.extState === "ok" ? "ONLINE" : "OFFLINE"}
-      />
-      <Pill
-        label="Facebook"
-        state={conn.fbState}
-        detail={conn.fbState === "ok" ? "ACTIVE" : conn.fbState === "error" ? "OFFLINE" : "UNKNOWN"}
-      />
-      <Pill
-        label="Marketplace"
-        state={conn.mktState}
-        detail={conn.mktState === "ok" ? "READY" : conn.mktState === "error" ? "BLOCKED" : "UNKNOWN"}
-      />
-      <Pill
-        label="Publishing"
-        state={conn.pubState}
-        detail={conn.pubState === "ok" ? "READY" : conn.pubState === "error" ? "NOT READY" : "PENDING"}
-      />
+      {/* ── Telemetry strip ─────────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <TelSeg label="EXT" value={conn.extState === "ok" ? "ONLINE" : "OFFLINE"} state={conn.extState} />
+        {dot("·")}
+        <TelSeg label="FB" value={conn.fbState === "ok" ? "ACTIVE" : conn.fbState === "error" ? "OFFLINE" : "—"} state={conn.fbState} />
+        {dot("·")}
+        <TelSeg label="MKT" value={conn.mktState === "ok" ? "READY" : conn.mktState === "error" ? "BLOCKED" : "—"} state={conn.mktState} />
+        {dot("·")}
+        <TelSeg label="PUB" value={conn.pubState === "ok" ? "READY" : conn.pubState === "error" ? "PENDING" : "—"} state={conn.pubState} />
 
-      {/* Divider */}
-      <div className="h-4 w-px bg-white/10 mx-0.5" />
+        {div()}
 
-      {/* Last sync + AI */}
-      <Pill
-        label="Sync"
-        state={lastRun?.status === "success" ? "ok" : lastRun ? "error" : "unknown"}
-        detail={syncDetail}
-      />
-      <Pill
-        label="AI"
-        state={activeJobs > 0 ? "warn" : "ok"}
-        detail={aiDetail}
-      />
+        <TelSeg label="SYNC" value={syncDetail} state={lastRun?.status === "success" ? "ok" : lastRun ? "error" : "unknown"} />
+        {dot("·")}
+        <TelSeg label="AI" value={aiDetail} state={activeJobs > 0 ? "warn" : "ok"} />
+      </div>
 
-      {/* Connect Marketplace button — only when not ready */}
+      {/* Connect button — only when not ready */}
       {conn.needsConnect && (
         <>
-          <div className="h-4 w-px bg-white/10 mx-0.5" />
+          {div()}
           <Button
             size="sm"
-            className="h-7 text-[11px] px-3 gap-1.5 bg-primary/90 hover:bg-primary text-white font-semibold"
+            className="h-6 text-[10px] px-3 gap-1.5 bg-blue-600/80 hover:bg-blue-600 text-white font-bold border border-blue-500/25 shadow-none rounded-md"
             onClick={() => connectMarketplace({ data: { action: "marketplace" } })}
             disabled={isBusy || !conn.extOnline}
             title={!conn.extOnline ? "Extension must be online to connect" : "Connect to Facebook Marketplace"}
           >
             {isBusy ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
+              <Loader2 className="w-2.5 h-2.5 animate-spin" />
             ) : !conn.extOnline ? (
-              <WifiOff className="w-3 h-3" />
+              <WifiOff className="w-2.5 h-2.5" />
             ) : (
-              <ShoppingBag className="w-3 h-3" />
+              <ShoppingBag className="w-2.5 h-2.5" />
             )}
-            {isBusy ? "Connecting…" : "Connect Marketplace"}
+            {isBusy ? "Connecting…" : "Connect"}
           </Button>
         </>
       )}

@@ -131,128 +131,77 @@ function OpportunityCard({
   onViewStrategy: () => void;
   isPublishing: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const colors = strategyColor(rec.strategyName);
 
   return (
-    <div className="glass-panel rounded-xl border border-white/[0.06] hover:border-primary/20 transition-colors overflow-hidden">
-      <div className="flex gap-4 p-4">
-        {/* Photo */}
-        <div className="w-24 h-20 rounded-lg overflow-hidden bg-secondary/40 flex-shrink-0 relative">
-          {rec.primaryImageUrl ? (
-            <img src={rec.primaryImageUrl} alt={rec.label} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Car className="w-5 h-5 text-muted-foreground/30" />
-            </div>
-          )}
-          <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary/90 flex items-center justify-center">
-            <span className="text-[9px] font-black text-white">{index + 1}</span>
-          </div>
-        </div>
+    <div className="flex items-center gap-4 rounded-2xl border border-white/[0.05] bg-white/[0.015] hover:border-white/[0.09] hover:bg-white/[0.022] transition-all p-4 group">
 
-        {/* Main content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-2 mb-1.5 flex-wrap">
-            {rec.strategyName && (
-              <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border flex-shrink-0", colors.bg, colors.text, colors.border)}>
-                {rec.strategyName}
-              </span>
-            )}
-            <span className="font-bold text-sm text-white truncate">{rec.label}</span>
-          </div>
+      {/* Rank */}
+      <div className="w-8 h-8 rounded-xl bg-blue-500/[0.08] border border-blue-500/[0.15] flex items-center justify-center shrink-0">
+        <span className="text-[12px] font-black text-blue-400/60">{index + 1}</span>
+      </div>
 
-          {/* Price row */}
-          <div className="flex items-center gap-2 mb-2 flex-wrap text-xs">
-            {rec.priceMode === "DOWN_PAYMENT" && rec.marketplacePrice != null ? (
-              <>
-                <span className="text-muted-foreground/60 line-through">{formatCurrency(rec.actualPrice!)}</span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold">
-                  Marketplace: {formatCurrency(rec.marketplacePrice)} down
-                </span>
-              </>
-            ) : rec.actualPrice != null ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/10 border border-success/20 text-success font-bold">
-                {formatCurrency(rec.actualPrice)} · Full price
-              </span>
-            ) : null}
-            <span className="flex items-center gap-1 text-muted-foreground">
-              <ImageIcon className="w-3 h-3" /> {rec.imageCount} photos
+      {/* Photo */}
+      <div className="w-[72px] h-[56px] rounded-xl overflow-hidden bg-white/[0.03] border border-white/[0.04] shrink-0">
+        {rec.primaryImageUrl ? (
+          <img src={rec.primaryImageUrl} alt={rec.label} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Car className="w-4 h-4 text-white/10" />
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          {rec.strategyName && (
+            <span className={cn("text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest shrink-0", colors.bg, colors.text, colors.border)}>
+              {rec.strategyName}
             </span>
-          </div>
-
-          {/* Reason bullets — skip any that duplicate the strategy badge */}
-          {rec.reasons.length > 0 && (
-            <ul className="space-y-0.5 mb-2">
-              {rec.reasons
-                .filter((r) => r.trim() !== rec.strategyName?.trim())
-                .slice(0, 2)
-                .map((r, i) => (
-                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                    <span className="w-1 h-1 rounded-full bg-primary/60 mt-1.5 flex-shrink-0" />
-                    {r}
-                  </li>
-                ))}
-            </ul>
           )}
-
-          {/* Expand button for more signals */}
-          {(rec.reasons.length > 2 || rec.supportingSignals.length > 0 || rec.expectedImpact) && (
-            <button
-              className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-1 mb-2"
-              onClick={() => setExpanded((v) => !v)}
-            >
-              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              {expanded ? "Less detail" : "Why this vehicle?"}
-            </button>
+          <span className="font-bold text-[14px] text-white/85 truncate">{rec.label}</span>
+        </div>
+        <div className="flex items-center gap-3 text-[11px]">
+          {rec.priceMode === "DOWN_PAYMENT" && rec.marketplacePrice != null ? (
+            <span className="text-amber-400 font-semibold">{formatCurrency(rec.marketplacePrice)} down</span>
+          ) : rec.actualPrice != null ? (
+            <span className="text-emerald-400 font-semibold">{formatCurrency(rec.actualPrice)}</span>
+          ) : null}
+          {rec.imageCount > 0 && (
+            <span className="flex items-center gap-1 text-white/22">
+              <ImageIcon className="w-3 h-3" />{rec.imageCount}
+            </span>
           )}
-
-          {expanded && (
-            <div className="pl-2 border-l border-white/10 space-y-2 mb-2">
-              {rec.reasons.slice(2).map((r, i) => (
-                <p key={i} className="text-xs text-muted-foreground">{r}</p>
-              ))}
-              {rec.supportingSignals.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {rec.supportingSignals.map((s, i) => (
-                    <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/60">{s}</span>
-                  ))}
-                </div>
-              )}
-              {rec.expectedImpact && (
-                <div className="flex items-start gap-1.5 p-2 rounded-lg bg-primary/5 border border-primary/15">
-                  <Target className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-white/70">{rec.expectedImpact}</p>
-                </div>
-              )}
-            </div>
+          {rec.reasons[0] && (
+            <span className="text-white/22 truncate hidden lg:block">· {rec.reasons[0]}</span>
           )}
         </div>
+      </div>
 
-        {/* Action column */}
-        <div className="flex flex-col items-end gap-2 flex-shrink-0">
-          <Button
-            size="sm"
-            className="h-8 gap-1.5 bg-success hover:bg-success/90 text-white text-xs font-semibold whitespace-nowrap"
-            disabled={isPublishing}
-            onClick={() => onPublish(rec.vehicleId)}
-          >
-            {isPublishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
-            Post to Marketplace
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground">
-                <MoreHorizontal className="w-3.5 h-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onClick={() => onAddToBatch(rec.vehicleId)}>Add to Batch</DropdownMenuItem>
-              <DropdownMenuItem onClick={onViewStrategy}>Review Strategy</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.open(`/creative-studio/${rec.vehicleId}`, "_self")}>Open Vehicle</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      {/* Actions */}
+      <div className="flex items-center gap-2 shrink-0">
+        <Button
+          size="sm"
+          className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[12px] font-bold px-4 shadow-lg shadow-blue-500/15 rounded-lg"
+          disabled={isPublishing}
+          onClick={() => onPublish(rec.vehicleId)}
+        >
+          {isPublishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
+          Publish
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white/20 hover:text-white/50 hover:bg-white/[0.04] rounded-lg">
+              <MoreHorizontal className="w-3.5 h-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={() => onAddToBatch(rec.vehicleId)}>Add to Batch</DropdownMenuItem>
+            <DropdownMenuItem onClick={onViewStrategy}>Review Strategy</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => window.open(`/creative-studio/${rec.vehicleId}`, "_self")}>Open Vehicle</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -439,230 +388,154 @@ export function SalesHub() {
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-6 md:p-8 max-w-[1400px] mx-auto animate-in fade-in slide-in-from-bottom-2 duration-400">
+      <div className="h-full flex overflow-hidden">
 
-          {/* ── MISSION HEADER ──────────────────────────────────────────────── */}
-          <div className="mb-6">
-            <p className="text-[10px] font-bold text-blue-400/50 uppercase tracking-[0.2em] mb-3">Command Center</p>
-            <div className="flex items-start justify-between gap-4 mb-2">
-              <div>
-                <p className="text-sm text-white/35 mb-1">{greeting}, Operator.</p>
-                <h1 className="text-[26px] font-bold text-white tracking-tight leading-tight">
-                  {isLoading ? "Loading opportunities…" : plan?.summary ?? `${dealer?.name ?? "Alpha Motorsport"}`}
+        {/* ── MAIN COLUMN ──────────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-8 max-w-[900px]">
+
+          {/* ── MISSION HEADER ─────────────────────────────────────────────── */}
+          <div className="mb-8 pt-1">
+            <p className="text-[9px] font-black text-blue-400/32 uppercase tracking-[0.28em] mb-5">
+              Command · {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            </p>
+            <div className="flex items-end gap-6 mb-0">
+              <div className="flex-1">
+                <h1 className="text-[52px] font-black text-white tracking-tight leading-[0.9] mb-3">
+                  {isLoading ? (
+                    <span className="text-white/12">Loading…</span>
+                  ) : plan ? (
+                    <>
+                      <span className="text-blue-400">{plan.recommendedToday.length}</span>
+                      {" "}Move{plan.recommendedToday.length !== 1 ? "s" : ""}{"\n"}Today
+                    </>
+                  ) : (
+                    "All Clear"
+                  )}
                 </h1>
+                <p className="text-[16px] text-white/28 leading-relaxed font-normal max-w-lg">
+                  {isLoading ? "" : plan?.summary ?? `${dealer?.name ?? "Alpha Motorsport"} — no action required right now.`}
+                </p>
               </div>
               <Button
-                className="shrink-0 h-9 gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[13px] px-4 mt-1"
+                className="shrink-0 h-11 gap-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[14px] px-7 shadow-xl shadow-blue-500/20 rounded-xl mb-0.5"
                 disabled={!plan?.recommendedToday[0] || isLoading}
                 onClick={() => plan?.recommendedToday[0] && setPublishNowVehicleId(plan.recommendedToday[0].vehicleId)}
               >
-                <UploadCloud className="w-3.5 h-3.5" />
+                <UploadCloud className="w-4 h-4" />
                 Publish Next Best
               </Button>
             </div>
           </div>
 
-          {/* ── MISSION CARDS ────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 mb-8">
-            {(() => {
-              const vReady = vehicleStats?.readyToPublish ?? plan?.recommendedToday.length ?? 0;
-              const hasReady = !isLoading && vReady > 0;
-              return (
-                <button
-                  onClick={() => setLocation("/listings")}
-                  className={cn("glass-panel rounded-xl border p-4 text-left transition-all", hasReady ? "border-blue-500/25 hover:border-blue-500/40" : "border-white/[0.06] hover:border-white/10")}
-                >
-                  <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-3", hasReady ? "bg-blue-500/10" : "bg-white/[0.03]")}>
-                    <Car className={cn("w-4 h-4", hasReady ? "text-blue-400" : "text-white/20")} />
-                  </div>
-                  <div className={cn("text-[26px] font-bold leading-none mb-1", hasReady ? "text-blue-400" : "text-white/30")}>
-                    {isLoading ? "—" : vReady}
-                  </div>
-                  <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Vehicles Ready</div>
-                </button>
-              );
-            })()}
-
-            {(() => {
-              const hasLive = !isLoading && listingsLive > 0;
-              return (
-                <button
-                  onClick={() => setLocation("/listings?tab=published")}
-                  className={cn("glass-panel rounded-xl border p-4 text-left transition-all", hasLive ? "border-green-500/25 hover:border-green-500/40" : "border-white/[0.06] hover:border-white/10")}
-                >
-                  <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-3", hasLive ? "bg-green-500/10" : "bg-white/[0.03]")}>
-                    <UploadCloud className={cn("w-4 h-4", hasLive ? "text-green-400" : "text-white/20")} />
-                  </div>
-                  <div className={cn("text-[26px] font-bold leading-none mb-1", hasLive ? "text-green-400" : "text-white/30")}>
-                    {isLoading ? "—" : listingsLive}
-                  </div>
-                  <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Listings Live</div>
-                </button>
-              );
-            })()}
-
-            <button
-              onClick={() => setLocation("/sales-ai")}
-              className={cn(
-                "glass-panel rounded-xl border p-4 text-left transition-all",
-                pendingLeads > 0
-                  ? "border-violet-500/25 hover:border-violet-500/40"
-                  : "border-white/[0.06] hover:border-violet-500/15",
-              )}
-            >
-              <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center mb-3",
-                pendingLeads > 0 ? "bg-violet-500/15" : "bg-white/[0.04]",
-              )}>
-                <MessageSquare className={cn("w-4 h-4", pendingLeads > 0 ? "text-violet-400" : "text-white/25")} />
-              </div>
-              <div className={cn("text-[26px] font-bold leading-none mb-1", pendingLeads > 0 ? "text-violet-400" : "text-white/50")}>
-                {pendingLeads}
-              </div>
-              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Buyers Waiting</div>
-            </button>
-
-            <button
-              onClick={() => setLocation("/sales-ai")}
-              className="glass-panel rounded-xl border border-white/[0.06] hover:border-amber-500/15 p-4 text-left transition-all"
-            >
-              <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center mb-3">
-                <Clock className="w-4 h-4 text-white/25" />
-              </div>
-              <div className="text-[26px] font-bold text-white/40 leading-none mb-1">0</div>
-              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Appointments</div>
-            </button>
-
-            <button
-              onClick={() => setLocation("/listings?tab=failed")}
-              className={cn(
-                "glass-panel rounded-xl border p-4 text-left transition-all",
-                issueCount > 0
-                  ? "border-red-500/25 hover:border-red-500/40"
-                  : "border-white/[0.06] hover:border-white/10",
-              )}
-            >
-              <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center mb-3",
-                issueCount > 0 ? "bg-red-500/10" : "bg-white/[0.04]",
-              )}>
-                <AlertTriangle className={cn("w-4 h-4", issueCount > 0 ? "text-red-400" : "text-white/25")} />
-              </div>
-              <div className={cn("text-[26px] font-bold leading-none mb-1", issueCount > 0 ? "text-red-400" : "text-white/40")}>
-                {issueCount}
-              </div>
-              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Issues</div>
-            </button>
+          {/* ── Metric strip ─────────────────────────────────────────────── */}
+          <div className="flex items-stretch border-y border-white/[0.04] mb-8 -mx-8 px-8">
+            {[
+              { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? plan?.recommendedToday.length ?? 0), label: "Ready", accent: "text-blue-400", path: "/listings" },
+              { value: isLoading ? "—" : String(listingsLive), label: "Live", accent: listingsLive > 0 ? "text-green-400" : "text-white/15", path: "/listings?tab=published" },
+              { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", accent: pendingLeads > 0 ? "text-violet-400" : "text-white/15", path: "/sales-ai" },
+              { value: "0", label: "Appts", accent: "text-white/15", path: "/sales-ai" },
+              { value: isLoading ? "—" : String(issueCount), label: "Issues", accent: issueCount > 0 ? "text-red-400" : "text-white/15", path: "/listings?tab=failed" },
+            ].map((m) => (
+              <button
+                key={m.label}
+                onClick={() => setLocation(m.path)}
+                className="flex-1 py-5 px-4 text-left hover:bg-white/[0.02] transition-colors border-r border-white/[0.04] last:border-r-0 first:pl-0 last:pr-0"
+              >
+                <div className={cn("text-[40px] font-black leading-none mb-1.5 tracking-tighter", m.accent)}>{m.value}</div>
+                <div className="text-[9px] font-bold text-white/18 uppercase tracking-[0.18em]">{m.label}</div>
+              </button>
+            ))}
           </div>
 
-          <div className="h-px bg-white/[0.04] mb-2" />
-
-          <div className="flex flex-col xl:flex-row gap-8">
-
-            {/* LEFT: Today's Picks */}
-            <div className="flex-1 flex flex-col gap-6 min-w-0">
-
-              {/* TODAY'S OPPORTUNITIES */}
-              {isLoading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
-                </div>
-              ) : !plan || plan.recommendedToday.length === 0 ? (
-                <div className="glass-panel rounded-xl border border-border/30 p-8 text-center space-y-3">
-                  <CheckCircle2 className="w-10 h-10 text-success/50 mx-auto" />
-                  <div>
-                    <p className="font-semibold text-white">No vehicles recommended right now.</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {queuedCount > 0
-                        ? `${queuedCount} vehicle${queuedCount !== 1 ? "s" : ""} already queued for publishing.`
-                        : "All ready vehicles are either queued or need review."}
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setLocation("/listings?tab=publishing")}>
-                    Review Marketplace Queue <ArrowRight className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                      Today's Opportunities · {plan.recommendedToday.length} vehicles
-                    </p>
-                    <div className="flex-1 h-px bg-white/5" />
-                  </div>
-                  {plan.recommendedToday.map((rec, i) => (
-                    <OpportunityCard
-                      key={rec.vehicleId}
-                      rec={rec}
-                      index={i}
-                      onPublish={handlePublish}
-                      onAddToBatch={handleAddToBatch}
-                      onViewStrategy={() => setLocation("/marketplace-intelligence")}
-                      isPublishing={false}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* DUPLICATE GROUPS — top 5 only, sorted by count */}
-              {plan && plan.duplicateGroups.length > 0 && (
-                <CommandCenterDuplicates groups={plan.duplicateGroups} />
-              )}
-
-              {/* HOLD VEHICLES */}
-              {plan && plan.holdToday.length > 0 && (
-                <div className="space-y-2">
-                  <button
-                    className="flex items-center gap-2 w-full"
-                    onClick={() => setShowHold(v => !v)}
-                  >
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                      Hold Today · {plan.holdToday.length} vehicles
-                    </p>
-                    <div className="flex-1 h-px bg-white/5" />
-                    {showHold ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
-                  </button>
-                  {showHold && (
-                    <div className="space-y-1.5">
-                      {plan.holdToday.slice(0, 8).map(rec => <HoldCard key={rec.vehicleId} rec={rec} />)}
-                    </div>
-                  )}
-                </div>
-              )}
-
-
+          {/* ── Command queue ──────────────────────────────────────────────── */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-5">
+              <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Command Queue</p>
+              {plan && <span className="text-[9px] font-bold text-blue-400/38 font-mono">{plan.recommendedToday.length} vehicles</span>}
+              <div className="flex-1 h-px bg-white/[0.04]" />
             </div>
 
-            {/* RIGHT: DealerPilot Live */}
-            <div className="w-full xl:w-72 shrink-0 flex flex-col gap-4 sticky top-6 self-start max-h-[calc(100vh-100px)]">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
-                  </span>
-                  DealerPilot Live
-                </h2>
-                <Badge className="text-[9px] bg-primary/10 text-primary/70 border-primary/20 uppercase tracking-widest">Real Data</Badge>
+            {isLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => <div key={i} className="h-[84px] rounded-2xl bg-white/[0.015] animate-pulse" />)}
               </div>
+            ) : !plan || plan.recommendedToday.length === 0 ? (
+              <div className="rounded-2xl border border-white/[0.04] bg-white/[0.01] p-12 text-center">
+                <CheckCircle2 className="w-7 h-7 text-emerald-400/22 mx-auto mb-3" />
+                <p className="text-[14px] font-semibold text-white/30">Queue is clear</p>
+                <p className="text-[11px] text-white/18 mt-1.5">
+                  {queuedCount > 0 ? `${queuedCount} vehicle${queuedCount !== 1 ? "s" : ""} already publishing` : "No vehicles require action right now"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {plan.recommendedToday.map((rec, i) => (
+                  <OpportunityCard
+                    key={rec.vehicleId}
+                    rec={rec}
+                    index={i}
+                    onPublish={handlePublish}
+                    onAddToBatch={handleAddToBatch}
+                    onViewStrategy={() => setLocation("/marketplace-intelligence")}
+                    isPublishing={false}
+                  />
+                ))}
+              </div>
+            )}
 
-              <div className="glass-panel rounded-2xl border border-white/5 flex-1 overflow-y-auto">
-                {activityItems.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground text-sm">No recent activity</div>
-                ) : (
-                  <div className="flex flex-col divide-y divide-white/[0.04]">
-                    {activityItems.map((item, idx) => (
-                      <div key={item.id} className="p-3 flex gap-3 hover:bg-white/[0.02] transition-colors relative">
-                        {idx === 0 && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary rounded-r" />}
-                        <span className={cn("w-1.5 h-1.5 rounded-full mt-1.5 shrink-0", item.color)} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-white/90 leading-tight">{item.label}</p>
-                          <p className="text-[10px] text-muted-foreground truncate mt-0.5">{item.sub}</p>
-                          <p className="text-[9px] text-muted-foreground/50 mt-0.5 font-mono">{format(item.date, "HH:mm")}</p>
+            {plan && plan.duplicateGroups.length > 0 && (
+              <div className="mt-5"><CommandCenterDuplicates groups={plan.duplicateGroups} /></div>
+            )}
+
+            {plan && plan.holdToday.length > 0 && (
+              <div className="mt-5">
+                <button className="flex items-center gap-2 w-full mb-3" onClick={() => setShowHold(v => !v)}>
+                  <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Hold Today · {plan.holdToday.length}</p>
+                  <div className="flex-1 h-px bg-white/[0.04]" />
+                  {showHold ? <ChevronUp className="w-3 h-3 text-white/18" /> : <ChevronDown className="w-3 h-3 text-white/18" />}
+                </button>
+                {showHold && (
+                  <div className="space-y-1.5">
+                    {plan.holdToday.slice(0, 8).map(rec => <HoldCard key={rec.vehicleId} rec={rec} />)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          </div>
+        </div>
+
+        {/* ── RIGHT: System Timeline ────────────────────────────────────────── */}
+        <div className="w-[260px] shrink-0 border-l border-white/[0.04] flex flex-col h-full">
+          <div className="px-5 pt-5 pb-3.5 border-b border-white/[0.04] shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-[6px] w-[6px] shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-40" />
+                <span className="relative inline-flex rounded-full h-[6px] w-[6px] bg-blue-400" />
+              </span>
+              <p className="text-[9px] font-black text-white/22 uppercase tracking-[0.22em]">System Timeline</p>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {activityItems.length === 0 ? (
+              <div className="p-8 text-center text-white/15 text-[12px]">No recent activity</div>
+            ) : (
+              <div className="flex flex-col">
+                {activityItems.map((item, idx) => (
+                  <div key={item.id} className="px-5 py-3 border-b border-white/[0.03] hover:bg-white/[0.015] transition-colors relative">
+                    {idx === 0 && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-blue-500 via-blue-500/30 to-transparent" />}
+                    <div className="flex items-start gap-2.5">
+                      <span className={cn("w-[5px] h-[5px] rounded-full mt-[5px] shrink-0 opacity-70", item.color)} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-semibold text-white/60 leading-snug">{item.label}</p>
+                        <p className="text-[10px] text-white/20 truncate mt-0.5">{item.sub}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-[9px] text-white/12 font-mono">{format(item.date, "HH:mm")}</p>
                           {item.action && item.actionPath && (
                             <button
-                              className="text-[9px] text-primary hover:text-primary/80 font-bold uppercase tracking-widest mt-0.5"
+                              className="text-[9px] text-blue-400/40 hover:text-blue-400 font-bold uppercase tracking-wider transition-colors"
                               onClick={() => setLocation(item.actionPath!)}
                             >
                               {item.action} →
@@ -670,14 +543,14 @@ export function SalesHub() {
                           )}
                         </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
-            </div>
-
+            )}
           </div>
         </div>
+
       </div>
       <PublishNowModal
         vehicleId={publishNowVehicleId}

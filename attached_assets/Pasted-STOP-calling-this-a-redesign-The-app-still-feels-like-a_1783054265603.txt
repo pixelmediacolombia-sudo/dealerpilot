@@ -1,0 +1,269 @@
+STOP calling this a redesign.
+
+The app still feels like a generic AI dashboard.
+
+The design system changed colors, but the actual visual environment did not change.
+
+We need a true visual/product redesign.
+
+====================================================
+PROBLEM
+====================================================
+
+DealerPilot still looks like:
+- generic shadcn dashboard
+- generic AI SaaS
+- dark cards with badges
+- template layout
+- no automotive identity
+- no cockpit feeling
+- no premium dealership atmosphere
+
+This is NOT acceptable.
+
+DealerPilot should feel like:
+A premium AI operations cockpit for auto dealerships.
+
+Not:
+Another AI dashboard.
+
+====================================================
+VISUAL DIRECTION
+====================================================
+
+Use an automotive cockpit visual language:
+
+Inspired by:
+- luxury vehicle dashboards
+- Tesla/Rivian digital cockpit
+- Porsche configurator
+- Linear polish
+- Apple Vision Pro depth
+- premium dealership showroom lighting
+
+Visual mood:
+- dark graphite
+- glass panels
+- subtle reflections
+- thin neon accents
+- depth layers
+- premium spacing
+- large confident typography
+- fewer boxes
+- more hierarchy
+
+====================================================
+1. Create a new App Shell
+====================================================
+
+Current sidebar is too generic.
+
+Replace with a premium cockpit shell:
+
+- narrower sidebar
+- glass/blur background
+- soft vertical glow line
+- active module has a light rail, not a big pill box
+- dealer selector integrated elegantly
+- operator profile smaller and cleaner
+- settings hidden under profile
+- top status bar feels like system telemetry, not badges
+
+Sidebar modules:
+- Command
+- Marketplace
+- Inventory
+- Studio
+- Sales
+- DNA
+
+No generic boxes.
+
+====================================================
+2. Command Center must feel like a mission control screen
+====================================================
+
+Do not use random cards.
+
+Create a full-screen mission layout:
+
+Top:
+"Today’s Mission"
+
+Large hero panel:
+DealerPilot has 3 moves for Alpha Motorsport today.
+
+Primary action:
+Publish next best vehicle
+
+Below:
+3 mission tiles:
+- Publish
+- Reply
+- Review
+
+Right side:
+Live system timeline
+
+It should feel like an AI operator telling the dealer what to do today.
+
+====================================================
+3. Marketplace must feel like a publishing cockpit
+====================================================
+
+Remove generic list feeling.
+
+Create:
+- Today’s Picks as a stacked command queue
+- each vehicle is a wide premium row
+- big vehicle photo
+- AI score as a circular gauge
+- strategy as tactical label
+- publish action as glowing primary button
+- queue as timeline
+
+No dense tabs.
+No repeated “Marketplace AI” everywhere.
+
+====================================================
+4. Sales AI must become an inbox, not cards
+====================================================
+
+Current Sales AI looks broken and empty.
+
+Create 3-column inbox:
+
+Left: conversations
+Center: chat thread
+Right: vehicle/lead intelligence
+
+No lonely cards.
+
+No 404.
+
+No floating empty space.
+
+Conversation opens by default.
+
+====================================================
+5. AI Photo Studio must look like a media lab
+====================================================
+
+Not a table.
+
+Not a simple before/after card.
+
+Create:
+- large visual preview
+- filmstrip
+- processing timeline
+- original vs enhanced toggle
+- AI photo set versions
+- status rail
+- quality indicators
+
+This should feel like a professional photo studio control room.
+
+====================================================
+6. Inventory must feel visual
+====================================================
+
+Inventory should not feel like spreadsheet-first.
+
+Use:
+- visual cards/grid
+- large thumbnails
+- photo status
+- marketplace status
+- AI photo status
+- lead activity
+- quick actions
+
+Table can exist as secondary mode.
+
+====================================================
+7. Typography
+====================================================
+
+Use larger titles.
+Use fewer labels.
+Use metric typography.
+
+Examples:
+
+3
+Moves Today
+
+117
+Ready Vehicles
+
+1
+Live Listing
+
+Everything should breathe.
+
+====================================================
+8. Colors
+====================================================
+
+Stop using flat generic colors.
+
+Use:
+- graphite background
+- soft blue glow
+- green marketplace glow
+- violet sales glow
+- gold studio glow
+- cyan inventory glow
+
+But subtle.
+
+No rainbow dashboard.
+
+====================================================
+9. Components
+====================================================
+
+Create custom DealerPilot components:
+
+- CockpitShell
+- TelemetryBar
+- MissionPanel
+- VehicleCommandCard
+- AiScoreGauge
+- PublishingTimeline
+- DealerGlassCard
+- StudioPreviewPanel
+- SalesInboxLayout
+
+Do not just reuse generic Card everywhere.
+
+====================================================
+10. Remove generic shadcn appearance
+====================================================
+
+The final UI should not look like:
+shadcn/ui
+Vercel dashboard
+generic dark mode admin
+AI SaaS template
+
+It should feel custom-built for auto dealers.
+
+====================================================
+11. Acceptance
+====================================================
+
+After this refactor:
+
+- screenshots should look obviously different
+- sidebar should be redesigned
+- Command Center should feel like mission control
+- Marketplace should feel like a publishing cockpit
+- Sales AI should feel like an inbox
+- AI Photo Studio should feel like a media lab
+- Inventory should feel more visual
+- the app should have automotive identity
+- not just new colors on the same layout
+
+This is a product design refactor, not a token update.
