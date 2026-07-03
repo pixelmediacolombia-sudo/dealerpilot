@@ -101,7 +101,7 @@ export function PhotoAuditPanel({ images, vehicleId, vehicleName }: Props) {
             {isLoading
               ? "Checking AI photo status…"
               : isReady
-                ? `AI Photos Ready — ${summary?.compositedCount ?? 0} exterior shots composited.${summary?.fallbackCount ? ` ${summary.fallbackCount} used original fallback.` : ""}`
+                ? `AI Photos Ready — ${summary?.compositedCount ?? 0} exterior shots composited.`
                 : isNeedsReview
                   ? "Processed with warnings — some shots may need manual review."
                   : isFailed

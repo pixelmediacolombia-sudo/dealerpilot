@@ -165,8 +165,8 @@ export function InventoryDashboard() {
         <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
 
           <PageHeader
-            eyebrow="Intelligence Engine"
-            title="Vehicle Intelligence"
+            eyebrow="Marketplace AI"
+            title="Inventory"
             description="DealerPilot AI analyzed your catalog and identified these vehicles for review."
             action={
               <div className="flex items-center gap-2">

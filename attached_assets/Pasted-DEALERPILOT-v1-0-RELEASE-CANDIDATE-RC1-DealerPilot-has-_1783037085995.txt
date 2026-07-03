@@ -1,0 +1,402 @@
+DEALERPILOT v1.0 RELEASE CANDIDATE (RC1)
+
+DealerPilot has reached feature completion.
+
+From this point forward we are entering Release Candidate mode.
+
+The objective is no longer to add features.
+
+The objective is to make DealerPilot feel like an enterprise SaaS ready for real dealership groups.
+
+====================================================
+MISSION
+====================================================
+
+Perform a complete production audit of the application.
+
+Think like:
+
+• Apple software QA
+• Stripe product team
+• Linear engineering
+• Vercel UX
+
+Every screen must feel intentional.
+
+Every button must have a purpose.
+
+Every interaction must feel polished.
+
+====================================================
+PHASE 1
+APPLICATION AUDIT
+====================================================
+
+Audit every page.
+
+Inventory
+
+Marketplace AI
+
+Sales AI
+
+AI Photo Studio
+
+Marketplace Listings
+
+Intelligence
+
+Settings
+
+Dashboard
+
+For every page identify:
+
+• duplicated information
+
+• duplicated buttons
+
+• unnecessary sections
+
+• dead actions
+
+• old developer widgets
+
+• inconsistent spacing
+
+• inconsistent typography
+
+• inconsistent card layouts
+
+• inconsistent icon usage
+
+• inconsistent button colors
+
+• unused filters
+
+• empty states
+
+• unnecessary scrolling
+
+• poor hierarchy
+
+====================================================
+PHASE 2
+REMOVE DEVELOPER UI
+====================================================
+
+Users should never see:
+
+Job IDs
+
+Pipeline names
+
+Provider names
+
+Sharp.js
+
+GPT provider names
+
+BRIA
+
+Fallback counters
+
+Processing internals
+
+Debug values
+
+Technical implementation details
+
+Developer metrics
+
+Anything useful only for engineers.
+
+Replace them with business language.
+
+====================================================
+PHASE 3
+CONSISTENCY
+====================================================
+
+Entire application must use one design system.
+
+One spacing scale.
+
+One button style.
+
+One typography scale.
+
+One badge style.
+
+One card style.
+
+One icon family.
+
+One border radius.
+
+One shadow system.
+
+No visual inconsistencies.
+
+====================================================
+PHASE 4
+LOCATION CONSISTENCY
+====================================================
+
+Global Dealer Location selector is now the source of truth.
+
+Every page must respect it.
+
+Including:
+
+Publishing Queue
+
+Recently Published
+
+Publishing History
+
+Marketplace Listings
+
+Sales AI
+
+Inventory
+
+Marketplace AI
+
+AI Photo Studio
+
+Intelligence
+
+Stats
+
+No mixed-location information.
+
+====================================================
+PHASE 5
+EMPTY STATES
+====================================================
+
+Every module must have a professional empty state.
+
+Never:
+
+Placeholder
+
+Lorem Ipsum
+
+Demo text
+
+Simulator
+
+Fake statistics
+
+Fake conversations
+
+Fake vehicles
+
+====================================================
+PHASE 6
+PERFORMANCE
+====================================================
+
+Audit:
+
+duplicate queries
+
+polling
+
+cache
+
+react renders
+
+memory leaks
+
+unused state
+
+large components
+
+code splitting
+
+lazy loading
+
+optimistic updates
+
+network waterfalls
+
+====================================================
+PHASE 7
+DATABASE
+====================================================
+
+Audit:
+
+unused tables
+
+unused columns
+
+unused indexes
+
+old migrations
+
+orphan records
+
+demo records
+
+seed data
+
+====================================================
+PHASE 8
+CODE CLEANUP
+====================================================
+
+Remove:
+
+unused routes
+
+unused APIs
+
+unused hooks
+
+unused components
+
+unused imports
+
+duplicate helpers
+
+dead code
+
+commented code
+
+obsolete feature flags
+
+====================================================
+PHASE 9
+UX POLISH
+====================================================
+
+Improve:
+
+loading states
+
+animations
+
+transitions
+
+hover states
+
+button feedback
+
+empty states
+
+success states
+
+error states
+
+notifications
+
+scroll behavior
+
+====================================================
+PHASE 10
+BUSINESS POLISH
+====================================================
+
+DealerPilot should speak business language.
+
+Avoid technical terminology.
+
+Instead of:
+
+Processing Job
+
+say
+
+Enhancing Photos
+
+Instead of:
+
+Publishing Queue
+
+say
+
+Publishing
+
+Instead of:
+
+Provider
+
+say
+
+AI Enhancement
+
+Everything should sound like dealership software.
+
+====================================================
+PHASE 11
+QUALITY GATE
+====================================================
+
+Every screen must answer:
+
+What is happening?
+
+What should I do next?
+
+What value am I getting?
+
+If any section cannot answer those questions,
+
+remove or redesign it.
+
+====================================================
+PHASE 12
+FINAL PRODUCT AUDIT
+====================================================
+
+Run a complete audit and produce a report.
+
+Category
+
+Score
+
+UI
+
+UX
+
+Performance
+
+Code Quality
+
+Architecture
+
+Business Value
+
+Accessibility
+
+Maintainability
+
+Production Readiness
+
+For every issue found:
+
+Severity
+
+Location
+
+Recommendation
+
+Estimated effort
+
+Priority
+
+====================================================
+STOP RULE
+====================================================
+
+Do NOT add new features.
+
+Do NOT invent new modules.
+
+Only polish, simplify, stabilize and improve the existing product.
+
+DealerPilot v1.0 RC1 should feel like a commercial enterprise platform ready to present to dealership owners.

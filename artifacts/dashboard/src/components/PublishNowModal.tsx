@@ -201,9 +201,6 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
           {vehicleLabel && (
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{vehicleLabel}</p>
           )}
-          {jobId && !isDone && !isFailed && (
-            <p className="text-[10px] text-muted-foreground/50 mt-0.5">Job #{jobId}</p>
-          )}
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">

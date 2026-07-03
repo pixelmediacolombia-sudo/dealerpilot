@@ -115,14 +115,14 @@ export function Settings() {
   };
 
   const services = [
-    { key: 'backend', name: 'Core API Server', icon: Server, description: 'Main orchestration and task runner' },
-    { key: 'database', name: 'Primary Database', icon: Database, description: 'Persistent state storage' },
-    { key: 'xmlFeed', name: 'Inventory Sync', icon: Rss, description: 'Nightly dealer feed ingestion' },
-    { key: 'chromeExtension', name: 'Publishing Agent', icon: Puzzle, description: 'Browser automation bridge' },
-    { key: 'facebookSession', name: 'FB Auth Token', icon: Facebook, description: 'Marketplace session state' },
-    { key: 'marketplace', name: 'Marketplace API', icon: Store, description: 'Listing publication endpoints' },
-    { key: 'messenger', name: 'Messenger Graph', icon: MessageCircle, description: 'Lead interception' },
-    { key: 'openai', name: 'Intelligence Engine', icon: Bot, description: 'AI generation and natural language' },
+    { key: 'backend', name: 'API Server', icon: Server, description: 'Powers the DealerPilot platform' },
+    { key: 'database', name: 'Data Storage', icon: Database, description: 'Securely stores dealer data' },
+    { key: 'xmlFeed', name: 'Inventory Sync', icon: Rss, description: 'Keeps your vehicle catalog current' },
+    { key: 'chromeExtension', name: 'Publishing Agent', icon: Puzzle, description: 'Handles Marketplace posting' },
+    { key: 'facebookSession', name: 'Facebook Session', icon: Facebook, description: 'Your Marketplace login status' },
+    { key: 'marketplace', name: 'Marketplace', icon: Store, description: 'Facebook Marketplace connection' },
+    { key: 'messenger', name: 'Messaging', icon: MessageCircle, description: 'Buyer conversation monitoring' },
+    { key: 'openai', name: 'AI Engine', icon: Bot, description: 'Powers AI copy and recommendations' },
   ] as const;
 
   if (dealerLoading) {
@@ -306,10 +306,10 @@ export function Settings() {
                       {(svc?.lastHeartbeatAt || svc?.backendUrl || svc?.detail) && (
                         <div className="mt-4 pt-3 border-t border-white/5">
                           {svc?.detail && (
-                            <p className="text-[10px] font-mono text-muted-foreground line-clamp-1 truncate mb-2">{svc.detail}</p>
+                            <p className="text-[10px] text-muted-foreground line-clamp-1 truncate mb-2">{svc.detail}</p>
                           )}
                           {svc?.lastHeartbeatAt && (
-                            <p className="text-[10px] text-muted-foreground">Heartbeat: {formatDate(svc.lastHeartbeatAt)}</p>
+                            <p className="text-[10px] text-muted-foreground">Last active: {formatDate(svc.lastHeartbeatAt)}</p>
                           )}
                         </div>
                       )}

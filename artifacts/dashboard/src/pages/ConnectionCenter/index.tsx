@@ -311,11 +311,11 @@ function MarketplaceConnectionPanel({ status, isConnecting, onConnect }: Connect
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 const SERVICES = [
-  { key: "backend", name: "Core API Server", icon: Server, description: "Main orchestration and task runner" },
-  { key: "database", name: "Primary Database", icon: Database, description: "Persistent state storage" },
-  { key: "xmlFeed", name: "Inventory Sync", icon: Rss, description: "Nightly dealer feed ingestion" },
-  { key: "messenger", name: "Messenger Graph", icon: MessageCircle, description: "Lead interception" },
-  { key: "openai", name: "Intelligence Engine", icon: Bot, description: "AI generation and natural language" },
+  { key: "backend", name: "Core API Server", icon: Server, description: "Powers the DealerPilot platform" },
+  { key: "database", name: "Data Storage", icon: Database, description: "Securely stores your dealer data" },
+  { key: "xmlFeed", name: "Inventory Sync", icon: Rss, description: "Nightly feed keeps inventory current" },
+  { key: "messenger", name: "Messaging", icon: MessageCircle, description: "Buyer conversation monitoring" },
+  { key: "openai", name: "AI Engine", icon: Bot, description: "Powers listing copy and recommendations" },
 ] as const;
 
 export function ConnectionCenter() {
@@ -415,29 +415,17 @@ export function ConnectionCenter() {
                         <CardContent className="relative z-10">
                           <div className="space-y-3 pt-1">
                             {svc?.detail && (
-                              <div className="text-sm px-3 py-2 bg-black/40 rounded border border-white/5 text-foreground/80 leading-relaxed font-mono text-xs">
+                              <div className="text-xs px-3 py-2 bg-black/40 rounded border border-white/5 text-foreground/60 leading-relaxed">
                                 {svc.detail}
                               </div>
                             )}
-                            {(svc?.lastHeartbeatAt || svc?.backendUrl) && (
-                              <div className="grid grid-cols-2 gap-3 text-sm">
-                                {svc.lastHeartbeatAt && (
-                                  <div className="space-y-1">
-                                    <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Heartbeat</span>
-                                    <span className="block font-medium text-foreground text-xs">{formatDate(svc.lastHeartbeatAt)}</span>
-                                  </div>
-                                )}
-                                {svc.backendUrl && (
-                                  <div className="space-y-1 col-span-2 sm:col-span-1">
-                                    <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Target</span>
-                                    <span className="block font-mono text-xs text-primary/90 truncate bg-primary/10 px-2 py-1 rounded">
-                                      {svc.backendUrl}
-                                    </span>
-                                  </div>
-                                )}
+                            {svc?.lastHeartbeatAt && (
+                              <div className="space-y-1">
+                                <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Last Active</span>
+                                <span className="block font-medium text-foreground text-xs">{formatDate(svc.lastHeartbeatAt)}</span>
                               </div>
                             )}
-                            {!svc?.detail && !svc?.lastHeartbeatAt && !svc?.backendUrl && (
+                            {!svc?.detail && !svc?.lastHeartbeatAt && (
                               <div className="flex items-center justify-center py-4 text-xs text-muted-foreground bg-black/20 rounded border border-white/5 border-dashed">
                                 Awaiting telemetry…
                               </div>

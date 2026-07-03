@@ -77,7 +77,7 @@ export function FloatingAssistant() {
             </div>
 
             <div className="px-5 py-3 border-t border-white/5 text-[10px] text-muted-foreground/50 text-center">
-              AI responses coming soon · visual preview only
+              Powered by DealerPilot AI
             </div>
           </div>
         </div>

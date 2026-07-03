@@ -843,7 +843,7 @@ function FieldValidationSection() {
                       className="p-3 rounded-lg bg-secondary/10 border border-border/20 text-xs space-y-1"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-medium">Job #{r.jobId} · Vehicle #{r.vehicleId}</span>
+                        <span className="font-medium">Vehicle #{r.vehicleId}</span>
                         <span className="text-muted-foreground">{new Date(r.testedAt).toLocaleString()}</span>
                       </div>
                       <div className="flex flex-wrap gap-2 mt-2">

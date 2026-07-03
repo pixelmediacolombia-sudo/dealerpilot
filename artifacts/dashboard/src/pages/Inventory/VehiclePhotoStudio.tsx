@@ -211,10 +211,7 @@ export function VehiclePhotoStudio({
               </div>
               {summary && (
                 <span className="text-[11px] text-muted-foreground">
-                  {summary.exteriorCount} ext · {summary.interiorCount} int
-                  {summary.fallbackCount > 0 && (
-                    <span className="text-amber-400"> · {summary.fallbackCount} fallback</span>
-                  )}
+                  {summary.exteriorCount} exterior · {summary.interiorCount} interior
                 </span>
               )}
             </div>

@@ -138,8 +138,8 @@ const AI_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   Ready:      { label: "AI Enhanced",  color: "text-green-400 bg-green-400/10 border-green-400/20" },
   Processing: { label: "Processing",   color: "text-blue-400 bg-blue-400/10 border-blue-400/20" },
   Queued:     { label: "In Queue",     color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
-  Failed:     { label: "Needs Retry",  color: "text-red-400 bg-red-400/10 border-red-400/20" },
-  Pending:    { label: "Not Started",  color: "text-white/30 bg-white/[0.04] border-white/[0.08]" },
+  Failed:     { label: "Needs Attention",  color: "text-red-400 bg-red-400/10 border-red-400/20" },
+  Pending:    { label: "Ready to Enhance",  color: "text-white/30 bg-white/[0.04] border-white/[0.08]" },
 };
 
 function AiStatusBadge({ status }: { status: string }) {
@@ -203,8 +203,8 @@ function VehicleCard({
             <h3 className="font-semibold text-white text-sm leading-tight">{name}</h3>
             <AiStatusBadge status={aiStatus} />
           </div>
-          {job.vehicleVin && (
-            <div className="text-[11px] text-white/30 font-mono tracking-wide">{job.vehicleVin}</div>
+          {job.vehicleTrim && (
+            <div className="text-[11px] text-white/40">{job.vehicleTrim}</div>
           )}
         </div>
         <div className="grid grid-cols-3 gap-2">
@@ -223,7 +223,7 @@ function VehicleCard({
               {enhancedCount > 0 && job.totalPhotos > 0
                 ? `${Math.round((enhancedCount / job.totalPhotos) * 100)}%` : "—"}
             </div>
-            <div className="text-[10px] text-white/40 mt-0.5">Coverage</div>
+            <div className="text-[10px] text-white/40 mt-0.5">Complete</div>
           </div>
         </div>
         {job.completedAt && (
@@ -372,8 +372,6 @@ function InventoryBrowser({
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-white truncate">{name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] text-white/30 font-mono">{vehicle.vin}</span>
-                      <span className="text-white/15">·</span>
                       <span className="text-[11px] text-white/30">{vehicle.imageCount} photo{vehicle.imageCount !== 1 ? "s" : ""}</span>
                     </div>
                   </div>
@@ -437,7 +435,11 @@ export function AIPhotoStudio() {
   const { data: allJobs, isLoading } = useQuery({
     queryKey: ["photo-studio-jobs"],
     queryFn: fetchJobs,
-    refetchInterval: 3000,
+    refetchInterval: (query) => {
+      const jobs = query.state.data?.jobs ?? [];
+      const hasActive = jobs.some((j) => j.status === "Processing" || j.status === "Queued");
+      return hasActive ? 5000 : 30000;
+    },
   });
 
   const reprocessMutation = useMutation({
@@ -491,7 +493,7 @@ export function AIPhotoStudio() {
     { label: "Processed", value: processedVehicles.length, icon: Camera, color: "text-white" },
     { label: "AI Enhanced", value: readyCount, icon: Sparkles, color: "text-green-400" },
     { label: "In Progress", value: processingCount, icon: Loader2, color: "text-blue-400", spin: processingCount > 0 },
-    { label: "Need Retry", value: failedCount, icon: Clock, color: failedCount > 0 ? "text-red-400" : "text-white/40" },
+    { label: "Needs Attention", value: failedCount, icon: Clock, color: failedCount > 0 ? "text-red-400" : "text-white/40" },
   ];
 
   if (openVehicleId !== null) {
