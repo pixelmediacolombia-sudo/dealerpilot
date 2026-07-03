@@ -34,6 +34,8 @@ interface OpportunityVehicle {
   recommendedAction: RecommendedAction;
   marketDemandScore: number;
   priceScore: number;
+  vehicleQualityScore: number;
+  buyerSegmentScore: number;
   seasonalScore: number;
   dealerPerformanceScore: number;
   buyerDemandScore: number;
@@ -42,6 +44,11 @@ interface OpportunityVehicle {
   pricingPosition: string;
   daysOnLot: number;
   opportunityFactors: string[];
+  primarySegment: string;
+  secondarySegment: string | null;
+  adAngle: string;
+  suggestedLanguage: string;
+  whyThisAudience: string;
   strategyName: string | null;
   recommendedDayLabel: string | null;
   recommendedTimeLabel: string | null;
@@ -369,12 +376,49 @@ function VehicleRow({
                 </ul>
               </div>
             )}
+            {/* Buyer Segment */}
+            {vehicle.primarySegment && vehicle.primarySegment !== "General" && (
+              <div className="rounded-lg border border-white/[0.07] bg-white/[0.025] p-3.5 space-y-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/25 mb-1">Buyer Segment</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[12px] font-bold text-white/75">{vehicle.primarySegment} Buyers</span>
+                      {vehicle.secondarySegment && (
+                        <span className="text-[10px] text-white/30">· also {vehicle.secondarySegment}</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className={cn(
+                    "shrink-0 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wide",
+                    vehicle.suggestedLanguage === "Spanish-first"
+                      ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                      : vehicle.suggestedLanguage === "Bilingual"
+                      ? "bg-teal-500/20 text-teal-400 border border-teal-500/30"
+                      : "bg-white/[0.06] text-white/35 border border-white/10",
+                  )}>
+                    {vehicle.suggestedLanguage}
+                  </span>
+                </div>
+                {vehicle.whyThisAudience && (
+                  <p className="text-[10px] text-white/35 leading-relaxed">{vehicle.whyThisAudience}</p>
+                )}
+                {vehicle.adAngle && (
+                  <div className="pt-1 border-t border-white/[0.05]">
+                    <p className="text-[9px] text-white/20 uppercase tracking-widest mb-0.5">Suggested Ad Angle</p>
+                    <p className="text-[11px] text-white/55 font-medium italic">"{vehicle.adAngle}"</p>
+                  </div>
+                )}
+              </div>
+            )}
             {/* Score breakdown bars */}
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/25 mb-2">Score Breakdown</p>
               <div className="space-y-1.5">
                 <SubScoreBar label="Mkt Demand" score={vehicle.marketDemandScore} accentClass="bg-green-500/70" />
                 <SubScoreBar label="Price" score={vehicle.priceScore} accentClass="bg-blue-500/70" />
+                <SubScoreBar label="Veh Quality" score={vehicle.vehicleQualityScore} accentClass="bg-emerald-500/70" />
+                <SubScoreBar label="Buyer Seg" score={vehicle.buyerSegmentScore} accentClass="bg-fuchsia-500/70" />
                 <SubScoreBar label="Dlr Perf" score={vehicle.dealerPerformanceScore} accentClass="bg-violet-500/70" />
                 <SubScoreBar label="Seasonal" score={vehicle.seasonalScore} accentClass="bg-cyan-500/70" />
                 <SubScoreBar label="Buyer" score={vehicle.buyerDemandScore} accentClass="bg-pink-500/70" />

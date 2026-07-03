@@ -350,7 +350,7 @@ function generateVehicleStrategy(
 // ── Opportunity Score Seed ────────────────────────────────────────────────────
 
 export async function seedOpportunityScores(logger: Logger): Promise<void> {
-  // Check if any rows are missing opportunityScore or recommendedAction (new column)
+  // Check if any rows are missing v1.2 buyer segment fields
   const [nullCheck] = await db
     .select({ cnt: count() })
     .from(vehicleIntelligenceTable)
@@ -360,6 +360,7 @@ export async function seedOpportunityScores(logger: Logger): Promise<void> {
         or(
           isNull(vehicleIntelligenceTable.opportunityScore),
           isNull(vehicleIntelligenceTable.recommendedAction),
+          isNull(vehicleIntelligenceTable.primarySegment),
         ),
       ),
     );
@@ -510,6 +511,8 @@ export async function seedOpportunityScores(logger: Logger): Promise<void> {
           recommendedAction: scores.recommendedAction,
           marketDemandScore: scores.marketDemandScore,
           priceScore: scores.priceScore,
+          vehicleQualityScore: scores.vehicleQualityScore,
+          buyerSegmentScore: scores.buyerSegmentScore,
           seasonalScore: scores.seasonalScore,
           dealerPerformanceScore: scores.dealerPerformanceScore,
           buyerDemandScore: scores.buyerDemandScore,
@@ -518,6 +521,11 @@ export async function seedOpportunityScores(logger: Logger): Promise<void> {
           pricingPosition: scores.pricingPosition,
           daysOnLot: scores.daysOnLot,
           opportunityFactors: JSON.stringify(scores.opportunityFactors),
+          primarySegment: scores.primarySegment,
+          secondarySegment: scores.secondarySegment ?? null,
+          adAngle: scores.adAngle,
+          suggestedLanguage: scores.suggestedLanguage,
+          whyThisAudience: scores.whyThisAudience,
         },
       });
     updated++;

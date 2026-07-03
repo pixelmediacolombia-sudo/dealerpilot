@@ -1,0 +1,124 @@
+PHASE 1.2 — Add Buyer Segment Demand Layer
+
+The Opportunity Engine should not only rank vehicles by generic numeric signals.
+
+It must also understand buyer segments and intent patterns.
+
+Do NOT classify by race or ethnicity.
+
+Use buyer segments instead:
+
+1. Spanish-first family buyers
+Common high-interest vehicles:
+- Toyota RAV4
+- Toyota Highlander
+- Toyota Corolla
+- Honda Civic
+- Honda Accord
+- Toyota Tacoma
+- Toyota Tundra
+- Honda CR-V
+- Nissan Rogue
+- Mazda CX-5
+
+2. Truck / work buyers
+Common high-interest vehicles:
+- Ford F-150
+- Chevy Silverado
+- GMC Sierra
+- Ram 1500
+- Toyota Tundra
+- Toyota Tacoma
+- Ford F-250 / F-350
+
+3. Affordable payment buyers
+Common high-interest vehicles:
+- Toyota Corolla
+- Honda Civic
+- Nissan Sentra
+- Hyundai Elantra
+- Kia Forte
+- Toyota Camry
+- Honda Accord
+- Ford Escape
+- Nissan Rogue
+
+4. Performance / muscle buyers
+Common high-interest vehicles:
+- Dodge Charger
+- Dodge Challenger
+- Chrysler 300
+- Ford Mustang
+- Chevy Camaro
+- Genesis G70 / G80
+- BMW 3 Series
+
+5. EV / tech buyers
+Common high-interest vehicles:
+- Tesla Model 3
+- Tesla Model Y
+- Tesla Model X
+- Ford Mustang Mach-E
+- Chevy Bolt
+
+6. Family SUV buyers
+Common high-interest vehicles:
+- Toyota Highlander
+- Toyota RAV4
+- Honda Pilot
+- Honda CR-V
+- Nissan Pathfinder
+- Ford Explorer
+- Chevy Traverse
+- Kia Telluride
+- Hyundai Palisade
+
+Add a Buyer Segment Fit Score.
+
+This should influence Opportunity Score but not override price, mileage, availability, or real demand.
+
+Suggested weight:
+Buyer Segment Fit: 10%
+
+To keep total score at 100, adjust weights:
+
+Market Demand: 25%
+Price: 18%
+Vehicle Quality / Mileage: 12%
+Buyer Segment Fit: 10%
+Dealer Performance: 10%
+Buyer Demand: 10%
+Seasonality: 7%
+Inventory Age: 5%
+Creative / Photo Quality: 3%
+
+Every recommendation should show:
+
+- Opportunity Score
+- Recommended buyer segment
+- Why this audience may respond
+- Suggested ad angle
+- Suggested language:
+  Spanish-first / English-first / bilingual
+
+Examples:
+
+Toyota RAV4:
+Buyer Segment: Spanish-first family buyers / Family SUV buyers
+Ad Angle: Reliable SUV, family-friendly, easy approval, low monthly payment.
+
+Ford F-150:
+Buyer Segment: Truck / work buyers
+Ad Angle: Work truck, hauling, strong payment offer.
+
+Dodge Charger:
+Buyer Segment: Performance / muscle buyers
+Ad Angle: Sporty look, power, lifestyle, attention-grabbing creative.
+
+Cheap sedan under $10k:
+Buyer Segment: Affordable payment buyers
+Ad Angle: Low price, low monthly payment, first-time buyer, practical car.
+
+Do not use racial labels in the UI.
+
+Use professional segment names only.

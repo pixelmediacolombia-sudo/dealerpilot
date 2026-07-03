@@ -721,6 +721,8 @@ router.get("/marketplace-intelligence/opportunity", async (req, res) => {
         recommendedAction: intel.recommendedAction ?? "Hold",
         marketDemandScore: intel.marketDemandScore ?? 0,
         priceScore: intel.priceScore ?? 0,
+        vehicleQualityScore: intel.vehicleQualityScore ?? 0,
+        buyerSegmentScore: intel.buyerSegmentScore ?? 0,
         seasonalScore: intel.seasonalScore ?? 0,
         dealerPerformanceScore: intel.dealerPerformanceScore ?? 0,
         buyerDemandScore: intel.buyerDemandScore ?? 0,
@@ -729,6 +731,12 @@ router.get("/marketplace-intelligence/opportunity", async (req, res) => {
         pricingPosition: intel.pricingPosition ?? "Market Average",
         daysOnLot: intel.daysOnLot ?? 0,
         opportunityFactors: factors,
+        // Buyer segment
+        primarySegment: intel.primarySegment ?? "General",
+        secondarySegment: intel.secondarySegment ?? null,
+        adAngle: intel.adAngle ?? "",
+        suggestedLanguage: intel.suggestedLanguage ?? "English-first",
+        whyThisAudience: intel.whyThisAudience ?? "",
         // Strategy
         strategyName: parseStrategyName(intel.explanation),
         recommendedDayOfWeek: intel.recommendedDayOfWeek ?? null,

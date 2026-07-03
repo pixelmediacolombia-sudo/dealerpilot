@@ -49,6 +49,14 @@ export const vehicleIntelligenceTable = pgTable(
     opportunityFactors: text("opportunity_factors"),
     opportunityLabel: text("opportunity_label"),
     recommendedAction: text("recommended_action"),
+    // ── Opportunity Engine v1.2 — Buyer Segment Layer ─────────────────────────
+    vehicleQualityScore: integer("vehicle_quality_score"),
+    buyerSegmentScore: integer("buyer_segment_score"),
+    primarySegment: text("primary_segment"),
+    secondarySegment: text("secondary_segment"),
+    adAngle: text("ad_angle"),
+    suggestedLanguage: text("suggested_language"),
+    whyThisAudience: text("why_this_audience"),
   },
   (table) => [uniqueIndex("vehicle_intelligence_vehicle_idx").on(table.vehicleId)],
 );
