@@ -69,11 +69,28 @@ router.get("/vehicles/stats", async (req, res) => {
   const location = typeof req.query.location === "string" ? req.query.location : "";
   const conditions: SQL[] = [eq(vehiclesTable.dealerId, DEALER_ID)];
   if (location) conditions.push(eq(vehiclesTable.lotLocation, location));
-  const rows = await db
-    .select({ status: vehiclesTable.status })
-    .from(vehiclesTable)
-    .where(and(...conditions));
+
+  // Two queries in parallel: filtered stats + global unknown-lot count.
+  // noLot is always dealer-wide so the warning shows regardless of location tab.
+  const KNOWN_LOTS = new Set(["Manassas", "Fredericksburg"]);
+  const [rows, allLotRows] = await Promise.all([
+    db
+      .select({ status: vehiclesTable.status })
+      .from(vehiclesTable)
+      .where(and(...conditions)),
+    db
+      .select({ lotLocation: vehiclesTable.lotLocation })
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.dealerId, DEALER_ID)),
+  ]);
+
   const by = (s: string) => rows.filter((r) => r.status === s).length;
+  const noLot = allLotRows.filter(
+    (r) =>
+      !r.lotLocation ||
+      r.lotLocation.trim() === "" ||
+      !KNOWN_LOTS.has(r.lotLocation),
+  ).length;
 
   const locationLabel = location ? ` — ${location}` : "";
   res.json({
@@ -84,6 +101,7 @@ router.get("/vehicles/stats", async (req, res) => {
     published: by("Published"),
     soldRemoved: by("Sold/Removed"),
     priceChanged: by("Price Changed"),
+    noLot,
     activeDealerLabel: `Alpha Motorsport${locationLabel}`,
   });
 });

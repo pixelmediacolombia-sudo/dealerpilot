@@ -463,7 +463,8 @@ export const GetVehicleStatsResponse = zod.object({
   "readyToPublish": zod.number(),
   "published": zod.number(),
   "soldRemoved": zod.number(),
-  "priceChanged": zod.number()
+  "priceChanged": zod.number(),
+  "noLot": zod.number().describe('Vehicles with null or unmapped lot location (cannot be published)')
 })
 
 

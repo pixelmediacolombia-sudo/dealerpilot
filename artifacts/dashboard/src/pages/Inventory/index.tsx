@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Search, Car, Tag, Activity, Share, Filter, LayoutGrid, CheckSquare, MapPin, Image as ImageIcon } from "lucide-react";
+import { Search, Car, Tag, Activity, Share, Filter, LayoutGrid, CheckSquare, MapPin, Image as ImageIcon, AlertTriangle } from "lucide-react";
 import { PageHeader, KpiCard, AnimatedCounter, EmptyState } from "@/components/shared";
 import { VehicleCard } from "@/components/inventory/VehicleCard";
 import { FloatingBulkBar } from "@/components/inventory/FloatingBulkBar";
@@ -171,6 +171,18 @@ export function InventoryDashboard() {
             description="Complete inventory with status tracking and publishing controls."
             className="mb-6"
           />
+
+          {/* Unknown lot warning */}
+          {!statsLoading && (stats?.noLot ?? 0) > 0 && (
+            <div className="flex items-start gap-3 mb-5 px-4 py-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] text-amber-300">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-400" />
+              <div className="text-[13px] leading-relaxed">
+                <span className="font-semibold text-amber-200">{stats!.noLot} vehicle{stats!.noLot !== 1 ? "s" : ""} with unknown lot location</span>
+                {" — "}these cannot be published to Marketplace until their lot is assigned to Manassas or Fredericksburg. Use the{" "}
+                <span className="font-medium text-amber-200">location filter</span> to find them (they appear in the "All" view only).
+              </div>
+            </div>
+          )}
 
           {/* Stats strip */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

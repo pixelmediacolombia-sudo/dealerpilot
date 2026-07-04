@@ -309,6 +309,27 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     return;
   }
 
+  // ── Lot location guard ────────────────────────────────────────────────────
+  // Marketplace requires an accurate physical city. We only publish vehicles
+  // assigned to a known, mapped lot. Unknown/wrong lots block the fill payload
+  // so the operator can correct the vehicle's lot assignment first.
+  const LOT_CITY_MAP: Record<string, string> = {
+    Manassas: "Manassas, VA",
+    Fredericksburg: "Fredericksburg, VA",
+  };
+  const lotCity = vehicle.lotLocation ? LOT_CITY_MAP[vehicle.lotLocation] : undefined;
+  if (!lotCity) {
+    req.log.warn(
+      { jobId: job.id, vehicleId: vehicle.id, lotLocation: vehicle.lotLocation },
+      "Publishing blocked: unknown or unmapped lot location",
+    );
+    res.status(422).json({
+      error: `Cannot publish: vehicle lot location "${vehicle.lotLocation ?? "unknown"}" is not mapped to a city. Assign this vehicle to Manassas or Fredericksburg before publishing.`,
+      code: "UNKNOWN_LOT",
+    });
+    return;
+  }
+
   const images = await getVehiclePhotos(vehicle.id, vehicle.aiPhotoSetId, vehicle.aiPhotoStatus);
   const usingAiPhotos = images.length > 0 && images[0].source === "ai";
 
@@ -396,7 +417,7 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       exteriorColor: vehicle.exteriorColor ?? null,
       fuelType: vehicle.fuelType ?? null,
       transmission: vehicle.transmission ?? null,
-      location: dealer?.name ?? null,
+      location: lotCity,
       category: "Vehicle",
       downPayment: fillDownPayment,
       actualVehiclePrice: pricing.actualVehiclePrice,

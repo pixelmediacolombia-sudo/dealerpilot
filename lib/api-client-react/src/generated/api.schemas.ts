@@ -183,6 +183,8 @@ export interface VehicleStats {
   published: number;
   soldRemoved: number;
   priceChanged: number;
+  /** Vehicles with null or unmapped lot location (cannot be published) */
+  noLot: number;
 }
 
 export interface ServiceStatus {

@@ -2294,7 +2294,7 @@ components:
     VehicleStats:
       type: object
       required:
-        [total, active, new, readyToPublish, published, soldRemoved, priceChanged]
+        [total, active, new, readyToPublish, published, soldRemoved, priceChanged, noLot]
       properties:
         total: { type: integer }
         active: { type: integer }
@@ -2303,6 +2303,7 @@ components:
         published: { type: integer }
         soldRemoved: { type: integer }
         priceChanged: { type: integer }
+        noLot: { type: integer, description: "Vehicles with null or unmapped lot location (cannot be published)" }
 
     ServiceStatus:
       type: object
