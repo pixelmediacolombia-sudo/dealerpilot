@@ -1,0 +1,106 @@
+FULL ECOSYSTEM AUDIT — DealerPilot Production Readiness
+
+Before testing Marketplace end-to-end, audit the entire DealerPilot ecosystem.
+
+Goal:
+Confirm nothing is disconnected, duplicated, stale, or using fake/demo data.
+
+Audit these systems:
+
+1. Inventory Sync
+- XML feed connected
+- active vehicles count
+- sold/removed excluded
+- price changed included
+- lotLocation correct
+- Manassas/Fredericksburg separated
+
+2. Opportunity Engine
+- top 10 ranking correct
+- same source used by Command Center, Marketplace, Publish Next, Publish Today’s 3, Inventory, Vehicle Detail
+- no legacy Fast Turn Strategy logic
+- no stale cached recommendations
+
+3. GM Coach
+- OpenAI reasoning connected
+- uses Opportunity Engine only
+- no invented data
+- publish/hold/reconsider works
+- override logged
+
+4. Publishing Flow
+- Publish Now
+- Publish Today’s 3
+- batch scheduling
+- GM guardrail blocks HOLD/RECONSIDER unless override
+- published vehicles removed from recommendations
+- queue cleanup working
+
+5. Chrome Extension
+- latest version installed
+- heartbeat working
+- backend connected
+- Facebook status detected
+- Marketplace status detected
+- job pickup working
+- no stale jobs
+- no old queued jobs blocking fresh jobs
+
+6. Marketplace Form Fill
+Required fields:
+- photos
+- year
+- make
+- model
+- price
+- mileage
+- title
+- description
+- location
+- body style
+- exterior color
+- interior color
+- Next button
+
+Confirm location always Manassas, VA for Manassas vehicles.
+
+7. AI Photo Studio
+- active studio background locked
+- AI photos visible in UI
+- original vs enhanced visible
+- publishing payload prefers AI photos
+- low-quality enhancement not counted as enhanced
+- costs tracked
+
+8. Sales AI / Messaging
+- no fake conversations
+- only real Facebook messages
+- empty state if no messages
+- store phone correct by lot
+- Manassas phone: 703-763-4675
+- no Fredericksburg mix-up
+
+9. System Connections
+- no future-sprint copy
+- status cards reflect real systems
+- AI Engine shows Opportunity Engine, GM Coach, AI Photo Studio, OpenAI, FAL.ai
+- Publishing Agent shows real extension heartbeat
+
+10. Production Data Guardrails
+- no seed/demo/test vehicles
+- no fake buyers
+- no fake messages
+- no fake metrics
+- Demo Mode only if explicitly enabled
+
+Return:
+- PASS / FAIL per system
+- exact broken endpoints/components
+- exact fix needed
+- whether we are ready for live Marketplace testing
+
+Also answer:
+What requires Chrome extension online?
+What works on the server without Chrome?
+What stops working if computer is off?
+What is required for true 24/7 messaging?
