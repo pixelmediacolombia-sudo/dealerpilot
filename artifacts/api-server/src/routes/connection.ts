@@ -3,6 +3,8 @@ import {
   db,
   feedRunsTable,
   extensionConnectionsTable,
+  leadsTable,
+  conversationsTable,
 } from "@workspace/db";
 import { desc, sql } from "drizzle-orm";
 
@@ -146,6 +148,72 @@ router.get("/connection-center", async (req, res) => {
     };
   }
 
+  // ── Messaging: real lead + conversation counts ────────────────────────────────
+  const [leadCountRow] = await db.select({ count: sql<number>`count(*)` }).from(leadsTable);
+  const [convCountRow] = await db.select({ count: sql<number>`count(*)` }).from(conversationsTable);
+  const leadCount = Number(leadCountRow?.count ?? 0);
+  const convCount = Number(convCountRow?.count ?? 0);
+
+  let messenger: { status: string; detail: string; leadCount: number; convCount: number };
+  if (!fbLoggedIn) {
+    messenger = {
+      status: "warning",
+      detail: "Waiting for Facebook connection",
+      leadCount,
+      convCount,
+    };
+  } else if (convCount > 0 || leadCount > 0) {
+    messenger = {
+      status: "connected",
+      detail: `Monitoring buyer conversations — ${leadCount} lead${leadCount !== 1 ? "s" : ""} captured`,
+      leadCount,
+      convCount,
+    };
+  } else {
+    messenger = {
+      status: "connected",
+      detail: "Sales AI active — no buyer conversations yet",
+      leadCount,
+      convCount,
+    };
+  }
+
+  // ── AI Engine: report each sub-system ─────────────────────────────────────────
+  const openaiConfigured = !!process.env["AI_INTEGRATIONS_OPENAI_API_KEY"];
+  const falConfigured = !!process.env["FAL_KEY"];
+
+  const aiEngine = {
+    status: "connected",
+    detail: "AI systems operational",
+    components: [
+      {
+        name: "Opportunity Engine",
+        status: "connected",
+        detail: "Market intelligence + opportunity scoring",
+      },
+      {
+        name: "GM Coach",
+        status: "connected",
+        detail: "AI-powered publish review & what-if analysis",
+      },
+      {
+        name: "AI Photo Studio",
+        status: falConfigured ? "connected" : "warning",
+        detail: falConfigured ? "FAL.ai scene rendering active" : "FAL_KEY not configured",
+      },
+      {
+        name: "OpenAI Reasoning",
+        status: openaiConfigured ? "connected" : "warning",
+        detail: openaiConfigured ? "gpt-5-mini via Replit AI proxy" : "API key not configured",
+      },
+      {
+        name: "FAL.ai",
+        status: falConfigured ? "connected" : "warning",
+        detail: falConfigured ? "Image generation active" : "FAL_KEY not configured",
+      },
+    ],
+  };
+
   // Overall marketplace connection status
   const connectRequestedAt = ext?.connectRequestedAt ?? null;
   const overallConnected = extOnline && fbLoggedIn === true && marketplaceConnected === true;
@@ -157,14 +225,8 @@ router.get("/connection-center", async (req, res) => {
     chromeExtension,
     facebookSession,
     marketplace,
-    messenger: {
-      status: "coming_soon",
-      detail: "Messenger AI arrives in a future sprint",
-    },
-    openai: {
-      status: "coming_soon",
-      detail: "AI Studio arrives in a future sprint",
-    },
+    messenger,
+    openai: aiEngine,
     // Summary fields for the connection panel
     overallConnected,
     extensionOnline: extOnline,

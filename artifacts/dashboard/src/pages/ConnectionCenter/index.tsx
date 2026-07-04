@@ -79,7 +79,16 @@ function svcLabel(s: string | undefined) {
 
 // ── Marketplace Connection Panel ───────────────────────────────────────────────
 
-type SvcStatus = { status?: string; detail?: string | null; lastHeartbeatAt?: string | null; backendUrl?: string | null } | undefined;
+type AiComponent = { name: string; status: string; detail?: string };
+type SvcStatus = {
+  status?: string;
+  detail?: string | null;
+  lastHeartbeatAt?: string | null;
+  backendUrl?: string | null;
+  components?: AiComponent[];
+  leadCount?: number;
+  convCount?: number;
+} | undefined;
 
 interface ConnectionPanelProps {
   status: ConnectionStatus | undefined;
@@ -314,8 +323,8 @@ const SERVICES = [
   { key: "backend", name: "Core API Server", icon: Server, description: "Powers the DealerPilot platform" },
   { key: "database", name: "Data Storage", icon: Database, description: "Securely stores your dealer data" },
   { key: "xmlFeed", name: "Inventory Sync", icon: Rss, description: "Nightly feed keeps inventory current" },
-  { key: "messenger", name: "Messaging", icon: MessageCircle, description: "Buyer conversation monitoring" },
-  { key: "openai", name: "AI Engine", icon: Bot, description: "Powers listing copy and recommendations" },
+  { key: "messenger", name: "Sales AI / Messaging", icon: MessageCircle, description: "Buyer conversation monitoring & AI reply engine" },
+  { key: "openai", name: "AI Engine", icon: Bot, description: "Opportunity Engine · GM Coach · Photo Studio · OpenAI · FAL.ai" },
 ] as const;
 
 export function ConnectionCenter() {
@@ -391,29 +400,72 @@ export function ConnectionCenter() {
                     const svc = status?.[key as keyof typeof status] as SvcStatus;
                     const color = svcColor(svc?.status);
                     const label = svcLabel(svc?.status);
+                    const hasComponents = !!svc?.components?.length;
 
                     return (
                       <div
                         key={key}
                         className={cn(
-                          "flex items-center gap-5 px-5 py-4 transition-colors hover:bg-white/[0.015]",
+                          "transition-colors hover:bg-white/[0.015]",
                           idx < SERVICES.length - 1 && "border-b border-white/[0.04]",
                         )}
                       >
-                        <div className="w-8 h-8 rounded-lg border border-white/[0.06] bg-white/[0.02] flex items-center justify-center shrink-0">
-                          <Icon className="w-3.5 h-3.5 text-white/30" />
+                        {/* Main row */}
+                        <div className="flex items-center gap-5 px-5 py-4">
+                          <div className="w-8 h-8 rounded-lg border border-white/[0.06] bg-white/[0.02] flex items-center justify-center shrink-0">
+                            <Icon className="w-3.5 h-3.5 text-white/30" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-semibold text-white/70">{name}</p>
+                            <p className="text-[11px] text-white/22 mt-0.5">
+                              {svc?.detail ?? description}
+                            </p>
+                            {svc?.lastHeartbeatAt && (
+                              <p className="text-[10px] text-white/18 font-mono mt-1">{formatDate(svc.lastHeartbeatAt)}</p>
+                            )}
+                          </div>
+                          <StatusPulse status={color} label={label} />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-white/70">{name}</p>
-                          <p className="text-[11px] text-white/22 mt-0.5">{description}</p>
-                          {svc?.lastHeartbeatAt && (
-                            <p className="text-[10px] text-white/18 font-mono mt-1">{formatDate(svc.lastHeartbeatAt)}</p>
-                          )}
-                        </div>
-                        {svc?.detail && (
-                          <p className="text-[11px] text-white/30 max-w-xs text-right hidden lg:block truncate">{svc.detail}</p>
+
+                        {/* Sub-components (AI Engine / Messaging details) */}
+                        {hasComponents && (
+                          <div className="px-5 pb-3 -mt-1">
+                            <div className="ml-[52px] border border-white/[0.04] bg-white/[0.015] rounded-lg overflow-hidden">
+                              {svc!.components!.map((c, ci) => {
+                                const cColor = svcColor(c.status);
+                                return (
+                                  <div
+                                    key={c.name}
+                                    className={cn(
+                                      "flex items-center justify-between px-3.5 py-2",
+                                      ci < svc!.components!.length - 1 && "border-b border-white/[0.04]",
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      {cColor === "success" ? (
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-400/70 shrink-0" />
+                                      ) : cColor === "warning" ? (
+                                        <AlertTriangle className="w-3 h-3 text-amber-400/70 shrink-0" />
+                                      ) : (
+                                        <XCircle className="w-3 h-3 text-red-400/60 shrink-0" />
+                                      )}
+                                      <span className="text-[11px] font-semibold text-white/55 shrink-0">{c.name}</span>
+                                      {c.detail && (
+                                        <span className="text-[10px] text-white/22 truncate ml-1 hidden sm:block">— {c.detail}</span>
+                                      )}
+                                    </div>
+                                    <span className={cn(
+                                      "text-[10px] font-bold shrink-0 ml-3",
+                                      cColor === "success" ? "text-emerald-400/70" : cColor === "warning" ? "text-amber-400/70" : "text-red-400/60",
+                                    )}>
+                                      {cColor === "success" ? "Live" : cColor === "warning" ? "Warning" : "Offline"}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         )}
-                        <StatusPulse status={color} label={label} />
                       </div>
                     );
                   })}
