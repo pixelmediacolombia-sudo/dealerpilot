@@ -59,6 +59,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /gm/decisions:
+    post:
+      operationId: recordGmDecision
+      tags: [gm]
+      summary: Record a GM Coach decision outcome
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordGmDecisionRequest"
+      responses:
+        "201":
+          description: Decision recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GmDecisionEntry"
+    get:
+      operationId: listGmDecisions
+      tags: [gm]
+      summary: List recent GM Coach decision log entries
+      parameters:
+        - name: vehicleId
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 50 }
+      responses:
+        "200":
+          description: Decision log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [decisions]
+                properties:
+                  decisions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GmDecisionEntry"
+
   /gm/whatif:
     post:
       operationId: gmWhatIf
@@ -3868,6 +3913,38 @@ components:
         duplicateConflictWarning: { type: ["string", "null"] }
         confidence: { type: integer }
         cachedAt: { type: string, format: date-time }
+
+    RecordGmDecisionRequest:
+      type: object
+      required: [vehicleId, vehicleLabel, gmRecommendation, operatorAction, overridden, finalPublishStatus]
+      properties:
+        vehicleId: { type: integer }
+        vehicleLabel: { type: string }
+        gmRecommendation: { type: string, enum: [PUBLISH, HOLD, RECONSIDER] }
+        gmConfidence: { type: integer }
+        operatorAction:
+          type: string
+          enum: [confirmed_publish, held, overridden, batch_blocked, batch_published]
+        overridden: { type: boolean }
+        finalPublishStatus:
+          type: string
+          enum: [published, held, batch_blocked]
+        notes: { type: string }
+
+    GmDecisionEntry:
+      type: object
+      required: [id, vehicleId, vehicleLabel, gmRecommendation, operatorAction, overridden, finalPublishStatus, createdAt]
+      properties:
+        id: { type: integer }
+        vehicleId: { type: integer }
+        vehicleLabel: { type: string }
+        gmRecommendation: { type: string }
+        gmConfidence: { type: ["integer", "null"] }
+        operatorAction: { type: string }
+        overridden: { type: boolean }
+        finalPublishStatus: { type: string }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
 
     GmWhatIfRequest:
       type: object

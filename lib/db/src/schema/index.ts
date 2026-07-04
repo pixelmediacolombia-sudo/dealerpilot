@@ -33,3 +33,4 @@ export * from "./aiPhotoImages";
 export * from "./aiStudioPacks";
 export * from "./marketplaceListings";
 export * from "./photoQualityProfiles";
+export * from "./gmDecisionLog";

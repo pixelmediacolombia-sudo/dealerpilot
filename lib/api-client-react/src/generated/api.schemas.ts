@@ -1615,6 +1615,61 @@ export interface GmAnalysisResult {
   cachedAt?: string;
 }
 
+export type RecordGmDecisionRequestGmRecommendation = typeof RecordGmDecisionRequestGmRecommendation[keyof typeof RecordGmDecisionRequestGmRecommendation];
+
+
+export const RecordGmDecisionRequestGmRecommendation = {
+  PUBLISH: 'PUBLISH',
+  HOLD: 'HOLD',
+  RECONSIDER: 'RECONSIDER',
+} as const;
+
+export type RecordGmDecisionRequestOperatorAction = typeof RecordGmDecisionRequestOperatorAction[keyof typeof RecordGmDecisionRequestOperatorAction];
+
+
+export const RecordGmDecisionRequestOperatorAction = {
+  confirmed_publish: 'confirmed_publish',
+  held: 'held',
+  overridden: 'overridden',
+  batch_blocked: 'batch_blocked',
+  batch_published: 'batch_published',
+} as const;
+
+export type RecordGmDecisionRequestFinalPublishStatus = typeof RecordGmDecisionRequestFinalPublishStatus[keyof typeof RecordGmDecisionRequestFinalPublishStatus];
+
+
+export const RecordGmDecisionRequestFinalPublishStatus = {
+  published: 'published',
+  held: 'held',
+  batch_blocked: 'batch_blocked',
+} as const;
+
+export interface RecordGmDecisionRequest {
+  vehicleId: number;
+  vehicleLabel: string;
+  gmRecommendation: RecordGmDecisionRequestGmRecommendation;
+  gmConfidence?: number;
+  operatorAction: RecordGmDecisionRequestOperatorAction;
+  overridden: boolean;
+  finalPublishStatus: RecordGmDecisionRequestFinalPublishStatus;
+  notes?: string;
+}
+
+export interface GmDecisionEntry {
+  id: number;
+  vehicleId: number;
+  vehicleLabel: string;
+  gmRecommendation: string;
+  /** @nullable */
+  gmConfidence?: number | null;
+  operatorAction: string;
+  overridden: boolean;
+  finalPublishStatus: string;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+}
+
 export interface GmWhatIfRequest {
   vehicleId: number;
   priceDeltaPercent: number;
@@ -1860,6 +1915,15 @@ export interface VehicleIntelligenceResponse {
   intelligence?: VehicleIntelligenceDetail;
   performanceHistory: ListingPerformanceRecord[];
 }
+
+export type ListGmDecisionsParams = {
+vehicleId?: number;
+limit?: number;
+};
+
+export type ListGmDecisions200 = {
+  decisions: GmDecisionEntry[];
+};
 
 export type ListVehiclesParams = {
 /**

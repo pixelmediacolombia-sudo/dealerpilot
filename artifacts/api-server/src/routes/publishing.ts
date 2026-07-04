@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
-import { getCachedGmDecision } from "./gm";
+import { getCachedGmDecision, recordGmDecision } from "./gm";
 import {
   db,
   vehiclesTable,
@@ -866,9 +866,32 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
       finalPublish: !gm || gm.recommendation === "PUBLISH" || overridden,
     }, "GM guardrail bulk-schedule check");
 
+    const vLabel = `${v.year ?? ""} ${v.make} ${v.model}`.trim();
     if (gm && (gm.recommendation === "HOLD" || gm.recommendation === "RECONSIDER") && !overridden) {
       gmBlocked.push({ vehicleId: v.id, recommendation: gm.recommendation, confidence: gm.confidence });
+      void recordGmDecision({
+        vehicleId: v.id,
+        vehicleLabel: vLabel,
+        gmRecommendation: gm.recommendation,
+        gmConfidence: gm.confidence,
+        operatorAction: "batch_blocked",
+        overridden: false,
+        finalPublishStatus: "batch_blocked",
+        notes: "Blocked during bulk-schedule",
+      });
       return false;
+    }
+    if (gm) {
+      void recordGmDecision({
+        vehicleId: v.id,
+        vehicleLabel: vLabel,
+        gmRecommendation: gm.recommendation,
+        gmConfidence: gm.confidence,
+        operatorAction: overridden ? "overridden" : "batch_published",
+        overridden,
+        finalPublishStatus: "published",
+        notes: "Included in bulk-schedule",
+      });
     }
     return true;
   });

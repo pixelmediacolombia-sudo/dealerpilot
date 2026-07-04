@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
-import { getCachedGmDecision } from "./gm";
+import { getCachedGmDecision, recordGmDecision } from "./gm";
 import {
   db,
   vehiclesTable,
@@ -550,7 +550,29 @@ router.post("/auto-publish/batches", async (req, res) => {
 
     if (gm && (gm.recommendation === "HOLD" || gm.recommendation === "RECONSIDER") && !overridden) {
       gmBlocked.push({ vehicleId: s.vehicle.id, label, recommendation: gm.recommendation, confidence: gm.confidence });
+      void recordGmDecision({
+        vehicleId: s.vehicle.id,
+        vehicleLabel: label,
+        gmRecommendation: gm.recommendation,
+        gmConfidence: gm.confidence,
+        operatorAction: "batch_blocked",
+        overridden: false,
+        finalPublishStatus: "batch_blocked",
+        notes: "Blocked during batch creation",
+      });
       return false;
+    }
+    if (gm) {
+      void recordGmDecision({
+        vehicleId: s.vehicle.id,
+        vehicleLabel: label,
+        gmRecommendation: gm.recommendation,
+        gmConfidence: gm.confidence,
+        operatorAction: overridden ? "overridden" : "batch_published",
+        overridden,
+        finalPublishStatus: "published",
+        notes: "Included in batch",
+      });
     }
     return true;
   });

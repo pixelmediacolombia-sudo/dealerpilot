@@ -1,11 +1,12 @@
 import { Router } from "express";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   vehiclesTable,
   vehicleImagesTable,
   vehicleIntelligenceTable,
   listingsTable,
+  gmDecisionLogTable,
 } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { z } from "zod/v4";
@@ -315,6 +316,83 @@ router.post("/gm/whatif", async (req, res) => {
     confidence: Math.round(confidence),
     explanation,
   });
+});
+
+// ─── Shared helper: persist a GM decision to the DB ──────────────────────────
+// Fire-and-forget safe: callers do not need to await this; errors are swallowed
+// so a log write never blocks the primary publish flow.
+export async function recordGmDecision(entry: {
+  vehicleId: number;
+  vehicleLabel: string;
+  gmRecommendation: string;
+  gmConfidence?: number | null;
+  operatorAction: "confirmed_publish" | "held" | "overridden" | "batch_blocked" | "batch_published";
+  overridden: boolean;
+  finalPublishStatus: "published" | "held" | "batch_blocked";
+  notes?: string;
+}): Promise<void> {
+  try {
+    await db.insert(gmDecisionLogTable).values({
+      vehicleId: entry.vehicleId,
+      vehicleLabel: entry.vehicleLabel,
+      gmRecommendation: entry.gmRecommendation,
+      gmConfidence: entry.gmConfidence ?? null,
+      operatorAction: entry.operatorAction,
+      overridden: entry.overridden,
+      finalPublishStatus: entry.finalPublishStatus,
+      notes: entry.notes ?? null,
+    });
+  } catch {
+    // Non-fatal: decision log writes must never break the publish flow
+  }
+}
+
+// ─── POST /gm/decisions — record an operator decision ────────────────────────
+const RecordDecisionBody = z.object({
+  vehicleId: z.number().int().positive(),
+  vehicleLabel: z.string().min(1),
+  gmRecommendation: z.enum(["PUBLISH", "HOLD", "RECONSIDER"]),
+  gmConfidence: z.number().int().optional(),
+  operatorAction: z.enum(["confirmed_publish", "held", "overridden", "batch_blocked", "batch_published"]),
+  overridden: z.boolean(),
+  finalPublishStatus: z.enum(["published", "held", "batch_blocked"]),
+  notes: z.string().optional(),
+});
+
+router.post("/gm/decisions", async (req, res) => {
+  const parsed = RecordDecisionBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid request body" });
+    return;
+  }
+  const [row] = await db
+    .insert(gmDecisionLogTable)
+    .values({
+      ...parsed.data,
+      gmConfidence: parsed.data.gmConfidence ?? null,
+      notes: parsed.data.notes ?? null,
+    })
+    .returning();
+  req.log.info(
+    { vehicleId: parsed.data.vehicleId, operatorAction: parsed.data.operatorAction },
+    "GM decision recorded",
+  );
+  res.status(201).json(row);
+});
+
+// ─── GET /gm/decisions — list recent decisions ───────────────────────────────
+router.get("/gm/decisions", async (req, res) => {
+  const vehicleIdParam = req.query.vehicleId ? Number(req.query.vehicleId) : null;
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
+
+  const rows = await db
+    .select()
+    .from(gmDecisionLogTable)
+    .where(vehicleIdParam ? eq(gmDecisionLogTable.vehicleId, vehicleIdParam) : undefined)
+    .orderBy(desc(gmDecisionLogTable.createdAt))
+    .limit(limit);
+
+  res.json({ decisions: rows });
 });
 
 export default router;

@@ -39,6 +39,60 @@ export const GmAnalyzeVehicleResponse = zod.object({
 
 
 /**
+ * @summary Record a GM Coach decision outcome
+ */
+export const RecordGmDecisionBody = zod.object({
+  "vehicleId": zod.number(),
+  "vehicleLabel": zod.string(),
+  "gmRecommendation": zod.enum(['PUBLISH', 'HOLD', 'RECONSIDER']),
+  "gmConfidence": zod.number().optional(),
+  "operatorAction": zod.enum(['confirmed_publish', 'held', 'overridden', 'batch_blocked', 'batch_published']),
+  "overridden": zod.boolean(),
+  "finalPublishStatus": zod.enum(['published', 'held', 'batch_blocked']),
+  "notes": zod.string().optional()
+})
+
+export const RecordGmDecisionResponse = zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "vehicleLabel": zod.string(),
+  "gmRecommendation": zod.string(),
+  "gmConfidence": zod.number().nullish(),
+  "operatorAction": zod.string(),
+  "overridden": zod.boolean(),
+  "finalPublishStatus": zod.string(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List recent GM Coach decision log entries
+ */
+export const listGmDecisionsQueryLimitDefault = 50;
+
+export const ListGmDecisionsQueryParams = zod.object({
+  "vehicleId": zod.coerce.number().optional(),
+  "limit": zod.coerce.number().default(listGmDecisionsQueryLimitDefault)
+})
+
+export const ListGmDecisionsResponse = zod.object({
+  "decisions": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicleId": zod.number(),
+  "vehicleLabel": zod.string(),
+  "gmRecommendation": zod.string(),
+  "gmConfidence": zod.number().nullish(),
+  "operatorAction": zod.string(),
+  "overridden": zod.boolean(),
+  "finalPublishStatus": zod.string(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
  * Given a vehicle and a hypothetical price delta, returns a GM-style
  * prediction of the impact on conversations, appointments, and sale
  * probability. All deterministic from opportunity data; no OpenAI call.

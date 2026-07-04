@@ -79,6 +79,7 @@ import type {
   GetVehicleStatsParams,
   GmAnalysisResult,
   GmAnalyzeRequest,
+  GmDecisionEntry,
   GmWhatIfRequest,
   GmWhatIfResult,
   HealthStatus,
@@ -91,6 +92,8 @@ import type {
   ListConversationsParams,
   ListCreativeJobsParams,
   ListCreativeStudioParams,
+  ListGmDecisions200,
+  ListGmDecisionsParams,
   ListLeadsParams,
   ListListingWorkspacesParams,
   ListMarketplaceRecommendationsParams,
@@ -128,6 +131,7 @@ import type {
   PublishingJobList,
   PublishingJobPayload,
   QueueListingInput,
+  RecordGmDecisionRequest,
   RetryPublishingJob200,
   SalesAiTestMessageInput,
   SalesAiTestMessageResult,
@@ -254,6 +258,160 @@ export const useGmAnalyzeVehicle = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getGmAnalyzeVehicleMutationOptions(options));
     }
+
+export const getRecordGmDecisionUrl = () => {
+
+
+
+
+  return `/api/gm/decisions`
+}
+
+/**
+ * @summary Record a GM Coach decision outcome
+ */
+export const recordGmDecision = async (recordGmDecisionRequest: RecordGmDecisionRequest, options?: RequestInit): Promise<GmDecisionEntry> => {
+
+  return customFetch<GmDecisionEntry>(getRecordGmDecisionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(recordGmDecisionRequest)
+  }
+);}
+
+
+
+
+export const getRecordGmDecisionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordGmDecision>>, TError,{data: BodyType<RecordGmDecisionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordGmDecision>>, TError,{data: BodyType<RecordGmDecisionRequest>}, TContext> => {
+
+const mutationKey = ['recordGmDecision'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordGmDecision>>, {data: BodyType<RecordGmDecisionRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  recordGmDecision(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordGmDecisionMutationResult = NonNullable<Awaited<ReturnType<typeof recordGmDecision>>>
+    export type RecordGmDecisionMutationBody = BodyType<RecordGmDecisionRequest>
+    export type RecordGmDecisionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Record a GM Coach decision outcome
+ */
+export const useRecordGmDecision = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordGmDecision>>, TError,{data: BodyType<RecordGmDecisionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordGmDecision>>,
+        TError,
+        {data: BodyType<RecordGmDecisionRequest>},
+        TContext
+      > => {
+      return useMutation(getRecordGmDecisionMutationOptions(options));
+    }
+
+export const getListGmDecisionsUrl = (params?: ListGmDecisionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/gm/decisions?${stringifiedParams}` : `/api/gm/decisions`
+}
+
+/**
+ * @summary List recent GM Coach decision log entries
+ */
+export const listGmDecisions = async (params?: ListGmDecisionsParams, options?: RequestInit): Promise<ListGmDecisions200> => {
+
+  return customFetch<ListGmDecisions200>(getListGmDecisionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListGmDecisionsQueryKey = (params?: ListGmDecisionsParams,) => {
+    return [
+    `/api/gm/decisions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListGmDecisionsQueryOptions = <TData = Awaited<ReturnType<typeof listGmDecisions>>, TError = ErrorType<unknown>>(params?: ListGmDecisionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGmDecisions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListGmDecisionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listGmDecisions>>> = ({ signal }) => listGmDecisions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listGmDecisions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListGmDecisionsQueryResult = NonNullable<Awaited<ReturnType<typeof listGmDecisions>>>
+export type ListGmDecisionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List recent GM Coach decision log entries
+ */
+
+export function useListGmDecisions<TData = Awaited<ReturnType<typeof listGmDecisions>>, TError = ErrorType<unknown>>(
+ params?: ListGmDecisionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGmDecisions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListGmDecisionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGmWhatIfUrl = () => {
 

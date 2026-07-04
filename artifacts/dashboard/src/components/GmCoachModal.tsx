@@ -168,7 +168,7 @@ export function GmCoachModal({
     return () => clearTimeout(t);
   }, [priceDelta, fetchWhatIf]);
 
-  function handleClose() {
+  function resetAndClose() {
     setAnalysis(null);
     setError(null);
     setPriceDelta(0);
@@ -176,10 +176,45 @@ export function GmCoachModal({
     onClose();
   }
 
+  function handleClose() {
+    if (vehicleId && analysis) {
+      fetch("/api/gm/decisions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vehicleId,
+          vehicleLabel: vehicleLabel ?? `Vehicle #${vehicleId}`,
+          gmRecommendation: analysis.recommendation,
+          gmConfidence: analysis.confidence,
+          operatorAction: "held",
+          overridden: false,
+          finalPublishStatus: "held",
+        }),
+      }).catch(() => {});
+    }
+    resetAndClose();
+  }
+
   function handleConfirm() {
     if (!vehicleId) return;
+    if (analysis) {
+      const overridden = analysis.recommendation !== "PUBLISH";
+      fetch("/api/gm/decisions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vehicleId,
+          vehicleLabel: vehicleLabel ?? `Vehicle #${vehicleId}`,
+          gmRecommendation: analysis.recommendation,
+          gmConfidence: analysis.confidence,
+          operatorAction: overridden ? "overridden" : "confirmed_publish",
+          overridden,
+          finalPublishStatus: "published",
+        }),
+      }).catch(() => {});
+    }
     onConfirmPublish(vehicleId);
-    handleClose();
+    resetAndClose();
   }
 
   const currentPrice = vehiclePrice ?? analysis?.vehicleId ?? 0;

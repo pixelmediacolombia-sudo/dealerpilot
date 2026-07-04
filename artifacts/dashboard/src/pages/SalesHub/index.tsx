@@ -27,6 +27,7 @@ import { useDealerLocation } from "@/context/LocationContext";
 import { cn } from "@/lib/utils";
 import { PublishNowModal } from "@/components/PublishNowModal";
 import { GmCoachModal } from "@/components/GmCoachModal";
+import { GmDecisionLogPanel } from "@/components/GmDecisionLogPanel";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -867,6 +868,9 @@ export function SalesHub() {
                 )}
               </div>
             )}
+
+            {/* GM Decision Log */}
+            <GmDecisionLogPanel />
 
           </div>
         </div>
