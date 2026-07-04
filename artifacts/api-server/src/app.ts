@@ -230,4 +230,18 @@ app.use("/api/static/ai-photos", express.static(AI_PHOTOS_DIR, { maxAge: "1d" })
 // ── API routes ───────────────────────────────────────────────────────────────
 app.use("/api", router);
 
+// ── Dashboard SPA (production only) ─────────────────────────────────────────
+// In production the compiled React dashboard is served by Express.
+// /api/* and the four feed URLs are handled above; everything else goes to the
+// SPA so client-side routing (wouter) can take over.
+// In development the Vite dev server runs separately — do not register this.
+if (process.env["NODE_ENV"] === "production") {
+  const dashboardDist = path.join(process.cwd(), "artifacts/dashboard/dist/public");
+  app.use(express.static(dashboardDist, { maxAge: "1h", etag: true }));
+  // SPA fallback: serve index.html for any route not already handled
+  app.get("/{*path}", (_req: Request, res: Response) => {
+    res.sendFile(path.join(dashboardDist, "index.html"));
+  });
+}
+
 export default app;
