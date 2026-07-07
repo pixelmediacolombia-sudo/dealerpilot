@@ -454,7 +454,7 @@ router.get("/conversations", async (req, res) => {
       let listingUrl: string | null = null;
       if (c.listingId) {
         const [listing] = await db
-          .select({ listingUrl: listingsTable.listingUrl })
+          .select({ listingUrl: listingsTable.externalUrl })
           .from(listingsTable)
           .where(eq(listingsTable.id, c.listingId))
           .limit(1);
@@ -515,7 +515,7 @@ router.get("/conversations/:id", async (req, res) => {
   let listingUrl: string | null = null;
   if (conv.listingId) {
     const [listing] = await db
-      .select({ listingUrl: listingsTable.listingUrl })
+      .select({ listingUrl: listingsTable.externalUrl })
       .from(listingsTable)
       .where(eq(listingsTable.id, conv.listingId))
       .limit(1);

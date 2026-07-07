@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { CURRENT_SAMPLE_FEED } from "../inventory/sampleFeed";
 import { computeFeedHealth } from "../channels/metaCatalog";
-import { getNextSyncAt } from "../inventory/scheduler";
+import { getNextSyncAt, runInventorySync } from "../inventory/scheduler";
+import { ALPHA_DEALER_ID } from "../lib/dealer";
 
 const router: IRouter = Router();
 
@@ -17,6 +18,29 @@ router.get("/inventory/health", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to compute inventory health");
     res.status(500).json({ error: "Failed to compute feed health" });
+  }
+});
+
+router.post("/inventory/sync", async (req, res) => {
+  try {
+    const result = await runInventorySync(req.log, {
+      dealerId: ALPHA_DEALER_ID,
+      trigger: "manual",
+    });
+
+    res.json({
+      ok: true,
+      dealerId: result.dealerId,
+      trigger: result.trigger,
+      nextSyncAt: getNextSyncAt()?.toISOString() ?? null,
+      summary: result.summary,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Manual inventory sync failed");
+    res.status(500).json({
+      ok: false,
+      error: err instanceof Error ? err.message : "Inventory sync failed",
+    });
   }
 });
 

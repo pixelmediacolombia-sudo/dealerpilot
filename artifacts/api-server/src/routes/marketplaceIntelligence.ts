@@ -400,7 +400,12 @@ router.get("/marketplace-intelligence/dashboard-health", async (req, res) => {
   const lastSyncRows = await db
     .select()
     .from(feedRunsTable)
-    .where(and(eq(feedRunsTable.dealerId, DEALER_ID), eq(feedRunsTable.status, "completed")))
+    .where(
+      and(
+        eq(feedRunsTable.dealerId, DEALER_ID),
+        or(eq(feedRunsTable.status, "success"), eq(feedRunsTable.status, "completed"))!,
+      ),
+    )
     .orderBy(desc(feedRunsTable.finishedAt))
     .limit(1);
   const lastSyncAt = lastSyncRows[0]?.finishedAt?.toISOString() ?? null;
