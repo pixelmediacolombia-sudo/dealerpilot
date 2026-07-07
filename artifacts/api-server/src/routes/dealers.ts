@@ -21,6 +21,7 @@ function toFeedRun(run: FeedRun) {
     id: run.id,
     dealerId: run.dealerId,
     status: run.status,
+    triggerType: run.triggerType,
     startedAt: run.startedAt.toISOString(),
     finishedAt: run.finishedAt ? run.finishedAt.toISOString() : null,
     vehiclesImported: run.vehiclesImported,

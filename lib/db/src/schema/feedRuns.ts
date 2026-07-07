@@ -7,6 +7,8 @@ export const feedRunsTable = pgTable("feed_runs", {
   dealerId: integer("dealer_id").notNull(),
   feedId: integer("feed_id"),
   status: text("status").notNull(),
+  /** How this sync was triggered: "auto" (scheduler), "manual" (API call), "seed" (startup seed) */
+  triggerType: text("trigger_type").notNull().default("auto"),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
   vehiclesImported: integer("vehicles_imported").notNull().default(0),

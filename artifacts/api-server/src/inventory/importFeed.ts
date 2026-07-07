@@ -75,13 +75,14 @@ export async function importFeed(
   dealerId: number,
   xml: string,
   log: Pick<Logger, "info" | "warn">,
+  opts?: { trigger?: "auto" | "manual" | "seed" },
 ): Promise<ImportSummary> {
   const { vehicles: parsed, rawCount, errors: parseErrors } = parseInventoryXml(xml);
   log.info({ dealerId, rawCount, parsed: parsed.length, parseErrors }, "Parsed inventory feed");
 
   const [run] = await db
     .insert(feedRunsTable)
-    .values({ dealerId, status: "running", vehiclesImported: parsed.length })
+    .values({ dealerId, status: "running", vehiclesImported: parsed.length, triggerType: opts?.trigger ?? "auto" })
     .returning();
   const feedRunId = run!.id;
 

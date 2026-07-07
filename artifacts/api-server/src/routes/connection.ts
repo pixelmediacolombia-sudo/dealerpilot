@@ -7,6 +7,7 @@ import {
   conversationsTable,
 } from "@workspace/db";
 import { desc, sql } from "drizzle-orm";
+import { getNextSyncAt } from "../inventory/scheduler";
 
 const router: IRouter = Router();
 
@@ -27,23 +28,62 @@ router.get("/connection-center", async (req, res) => {
     .orderBy(desc(feedRunsTable.startedAt))
     .limit(1);
 
+  const nextSync = getNextSyncAt();
+
   let xmlFeed: {
     status: string;
     detail: string | null;
     lastHeartbeatAt?: string | null;
+    nextSyncAt?: string | null;
+    components?: { name: string; status: string; detail: string }[];
   };
+
   if (!latestRun) {
-    xmlFeed = { status: "not_synced", detail: "No sync has run yet" };
+    xmlFeed = {
+      status: "not_synced",
+      detail: "No sync has run yet",
+      nextSyncAt: nextSync?.toISOString() ?? null,
+      components: [
+        { name: "Last Sync", status: "warning", detail: "Never" },
+        { name: "Next Sync", status: "connected", detail: nextSync ? nextSync.toLocaleString() : "Pending" },
+      ],
+    };
   } else if (latestRun.status === "success") {
+    const finishedAt = latestRun.finishedAt ?? latestRun.startedAt;
+    const ageMs = Date.now() - finishedAt.getTime();
+    const ageHours = Math.round(ageMs / 3_600_000);
+    const summary = [
+      latestRun.vehiclesNew > 0 ? `${latestRun.vehiclesNew} new` : null,
+      latestRun.vehiclesUpdated > 0 ? `${latestRun.vehiclesUpdated} updated` : null,
+      latestRun.vehiclesRemoved > 0 ? `${latestRun.vehiclesRemoved} removed` : null,
+    ].filter(Boolean).join(" · ") || `${latestRun.vehiclesImported} vehicles`;
+
     xmlFeed = {
       status: "connected",
-      detail: `Last sync imported ${latestRun.vehiclesImported} vehicles`,
-      lastHeartbeatAt: (latestRun.finishedAt ?? latestRun.startedAt).toISOString(),
+      detail: `Last sync: ${summary} · ${ageHours}h ago`,
+      lastHeartbeatAt: finishedAt.toISOString(),
+      nextSyncAt: nextSync?.toISOString() ?? null,
+      components: [
+        { name: "Last Sync", status: "connected", detail: `${finishedAt.toLocaleString()} — ${summary}` },
+        { name: "Next Sync", status: "connected", detail: nextSync ? nextSync.toLocaleString() : "Pending" },
+        { name: "Vehicles Active", status: "connected", detail: String(latestRun.vehiclesActive ?? latestRun.vehiclesImported) },
+        ...(latestRun.errorCount > 0
+          ? [{ name: "Parse Errors", status: "warning", detail: `${latestRun.errorCount} errors in last sync` }]
+          : []),
+      ],
     };
   } else {
     xmlFeed = {
       status: "error",
       detail: latestRun.errorMessage ?? "Last sync failed",
+      nextSyncAt: nextSync?.toISOString() ?? null,
+      components: [
+        { name: "Last Sync", status: "error", detail: latestRun.errorMessage ?? "Sync failed" },
+        { name: "Next Sync", status: "connected", detail: nextSync ? nextSync.toLocaleString() : "Pending" },
+        ...(latestRun.errorCount > 0
+          ? [{ name: "Errors", status: "error", detail: `${latestRun.errorCount} errors` }]
+          : []),
+      ],
     };
   }
 

@@ -349,7 +349,10 @@ function generateVehicleStrategy(
 
 // ── Opportunity Score Seed ────────────────────────────────────────────────────
 
-export async function seedOpportunityScores(logger: Logger): Promise<void> {
+export async function seedOpportunityScores(
+  logger: Logger,
+  opts?: { forceRefresh?: boolean },
+): Promise<void> {
   // Check if any rows are missing v1.2 buyer segment fields
   const [nullCheck] = await db
     .select({ cnt: count() })
@@ -366,7 +369,7 @@ export async function seedOpportunityScores(logger: Logger): Promise<void> {
     );
 
   const needsScoring = (nullCheck?.cnt ?? 0) > 0;
-  if (!needsScoring) {
+  if (!needsScoring && !opts?.forceRefresh) {
     logger.info("Opportunity scores already computed; skipping");
     return;
   }

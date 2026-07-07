@@ -1,11 +1,7 @@
 import { Router, type IRouter } from "express";
 import { CURRENT_SAMPLE_FEED } from "../inventory/sampleFeed";
 import { computeFeedHealth } from "../channels/metaCatalog";
-import { getNextSyncAt } from "../inventory/scheduler";
-import { fetchFeedXml } from "../inventory/feedSource";
-import { importFeed } from "../inventory/importFeed";
-import { db, dealersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { getNextSyncAt, runSyncNow } from "../inventory/scheduler";
 
 const router: IRouter = Router();
 
@@ -25,24 +21,15 @@ router.get("/inventory/health", async (req, res) => {
 });
 
 // POST /api/inventory/sync — manually trigger a full feed import including
-// the Alpha Motorsport location scraper. Used when lot locations are stale
-// (e.g. after a fresh production deployment before the 24h scheduler fires).
+// the Alpha Motorsport location scraper and Opportunity Engine refresh.
 router.post("/inventory/sync", async (req, res) => {
-  req.log.info("Manual inventory sync triggered");
-  try {
-    const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, 1));
-    if (!dealer?.xmlFeedUrl) {
-      res.status(422).json({ error: "No XML feed URL configured for dealer 1" });
-      return;
-    }
-    const xml = await fetchFeedXml(dealer.xmlFeedUrl);
-    const summary = await importFeed(dealer.id, xml, req.log);
-    req.log.info(summary, "Manual inventory sync complete");
-    res.json({ ok: true, ...summary });
-  } catch (err) {
-    req.log.error({ err }, "Manual inventory sync failed");
-    res.status(500).json({ error: "Sync failed", detail: String(err) });
+  req.log.info("Manual inventory sync triggered via API");
+  const summary = await runSyncNow(req.log, "manual");
+  if (!summary) {
+    res.status(422).json({ error: "Sync failed — check server logs. Feed URL may not be configured." });
+    return;
   }
+  res.json({ ok: true, ...summary });
 });
 
 export default router;

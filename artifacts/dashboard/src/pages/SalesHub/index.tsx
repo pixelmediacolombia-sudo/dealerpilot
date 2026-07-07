@@ -729,7 +729,10 @@ export function SalesHub() {
     type Item = { id: string; label: string; sub: string; date: Date; color: string; action?: string; actionPath?: string };
     const items: Item[] = [];
     feedRuns?.feedRuns?.forEach(run => {
-      if (run.finishedAt) items.push({ id: `feed-${run.id}`, label: "Inventory synced", sub: `${run.vehiclesNew ?? 0} new · ${run.vehiclesUpdated ?? 0} updated · ${run.vehiclesRemoved ?? 0} removed`, date: new Date(run.finishedAt), color: "bg-primary", action: "View Inventory", actionPath: "/inventory" });
+      if (run.finishedAt) {
+        const isAuto = (run as unknown as Record<string, unknown>).triggerType === "auto";
+        items.push({ id: `feed-${run.id}`, label: isAuto ? "Inventory synced automatically" : "Inventory synced", sub: `${run.vehiclesNew ?? 0} new · ${run.vehiclesUpdated ?? 0} updated · ${run.vehiclesRemoved ?? 0} removed`, date: new Date(run.finishedAt), color: "bg-primary", action: "View Inventory", actionPath: "/inventory" });
+      }
     });
     creativeJobs?.jobs?.forEach(job => {
       if (job.completedAt) items.push({ id: `creative-${job.id}`, label: "Creative generated", sub: job.vehicleLabel ?? "Vehicle", date: new Date(job.completedAt), color: "bg-accent" });
