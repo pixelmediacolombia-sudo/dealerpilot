@@ -22,7 +22,7 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.7";
+  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.8";
 
   // ── Performance / fast-mode settings ────────────────────────────────────────
   // MARKETPLACE_FAST_MODE=true fills the 10 required fields:
@@ -531,6 +531,86 @@
     return null;
   }
 
+  // ── waitForManualContinue ────────────────────────────────────────────────────
+  // Shows a top-of-page banner and panel message asking the operator to complete
+  // an action manually.  Resolves when the operator clicks "Continue →".
+  function waitForManualContinue(message) {
+    return new Promise((resolve) => {
+      // Remove any previous banner
+      const old = document.getElementById("mai-manual-action");
+      if (old) old.remove();
+
+      const banner = document.createElement("div");
+      banner.id = "mai-manual-action";
+      banner.style.cssText =
+        "position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2147483647;" +
+        "background:#c0392b;color:#fff;padding:12px 24px;border-radius:0 0 10px 10px;" +
+        "font:bold 13px/1.6 sans-serif;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.45);" +
+        "max-width:620px;";
+      banner.innerHTML =
+        '<div style="margin-bottom:10px;">⚠️ ' + message + "</div>" +
+        '<button id="mai-manual-continue" style="' +
+        "background:#27ae60;color:#fff;border:none;padding:9px 28px;" +
+        'border-radius:5px;font:bold 13px sans-serif;cursor:pointer;">Continue →</button>';
+      document.documentElement.appendChild(banner);
+
+      showOutput(
+        '<div style="color:#e74c3c;font-weight:700;margin-bottom:6px;">⚠️ Manual Action Required</div>' +
+        '<div style="font-size:12px;line-height:1.5;margin-bottom:8px;">' + escapeHtml(message) + "</div>",
+      );
+
+      banner.querySelector("#mai-manual-continue").addEventListener("click", () => {
+        banner.remove();
+        stateLog("Manual action confirmed by operator");
+        resolve();
+      });
+    });
+  }
+
+  // ── scanForAnyOptions ────────────────────────────────────────────────────────
+  // Waits up to `waitMs` for any visible option-like elements to appear in the
+  // DOM, checking multiple roles / element types Facebook has used across UI
+  // versions.  Returns the array (possibly empty).
+  async function scanForAnyOptions(waitMs, tag) {
+    const limit = waitMs ?? 8000;
+    const label = tag || "options";
+    const start = Date.now();
+    while (Date.now() - start < limit) {
+      // 1. role=option (standard, may be in a fixed portal)
+      let opts = Array.from(document.querySelectorAll('[role="option"]')).filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      });
+      if (opts.length) { console.log(`[VT] ${label}: ${opts.length} [role="option"]`); return opts; }
+
+      // 2. role=menuitem
+      opts = Array.from(document.querySelectorAll('[role="menuitem"]')).filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      });
+      if (opts.length) { console.log(`[VT] ${label}: ${opts.length} [role="menuitem"]`); return opts; }
+
+      // 3. li / data-value inside any listbox / dialog
+      const popup =
+        document.querySelector('[role="listbox"]') ||
+        document.querySelector('[role="dialog"][aria-modal="true"]') ||
+        document.querySelector('[aria-modal="true"]');
+      if (popup) {
+        opts = Array.from(popup.querySelectorAll('li, [data-value], [role="listitem"]')).filter(
+          (el) => {
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+          },
+        );
+        if (opts.length) { console.log(`[VT] ${label}: ${opts.length} li/data-value in popup`); return opts; }
+      }
+
+      await sleep(200);
+    }
+    console.log(`[VT] ${label}: no options found after ${limit}ms`);
+    return [];
+  }
+
   // =====================================================================
   // Publishing-queue flow on the Marketplace create page.
   // =====================================================================
@@ -832,6 +912,294 @@
     }
 
     // ------------------------------------------------------------------
+    // selectVehicleTypeStep — dedicated, 7-strategy Vehicle Type selector.
+    //
+    // Facebook has changed the Vehicle Type dropdown multiple times. This
+    // function tries every known interaction pattern before pausing for
+    // manual operator action rather than hard-failing the job.
+    // ------------------------------------------------------------------
+    async function selectVehicleTypeStep(rawValue) {
+      // ── Body-style → Facebook Vehicle Type mapping ──────────────────────
+      // Facebook now shows granular body types (Truck, SUV, …) instead of
+      // the old "Car/Truck" category.  Map whichever value the server sends
+      // to the label Facebook is most likely to display.
+      const VT_MAP = {
+        "truck":          "Truck",
+        "pickup":         "Truck",
+        "pickup truck":   "Truck",
+        "suv":            "SUV",
+        "sport utility":  "SUV",
+        "sport-utility":  "SUV",
+        "sedan":          "Sedan",
+        "saloon":         "Sedan",
+        "coupe":          "Coupe",
+        "2-door":         "Coupe",
+        "hatchback":      "Hatchback",
+        "hatch":          "Hatchback",
+        "van":            "Van",
+        "minivan":        "Van",
+        "mini-van":       "Van",
+        "wagon":          "Wagon",
+        "estate":         "Wagon",
+        "convertible":    "Convertible",
+        "cabriolet":      "Convertible",
+        "roadster":       "Convertible",
+        "car/truck":      "Car/Truck",
+        "cars & trucks":  "Car/Truck",
+        "cars and trucks":"Car/Truck",
+        "car":            "Car/Truck",
+        "automobile":     "Car/Truck",
+      };
+      const rawLower   = (rawValue || "").toLowerCase().trim();
+      const mapped     = VT_MAP[rawLower] || rawValue || "Car/Truck";
+      const VT_KWS     = ["vehicle type", "tipo de veh", "category", "tipo"];
+      // Also include body-style keywords for vehicles whose bodyStyle value
+      // might land in the vehicle-type combobox (depends on form version)
+      const CAR_ALIASES = ["car/truck", "cars & trucks", "cars and trucks", "vehicle", "automobile"];
+
+      console.log(`[VT] selectVehicleTypeStep: "${rawValue}" → "${mapped}"`);
+      stateLog(`Vehicle type: "${rawValue}" → "${mapped}"`);
+
+      // ── Option-picker helper ────────────────────────────────────────────
+      function tryPickOption(optionEls, target) {
+        if (!optionEls.length) return false;
+        const needle   = target.toLowerCase().trim();
+        const getText  = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
+        const normStr  = (s) => s.replace(/[^a-z0-9]/g, "");
+
+        let pick =
+          optionEls.find((o) => getText(o) === needle) ||
+          optionEls.find((o) => getText(o).includes(needle)) ||
+          optionEls.find((o) => needle.includes(getText(o)) && getText(o).length > 2) ||
+          optionEls.find((o) => normStr(getText(o)) === normStr(needle)) ||
+          (CAR_ALIASES.includes(needle)
+            ? optionEls.find((o) => CAR_ALIASES.some((a) => getText(o).includes(a)))
+            : undefined);
+
+        if (!pick) {
+          // Fallback: first option — log the discrepancy
+          const sample = optionEls.slice(0, 6).map((o) => `"${getText(o)}"`).join(", ");
+          console.warn(`[VT] No exact match for "${target}" — available: ${sample} — using first`);
+          warnings.push(`vehicle type: no match for "${target}" — used first option: "${getText(optionEls[0])}"`);
+          pick = optionEls[0];
+        }
+
+        const pickedText = (pick.innerText || pick.textContent || "").trim();
+        console.log(`[VT] Clicking option "${pickedText}"`);
+        stateLog(`vehicle type → "${pickedText}"`);
+        pick.click();
+        filled.push(`vehicle type`);
+        log(`vehicle type → "${pickedText}"`);
+        return true;
+      }
+
+      // ── Run a click + option-scan cycle ────────────────────────────────
+      async function clickAndScan(el, strategyLabel, waitMs) {
+        el.click();
+        await sleep(350);
+        const opts = await scanForAnyOptions(waitMs || 8000, strategyLabel);
+        return opts;
+      }
+
+      // ── Locate the vehicle-type combobox ───────────────────────────────
+      let cb = await waitForCombobox(VT_KWS, BUDGET.COMBOBOX_WAIT_MS);
+
+      // ── Strategy 1: Keyword combobox → click → role-agnostic scan ──────
+      setStatus("Selecting vehicle type (1/7)…");
+      if (cb) {
+        console.log("[VT] S1: keyword combobox found, clicking");
+        const opts = await clickAndScan(cb, "S1", 8000);
+        if (opts.length) {
+          if (tryPickOption(opts, mapped)) { await sleep(350); return; }
+        }
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        await sleep(350);
+      }
+
+      // ── Strategy 2: Synthetic mouse-event sequence ─────────────────────
+      setStatus("Selecting vehicle type (2/7)…");
+      {
+        const cb2 = (await waitForCombobox(VT_KWS, 3000)) || cb;
+        if (cb2) {
+          console.log("[VT] S2: synthetic mousedown/mouseup/click");
+          cb2.focus();
+          await sleep(200);
+          for (const evType of ["mousedown", "mouseup", "click"]) {
+            cb2.dispatchEvent(new MouseEvent(evType, { bubbles: true, cancelable: true, view: window }));
+          }
+          await sleep(500);
+          const opts = await scanForAnyOptions(6000, "S2");
+          if (opts.length) {
+            if (tryPickOption(opts, mapped)) { await sleep(350); return; }
+          }
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          await sleep(350);
+        }
+      }
+
+      // ── Strategy 3: ArrowDown + Space keyboard open ────────────────────
+      setStatus("Selecting vehicle type (3/7)…");
+      {
+        const cb3 = (await waitForCombobox(VT_KWS, 2000)) || cb;
+        if (cb3) {
+          console.log("[VT] S3: ArrowDown + Space keyboard open");
+          cb3.focus();
+          await sleep(200);
+          cb3.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
+          await sleep(400);
+          cb3.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
+          await sleep(400);
+          const opts = await scanForAnyOptions(5000, "S3");
+          if (opts.length) {
+            if (tryPickOption(opts, mapped)) { await sleep(350); return; }
+          }
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          await sleep(350);
+        }
+      }
+
+      // ── Strategy 4: Label-text walk — find "Vehicle type" text, click nearby button ──
+      setStatus("Selecting vehicle type (4/7)…");
+      {
+        console.log("[VT] S4: scanning for visible 'Vehicle type' label text");
+        const VT_LABEL_KWS = ["vehicle type", "tipo de vehículo", "tipo de vehiculo", "vehicle category"];
+        const labelEls = Array.from(document.querySelectorAll("label, span, div, p, legend"))
+          .filter((el) => {
+            if (!el.offsetParent) return false;
+            const t = (el.innerText || el.textContent || "").toLowerCase().trim();
+            return VT_LABEL_KWS.some((kw) => t === kw || t.startsWith(kw));
+          });
+        console.log(`[VT] S4: ${labelEls.length} matching label elements`);
+        for (const lbl of labelEls) {
+          const container = lbl.closest("div, form, fieldset") || lbl.parentElement;
+          if (!container) continue;
+          const nearby = container.querySelector(
+            '[role="combobox"], [role="button"][tabindex], div[tabindex="0"]',
+          );
+          if (nearby && nearby.offsetParent) {
+            console.log("[VT] S4: clicking nearby combobox/button via label");
+            const opts = await clickAndScan(nearby, "S4", 5000);
+            if (opts.length) {
+              if (tryPickOption(opts, mapped)) { await sleep(350); return; }
+            }
+            document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+            await sleep(350);
+          }
+        }
+      }
+
+      // ── Strategy 5: First visible combobox (positional fallback) ──────
+      setStatus("Selecting vehicle type (5/7)…");
+      {
+        const allCbs = Array.from(document.querySelectorAll('[role="combobox"]'))
+          .filter((el) => el.offsetParent !== null);
+        console.log(`[VT] S5: ${allCbs.length} visible comboboxes — clicking first`);
+        if (allCbs.length > 0) {
+          const opts = await clickAndScan(allCbs[0], "S5", 5000);
+          if (opts.length) {
+            const texts = opts.map((o) => (o.innerText || o.textContent || "").toLowerCase().trim());
+            const looksLikeVT = texts.some((t) =>
+              ["car", "truck", "suv", "sedan", "coupe", "van", "motorcycle", "vehicle", "automobile"]
+                .some((vt) => t.includes(vt)),
+            );
+            if (looksLikeVT) {
+              if (tryPickOption(opts, mapped)) { await sleep(350); return; }
+            }
+          }
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          await sleep(350);
+        }
+      }
+
+      // ── Strategy 6: aria-owns / aria-controls / ancestor walk ─────────
+      setStatus("Selecting vehicle type (6/7)…");
+      {
+        const cbEl = (await waitForCombobox(VT_KWS, 2000)) || cb;
+        if (cbEl) {
+          console.log("[VT] S6: aria-owns / ancestor walk");
+          cbEl.focus();
+          cbEl.click();
+          await sleep(600);
+
+          const ariaRef = cbEl.getAttribute("aria-owns") || cbEl.getAttribute("aria-controls");
+          if (ariaRef) {
+            const container = document.getElementById(ariaRef);
+            if (container) {
+              const opts = Array.from(
+                container.querySelectorAll('[role="option"], [role="menuitem"], li, [data-value]'),
+              ).filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+              if (opts.length) {
+                console.log(`[VT] S6: ${opts.length} options via aria-ref`);
+                if (tryPickOption(opts, mapped)) { await sleep(350); return; }
+              }
+            }
+          }
+
+          // Walk up 6 ancestors looking for an expanded dropdown
+          let ancestor = cbEl.parentElement;
+          for (let i = 0; i < 6 && ancestor; i++) {
+            const opts = Array.from(
+              ancestor.querySelectorAll('[role="option"], [role="menuitem"]'),
+            ).filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+            if (opts.length) {
+              console.log(`[VT] S6: ${opts.length} options in ancestor level ${i}`);
+              if (tryPickOption(opts, mapped)) { await sleep(350); return; }
+              break;
+            }
+            ancestor = ancestor.parentElement;
+          }
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          await sleep(350);
+        }
+      }
+
+      // ── Strategy 7: Type the mapped value → await filtered options ─────
+      setStatus("Selecting vehicle type (7/7 — type + Enter)…");
+      {
+        const cbEl = (await waitForCombobox(VT_KWS, 2000)) || cb;
+        if (cbEl) {
+          console.log(`[VT] S7: typing "${mapped}" char-by-char`);
+          cbEl.focus();
+          await sleep(200);
+          for (const ch of mapped) {
+            cbEl.dispatchEvent(new KeyboardEvent("keydown",  { key: ch, bubbles: true }));
+            cbEl.dispatchEvent(new KeyboardEvent("keypress", { key: ch, bubbles: true }));
+            cbEl.dispatchEvent(new KeyboardEvent("keyup",    { key: ch, bubbles: true }));
+            await sleep(60);
+          }
+          await sleep(700);
+          const opts = await scanForAnyOptions(4000, "S7");
+          if (opts.length) {
+            if (tryPickOption(opts, mapped)) { await sleep(350); return; }
+          }
+          // Try Enter to commit typed value
+          cbEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+          await sleep(500);
+          const cbText = (cbEl.innerText || cbEl.textContent || "").trim();
+          if (cbText && cbText.length > 1) {
+            console.log(`[VT] S7: Enter committed, combobox shows "${cbText}"`);
+            filled.push("vehicle type");
+            log(`vehicle type → "${cbText}" (typed)`);
+            return;
+          }
+        }
+      }
+
+      // ── All 7 strategies exhausted — pause for manual operator action ──
+      console.error("[VT] All strategies failed — pausing for manual selection");
+      stateError("Vehicle type auto-selection failed (all 7 strategies exhausted)");
+      warnings.push("vehicle type: auto-selection failed — operator must select manually");
+
+      await waitForManualContinue(
+        "Select Vehicle Type on the Facebook form (the first dropdown), then click Continue.",
+      );
+      // Operator confirmed — credit the field as filled
+      filled.push("vehicle type");
+      warnings.push("vehicle type: selected manually by operator");
+      stateLog("Vehicle type: operator confirmed manual selection");
+    }
+
+    // ------------------------------------------------------------------
     // fillStep — wait for a text input / textarea and write the value.
     // ------------------------------------------------------------------
     async function fillStep(label, keywords, value) {
@@ -888,15 +1256,12 @@
       }
 
       // ---- Phase 1: Vehicle type (required for Next button to activate) ----
+      // Uses the dedicated 7-strategy selectVehicleTypeStep which also maps
+      // body-style values (Truck/SUV/Sedan/…) to Facebook's label variants
+      // and pauses for manual operator action rather than hard-failing.
       stateLog("Phase 1: vehicle type (required)");
       setStatus("Selecting vehicle type…");
-      await selectComboboxStep(
-        "vehicle type",
-        ["vehicle type", "type of vehicle", "category"],
-        fill.vehicleType || "Car/Truck",
-        "generic",
-        true,   // required — fallback to first option if no exact match
-      );
+      await selectVehicleTypeStep(fill.vehicleType || fill.bodyStyle || "Car/Truck");
 
       // ---- Phase 2: Year / Make / Model ──────────────────────────────────
       // Year and Make are required for Facebook to enable the Next button.
@@ -1992,93 +2357,151 @@
   }
 
   // ==================================================================
-  // DEBUG: Vehicle Type only — stops after selecting Vehicle Type.
+  // DEBUG: Vehicle Type only — probes all 7 strategies and reports
+  // which one works, or shows the operator exactly what the DOM contains.
   // ==================================================================
   async function debugVehicleType() {
-    const TARGET_VALUE = "Car/Truck";
+    const VT_KWS = ["vehicle type", "tipo de veh", "category", "tipo"];
 
-    console.log("[STEP 1] Waiting for Vehicle Type dropdown");
-    setStatus('[DEBUG] Step 1: Scanning for [role="combobox"] elements…');
+    // ── Step 1: Inventory of all comboboxes ───────────────────────────
+    setStatus('[DEBUG] Step 1: inventorying [role="combobox"] elements…');
     await sleep(400);
 
     const allBoxes = Array.from(document.querySelectorAll('[role="combobox"]'));
-    console.log(`[STEP 1] Total [role="combobox"] found: ${allBoxes.length}`);
+    console.log(`[VT-DEBUG] Total [role="combobox"] found: ${allBoxes.length}`);
     allBoxes.forEach((el, i) => {
-      const labelledBy = el.getAttribute("aria-labelledby");
+      const labelledBy = el.getAttribute("aria-labelledby") || "";
       let resolvedLabel = "";
       if (labelledBy) {
         const lbEl = document.getElementById(labelledBy);
         if (lbEl) resolvedLabel = (lbEl.innerText || lbEl.textContent || "").trim();
       }
-      console.log(
+      const info =
         `  [${i}]` +
         ` text="${(el.innerText || el.textContent || "").trim().slice(0, 60)}"` +
         ` aria-label="${el.getAttribute("aria-label") || ""}"` +
-        ` aria-labelledby="${labelledBy || ""}" → "${resolvedLabel}"` +
-        ` placeholder="${el.getAttribute("placeholder") || ""}"` +
-        ` role="${el.getAttribute("role") || ""}"` +
-        ` aria-expanded="${el.getAttribute("aria-expanded") || ""}"`,
-      );
+        ` labelledby="${labelledBy}" → "${resolvedLabel}"` +
+        ` expanded="${el.getAttribute("aria-expanded") || ""}"` +
+        ` owns="${el.getAttribute("aria-owns") || ""}"` +
+        ` controls="${el.getAttribute("aria-controls") || ""}"`;
+      console.log(info);
       el.style.outline = "2px dashed orange";
     });
 
-    const VT_KEYWORDS = ["vehicle type", "type of vehicle", "category"];
-    const targetEl = findCombobox(VT_KEYWORDS);
-
+    // ── Step 2: Locate the vehicle-type combobox ──────────────────────
+    setStatus('[DEBUG] Step 2: finding Vehicle Type combobox by keywords…');
+    const targetEl = findCombobox(VT_KWS);
     if (!targetEl) {
-      console.log("[ERROR] [STEP 2] Vehicle Type combobox NOT FOUND");
-      setStatus('[ERROR] Vehicle Type combobox NOT FOUND. Check console (F12).', "err");
+      console.log("[VT-DEBUG] Vehicle Type combobox NOT found by keywords — will try first visible");
+      setStatus("[DEBUG] No keyword-match combobox. Trying first visible combobox…");
+    } else {
+      console.log("[VT-DEBUG] Vehicle Type combobox FOUND:", targetEl);
+      targetEl.style.outline = "4px solid red";
+      targetEl.style.outlineOffset = "2px";
+      setStatus("[DEBUG] Step 2: combobox highlighted RED");
+    }
+
+    const cb = targetEl || Array.from(document.querySelectorAll('[role="combobox"]')).find((el) => el.offsetParent);
+
+    if (!cb) {
+      setStatus("[DEBUG] No combobox found at all — check console (F12).", "err");
       return;
     }
 
-    console.log("[STEP 2] Vehicle Type combobox FOUND:", targetEl);
-    targetEl.style.outline = "4px solid red";
-    targetEl.style.outlineOffset = "2px";
-    setStatus("[DEBUG] Step 2: Combobox found — highlighted RED");
+    // ── Step 3: Click and probe with all option-role variants ─────────
+    setStatus("[DEBUG] Step 3: clicking combobox and scanning for options…");
+    cb.click();
+    await sleep(400);
 
-    console.log("[STEP 3] Opening combobox — calling .click()");
-    setStatus("[DEBUG] Step 3: Opening combobox…");
-    targetEl.click();
+    // Collect all candidate option elements across roles
+    const roleSelectors = [
+      '[role="option"]',
+      '[role="menuitem"]',
+      '[role="listitem"]',
+    ];
+    let allOpts = [];
+    for (const sel of roleSelectors) {
+      const els = Array.from(document.querySelectorAll(sel)).filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      });
+      if (els.length) {
+        console.log(`[VT-DEBUG] Found ${els.length} visible ${sel} elements`);
+        allOpts = allOpts.concat(els);
+      }
+    }
+    // Also check listbox / dialog portals
+    const popup =
+      document.querySelector('[role="listbox"]') ||
+      document.querySelector('[role="dialog"][aria-modal="true"]') ||
+      document.querySelector('[aria-modal="true"]');
+    if (popup) {
+      const liEls = Array.from(popup.querySelectorAll('li, [data-value]')).filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      });
+      if (liEls.length) {
+        console.log(`[VT-DEBUG] Found ${liEls.length} li/data-value elements in popup`);
+        allOpts = allOpts.concat(liEls);
+      }
+    }
 
-    const options = await waitForOptions(8000);
-    console.log(`[STEP 4] Available options (${options.length}):`);
-    options.forEach((o, i) =>
-      console.log(`  [${i}] "${(o.innerText || o.textContent || "").trim()}"`)
+    // Wait up to 8 s for delayed options
+    if (!allOpts.length) {
+      console.log("[VT-DEBUG] No options yet — waiting up to 8 s…");
+      setStatus("[DEBUG] Waiting for options to appear…");
+      allOpts = await scanForAnyOptions(8000, "debug");
+    }
+
+    console.log(`[VT-DEBUG] Final option count: ${allOpts.length}`);
+    allOpts.forEach((o, i) =>
+      console.log(`  [${i}] role="${o.getAttribute("role") || o.tagName}" text="${(o.innerText || o.textContent || "").trim().slice(0, 80)}"`)
     );
 
-    if (!options.length) {
-      console.log('[ERROR] [STEP 4] No [role="option"] appeared after clicking');
-      setStatus("[ERROR] No options appeared. Combobox may use a different interaction.", "err");
-      return;
-    }
-
-    const needle  = TARGET_VALUE.toLowerCase().trim();
-    const getText = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
-    const pick =
-      options.find((o) => getText(o) === needle) ||
-      options.find((o) => getText(o).includes(needle)) ||
-      options.find((o) => needle.includes(getText(o)) && getText(o).length > 2);
-
-    if (!pick) {
-      console.log(`[ERROR] [STEP 5] No option matching "${TARGET_VALUE}"`);
-      console.log("[DEBUG] Option texts:", options.map((o) => (o.innerText || o.textContent || "").trim()));
-      setStatus(`[ERROR] No match for "${TARGET_VALUE}". Check console for actual option texts.`, "err");
+    if (!allOpts.length) {
+      // Show aria attributes to help diagnose
+      const ariaOwns = cb.getAttribute("aria-owns");
+      const ariaCtrl = cb.getAttribute("aria-controls");
+      const expanded = cb.getAttribute("aria-expanded");
+      console.log(`[VT-DEBUG] aria-expanded=${expanded} aria-owns=${ariaOwns} aria-controls=${ariaCtrl}`);
+      setStatus(
+        `[DEBUG] No options appeared (expanded=${expanded}, owns=${ariaOwns || "—"}). ` +
+        "Check console (F12) for DOM details.",
+        "err",
+      );
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       return;
     }
 
-    const pickedText = (pick.innerText || pick.textContent || "").trim();
-    console.log(`[STEP 5] Selecting: ${pickedText}`);
-    setStatus(`[DEBUG] Step 5: Clicking "${pickedText}"…`);
-    pick.click();
+    // ── Step 4: Try to pick "Car/Truck" or first available option ─────
+    const VT_TARGET = "Car/Truck";
+    const getText = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
+    const needle = VT_TARGET.toLowerCase();
+    const ALIASES = ["car/truck", "cars & trucks", "cars and trucks", "vehicle", "automobile"];
+    const pick =
+      allOpts.find((o) => getText(o) === needle) ||
+      allOpts.find((o) => getText(o).includes(needle)) ||
+      allOpts.find((o) => needle.includes(getText(o)) && getText(o).length > 2) ||
+      allOpts.find((o) => ALIASES.some((a) => getText(o).includes(a))) ||
+      allOpts[0];
 
-    console.log(`[STEP 6] Selection success — clicked "${pickedText}"`);
+    const pickedText = (pick.innerText || pick.textContent || "").trim();
+    console.log(`[VT-DEBUG] Selecting: "${pickedText}"`);
+    setStatus(`[DEBUG] Clicking "${pickedText}"…`);
+    pick.click();
+    await sleep(400);
+
     setStatus(
-      `[DEBUG] Done: Selected "${pickedText}". ` +
-      `Watch if Year / Make / Model appear. WORKFLOW STOPPED.`,
+      `[DEBUG] ✓ Selected "${pickedText}". ` +
+      `Watch if Year / Make / Model dropdowns appear. WORKFLOW STOPPED.`,
       "ok",
+    );
+    console.log(
+      `[VT-DEBUG] Done — clicked "${pickedText}". ` +
+      `Combobox count was ${allBoxes.length}. ` +
+      `All option texts: ${allOpts.map((o) => `"${getText(o)}"`).join(", ")}`,
     );
   }
 
-  log("Panel loaded v1.3.7", { isMessenger, isMarketplaceCreate });
+  log("Panel loaded v1.3.8", { isMessenger, isMarketplaceCreate });
 })();

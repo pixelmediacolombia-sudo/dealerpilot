@@ -1,0 +1,71 @@
+URGENT EXTENSION BUG — Marketplace publishing stuck at Vehicle Type
+
+This is separate from Render/GitHub/VPS infrastructure.
+
+Production backend is working.
+Extension connects.
+Facebook is logged in.
+The job reaches Facebook Marketplace.
+Photos and description are filled.
+
+But the publishing flow gets stuck before Next/Publish.
+
+Current visible error in extension:
+[ERROR] No options appeared. Combobox may use a different interaction.
+DEBUG: Vehicle Type only
+
+Issue:
+Facebook Marketplace changed or rendered the Vehicle Type combobox differently.
+DealerPilot used to publish successfully before.
+Now the extension cannot select Vehicle Type, so Next remains disabled.
+
+Fix only the Chrome extension Marketplace form filler.
+
+Do not change Render.
+Do not change database.
+Do not change inventory sync.
+Do not change Opportunity Engine.
+Do not change GM Coach.
+
+Required fix:
+1. Locate the extension code that fills Marketplace vehicle fields.
+2. Specifically debug Vehicle Type selection.
+3. Add multiple fallback strategies:
+   - find by label text: Vehicle type / Tipo de vehículo
+   - find role=combobox
+   - click parent container if input is hidden
+   - type mapped value
+   - wait for options
+   - keyboard fallback: ArrowDown + Enter
+   - visible text fallback
+   - aria-activedescendant fallback if Facebook uses virtualized options
+
+4. Map body type:
+   Truck / Pickup / Pickup Truck → Truck
+   SUV → SUV
+   Sedan → Sedan
+   Coupe → Coupe
+   Hatchback → Hatchback
+   Convertible → Convertible
+   Van / Minivan → Van
+   Wagon → Wagon
+
+5. After selection, verify:
+   - field displays selected value
+   - Next button becomes enabled
+
+6. Add debug mode button:
+   "DEBUG: Vehicle Type only"
+   It should only test Vehicle Type selection without refilling the entire form.
+
+7. If auto-selection fails:
+   pause job with:
+   Manual action required: select Vehicle Type, then click Continue in DealerPilot.
+   Do not mark the whole job failed immediately.
+
+Acceptance:
+Using the same 2025 Toyota Tacoma job:
+- Vehicle Type is selected as Truck or Pickup
+- Next button becomes enabled
+- the flow proceeds to the final publish step automatically
+- no manual field selection required
