@@ -46,12 +46,14 @@ export function InventoryDashboard() {
   const selection = useVehicleSelection();
   const { selectedLocation } = useDealerLocation();
 
-  const { data: stats, isLoading: statsLoading } = useGetVehicleStats({ location: selectedLocation });
+  const locationFilter = selectedLocation || undefined;
+
+  const { data: stats, isLoading: statsLoading } = useGetVehicleStats({ location: locationFilter });
   const { data: vehiclesData, isLoading: vehiclesLoading } = useListVehicles({
     q: search || undefined,
     status: statusFilter === "all" ? undefined : statusFilter,
     sort: sortOrder,
-    location: selectedLocation,
+    location: locationFilter,
   });
 
   const allVisibleIds = (vehiclesData?.vehicles ?? []).map((v) => v.id);

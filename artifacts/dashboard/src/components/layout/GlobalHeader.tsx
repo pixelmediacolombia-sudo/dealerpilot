@@ -56,10 +56,16 @@ function TelSeg({ label, value, state }: { label: string; value: string; state: 
 
 // ── Location selector ─────────────────────────────────────────────────────────
 
-const LOCATIONS: DealerLocation[] = ["Manassas", "Fredericksburg"];
+type LocationOption = { value: DealerLocation; label: string };
+const LOCATIONS: LocationOption[] = [
+  { value: "", label: "All Locations" },
+  { value: "Manassas", label: "Manassas" },
+  { value: "Fredericksburg", label: "Fredericksburg" },
+];
 
 function LocationSelector() {
   const { selectedLocation, setSelectedLocation } = useDealerLocation();
+  const displayLabel = selectedLocation === "" ? "ALL" : selectedLocation.toUpperCase();
 
   return (
     <DropdownMenu>
@@ -70,21 +76,21 @@ function LocationSelector() {
             Alpha Motorsport
           </span>
           <span className="text-[10px] font-bold text-blue-400/60 group-hover:text-blue-400/90 transition-colors uppercase tracking-widest">
-            {selectedLocation}
+            {displayLabel}
           </span>
           <ChevronDown className="w-2.5 h-2.5 text-white/15 shrink-0" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[220px]">
-        {LOCATIONS.map((loc) => (
+        {LOCATIONS.map(({ value, label }) => (
           <DropdownMenuItem
-            key={loc}
-            className={cn("text-xs cursor-pointer", loc === selectedLocation && "text-primary font-semibold")}
-            onClick={() => setSelectedLocation(loc)}
+            key={value}
+            className={cn("text-xs cursor-pointer", value === selectedLocation && "text-primary font-semibold")}
+            onClick={() => setSelectedLocation(value)}
           >
-            <MapPin className={cn("w-3.5 h-3.5 mr-2 shrink-0", loc === selectedLocation ? "text-primary" : "text-muted-foreground")} />
-            Alpha Motorsport — {loc}
-            {loc === selectedLocation && <span className="ml-auto text-primary text-xs">✓</span>}
+            <MapPin className={cn("w-3.5 h-3.5 mr-2 shrink-0", value === selectedLocation ? "text-primary" : "text-muted-foreground")} />
+            {value === "" ? "All Locations" : `Alpha Motorsport — ${label}`}
+            {value === selectedLocation && <span className="ml-auto text-primary text-xs">✓</span>}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

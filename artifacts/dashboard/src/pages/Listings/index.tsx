@@ -307,15 +307,16 @@ export function ListingsWorkspace() {
   };
 
   const { selectedLocation } = useDealerLocation();
+  const locationFilter = selectedLocation || undefined;
 
   const { data: workspacesData, isLoading: workspacesLoading } = useListListingWorkspaces({
     q: search || undefined,
     status: statusFilter === "all" ? undefined : statusFilter,
-    location: selectedLocation,
+    location: locationFilter,
   });
 
   const { data: jobsData, isLoading: jobsLoading } = useListPublishingJobs(
-    { location: selectedLocation },
+    { location: locationFilter },
     { query: { refetchInterval: 5000 } as never },
   );
 
@@ -364,7 +365,7 @@ export function ListingsWorkspace() {
     (photoScoresData?.scores ?? []).map((s) => [s.vehicleId, s]),
   );
 
-  const { data: intelligenceData } = useListMarketplaceRecommendations({ location: selectedLocation });
+  const { data: intelligenceData } = useListMarketplaceRecommendations({ location: locationFilter });
 
   const intelligenceMap = useMemo(() => {
     const m = new Map<number, {
@@ -634,7 +635,7 @@ export function ListingsWorkspace() {
           />
 
           {/* Batch Progress */}
-          <BatchProgressCard dealerId={DEALER_ID} refreshKey={batchRefreshKey} location={selectedLocation} />
+          <BatchProgressCard dealerId={DEALER_ID} refreshKey={batchRefreshKey} location={locationFilter} />
 
           {/* ── Published / Needs Update / Sold tabs — engagement-rich cards ── */}
           {isPublishedTab && (

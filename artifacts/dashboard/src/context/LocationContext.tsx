@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-export type DealerLocation = "Manassas" | "Fredericksburg";
+// "" means "All locations" (no filter applied to API calls)
+export type DealerLocation = "Manassas" | "Fredericksburg" | "";
 
 interface LocationContextValue {
   selectedLocation: DealerLocation;
@@ -8,7 +9,7 @@ interface LocationContextValue {
 }
 
 const STORAGE_KEY = "dp_location";
-const DEFAULT_LOCATION: DealerLocation = "Manassas";
+const DEFAULT_LOCATION: DealerLocation = "";
 
 const LocationContext = createContext<LocationContextValue>({
   selectedLocation: DEFAULT_LOCATION,
@@ -19,7 +20,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const [selectedLocation, setLocationState] = useState<DealerLocation>(() => {
     try {
       const v = localStorage.getItem(STORAGE_KEY);
-      if (v === "Manassas" || v === "Fredericksburg") return v as DealerLocation;
+      if (v === "Manassas" || v === "Fredericksburg" || v === "") return v as DealerLocation;
     } catch {}
     return DEFAULT_LOCATION;
   });

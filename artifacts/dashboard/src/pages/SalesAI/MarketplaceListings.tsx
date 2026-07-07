@@ -376,9 +376,10 @@ export function MarketplaceListings() {
   const qc = useQueryClient();
   const { selectedLocation } = useDealerLocation();
 
+  const locationFilter = selectedLocation || undefined;
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["marketplace-listings", selectedLocation],
-    queryFn: () => fetchListings(selectedLocation),
+    queryKey: ["marketplace-listings", locationFilter],
+    queryFn: () => fetchListings(locationFilter),
     refetchInterval: 30_000,
   });
 

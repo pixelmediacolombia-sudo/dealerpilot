@@ -1,0 +1,78 @@
+URGENT BUG AUDIT — Inventory disappeared after GitHub/Render prep
+
+After the GitHub/render production changes, DealerPilot UI shows:
+- Inventory = 0 vehicles
+- Marketplace = 0 listings/workspaces
+- AI Photo Studio = 0 vehicles
+- Command Center = All Clear
+- But the timeline still shows inventory synced events
+- Top status shows EXT ONLINE and FB ACTIVE from the VPS extension
+
+This started after the GitHub/production/render changes.
+
+Do not change architecture yet.
+Do not delete data.
+Do not reseed blindly.
+
+Audit:
+
+1. DATABASE_URL
+- Confirm which database Replit is currently using
+- Confirm whether it changed during Render prep
+- Count vehicles directly in DB
+- Count dealers directly in DB
+- Count vehicle_images directly in DB
+- Count listing_workspaces directly in DB
+
+2. API responses
+Check:
+- GET /api/vehicles/stats
+- GET /api/vehicles
+- GET /api/inventory
+- GET /api/marketplace/workspaces
+- GET /api/photo-studio/stats
+- GET /api/dealers / active dealer endpoint
+
+Return exact JSON counts.
+
+3. Dealer / lot filter bug
+Verify:
+- activeDealerId
+- selected lot = Manassas
+- lotLocation values in DB
+- whether all vehicles are now null/unknown lot by mistake
+- whether the UI is filtering everything out
+
+4. Recent code changes
+Review the changes made for:
+- production static serving
+- SPA fallback
+- unknown lot blocking
+- global noLot count
+- GitHub push prep
+
+Find if any change caused:
+- vehicle query to require lotLocation but DB vehicles have null
+- API to exclude unknown lot vehicles
+- frontend to only show Manassas/Fredericksburg while DB values do not match
+- dealerId mismatch
+
+5. Fix
+If the DB still has vehicles:
+- fix the query/filter so inventory appears again
+- preserve unknown-lot warning but do not hide all inventory
+- Manassas/Fredericksburg tabs should show valid lots
+- All tab should show all active vehicles including unknown lot
+
+If the DB is empty:
+- explain why
+- do not reseed fake/demo data
+- run real XML inventory sync only
+
+Acceptance:
+- Inventory shows real vehicles again
+- Marketplace recommendations return real vehicles again
+- AI Photo Studio lists real vehicles again
+- Command Center shows Opportunity Engine recommendations again
+- no fake/demo data
+- extension status remains online

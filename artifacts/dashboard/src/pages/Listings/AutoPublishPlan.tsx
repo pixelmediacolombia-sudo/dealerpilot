@@ -66,7 +66,7 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
           dealerId,
           mode: (settings?.autoClickPublish ? "Controlled" : "Assisted") as "Assisted" | "Controlled",
           count: settings?.vehiclesPerBatch ?? 4,
-          lotLocation: selectedLocation,
+          lotLocation: selectedLocation || undefined,
         },
       });
       qc.invalidateQueries({ queryKey: getListPublishingBatchesQueryKey() });
