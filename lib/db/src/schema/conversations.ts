@@ -17,6 +17,9 @@ export const conversationsTable = pgTable("conversations", {
   dealerId: integer("dealer_id")
     .notNull()
     .references(() => dealersTable.id),
+  source: text("source").notNull().default("marketplace_extension"),
+  externalPageId: text("external_page_id"),
+  externalSenderId: text("external_sender_id"),
   externalThreadRef: text("external_thread_ref").notNull().unique(),
   buyerName: text("buyer_name"),
   language: text("language").notNull().default("en"),

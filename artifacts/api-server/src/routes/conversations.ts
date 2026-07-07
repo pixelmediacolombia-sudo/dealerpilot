@@ -53,13 +53,13 @@ Reply format:
 - End with one soft question (appointment or purchase timeline)
 `;
 
-function detectLanguage(text: string): "en" | "es" {
+export function detectLanguage(text: string): "en" | "es" {
   const spanishWords =
     /\b(hola|gracias|disponible|tengo|quiero|inicial|comprar|semana|número|itin|ingresos|esta|carro|auto)\b/i;
   return spanishWords.test(text) ? "es" : "en";
 }
 
-function computeLeadScore(params: {
+export function computeLeadScore(params: {
   buyerTimeline?: string | null;
   buyerAvailableDownPayment?: number | null;
   publishedDownPayment?: number | null;
@@ -92,7 +92,7 @@ function computeLeadScore(params: {
   return { score, temperature };
 }
 
-async function generateAiReply(
+export async function generateAiReply(
   visibleMessages: string[],
   currentMessage: string,
   language: string,
