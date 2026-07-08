@@ -1,0 +1,310 @@
+DEALERPILOT v1.0 – PRODUCTION READINESS AUDIT
+
+Antes de continuar desarrollando nuevas funcionalidades, quiero una auditoría completa del ecosistema.
+
+No quiero agregar features nuevas.
+Quiero validar que todo el sistema esté conectado y funcionando como un solo producto.
+
+==================================================
+FASE 1 – BACKEND
+==================================================
+
+Verificar:
+
+✓ API inicia correctamente
+✓ PostgreSQL conecta correctamente
+✓ Todos los workers inician
+✓ AI Orchestrator inicia
+✓ Scheduler inicia
+✓ No existen errores silenciosos
+✓ No existen procesos duplicados
+
+Entregar:
+
+PASS / FAIL
+
+==================================================
+FASE 2 – INVENTORY
+==================================================
+
+Verificar:
+
+✓ XML Sync
+
+✓ Sync manual
+
+✓ Sync automático
+
+✓ Scraper de ubicación
+
+✓ Detección de:
+
+Vehículos nuevos
+
+Vehículos vendidos
+
+Cambios de precio
+
+Cambios de millaje
+
+✓ Opportunity Engine se actualiza
+
+PASS / FAIL
+
+==================================================
+FASE 3 – MARKET INTELLIGENCE
+==================================================
+
+Verificar:
+
+Top 10
+
+Opportunity Score
+
+Buyer Segments
+
+Duplicate Guard
+
+Publishing Queue
+
+GM Coach
+
+Todo debe usar el mismo origen de datos.
+
+No debe haber dos motores distintos.
+
+PASS / FAIL
+
+==================================================
+FASE 4 – AI WORKERS
+==================================================
+
+Verificar:
+
+Inventory Worker
+
+Opportunity Worker
+
+Market Worker
+
+Photo Worker
+
+Publishing Worker
+
+Learning Worker
+
+Todos deben:
+
+tener status
+
+last run
+
+next run
+
+logs
+
+timeline
+
+PASS / FAIL
+
+==================================================
+FASE 5 – AI ORCHESTRATOR
+==================================================
+
+Verificar:
+
+Decisiones
+
+Workers pausados
+
+Workers ejecutados
+
+Workers omitidos
+
+Razón de cada decisión
+
+Budget
+
+Dependencias
+
+PASS / FAIL
+
+==================================================
+FASE 6 – COST GUARDRAILS
+==================================================
+
+Verificar:
+
+OpenAI Budget
+
+FAL Budget
+
+Reset diario
+
+Resume automático
+
+No puede gastar por encima del límite.
+
+PASS / FAIL
+
+==================================================
+FASE 7 – PHOTO AI
+==================================================
+
+Verificar:
+
+Clasificación
+
+Background
+
+Composite
+
+AI Images
+
+Publishing usa imágenes IA
+
+Fallback correcto
+
+PASS / FAIL
+
+==================================================
+FASE 8 – CHROME EXTENSION
+==================================================
+
+Verificar:
+
+Heartbeat
+
+Facebook
+
+Marketplace
+
+Publishing
+
+Vehicle Type
+
+Description
+
+Photos
+
+Location
+
+Final Publish
+
+Sin pasos manuales adicionales.
+
+PASS / FAIL
+
+==================================================
+FASE 9 – VPS
+==================================================
+
+Verificar:
+
+Windows
+
+Chrome
+
+Facebook
+
+DealerPilot Extension
+
+Heartbeat
+
+Reconexión
+
+PASS / FAIL
+
+==================================================
+FASE 10 – RENDER
+==================================================
+
+Preparar para producción.
+
+Verificar:
+
+GitHub
+
+Auto Deploy
+
+Health Check
+
+Database
+
+Workers
+
+Scheduler
+
+Variables
+
+PASS / FAIL
+
+==================================================
+FASE 11 – END TO END TEST
+==================================================
+
+Quiero una prueba completa.
+
+XML
+
+↓
+
+Inventory
+
+↓
+
+Opportunity Engine
+
+↓
+
+GM Coach
+
+↓
+
+Publishing Queue
+
+↓
+
+Chrome Extension
+
+↓
+
+Marketplace
+
+↓
+
+Publicado
+
+↓
+
+Timeline
+
+↓
+
+Workers
+
+↓
+
+Dashboard
+
+Todo debe funcionar como un solo ecosistema.
+
+==================================================
+ENTREGABLE
+==================================================
+
+Quiero un reporte final con:
+
+PASS / FAIL por módulo
+
+Riesgos críticos
+
+Riesgos medios
+
+Recomendaciones
+
+Bloqueantes antes de producción
+
+No agregar funcionalidades nuevas.
+
+Solo validar que DealerPilot esté realmente listo para operar en producción con Alpha Motorsport.
