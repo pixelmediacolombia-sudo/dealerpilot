@@ -59,8 +59,19 @@ async function scheduleWithCatchup(worker: WorkerDefinition, log: Logger): Promi
   );
 }
 
-/** Starts every registered worker on its own catch-up-aware interval. */
+/**
+ * Starts every registered worker on its own catch-up-aware interval, unless
+ * disabled via WORKERS_ENABLED=false (e.g. for a staging/preview deploy that
+ * should not sync inventory, spend photo budget, or assign publishing jobs).
+ * Manual triggers via POST /api/workers/:id/run still work when disabled —
+ * this flag only gates the automatic timers.
+ */
 export function startWorkers(log: Logger): void {
+  if (process.env["WORKERS_ENABLED"] === "false") {
+    log.warn("Worker framework disabled via WORKERS_ENABLED=false — no automatic scheduling. Manual triggers via POST /api/workers/:id/run still work.");
+    return;
+  }
+
   const workers = getAllWorkers();
   log.info({ count: workers.length, ids: workers.map((w) => w.id) }, "Starting worker framework");
   for (const worker of workers) {

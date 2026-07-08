@@ -39,6 +39,25 @@ export async function runWorkerOnce(
   }
   runningWorkers.add(worker.id);
 
+  try {
+    return await runWorkerOnceInner(worker, log, trigger, nextRunAt);
+  } catch (err) {
+    // Defense in depth: even a failure to write worker_runs/worker_state (e.g.
+    // a transient DB hiccup) must never escape as an unhandled rejection —
+    // that would crash the whole API process for the auto-scheduled path.
+    log.error({ err, worker: worker.id }, "worker framework bookkeeping failed — swallowed, process continues");
+    return { summary: `Failed: ${err instanceof Error ? err.message : String(err)}` };
+  } finally {
+    runningWorkers.delete(worker.id);
+  }
+}
+
+async function runWorkerOnceInner(
+  worker: WorkerDefinition,
+  log: Logger,
+  trigger: "auto" | "manual",
+  nextRunAt: Date | null,
+): Promise<WorkerRunOutcome> {
   const startedAt = new Date();
   const [runRow] = await db
     .insert(workerRunsTable)
@@ -108,8 +127,6 @@ export async function runWorkerOnce(
     );
 
     return { summary: `Failed: ${errorMessage}` };
-  } finally {
-    runningWorkers.delete(worker.id);
   }
 }
 
