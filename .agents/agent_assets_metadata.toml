@@ -293,3 +293,9 @@ id = "YXqTUSmITWmMIoNE2geSh"
 uri = "file://DealerPilot-AI-Extension-v1.3.7.zip"
 type = "unspecified"
 title = "DealerPilot-AI-Extension-v1.3.7.zip"
+
+[[outputs]]
+id = "zJGOiYsWY0v3I58jaytVn"
+uri = "file://dist/dealerpilot-ai-extension-v1.3.8.zip"
+type = "unspecified"
+title = "DealerPilot AI Extension v1.3.8"
