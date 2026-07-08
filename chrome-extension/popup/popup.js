@@ -189,6 +189,15 @@ function envBadgeClass(env) {
   }
 }
 
+function envBadgeLabel(env) {
+  switch (env) {
+    case "Render": return "Render ✓";
+    case "Replit": return "Replit (dev)";
+    case "Local":  return "Local ⚠";
+    default:       return (env || "Unknown") + " ⚠";
+  }
+}
+
 function fmtHeartbeatResponse(hb) {
   if (!hb) return "—";
   if (hb.ok) return `OK (${fmtTime(hb.at)})`;
@@ -217,24 +226,7 @@ async function loadDebugState() {
   dbg.environment.textContent = d.environment || "Unknown";
   dbg.environment.className   = "value " + (d.environment === "Render" ? "ok" : d.environment === "Replit" ? "" : "warn-text");
 
-  el.vEnvBadge.textContent = d.environment || "Unknown";
-  el.vEnvBadge.className   = "env-badge " + envBadgeClass(d.environment);
-
-  dbg.heartbeatUrl.textContent = truncate(d.lastHeartbeatUrl || "—", 32);
-  dbg.heartbeatUrl.title       = d.lastHeartbeatUrl || "";
-
-  dbg.heartbeatResponse.textContent = fmtHeartbeatResponse(d.lastHeartbeatResponse);
-  dbg.heartbeatResponse.title       = d.lastHeartbeatResponse
-    ? JSON.stringify(d.lastHeartbeatResponse)
-    : "";
-  dbg.heartbeatResponse.className   = "value " + (d.lastHeartbeatResponse
-    ? (d.lastHeartbeatResponse.ok ? "ok" : "err")
-    : "");
-
-  dbg.environment.textContent = d.environment || "Unknown";
-  dbg.environment.className   = "value " + (d.environment === "Render" ? "ok" : d.environment === "Replit" ? "" : "warn-text");
-
-  el.vEnvBadge.textContent = d.environment || "Unknown";
+  el.vEnvBadge.textContent = envBadgeLabel(d.environment);
   el.vEnvBadge.className   = "env-badge " + envBadgeClass(d.environment);
 
   dbg.heartbeatUrl.textContent = truncate(d.lastHeartbeatUrl || "—", 32);
