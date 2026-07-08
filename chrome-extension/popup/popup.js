@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_URL = "https://dealerpilot1987.replit.app";
+const DEFAULT_BACKEND_URL = "";
 
 // Build date is bumped manually alongside manifest.json's version field.
 const BUILD_DATE = "2026-07-08";
@@ -566,6 +566,7 @@ chrome.storage.local.get("backendUrl").then(({ backendUrl }) => {
 document.getElementById("save").addEventListener("click", async () => {
   const value = urlInput.value.trim().replace(/\/+$/, "");
   if (!value) { setStatus("Please enter a URL.", "err"); return; }
+  if (!/^https?:\/\//i.test(value)) { setStatus("Enter the full URL including https://.", "err"); return; }
   await chrome.storage.local.set({ backendUrl: value });
   setStatus("Saved. Testing connection…");
   await refresh();

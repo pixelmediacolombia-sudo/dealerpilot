@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_URL = "https://dealerpilot1987.replit.app";
+const DEFAULT_BACKEND_URL = "";
 
 const MARKETPLACE_CREATE_URL = "https://www.facebook.com/marketplace/create/vehicle";
 const FACEBOOK_LOGIN_URL =
@@ -6,7 +6,11 @@ const FACEBOOK_LOGIN_URL =
 
 async function getBackendUrl() {
   const { backendUrl } = await chrome.storage.local.get("backendUrl");
-  return (backendUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, "");
+  const base = (backendUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, "");
+  if (!base) {
+    throw new Error("Backend URL is not configured. Open Backend settings and save the Render URL.");
+  }
+  return base;
 }
 
 async function getExtensionId() {

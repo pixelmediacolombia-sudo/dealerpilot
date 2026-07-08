@@ -11,12 +11,14 @@
     "tabs"
   ],
   "host_permissions": [
+    "https://*.onrender.com/*",
     "https://*.replit.dev/*",
     "https://*.replit.app/*",
     "http://localhost/*"
   ],
   "externally_connectable": {
     "matches": [
+      "https://*.onrender.com/*",
       "https://*.replit.app/*",
       "https://*.replit.dev/*",
       "http://localhost/*"
