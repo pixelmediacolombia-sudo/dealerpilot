@@ -1,4 +1,5 @@
-const DEFAULT_BACKEND_URL = "https://dealerpilot1987.replit.app";
+const DEFAULT_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
+const REPLIT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 
 const MARKETPLACE_CREATE_URL = "https://www.facebook.com/marketplace/create/vehicle";
 const FACEBOOK_LOGIN_URL =
@@ -163,8 +164,8 @@ const handlers = {
   async GET_BACKEND_PRESETS() {
     const { backendPresets } = await chrome.storage.local.get("backendPresets");
     return {
-      replit: DEFAULT_BACKEND_URL,
-      render: "",
+      replit: REPLIT_BACKEND_URL,
+      render: DEFAULT_BACKEND_URL,
       local: "http://localhost:5000",
       ...(backendPresets || {}),
     };

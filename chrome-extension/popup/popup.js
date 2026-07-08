@@ -1,4 +1,5 @@
-const DEFAULT_BACKEND_URL = "https://dealerpilot1987.replit.app";
+const DEFAULT_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
+const REPLIT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 
 // Build date is bumped manually alongside manifest.json's version field.
 const BUILD_DATE = "2026-07-08";
@@ -639,7 +640,7 @@ async function loadBackendPresetsIntoUI() {
   const current = (backendUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, "");
 
   let selected = "custom";
-  if (current === (presets.replit || DEFAULT_BACKEND_URL)) selected = "replit";
+  if (current === (presets.replit || REPLIT_BACKEND_URL)) selected = "replit";
   else if (presets.render && current === presets.render) selected = "render";
   else if (presets.local && current === presets.local) selected = "local";
 
@@ -653,7 +654,7 @@ async function loadBackendPresetsIntoUI() {
 envSelect.addEventListener("change", () => {
   const presets = JSON.parse(envSelect.dataset.presets || "{}");
   const key = envSelect.value;
-  if (key === "replit") envUrlInput.value = presets.replit || DEFAULT_BACKEND_URL;
+  if (key === "replit") envUrlInput.value = presets.replit || REPLIT_BACKEND_URL;
   else if (key === "render") envUrlInput.value = presets.render || "";
   else if (key === "local") envUrlInput.value = presets.local || "http://localhost:5000";
   // "custom" leaves the field for manual entry
