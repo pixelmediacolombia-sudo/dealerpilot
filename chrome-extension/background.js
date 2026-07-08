@@ -817,6 +817,23 @@ const STATE_KEYS_TO_CLEAR = [
     });
     console.log(`[DealerPilot AI] Version ${storedVersion ?? "none"} → ${currentVersion}: state cleared, installedAt reset`);
   }
+
+  // ── One-time URL migration: old Replit default → Render ──────────────────
+  // Dealers who installed before Render was the default may have the old
+  // Replit URL stored. Upgrade it silently on first startup after this change.
+  // The `replitUrlMigrated` flag prevents re-running if the dealer later
+  // deliberately re-points to Replit via the popup.
+  const { backendUrl: storedUrl, replitUrlMigrated } = await chrome.storage.local.get([
+    "backendUrl",
+    "replitUrlMigrated",
+  ]);
+  if (!replitUrlMigrated) {
+    if (storedUrl === REPLIT_BACKEND_URL) {
+      await chrome.storage.local.set({ backendUrl: DEFAULT_BACKEND_URL });
+      console.log(`[DealerPilot AI] URL migration: Replit default → Render (${DEFAULT_BACKEND_URL})`);
+    }
+    await chrome.storage.local.set({ replitUrlMigrated: true });
+  }
 })();
 
 // ── Immediate poll on browser startup ────────────────────────────────────────
