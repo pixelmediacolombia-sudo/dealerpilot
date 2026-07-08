@@ -6,10 +6,13 @@
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "lint:extension": "node node_modules/eslint/bin/eslint.js --config chrome-extension/eslint.config.mjs chrome-extension/background.js chrome-extension/content/content.js chrome-extension/popup/popup.js"
   },
   "private": true,
   "devDependencies": {
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0",
     "prettier": "^3.8.4",
     "typescript": "~5.9.3"
   }
