@@ -586,7 +586,7 @@ const handlers = {
       "auditLog",
     ];
     const stored = await chrome.storage.local.get(keys);
-    const base = await getBackendUrl();
+    const base = await getBackendUrl().catch(() => stored.backendUrl || "");
     const manifest = chrome.runtime.getManifest();
     return {
       version: manifest.version,

@@ -1,5 +1,5 @@
 // OpenAI GPT-5-mini vision — photo classification provider.
-// Uses the existing Replit-managed OpenAI integration (no extra API key needed).
+// Uses the configured OpenAI integration.
 import { openai } from "@workspace/integrations-openai-ai-server";
 import type { ClassificationResult, IClassificationProvider } from "./types";
 import { PHOTO_CLASSIFICATIONS, EXTERIOR_CLASSIFICATIONS } from "./types";

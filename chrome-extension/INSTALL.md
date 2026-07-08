@@ -23,7 +23,7 @@ When you queue a vehicle in the dashboard, this extension:
 ## Prerequisites
 
 - Google Chrome (or any Chromium-based browser: Edge, Brave, etc.)
-- Access to the DealerPilot AI backend URL (your Replit deployment or local server)
+- Access to the DealerPilot AI backend URL (your Render deployment or local server)
 - A Facebook account logged in to the Alpha Motorsport dealer page
 
 ---
@@ -72,8 +72,7 @@ The extension needs to know where your DealerPilot backend is running.
 2. The popup opens — you'll see the **Extension Status** panel
 3. Scroll down and click **⚙ Backend settings** to expand it
 4. In the **Backend URL** field, enter your backend URL:
-   - **Replit (deployed):** `https://your-app.replit.app`
-   - **Replit (dev):** `https://your-replit-dev-domain.replit.dev`
+   - **Render (production):** `https://your-render-service.onrender.com`
    - **Local dev:** `http://localhost:5000`
 5. Click **Save & Test Connection**
 

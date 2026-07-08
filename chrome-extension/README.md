@@ -54,7 +54,7 @@ security screen.
 
 1. Click the extension icon in the Chrome toolbar to open the popup.
 2. Expand **⚙ Backend settings**, paste your backend URL (e.g.
-   `https://your-app.replit.dev`) — no trailing slash needed.
+   `https://your-render-service.onrender.com`) — no trailing slash needed.
 3. Click **Save & Test Connection**. The status should show **Backend: Connected**.
 
 The URL is stored in `chrome.storage.local`. All API calls go through the

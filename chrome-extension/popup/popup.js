@@ -23,6 +23,10 @@ const refreshBtn = document.getElementById("refresh");
 const el = {
   dotBackend:   document.getElementById("dot-backend"),
   vBackend:     document.getElementById("v-backend"),
+  vEnvironment: document.getElementById("v-environment"),
+  vCurrentBackend: document.getElementById("v-current-backend"),
+  vHeartbeat:   document.getElementById("v-heartbeat"),
+  vExtensionStatus: document.getElementById("v-extension-status"),
   vCurrent:     document.getElementById("v-current"),
   vQueued:      document.getElementById("v-queued"),
   vLastPoll:    document.getElementById("v-last-poll"),
@@ -41,6 +45,7 @@ const dbg = {
   chromeId:      document.getElementById("d-chrome-id"),
   dealerId:      document.getElementById("d-dealer-id"),
   backendUrl:    document.getElementById("d-backend-url"),
+  environment:   document.getElementById("d-environment"),
   connStatus:    document.getElementById("d-conn-status"),
   fbLogin:       document.getElementById("d-fb-login"),
   mkpAccess:     document.getElementById("d-mkp-access"),
@@ -85,6 +90,29 @@ function send(message) {
 
 function setDot(dot, kind) {
   dot.className = "dot" + (kind ? " " + kind : "");
+}
+
+function environmentForUrl(url) {
+  if (!url) return "Not configured";
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host.endsWith(".onrender.com")) return "Render";
+    if (host === "localhost" || host === "127.0.0.1") return "Local";
+    return "Custom";
+  } catch {
+    return "Invalid URL";
+  }
+}
+
+function updateBackendSummary(backendUrl, heartbeat, online) {
+  const displayUrl = backendUrl || "Not configured";
+  el.vEnvironment.textContent = environmentForUrl(backendUrl);
+  el.vCurrentBackend.textContent = truncate(displayUrl, 34);
+  el.vCurrentBackend.title = displayUrl;
+  el.vHeartbeat.textContent = fmtTime(heartbeat);
+  el.vHeartbeat.className = "value " + (heartbeat ? "ok" : "");
+  el.vExtensionStatus.textContent = online ? "Online" : "Offline";
+  el.vExtensionStatus.className = "value " + (online ? "ok" : "err");
 }
 
 function getModeLabel(job) {
@@ -190,6 +218,8 @@ async function loadDebugState() {
   dbg.dealerId.textContent   = `${d.dealerId} — ${d.dealerName}`;
   dbg.backendUrl.textContent = truncate(d.backendUrl || "—", 32);
   dbg.backendUrl.title       = d.backendUrl || "";
+  dbg.environment.textContent = environmentForUrl(d.backendUrl || "");
+  dbg.environment.className   = "value " + (dbg.environment.textContent === "Render" ? "ok" : "");
 
   dbg.connStatus.textContent  = lastConnectionOk ? "Connected" : "Unreachable";
   dbg.connStatus.className    = "value " + (lastConnectionOk ? "ok" : "err");
@@ -325,13 +355,17 @@ async function refresh() {
 
   const ping = await send({ type: "PING" });
   lastConnectionOk = !!(ping && ping.ok);
+  const storedSummary = await chrome.storage.local.get(["backendUrl", "lastHeartbeat"]);
+  const connectedBackendUrl = ping?.data?.backendUrl || storedSummary.backendUrl || "";
 
   if (lastConnectionOk) {
     el.vBackend.textContent = "Connected";
     setDot(el.dotBackend, "on");
+    updateBackendSummary(connectedBackendUrl, new Date().toISOString(), true);
   } else {
     el.vBackend.textContent = "Unreachable";
     setDot(el.dotBackend, "off");
+    updateBackendSummary(connectedBackendUrl, storedSummary.lastHeartbeat || null, false);
     el.vQueued.textContent = "—";
 
     const stored = await chrome.storage.local.get(["activeJob", "fbLoggedIn", "marketplaceConnected", "lastPollTime"]);
