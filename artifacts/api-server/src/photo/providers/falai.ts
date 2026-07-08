@@ -65,13 +65,10 @@ async function toDataUrl(imageUrl: string): Promise<string> {
 }
 
 // ── Public URL resolution ─────────────────────────────────────────────────────
-// fal.ai queued endpoints need publicly-reachable URLs.  Strategy, in order:
-//   1. Already an https:// URL → pass as-is.
-//   2. A local /api/* path    → build a public URL via REPLIT_DEV_DOMAIN (free,
-//                               works in both dev and Replit deployments).
-//   3. Fallback               → upload to fal.ai storage via the two-step
-//                               initiate-then-PUT flow (cached per process).
-
+// fal.ai queued endpoints need publicly-reachable URLs. Strategy, in order:
+//   1. Already an https:// URL -> pass as-is.
+//   2. A local /api/* path -> build a public URL via BACKEND_PUBLIC_URL.
+//   3. Fallback -> upload to fal.ai storage via the two-step initiate-then-PUT flow.
 const falStorageCache = new Map<string, string>();
 
 interface FalStorageInitiateResult { upload_url: string; file_url: string }
@@ -87,10 +84,15 @@ async function toPublicFalUrl(imageUrl: string, apiKey: string): Promise<string>
   // In-process cache for local paths
   if (falStorageCache.has(imageUrl)) return falStorageCache.get(imageUrl)!;
 
-  // ── Primary: Replit dev-domain proxy (zero-cost, no API call) ──────────────
-  const devDomain = process.env["REPLIT_DEV_DOMAIN"];
-  if (devDomain && imageUrl.startsWith("/")) {
-    const publicUrl = `https://${devDomain}${imageUrl}`;
+  // Public backend URL path (zero-cost, no fal.ai storage upload)
+  const backendPublicUrl = (
+    process.env["BACKEND_PUBLIC_URL"] ||
+    process.env["PUBLIC_BASE_URL"] ||
+    process.env["RENDER_EXTERNAL_URL"] ||
+    ""
+  ).replace(/\/+$/, "");
+  if (backendPublicUrl && imageUrl.startsWith("/")) {
+    const publicUrl = `${backendPublicUrl}${imageUrl}`;
     falStorageCache.set(imageUrl, publicUrl);
     return publicUrl;
   }
@@ -281,7 +283,7 @@ export async function briaProductShot(
   const start = Date.now();
 
   // Resolve both URLs to publicly-accessible HTTPS URLs.
-  // The background is a local /api/* path → served via REPLIT_DEV_DOMAIN (free).
+  // The background may be a local /api/* path; toPublicFalUrl makes it public.
   // The vehicle URL is already an https:// URL from BRIA RMBG → passes through.
   const [vehiclePublicUrl, refCdnUrl] = await Promise.all([
     toPublicFalUrl(vehicleImageUrl, apiKey),
@@ -290,7 +292,7 @@ export async function briaProductShot(
 
   const input: Record<string, unknown> = {
     image_url:          vehiclePublicUrl, // public HTTPS URL
-    ref_image_url:      refCdnUrl,        // public HTTPS URL (Replit dev domain or fal.ai storage)
+    ref_image_url:      refCdnUrl,        // public HTTPS URL
     scene_description:  sceneDescription,
     placement_type:     "automatic",
     shot_size:          outputSize,

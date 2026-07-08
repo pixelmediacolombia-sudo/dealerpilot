@@ -230,6 +230,23 @@ async function loadDebugState() {
     ? (d.lastHeartbeatResponse.ok ? "ok" : "err")
     : "");
 
+  dbg.environment.textContent = d.environment || "Unknown";
+  dbg.environment.className   = "value " + (d.environment === "Render" ? "ok" : d.environment === "Replit" ? "" : "warn-text");
+
+  el.vEnvBadge.textContent = d.environment || "Unknown";
+  el.vEnvBadge.className   = "env-badge " + envBadgeClass(d.environment);
+
+  dbg.heartbeatUrl.textContent = truncate(d.lastHeartbeatUrl || "—", 32);
+  dbg.heartbeatUrl.title       = d.lastHeartbeatUrl || "";
+
+  dbg.heartbeatResponse.textContent = fmtHeartbeatResponse(d.lastHeartbeatResponse);
+  dbg.heartbeatResponse.title       = d.lastHeartbeatResponse
+    ? JSON.stringify(d.lastHeartbeatResponse)
+    : "";
+  dbg.heartbeatResponse.className   = "value " + (d.lastHeartbeatResponse
+    ? (d.lastHeartbeatResponse.ok ? "ok" : "err")
+    : "");
+
   dbg.connStatus.textContent  = lastConnectionOk ? "Connected" : "Unreachable";
   dbg.connStatus.className    = "value " + (lastConnectionOk ? "ok" : "err");
 

@@ -215,11 +215,12 @@ function formatPrice(price: number | null): string {
 }
 
 function getFeedBase(): string {
-  const domains = process.env["REPLIT_DOMAINS"];
-  if (domains) return `https://${domains.split(",")[0]!.trim()}`;
-  const devDomain = process.env["REPLIT_DEV_DOMAIN"];
-  if (devDomain) return `https://${devDomain}`;
-  return "";
+  return (
+    process.env["BACKEND_PUBLIC_URL"] ||
+    process.env["PUBLIC_BASE_URL"] ||
+    process.env["RENDER_EXTERNAL_URL"] ||
+    ""
+  ).replace(/\/+$/, "");
 }
 
 function escapeXml(str: string): string {
