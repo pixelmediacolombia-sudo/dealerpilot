@@ -1,0 +1,19 @@
+Implementation is complete and verified live. Here's a summary of what was built:
+
+Real OpenAI daily budget guardrail (separate from FAL's existing guardrail):
+
+New table ai_usage_events — logs one real row per actual OpenAI classification API call (provider="openai", purpose="photo_classification"), giving a true per-image counter instead of an estimate.
+costGuardrail.ts — added checkOpenAiBudget() (reads today's real call count vs WORKER_DAILY_OPENAI_BUDGET_USD) and recordOpenAiClassification() (writes a usage row right after each successful API call).
+Enforcement point: photo/stages/1_classify.ts — checked before every single image, not per vehicle/job. Once the budget is exhausted, remaining images fall back to "Miscellaneous" with zero further API calls, logs "OpenAI daily budget reached", and never throws.
+workers/photo.worker.ts — also checks the OpenAI budget before enqueuing new jobs, so once exhausted it stops creating new photo jobs for the rest of the day (in addition to the FAL check it already had). FAL and OpenAI budgets are fully independent checks/counters.
+GET /api/workers now returns todayOpenAISpendEstimate, todayFALSpendEstimate, openAIBudgetRemaining, falBudgetRemaining (added to OpenAPI spec + regenerated codegen).
+Dashboard — Background Workers panel now shows both budgets side-by-side; verified live in the screenshot showing real data (FAL currently exhausted at $54.90/$10, OpenAI at $0.04/$1 spent).
+Everything typechecks cleanly (the one remaining error in conversations.ts is pre-existing and unrelated). Verified live against the running server — the two budgets track and gate independently as required.
+
+Recommended Render environment variables for deploy:
+
+WORKERS_ENABLED=true
+WORKER_PHOTO_MAX_VEHICLES_PER_RUN=3
+WORKER_DAILY_FAL_BUDGET_USD=5
+WORKER_DAILY_OPENAI_BUDGET_USD=1
+Let me know if you'd like me to help configure these before you deploy to Render, or if you want the Photo Worker's paused state to auto-resume messaging surfaced anywhere else

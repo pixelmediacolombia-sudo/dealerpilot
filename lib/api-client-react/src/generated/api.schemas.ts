@@ -31,16 +31,31 @@ export interface WorkerStatus {
   lastError: string | null;
 }
 
+/**
+ * Detailed runtime status of the Photo Worker, distinguishing budget pauses from no-work pauses.
+ */
+export type WorkerStatusListPhotoWorkerStatus = typeof WorkerStatusListPhotoWorkerStatus[keyof typeof WorkerStatusListPhotoWorkerStatus];
+
+
+export const WorkerStatusListPhotoWorkerStatus = {
+  Running: 'Running',
+  'Paused_(Budget)': 'Paused (Budget)',
+  'Paused_(No_Vehicles)': 'Paused (No Vehicles)',
+  Sleeping: 'Sleeping',
+} as const;
+
 export interface WorkerStatusList {
   workers: WorkerStatus[];
   /** Estimated USD spent today on OpenAI photo classification calls (real per-call counter). */
   todayOpenAISpendEstimate: number;
-  /** Estimated USD spent today on FAL background removal/enhancement jobs. */
+  /** Estimated USD spent today on FAL background removal/enhancement jobs (real per-call counter). */
   todayFALSpendEstimate: number;
   /** Remaining USD budget today under WORKER_DAILY_OPENAI_BUDGET_USD. */
   openAIBudgetRemaining: number;
   /** Remaining USD budget today under WORKER_DAILY_FAL_BUDGET_USD. */
   falBudgetRemaining: number;
+  /** Detailed runtime status of the Photo Worker, distinguishing budget pauses from no-work pauses. */
+  photoWorkerStatus: WorkerStatusListPhotoWorkerStatus;
 }
 
 export interface WorkerRunResult {

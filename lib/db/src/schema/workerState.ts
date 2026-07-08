@@ -14,6 +14,11 @@ export const workerStateTable = pgTable("worker_state", {
   lastDurationMs: integer("last_duration_ms"),
   lastResultJson: text("last_result_json"),
   lastErrorMessage: text("last_error_message"),
+  // Set only when the worker deliberately paused itself (e.g. daily budget
+  // exhausted, no eligible work). Cleared on the next run once the condition
+  // no longer holds — this is what lets a paused worker resume automatically
+  // (e.g. after the midnight budget reset) with no manual intervention.
+  pauseReason: text("pause_reason"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()

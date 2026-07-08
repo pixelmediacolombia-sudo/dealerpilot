@@ -2180,6 +2180,7 @@ components:
           todayFALSpendEstimate,
           openAIBudgetRemaining,
           falBudgetRemaining,
+          photoWorkerStatus,
         ]
       properties:
         workers:
@@ -2191,13 +2192,17 @@ components:
           description: Estimated USD spent today on OpenAI photo classification calls (real per-call counter).
         todayFALSpendEstimate:
           type: number
-          description: Estimated USD spent today on FAL background removal/enhancement jobs.
+          description: Estimated USD spent today on FAL background removal/enhancement jobs (real per-call counter).
         openAIBudgetRemaining:
           type: number
           description: Remaining USD budget today under WORKER_DAILY_OPENAI_BUDGET_USD.
         falBudgetRemaining:
           type: number
           description: Remaining USD budget today under WORKER_DAILY_FAL_BUDGET_USD.
+        photoWorkerStatus:
+          type: string
+          enum: [Running, "Paused (Budget)", "Paused (No Vehicles)", Sleeping]
+          description: Detailed runtime status of the Photo Worker, distinguishing budget pauses from no-work pauses.
 
     WorkerRunResult:
       type: object

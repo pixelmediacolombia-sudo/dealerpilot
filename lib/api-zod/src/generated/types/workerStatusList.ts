@@ -6,15 +6,18 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { WorkerStatus } from './workerStatus';
+import type { WorkerStatusListPhotoWorkerStatus } from './workerStatusListPhotoWorkerStatus';
 
 export interface WorkerStatusList {
   workers: WorkerStatus[];
   /** Estimated USD spent today on OpenAI photo classification calls (real per-call counter). */
   todayOpenAISpendEstimate: number;
-  /** Estimated USD spent today on FAL background removal/enhancement jobs. */
+  /** Estimated USD spent today on FAL background removal/enhancement jobs (real per-call counter). */
   todayFALSpendEstimate: number;
   /** Remaining USD budget today under WORKER_DAILY_OPENAI_BUDGET_USD. */
   openAIBudgetRemaining: number;
   /** Remaining USD budget today under WORKER_DAILY_FAL_BUDGET_USD. */
   falBudgetRemaining: number;
+  /** Detailed runtime status of the Photo Worker, distinguishing budget pauses from no-work pauses. */
+  photoWorkerStatus: WorkerStatusListPhotoWorkerStatus;
 }

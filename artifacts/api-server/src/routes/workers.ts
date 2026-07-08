@@ -21,6 +21,22 @@ function deriveStatus(
   return ageMs <= intervalMs * 1.5 ? "Online" : "Sleeping";
 }
 
+export type PhotoWorkerStatus = "Running" | "Paused (Budget)" | "Paused (No Vehicles)" | "Sleeping";
+
+function derivePhotoWorkerStatus(
+  enabled: boolean,
+  pauseReason: string | null,
+  lastRunAt: Date | null,
+  intervalMs: number,
+): PhotoWorkerStatus {
+  if (!enabled) return "Sleeping";
+  if (pauseReason === "budget") return "Paused (Budget)";
+  if (pauseReason === "no-vehicles") return "Paused (No Vehicles)";
+  if (!lastRunAt) return "Sleeping";
+  const ageMs = Date.now() - lastRunAt.getTime();
+  return ageMs <= intervalMs * 1.5 ? "Running" : "Sleeping";
+}
+
 // GET /workers — status of all 6 scheduled AI workers, for the dashboard panel.
 router.get("/workers", async (req, res) => {
   const definitions = getAllWorkers();
@@ -45,6 +61,16 @@ router.get("/workers", async (req, res) => {
   });
 
   const budget = await getPhotoBudgetStatus();
+  const photoDef = definitions.find((d) => d.id === "photo");
+  const photoState = stateByWorkerId.get("photo");
+  const photoWorkerStatus: PhotoWorkerStatus = photoDef
+    ? derivePhotoWorkerStatus(
+        photoDef.enabled,
+        photoState?.pauseReason ?? null,
+        photoState?.lastRunAt ?? null,
+        photoDef.intervalMs,
+      )
+    : "Sleeping";
 
   res.json({
     workers,
@@ -52,6 +78,7 @@ router.get("/workers", async (req, res) => {
     todayFALSpendEstimate: budget.todayFALSpendEstimate,
     openAIBudgetRemaining: budget.openAIBudgetRemaining,
     falBudgetRemaining: budget.falBudgetRemaining,
+    photoWorkerStatus,
   });
 });
 

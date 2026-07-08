@@ -342,6 +342,12 @@ function workerStatusColor(status: WorkerStatus["status"]): "success" | "destruc
   }
 }
 
+function photoWorkerStatusColor(status: string): "success" | "destructive" | "warning" | "info" | "muted" {
+  if (status === "Running") return "success";
+  if (status === "Paused (Budget)" || status === "Paused (No Vehicles)") return "warning";
+  return "info";
+}
+
 function AiWorkersPanel() {
   const queryClient = useQueryClient();
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -378,6 +384,7 @@ function AiWorkersPanel() {
   const todayFALSpendEstimate = workersData?.todayFALSpendEstimate ?? 0;
   const openAIBudgetRemaining = workersData?.openAIBudgetRemaining ?? 0;
   const falBudgetRemaining = workersData?.falBudgetRemaining ?? 0;
+  const photoWorkerStatus = workersData?.photoWorkerStatus ?? "Sleeping";
 
   return (
     <div>
@@ -403,17 +410,33 @@ function AiWorkersPanel() {
             </div>
           ) : (
             <>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
+              <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Photo Worker Status</p>
+              <StatusPulse status={photoWorkerStatusColor(photoWorkerStatus)} label={photoWorkerStatus} />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">OpenAI Budget</p>
+                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Today's FAL Spend</p>
                 <p className="text-[13px] font-semibold text-white/70 mt-0.5">
-                  ${todayOpenAISpendEstimate.toFixed(3)} spent · ${openAIBudgetRemaining.toFixed(3)} left
+                  ${todayFALSpendEstimate.toFixed(2)}
                 </p>
               </div>
               <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">FAL Budget</p>
+                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Today's OpenAI Spend</p>
                 <p className="text-[13px] font-semibold text-white/70 mt-0.5">
-                  ${todayFALSpendEstimate.toFixed(2)} spent · ${falBudgetRemaining.toFixed(2)} left
+                  ${todayOpenAISpendEstimate.toFixed(3)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
+                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Remaining FAL Budget</p>
+                <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+                  ${falBudgetRemaining.toFixed(2)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
+                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Remaining OpenAI Budget</p>
+                <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+                  ${openAIBudgetRemaining.toFixed(3)}
                 </p>
               </div>
             </div>

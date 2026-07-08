@@ -91,6 +91,10 @@ async function runWorkerOnceInner(
       lastDurationMs: durationMs,
       lastResultJson: outcome.summary,
       lastErrorMessage: null,
+      // Cleared whenever the worker doesn't report a pause this run — this is
+      // what lets a paused worker resume automatically (e.g. after the
+      // midnight budget reset) with no manual intervention.
+      pauseReason: outcome.pauseReason ?? null,
     });
 
     workerLog.info({ status, durationMs, summary: outcome.summary }, "worker run complete");

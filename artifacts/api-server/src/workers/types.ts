@@ -5,6 +5,8 @@ export interface WorkerRunContext {
   trigger: "auto" | "manual";
 }
 
+export type WorkerPauseReason = "budget" | "no-vehicles";
+
 export interface WorkerRunOutcome {
   /** Short human-readable summary shown in worker_state.lastResultJson and the dashboard panel. */
   summary: string;
@@ -12,6 +14,13 @@ export interface WorkerRunOutcome {
   detail?: Record<string, unknown>;
   /** Set when the worker deliberately did nothing (e.g. guardrail, offline dependency). */
   skipped?: boolean;
+  /**
+   * Set only when `skipped` is a deliberate pause the dashboard should surface
+   * distinctly (e.g. "Paused (Budget)"). Persisted on worker_state and cleared
+   * automatically the next time the worker runs without pausing — this is
+   * what makes resumption automatic (no manual intervention required).
+   */
+  pauseReason?: WorkerPauseReason;
 }
 
 export interface WorkerDefinition {

@@ -4,8 +4,12 @@
 // If removal fails for one image, uses original URL and marks usedFallback=1.
 // Skip: if backgroundRemovedUrl is already pre-loaded from a previous AI photo set
 //       (background-version reprocess mode — avoids redundant Fal.ai calls).
+// Budget: enforced PER IMAGE via checkFalBudget() — once WORKER_DAILY_FAL_BUDGET_USD
+//       is exhausted, remaining images stop calling fal.ai for the rest of the day
+//       and pass through as a fallback (original image, usedFallback=1) instead.
 import type { PipelineContext } from "../pipeline";
 import { getBackgroundRemovalProvider } from "../providers";
+import { checkFalBudget, recordFalUsage, ESTIMATED_COST_PER_FAL_BG_REMOVAL_USD } from "../../workers/costGuardrail";
 
 // Only remove backgrounds from these exterior-focused categories
 const REMOVE_BG_CLASSIFICATIONS = new Set([
@@ -32,6 +36,8 @@ export async function stageRemoveBackground(ctx: PipelineContext): Promise<void>
     return;
   }
 
+  let budgetExhaustedThisStage = false;
+
   for (const img of ctx.images) {
     if (img.processingStatus === "Failed") continue;
     if (!REMOVE_BG_CLASSIFICATIONS.has(img.classification ?? "")) {
@@ -52,9 +58,32 @@ export async function stageRemoveBackground(ctx: PipelineContext): Promise<void>
       continue;
     }
 
+    if (!budgetExhaustedThisStage) {
+      const budget = await checkFalBudget(ESTIMATED_COST_PER_FAL_BG_REMOVAL_USD);
+      if (budget.budgetExhausted) {
+        budgetExhaustedThisStage = true;
+        ctx.log.warn(
+          { estimatedSpentTodayUsd: budget.estimatedSpentTodayUsd, dailyBudgetUsd: budget.dailyBudgetUsd },
+          "FAL daily budget reached",
+        );
+      }
+    }
+
+    if (budgetExhaustedThisStage) {
+      // Stop calling fal.ai for the rest of today — pass through the
+      // original image without spending an API call, and never throw.
+      img.backgroundRemovedUrl = img.originalUrl;
+      img.usedFallback = 1;
+      img.removalProvider = provider.name;
+      img.removalModel = provider.model;
+      img.removalTimeMs = 0;
+      continue;
+    }
+
     const t0 = Date.now();
     try {
       const result = await provider.removeBackground(img.originalUrl);
+      await recordFalUsage("fal_bg_removal");
       img.backgroundRemovedUrl = result.url;
       img.removalProvider = result.provider;
       img.removalModel = result.model;

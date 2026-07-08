@@ -221,4 +221,5 @@ export * from './weakListing';
 export * from './workerRunResult';
 export * from './workerStatus';
 export * from './workerStatusList';
+export * from './workerStatusListPhotoWorkerStatus';
 export * from './workerStatusStatus';

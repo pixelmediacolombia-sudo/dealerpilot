@@ -1,34 +1,45 @@
-// Daily spend guardrails for the AI Photo pipeline — two independent budgets:
-//  - FAL (background removal/enhancement): estimated from ai_photo_jobs created
-//    today (no per-image granularity needed — one FAL pass per photo set).
-//  - OpenAI (classification): tracked from REAL ai_usage_events rows, one per
-//    actual classify() call, because classification happens once per IMAGE —
-//    a single vehicle can be 3 photos or 40, so a per-job estimate would be
-//    wildly inaccurate. Call recordOpenAiClassification() after every real
-//    OpenAI call so the counter reflects true spend.
-import { db, aiPhotoJobsTable, aiUsageEventsTable } from "@workspace/db";
+// Daily spend guardrails for the AI Photo pipeline — two independent, hard-stop
+// budgets, both backed by REAL per-call usage events (never estimates derived
+// from job/vehicle counts):
+//  - FAL (background removal + AI Studio composite): one ai_usage_events row
+//    per actual fal.ai call, tagged fal_bg_removal / fal_composite.
+//  - OpenAI (classification): one ai_usage_events row per actual classify()
+//    call — classification happens once per IMAGE, so a per-job estimate
+//    would be wildly inaccurate for vehicles with different photo counts.
+//
+// Every call site MUST check the relevant checkXBudget() BEFORE making the
+// real API call (not after), so spend can never exceed the configured daily
+// budget. Both budgets reset automatically at midnight because every query
+// is bounded to "today" — there is no persisted "exhausted" flag to clear.
+import { db, aiUsageEventsTable } from "@workspace/db";
 import { and, eq, gte, sql } from "drizzle-orm";
-
-// Estimated FAL cost (background removal + enhancement) per vehicle photo set.
-export const ESTIMATED_COST_PER_PHOTO_JOB_USD = 0.15;
 
 // Estimated OpenAI cost (gpt-5-mini vision, low-detail image, small JSON reply)
 // per single classification call. Conservative estimate, not billing truth —
 // exists purely to stop runaway per-image spend.
 export const ESTIMATED_COST_PER_OPENAI_CLASSIFICATION_USD = 0.002;
 
+// Estimated FAL cost per real API call, split by operation since AI Studio
+// compositing (queued, ~20-60s/image) is far more expensive than background
+// removal (direct endpoint, ~750ms/image).
+export const ESTIMATED_COST_PER_FAL_BG_REMOVAL_USD = 0.02;
+export const ESTIMATED_COST_PER_FAL_COMPOSITE_USD = 0.13;
+// Rough per-vehicle-job estimate used only to gate whether it's worth
+// enqueuing a NEW job at all (a job may contain several images of each type).
+export const ESTIMATED_COST_PER_PHOTO_JOB_USD =
+  ESTIMATED_COST_PER_FAL_BG_REMOVAL_USD + ESTIMATED_COST_PER_FAL_COMPOSITE_USD;
+
+export type FalUsagePurpose = "fal_bg_removal" | "fal_composite";
+
+const FAL_COST_BY_PURPOSE: Record<FalUsagePurpose, number> = {
+  fal_bg_removal: ESTIMATED_COST_PER_FAL_BG_REMOVAL_USD,
+  fal_composite: ESTIMATED_COST_PER_FAL_COMPOSITE_USD,
+};
+
 function todayStart(): Date {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d;
-}
-
-export async function getTodayPhotoJobCount(): Promise<number> {
-  const [row] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(aiPhotoJobsTable)
-    .where(and(gte(aiPhotoJobsTable.createdAt, todayStart())));
-  return row?.count ?? 0;
 }
 
 export async function getTodayOpenAiClassificationCount(): Promise<number> {
@@ -48,33 +59,6 @@ export async function getTodayOpenAiClassificationCount(): Promise<number> {
 /** Records one real OpenAI classification call against today's usage counter. */
 export async function recordOpenAiClassification(): Promise<void> {
   await db.insert(aiUsageEventsTable).values({ provider: "openai", purpose: "photo_classification" });
-}
-
-export interface PhotoBudgetCheck {
-  allowedCount: number;
-  estimatedSpentTodayUsd: number;
-  dailyBudgetUsd: number;
-  budgetExhausted: boolean;
-}
-
-/**
- * Given a requested number of new photo jobs, returns how many can actually
- * be enqueued this run without exceeding WORKER_DAILY_FAL_BUDGET_USD.
- */
-export async function checkPhotoBudget(requestedCount: number): Promise<PhotoBudgetCheck> {
-  const dailyBudgetUsd = Number(process.env["WORKER_DAILY_FAL_BUDGET_USD"] ?? "10");
-  const jobsToday = await getTodayPhotoJobCount();
-  const estimatedSpentTodayUsd = jobsToday * ESTIMATED_COST_PER_PHOTO_JOB_USD;
-  const remainingBudgetUsd = Math.max(0, dailyBudgetUsd - estimatedSpentTodayUsd);
-  const affordableCount = Math.floor(remainingBudgetUsd / ESTIMATED_COST_PER_PHOTO_JOB_USD);
-  const allowedCount = Math.max(0, Math.min(requestedCount, affordableCount));
-
-  return {
-    allowedCount,
-    estimatedSpentTodayUsd,
-    dailyBudgetUsd,
-    budgetExhausted: allowedCount === 0 && requestedCount > 0,
-  };
 }
 
 export interface OpenAiBudgetCheck {
@@ -110,6 +94,58 @@ export async function checkOpenAiBudget(): Promise<OpenAiBudgetCheck> {
   };
 }
 
+function getFalDailyBudgetUsd(): number {
+  return Number(process.env["WORKER_DAILY_FAL_BUDGET_USD"] ?? "10");
+}
+
+/** Real spend today across BOTH fal.ai operations, from actual usage events. */
+export async function getTodayFalSpend(): Promise<number> {
+  const rows = await db
+    .select({ purpose: aiUsageEventsTable.purpose, count: sql<number>`count(*)::int` })
+    .from(aiUsageEventsTable)
+    .where(and(eq(aiUsageEventsTable.provider, "fal"), gte(aiUsageEventsTable.createdAt, todayStart())))
+    .groupBy(aiUsageEventsTable.purpose);
+
+  return rows.reduce((sum, r) => {
+    const cost = FAL_COST_BY_PURPOSE[r.purpose as FalUsagePurpose] ?? 0;
+    return sum + r.count * cost;
+  }, 0);
+}
+
+/** Records one real FAL API call against today's usage counter. */
+export async function recordFalUsage(purpose: FalUsagePurpose): Promise<void> {
+  await db.insert(aiUsageEventsTable).values({ provider: "fal", purpose });
+}
+
+export interface FalBudgetCheck {
+  dailyBudgetUsd: number;
+  estimatedSpentTodayUsd: number;
+  remainingBudgetUsd: number;
+  estimatedCallCostUsd: number;
+  budgetExhausted: boolean;
+}
+
+/**
+ * Real-time, hard-stop FAL budget check. MUST be called before submitting ANY
+ * FAL job (both the scheduled enqueue step and each individual fal.ai call
+ * inside the pipeline stages) — if the estimated cost of the call exceeds the
+ * remaining daily budget, the caller must skip it, log "FAL daily budget
+ * reached", and never place the call.
+ */
+export async function checkFalBudget(estimatedCallCostUsd: number): Promise<FalBudgetCheck> {
+  const dailyBudgetUsd = getFalDailyBudgetUsd();
+  const estimatedSpentTodayUsd = await getTodayFalSpend();
+  const remainingBudgetUsd = Math.max(0, dailyBudgetUsd - estimatedSpentTodayUsd);
+
+  return {
+    dailyBudgetUsd,
+    estimatedSpentTodayUsd,
+    remainingBudgetUsd,
+    estimatedCallCostUsd,
+    budgetExhausted: estimatedCallCostUsd > remainingBudgetUsd,
+  };
+}
+
 export function getPhotoMaxVehiclesPerRun(): number {
   return Number(process.env["WORKER_PHOTO_MAX_VEHICLES_PER_RUN"] ?? "5");
 }
@@ -125,10 +161,8 @@ export interface PhotoBudgetStatus {
 
 /** Combined snapshot for the /api/workers status endpoint. */
 export async function getPhotoBudgetStatus(): Promise<PhotoBudgetStatus> {
-  const falDailyBudgetUsd = Number(process.env["WORKER_DAILY_FAL_BUDGET_USD"] ?? "10");
-  const jobsToday = await getTodayPhotoJobCount();
-  const todayFALSpendEstimate = jobsToday * ESTIMATED_COST_PER_PHOTO_JOB_USD;
-
+  const falDailyBudgetUsd = getFalDailyBudgetUsd();
+  const todayFALSpendEstimate = await getTodayFalSpend();
   const openAi = await checkOpenAiBudget();
 
   return {

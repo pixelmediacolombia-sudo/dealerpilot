@@ -3260,9 +3260,10 @@ export const ListWorkersResponse = zod.object({
   "lastError": zod.string().nullable()
 })),
   "todayOpenAISpendEstimate": zod.number().describe('Estimated USD spent today on OpenAI photo classification calls (real per-call counter).'),
-  "todayFALSpendEstimate": zod.number().describe('Estimated USD spent today on FAL background removal\/enhancement jobs.'),
+  "todayFALSpendEstimate": zod.number().describe('Estimated USD spent today on FAL background removal\/enhancement jobs (real per-call counter).'),
   "openAIBudgetRemaining": zod.number().describe('Remaining USD budget today under WORKER_DAILY_OPENAI_BUDGET_USD.'),
-  "falBudgetRemaining": zod.number().describe('Remaining USD budget today under WORKER_DAILY_FAL_BUDGET_USD.')
+  "falBudgetRemaining": zod.number().describe('Remaining USD budget today under WORKER_DAILY_FAL_BUDGET_USD.'),
+  "photoWorkerStatus": zod.enum(['Running', 'Paused (Budget)', 'Paused (No Vehicles)', 'Sleeping']).describe('Detailed runtime status of the Photo Worker, distinguishing budget pauses from no-work pauses.')
 })
 
 

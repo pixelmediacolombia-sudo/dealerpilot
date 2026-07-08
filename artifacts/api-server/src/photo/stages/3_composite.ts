@@ -20,6 +20,7 @@ import path from "path";
 import type { PipelineContext } from "../pipeline";
 import { STUDIO_EXTERIOR_CLASSIFICATIONS } from "../providers/types";
 import { briaProductShot } from "../providers/falai";
+import { checkFalBudget, recordFalUsage, ESTIMATED_COST_PER_FAL_COMPOSITE_USD } from "../../workers/costGuardrail";
 
 // Scene description sent to BRIA Product Shot for every Alpha Motorsport studio exterior.
 // The reference background is a white curved automotive studio with a circular elevated
@@ -74,6 +75,8 @@ export async function stageComposite(ctx: PipelineContext): Promise<void> {
     return;
   }
 
+  let budgetExhaustedThisStage = false;
+
   for (const img of ctx.images) {
     if (img.processingStatus === "Failed") continue;
 
@@ -93,6 +96,25 @@ export async function stageComposite(ctx: PipelineContext): Promise<void> {
       continue;
     }
 
+    if (!budgetExhaustedThisStage) {
+      const budget = await checkFalBudget(ESTIMATED_COST_PER_FAL_COMPOSITE_USD);
+      if (budget.budgetExhausted) {
+        budgetExhaustedThisStage = true;
+        ctx.log.warn(
+          { estimatedSpentTodayUsd: budget.estimatedSpentTodayUsd, dailyBudgetUsd: budget.dailyBudgetUsd },
+          "FAL daily budget reached",
+        );
+      }
+    }
+
+    if (budgetExhaustedThisStage) {
+      // Stop calling fal.ai for the rest of today — pass through the
+      // background-removed image without spending an API call, never throw.
+      img.compositedUrl = vehicleUrl;
+      img.usedFallback  = 1;
+      continue;
+    }
+
     try {
       ctx.log.info(
         { vehicleId: ctx.job.vehicleId, classification: img.classification },
@@ -105,6 +127,7 @@ export async function stageComposite(ctx: PipelineContext): Promise<void> {
         ALPHA_MOTORSPORT_SCENE,
         [bgW, bgH],
       );
+      await recordFalUsage("fal_composite");
 
       // Download the AI-generated composition and store it locally.
       // This decouples us from fal.ai CDN URL expiry.
