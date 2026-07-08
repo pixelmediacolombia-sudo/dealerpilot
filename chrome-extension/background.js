@@ -22,18 +22,6 @@ function detectEnvironment(url) {
   return "Custom";
 }
 
-// ---- Environment detection ----
-// Classifies the active backendUrl so the popup can clearly show whether the
-// extension is pointed at Render, Replit, or a local dev server before a
-// live publish test.
-function detectEnvironment(url) {
-  if (!url) return "Unknown";
-  if (/onrender\.com/i.test(url)) return "Render";
-  if (/replit\.(app|dev)/i.test(url)) return "Replit";
-  if (/localhost|127\.0\.0\.1/i.test(url)) return "Local";
-  return "Custom";
-}
-
 async function getExtensionId() {
   const { extensionId } = await chrome.storage.local.get("extensionId");
   if (extensionId) return extensionId;
