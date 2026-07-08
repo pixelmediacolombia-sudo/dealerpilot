@@ -18,6 +18,7 @@ import channelsRouter from "./channels";
 import photoStudioRouter from "./photoStudio";
 import marketplaceListingsRouter from "./marketplaceListings";
 import gmRouter from "./gm";
+import workersRouter from "./workers";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(marketplaceIntelligenceRouter);
 router.use(channelsRouter);
 router.use(photoStudioRouter);
 router.use(marketplaceListingsRouter);
+router.use(workersRouter);
 
 export default router;
