@@ -2152,6 +2152,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/SystemTimelineEventList"
 
+  /orchestrator/status:
+    get:
+      operationId: getOrchestratorStatus
+      tags: [orchestrator]
+      summary: Current AI Orchestrator status and last decision
+      responses:
+        "200":
+          description: Orchestrator status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrchestratorStatus"
+
+  /orchestrator/run:
+    post:
+      operationId: runOrchestratorCycle
+      tags: [orchestrator]
+      summary: Manually run one orchestration cycle
+      responses:
+        "200":
+          description: Orchestration cycle result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrchestrationCycleResult"
+
 components:
   schemas:
     WorkerStatus:
@@ -2212,6 +2238,93 @@ components:
         summary: { type: string }
         skipped: { type: boolean }
         detail: {}
+
+    WorkerDecision:
+      type: object
+      required: [workerId, action, reason]
+      properties:
+        workerId: { type: string }
+        action:
+          type: string
+          enum: [RUN, SKIP, PAUSE]
+        reason: { type: string }
+        budgetStatus: { type: string }
+        dependencyStatus: { type: string }
+
+    OrchestratorBudgetStatus:
+      type: object
+      required:
+        [
+          todayFALSpendEstimate,
+          falBudgetRemaining,
+          falDailyBudgetUsd,
+          todayOpenAISpendEstimate,
+          openAIBudgetRemaining,
+          openAIDailyBudgetUsd,
+        ]
+      properties:
+        todayFALSpendEstimate: { type: number }
+        falBudgetRemaining: { type: number }
+        falDailyBudgetUsd: { type: number }
+        todayOpenAISpendEstimate: { type: number }
+        openAIBudgetRemaining: { type: number }
+        openAIDailyBudgetUsd: { type: number }
+
+    OrchestratorStatus:
+      type: object
+      required:
+        [
+          status,
+          lastDecisionAt,
+          decisions,
+          workersRunning,
+          workersSkipped,
+          workersPaused,
+          budgetStatus,
+          extensionOnline,
+        ]
+      properties:
+        status:
+          type: string
+          enum: [Active, Failed, Sleeping]
+        lastDecisionAt: { type: ["string", "null"], format: date-time }
+        decisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkerDecision"
+        workersRunning:
+          type: array
+          items: { type: string }
+        workersSkipped:
+          type: array
+          items: { type: string }
+        workersPaused:
+          type: array
+          items: { type: string }
+        budgetStatus:
+          $ref: "#/components/schemas/OrchestratorBudgetStatus"
+        extensionOnline: { type: boolean }
+
+    OrchestrationCycleResult:
+      type: object
+      required: [status, decisions, ranWorkerIds, skippedWorkerIds, pausedWorkerIds]
+      properties:
+        status:
+          type: string
+          enum: [Active, Failed]
+        decisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkerDecision"
+        ranWorkerIds:
+          type: array
+          items: { type: string }
+        skippedWorkerIds:
+          type: array
+          items: { type: string }
+        pausedWorkerIds:
+          type: array
+          items: { type: string }
 
     SystemTimelineEvent:
       type: object

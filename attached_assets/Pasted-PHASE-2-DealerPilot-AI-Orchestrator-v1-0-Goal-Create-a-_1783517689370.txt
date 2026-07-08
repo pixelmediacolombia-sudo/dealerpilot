@@ -1,0 +1,168 @@
+PHASE 2 — DealerPilot AI Orchestrator v1.0
+
+Goal:
+Create a small AI Orchestrator that decides which workers should run and prevents waste.
+
+Do NOT build new AI features yet.
+Do NOT add OpenAI reasoning to the orchestrator yet.
+Do NOT create new workers.
+
+Use the existing workers only.
+
+Current workers:
+- Inventory Worker
+- Opportunity Worker
+- Market Worker
+- Photo Worker
+- Publishing Worker
+- Learning Worker
+
+====================================================
+1. Orchestrator Role
+====================================================
+
+The Orchestrator should decide:
+
+- Which worker should run
+- Which worker should skip
+- Why it skipped
+- Whether budget allows the worker to run
+- Whether extension/VPS is online before publishing
+- Whether inventory changed before recalculating
+- Whether photos need processing before running Photo Worker
+
+====================================================
+2. Prevent Waste
+====================================================
+
+Do not run workers blindly on timers.
+
+Before any worker runs, Orchestrator checks:
+
+Inventory Worker:
+- run if last sync > 24h
+- or manual trigger
+
+Opportunity Worker:
+- run only if inventory changed
+- or intelligence is stale
+
+Market Worker:
+- run only if opportunity scores changed
+- or market strategy is stale
+
+Photo Worker:
+- run only if vehicles need AI photos
+- only if FAL/OpenAI budgets allow
+- never exceed daily budget
+
+Publishing Worker:
+- run only if extension online
+- Facebook active
+- queue has approved vehicles
+- GM Coach allows
+
+Learning Worker:
+- run nightly only if there are published results to analyze
+
+====================================================
+3. Add Orchestrator State
+====================================================
+
+Create:
+
+orchestrator_state
+
+Fields:
+- id
+- lastDecisionAt
+- lastDecisionJson
+- status
+- createdAt
+- updatedAt
+
+Each decision should log:
+
+- workerId
+- action: RUN / SKIP / PAUSE
+- reason
+- budgetStatus
+- dependencyStatus
+
+====================================================
+4. API
+====================================================
+
+Add:
+
+GET /api/orchestrator/status
+
+Returns:
+- orchestrator status
+- last decision
+- workers allowed to run
+- workers paused
+- budget status
+- extension status
+
+POST /api/orchestrator/run
+
+Manually runs one orchestration cycle.
+
+====================================================
+5. Dashboard
+====================================================
+
+In Connection Center / AI Workers panel add:
+
+AI Orchestrator
+
+Show:
+- Active / Sleeping / Paused
+- Last decision
+- Workers running
+- Workers skipped
+- Budget status
+- Extension dependency
+
+Example:
+
+AI Orchestrator
+Active
+
+Last decision:
+Photo Worker skipped — FAL budget reached.
+Publishing Worker skipped — extension offline.
+Opportunity Worker ran — inventory changed.
+
+====================================================
+6. Budget Control
+====================================================
+
+Orchestrator must respect:
+
+WORKER_DAILY_FAL_BUDGET_USD
+WORKER_DAILY_OPENAI_BUDGET_USD
+WORKER_PHOTO_MAX_VEHICLES_PER_RUN
+
+If budget is reached:
+- pause Photo Worker
+- do not enqueue AI photo jobs
+- auto-resume next day
+
+====================================================
+7. Acceptance
+====================================================
+
+- Orchestrator does not create fake data
+- Orchestrator does not call OpenAI
+- Orchestrator does not call FAL
+- Orchestrator only decides worker execution
+- Workers no longer run blindly if nothing changed
+- /api/orchestrator/status works
+- /api/orchestrator/run works
+- Dashboard shows last orchestration decision
+- API never crashes if orchestrator fails
+
+Goal:
+DealerPilot should stop acting like several independent timers and start acting like one coordinated operating system.

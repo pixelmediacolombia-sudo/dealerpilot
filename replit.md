@@ -66,6 +66,14 @@ and AI Studio are intentionally "Coming Soon".
 - Separate `WORKER_DAILY_OPENAI_BUDGET_USD` (default $1) guardrail enforces OpenAI classification spend **per image** (not per vehicle/job): `ai_usage_events` table logs one row per real `classify()` call; `checkOpenAiBudget()`/`recordOpenAiClassification()` in `costGuardrail.ts` are called inside the per-image loop in `photo/stages/1_classify.ts`, falling back to "Miscellaneous" (no API call, no crash) once exhausted. FAL and OpenAI budgets are tracked and enforced independently. `GET /api/workers` also returns `todayOpenAISpendEstimate`/`todayFALSpendEstimate`/`openAIBudgetRemaining`/`falBudgetRemaining`, surfaced in the Background Workers dashboard panel.
 - Generic catch-up scheduling (`scheduleWithCatchup` in `workers/index.ts`) drives all 6 workers off `worker_state`, replacing the old bespoke `startInventoryScheduler` catch-up logic (removed from `inventory/scheduler.ts`, which still exposes `runSyncNow`/`setNextSyncAt`/`getNextSyncAt` for the existing UI)
 
+### Where things live (AI Orchestrator v1.0)
+- Orchestrator core: `artifacts/api-server/src/workers/orchestrator.ts` — per-worker `decide*()` functions (dependency/change/budget-aware RUN/SKIP/PAUSE rules), `decideAll()`, `runOrchestrationCycle(log, trigger)` (delegates RUN decisions to `runWorkerOnce` from `scheduler.ts`, logs SKIP/PAUSE to the System Timeline, upserts `orchestrator_state`, never throws), `getOrchestratorStatus()` (read-only, never throws)
+- Schema: `orchestrator_state` (single-row: id, lastDecisionAt, lastDecisionJson, status, timestamps) in `lib/db/src/schema/`
+- API: `GET /api/orchestrator/status` (read-only snapshot), `POST /api/orchestrator/run` (manual cycle trigger) — `routes/orchestrator.ts`
+- Replaces the old per-worker `scheduleWithCatchup` timers in `workers/index.ts`: a single 5-min interval (matching the shortest worker interval) calls `runOrchestrationCycle` on a startup catch-up + timer; manual per-worker `POST /api/workers/:id/run` is untouched
+- Dashboard panel: "AI Orchestrator" card in `artifacts/dashboard/src/pages/ConnectionCenter/index.tsx` (`AiOrchestratorPanel`), above the existing "AI Workers" panel; polls every 15s, shows Active/Sleeping/Failed status, last decision time, running/skipped/paused counts, FAL/OpenAI budget remaining, extension online/offline, and the per-worker decision list with reasons
+- Does not call OpenAI/FAL directly or create new workers — reuses `checkOpenAiBudget`/`checkFalBudget` from `costGuardrail.ts` and `runWorkerOnce` from `scheduler.ts` for actual execution
+
 ### Where things live (Sprint 4 — Creative Intelligence Engine)
 - Creative engine: `artifacts/api-server/src/creative/` (`pipeline.ts`, `scoring.ts`, `worker.ts`, `templates.ts`, `seed.ts`)
 - Creative routes: `artifacts/api-server/src/routes/creative.ts`

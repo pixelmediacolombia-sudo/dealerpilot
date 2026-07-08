@@ -9,8 +9,12 @@ import {
   useRunWorkerNow,
   useGetSystemTimeline,
   getGetSystemTimelineQueryKey,
+  useGetOrchestratorStatus,
+  getGetOrchestratorStatusQueryKey,
+  useRunOrchestratorCycle,
   type ConnectionStatus,
   type WorkerStatus,
+  type WorkerDecision,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -45,6 +49,9 @@ import {
   Clock,
   Play,
   History,
+  Brain,
+  Pause,
+  CircleSlash,
 } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -521,6 +528,180 @@ function AiWorkersPanel() {
   );
 }
 
+// ── AI Orchestrator Panel ────────────────────────────────────────────────────────
+
+function orchestratorStatusColor(status: string | undefined): "success" | "destructive" | "warning" | "info" | "muted" {
+  switch (status) {
+    case "Active":
+      return "success";
+    case "Failed":
+      return "destructive";
+    case "Sleeping":
+      return "info";
+    default:
+      return "muted";
+  }
+}
+
+function decisionActionMeta(action: WorkerDecision["action"]): {
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+} {
+  switch (action) {
+    case "RUN":
+      return { icon: Play, color: "text-emerald-400" };
+    case "PAUSE":
+      return { icon: Pause, color: "text-amber-400" };
+    default:
+      return { icon: CircleSlash, color: "text-white/30" };
+  }
+}
+
+function AiOrchestratorPanel() {
+  const queryClient = useQueryClient();
+
+  const { data, isLoading } = useGetOrchestratorStatus({
+    query: { queryKey: getGetOrchestratorStatusQueryKey(), refetchInterval: 15000 },
+  });
+
+  const { mutate: runCycle, isPending: isRunning } = useRunOrchestratorCycle({
+    mutation: {
+      onSuccess: (result) => {
+        toast({
+          title: "Orchestration cycle complete",
+          description: `${result.ranWorkerIds.length} ran · ${result.skippedWorkerIds.length} skipped · ${result.pausedWorkerIds.length} paused`,
+        });
+        queryClient.invalidateQueries({ queryKey: getGetOrchestratorStatusQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListWorkersQueryKey() });
+      },
+      onError: () => {
+        toast({ title: "Run failed", description: "Could not trigger the orchestrator.", variant: "destructive" });
+      },
+    },
+  });
+
+  const status = data?.status ?? "Sleeping";
+  const decisions = data?.decisions ?? [];
+  const workersRunning = data?.workersRunning ?? [];
+  const workersSkipped = data?.workersSkipped ?? [];
+  const workersPaused = data?.workersPaused ?? [];
+  const extensionOnline = data?.extensionOnline ?? false;
+  const budget = data?.budgetStatus;
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">AI Orchestrator</p>
+        <div className="flex-1 h-px bg-white/[0.04]" />
+      </div>
+
+      <Card className="glass-panel border-white/5 overflow-hidden">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2.5">
+                <Brain className="w-5 h-5 text-primary opacity-80" />
+                <CardTitle className="text-lg font-semibold tracking-tight">DealerPilot Orchestrator</CardTitle>
+                <StatusPulse status={orchestratorStatusColor(status)} label={status} />
+              </div>
+              <CardDescription className="text-sm text-muted-foreground">
+                Decides which workers actually need to run — instead of firing all six on a blind timer.
+              </CardDescription>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-white/10 text-white/70 hover:bg-white/5 gap-1.5 shrink-0"
+              disabled={isRunning}
+              onClick={() => runCycle()}
+            >
+              {isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              Re-evaluate now
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoading ? (
+            <div className="py-8 flex justify-center">
+              <Loader2 className="w-5 h-5 animate-spin text-white/20" />
+            </div>
+          ) : (
+            <>
+              {data?.lastDecisionAt && (
+                <p className="text-[11px] text-white/30 -mt-1">
+                  Last decision {formatDate(data.lastDecisionAt)}
+                </p>
+              )}
+
+              <div className="grid grid-cols-4 gap-3">
+                <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
+                  <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Running</p>
+                  <p className="text-[13px] font-semibold text-emerald-400 mt-0.5">{workersRunning.length}</p>
+                </div>
+                <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
+                  <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Skipped</p>
+                  <p className="text-[13px] font-semibold text-white/50 mt-0.5">{workersSkipped.length}</p>
+                </div>
+                <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
+                  <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Paused</p>
+                  <p className="text-[13px] font-semibold text-amber-400 mt-0.5">{workersPaused.length}</p>
+                </div>
+                <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
+                  <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Extension</p>
+                  <p className={cn("text-[13px] font-semibold mt-0.5", extensionOnline ? "text-emerald-400" : "text-red-400")}>
+                    {extensionOnline ? "Online" : "Offline"}
+                  </p>
+                </div>
+              </div>
+
+              {budget && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
+                    <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">FAL Budget Remaining</p>
+                    <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+                      ${budget.falBudgetRemaining.toFixed(2)} / ${budget.falDailyBudgetUsd.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
+                    <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">OpenAI Budget Remaining</p>
+                    <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+                      ${budget.openAIBudgetRemaining.toFixed(3)} / ${budget.openAIDailyBudgetUsd.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="border border-white/[0.05] bg-white/[0.01] rounded-xl overflow-hidden">
+                {decisions.map((d, idx) => {
+                  const { icon: ActionIcon, color } = decisionActionMeta(d.action);
+                  return (
+                    <div
+                      key={d.workerId}
+                      className={cn(
+                        "flex items-center gap-3 px-5 py-3",
+                        idx < decisions.length - 1 && "border-b border-white/[0.04]",
+                      )}
+                    >
+                      <ActionIcon className={cn("w-3.5 h-3.5 shrink-0", color)} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[12px] font-semibold text-white/70 capitalize">{d.workerId}</p>
+                          <span className={cn("text-[10px] font-bold uppercase tracking-wider", color)}>{d.action}</span>
+                        </div>
+                        <p className="text-[11px] text-white/30 mt-0.5 truncate">{d.reason}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 const SERVICES = [
@@ -592,6 +773,9 @@ export function ConnectionCenter() {
                 isConnecting={isConnecting}
                 onConnect={handleConnect}
               />
+
+              {/* AI Orchestrator */}
+              <AiOrchestratorPanel />
 
               {/* AI Workers */}
               <AiWorkersPanel />

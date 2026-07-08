@@ -3303,3 +3303,49 @@ export const GetSystemTimelineResponse = zod.object({
 })
 
 
+/**
+ * @summary Current AI Orchestrator status and last decision
+ */
+export const GetOrchestratorStatusResponse = zod.object({
+  "status": zod.enum(['Active', 'Failed', 'Sleeping']),
+  "lastDecisionAt": zod.coerce.date().nullable(),
+  "decisions": zod.array(zod.object({
+  "workerId": zod.string(),
+  "action": zod.enum(['RUN', 'SKIP', 'PAUSE']),
+  "reason": zod.string(),
+  "budgetStatus": zod.string().optional(),
+  "dependencyStatus": zod.string().optional()
+})),
+  "workersRunning": zod.array(zod.string()),
+  "workersSkipped": zod.array(zod.string()),
+  "workersPaused": zod.array(zod.string()),
+  "budgetStatus": zod.object({
+  "todayFALSpendEstimate": zod.number(),
+  "falBudgetRemaining": zod.number(),
+  "falDailyBudgetUsd": zod.number(),
+  "todayOpenAISpendEstimate": zod.number(),
+  "openAIBudgetRemaining": zod.number(),
+  "openAIDailyBudgetUsd": zod.number()
+}),
+  "extensionOnline": zod.boolean()
+})
+
+
+/**
+ * @summary Manually run one orchestration cycle
+ */
+export const RunOrchestratorCycleResponse = zod.object({
+  "status": zod.enum(['Active', 'Failed']),
+  "decisions": zod.array(zod.object({
+  "workerId": zod.string(),
+  "action": zod.enum(['RUN', 'SKIP', 'PAUSE']),
+  "reason": zod.string(),
+  "budgetStatus": zod.string().optional(),
+  "dependencyStatus": zod.string().optional()
+})),
+  "ranWorkerIds": zod.array(zod.string()),
+  "skippedWorkerIds": zod.array(zod.string()),
+  "pausedWorkerIds": zod.array(zod.string())
+})
+
+

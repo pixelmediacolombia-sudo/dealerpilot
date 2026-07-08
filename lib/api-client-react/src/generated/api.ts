@@ -117,6 +117,8 @@ import type {
   MessageContextResult,
   MetaDiagnostics,
   NextPublishingJob,
+  OrchestrationCycleResult,
+  OrchestratorStatus,
   PatchBatchInput,
   PublishNow200,
   PublishNow201,
@@ -7372,4 +7374,151 @@ export function useGetSystemTimeline<TData = Awaited<ReturnType<typeof getSystem
 
 
 
+
+export const getGetOrchestratorStatusUrl = () => {
+
+
+
+
+  return `/api/orchestrator/status`
+}
+
+/**
+ * @summary Current AI Orchestrator status and last decision
+ */
+export const getOrchestratorStatus = async ( options?: RequestInit): Promise<OrchestratorStatus> => {
+
+  return customFetch<OrchestratorStatus>(getGetOrchestratorStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOrchestratorStatusQueryKey = () => {
+    return [
+    `/api/orchestrator/status`
+    ] as const;
+    }
+
+
+export const getGetOrchestratorStatusQueryOptions = <TData = Awaited<ReturnType<typeof getOrchestratorStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrchestratorStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOrchestratorStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrchestratorStatus>>> = ({ signal }) => getOrchestratorStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOrchestratorStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOrchestratorStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getOrchestratorStatus>>>
+export type GetOrchestratorStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Current AI Orchestrator status and last decision
+ */
+
+export function useGetOrchestratorStatus<TData = Awaited<ReturnType<typeof getOrchestratorStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrchestratorStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOrchestratorStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRunOrchestratorCycleUrl = () => {
+
+
+
+
+  return `/api/orchestrator/run`
+}
+
+/**
+ * @summary Manually run one orchestration cycle
+ */
+export const runOrchestratorCycle = async ( options?: RequestInit): Promise<OrchestrationCycleResult> => {
+
+  return customFetch<OrchestrationCycleResult>(getRunOrchestratorCycleUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRunOrchestratorCycleMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runOrchestratorCycle>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runOrchestratorCycle>>, TError,void, TContext> => {
+
+const mutationKey = ['runOrchestratorCycle'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runOrchestratorCycle>>, void> = () => {
+
+
+          return  runOrchestratorCycle(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunOrchestratorCycleMutationResult = NonNullable<Awaited<ReturnType<typeof runOrchestratorCycle>>>
+
+    export type RunOrchestratorCycleMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Manually run one orchestration cycle
+ */
+export const useRunOrchestratorCycle = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runOrchestratorCycle>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runOrchestratorCycle>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRunOrchestratorCycleMutationOptions(options));
+    }
 

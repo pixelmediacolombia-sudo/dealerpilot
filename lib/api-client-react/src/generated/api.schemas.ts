@@ -65,6 +65,69 @@ export interface WorkerRunResult {
   detail?: unknown;
 }
 
+export type WorkerDecisionAction = typeof WorkerDecisionAction[keyof typeof WorkerDecisionAction];
+
+
+export const WorkerDecisionAction = {
+  RUN: 'RUN',
+  SKIP: 'SKIP',
+  PAUSE: 'PAUSE',
+} as const;
+
+export interface WorkerDecision {
+  workerId: string;
+  action: WorkerDecisionAction;
+  reason: string;
+  budgetStatus?: string;
+  dependencyStatus?: string;
+}
+
+export interface OrchestratorBudgetStatus {
+  todayFALSpendEstimate: number;
+  falBudgetRemaining: number;
+  falDailyBudgetUsd: number;
+  todayOpenAISpendEstimate: number;
+  openAIBudgetRemaining: number;
+  openAIDailyBudgetUsd: number;
+}
+
+export type OrchestratorStatusStatus = typeof OrchestratorStatusStatus[keyof typeof OrchestratorStatusStatus];
+
+
+export const OrchestratorStatusStatus = {
+  Active: 'Active',
+  Failed: 'Failed',
+  Sleeping: 'Sleeping',
+} as const;
+
+export interface OrchestratorStatus {
+  status: OrchestratorStatusStatus;
+  /** @nullable */
+  lastDecisionAt: string | null;
+  decisions: WorkerDecision[];
+  workersRunning: string[];
+  workersSkipped: string[];
+  workersPaused: string[];
+  budgetStatus: OrchestratorBudgetStatus;
+  extensionOnline: boolean;
+}
+
+export type OrchestrationCycleResultStatus = typeof OrchestrationCycleResultStatus[keyof typeof OrchestrationCycleResultStatus];
+
+
+export const OrchestrationCycleResultStatus = {
+  Active: 'Active',
+  Failed: 'Failed',
+} as const;
+
+export interface OrchestrationCycleResult {
+  status: OrchestrationCycleResultStatus;
+  decisions: WorkerDecision[];
+  ranWorkerIds: string[];
+  skippedWorkerIds: string[];
+  pausedWorkerIds: string[];
+}
+
 export interface SystemTimelineEvent {
   id: number;
   category: string;
