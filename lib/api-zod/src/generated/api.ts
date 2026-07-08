@@ -3258,7 +3258,11 @@ export const ListWorkersResponse = zod.object({
   "nextRunAt": zod.coerce.date().nullable(),
   "lastResult": zod.string().nullable(),
   "lastError": zod.string().nullable()
-}))
+})),
+  "todayOpenAISpendEstimate": zod.number().describe('Estimated USD spent today on OpenAI photo classification calls (real per-call counter).'),
+  "todayFALSpendEstimate": zod.number().describe('Estimated USD spent today on FAL background removal\/enhancement jobs.'),
+  "openAIBudgetRemaining": zod.number().describe('Remaining USD budget today under WORKER_DAILY_OPENAI_BUDGET_USD.'),
+  "falBudgetRemaining": zod.number().describe('Remaining USD budget today under WORKER_DAILY_FAL_BUDGET_USD.')
 })
 
 

@@ -9,4 +9,12 @@ import type { WorkerStatus } from './workerStatus';
 
 export interface WorkerStatusList {
   workers: WorkerStatus[];
+  /** Estimated USD spent today on OpenAI photo classification calls (real per-call counter). */
+  todayOpenAISpendEstimate: number;
+  /** Estimated USD spent today on FAL background removal/enhancement jobs. */
+  todayFALSpendEstimate: number;
+  /** Remaining USD budget today under WORKER_DAILY_OPENAI_BUDGET_USD. */
+  openAIBudgetRemaining: number;
+  /** Remaining USD budget today under WORKER_DAILY_FAL_BUDGET_USD. */
+  falBudgetRemaining: number;
 }

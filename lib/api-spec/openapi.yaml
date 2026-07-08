@@ -2173,12 +2173,31 @@ components:
 
     WorkerStatusList:
       type: object
-      required: [workers]
+      required:
+        [
+          workers,
+          todayOpenAISpendEstimate,
+          todayFALSpendEstimate,
+          openAIBudgetRemaining,
+          falBudgetRemaining,
+        ]
       properties:
         workers:
           type: array
           items:
             $ref: "#/components/schemas/WorkerStatus"
+        todayOpenAISpendEstimate:
+          type: number
+          description: Estimated USD spent today on OpenAI photo classification calls (real per-call counter).
+        todayFALSpendEstimate:
+          type: number
+          description: Estimated USD spent today on FAL background removal/enhancement jobs.
+        openAIBudgetRemaining:
+          type: number
+          description: Remaining USD budget today under WORKER_DAILY_OPENAI_BUDGET_USD.
+        falBudgetRemaining:
+          type: number
+          description: Remaining USD budget today under WORKER_DAILY_FAL_BUDGET_USD.
 
     WorkerRunResult:
       type: object

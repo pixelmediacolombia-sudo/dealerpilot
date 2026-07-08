@@ -37,3 +37,4 @@ export * from "./gmDecisionLog";
 export * from "./workerRuns";
 export * from "./workerState";
 export * from "./systemTimelineEvents";
+export * from "./aiUsageEvents";

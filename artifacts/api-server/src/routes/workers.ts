@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, workerStateTable, systemTimelineEventsTable } from "@workspace/db";
 import { desc } from "drizzle-orm";
 import { getAllWorkers, getWorker, runWorkerOnce } from "../workers";
+import { getPhotoBudgetStatus } from "../workers/costGuardrail";
 import type { WorkerStatusLabel } from "../workers/types";
 
 const router: IRouter = Router();
@@ -43,7 +44,15 @@ router.get("/workers", async (req, res) => {
     };
   });
 
-  res.json({ workers });
+  const budget = await getPhotoBudgetStatus();
+
+  res.json({
+    workers,
+    todayOpenAISpendEstimate: budget.todayOpenAISpendEstimate,
+    todayFALSpendEstimate: budget.todayFALSpendEstimate,
+    openAIBudgetRemaining: budget.openAIBudgetRemaining,
+    falBudgetRemaining: budget.falBudgetRemaining,
+  });
 });
 
 // POST /workers/:id/run — manually trigger a worker to run immediately.

@@ -374,6 +374,10 @@ function AiWorkersPanel() {
 
   const workers = workersData?.workers ?? [];
   const events = timelineData?.events ?? [];
+  const todayOpenAISpendEstimate = workersData?.todayOpenAISpendEstimate ?? 0;
+  const todayFALSpendEstimate = workersData?.todayFALSpendEstimate ?? 0;
+  const openAIBudgetRemaining = workersData?.openAIBudgetRemaining ?? 0;
+  const falBudgetRemaining = workersData?.falBudgetRemaining ?? 0;
 
   return (
     <div>
@@ -398,6 +402,21 @@ function AiWorkersPanel() {
               <Loader2 className="w-5 h-5 animate-spin text-white/20" />
             </div>
           ) : (
+            <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
+                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">OpenAI Budget</p>
+                <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+                  ${todayOpenAISpendEstimate.toFixed(3)} spent · ${openAIBudgetRemaining.toFixed(3)} left
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
+                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">FAL Budget</p>
+                <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+                  ${todayFALSpendEstimate.toFixed(2)} spent · ${falBudgetRemaining.toFixed(2)} left
+                </p>
+              </div>
+            </div>
             <div className="border border-white/[0.05] bg-white/[0.01] rounded-xl overflow-hidden">
               {workers.map((w, idx) => {
                 const color = workerStatusColor(w.status);
@@ -447,6 +466,7 @@ function AiWorkersPanel() {
                 );
               })}
             </div>
+            </>
           )}
 
           {/* System timeline */}

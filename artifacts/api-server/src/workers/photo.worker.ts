@@ -1,13 +1,29 @@
 // Photo Worker — enqueues AI Photo Studio jobs for vehicles that need them,
-// respecting a max-vehicles-per-run cap and a daily spend guardrail.
+// respecting a max-vehicles-per-run cap and two independent daily spend
+// guardrails (FAL for background removal/enhancement, OpenAI for per-image
+// classification). If either budget is exhausted, the worker skips enqueuing
+// new jobs entirely rather than creating jobs it can't fully classify.
 import { autoEnqueueAfterImport } from "../photo/autoEnqueue";
-import { checkPhotoBudget, getPhotoMaxVehiclesPerRun } from "./costGuardrail";
+import { checkPhotoBudget, checkOpenAiBudget, getPhotoMaxVehiclesPerRun } from "./costGuardrail";
 import type { WorkerDefinition, WorkerRunOutcome } from "./types";
 
 const INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const DEALER_ID = 1;
 
 async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOutcome> {
+  const openAiBudget = await checkOpenAiBudget();
+  if (openAiBudget.budgetExhausted) {
+    log.warn(
+      { estimatedSpentTodayUsd: openAiBudget.estimatedSpentTodayUsd, dailyBudgetUsd: openAiBudget.dailyBudgetUsd },
+      "OpenAI daily budget reached",
+    );
+    return {
+      summary: `Photo worker paused — daily OpenAI budget exhausted ($${openAiBudget.estimatedSpentTodayUsd.toFixed(2)} / $${openAiBudget.dailyBudgetUsd})`,
+      detail: { ...openAiBudget },
+      skipped: true,
+    };
+  }
+
   const maxPerRun = getPhotoMaxVehiclesPerRun();
   const budget = await checkPhotoBudget(maxPerRun);
 
