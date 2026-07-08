@@ -1,4 +1,5 @@
-const DEFAULT_BACKEND_URL = "https://dealerpilot1987.replit.app";
+const DEFAULT_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
+const REPLIT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 
 const MARKETPLACE_CREATE_URL = "https://www.facebook.com/marketplace/create/vehicle";
 const FACEBOOK_LOGIN_URL =
@@ -151,8 +152,8 @@ const handlers = {
   async GET_BACKEND_PRESETS() {
     const { backendPresets } = await chrome.storage.local.get("backendPresets");
     return {
-      replit: DEFAULT_BACKEND_URL,
-      render: "",
+      replit: REPLIT_BACKEND_URL,
+      render: DEFAULT_BACKEND_URL,
       local: "http://localhost:5000",
       ...(backendPresets || {}),
     };
@@ -803,6 +804,23 @@ const STATE_KEYS_TO_CLEAR = [
       installedAt: new Date().toISOString(),
     });
     console.log(`[DealerPilot AI] Version ${storedVersion ?? "none"} → ${currentVersion}: state cleared, installedAt reset`);
+  }
+
+  // ── One-time URL migration: old Replit default → Render ──────────────────
+  // Dealers who installed before Render was the default may have the old
+  // Replit URL stored. Upgrade it silently on first startup after this change.
+  // The `replitUrlMigrated` flag prevents re-running if the dealer later
+  // deliberately re-points to Replit via the popup.
+  const { backendUrl: storedUrl, replitUrlMigrated } = await chrome.storage.local.get([
+    "backendUrl",
+    "replitUrlMigrated",
+  ]);
+  if (!replitUrlMigrated) {
+    if (storedUrl === REPLIT_BACKEND_URL) {
+      await chrome.storage.local.set({ backendUrl: DEFAULT_BACKEND_URL });
+      console.log(`[DealerPilot AI] URL migration: Replit default → Render (${DEFAULT_BACKEND_URL})`);
+    }
+    await chrome.storage.local.set({ replitUrlMigrated: true });
   }
 })();
 

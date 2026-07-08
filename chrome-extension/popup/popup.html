@@ -186,15 +186,22 @@
       }
       .env-badge {
         display: inline-block;
-        padding: 1px 6px;
+        padding: 2px 8px;
         border-radius: 10px;
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 700;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.03em;
       }
-      .env-badge.env-render  { background: #0e2d1a; color: #6fe39f; border: 1px solid #1e5e30; }
-      .env-badge.env-replit  { background: #1c3a63; color: #cdd9ea; border: 1px solid #2a4d80; }
-      .env-badge.env-local   { background: #2d250e; color: #ffce6b; border: 1px solid #5e4e1e; }
+      .env-badge.env-render  {
+        background: #0e2d1a;
+        color: #6fe39f;
+        border: 1px solid #2a7a46;
+        box-shadow: 0 0 6px #1e5e3055;
+        font-size: 12px;
+        padding: 3px 9px;
+      }
+      .env-badge.env-replit  { background: #2d250e; color: #ffce6b; border: 1px solid #5e4e1e; }
+      .env-badge.env-local   { background: #2d0e0e; color: #ff8a7a; border: 1px solid #5e1e1e; }
       .env-badge.env-custom  { background: #2d0e0e; color: #ff8a7a; border: 1px solid #5e1e1e; }
       details { margin-top: 8px; }
       summary {

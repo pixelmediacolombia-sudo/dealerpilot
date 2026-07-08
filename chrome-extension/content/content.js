@@ -1753,7 +1753,7 @@
     // Ensure the form is ready before we click Next. If the Next button is
     // disabled or missing required fields, detect the exact reason instead
     // of reporting a generic "Publish button not found" error.
-    const validation = await validateBeforeNext();
+    const validation = await validateBeforeNext(missed, warnings);
     if (!validation.ok) {
       stateError("Pre-Next validation failed", new Error(validation.reason));
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: validation.reason }).catch(() => {});
@@ -1878,7 +1878,7 @@
 
   // validateBeforeNext — checks the form has the minimum required data before
   // we try to click Next. Returns { ok, reason }.
-  async function validateBeforeNext() {
+  async function validateBeforeNext(missed = [], warnings = []) {
     // 1. Confirm at least one photo thumbnail is visible.
     //
     //    If uploadPhotos already confirmed thumbnails (via waitForPhotoThumbnails),
