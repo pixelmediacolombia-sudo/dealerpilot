@@ -4,11 +4,11 @@ import { seedDealerAndInventory } from "./inventory/seed";
 import { seedCreative } from "./creative/seed";
 import { startCreativeWorker } from "./creative/worker";
 import { seedMarketplaceIntelligence } from "./intelligence/seed";
-import { startInventoryScheduler } from "./inventory/scheduler";
 import { startStaleJobCleaner } from "./publishing/staleCleaner";
 import { seedAiStudio } from "./photo/seed";
 import { seedPhotoQualityProfiles } from "./photo/seedProfiles";
 import { startPhotoWorker } from "./photo/worker";
+import { startWorkers } from "./workers";
 
 const rawPort = process.env["PORT"];
 
@@ -36,11 +36,11 @@ app.listen(port, (err) => {
     .then(() => seedCreative(logger))
     .then(() => startCreativeWorker(logger))
     .then(() => seedMarketplaceIntelligence(logger))
-    .then(() => startInventoryScheduler(logger))
     .then(() => startStaleJobCleaner(logger))
     .then(() => seedAiStudio(logger))
     .then(() => seedPhotoQualityProfiles(logger))
     .then(() => startPhotoWorker(logger))
+    .then(() => startWorkers(logger))
     .catch((seedErr) => {
       logger.error({ err: seedErr }, "Failed to seed/start engines");
     });

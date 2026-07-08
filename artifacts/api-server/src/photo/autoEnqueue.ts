@@ -19,7 +19,9 @@ const ELIGIBLE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish"]
 export async function autoEnqueueAfterImport(
   dealerId: number,
   log: Logger,
+  opts: { maxCount?: number } = {},
 ): Promise<{ enqueued: number; skipped: number }> {
+  const maxCount = opts.maxCount ?? Infinity;
   const [defaultPack] = await db
     .select()
     .from(aiStudioPacksTable)
@@ -47,6 +49,11 @@ export async function autoEnqueueAfterImport(
   let skipped = 0;
 
   for (const v of vehicles) {
+    if (enqueued >= maxCount) {
+      skipped++;
+      continue;
+    }
+
     // Skip vehicles already in flight
     if (v.aiPhotoStatus === "Pending" || v.aiPhotoStatus === "Processing") {
       skipped++;

@@ -5,6 +5,57 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type WorkerStatusStatus = typeof WorkerStatusStatus[keyof typeof WorkerStatusStatus];
+
+
+export const WorkerStatusStatus = {
+  Online: 'Online',
+  Sleeping: 'Sleeping',
+  Failed: 'Failed',
+} as const;
+
+export interface WorkerStatus {
+  id: string;
+  name: string;
+  description: string;
+  intervalMs: number;
+  enabled: boolean;
+  status: WorkerStatusStatus;
+  /** @nullable */
+  lastRunAt: string | null;
+  /** @nullable */
+  nextRunAt: string | null;
+  /** @nullable */
+  lastResult: string | null;
+  /** @nullable */
+  lastError: string | null;
+}
+
+export interface WorkerStatusList {
+  workers: WorkerStatus[];
+}
+
+export interface WorkerRunResult {
+  workerId: string;
+  summary: string;
+  skipped: boolean;
+  detail?: unknown;
+}
+
+export interface SystemTimelineEvent {
+  id: number;
+  category: string;
+  /** @nullable */
+  workerId: string | null;
+  message: string;
+  detail?: unknown;
+  createdAt: string;
+}
+
+export interface SystemTimelineEventList {
+  events: SystemTimelineEvent[];
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -2167,5 +2218,9 @@ location?: string;
 export type SeedMarketplaceIntelligence200 = {
   ok: boolean;
   message: string;
+};
+
+export type GetSystemTimelineParams = {
+limit?: number;
 };
 

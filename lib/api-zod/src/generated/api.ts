@@ -3243,3 +3243,58 @@ export const GetVehicleIntelligenceResponse = zod.object({
 })
 
 
+/**
+ * @summary Status of all 6 scheduled AI workers
+ */
+export const ListWorkersResponse = zod.object({
+  "workers": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "intervalMs": zod.number(),
+  "enabled": zod.boolean(),
+  "status": zod.enum(['Online', 'Sleeping', 'Failed']),
+  "lastRunAt": zod.coerce.date().nullable(),
+  "nextRunAt": zod.coerce.date().nullable(),
+  "lastResult": zod.string().nullable(),
+  "lastError": zod.string().nullable()
+}))
+})
+
+
+/**
+ * @summary Manually trigger a worker to run immediately
+ */
+export const RunWorkerNowParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const RunWorkerNowResponse = zod.object({
+  "workerId": zod.string(),
+  "summary": zod.string(),
+  "skipped": zod.boolean(),
+  "detail": zod.unknown().optional()
+})
+
+
+/**
+ * @summary Recent System Timeline events emitted by workers
+ */
+export const getSystemTimelineQueryLimitDefault = 30;
+
+export const GetSystemTimelineQueryParams = zod.object({
+  "limit": zod.coerce.number().default(getSystemTimelineQueryLimitDefault)
+})
+
+export const GetSystemTimelineResponse = zod.object({
+  "events": zod.array(zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "workerId": zod.string().nullable(),
+  "message": zod.string(),
+  "detail": zod.unknown().optional(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+

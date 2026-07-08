@@ -18,3 +18,4 @@
 - [Sales AI Response Engine](sales-ai-engine.md) — Zod barrel collision fix pattern; intent/escalation/qualification helpers in conversations.ts; 20-message acceptance test suite; ConversationDetail UI patterns.
 - [Alpha Motorsport location mapping](alpha-location-mapping.md) — XML feed has NO location field; website VehicleLocationID (3004265=Fredericksburg/196, 3004268=Manassas/119) is DealerCentric-internal; locationScraper.ts scrapes both pages on every sync to populate lot_location.
 - [Photo Quality Profiles](photo-quality-profiles.md) — evaluator is DB-free (QualityProfile interface only); DB loading in profileLoader.ts; drizzle-orm must be in scripts deps; 5-tier ratings; 2 seeded profiles.
+- [Worker Framework v1.0](worker-framework.md) — one generic worker_state-driven catch-up scheduler for all background jobs; workers wrap existing engines, never reimplement logic; cost-sensitive workers check a shared budget guardrail.

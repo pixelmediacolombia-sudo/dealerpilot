@@ -76,6 +76,7 @@ import type {
   GetFieldValidationParams,
   GetLaunchChecklistParams,
   GetPublishingJobProgress200,
+  GetSystemTimelineParams,
   GetVehicleStatsParams,
   GmAnalysisResult,
   GmAnalyzeRequest,
@@ -142,6 +143,7 @@ import type {
   SimulatorRunBody,
   SimulatorRunResponse,
   SimulatorScenariosResponse,
+  SystemTimelineEventList,
   TestListing,
   UpdateConversationAutoReply200,
   UpdateConversationAutoReplyBody,
@@ -155,7 +157,9 @@ import type {
   VehiclePhotoScoreList,
   VehiclePhotoScoreResponse,
   VehicleStats,
-  VehicleStatusUpdate
+  VehicleStatusUpdate,
+  WorkerRunResult,
+  WorkerStatusList
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -7126,6 +7130,237 @@ export function useGetVehicleIntelligence<TData = Awaited<ReturnType<typeof getV
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetVehicleIntelligenceQueryOptions(vehicleId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListWorkersUrl = () => {
+
+
+
+
+  return `/api/workers`
+}
+
+/**
+ * @summary Status of all 6 scheduled AI workers
+ */
+export const listWorkers = async ( options?: RequestInit): Promise<WorkerStatusList> => {
+
+  return customFetch<WorkerStatusList>(getListWorkersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWorkersQueryKey = () => {
+    return [
+    `/api/workers`
+    ] as const;
+    }
+
+
+export const getListWorkersQueryOptions = <TData = Awaited<ReturnType<typeof listWorkers>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWorkers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWorkersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkers>>> = ({ signal }) => listWorkers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWorkers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWorkersQueryResult = NonNullable<Awaited<ReturnType<typeof listWorkers>>>
+export type ListWorkersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Status of all 6 scheduled AI workers
+ */
+
+export function useListWorkers<TData = Awaited<ReturnType<typeof listWorkers>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWorkers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWorkersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRunWorkerNowUrl = (id: string,) => {
+
+
+
+
+  return `/api/workers/${id}/run`
+}
+
+/**
+ * @summary Manually trigger a worker to run immediately
+ */
+export const runWorkerNow = async (id: string, options?: RequestInit): Promise<WorkerRunResult> => {
+
+  return customFetch<WorkerRunResult>(getRunWorkerNowUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRunWorkerNowMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runWorkerNow>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runWorkerNow>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['runWorkerNow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runWorkerNow>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  runWorkerNow(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunWorkerNowMutationResult = NonNullable<Awaited<ReturnType<typeof runWorkerNow>>>
+
+    export type RunWorkerNowMutationError = ErrorType<void>
+
+    /**
+ * @summary Manually trigger a worker to run immediately
+ */
+export const useRunWorkerNow = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runWorkerNow>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runWorkerNow>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getRunWorkerNowMutationOptions(options));
+    }
+
+export const getGetSystemTimelineUrl = (params?: GetSystemTimelineParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/workers/timeline?${stringifiedParams}` : `/api/workers/timeline`
+}
+
+/**
+ * @summary Recent System Timeline events emitted by workers
+ */
+export const getSystemTimeline = async (params?: GetSystemTimelineParams, options?: RequestInit): Promise<SystemTimelineEventList> => {
+
+  return customFetch<SystemTimelineEventList>(getGetSystemTimelineUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSystemTimelineQueryKey = (params?: GetSystemTimelineParams,) => {
+    return [
+    `/api/workers/timeline`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetSystemTimelineQueryOptions = <TData = Awaited<ReturnType<typeof getSystemTimeline>>, TError = ErrorType<unknown>>(params?: GetSystemTimelineParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSystemTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSystemTimelineQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSystemTimeline>>> = ({ signal }) => getSystemTimeline(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSystemTimeline>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSystemTimelineQueryResult = NonNullable<Awaited<ReturnType<typeof getSystemTimeline>>>
+export type GetSystemTimelineQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Recent System Timeline events emitted by workers
+ */
+
+export function useGetSystemTimeline<TData = Awaited<ReturnType<typeof getSystemTimeline>>, TError = ErrorType<unknown>>(
+ params?: GetSystemTimelineParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSystemTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSystemTimelineQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

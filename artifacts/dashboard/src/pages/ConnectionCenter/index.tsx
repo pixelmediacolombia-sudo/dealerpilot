@@ -4,7 +4,13 @@ import {
   useGetConnectionStatus,
   getGetConnectionStatusQueryKey,
   useConnectMarketplace,
+  useListWorkers,
+  getListWorkersQueryKey,
+  useRunWorkerNow,
+  useGetSystemTimeline,
+  getGetSystemTimelineQueryKey,
   type ConnectionStatus,
+  type WorkerStatus,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -35,6 +41,10 @@ import {
   ShoppingBag,
   Facebook,
   Puzzle,
+  Zap,
+  Clock,
+  Play,
+  History,
 } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -317,6 +327,157 @@ function MarketplaceConnectionPanel({ status, isConnecting, onConnect }: Connect
   );
 }
 
+// ── AI Workers Panel ────────────────────────────────────────────────────────────
+
+function workerStatusColor(status: WorkerStatus["status"]): "success" | "destructive" | "warning" | "info" | "muted" {
+  switch (status) {
+    case "Online":
+      return "success";
+    case "Failed":
+      return "destructive";
+    case "Sleeping":
+      return "info";
+    default:
+      return "muted";
+  }
+}
+
+function AiWorkersPanel() {
+  const queryClient = useQueryClient();
+  const [runningId, setRunningId] = useState<string | null>(null);
+
+  const { data: workersData, isLoading } = useListWorkers({
+    query: { queryKey: getListWorkersQueryKey(), refetchInterval: 15000 },
+  });
+
+  const { data: timelineData } = useGetSystemTimeline(
+    { limit: 8 },
+    { query: { queryKey: getGetSystemTimelineQueryKey({ limit: 8 }), refetchInterval: 15000 } },
+  );
+
+  const { mutate: runWorker } = useRunWorkerNow({
+    mutation: {
+      onMutate: (vars) => setRunningId(vars.id),
+      onSuccess: (result) => {
+        toast({
+          title: result.skipped ? "Worker skipped" : "Worker run complete",
+          description: result.summary,
+        });
+        queryClient.invalidateQueries({ queryKey: getListWorkersQueryKey() });
+      },
+      onError: () => {
+        toast({ title: "Run failed", description: "Could not trigger the worker.", variant: "destructive" });
+      },
+      onSettled: () => setRunningId(null),
+    },
+  });
+
+  const workers = workersData?.workers ?? [];
+  const events = timelineData?.events ?? [];
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">AI Workers</p>
+        <div className="flex-1 h-px bg-white/[0.04]" />
+      </div>
+
+      <Card className="glass-panel border-white/5 overflow-hidden">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2.5">
+            <Zap className="w-5 h-5 text-primary opacity-80" />
+            <CardTitle className="text-lg font-semibold tracking-tight">Background Workers</CardTitle>
+          </div>
+          <CardDescription className="text-sm text-muted-foreground">
+            Scheduled jobs that keep inventory, opportunity scores, and publishing in sync — independent of dashboard activity.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoading ? (
+            <div className="py-8 flex justify-center">
+              <Loader2 className="w-5 h-5 animate-spin text-white/20" />
+            </div>
+          ) : (
+            <div className="border border-white/[0.05] bg-white/[0.01] rounded-xl overflow-hidden">
+              {workers.map((w, idx) => {
+                const color = workerStatusColor(w.status);
+                const isRunning = runningId === w.id;
+                return (
+                  <div
+                    key={w.id}
+                    className={cn(
+                      "flex items-center gap-4 px-5 py-3.5",
+                      idx < workers.length - 1 && "border-b border-white/[0.04]",
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[13px] font-semibold text-white/70">{w.name}</p>
+                        <StatusPulse status={color} label={w.status} />
+                      </div>
+                      <p className="text-[11px] text-white/22 mt-0.5 truncate">
+                        {w.lastResult ?? w.lastError ?? w.description}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1 text-[10px] text-white/18 font-mono">
+                        {w.lastRunAt && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5" /> Last {formatDate(w.lastRunAt)}
+                          </span>
+                        )}
+                        {w.nextRunAt && (
+                          <span>Next {formatDate(w.nextRunAt)}</span>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-white/10 text-white/70 hover:bg-white/5 gap-1.5 shrink-0"
+                      disabled={isRunning || !w.enabled}
+                      onClick={() => runWorker({ id: w.id })}
+                    >
+                      {isRunning ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Play className="w-3 h-3" />
+                      )}
+                      Run now
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* System timeline */}
+          {events.length > 0 && (
+            <div className="pt-1">
+              <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-white/22 uppercase tracking-wider">
+                <History className="w-3 h-3" />
+                Recent Activity
+              </div>
+              <div className="border border-white/[0.04] bg-white/[0.01] rounded-lg overflow-hidden">
+                {events.map((e, ei) => (
+                  <div
+                    key={e.id}
+                    className={cn(
+                      "flex items-start justify-between gap-3 px-3.5 py-2",
+                      ei < events.length - 1 && "border-b border-white/[0.04]",
+                    )}
+                  >
+                    <span className="text-[11px] text-white/50 min-w-0">{e.message}</span>
+                    <span className="text-[10px] text-white/18 font-mono shrink-0">{formatDate(e.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 const SERVICES = [
@@ -388,6 +549,9 @@ export function ConnectionCenter() {
                 isConnecting={isConnecting}
                 onConnect={handleConnect}
               />
+
+              {/* AI Workers */}
+              <AiWorkersPanel />
 
               {/* Service health telemetry */}
               <div>

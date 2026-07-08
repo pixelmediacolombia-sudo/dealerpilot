@@ -17,10 +17,12 @@ import channelsRouter from "./channels";
 import photoStudioRouter from "./photoStudio";
 import marketplaceListingsRouter from "./marketplaceListings";
 import gmRouter from "./gm";
+import workersRouter from "./workers";
 
 const router: IRouter = Router();
 
 router.use(gmRouter);
+router.use(workersRouter);
 router.use(healthRouter);
 router.use(extensionRouter);
 router.use(dealersRouter);

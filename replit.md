@@ -55,6 +55,16 @@ and AI Studio are intentionally "Coming Soon".
 - Dealer inventory is seeded on API-server startup via `seedDealerAndInventory` (two-pass import for realistic change history)
 - Sample feed is served at `GET /api/sample-feed`; the dealer's feed URL is editable in Settings
 
+### Where things live (Worker Framework v1.0)
+- Worker framework core: `artifacts/api-server/src/workers/` (`types.ts`, `registry.ts`, `timeline.ts`, `scheduler.ts`, `index.ts`, `costGuardrail.ts`)
+- 6 worker wrappers: `workers/{inventory,opportunity,market,photo,publishing,learning}.worker.ts` — each reuses an existing engine (inventory sync, opportunity engine, market scan, photo auto-enqueue, autoPublish, learning calibration check) rather than duplicating logic
+- Schema: `lib/db/src/schema/` (worker_runs, worker_state, system_timeline_events)
+- API: `GET /api/workers` (status list), `POST /api/workers/:id/run` (manual trigger), `GET /api/workers/timeline` (event feed) — `routes/workers.ts`
+- Dashboard panel: "AI Workers" / Background Workers card in `artifacts/dashboard/src/pages/ConnectionCenter/index.tsx` (`AiWorkersPanel`), polls every 15s, includes per-worker "Run now" and a Recent Activity feed
+- Started via `startWorkers(logger)` in `index.ts`, after `startPhotoWorker` (which is a separate, pre-existing job *processor* — unrelated to the new 15-min photo *enqueue* worker)
+- Cost guardrail: `WORKER_DAILY_FAL_BUDGET_USD` (default $10) and `WORKER_PHOTO_MAX_VEHICLES_PER_RUN` (default 5) env vars cap AI photo spend per run/day
+- Generic catch-up scheduling (`scheduleWithCatchup` in `workers/index.ts`) drives all 6 workers off `worker_state`, replacing the old bespoke `startInventoryScheduler` catch-up logic (removed from `inventory/scheduler.ts`, which still exposes `runSyncNow`/`setNextSyncAt`/`getNextSyncAt` for the existing UI)
+
 ### Where things live (Sprint 4 — Creative Intelligence Engine)
 - Creative engine: `artifacts/api-server/src/creative/` (`pipeline.ts`, `scoring.ts`, `worker.ts`, `templates.ts`, `seed.ts`)
 - Creative routes: `artifacts/api-server/src/routes/creative.ts`

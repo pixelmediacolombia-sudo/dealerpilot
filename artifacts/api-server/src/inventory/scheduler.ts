@@ -3,15 +3,20 @@ import { fetchFeedXml } from "./feedSource";
 import { importFeed, type ImportSummary } from "./importFeed";
 import { autoEnqueueAfterImport } from "../photo/autoEnqueue";
 import { seedOpportunityScores } from "../intelligence/seed";
-import { db, dealersTable, feedRunsTable } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { db, dealersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
-const SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
-
+// Scheduling itself (24h interval, startup catch-up) is owned by the Worker
+// Framework (see ../workers/index.ts). This module only tracks the
+// next-run timestamp for display in the Connection Center / Feed Health UI.
 let nextSyncAt: Date | null = null;
 
 export function getNextSyncAt(): Date | null {
   return nextSyncAt;
+}
+
+export function setNextSyncAt(date: Date | null): void {
+  nextSyncAt = date;
 }
 
 /**
@@ -83,66 +88,4 @@ export async function runSyncNow(
     log.error({ trigger, err }, "Inventory sync failed");
     return null;
   }
-}
-
-/**
- * Start the 24-hour inventory scheduler.
- *
- * Startup behaviour:
- * - If the last completed sync is ≥ 24 hours old (or no sync has run yet),
- *   runs a sync immediately and then schedules the next one in 24 hours.
- * - Otherwise, schedules the next sync for 24 hours after the last one completed.
- *
- * This ensures production restarts after downtime catch up immediately,
- * without double-running when the seed already ran on fresh startup.
- */
-export function startInventoryScheduler(log: Logger): void {
-  async function reschedule() {
-    nextSyncAt = new Date(Date.now() + SYNC_INTERVAL_MS);
-    log.info({ nextSyncAt }, "Next auto inventory sync scheduled");
-    setTimeout(() => void runAndReschedule(), SYNC_INTERVAL_MS);
-  }
-
-  async function runAndReschedule() {
-    await runSyncNow(log, "auto");
-    await reschedule();
-  }
-
-  async function startUp() {
-    try {
-      const [lastRun] = await db
-        .select()
-        .from(feedRunsTable)
-        .where(eq(feedRunsTable.dealerId, 1))
-        .orderBy(desc(feedRunsTable.startedAt))
-        .limit(1);
-
-      const lastSyncAt = lastRun?.finishedAt ?? lastRun?.startedAt ?? null;
-      const ageMs = lastSyncAt ? Date.now() - lastSyncAt.getTime() : Infinity;
-      const ageHours = Math.round(ageMs / 3_600_000);
-
-      if (ageMs >= SYNC_INTERVAL_MS) {
-        log.info(
-          { ageHours, lastSyncAt: lastSyncAt?.toISOString() ?? "never" },
-          "Last inventory sync is stale — running immediately on startup",
-        );
-        await runSyncNow(log, "auto");
-        await reschedule();
-      } else {
-        const remaining = SYNC_INTERVAL_MS - ageMs;
-        nextSyncAt = new Date(Date.now() + remaining);
-        log.info(
-          { ageHours, nextSyncAt, hoursUntilNext: Math.round(remaining / 3_600_000) },
-          "Inventory scheduler started — last sync is fresh",
-        );
-        setTimeout(() => void runAndReschedule(), remaining);
-      }
-    } catch (err) {
-      log.error({ err }, "Inventory scheduler startup check failed — falling back to 24h schedule");
-      await reschedule();
-    }
-  }
-
-  log.info("Starting inventory scheduler");
-  void startUp();
 }

@@ -1,0 +1,245 @@
+ARCHITECTURE PHASE — DealerPilot AI Worker Framework v1.0
+
+Goal:
+DealerPilot should work even when nobody is using the dashboard.
+
+Replit = development.
+GitHub = source of truth.
+Render = production runtime where workers run 24/7.
+
+Build an AI Worker Framework inside the backend.
+
+This is not another UI page.
+This is the operational brain of DealerPilot.
+
+====================================================
+1. Worker Framework
+====================================================
+
+Create a central worker system:
+
+workers/
+  index.ts
+  scheduler.ts
+  registry.ts
+  types.ts
+  inventory.worker.ts
+  opportunity.worker.ts
+  market.worker.ts
+  photo.worker.ts
+  publishing.worker.ts
+  learning.worker.ts
+
+Each worker must have:
+
+- id
+- name
+- description
+- interval
+- enabled flag
+- lastRunAt
+- nextRunAt
+- status
+- durationMs
+- result summary
+- error if failed
+
+====================================================
+2. Worker Schedule
+====================================================
+
+Inventory Worker:
+Runs every 24h.
+Also runs on startup if last sync > 24h.
+Does:
+- XML feed sync
+- location scraper
+- sold/removed detection
+- price changed detection
+- no duplicate vehicles
+
+Opportunity Worker:
+Runs every 30 min.
+Does:
+- refresh Opportunity Scores
+- update Top 10
+- remove published vehicles from recommendations
+- refresh Command Center strategy
+
+Market Intelligence Worker:
+Runs every 1h.
+Does:
+- analyze active inventory
+- identify Spanish-first buyer opportunities
+- identify affordable payment vehicles
+- identify trucks/work vehicles
+- identify family SUVs
+- identify duplicate conflicts
+- update publishing strategy
+
+Photo Worker:
+Runs every 15 min.
+Does:
+- find new vehicles without AI photo set
+- enqueue AI Photo Studio jobs
+- skip vehicles already processed
+- respect FAL/OpenAI cost guardrails
+
+Publishing Worker:
+Runs every 5 min.
+Does:
+- check if extension/VPS agent online
+- check approved publishing queue
+- assign next job only if GM Coach allows
+- never publish HOLD/RECONSIDER without override
+- skip unknown-lot vehicles
+- respect duplicate conflict guardrail
+
+Learning Worker:
+Runs nightly.
+Does:
+- compare predictions vs actual results
+- update dealer performance baselines
+- update buyer segment weights
+- update model-level learning signals
+- write Daily Journal
+
+====================================================
+3. Worker Logs
+====================================================
+
+Create DB tables:
+
+worker_runs
+- id
+- workerId
+- status
+- startedAt
+- completedAt
+- durationMs
+- resultJson
+- errorMessage
+
+worker_state
+- workerId
+- enabled
+- lastRunAt
+- nextRunAt
+- lastStatus
+- lastResultJson
+
+====================================================
+4. System Timeline
+====================================================
+
+Every important worker result should create a System Timeline event:
+
+Examples:
+- Inventory synced automatically
+- Opportunity scores refreshed
+- 10 vehicles selected for today
+- AI photos queued for 7 new vehicles
+- Publishing worker skipped: extension offline
+- Learning updated buyer segment weights
+
+====================================================
+5. Dashboard Integration
+====================================================
+
+Do not create a big new page yet.
+
+Add a compact “AI Workers” panel under System Connections / Intelligence Stack.
+
+Show:
+- Inventory Agent
+- Opportunity Agent
+- Market Agent
+- Photo Agent
+- Publishing Agent
+- Learning Agent
+
+For each:
+- Online / Sleeping / Failed
+- last run
+- next run
+- last result
+
+====================================================
+6. Guardrails
+====================================================
+
+Workers must never:
+- create fake vehicles
+- create fake conversations
+- create fake leads
+- publish without GM approval/guardrail
+- publish unknown-lot vehicles
+- overwrite published listing status
+- delete real inventory records blindly
+- run AI photo bulk processing if cost guardrail is exceeded
+
+====================================================
+7. Cost Guardrails
+====================================================
+
+Photo Worker must respect:
+- max vehicles per run
+- max estimated FAL spend per day
+- max OpenAI spend per day if available
+- pause if provider balance/estimated spend exceeds threshold
+
+Add env vars:
+
+WORKERS_ENABLED=true
+WORKER_PHOTO_MAX_VEHICLES_PER_RUN=5
+WORKER_DAILY_FAL_BUDGET_USD=10
+WORKER_DAILY_OPENAI_BUDGET_USD=10
+
+====================================================
+8. Production Behavior
+====================================================
+
+Workers run only in production or when explicitly enabled.
+
+In dev:
+- allow manual trigger endpoints
+- do not auto-run expensive AI jobs unless WORKERS_ENABLED=true
+
+Manual endpoints:
+
+POST /api/workers/:workerId/run
+GET /api/workers/status
+GET /api/workers/runs
+
+====================================================
+9. Render
+====================================================
+
+Render Web Service should start API + workers in the same process for now.
+
+Later we can split workers into a separate Render Background Worker service.
+
+For now:
+- API starts normally
+- scheduler starts after DB connection is ready
+- if scheduler fails, API should still boot
+- worker errors must not crash the server
+
+====================================================
+10. Acceptance
+====================================================
+
+After implementation:
+
+- workers status endpoint works
+- inventory worker can run manually
+- opportunity worker can run manually
+- market worker can run manually
+- photo worker can run manually but respects cost limits
+- publishing worker detects extension offline and does not create stuck jobs
+- learning worker writes a daily journal entry
+- system timeline shows worker activity
+- no fake/demo data is created
+
+Goal:
+DealerPilot should behave like a team of specialized AI employees working 24/7, not a dashboard that only reacts when the operator clicks something.

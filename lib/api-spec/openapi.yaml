@@ -28,6 +28,8 @@ tags:
     description: Marketplace Intelligence Engine — listing performance and strategy
   - name: gm
     description: AI General Manager — pre-publish coaching and what-if analysis
+  - name: workers
+    description: DealerPilot AI Worker Framework — scheduled agents, manual triggers, System Timeline
 paths:
   /gm/analyze:
     post:
@@ -2099,8 +2101,114 @@ paths:
               schema:
                 $ref: "#/components/schemas/VehicleIntelligenceResponse"
 
+  /workers:
+    get:
+      operationId: listWorkers
+      tags: [workers]
+      summary: Status of all 6 scheduled AI workers
+      responses:
+        "200":
+          description: Worker statuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkerStatusList"
+
+  /workers/{id}/run:
+    post:
+      operationId: runWorkerNow
+      tags: [workers]
+      summary: Manually trigger a worker to run immediately
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Worker run result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkerRunResult"
+        "404":
+          description: Unknown worker id
+
+  /workers/timeline:
+    get:
+      operationId: getSystemTimeline
+      tags: [workers]
+      summary: Recent System Timeline events emitted by workers
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 30 }
+      responses:
+        "200":
+          description: System Timeline events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemTimelineEventList"
+
 components:
   schemas:
+    WorkerStatus:
+      type: object
+      required: [id, name, description, intervalMs, enabled, status, lastRunAt, nextRunAt, lastResult, lastError]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        intervalMs: { type: integer }
+        enabled: { type: boolean }
+        status:
+          type: string
+          enum: [Online, Sleeping, Failed]
+        lastRunAt: { type: ["string", "null"], format: date-time }
+        nextRunAt: { type: ["string", "null"], format: date-time }
+        lastResult: { type: ["string", "null"] }
+        lastError: { type: ["string", "null"] }
+
+    WorkerStatusList:
+      type: object
+      required: [workers]
+      properties:
+        workers:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkerStatus"
+
+    WorkerRunResult:
+      type: object
+      required: [workerId, summary, skipped]
+      properties:
+        workerId: { type: string }
+        summary: { type: string }
+        skipped: { type: boolean }
+        detail: {}
+
+    SystemTimelineEvent:
+      type: object
+      required: [id, category, workerId, message, createdAt]
+      properties:
+        id: { type: integer }
+        category: { type: string }
+        workerId: { type: ["string", "null"] }
+        message: { type: string }
+        detail: {}
+        createdAt: { type: string, format: date-time }
+
+    SystemTimelineEventList:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/SystemTimelineEvent"
+
     HealthStatus:
       type: object
       properties:
