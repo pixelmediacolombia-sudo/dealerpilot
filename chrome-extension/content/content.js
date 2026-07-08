@@ -2504,5 +2504,5 @@
     );
   }
 
-  log("Panel loaded v1.3.8", { isMessenger, isMarketplaceCreate });
+  log("Panel loaded v1.3.9", { isMessenger, isMarketplaceCreate });
 })();
