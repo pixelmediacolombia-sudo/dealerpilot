@@ -9,9 +9,7 @@ import {
   type FeedRun,
 } from "@workspace/db";
 import { and, count, desc, eq, ilike, isNull, or } from "drizzle-orm";
-import { fetchFeedXml } from "../inventory/feedSource";
-import { importFeed } from "../inventory/importFeed";
-import { autoEnqueueAfterImport } from "../photo/autoEnqueue";
+import { runInventorySync } from "../inventory/scheduler";
 
 
 const router: IRouter = Router();
@@ -118,16 +116,14 @@ router.post("/dealers/:id/sync", async (req, res) => {
     return;
   }
   try {
-    const xml = await fetchFeedXml(dealer.xmlFeedUrl);
-    const summary = await importFeed(dealer.id, xml, req.log);
+    const { summary } = await runInventorySync(req.log, {
+      dealerId: dealer.id,
+      trigger: "manual",
+    });
     const [run] = await db
       .select()
       .from(feedRunsTable)
       .where(eq(feedRunsTable.id, summary.feedRunId));
-    // Auto-enqueue photo jobs for new/changed vehicles after every sync
-    if (summary.created > 0 || summary.updated > 0) {
-      void autoEnqueueAfterImport(dealer.id, req.log);
-    }
     res.json(toFeedRun(run!));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown sync error";

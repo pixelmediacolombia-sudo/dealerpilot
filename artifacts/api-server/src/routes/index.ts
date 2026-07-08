@@ -12,6 +12,7 @@ import creativeRouter from "./creative";
 import conversationsRouter from "./conversations";
 import leadsRouter from "./leads";
 import simulatorRouter from "./simulator";
+import metaMessengerRouter from "./metaMessenger";
 import marketplaceIntelligenceRouter from "./marketplaceIntelligence";
 import channelsRouter from "./channels";
 import photoStudioRouter from "./photoStudio";
@@ -37,7 +38,10 @@ router.use(autoPublishRouter);
 router.use(creativeRouter);
 router.use(conversationsRouter);
 router.use(leadsRouter);
-router.use(simulatorRouter);
+router.use(metaMessengerRouter);
+if (process.env["NODE_ENV"] !== "production") {
+  router.use(simulatorRouter);
+}
 router.use(marketplaceIntelligenceRouter);
 router.use(channelsRouter);
 router.use(photoStudioRouter);

@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { CURRENT_SAMPLE_FEED } from "../inventory/sampleFeed";
 import { computeFeedHealth } from "../channels/metaCatalog";
-import { getNextSyncAt, runSyncNow } from "../inventory/scheduler";
+import { getNextSyncAt, runInventorySync } from "../inventory/scheduler";
+import { ALPHA_DEALER_ID } from "../lib/dealer";
 
 const router: IRouter = Router();
 
@@ -23,13 +24,26 @@ router.get("/inventory/health", async (req, res) => {
 // POST /api/inventory/sync — manually trigger a full feed import including
 // the Alpha Motorsport location scraper and Opportunity Engine refresh.
 router.post("/inventory/sync", async (req, res) => {
-  req.log.info("Manual inventory sync triggered via API");
-  const summary = await runSyncNow(req.log, "manual");
-  if (!summary) {
-    res.status(422).json({ error: "Sync failed — check server logs. Feed URL may not be configured." });
-    return;
+  try {
+    const result = await runInventorySync(req.log, {
+      dealerId: ALPHA_DEALER_ID,
+      trigger: "manual",
+    });
+
+    res.json({
+      ok: true,
+      dealerId: result.dealerId,
+      trigger: result.trigger,
+      nextSyncAt: getNextSyncAt()?.toISOString() ?? null,
+      summary: result.summary,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Manual inventory sync failed");
+    res.status(500).json({
+      ok: false,
+      error: err instanceof Error ? err.message : "Inventory sync failed",
+    });
   }
-  res.json({ ok: true, ...summary });
 });
 
 export default router;

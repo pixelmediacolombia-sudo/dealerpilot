@@ -219,6 +219,36 @@ router.get("/connection-center", async (req, res) => {
   }
 
   // ── AI Engine: report each sub-system ─────────────────────────────────────────
+  const metaAppSecretConfigured = !!process.env["META_APP_SECRET"];
+  const metaVerifyTokenConfigured = !!process.env["META_VERIFY_TOKEN"];
+  const metaPageTokenConfigured = !!process.env["META_PAGE_ACCESS_TOKEN"];
+  const metaPageIdConfigured = !!process.env["META_PAGE_ID"];
+  const metaAutoReplyEnabled = process.env["META_AUTO_REPLY_ENABLED"] === "true";
+
+  const messagingWebhook = {
+    status:
+      metaAppSecretConfigured && metaVerifyTokenConfigured
+        ? "connected"
+        : "warning",
+    detail:
+      metaAppSecretConfigured && metaVerifyTokenConfigured
+        ? `Webhook ready at /api/meta/webhooks/messenger. Auto-reply ${metaAutoReplyEnabled ? "enabled" : "disabled"}. ${leadCount} lead${leadCount !== 1 ? "s" : ""} captured.`
+        : "META_APP_SECRET and META_VERIFY_TOKEN are required before Meta can subscribe the webhook.",
+    leadCount,
+    convCount,
+  };
+
+  const facebookPage = {
+    status:
+      metaPageTokenConfigured && metaPageIdConfigured
+        ? "connected"
+        : "warning",
+    detail:
+      metaPageTokenConfigured && metaPageIdConfigured
+        ? "Facebook Page ID and Page Access Token configured for Messenger Send API."
+        : "META_PAGE_ID and META_PAGE_ACCESS_TOKEN are missing.",
+  };
+
   const openaiConfigured = !!process.env["AI_INTEGRATIONS_OPENAI_API_KEY"];
   const falConfigured = !!process.env["FAL_KEY"];
 
@@ -244,7 +274,7 @@ router.get("/connection-center", async (req, res) => {
       {
         name: "OpenAI Reasoning",
         status: openaiConfigured ? "connected" : "warning",
-        detail: openaiConfigured ? "gpt-5-mini via Replit AI proxy" : "API key not configured",
+        detail: openaiConfigured ? "OpenAI API configured" : "AI_INTEGRATIONS_OPENAI_API_KEY not configured",
       },
       {
         name: "FAL.ai",
@@ -265,8 +295,11 @@ router.get("/connection-center", async (req, res) => {
     chromeExtension,
     facebookSession,
     marketplace,
-    messenger,
+    messenger: messagingWebhook,
+    messagingWebhook,
+    facebookPage,
     openai: aiEngine,
+    aiEngine,
     // Summary fields for the connection panel
     overallConnected,
     extensionOnline: extOnline,

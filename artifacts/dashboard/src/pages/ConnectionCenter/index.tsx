@@ -705,11 +705,13 @@ function AiOrchestratorPanel() {
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 const SERVICES = [
+  { key: "chromeExtension", name: "Publishing Agent", icon: Puzzle, description: "Chrome extension status for Marketplace publishing" },
+  { key: "messagingWebhook", name: "Messaging Webhook", icon: MessageCircle, description: "Meta Messenger webhook intake and Sales AI replies" },
+  { key: "facebookPage", name: "Facebook Page", icon: Facebook, description: "Page token and Page ID for Messenger Send API" },
+  { key: "openai", name: "AI Engine", icon: Bot, description: "Opportunity Engine · GM Coach · Photo Studio · OpenAI · FAL.ai" },
+  { key: "xmlFeed", name: "Inventory Sync", icon: Rss, description: "Nightly feed keeps inventory current" },
   { key: "backend", name: "Core API Server", icon: Server, description: "Powers the DealerPilot platform" },
   { key: "database", name: "Data Storage", icon: Database, description: "Securely stores your dealer data" },
-  { key: "xmlFeed", name: "Inventory Sync", icon: Rss, description: "Nightly feed keeps inventory current" },
-  { key: "messenger", name: "Sales AI / Messaging", icon: MessageCircle, description: "Buyer conversation monitoring & AI reply engine" },
-  { key: "openai", name: "AI Engine", icon: Bot, description: "Opportunity Engine · GM Coach · Photo Studio · OpenAI · FAL.ai" },
 ] as const;
 
 export function ConnectionCenter() {
@@ -788,7 +790,7 @@ export function ConnectionCenter() {
                 </div>
                 <div className="border border-white/[0.05] bg-white/[0.01] rounded-xl overflow-hidden">
                   {SERVICES.map(({ key, name, icon: Icon, description }, idx) => {
-                    const svc = status?.[key as keyof typeof status] as SvcStatus;
+                    const svc = (status as unknown as Record<string, SvcStatus> | undefined)?.[key];
                     const color = svcColor(svc?.status);
                     const label = svcLabel(svc?.status);
                     const hasComponents = !!svc?.components?.length;

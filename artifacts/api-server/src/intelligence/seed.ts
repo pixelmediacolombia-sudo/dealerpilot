@@ -368,8 +368,21 @@ export async function seedOpportunityScores(
       ),
     );
 
-  const needsScoring = (nullCheck?.cnt ?? 0) > 0;
-  if (!needsScoring && !opts?.forceRefresh) {
+  const [vehicleCount] = await db
+    .select({ cnt: count() })
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.dealerId, DEALER_ID));
+
+  const [intelligenceCount] = await db
+    .select({ cnt: count() })
+    .from(vehicleIntelligenceTable)
+    .where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID));
+
+  const needsScoring =
+    !!opts?.forceRefresh ||
+    (nullCheck?.cnt ?? 0) > 0 ||
+    (intelligenceCount?.cnt ?? 0) < (vehicleCount?.cnt ?? 0);
+  if (!needsScoring) {
     logger.info("Opportunity scores already computed; skipping");
     return;
   }
