@@ -454,11 +454,11 @@ router.get("/conversations", async (req, res) => {
       let listingUrl: string | null = null;
       if (c.listingId) {
         const [listing] = await db
-          .select({ listingUrl: listingsTable.listingUrl })
+          .select({ externalUrl: listingsTable.externalUrl })
           .from(listingsTable)
           .where(eq(listingsTable.id, c.listingId))
           .limit(1);
-        listingUrl = listing?.listingUrl ?? null;
+        listingUrl = listing?.externalUrl ?? null;
       }
 
       return { ...c, lead: lead ?? null, lastMessage: messages[0] ?? null, vehicle, listingUrl };
@@ -515,11 +515,11 @@ router.get("/conversations/:id", async (req, res) => {
   let listingUrl: string | null = null;
   if (conv.listingId) {
     const [listing] = await db
-      .select({ listingUrl: listingsTable.listingUrl })
+      .select({ externalUrl: listingsTable.externalUrl })
       .from(listingsTable)
       .where(eq(listingsTable.id, conv.listingId))
       .limit(1);
-    listingUrl = listing?.listingUrl ?? null;
+    listingUrl = listing?.externalUrl ?? null;
   }
 
   res.json({ conversation: conv, messages, lead: lead ?? null, vehicle, listingUrl });

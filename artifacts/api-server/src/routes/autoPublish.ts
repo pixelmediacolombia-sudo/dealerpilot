@@ -31,6 +31,12 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import {
+  isExtensionOnline,
+  LOT_CITY_MAP,
+  resolvePublishMode,
+} from "../publishing/controlledMode";
+import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
 // Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
@@ -367,8 +373,27 @@ router.post("/auto-publish/batches", async (req, res) => {
     res.status(400).json({ error: "Invalid batch request" });
     return;
   }
-  const { dealerId, mode, count, scheduledAt, lotLocation, gmOverrides } = parsed.data;
+  const { dealerId, count, scheduledAt, lotLocation, gmOverrides } = parsed.data;
   const gmOverrideSet = new Set(gmOverrides);
+
+  // The client-sent `mode` is advisory only — the server is authoritative.
+  // Controlled Mode requires BOTH the global launch switch AND the dealer's
+  // own autoClickPublish setting; otherwise every job in this batch runs
+  // Assisted regardless of what was requested.
+  const [dealerAutoPublishSettings] = await db
+    .select()
+    .from(autoPublishSettingsTable)
+    .where(eq(autoPublishSettingsTable.dealerId, dealerId));
+  const mode = resolvePublishMode(dealerAutoPublishSettings?.autoClickPublish ?? false);
+  const isImmediate = !scheduledAt;
+  if (mode === "Controlled" && isImmediate) {
+    const online = await isExtensionOnline();
+    if (!online) {
+      res.status(422).json({ error: "Chrome extension is offline — cannot dispatch a Controlled Mode batch.", code: "EXTENSION_OFFLINE" });
+      return;
+    }
+  }
+  const duplicateConflictIds = await getDuplicateConflictVehicleIds();
 
   // Fetch active/ready vehicles for this dealer, optionally scoped to a lot location.
   const vehicles = await db
@@ -465,7 +490,17 @@ router.post("/auto-publish/batches", async (req, res) => {
     const bestVersion = versionByVehicle.get(v.id);
     const hasListing = !!bestVersion;
     const photoAnalysis = analyzePhotos(imgs);
-    const validation = validateVehicleForPublish(v, imgs.length, hasListing);
+    let validation = validateVehicleForPublish(v, imgs.length, hasListing);
+
+    // Lot location must exist and be a known, mapped city (Manassas or Fredericksburg).
+    if (validation.eligible && (!v.lotLocation || !LOT_CITY_MAP[v.lotLocation])) {
+      validation = { eligible: false, reason: `Unmapped lot location "${v.lotLocation ?? "unknown"}"` };
+    }
+    // Market Agent duplicate-listing conflict — blocked unless explicitly overridden.
+    if (validation.eligible && duplicateConflictIds.has(v.id) && !gmOverrideSet.has(v.id)) {
+      validation = { eligible: false, reason: "Market Agent flagged a duplicate-listing conflict" };
+    }
+
     const neverPublished = !listing || listing.status !== "Published";
 
     const scores = computePriorityScore(v, photoAnalysis.photoScore, neverPublished);
@@ -1067,6 +1102,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
       ),
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
+  const duplicateConflictIds = await getDuplicateConflictVehicleIds();
 
   const imagesByVehicle = new Map<number, typeof allImages>();
   for (const img of allImages) {
@@ -1114,7 +1150,15 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     const bestVersion = versionByVehicle.get(v.id);
     const hasListing = !!bestVersion;
     const photoAnalysis = analyzePhotos(imgs);
-    const validation = validateVehicleForPublish(v, imgs.length, hasListing);
+    let validation = validateVehicleForPublish(v, imgs.length, hasListing);
+
+    if (validation.eligible && (!v.lotLocation || !LOT_CITY_MAP[v.lotLocation])) {
+      validation = { eligible: false, reason: `Unmapped lot location "${v.lotLocation ?? "unknown"}"` };
+    }
+    if (validation.eligible && duplicateConflictIds.has(v.id)) {
+      validation = { eligible: false, reason: "Market Agent flagged a duplicate-listing conflict" };
+    }
+
     const neverPublished = !listing || listing.status !== "Published";
     const { priorityScore } = computePriorityScore(v, photoAnalysis.photoScore, neverPublished);
 

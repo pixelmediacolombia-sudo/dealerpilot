@@ -12,10 +12,19 @@ import {
   publishingJobsTable,
   vehicleIntelligenceTable,
   marketplaceListingsTable,
+  autoPublishSettingsTable,
   type PublishingJob,
 } from "@workspace/db";
 import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { getMarketplacePricing } from "../listings/pricing";
+import {
+  checkPublishGuardrails,
+  isControlledModeEnabled,
+  isExtensionOnline,
+  resolvePublishMode,
+  LOT_CITY_MAP,
+} from "../publishing/controlledMode";
+import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
 // Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
@@ -313,10 +322,6 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
   // Marketplace requires an accurate physical city. We only publish vehicles
   // assigned to a known, mapped lot. Unknown/wrong lots block the fill payload
   // so the operator can correct the vehicle's lot assignment first.
-  const LOT_CITY_MAP: Record<string, string> = {
-    Manassas: "Manassas, VA",
-    Fredericksburg: "Fredericksburg, VA",
-  };
   const lotCity = vehicle.lotLocation ? LOT_CITY_MAP[vehicle.lotLocation] : undefined;
   if (!lotCity) {
     req.log.warn(
@@ -858,6 +863,15 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
     return;
   }
 
+  // Resolve mode once for the whole batch: Controlled only if the global
+  // launch switch AND the dealer's autoClickPublish setting both allow it.
+  const [dealerSettings] = await db
+    .select()
+    .from(autoPublishSettingsTable)
+    .where(eq(autoPublishSettingsTable.dealerId, DEALER_ID));
+  const mode = resolvePublishMode(dealerSettings?.autoClickPublish ?? false);
+  const isImmediate = !scheduledAtStr;
+
   // Skip vehicles that already have an active publishing job
   const activeJobs = await db
     .select({ vehicleId: publishingJobsTable.vehicleId })
@@ -869,13 +883,29 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
       ),
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
+  const duplicateConflictIds = await getDuplicateConflictVehicleIds();
+  const extensionOnline = mode === "Controlled" && isImmediate ? await isExtensionOnline() : true;
 
-  // ── GM Coach guardrail ──────────────────────────────────────────────────────
+  // ── GM Coach + lot-location + duplicate-conflict + extension guardrails ────
   // Block any vehicle the GM has flagged HOLD or RECONSIDER unless the operator
-  // explicitly acknowledged and overrode the decision.
+  // explicitly acknowledged and overrode the decision; block unmapped lots and
+  // Market Agent duplicate-listing conflicts; require an online extension
+  // before dispatching Controlled Mode jobs immediately.
   const gmBlocked: { vehicleId: number; recommendation: string; confidence: number }[] = [];
+  const otherBlocked: { vehicleId: number; code: string; reason: string }[] = [];
   const eligible = vehicles.filter((v) => {
     if (alreadyQueued.has(v.id)) return false;
+
+    if (mode === "Controlled" && !extensionOnline) {
+      otherBlocked.push({ vehicleId: v.id, code: "EXTENSION_OFFLINE", reason: "Extension offline" });
+      return false;
+    }
+    const lotCity = v.lotLocation ? LOT_CITY_MAP[v.lotLocation] : undefined;
+    if (!lotCity) {
+      otherBlocked.push({ vehicleId: v.id, code: "UNKNOWN_LOT", reason: `Unmapped lot location "${v.lotLocation ?? "unknown"}"` });
+      return false;
+    }
+
     const gm = getCachedGmDecision(v.id);
     const overridden = gmOverrideSet.has(v.id);
 
@@ -902,6 +932,10 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
       });
       return false;
     }
+    if (duplicateConflictIds.has(v.id) && !overridden) {
+      otherBlocked.push({ vehicleId: v.id, code: "DUPLICATE_LISTING_CONFLICT", reason: "Market Agent flagged a duplicate-listing conflict" });
+      return false;
+    }
     if (gm) {
       void recordGmDecision({
         vehicleId: v.id,
@@ -920,11 +954,14 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
   if (gmBlocked.length > 0) {
     req.log.warn({ gmBlocked }, "Bulk-schedule blocked vehicles due to GM Coach recommendation");
   }
+  if (otherBlocked.length > 0) {
+    req.log.warn({ otherBlocked }, "Bulk-schedule blocked vehicles due to lot/duplicate/extension guardrails");
+  }
 
-  const skipped = vehicles.length - eligible.length - gmBlocked.length;
+  const skipped = vehicles.length - eligible.length - gmBlocked.length - otherBlocked.length;
 
   if (eligible.length === 0) {
-    res.status(202).json({ enqueued: 0, skipped });
+    res.status(202).json({ enqueued: 0, skipped, gmBlocked, otherBlocked });
     return;
   }
 
@@ -941,7 +978,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
         vehicleId: vehicle.id,
         dealerId: vehicle.dealerId,
         listingVersionId: null,
-        mode: "Assisted",
+        mode,
         status: scheduledAtStr ? "Scheduled" : "Queued",
         priority,
         scheduledAt,
@@ -967,6 +1004,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
 
 const PublishNowBody = z.object({
   vehicleId: z.number().int().positive(),
+  gmOverride: z.boolean().optional().default(false),
 });
 
 router.post("/publishing/jobs/publish-now", async (req, res) => {
@@ -975,7 +1013,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     res.status(400).json({ error: "vehicleId is required" });
     return;
   }
-  const { vehicleId } = parsed.data;
+  const { vehicleId, gmOverride } = parsed.data;
   const DEALER_ID = 1;
 
   const [vehicle] = await db
@@ -984,6 +1022,21 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     .where(and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, DEALER_ID)));
   if (!vehicle) {
     res.status(404).json({ error: "Vehicle not found" });
+    return;
+  }
+
+  // Publish Now bypasses batching but never bypasses the guardrails: real
+  // inventory, mapped lot location, GM Coach, duplicate conflicts, and (for
+  // Controlled Mode) an online extension all must pass before a job is created.
+  const mode: "Assisted" | "Controlled" = isControlledModeEnabled() ? "Controlled" : "Assisted";
+  const guardrail = await checkPublishGuardrails({
+    vehicle: { id: vehicle.id, status: vehicle.status, lotLocation: vehicle.lotLocation },
+    gmOverride,
+    requireExtensionOnline: mode === "Controlled",
+  });
+  if (!guardrail.ok) {
+    req.log.warn({ vehicleId, code: guardrail.code, reason: guardrail.reason }, "Publish Now blocked by guardrail");
+    res.status(422).json({ error: guardrail.reason, code: guardrail.code });
     return;
   }
 
@@ -1038,7 +1091,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
       vehicleId,
       dealerId: DEALER_ID,
       listingVersionId: null,
-      mode: "Controlled",
+      mode,
       status: "Queued",
       priority: 100,
       progressPercent: 0,
@@ -1047,7 +1100,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     })
     .returning();
 
-  req.log.info({ vehicleId, jobId: job.id, source: "publish_now" }, "Publish Now job created (Controlled mode)");
+  req.log.info({ vehicleId, jobId: job.id, source: "publish_now", mode }, "Publish Now job created");
   const [enriched] = await enrich([job]);
   res.status(201).json({ jobId: job.id, job: enriched });
 });

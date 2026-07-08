@@ -82,13 +82,20 @@ and AI Studio are intentionally "Coming Soon".
 - In-process background worker started in `index.ts`; generates versioned, scored creatives from Dealer Brand DNA
 - Image transforms are PLACEHOLDER/pluggable: a real provider fills `outputs[].url` from `renderSpec` with no DB/UI change (previews render from `renderSpec` via CSS)
 
+### Where things live (Controlled Mode — automatic publishing)
+- Guardrail module: `artifacts/api-server/src/publishing/controlledMode.ts` — `isControlledModeEnabled()` (reads `MARKETPLACE_CONTROLLED_MODE_ENABLED`), `resolvePublishMode(dealerAutoClickPublish)` (mode is ALWAYS server-resolved from the env var + dealer setting — never trusts a client-sent `mode`), `isExtensionOnline()`, `LOT_CITY_MAP` (Manassas/Fredericksburg only), `checkPublishGuardrails()` (single source of truth for all pre-dispatch checks)
+- `checkPublishGuardrails()` checks, in order: vehicle not already Published/Sold/Removed, lot location mapped (no override), GM Coach doesn't say HOLD/RECONSIDER (overridable), no duplicate active job for the vehicle, no Market Agent duplicate-listing conflict (overridable), extension online (required only when resolved mode is Controlled)
+- Wired into all three job-creation paths so none can bypass it: `publish-now` and `bulk-schedule` in `routes/publishing.ts`, and `/auto-publish/batches` + `/auto-publish/dry-run` in `routes/autoPublish.ts`
+- When `MARKETPLACE_CONTROLLED_MODE_ENABLED=true` and a dealer has `autoClickPublish=true`, the Chrome extension auto-uploads photos, fills fields, clicks Next/Publish, captures the listing URL, marks the vehicle Published, and removes it from recommendations — no manual final click. Extension `chrome-extension/content.js` already implements this flow.
+- Env var: `MARKETPLACE_CONTROLLED_MODE_ENABLED` (master switch, default off/false)
+
 ## User preferences
 
 _Populate as you build — explicit user instructions worth remembering across sessions._
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Controlled Mode publish/batch dispatch is blocked (by design, `EXTENSION_OFFLINE`) whenever the Chrome extension isn't connected — expected in dev where no live extension is running.
 
 ## Pointers
 
