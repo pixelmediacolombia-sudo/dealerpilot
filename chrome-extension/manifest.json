@@ -13,12 +13,14 @@
   "host_permissions": [
     "https://*.replit.dev/*",
     "https://*.replit.app/*",
+    "https://*.onrender.com/*",
     "http://localhost/*"
   ],
   "externally_connectable": {
     "matches": [
       "https://*.replit.app/*",
       "https://*.replit.dev/*",
+      "https://*.onrender.com/*",
       "http://localhost/*"
     ]
   },

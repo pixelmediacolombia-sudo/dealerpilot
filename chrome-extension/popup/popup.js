@@ -33,14 +33,19 @@ const el = {
   pillMkpText:  document.getElementById("pill-mkp-text"),
   fbLoginRow:   document.getElementById("fb-login-row"),
   btnFbLogin:   document.getElementById("btn-fb-login"),
+  vEnvBadge:    document.getElementById("v-env-badge"),
 };
 
 // ---- DOM refs: debug panel ----
 const dbg = {
   version:       document.getElementById("d-version"),
   chromeId:      document.getElementById("d-chrome-id"),
+  extId:         document.getElementById("d-ext-id"),
   dealerId:      document.getElementById("d-dealer-id"),
   backendUrl:    document.getElementById("d-backend-url"),
+  environment:   document.getElementById("d-environment"),
+  heartbeatUrl:      document.getElementById("d-heartbeat-url"),
+  heartbeatResponse: document.getElementById("d-heartbeat-response"),
   connStatus:    document.getElementById("d-conn-status"),
   fbLogin:       document.getElementById("d-fb-login"),
   mkpAccess:     document.getElementById("d-mkp-access"),
@@ -174,6 +179,21 @@ function updateFbPills(fbLoggedIn, marketplaceConnected) {
 }
 
 // ---- Debug panel ----
+function envBadgeClass(env) {
+  switch (env) {
+    case "Render": return "env-render";
+    case "Replit": return "env-replit";
+    case "Local":  return "env-local";
+    default:       return "env-custom";
+  }
+}
+
+function fmtHeartbeatResponse(hb) {
+  if (!hb) return "—";
+  if (hb.ok) return `OK (${fmtTime(hb.at)})`;
+  return `Error${hb.status ? " " + hb.status : ""}: ${truncate(hb.error || "unknown", 24)}`;
+}
+
 async function loadDebugState() {
   dbg.chromeId.textContent = truncate(chrome.runtime.id || "—", 24);
   dbg.chromeId.title = chrome.runtime.id || "";
@@ -187,9 +207,28 @@ async function loadDebugState() {
   const d = res.data;
 
   dbg.version.textContent    = d.version || "—";
+  dbg.extId.textContent      = truncate(d.extensionId || "—", 24);
+  dbg.extId.title            = d.extensionId || "";
   dbg.dealerId.textContent   = `${d.dealerId} — ${d.dealerName}`;
   dbg.backendUrl.textContent = truncate(d.backendUrl || "—", 32);
   dbg.backendUrl.title       = d.backendUrl || "";
+
+  dbg.environment.textContent = d.environment || "Unknown";
+  dbg.environment.className   = "value " + (d.environment === "Render" ? "ok" : d.environment === "Replit" ? "" : "warn-text");
+
+  el.vEnvBadge.textContent = d.environment || "Unknown";
+  el.vEnvBadge.className   = "env-badge " + envBadgeClass(d.environment);
+
+  dbg.heartbeatUrl.textContent = truncate(d.lastHeartbeatUrl || "—", 32);
+  dbg.heartbeatUrl.title       = d.lastHeartbeatUrl || "";
+
+  dbg.heartbeatResponse.textContent = fmtHeartbeatResponse(d.lastHeartbeatResponse);
+  dbg.heartbeatResponse.title       = d.lastHeartbeatResponse
+    ? JSON.stringify(d.lastHeartbeatResponse)
+    : "";
+  dbg.heartbeatResponse.className   = "value " + (d.lastHeartbeatResponse
+    ? (d.lastHeartbeatResponse.ok ? "ok" : "err")
+    : "");
 
   dbg.connStatus.textContent  = lastConnectionOk ? "Connected" : "Unreachable";
   dbg.connStatus.className    = "value " + (lastConnectionOk ? "ok" : "err");
@@ -570,6 +609,61 @@ document.getElementById("save").addEventListener("click", async () => {
   setStatus("Saved. Testing connection…");
   await refresh();
 });
+
+// ---- Switch Backend URL (Replit / Render / Local / Custom, no rebuild) ----
+const envSelect = document.getElementById("env-select");
+const envUrlInput = document.getElementById("env-url-input");
+const switchBackendBtn = document.getElementById("switch-backend");
+
+async function loadBackendPresetsIntoUI() {
+  const res = await send({ type: "GET_BACKEND_PRESETS" });
+  const presets = res && res.ok ? res.data : {};
+  const { backendUrl } = await chrome.storage.local.get("backendUrl");
+  const current = (backendUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, "");
+
+  let selected = "custom";
+  if (current === (presets.replit || DEFAULT_BACKEND_URL)) selected = "replit";
+  else if (presets.render && current === presets.render) selected = "render";
+  else if (presets.local && current === presets.local) selected = "local";
+
+  envSelect.value = selected;
+  envUrlInput.value =
+    selected === "custom" ? current : presets[selected] || current;
+
+  envSelect.dataset.presets = JSON.stringify(presets);
+}
+
+envSelect.addEventListener("change", () => {
+  const presets = JSON.parse(envSelect.dataset.presets || "{}");
+  const key = envSelect.value;
+  if (key === "replit") envUrlInput.value = presets.replit || DEFAULT_BACKEND_URL;
+  else if (key === "render") envUrlInput.value = presets.render || "";
+  else if (key === "local") envUrlInput.value = presets.local || "http://localhost:5000";
+  // "custom" leaves the field for manual entry
+});
+
+switchBackendBtn.addEventListener("click", async () => {
+  const key = envSelect.value;
+  const url = envUrlInput.value.trim().replace(/\/+$/, "");
+  if (!url) { setStatus("Please enter a URL to switch to.", "err"); return; }
+
+  if (key === "render" || key === "local" || key === "custom") {
+    await send({ type: "SAVE_BACKEND_PRESET", key, url });
+  }
+
+  const res = await send({ type: "SET_BACKEND_URL", url });
+  if (!res || !res.ok) {
+    setStatus("Failed to switch backend URL.", "err");
+    return;
+  }
+  urlInput.value = url;
+  setStatus(`Switched to ${res.data.environment}: ${url}`);
+  await loadBackendPresetsIntoUI();
+  await refresh();
+  await loadDebugState();
+});
+
+loadBackendPresetsIntoUI();
 
 // ---- Auto-refresh ----
 const POLL_MS = 5000;

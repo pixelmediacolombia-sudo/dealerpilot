@@ -9,6 +9,18 @@ async function getBackendUrl() {
   return (backendUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, "");
 }
 
+// ---- Environment detection ----
+// Classifies the active backendUrl so the popup can clearly show whether the
+// extension is pointed at Render, Replit, or a local dev server before a
+// live publish test.
+function detectEnvironment(url) {
+  if (!url) return "Unknown";
+  if (/onrender\.com/i.test(url)) return "Render";
+  if (/replit\.(app|dev)/i.test(url)) return "Replit";
+  if (/localhost|127\.0\.0\.1/i.test(url)) return "Local";
+  return "Custom";
+}
+
 async function getExtensionId() {
   const { extensionId } = await chrome.storage.local.get("extensionId");
   if (extensionId) return extensionId;
@@ -95,18 +107,67 @@ const handlers = {
       "marketplaceConnected",
     ]);
     const now = new Date().toISOString();
+    const heartbeatUrl = `${base}/api/extension/heartbeat`;
     try {
-      await apiPost("/api/extension/heartbeat", {
+      const data = await apiPost("/api/extension/heartbeat", {
         backendUrl: base,
         status: "online",
         fbLoggedIn: fbLoggedIn ?? null,
         marketplaceConnected: marketplaceConnected ?? null,
       });
-      await chrome.storage.local.set({ lastHeartbeat: now });
+      await chrome.storage.local.set({
+        lastHeartbeat: now,
+        lastHeartbeatUrl: heartbeatUrl,
+        lastHeartbeatResponse: { ok: true, status: 200, body: data, at: now },
+      });
     } catch (heartbeatErr) {
       console.warn("[DealerPilot AI] heartbeat failed", heartbeatErr);
+      await chrome.storage.local
+        .set({
+          lastHeartbeatUrl: heartbeatUrl,
+          lastHeartbeatResponse: {
+            ok: false,
+            status: heartbeatErr && heartbeatErr.status ? heartbeatErr.status : null,
+            error: heartbeatErr instanceof Error ? heartbeatErr.message : String(heartbeatErr),
+            at: now,
+          },
+        })
+        .catch(() => {});
     }
-    return { backendUrl: base };
+    return { backendUrl: base, environment: detectEnvironment(base) };
+  },
+
+  // ---- Backend URL switching (no rebuild required) ----
+  async SET_BACKEND_URL(message) {
+    const url = (message && message.url ? message.url : "").trim().replace(/\/+$/, "");
+    if (!url) throw new Error("Backend URL cannot be empty");
+    await chrome.storage.local.set({ backendUrl: url });
+    await logAudit("backend_url_switched", { url, environment: detectEnvironment(url) });
+    return { ok: true, backendUrl: url, environment: detectEnvironment(url) };
+  },
+
+  // Named presets (Replit / Render / Local) so operators only type the
+  // Render URL once, then can toggle between environments afterwards.
+  async GET_BACKEND_PRESETS() {
+    const { backendPresets } = await chrome.storage.local.get("backendPresets");
+    return {
+      replit: DEFAULT_BACKEND_URL,
+      render: "",
+      local: "http://localhost:5000",
+      ...(backendPresets || {}),
+    };
+  },
+
+  async SAVE_BACKEND_PRESET(message) {
+    const key = message && message.key;
+    if (!["render", "local", "custom"].includes(key)) {
+      throw new Error(`Invalid preset key: ${key}`);
+    }
+    const url = (message && message.url ? message.url : "").trim().replace(/\/+$/, "");
+    const { backendPresets = {} } = await chrome.storage.local.get("backendPresets");
+    backendPresets[key] = url;
+    await chrome.storage.local.set({ backendPresets });
+    return { ok: true, backendPresets };
   },
 
   async GET_TEST_LISTING() {
@@ -580,6 +641,8 @@ const handlers = {
       "lastClaimAttempt",
       "lastClaimError",
       "auditLog",
+      "lastHeartbeatUrl",
+      "lastHeartbeatResponse",
     ];
     const stored = await chrome.storage.local.get(keys);
     const base = await getBackendUrl();
@@ -588,9 +651,12 @@ const handlers = {
       version: manifest.version,
       extensionId: stored.extensionId || null,
       backendUrl: base,
+      environment: detectEnvironment(base),
       dealerId: 1,
       dealerName: "Alpha Motorsport",
       lastHeartbeat: stored.lastHeartbeat || null,
+      lastHeartbeatUrl: stored.lastHeartbeatUrl || null,
+      lastHeartbeatResponse: stored.lastHeartbeatResponse || null,
       lastClaimedJob: stored.lastClaimedJob || null,
       lastPublishedJob: stored.lastPublishedJob || null,
       lastError: stored.lastError || null,
