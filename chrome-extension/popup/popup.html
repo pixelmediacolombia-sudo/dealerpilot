@@ -175,6 +175,27 @@
       .ok  { color: #6fe39f; }
       .err { color: #ff8a7a; }
       .warn-text { color: #ffce6b; }
+      select {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid #1c3a63;
+        background: #08182d;
+        color: #f2f5fa;
+        font-size: 12px;
+      }
+      .env-badge {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      .env-badge.env-render  { background: #0e2d1a; color: #6fe39f; border: 1px solid #1e5e30; }
+      .env-badge.env-replit  { background: #1c3a63; color: #cdd9ea; border: 1px solid #2a4d80; }
+      .env-badge.env-local   { background: #2d250e; color: #ffce6b; border: 1px solid #5e4e1e; }
+      .env-badge.env-custom  { background: #2d0e0e; color: #ff8a7a; border: 1px solid #5e1e1e; }
       details { margin-top: 8px; }
       summary {
         font-size: 12px;
@@ -249,24 +270,12 @@
         </span>
       </div>
       <div class="row">
+        <span class="label">Environment</span>
+        <span class="value"><span id="v-env-badge" class="env-badge">—</span></span>
+      </div>
+      <div class="row">
         <span class="label">Active job</span>
         <span class="value" id="v-current">None</span>
-      </div>
-      <div class="row">
-        <span class="label">Environment</span>
-        <span class="value" id="v-environment">â€”</span>
-      </div>
-      <div class="row">
-        <span class="label">Current Backend</span>
-        <span class="value" id="v-current-backend">â€”</span>
-      </div>
-      <div class="row">
-        <span class="label">Heartbeat</span>
-        <span class="value" id="v-heartbeat">Never</span>
-      </div>
-      <div class="row">
-        <span class="label">Extension</span>
-        <span class="value" id="v-extension-status">Offline</span>
       </div>
       <div class="row">
         <span class="label">Queued job</span>
@@ -309,7 +318,7 @@
       <summary>⚙ Backend settings</summary>
       <div class="details-inner">
         <label for="url">Backend URL</label>
-        <input id="url" type="url" placeholder="https://your-render-service.onrender.com" />
+        <input id="url" type="url" placeholder="https://your-app.replit.dev" />
         <button id="save" class="secondary">Save &amp; Test Connection</button>
       </div>
     </details>
@@ -329,8 +338,12 @@
             <span class="value" id="d-version">—</span>
           </div>
           <div class="row">
-            <span class="label">Extension ID</span>
+            <span class="label">Chrome Extension ID</span>
             <span class="value" id="d-chrome-id" title="">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Extension ID (backend)</span>
+            <span class="value" id="d-ext-id" title="">—</span>
           </div>
           <div class="row">
             <span class="label">Dealer</span>
@@ -338,12 +351,26 @@
           </div>
           <div class="row">
             <span class="label">Backend URL</span>
-            <span class="value" id="d-backend-url">—</span>
+            <span class="value" id="d-backend-url" title="">—</span>
           </div>
-
           <div class="row">
             <span class="label">Environment</span>
-            <span class="value" id="d-environment">â€”</span>
+            <span class="value" id="d-environment">—</span>
+          </div>
+
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Switch Backend URL</h2>
+          <div class="details-inner" style="margin-top:4px;">
+            <label for="env-select">Environment</label>
+            <select id="env-select">
+              <option value="replit">Replit</option>
+              <option value="render">Render</option>
+              <option value="local">Local</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <label for="env-url-input" style="margin-top:8px;">URL</label>
+            <input id="env-url-input" type="url" placeholder="https://your-service.onrender.com" />
+            <button id="switch-backend" class="secondary" style="margin-top:8px;">Switch Backend URL</button>
           </div>
 
           <div class="divider"></div>
@@ -363,6 +390,14 @@
           <div class="row">
             <span class="label">Last Heartbeat</span>
             <span class="value" id="d-heartbeat">Never</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Heartbeat URL</span>
+            <span class="value" id="d-heartbeat-url" title="">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Heartbeat Response</span>
+            <span class="value" id="d-heartbeat-response" title="">—</span>
           </div>
 
           <div class="divider"></div>

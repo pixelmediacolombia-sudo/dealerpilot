@@ -23,7 +23,7 @@ When you queue a vehicle in the dashboard, this extension:
 ## Prerequisites
 
 - Google Chrome (or any Chromium-based browser: Edge, Brave, etc.)
-- Access to the DealerPilot AI backend URL (your Render deployment or local server)
+- Access to the DealerPilot AI backend URL (your Replit deployment or local server)
 - A Facebook account logged in to the Alpha Motorsport dealer page
 
 ---
@@ -72,7 +72,9 @@ The extension needs to know where your DealerPilot backend is running.
 2. The popup opens — you'll see the **Extension Status** panel
 3. Scroll down and click **⚙ Backend settings** to expand it
 4. In the **Backend URL** field, enter your backend URL:
-   - **Render (production):** `https://your-render-service.onrender.com`
+   - **Replit (deployed):** `https://your-app.replit.app`
+   - **Replit (dev):** `https://your-replit-dev-domain.replit.dev`
+   - **Render:** `https://your-service.onrender.com`
    - **Local dev:** `http://localhost:5000`
 5. Click **Save & Test Connection**
 
@@ -80,7 +82,18 @@ The status panel updates immediately:
 - ✅ **Backend connected: Connected** — the extension can reach the server
 - ❌ **Backend connected: Unreachable** — check the URL, server status, and CORS settings
 
+An **Environment** badge next to the Backend row (Replit / Render / Local / Custom) is derived automatically from the URL, so it's always obvious which backend is active — no need to memorize URLs before a live publish test.
+
 > **No trailing slash.** The URL should end with the domain, not a `/`.
+
+### Switching backends without retyping the URL
+
+Open **🔧 Debug Mode** and use the **Switch Backend URL** section:
+1. Pick an environment from the dropdown (**Replit**, **Render**, **Local**, or **Custom**)
+2. The URL field auto-fills from a saved preset (type the Render URL once and it's remembered)
+3. Click **Switch Backend URL** — no extension reload or rebuild required, the popup immediately shows the new **Environment** badge and Backend URL
+
+**Before any live publish test against Render, confirm in the popup that the Environment badge reads "Render" (not "Replit") and the Backend URL matches your Render service.**
 
 ---
 
@@ -96,7 +109,10 @@ After saving the backend URL:
    - **Connection Status:** Connected
    - **Dealer ID:** 1 — Alpha Motorsport
    - **Last Heartbeat:** shows the current time (updated on each ping)
-   - **Extension ID:** shows your Chrome extension's unique ID
+   - **Last Heartbeat URL / Response:** shows the exact endpoint pinged and whether it succeeded
+   - **Chrome Extension ID:** your Chrome-assigned extension ID
+   - **Extension ID (backend):** the app-level UUID used for job claiming
+   - **Environment:** Render / Replit / Local / Custom — must read the environment you intend to test against
 
 ---
 
