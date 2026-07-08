@@ -1,5 +1,19 @@
 const DEFAULT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 
+// Build date is bumped manually alongside manifest.json's version field.
+const BUILD_DATE = "2026-07-08";
+
+(function initVersionDisplay() {
+  const manifest = chrome.runtime.getManifest();
+  const version = manifest.version;
+  const headerVersionEl = document.getElementById("header-version");
+  const headerBuildEl   = document.getElementById("header-build");
+  const dBuildEl        = document.getElementById("d-build");
+  if (headerVersionEl) headerVersionEl.textContent = `v${version} · Alpha Motorsport`;
+  if (headerBuildEl)   headerBuildEl.textContent   = `Build: ${version} — ${BUILD_DATE}`;
+  if (dBuildEl)         dBuildEl.textContent        = `APP_CONTROLLED_PUBLISHING_${version} — ${BUILD_DATE}`;
+})();
+
 // ---- DOM refs: main panel ----
 const urlInput   = document.getElementById("url");
 const statusEl   = document.getElementById("status");

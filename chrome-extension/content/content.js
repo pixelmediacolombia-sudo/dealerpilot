@@ -22,7 +22,8 @@
 
   // ---- Safe runtime communication ----
   const CTXI = "EXTENSION_CONTEXT_INVALIDATED";
-  const BUILD_LABEL = "APP_CONTROLLED_PUBLISHING_1.3.8";
+  const EXT_VERSION = chrome.runtime.getManifest().version;
+  const BUILD_LABEL = `APP_CONTROLLED_PUBLISHING_${EXT_VERSION}`;
 
   // ── Performance / fast-mode settings ────────────────────────────────────────
   // MARKETPLACE_FAST_MODE=true fills the 10 required fields:
@@ -426,7 +427,7 @@
     <div id="mai-header">
       <span id="mai-dot"></span>
       <span id="mai-title">DealerPilot AI</span>
-      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v1.3.7</span>
+      <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v${EXT_VERSION}</span>
       <button id="mai-toggle" title="Collapse">_</button>
     </div>
     <div id="mai-body">
