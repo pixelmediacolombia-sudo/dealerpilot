@@ -324,6 +324,59 @@ export function buildDailyMarketplacePlan(
   function isMainstreamRec(r: DailyVehicleRec): boolean {
     return MAINSTREAM_MAKES.has(r.make.toLowerCase());
   }
+  function conversationLane(r: DailyVehicleRec): string {
+    const text = [
+      r.make,
+      r.model,
+      r.primarySegment,
+      r.secondarySegment ?? "",
+      r.adAngle,
+      r.whyThisAudience,
+    ].join(" ").toLowerCase();
+    if (isEVRec(r)) return "ev";
+    if (/\b(truck|pickup|work|silverado|f-150|f150|ram|tacoma|sierra|colorado)\b/.test(text)) return "truck";
+    if (/\b(suv|family|pilot|cr-v|crv|rav4|rogue|escape|explorer|highlander|cx-5|cx5)\b/.test(text)) return "family";
+    if (r.priceMode === "DOWN_PAYMENT" || (r.actualPrice != null && r.actualPrice < 22_000) || /\b(payment|affordable|budget|spanish)\b/.test(text)) return "payment";
+    return isMainstreamRec(r) ? "mainstream" : "general";
+  }
+  function conversationBalancedTop3(pool: DailyVehicleRec[]): DailyVehicleRec[] {
+    const selected: DailyVehicleRec[] = [];
+    const selectedIds = new Set<number>();
+
+    const hasDifferentMakeAvailable = (make: string) =>
+      pool.some((r) => !selectedIds.has(r.vehicleId) && r.make.toLowerCase() !== make.toLowerCase());
+    const hasDifferentLaneAvailable = (lane: string) =>
+      pool.some((r) => !selectedIds.has(r.vehicleId) && conversationLane(r) !== lane);
+    const hasNonEvAvailable = () =>
+      pool.some((r) => !selectedIds.has(r.vehicleId) && !isEVRec(r));
+
+    for (const rec of pool) {
+      if (selected.length >= 3) continue;
+      const lane = conversationLane(rec);
+      const repeatsMake = selected.some((r) => r.make.toLowerCase() === rec.make.toLowerCase());
+      const repeatsLane = selected.some((r) => conversationLane(r) === lane);
+      const repeatsEv = isEVRec(rec) && selected.some((r) => isEVRec(r));
+
+      if ((repeatsEv && hasNonEvAvailable()) ||
+          (repeatsMake && hasDifferentMakeAvailable(rec.make)) ||
+          (repeatsLane && hasDifferentLaneAvailable(lane))) {
+        continue;
+      }
+
+      selected.push(rec);
+      selectedIds.add(rec.vehicleId);
+    }
+
+    for (const rec of pool) {
+      if (selected.length >= 3) break;
+      if (!selectedIds.has(rec.vehicleId)) {
+        selected.push(rec);
+        selectedIds.add(rec.vehicleId);
+      }
+    }
+
+    return [...selected, ...pool.filter((r) => !selectedIds.has(r.vehicleId))];
+  }
 
   // ── Build eligible recs and apply tiebreaker sort ───────────────────────────
   const eligible: DailyVehicleRec[] = eligibleWorkspaces.map((w) => toRec(w));
@@ -439,11 +492,12 @@ export function buildDailyMarketplacePlan(
   }
 
   // ── Split top10 into Today's 3 + Next Best 7 ────────────────────────────────
-  const recommendedToday = top10.slice(0, 3);
-  const nextBest = top10.slice(3, 10);
+  const balancedTop10 = conversationBalancedTop3(top10);
+  const recommendedToday = balancedTop10.slice(0, 3);
+  const nextBest = balancedTop10.slice(3, 10);
 
   // Everything else goes to holdToday
-  const top10Set = new Set(top10.map((r) => r.vehicleId));
+  const top10Set = new Set(balancedTop10.map((r) => r.vehicleId));
   const holdToday: DailyVehicleRec[] = eligible
     .filter((r) => !top10Set.has(r.vehicleId))
     .map((r) => ({ ...r, holdReason: "Lower priority — not in today's top 10" }));

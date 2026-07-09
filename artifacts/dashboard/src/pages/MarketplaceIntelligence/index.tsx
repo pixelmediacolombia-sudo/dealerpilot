@@ -291,6 +291,66 @@ const MAINSTREAM_MAKES_MI = new Set([
 ]);
 const EV_MAKES_MI = new Set(["tesla", "rivian", "lucid", "polestar", "fisker"]);
 
+function isEvOpportunity(v: OpportunityVehicle): boolean {
+  return EV_MAKES_MI.has(v.make.toLowerCase()) || v.primarySegment.toLowerCase().includes("ev");
+}
+
+function conversationLane(v: OpportunityVehicle): string {
+  const text = [
+    v.make,
+    v.model,
+    v.bodyStyle ?? "",
+    v.primarySegment,
+    v.secondarySegment ?? "",
+    v.adAngle,
+    v.whyThisAudience,
+  ].join(" ").toLowerCase();
+  if (isEvOpportunity(v)) return "ev";
+  if (/\b(truck|pickup|work|silverado|f-150|f150|ram|tacoma|sierra|colorado)\b/.test(text)) return "truck";
+  if (/\b(suv|family|pilot|cr-v|crv|rav4|rogue|escape|explorer|highlander|cx-5|cx5)\b/.test(text)) return "family";
+  if ((v.price != null && v.price < 22_000) || /\b(payment|affordable|budget|spanish)\b/.test(text)) return "payment";
+  return MAINSTREAM_MAKES_MI.has(v.make.toLowerCase()) ? "mainstream" : "general";
+}
+
+function conversationBalancedTop3(pool: OpportunityVehicle[]): OpportunityVehicle[] {
+  const selected: OpportunityVehicle[] = [];
+  const selectedIds = new Set<number>();
+
+  const hasDifferentMakeAvailable = (make: string) =>
+    pool.some((v) => !selectedIds.has(v.vehicleId) && v.make.toLowerCase() !== make.toLowerCase());
+  const hasDifferentLaneAvailable = (lane: string) =>
+    pool.some((v) => !selectedIds.has(v.vehicleId) && conversationLane(v) !== lane);
+  const hasNonEvAvailable = () =>
+    pool.some((v) => !selectedIds.has(v.vehicleId) && !isEvOpportunity(v));
+
+  for (const v of pool) {
+    if (selected.length >= 3) continue;
+    const lane = conversationLane(v);
+    const repeatsMake = selected.some((s) => s.make.toLowerCase() === v.make.toLowerCase());
+    const repeatsLane = selected.some((s) => conversationLane(s) === lane);
+    const repeatsEv = isEvOpportunity(v) && selected.some((s) => isEvOpportunity(s));
+
+    if ((repeatsEv && hasNonEvAvailable()) ||
+        (repeatsMake && hasDifferentMakeAvailable(v.make)) ||
+        (repeatsLane && hasDifferentLaneAvailable(lane))) {
+      continue;
+    }
+
+    selected.push(v);
+    selectedIds.add(v.vehicleId);
+  }
+
+  for (const v of pool) {
+    if (selected.length >= 3) break;
+    if (!selectedIds.has(v.vehicleId)) {
+      selected.push(v);
+      selectedIds.add(v.vehicleId);
+    }
+  }
+
+  return [...selected, ...pool.filter((v) => !selectedIds.has(v.vehicleId))];
+}
+
 function applyDiversityTop10(sorted: OpportunityVehicle[]): OpportunityVehicle[] {
   const modelSlots = new Map<string, number>();
   let evCount = 0;
@@ -301,7 +361,7 @@ function applyDiversityTop10(sorted: OpportunityVehicle[]): OpportunityVehicle[]
   for (const v of sorted) {
     const modelKey = `${v.make.toLowerCase()}_${v.model.toLowerCase()}`;
     const slotsTaken = modelSlots.get(modelKey) ?? 0;
-    const isEV = EV_MAKES_MI.has(v.make.toLowerCase()) || v.primarySegment.toLowerCase().includes("ev");
+    const isEV = isEvOpportunity(v);
     if (top10.length >= 10) { deferred.push(v); continue; }
     if (slotsTaken >= 2) { deferred.push(v); continue; }
     if (isEV && evCount >= 3 && v.demandScore < 90) { deferred.push(v); continue; }
@@ -323,7 +383,7 @@ function applyDiversityTop10(sorted: OpportunityVehicle[]): OpportunityVehicle[]
       mainstreamCount++;
     }
   }
-  return top10;
+  return conversationBalancedTop3(top10);
 }
 
 // ── Vehicle Row ───────────────────────────────────────────────────────────────
