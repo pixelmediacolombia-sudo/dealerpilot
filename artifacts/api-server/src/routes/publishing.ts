@@ -19,7 +19,6 @@ import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { getMarketplacePricing } from "../listings/pricing";
 import {
   checkPublishGuardrails,
-  isControlledModeEnabled,
   isExtensionOnline,
   resolvePublishMode,
   LOT_CITY_MAP,
@@ -1028,7 +1027,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
   // Publish Now bypasses batching but never bypasses the guardrails: real
   // inventory, mapped lot location, GM Coach, duplicate conflicts, and (for
   // Controlled Mode) an online extension all must pass before a job is created.
-  const mode: "Assisted" | "Controlled" = isControlledModeEnabled() ? "Controlled" : "Assisted";
+  const mode = resolvePublishMode(true);
   const guardrail = await checkPublishGuardrails({
     vehicle: { id: vehicle.id, status: vehicle.status, lotLocation: vehicle.lotLocation },
     gmOverride,

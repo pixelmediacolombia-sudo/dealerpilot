@@ -24,6 +24,8 @@ const refreshBtn = document.getElementById("refresh");
 const el = {
   dotBackend:   document.getElementById("dot-backend"),
   vBackend:     document.getElementById("v-backend"),
+  vMode:        document.getElementById("v-mode"),
+  vPublishModeBanner: document.getElementById("v-publish-mode-banner"),
   vCurrent:     document.getElementById("v-current"),
   vQueued:      document.getElementById("v-queued"),
   vLastPoll:    document.getElementById("v-last-poll"),
@@ -96,7 +98,21 @@ function setDot(dot, kind) {
 function getModeLabel(job) {
   if (!job) return "";
   const mode = job.mode || "Assisted";
-  return mode === "Controlled" ? " [AUTO]" : " [Assisted]";
+  return mode === "Controlled" ? " [Full Auto]" : " [Assisted]";
+}
+
+function updatePublishModeDisplay(job) {
+  const mode = job ? (job.mode || "Assisted") : "Full Auto";
+  const isFullAuto = mode === "Controlled" || mode === "Full Auto";
+  if (el.vMode) {
+    el.vMode.textContent = isFullAuto ? "Full Auto ✓" : "Assisted";
+    el.vMode.className = "value " + (isFullAuto ? "ok" : "warn-text");
+  }
+  if (el.vPublishModeBanner) {
+    el.vPublishModeBanner.textContent = isFullAuto
+      ? "Mode: Full Auto — extension clicks Next + Publish automatically."
+      : "Mode: Assisted — operator clicks Publish manually.";
+  }
 }
 
 function renderStart() {
@@ -443,6 +459,7 @@ async function refresh() {
     ? (activeJob.vehicleLabel || activeJob.listingTitle || `Job #${activeJob.id}`) + getModeLabel(activeJob)
     : "None";
   el.vSync.textContent = new Date().toLocaleTimeString();
+  updatePublishModeDisplay(activeJob || nextJob);
   renderStart();
 
   await loadDebugState();

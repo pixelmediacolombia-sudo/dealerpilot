@@ -27,3 +27,4 @@ channel = "stable-25_05"
 
 [userenv.shared]
 MARKETPLACE_CONTROLLED_MODE_ENABLED = "true"
+MARKETPLACE_PUBLISH_MODE = "full_auto"

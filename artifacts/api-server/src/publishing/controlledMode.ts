@@ -37,16 +37,28 @@ const ACTIVE_JOB_STATUSES = [
 const NOT_ELIGIBLE_STATUSES = new Set(["Published", "Sold", "Removed"]);
 
 export function isControlledModeEnabled(): boolean {
-  return process.env.MARKETPLACE_CONTROLLED_MODE_ENABLED === "true";
+  return (
+    process.env.MARKETPLACE_CONTROLLED_MODE_ENABLED === "true" ||
+    process.env.MARKETPLACE_PUBLISH_MODE === "full_auto"
+  );
 }
 
 /**
- * Resolves the mode a job should actually run in. Controlled Mode requires
- * BOTH the global env-var switch and the dealer's own autoClickPublish
- * setting to be on. If either is off, the job runs Assisted (human clicks
- * Publish) regardless of what a caller requested.
+ * Full Auto Mode: MARKETPLACE_PUBLISH_MODE=full_auto forces Controlled Mode
+ * for every dealer globally, bypassing the per-dealer autoClickPublish toggle.
+ */
+export function isFullAutoMode(): boolean {
+  return process.env.MARKETPLACE_PUBLISH_MODE === "full_auto";
+}
+
+/**
+ * Resolves the mode a job should actually run in.
+ * - Full Auto (MARKETPLACE_PUBLISH_MODE=full_auto): always Controlled, no dealer toggle needed.
+ * - Controlled Mode (MARKETPLACE_CONTROLLED_MODE_ENABLED=true): requires dealer's autoClickPublish=true.
+ * - Otherwise: Assisted (human clicks Publish).
  */
 export function resolvePublishMode(dealerAutoClickPublish: boolean): "Assisted" | "Controlled" {
+  if (isFullAutoMode()) return "Controlled";
   return isControlledModeEnabled() && dealerAutoClickPublish ? "Controlled" : "Assisted";
 }
 
