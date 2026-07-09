@@ -141,8 +141,8 @@ function renderStart() {
     startBtn.textContent = "Resume Current Approved Job";
     startBtn.disabled = false;
   } else {
-    startBtn.textContent = "Resume Current Approved Job";
-    startBtn.disabled = true;
+    startBtn.textContent = "Check For Approved Job";
+    startBtn.disabled = !lastConnectionOk;
   }
 }
 
@@ -445,7 +445,8 @@ async function refresh() {
 
   // ── Fresh-install filter ──────────────────────────────────────────────────
   // Only show a queued job if it was created AFTER this extension was installed,
-  // OR it's a publish_now job that the user approved within the last 10 minutes.
+  // OR it's a recent publish_now job. Some backend responses do not include
+  // approvedByUser after enrichment, but publish_now is already operator-created.
   if (nextJob) {
     const { installedAt } = await chrome.storage.local.get("installedAt");
     if (installedAt) {
@@ -453,9 +454,9 @@ async function refresh() {
       const jobCreatedAt = nextJob.createdAt ? new Date(nextJob.createdAt).getTime() : 0;
       const jobAge = Date.now() - jobCreatedAt;
       const isAfterInstall = jobCreatedAt > installedTime;
-      const isPublishNowApproved = nextJob.source === "publish_now" && nextJob.approvedByUser === true;
+      const isPublishNow = nextJob.source === "publish_now";
       const isRecent = jobAge < 10 * 60 * 1000;
-      if (!isAfterInstall && !(isPublishNowApproved && isRecent)) {
+      if (!isAfterInstall && !(isPublishNow && isRecent)) {
         nextJob = null;
       }
     }
@@ -491,8 +492,17 @@ startBtn.addEventListener("click", async () => {
   }
 
   if (!nextJob) {
-    setStatus("No jobs available.", "err");
-    startBtn.disabled = false;
+    setStatus("Checking for an approved job...");
+    const poll = await send({ type: "POLL_NOW", forceUserAction: true });
+    const pollData = poll && poll.data ? poll.data : null;
+    if (poll && poll.ok && pollData && pollData.ok === true && pollData.jobId != null) {
+      setStatus("Job found. Opening Marketplace...", "ok");
+      window.close();
+      return;
+    }
+    await refresh();
+    setStatus("No approved job found yet. Confirm Publish Now in DealerPilot, then try again.", "err");
+    startBtn.disabled = !lastConnectionOk;
     return;
   }
 

@@ -1,5 +1,14 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.17
+
+**Fixed**
+- Manual job rescue - the popup can now check for and start an approved `publish_now` job even when dashboard-to-extension wake fails with "Receiving end does not exist".
+- Publish Now visibility - recent `publish_now` jobs no longer disappear from the popup just because the backend response omits the `approvedByUser` flag.
+- Stale job recovery - explicit popup actions can resume old `publish_now` jobs while scheduled batch jobs remain protected from accidental auto-start.
+
+---
+
 ## v1.3.16
 
 **Fixed**

@@ -275,7 +275,7 @@ const handlers = {
     const JOB_MAX_AGE_MS = 10 * 60 * 1000;
     if (message.createdAt) {
       const age = Date.now() - new Date(message.createdAt).getTime();
-      if (age > JOB_MAX_AGE_MS) {
+      if (age > JOB_MAX_AGE_MS && message.forceUserAction !== true) {
         await logAudit("AUTO_START_BLOCKED_STALE", {
           jobId: message.jobId,
           createdAt: message.createdAt,
@@ -410,7 +410,9 @@ const handlers = {
     return { tabId: tab.id };
   },
 
-  async POLL_ASSIGNED_JOB() {
+  async POLL_ASSIGNED_JOB(message = {}) {
+    const forceUserAction = message.forceUserAction === true;
+
     // Self-heal: verify activeJob is still in-progress on the backend.
     // A stuck/terminal job in storage blocks all future polling.
     const { activeJob } = await chrome.storage.local.get("activeJob");
@@ -450,6 +452,7 @@ const handlers = {
         mode: assignedJob.mode || "Controlled",
         source: "assigned",
         approvedByUser: true,
+        forceUserAction,
       });
     }
 
@@ -498,7 +501,7 @@ const handlers = {
     const isAutoPublishBatch = jobSource === "auto_publish_batch";
     const isTooOld = jobAge > RECENT_JOB_MS;
 
-    if ((isTooOld && !isPublishNow) || isAutoPublishBatch) {
+    if (((isTooOld && !isPublishNow) || isAutoPublishBatch) && !(forceUserAction && isPublishNow)) {
       const reason = isAutoPublishBatch
         ? "Job source is auto_publish_batch — user must approve from popup"
         : "Job is older than 5 minutes — user must trigger from popup";
@@ -548,13 +551,16 @@ const handlers = {
       mode: nextJob.mode || "Controlled",
       source: jobSource || "publish_now",
       approvedByUser: true,
+      forceUserAction,
     });
   },
 
   // ── Instant wake: called by the dashboard immediately after Publish Now ──
   // Bypasses the alarm interval so the job is claimed in under 2 seconds.
-  async POLL_NOW() {
-    return handlers.POLL_ASSIGNED_JOB();
+  async POLL_NOW(message = {}) {
+    return handlers.POLL_ASSIGNED_JOB({
+      forceUserAction: message.forceUserAction === true,
+    });
   },
 
   async GET_EXTENSION_ID() {
