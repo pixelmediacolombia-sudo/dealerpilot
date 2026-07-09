@@ -1688,7 +1688,21 @@
             const reason = `Photo ${idx + 1}: could not compress below ${(TARGET_MAX_BYTES / 1024).toFixed(0)} KB`;
             console.warn("[PHOTO]", reason);
             warnings.push(reason);
-            // Opción: omitir la foto para no bloquear todo el lote
+
+            // If active job is Controlled or autoClickPublish, fail it immediately
+            try {
+              const { activeJob } = await chrome.storage.local.get("activeJob");
+              if (activeJob && (activeJob.mode === "Controlled" || activeJob.autoClickPublish === true) && activeJob.id === jobId) {
+                await send({ type: "SEND_JOB_EVENT", jobId, event: "auto_publish_failed", details: reason }).catch(() => { });
+                await send({ type: "FAIL_JOB", jobId, reason }).catch(() => { });
+                await chrome.storage.local.remove("activeJob");
+                return { uploaded: 0, failed: true, reason };
+              }
+            } catch (e) {
+              console.warn("[PHOTO] error while failing job:", e && e.message);
+            }
+
+            // Default: skip this image and continue with others
             continue;
           }
 
