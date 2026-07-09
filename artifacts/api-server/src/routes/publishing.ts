@@ -20,6 +20,8 @@ import { getMarketplacePricing } from "../listings/pricing";
 import {
   checkPublishGuardrails,
   isExtensionOnline,
+  isControlledModeEnabled,
+  isFullAutoMode,
   resolvePublishMode,
   LOT_CITY_MAP,
 } from "../publishing/controlledMode";
@@ -285,165 +287,211 @@ router.get("/publishing/jobs/next", async (req, res) => {
 // GET /publishing/jobs/:id/payload — full data the extension needs to fill the
 // Marketplace form for a (claimed) job. Grounded entirely in inventory + the
 // specific listing version this job references.
+//
+// Never throws a bare 500: all errors are caught, logged, and returned as
+// structured JSON so the extension can surface a meaningful message.
 router.get("/publishing/jobs/:id/payload", async (req, res) => {
   const id = Number(req.params.id);
   if (Number.isNaN(id)) {
-    res.status(400).json({ error: "Invalid job id" });
+    res.status(400).json({ error: "Invalid job id", code: "INVALID_ID" });
     return;
   }
 
-  const [job] = await db.select().from(publishingJobsTable).where(eq(publishingJobsTable.id, id));
-  if (!job) {
-    res.status(404).json({ error: "Job not found" });
-    return;
-  }
+  try {
+    const [job] = await db.select().from(publishingJobsTable).where(eq(publishingJobsTable.id, id));
+    if (!job) {
+      res.status(404).json({ error: "Job not found", code: "JOB_NOT_FOUND", jobId: id });
+      return;
+    }
 
-  const [version] = job.listingVersionId
-    ? await db
+    // ── Publish mode — always re-derive from server env vars ──────────────────
+    // job.mode may be stale ("Assisted") if the job was created before
+    // MARKETPLACE_PUBLISH_MODE=full_auto was set. Re-derive every time the
+    // payload is fetched so the extension always gets the current mode.
+    // resolvePublishMode(true) = same logic as publish-now (treats dealer as opted-in).
+    const resolvedMode = resolvePublishMode(true);
+    const autoClickPublish = resolvedMode === "Controlled";
+    const controlledMode = isControlledModeEnabled();
+    const publishMode = isFullAutoMode() ? "full_auto" : autoClickPublish ? "controlled" : "assisted";
+
+    // Heal stale mode in DB so future queries and the UI show the right value.
+    if (job.mode !== resolvedMode) {
+      req.log.info(
+        { jobId: id, oldMode: job.mode, newMode: resolvedMode, publishMode },
+        "Payload: healing stale job mode to match current server config",
+      );
+      await db
+        .update(publishingJobsTable)
+        .set({ mode: resolvedMode })
+        .where(eq(publishingJobsTable.id, id));
+    }
+
+    const [version] = job.listingVersionId
+      ? await db
+          .select()
+          .from(listingVersionsTable)
+          .where(eq(listingVersionsTable.id, job.listingVersionId))
+      : [];
+    const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
+    const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, job.dealerId));
+
+    // vehicleIntelligence is optional — missing table or row is not fatal.
+    let intel: { recommendedDownPayment: number | null } | undefined;
+    try {
+      const [row] = await db
         .select()
-        .from(listingVersionsTable)
-        .where(eq(listingVersionsTable.id, job.listingVersionId))
-    : [];
-  const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
-  const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, job.dealerId));
-  const [intel] = await db
-    .select()
-    .from(vehicleIntelligenceTable)
-    .where(eq(vehicleIntelligenceTable.vehicleId, job.vehicleId))
-    .orderBy(desc(vehicleIntelligenceTable.generatedAt))
-    .limit(1);
-  if (!vehicle) {
-    res.status(404).json({ error: "Vehicle not found for job" });
-    return;
-  }
+        .from(vehicleIntelligenceTable)
+        .where(eq(vehicleIntelligenceTable.vehicleId, job.vehicleId))
+        .orderBy(desc(vehicleIntelligenceTable.generatedAt))
+        .limit(1);
+      intel = row;
+    } catch {
+      req.log.warn({ jobId: id, vehicleId: job.vehicleId }, "vehicle_intelligence unavailable — using null pricing intel");
+    }
 
-  // ── Lot location guard ────────────────────────────────────────────────────
-  // Marketplace requires an accurate physical city. We only publish vehicles
-  // assigned to a known, mapped lot. Unknown/wrong lots block the fill payload
-  // so the operator can correct the vehicle's lot assignment first.
-  const lotCity = vehicle.lotLocation ? LOT_CITY_MAP[vehicle.lotLocation] : undefined;
-  if (!lotCity) {
-    req.log.warn(
-      { jobId: job.id, vehicleId: vehicle.id, lotLocation: vehicle.lotLocation },
-      "Publishing blocked: unknown or unmapped lot location",
+    if (!vehicle) {
+      res.status(404).json({
+        error: "Vehicle not found for job",
+        code: "VEHICLE_NOT_FOUND",
+        jobId: id,
+        vehicleId: job.vehicleId,
+      });
+      return;
+    }
+
+    // ── Lot location guard ────────────────────────────────────────────────────
+    const lotCity = vehicle.lotLocation ? LOT_CITY_MAP[vehicle.lotLocation] : undefined;
+    if (!lotCity) {
+      req.log.warn(
+        { jobId: job.id, vehicleId: vehicle.id, lotLocation: vehicle.lotLocation },
+        "Publishing blocked: unknown or unmapped lot location",
+      );
+      res.status(422).json({
+        error: `Cannot publish: vehicle lot location "${vehicle.lotLocation ?? "unknown"}" is not mapped to a city. Assign this vehicle to Manassas or Fredericksburg before publishing.`,
+        code: "UNKNOWN_LOT",
+        jobId: id,
+        vehicleId: vehicle.id,
+        lotLocation: vehicle.lotLocation ?? null,
+      });
+      return;
+    }
+
+    const images = await getVehiclePhotos(vehicle.id, vehicle.aiPhotoSetId, vehicle.aiPhotoStatus);
+    const usingAiPhotos = images.length > 0 && images[0].source === "ai";
+
+    const pricing = getMarketplacePricing(vehicle, intel?.recommendedDownPayment ?? null);
+
+    // "Real prose" test: non-empty after trim, ≥ 15 chars, has a space, not all-digits.
+    function isProseText(s: string | null | undefined): s is string {
+      if (!s) return false;
+      const t = s.trim();
+      return t.length >= 15 && /\s/.test(t) && !/^\d+$/.test(t);
+    }
+
+    let fillTitle: string;
+    let fillDescription: string;
+    let fillDescriptionEs: string | null = null;
+    let fillDownPayment: number | null = null;
+
+    const yr = vehicle.year ?? "";
+    const trimStr = vehicle.trim ? ` ${vehicle.trim}` : "";
+    const autoTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
+
+    function buildAISalesCopy(): string {
+      const modelKeyword = vehicle.model.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      return [
+        `🔥 ${autoTitle} lista para manejar`,
+        "",
+        "💰 Financiamiento desde $1,000, $2,000 o $3,000 de inicial",
+        "✅ Identificación válida",
+        "✅ Cuenta de banco activa",
+        "✅ Precios bajos para compradores serios",
+        "⏳ Solo personas interesadas en comprar este mes",
+        "",
+        `📩 Escríbenos "${modelKeyword}" hoy y te damos más detalles.`,
+      ].join("\n");
+    }
+
+    if (version) {
+      const rawEn  = version.descriptionEn?.trim() ?? "";
+      const rawCta = version.callToAction?.trim()  ?? "";
+      const descParts = [rawEn, rawCta].filter(isProseText);
+      fillTitle         = version.title;
+      fillDescriptionEs = version.descriptionEs ?? null;
+      fillDownPayment   = version.downPayment ?? null;
+      fillDescription   = descParts.length > 0 ? descParts.join("\n\n") : buildAISalesCopy();
+    } else {
+      fillTitle       = autoTitle;
+      fillDescription = buildAISalesCopy();
+    }
+
+    // Enrich using the healed mode so the extension always sees the correct value.
+    const [enriched] = await enrich([{ ...job, mode: resolvedMode }]);
+
+    req.log.info(
+      { jobId: id, vehicleId: job.vehicleId, dealerId: job.dealerId, publishMode, resolvedMode, photoCount: images.length, hasLocation: true },
+      "Payload served",
     );
-    res.status(422).json({
-      error: `Cannot publish: vehicle lot location "${vehicle.lotLocation ?? "unknown"}" is not mapped to a city. Assign this vehicle to Manassas or Fredericksburg before publishing.`,
-      code: "UNKNOWN_LOT",
-    });
-    return;
-  }
 
-  const images = await getVehiclePhotos(vehicle.id, vehicle.aiPhotoSetId, vehicle.aiPhotoStatus);
-  const usingAiPhotos = images.length > 0 && images[0].source === "ai";
-
-  const pricing = getMarketplacePricing(vehicle, intel?.recommendedDownPayment ?? null);
-
-  // Build fill content — prefer an existing listing version; auto-generate from inventory otherwise.
-  //
-  // Description priority:
-  //   1. listingVersion.descriptionEn (+ callToAction) — only if it is real prose
-  //      (not a bare number, stock ID, or other raw data artifact).
-  //   2. vehicle.description — the XML feed's human-readable description, if present.
-  //   3. Auto-generated sentence assembled from structured vehicle fields.
-  //
-  // "Real prose" test: non-empty after trim, ≥ 15 chars, contains at least one
-  // space, and is not all-digits.  This guards against garbage like "149829"
-  // (a raw mileage or stock number accidentally stored in descriptionEn).
-  function isProseText(s: string | null | undefined): s is string {
-    if (!s) return false;
-    const t = s.trim();
-    return t.length >= 15 && /\s/.test(t) && !/^\d+$/.test(t);
-  }
-
-  let fillTitle: string;
-  let fillDescription: string;
-  let fillDescriptionEs: string | null = null;
-  let fillDownPayment: number | null = null;
-
-  const yr = vehicle.year ?? "";
-  const trimStr = vehicle.trim ? ` ${vehicle.trim}` : "";
-  const autoTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
-
-  // Generate Alpha Motorsport Marketplace sales copy.
-  // Spanish-only, short, sales-focused. No English block, no "---" separator.
-  // No guaranteed-approval language, no "bad credit", no long dealer boilerplate.
-  function buildAISalesCopy(): string {
-    const name         = autoTitle;
-    const modelKeyword = vehicle.model.toUpperCase().replace(/[^A-Z0-9]/g, "");
-
-    return [
-      `🔥 ${name} lista para manejar`,
-      "",
-      "💰 Financiamiento desde $1,000, $2,000 o $3,000 de inicial",
-      "✅ Identificación válida",
-      "✅ Cuenta de banco activa",
-      "✅ Precios bajos para compradores serios",
-      "⏳ Solo personas interesadas en comprar este mes",
-      "",
-      `📩 Escríbenos "${modelKeyword}" hoy y te damos más detalles.`,
-    ].join("\n");
-  }
-
-  if (version) {
-    const rawEn  = version.descriptionEn?.trim()  ?? "";
-    const rawCta = version.callToAction?.trim()   ?? "";
-    const descParts = [rawEn, rawCta].filter(isProseText);
-    fillTitle         = version.title;
-    fillDescriptionEs = version.descriptionEs ?? null;
-    fillDownPayment   = version.downPayment ?? null;
-
-    // Always use Alpha Motorsport bilingual sales copy for Marketplace.
-    // XML feed descriptions (vehicle.description) are NEVER used — they contain
-    // dealer boilerplate, stock numbers, and raw data not suitable for Marketplace.
-    fillDescription = descParts.length > 0 ? descParts.join("\n\n") : buildAISalesCopy();
-  } else {
-    // No listing version — always generate Alpha sales copy.
-    fillTitle = autoTitle;
-    fillDescription = buildAISalesCopy();
-  }
-
-  const [enriched] = await enrich([job]);
-  res.json({
-    job: enriched,
-    fill: {
-      title: fillTitle,
-      price: pricing.marketplaceDisplayedPrice,
-      description: fillDescription,
-      descriptionEs: fillDescriptionEs,
-      mileage: vehicle.mileage ?? null,
-      year: vehicle.year ?? null,
-      make: vehicle.make,
-      model: vehicle.model,
-      trim: vehicle.trim ?? null,
-      vin: vehicle.vin,
-      bodyStyle: vehicle.bodyStyle ?? null,
-      exteriorColor: vehicle.exteriorColor ?? null,
-      fuelType: vehicle.fuelType ?? null,
-      transmission: vehicle.transmission ?? null,
+    res.json({
+      // ── Debug / diagnostics (top-level for easy inspection) ──────────────
+      jobId: id,
+      vehicleId: job.vehicleId,
+      dealerId: job.dealerId,
+      publishMode,          // "full_auto" | "controlled" | "assisted"
+      controlledMode,       // true when MARKETPLACE_CONTROLLED_MODE_ENABLED=true
+      autoClickPublish,     // true when extension should auto-click Publish
+      backendEnvironment: process.env.NODE_ENV ?? "production",
+      hasPhotos: images.length > 0,
+      photoCount: images.length,
+      hasLocation: true,
       location: lotCity,
-      category: "Vehicle",
-      downPayment: fillDownPayment,
-      actualVehiclePrice: pricing.actualVehiclePrice,
-      marketplaceDisplayedPrice: pricing.marketplaceDisplayedPrice,
-      priceMode: pricing.priceMode,
-      recommendedDownPayment: pricing.recommendedDownPayment,
-      pricingReason: pricing.pricingReason,
-    },
-    usingAiPhotos,
-    images: images.map((img) => {
-      const url = img.url;
-      if (!url) return url;
-      if (url.startsWith("http://") || url.startsWith("https://")) return url;
-      // Relative URL — build an absolute URL from the request origin.
-      // Prefer X-Forwarded-Proto (set by the production reverse proxy) over req.protocol,
-      // which stays "http" for internal traffic even on HTTPS deployments.
-      const proto = (req.get("x-forwarded-proto") || req.protocol).split(",")[0].trim();
-      const host = req.get("host") ?? "localhost";
-      const origin = `${proto}://${host}`;
-      return `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
-    }),
-  });
+      // ── Core payload ─────────────────────────────────────────────────────
+      job: enriched,
+      fill: {
+        title: fillTitle,
+        price: pricing.marketplaceDisplayedPrice,
+        description: fillDescription,
+        descriptionEs: fillDescriptionEs,
+        mileage: vehicle.mileage ?? null,
+        year: vehicle.year ?? null,
+        make: vehicle.make,
+        model: vehicle.model,
+        trim: vehicle.trim ?? null,
+        vin: vehicle.vin,
+        bodyStyle: vehicle.bodyStyle ?? null,
+        exteriorColor: vehicle.exteriorColor ?? null,
+        fuelType: vehicle.fuelType ?? null,
+        transmission: vehicle.transmission ?? null,
+        location: lotCity,
+        category: "Vehicle",
+        downPayment: fillDownPayment,
+        actualVehiclePrice: pricing.actualVehiclePrice,
+        marketplaceDisplayedPrice: pricing.marketplaceDisplayedPrice,
+        priceMode: pricing.priceMode,
+        recommendedDownPayment: pricing.recommendedDownPayment,
+        pricingReason: pricing.pricingReason,
+      },
+      usingAiPhotos,
+      images: images.map((img) => {
+        const url = img.url;
+        if (!url) return url;
+        if (url.startsWith("http://") || url.startsWith("https://")) return url;
+        const proto = (req.get("x-forwarded-proto") || req.protocol).split(",")[0].trim();
+        const host = req.get("host") ?? "localhost";
+        const origin = `${proto}://${host}`;
+        return `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
+      }),
+    });
+  } catch (err) {
+    req.log.error({ jobId: id, err }, "GET /publishing/jobs/:id/payload — unhandled error");
+    res.status(500).json({
+      error: "Failed to build job payload",
+      code: "PAYLOAD_ERROR",
+      jobId: id,
+      reason: err instanceof Error ? err.message : String(err),
+    });
+  }
 });
 
 const ClaimBody = z.object({ extensionId: z.string().min(1) });
