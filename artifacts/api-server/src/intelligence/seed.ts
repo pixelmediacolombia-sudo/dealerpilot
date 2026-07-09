@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 import { db } from "@workspace/db";
-import { eq, count, isNull, or, and } from "drizzle-orm";
+import { eq, count, isNull, or, and, sql } from "drizzle-orm";
 import {
   vehiclesTable,
   creativeVersionsTable,
@@ -33,6 +33,39 @@ const V2_MARKER = "v2:"; // prefix in recommendedTemplateKey to detect v2 seeded
 
 const DEALER_ID = 1;
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+async function ensureVehicleIntelligenceUpsertTarget(logger: Logger): Promise<void> {
+  try {
+    await db.execute(sql`
+      with ranked as (
+        select
+          id,
+          row_number() over (
+            partition by vehicle_id
+            order by generated_at desc nulls last, id desc
+          ) as rn
+        from vehicle_intelligence
+      )
+      delete from vehicle_intelligence vi
+      using ranked r
+      where vi.id = r.id
+        and r.rn > 1
+    `);
+
+    await db.execute(sql`
+      create unique index if not exists vehicle_intelligence_vehicle_idx
+      on vehicle_intelligence (vehicle_id)
+    `);
+
+    await db.execute(sql`
+      create unique index if not exists vehicle_intelligence_vehicle_id_unique_idx
+      on vehicle_intelligence (vehicle_id)
+    `);
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure vehicle_intelligence upsert target");
+    throw err;
+  }
+}
 
 const LUXURY_MAKES = [
   "bmw", "mercedes", "audi", "lexus", "infiniti", "cadillac", "lincoln",
@@ -360,6 +393,8 @@ export async function seedOpportunityScores(
   logger: Logger,
   opts?: { forceRefresh?: boolean; force?: boolean },
 ): Promise<void> {
+  await ensureVehicleIntelligenceUpsertTarget(logger);
+
   // Check if any rows are missing v1.2 buyer segment fields
   const [nullCheck] = await db
     .select({ cnt: count() })
@@ -675,6 +710,8 @@ export async function seedOpportunityScores(
 // ── Main seed function ────────────────────────────────────────────────────────
 
 export async function seedMarketplaceIntelligence(logger: Logger): Promise<void> {
+  await ensureVehicleIntelligenceUpsertTarget(logger);
+
   // Check if already seeded with v2 strategy engine
   const [existing] = await db
     .select({ cnt: count() })
@@ -696,9 +733,7 @@ export async function seedMarketplaceIntelligence(logger: Logger): Promise<void>
       return;
     }
 
-    // Clear v1 data, re-seed with v2
-    logger.info("Upgrading Marketplace Intelligence from v1 → Strategy Engine v2…");
-    await db.delete(vehicleIntelligenceTable).where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID));
+    logger.info("Upgrading Marketplace Intelligence from v1 to Strategy Engine v2 without clearing existing opportunities");
   }
 
   const vehicles = await db
