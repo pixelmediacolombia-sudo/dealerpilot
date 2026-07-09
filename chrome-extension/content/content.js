@@ -1802,11 +1802,13 @@
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_next" }).catch(() => {});
     await sleep(500);
 
-    const listingUrl = await clickPublishUntilListingUrl(job);
+    const publishOutcome = await clickPublishUntilListingUrl(job);
+    const listingUrl = publishOutcome.listingUrl;
     if (!listingUrl) {
-      const reason =
-        "Publish was clicked, but DealerPilot could not confirm a live Marketplace listing URL. " +
-        "Facebook may require one more Publish click or manual review.";
+      const reason = publishOutcome.blockReason
+        ? `Facebook blocked publishing: ${publishOutcome.blockReason}`
+        : "Publish was clicked, but DealerPilot could not confirm a live Marketplace listing URL. " +
+          "Facebook may require one more Publish click or manual review.";
       stateError("Auto-publish: live listing not confirmed", new Error(reason));
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
       const failResult = await send({ type: "FAIL_JOB", jobId: job.id, reason });
@@ -1866,14 +1868,14 @@
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_publish" }).catch(() => {});
       await sleep(900);
 
-      const listingUrl = await waitForPublishSuccess(attempt === 1 ? 12000 : 22000);
-      if (listingUrl) return listingUrl;
+      const outcome = await waitForPublishOutcome(attempt === 1 ? 12000 : 22000);
+      if (outcome.listingUrl || outcome.blockReason) return outcome;
 
       // Some Facebook sessions show a final confirmation dialog with another
       // Publish/Post button. Try once more only when that button is still visible.
-      if (!findEnabledButtonByText(publishTexts)) return null;
+      if (!findEnabledButtonByText(publishTexts)) return outcome;
     }
-    return null;
+    return { listingUrl: null, blockReason: null };
   }
 
   function findEnabledButtonByText(textOptions) {
@@ -2042,22 +2044,108 @@
     return [...new Set(errors)].join("; ") || null;
   }
 
-  async function waitForPublishSuccess(timeoutMs) {
+  function normalizePublishText(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function visibleTextFrom(el) {
+    const text = (el.innerText || el.textContent || "").trim();
+    if (!text || text.length > 500) return null;
+    const rect = el.getBoundingClientRect?.();
+    if (rect && rect.width === 0 && rect.height === 0) return null;
+    return text;
+  }
+
+  function detectMarketplacePublishBlock() {
+    const selectors = [
+      '[role="alert"]',
+      '[aria-live]',
+      '[data-testid*="error" i]',
+      '[data-testid*="toast" i]',
+      '[aria-label*="error" i]',
+      '[aria-label*="warning" i]',
+      'div[role="dialog"]',
+    ];
+    const sourceTexts = [];
+
+    for (const selector of selectors) {
+      document.querySelectorAll(selector).forEach((el) => {
+        const text = visibleTextFrom(el);
+        if (text) sourceTexts.push(text);
+      });
+    }
+
+    const formErrors = scrapeFacebookErrors();
+    if (formErrors) sourceTexts.push(formErrors);
+
+    const bodyText = (document.body?.innerText || "").slice(0, 12000);
+    if (bodyText) sourceTexts.push(bodyText);
+
+    const combined = normalizePublishText([...new Set(sourceTexts)].join(" "));
+    if (!combined) return null;
+
+    const checks = [
+      {
+        pattern: /(posting|listing|marketplace).{0,80}(limit|limited|too many)|you (have )?(reached|hit).{0,80}(limit|maximum)|limite.{0,80}(publicaciones|anuncios|marketplace)|demasiad[ao]s.{0,80}(publicaciones|anuncios)/,
+        reason: "Facebook says this account reached a Marketplace posting/listing limit.",
+      },
+      {
+        pattern: /(temporarily|temporary).{0,80}(blocked|restricted|limited)|blocked from (posting|listing)|restricted from (posting|listing)|bloquead[ao].{0,80}temporal|temporalmente.{0,80}(bloquead[ao]|restringid[ao]|limitad[ao])/,
+        reason: "Facebook says this account or session is temporarily blocked/restricted from publishing.",
+      },
+      {
+        pattern: /(can't|cannot|can not|couldn't|could not).{0,80}(publish|post|list)|not allowed.{0,80}(publish|post|list)|no (puedes|puede).{0,80}(publicar|crear)|no se pudo.{0,80}(publicar|crear)|no pudimos.{0,80}(publicar|crear)/,
+        reason: "Facebook refused the publish action for this account/session.",
+      },
+      {
+        pattern: /(marketplace access|access to marketplace).{0,80}(restricted|removed|limited|unavailable)|not eligible.{0,80}marketplace|acceso.{0,80}marketplace.{0,80}(restringid[ao]|limitad[ao]|no disponible)/,
+        reason: "Facebook says Marketplace access is restricted or unavailable for this account.",
+      },
+      {
+        pattern: /(duplicate|already posted|already listed|similar listing|listing already exists)|duplicad[ao]|ya (publicad[ao]|existe|listad[ao])/,
+        reason: "Facebook rejected the listing as duplicate or already posted.",
+      },
+      {
+        pattern: /(try again later|something went wrong|we're reviewing|under review|intenta(l[oa])? mas tarde|algo salio mal|en revision|estamos revisando)/,
+        reason: "Facebook did not publish immediately and is asking to retry later or review the listing.",
+      },
+    ];
+
+    for (const check of checks) {
+      if (check.pattern.test(combined)) return check.reason;
+    }
+
+    return null;
+  }
+
+  async function waitForPublishOutcome(timeoutMs) {
     const startUrl = window.location.href;
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const cur = window.location.href;
       if (cur !== startUrl && cur.includes("/marketplace/item/")) {
-        return cur;
+        return { listingUrl: cur, blockReason: null };
       }
       const successEl =
         document.querySelector('[aria-label*="listed" i]') ||
         document.querySelector('[data-testid*="success" i]');
-      if (successEl && window.location.href.includes("/marketplace/item/")) return window.location.href;
+      if (successEl && window.location.href.includes("/marketplace/item/")) {
+        return { listingUrl: window.location.href, blockReason: null };
+      }
+      const blockReason = detectMarketplacePublishBlock();
+      if (blockReason) return { listingUrl: null, blockReason };
       await sleep(500);
     }
     const final = window.location.href;
-    return final !== startUrl && final.includes("/marketplace/item/") ? final : null;
+    if (final !== startUrl && final.includes("/marketplace/item/")) {
+      return { listingUrl: final, blockReason: null };
+    }
+    return { listingUrl: null, blockReason: detectMarketplacePublishBlock() };
   }
 
   function chips(items, cls) {

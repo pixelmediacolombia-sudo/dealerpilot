@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.15
+
+**Fixed**
+- Publish diagnostics - when Facebook refuses the final Publish action because of account limits, Marketplace restrictions, duplicate listings, temporary blocks, or review/retry-later states, the extension now fails the job with that explicit reason instead of a generic "listing URL not confirmed" message.
+
+---
+
 ## v1.3.14
 
 **Fixed**
