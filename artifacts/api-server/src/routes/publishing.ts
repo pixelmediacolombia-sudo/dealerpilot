@@ -1427,7 +1427,13 @@ router.get("/publishing/jobs/:id/photo/:index", async (req, res) => {
     return;
   }
 
-  const contentType = upstream.headers.get("content-type") || "image/jpeg";
+  const contentType = (upstream.headers.get("content-type") || "").toLowerCase();
+  if (!contentType.startsWith("image/")) {
+    req.log.warn({ jobId: id, index, imageUrl, contentType }, "Photo proxy: upstream returned non-image content");
+    res.status(502).json({ error: `Upstream image returned non-image content type ${contentType}` });
+    return;
+  }
+
   const buffer = Buffer.from(await upstream.arrayBuffer());
 
   res.set({

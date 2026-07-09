@@ -1521,8 +1521,11 @@
       const ctx = canvas.getContext("2d");
       ctx.drawImage(bitmap, 0, 0, width, height);
       bitmap.close();
-      return await new Promise((resolve) => {
-        canvas.toBlob((resized) => resolve(resized || srcBlob), "image/jpeg", q);
+      return await new Promise((resolve, reject) => {
+        canvas.toBlob((resized) => {
+          if (resized) resolve(resized);
+          else reject(new Error("canvas.toBlob returned null"));
+        }, "image/jpeg", q);
       });
     }
 
@@ -1545,8 +1548,11 @@
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
-        return await new Promise((resolve) => {
-          canvas.toBlob((resized) => resolve(resized || srcBlob), "image/jpeg", q);
+        return await new Promise((resolve, reject) => {
+          canvas.toBlob((resized) => {
+            if (resized) resolve(resized);
+            else reject(new Error("canvas.toBlob returned null"));
+          }, "image/jpeg", q);
         });
       } finally {
         URL.revokeObjectURL(url);
@@ -1583,6 +1589,10 @@
       for (const q of QUALITY_STEPS) {
         try {
           const resized = await resizeImage(originalBlob, w, q);
+          if (!resized) {
+            console.warn(`[PHOTO] resizeImage failed for width=${w} quality=${q}`);
+            continue;
+          }
           // Ensure mime is image/jpeg
           const finalBlob = resized.type && resized.type !== "image/jpeg"
             ? new Blob([await resized.arrayBuffer()], { type: "image/jpeg" })

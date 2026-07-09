@@ -785,6 +785,12 @@ const handlers = {
       throw new Error(errMsg);
     }
 
+    if (!contentType.toLowerCase().startsWith("image/")) {
+      const errMsg = `[PHOTO] proxy returned invalid Content-Type ${contentType} for ${message.url}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+
     const arrayBuffer = await response.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     console.log("[PHOTO] blob size:", uint8Array.length, "bytes —", Math.round(uint8Array.length / 1024), "KB");
