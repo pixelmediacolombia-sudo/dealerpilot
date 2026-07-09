@@ -16,7 +16,7 @@ import {
   pool,
   type PublishingJob,
 } from "@workspace/db";
-import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { getMarketplacePricing } from "../listings/pricing";
 import {
   checkPublishGuardrails,
@@ -311,6 +311,7 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
 // then by created_at ASC (FIFO). This prevents stale Retry jobs from
 // blocking fresh publish_now jobs that share the same priority value.
 router.get("/publishing/jobs/next", async (req, res) => {
+  const now = new Date();
   const [row] = await db
     .select()
     .from(publishingJobsTable)
@@ -319,6 +320,7 @@ router.get("/publishing/jobs/next", async (req, res) => {
         or(
           eq(publishingJobsTable.status, "Queued"),
           eq(publishingJobsTable.status, "Retry"),
+          and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, now)),
         ),
         isNull(publishingJobsTable.claimedByExtension),
       ),
@@ -588,6 +590,7 @@ router.post("/publishing/jobs/:id/claim", async (req, res) => {
           eq(publishingJobsTable.status, "Queued"),
           eq(publishingJobsTable.status, "Retry"),
           eq(publishingJobsTable.status, "Assigned"),
+          and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, new Date())),
         ),
         isNull(publishingJobsTable.claimedByExtension),
       ),

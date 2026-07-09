@@ -2408,7 +2408,18 @@
           const valRes = await send({ type: "VALIDATE_JOB", jobId: activeJob.id });
           if (valRes && valRes.ok && valRes.data) {
             jobStatus = valRes.data.status;
-            const ACTIVE_STATUSES = ["Queued", "Claimed", "Publishing", "Retry"];
+            const ACTIVE_STATUSES = [
+              "Queued",
+              "Scheduled",
+              "Assigned",
+              "Claimed",
+              "Publishing",
+              "Opening Facebook",
+              "Filling Form",
+              "Auto Publishing",
+              "Ready for Review",
+              "Retry",
+            ];
             jobIsActive = ACTIVE_STATUSES.includes(jobStatus);
           }
           console.log(`[DealerPilot AI] [AUDIT] activeJob #${activeJob.id} validation: status=${jobStatus}, active=${jobIsActive}`);
