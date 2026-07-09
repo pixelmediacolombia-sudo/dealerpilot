@@ -9,7 +9,7 @@
     console.log(`[DealerPilot AI][STATE] ${msg}`);
     chrome.storage.local
       .set({ workflowStep: msg, workflowStepAt: new Date().toISOString() })
-      .catch(() => {});
+      .catch(() => { });
   }
 
   function stateError(context, err) {
@@ -17,7 +17,7 @@
     console.error(`[DealerPilot AI][ERROR] ${context}${detail}`, err || "");
     chrome.storage.local
       .set({ workflowStep: `\u274C ${context}`, workflowStepAt: new Date().toISOString() })
-      .catch(() => {});
+      .catch(() => { });
   }
 
   // ---- Safe runtime communication ----
@@ -34,10 +34,10 @@
   const MARKETPLACE_FAST_MODE = true;
 
   const BUDGET = {
-    THUMBNAIL_WAIT_MS:   20_000,       // stop polling thumbnails after 20 s
-    COMBOBOX_WAIT_MS:     5_000,       // max time to find year / make / model combobox
-    COMBOBOX_OPTIONS_MS:  8_000,       // max time for option list to appear
-    TOTAL_JOB_MS:        4 * 60_000,   // 4-minute hard cap on the full job
+    THUMBNAIL_WAIT_MS: 20_000,       // stop polling thumbnails after 20 s
+    COMBOBOX_WAIT_MS: 5_000,       // max time to find year / make / model combobox
+    COMBOBOX_OPTIONS_MS: 8_000,       // max time for option list to appear
+    TOTAL_JOB_MS: 4 * 60_000,   // 4-minute hard cap on the full job
   };
 
   // ── Per-job photo cache ───────────────────────────────────────────────────
@@ -65,7 +65,7 @@
         "DealerPilot extension was updated. Please fully refresh this Facebook tab and try again.",
         "err",
       );
-    } catch (_) {}
+    } catch (_) { }
     try {
       if (!document.getElementById("mai-ctx-banner")) {
         const b = document.createElement("div");
@@ -78,7 +78,7 @@
           "⚠ DealerPilot extension was updated — fully refresh this Facebook tab to continue.";
         document.documentElement.appendChild(b);
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   function send(message) {
@@ -121,9 +121,9 @@
         : window.HTMLInputElement.prototype;
     const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
     setter.call(el, value);
-    el.dispatchEvent(new Event("input",  { bubbles: true }));
+    el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
-    el.dispatchEvent(new Event("blur",   { bubbles: true }));
+    el.dispatchEvent(new Event("blur", { bubbles: true }));
   }
 
   function labelText(el) {
@@ -180,10 +180,10 @@
     const boxes = Array.from(document.querySelectorAll('[role="combobox"]'))
       .filter((el) => el.offsetParent !== null);
     for (const el of boxes) {
-      const inner      = (el.innerText || el.textContent || "").toLowerCase().trim();
-      const ariaLabel  = (el.getAttribute("aria-label") || "").toLowerCase();
+      const inner = (el.innerText || el.textContent || "").toLowerCase().trim();
+      const ariaLabel = (el.getAttribute("aria-label") || "").toLowerCase();
       const labelledBy = el.getAttribute("aria-labelledby");
-      let   labelTxt   = "";
+      let labelTxt = "";
       if (labelledBy) {
         const lbEl = document.getElementById(labelledBy);
         if (lbEl) labelTxt = (lbEl.innerText || lbEl.textContent || "").toLowerCase().trim();
@@ -222,7 +222,7 @@
 
   function waitForOptions(maxWaitMs, stepLabel) {
     const limit = maxWaitMs === undefined ? 8000 : maxWaitMs;
-    const tag   = stepLabel || "options";
+    const tag = stepLabel || "options";
     return new Promise((resolve) => {
       const interval = 150;
       let elapsed = 0;
@@ -252,7 +252,7 @@
         if (elapsed >= limit) {
           const popup =
             document.querySelector('[role="listbox"]') ||
-            document.querySelector('[role="dialog"]')  ||
+            document.querySelector('[role="dialog"]') ||
             document.querySelector('[aria-modal="true"]');
           const popupHtml = popup
             ? popup.outerHTML.slice(0, 3000)
@@ -349,8 +349,8 @@
   function detectPageState() {
     const hostname = location.hostname;
     const pathname = location.pathname;
-    const href     = location.href;
-    const now      = new Date().toISOString();
+    const href = location.href;
+    const now = new Date().toISOString();
 
     const isMarketplaceNow =
       hostname.includes("facebook.com") && pathname.includes("/marketplace");
@@ -368,15 +368,15 @@
 
     chrome.storage.local
       .set({
-        marketplaceDetected:   isMarketplaceNow,
-        marketplacePath:       isMarketplaceNow ? pathname : null,
-        marketplaceUrl:        isMarketplaceNow ? href : null,
+        marketplaceDetected: isMarketplaceNow,
+        marketplacePath: isMarketplaceNow ? pathname : null,
+        marketplaceUrl: isMarketplaceNow ? href : null,
         marketplaceDetectedAt: now,
-        messengerDetected:     isMessengerNow,
+        messengerDetected: isMessengerNow,
         fbLoggedIn,
         marketplaceConnected,
       })
-      .catch(() => {});
+      .catch(() => { });
 
     if (hostname.includes("facebook.com")) {
       try {
@@ -385,7 +385,7 @@
           fbLoggedIn,
           marketplaceConnected,
         });
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     log("Page state:", { isMarketplaceNow, isMessengerNow, fbLoggedIn, marketplaceConnected });
@@ -403,7 +403,7 @@
         return result;
       };
     }
-    history.pushState    = wrap(history.pushState);
+    history.pushState = wrap(history.pushState);
     history.replaceState = wrap(history.replaceState);
   })();
   window.addEventListener("popstate", detectPageState);
@@ -416,7 +416,7 @@
     }
   }).observe(document.documentElement, { subtree: true, childList: true });
 
-  const href        = location.href;
+  const href = location.href;
   const isMessenger = _initial.isMessengerNow;
   const isMarketplaceCreate = /\/marketplace\/create/.test(location.pathname);
 
@@ -439,12 +439,12 @@
   `;
   document.documentElement.appendChild(panel);
 
-  const statusEl  = panel.querySelector("#mai-status");
+  const statusEl = panel.querySelector("#mai-status");
   const actionsEl = panel.querySelector("#mai-actions");
-  const outputEl  = panel.querySelector("#mai-output");
-  const jobBoxEl  = panel.querySelector("#mai-job-box");
-  const dotEl     = panel.querySelector("#mai-dot");
-  const bodyEl    = panel.querySelector("#mai-body");
+  const outputEl = panel.querySelector("#mai-output");
+  const jobBoxEl = panel.querySelector("#mai-job-box");
+  const dotEl = panel.querySelector("#mai-dot");
+  const bodyEl = panel.querySelector("#mai-body");
 
   panel.querySelector("#mai-toggle").addEventListener("click", () => {
     bodyEl.hidden = !bodyEl.hidden;
@@ -506,7 +506,7 @@
           <div class="mai-job-meta">Sign in to Facebook. DealerPilot will open Marketplace and continue publishing automatically after login.</div>
         </div>`;
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   // ---- Safety: stop on Facebook login / checkpoint / captcha ----
@@ -638,14 +638,13 @@
     jobBoxEl.innerHTML = `
       <div class="mai-job">
         <div class="mai-job-title">${escapeHtml(job.listingTitle || "Publishing job")}</div>
-        <div class="mai-job-meta">${escapeHtml(job.vehicleLabel || "")}${
-          job.dealerName ? " · " + escapeHtml(job.dealerName) : ""
-        } · Job #${escapeHtml(String(job.id))}</div>
+        <div class="mai-job-meta">${escapeHtml(job.vehicleLabel || "")}${job.dealerName ? " · " + escapeHtml(job.dealerName) : ""
+      } · Job #${escapeHtml(String(job.id))}</div>
       </div>`;
 
     let fill, images;
     if (job._prefetchedPayload) {
-      fill   = job._prefetchedPayload.fill;
+      fill = job._prefetchedPayload.fill;
       images = job._prefetchedPayload.images ?? [];
     } else {
       setStatus("Loading listing data…");
@@ -661,7 +660,7 @@
         }
         return;
       }
-      fill   = res.data.fill;
+      fill = res.data.fill;
       images = res.data.images;
 
       // Adopt the server-healed mode + new debug fields (v1.3.13). job.mode may
@@ -680,11 +679,11 @@
           autoClickPublish: res.data.autoClickPublish,
           backendEnvironment: res.data.backendEnvironment,
         },
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
-    const filled   = [];
-    const missed   = [];
+    const filled = [];
+    const missed = [];
     const warnings = [];
 
     // ------------------------------------------------------------------
@@ -729,8 +728,8 @@
         cb2.focus();
         await sleep(200);
         cb2.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
-        cb2.dispatchEvent(new MouseEvent("mouseup",   { bubbles: true, cancelable: true, view: window }));
-        cb2.dispatchEvent(new MouseEvent("click",     { bubbles: true, cancelable: true, view: window }));
+        cb2.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
+        cb2.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
         await sleep(500);
         options = await waitForOptions(6000, `${label}-retry1`);
       }
@@ -755,9 +754,9 @@
         cb4.focus();
         await sleep(200);
         for (const ch of String(targetValue)) {
-          cb4.dispatchEvent(new KeyboardEvent("keydown",  { key: ch, bubbles: true }));
+          cb4.dispatchEvent(new KeyboardEvent("keydown", { key: ch, bubbles: true }));
           cb4.dispatchEvent(new KeyboardEvent("keypress", { key: ch, bubbles: true }));
-          cb4.dispatchEvent(new KeyboardEvent("keyup",    { key: ch, bubbles: true }));
+          cb4.dispatchEvent(new KeyboardEvent("keyup", { key: ch, bubbles: true }));
           await sleep(60);
         }
         await sleep(700);
@@ -784,9 +783,9 @@
       }
 
       // ---- Fuzzy option matching ----
-      const needle   = String(targetValue).toLowerCase().trim();
-      const getText  = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
-      const norm     = (s) => s.replace(/[^a-z0-9]/g, "");
+      const needle = String(targetValue).toLowerCase().trim();
+      const getText = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
+      const norm = (s) => s.replace(/[^a-z0-9]/g, "");
 
       // Vehicle-type alias set — Facebook has used many different labels
       const VT_ALIASES = [
@@ -796,30 +795,30 @@
 
       // Color normalization map — handle Facebook label variants
       const COLOR_MAP = {
-        "beige":  ["beige", "tan"],
-        "black":  ["black"],
-        "blue":   ["blue", "navy", "dark blue", "light blue"],
-        "brown":  ["brown", "burgundy", "maroon", "wine"],
-        "gold":   ["gold", "champagne", "bronze", "copper"],
-        "gray":   ["gray", "grey", "silver", "charcoal", "dark gray", "light gray"],
-        "green":  ["green", "olive", "dark green", "light green"],
+        "beige": ["beige", "tan"],
+        "black": ["black"],
+        "blue": ["blue", "navy", "dark blue", "light blue"],
+        "brown": ["brown", "burgundy", "maroon", "wine"],
+        "gold": ["gold", "champagne", "bronze", "copper"],
+        "gray": ["gray", "grey", "silver", "charcoal", "dark gray", "light gray"],
+        "green": ["green", "olive", "dark green", "light green"],
         "orange": ["orange"],
         "purple": ["purple", "violet", "lavender"],
-        "red":    ["red", "dark red"],
-        "white":  ["white", "pearl", "cream", "ivory", "off-white"],
+        "red": ["red", "dark red"],
+        "white": ["white", "pearl", "cream", "ivory", "off-white"],
         "yellow": ["yellow"],
-        "other":  ["other"],
+        "other": ["other"],
       };
 
       // Body style map — normalize vehicle body type to Facebook's option labels
       const BODY_STYLE_MAP = {
-        "suv":         ["suv", "sport utility", "sport-utility"],
-        "sedan":       ["sedan", "saloon"],
-        "truck":       ["truck", "pickup", "pick-up", "pick up"],
-        "coupe":       ["coupe", "2-door", "2door"],
-        "hatchback":   ["hatchback", "hatch", "5-door"],
-        "van":         ["van", "minivan", "mini-van"],
-        "wagon":       ["wagon", "estate", "touring"],
+        "suv": ["suv", "sport utility", "sport-utility"],
+        "sedan": ["sedan", "saloon"],
+        "truck": ["truck", "pickup", "pick-up", "pick up"],
+        "coupe": ["coupe", "2-door", "2door"],
+        "hatchback": ["hatchback", "hatch", "5-door"],
+        "van": ["van", "minivan", "mini-van"],
+        "wagon": ["wagon", "estate", "touring"],
         "convertible": ["convertible", "cabriolet", "roadster", "cabrio"],
       };
 
@@ -835,26 +834,26 @@
         // Color matching — fires for "color", "exterior color", "interior color"
         (label.toLowerCase().includes("color")
           ? (() => {
-              for (const [canonical, aliases] of Object.entries(COLOR_MAP)) {
-                if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
-                  const found = options.find((o) => getText(o).includes(canonical));
-                  if (found) return found;
-                }
+            for (const [canonical, aliases] of Object.entries(COLOR_MAP)) {
+              if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
+                const found = options.find((o) => getText(o).includes(canonical));
+                if (found) return found;
               }
-              return undefined;
-            })()
+            }
+            return undefined;
+          })()
           : undefined) ||
         // Body style matching
         (label === "body style"
           ? (() => {
-              for (const [canonical, aliases] of Object.entries(BODY_STYLE_MAP)) {
-                if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
-                  const found = options.find((o) => getText(o).includes(canonical));
-                  if (found) return found;
-                }
+            for (const [canonical, aliases] of Object.entries(BODY_STYLE_MAP)) {
+              if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
+                const found = options.find((o) => getText(o).includes(canonical));
+                if (found) return found;
               }
-              return undefined;
-            })()
+            }
+            return undefined;
+          })()
           : undefined);
 
       if (!pick) {
@@ -943,35 +942,35 @@
       // the old "Car/Truck" category.  Map whichever value the server sends
       // to the label Facebook is most likely to display.
       const VT_MAP = {
-        "truck":          "Truck",
-        "pickup":         "Truck",
-        "pickup truck":   "Truck",
-        "suv":            "SUV",
-        "sport utility":  "SUV",
-        "sport-utility":  "SUV",
-        "sedan":          "Sedan",
-        "saloon":         "Sedan",
-        "coupe":          "Coupe",
-        "2-door":         "Coupe",
-        "hatchback":      "Hatchback",
-        "hatch":          "Hatchback",
-        "van":            "Van",
-        "minivan":        "Van",
-        "mini-van":       "Van",
-        "wagon":          "Wagon",
-        "estate":         "Wagon",
-        "convertible":    "Convertible",
-        "cabriolet":      "Convertible",
-        "roadster":       "Convertible",
-        "car/truck":      "Car/Truck",
-        "cars & trucks":  "Car/Truck",
-        "cars and trucks":"Car/Truck",
-        "car":            "Car/Truck",
-        "automobile":     "Car/Truck",
+        "truck": "Truck",
+        "pickup": "Truck",
+        "pickup truck": "Truck",
+        "suv": "SUV",
+        "sport utility": "SUV",
+        "sport-utility": "SUV",
+        "sedan": "Sedan",
+        "saloon": "Sedan",
+        "coupe": "Coupe",
+        "2-door": "Coupe",
+        "hatchback": "Hatchback",
+        "hatch": "Hatchback",
+        "van": "Van",
+        "minivan": "Van",
+        "mini-van": "Van",
+        "wagon": "Wagon",
+        "estate": "Wagon",
+        "convertible": "Convertible",
+        "cabriolet": "Convertible",
+        "roadster": "Convertible",
+        "car/truck": "Car/Truck",
+        "cars & trucks": "Car/Truck",
+        "cars and trucks": "Car/Truck",
+        "car": "Car/Truck",
+        "automobile": "Car/Truck",
       };
-      const rawLower   = (rawValue || "").toLowerCase().trim();
-      const mapped     = VT_MAP[rawLower] || rawValue || "Car/Truck";
-      const VT_KWS     = ["vehicle type", "tipo de veh", "category", "tipo"];
+      const rawLower = (rawValue || "").toLowerCase().trim();
+      const mapped = VT_MAP[rawLower] || rawValue || "Car/Truck";
+      const VT_KWS = ["vehicle type", "tipo de veh", "category", "tipo"];
       // Also include body-style keywords for vehicles whose bodyStyle value
       // might land in the vehicle-type combobox (depends on form version)
       const CAR_ALIASES = ["car/truck", "cars & trucks", "cars and trucks", "vehicle", "automobile"];
@@ -982,9 +981,9 @@
       // ── Option-picker helper ────────────────────────────────────────────
       function tryPickOption(optionEls, target) {
         if (!optionEls.length) return false;
-        const needle   = target.toLowerCase().trim();
-        const getText  = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
-        const normStr  = (s) => s.replace(/[^a-z0-9]/g, "");
+        const needle = target.toLowerCase().trim();
+        const getText = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
+        const normStr = (s) => s.replace(/[^a-z0-9]/g, "");
 
         let pick =
           optionEls.find((o) => getText(o) === needle) ||
@@ -1181,9 +1180,9 @@
           cbEl.focus();
           await sleep(200);
           for (const ch of mapped) {
-            cbEl.dispatchEvent(new KeyboardEvent("keydown",  { key: ch, bubbles: true }));
+            cbEl.dispatchEvent(new KeyboardEvent("keydown", { key: ch, bubbles: true }));
             cbEl.dispatchEvent(new KeyboardEvent("keypress", { key: ch, bubbles: true }));
-            cbEl.dispatchEvent(new KeyboardEvent("keyup",    { key: ch, bubbles: true }));
+            cbEl.dispatchEvent(new KeyboardEvent("keyup", { key: ch, bubbles: true }));
             await sleep(60);
           }
           await sleep(700);
@@ -1251,7 +1250,7 @@
       // one photo before the Next button becomes active.
       stateLog("Phase 0: uploading photos first");
       setStatus("Uploading photos…");
-      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "field_fill_started", details: "Starting photo upload and form fill" }).catch(() => {});
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "field_fill_started", details: "Starting photo upload and form fill" }).catch(() => { });
 
       if (images && images.length) {
         const photoResult = await uploadPhotos(images, job.id, warnings);
@@ -1260,7 +1259,7 @@
             const reason = photoResult.reason || "Photo upload failed";
             stateError("Photo upload failed — aborting", new Error(reason));
             setStatus(reason, "err");
-            send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
+            send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => { });
             await send({ type: "FAIL_JOB", jobId: job.id, reason });
             await chrome.storage.local.remove("activeJob");
             renderReview(job, { filled, missed, warnings });
@@ -1323,7 +1322,7 @@
       const modelInput = await waitForNamedField("model", ["model"], 10000);
       if (modelInput && fill.model) {
         setNativeValue(modelInput, String(fill.model));
-        modelInput.dispatchEvent(new Event("input",  { bubbles: true }));
+        modelInput.dispatchEvent(new Event("input", { bubbles: true }));
         modelInput.dispatchEvent(new Event("change", { bubbles: true }));
         modelInput.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
         filled.push("model");
@@ -1356,7 +1355,7 @@
         if (titleEl) {
           if (fill.title) {
             setNativeValue(titleEl, String(fill.title));
-            titleEl.dispatchEvent(new Event("input",  { bubbles: true }));
+            titleEl.dispatchEvent(new Event("input", { bubbles: true }));
             titleEl.dispatchEvent(new Event("change", { bubbles: true }));
             titleEl.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
             filled.push("title");
@@ -1451,8 +1450,8 @@
           : ["Black", "Gray", "Other"];
         let interiorFilled = false;
         for (const candidate of interiorCandidates) {
-          const missedBefore  = missed.length;
-          const warnsBefore   = warnings.length;
+          const missedBefore = missed.length;
+          const warnsBefore = warnings.length;
           const ok = await selectComboboxStep(
             "interior color",
             ["interior color", "interior"],
@@ -1505,13 +1504,16 @@
   // ── Canvas resize helper ─────────────────────────────────────────────────
   // Scales a blob to maxWidth preserving aspect ratio, encodes as JPEG.
   // Falls back to the original blob if createImageBitmap or canvas fails.
+  // =====================================================================
+  // Canvas/bitmap resize helper (reemplaza la versión anterior)
   async function resizeImage(blob, maxWidth, quality) {
-    try {
-      const bitmap = await createImageBitmap(blob);
+    // Intenta usar createImageBitmap (rápido); si falla, usa Image() + canvas fallback.
+    async function bitmapResize(srcBlob, targetWidth, q) {
+      const bitmap = await createImageBitmap(srcBlob);
       let { width, height } = bitmap;
-      if (width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
+      if (width > targetWidth) {
+        height = Math.round((height * targetWidth) / width);
+        width = targetWidth;
       }
       const canvas = document.createElement("canvas");
       canvas.width = width;
@@ -1519,13 +1521,88 @@
       const ctx = canvas.getContext("2d");
       ctx.drawImage(bitmap, 0, 0, width, height);
       bitmap.close();
-      return new Promise((resolve) => {
-        canvas.toBlob((resized) => resolve(resized || blob), "image/jpeg", quality);
+      return await new Promise((resolve) => {
+        canvas.toBlob((resized) => resolve(resized || srcBlob), "image/jpeg", q);
       });
-    } catch (e) {
-      console.warn("[PHOTO] resize failed — using original:", e.message);
-      return blob;
     }
+
+    async function imageElementResize(srcBlob, targetWidth, q) {
+      const url = URL.createObjectURL(srcBlob);
+      try {
+        const img = await new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = () => reject(new Error("Image() load failed"));
+          image.src = url;
+        });
+        let { width, height } = img;
+        if (width > targetWidth) {
+          height = Math.round((height * targetWidth) / width);
+          width = targetWidth;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        return await new Promise((resolve) => {
+          canvas.toBlob((resized) => resolve(resized || srcBlob), "image/jpeg", q);
+        });
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    try {
+      return await bitmapResize(blob, maxWidth, quality);
+    } catch (e) {
+      console.warn("[PHOTO] createImageBitmap failed, falling back to Image():", e && e.message);
+      try {
+        return await imageElementResize(blob, maxWidth, quality);
+      } catch (e2) {
+        console.warn("[PHOTO] Image() fallback failed; returning original blob:", e2 && e2.message);
+        return blob;
+      }
+    }
+  }
+
+  // =====================================================================
+  // Ensure final JPEG is under maxBytes by trying quality and width reductions.
+  // Devuelve Blob (JPEG) si tuvo éxito, o null si no pudo reducirlo.
+  async function ensureUnderLimit(originalBlob, initialMaxWidth = 1600, initialQuality = 0.82, maxBytes = 10 * 1024 * 1024) {
+    const QUALITY_STEPS = [initialQuality, 0.75, 0.65, 0.55, 0.5];
+    const WIDTH_STEPS = [initialMaxWidth, 1200, 1000, 800];
+
+    // If already small and JPEG, return early
+    const lowerType = (originalBlob.type || "").toLowerCase();
+    if (originalBlob.size <= maxBytes && (lowerType.includes("jpeg") || lowerType.includes("jpg"))) {
+      return originalBlob;
+    }
+
+    for (const w of WIDTH_STEPS) {
+      for (const q of QUALITY_STEPS) {
+        try {
+          const resized = await resizeImage(originalBlob, w, q);
+          // Ensure mime is image/jpeg
+          const finalBlob = resized.type && resized.type !== "image/jpeg"
+            ? new Blob([await resized.arrayBuffer()], { type: "image/jpeg" })
+            : resized;
+          console.log(`[PHOTO] compress attempt: width=${w} quality=${q} sizeKB=${Math.round(finalBlob.size / 1024)}`);
+          if (finalBlob.size <= maxBytes) return finalBlob;
+        } catch (e) {
+          console.warn("[PHOTO] compress attempt error:", e && e.message);
+        }
+      }
+    }
+
+    // Último intento agresivo
+    try {
+      const last = await resizeImage(originalBlob, WIDTH_STEPS[WIDTH_STEPS.length - 1], 0.5);
+      if (last.size <= maxBytes) return last;
+    } catch (_) { /* ignore */ }
+
+    console.warn("[PHOTO] Could not compress image under limit:", Math.round(originalBlob.size / 1024), "KB");
+    return null;
   }
 
   // =====================================================================
@@ -1562,8 +1639,10 @@
     }
 
     // ── Parallel download (3 concurrent) with in-memory cache ────────────
-    send({ type: "SEND_JOB_EVENT", jobId, event: "photo_download_started",
-           details: `Downloading ${totalPhotos} photos` }).catch(() => {});
+    send({
+      type: "SEND_JOB_EVENT", jobId, event: "photo_download_started",
+      details: `Downloading ${totalPhotos} photos`
+    }).catch(() => { });
     stateLog(`Photo download: fetching ${totalPhotos} photo(s) in parallel batches of 5`);
     setStatus(`Downloading photos 0 / ${totalPhotos}…`);
 
@@ -1602,9 +1681,21 @@
 
           // Resize to max 1600 px wide, JPEG quality 0.82
           const resizedBlob = await resizeImage(originalBlob, 1600, 0.82);
-          stateLog(`Photo ${idx + 1}: ${Math.round(originalBlob.size / 1024)} KB → ${Math.round(resizedBlob.size / 1024)} KB`);
+          // Produce final JPEG bajo 10 MB (límite Facebook), con compresión progresiva.
+          const TARGET_MAX_BYTES = 10 * 1024 * 1024;
+          const finalBlob = await ensureUnderLimit(originalBlob, 1600, 0.82, TARGET_MAX_BYTES);
 
-          rawFiles[idx] = new File([resizedBlob], `vehicle-${idx + 1}.jpg`, { type: "image/jpeg" });
+          if (!finalBlob) {
+            const reason = `Photo ${idx + 1}: could not compress below ${(TARGET_MAX_BYTES / 1024).toFixed(0)} KB`;
+            console.warn("[PHOTO]", reason);
+            warnings.push(reason);
+            // Opción: omitir la foto para no bloquear todo el lote
+            continue;
+          }
+
+          stateLog(`Photo ${idx + 1}: ${Math.round(originalBlob.size / 1024)} KB → ${Math.round(finalBlob.size / 1024)} KB (final)`);
+
+          rawFiles[idx] = new File([finalBlob], `vehicle-${idx + 1}.jpg`, { type: "image/jpeg" });
           downloaded++;
           setStatus(`Downloading photos ${downloaded} / ${totalPhotos}…`);
         } catch (err) {
@@ -1614,8 +1705,10 @@
 
       // Progress event after each batch completes
       const done = Math.min(i + BATCH, totalPhotos);
-      send({ type: "SEND_JOB_EVENT", jobId, event: "photo_download_progress",
-             details: `Downloading photos ${done} / ${totalPhotos}` }).catch(() => {});
+      send({
+        type: "SEND_JOB_EVENT", jobId, event: "photo_download_progress",
+        details: `Downloading photos ${done} / ${totalPhotos}`
+      }).catch(() => { });
     }
 
     const files = rawFiles.filter(Boolean);
@@ -1625,24 +1718,30 @@
       return { uploaded: 0, failed: true, reason };
     }
 
-    send({ type: "SEND_JOB_EVENT", jobId, event: "photo_download_complete",
-           details: `${files.length} photos ready` }).catch(() => {});
+    send({
+      type: "SEND_JOB_EVENT", jobId, event: "photo_download_complete",
+      details: `${files.length} photos ready`
+    }).catch(() => { });
     stateLog(`Photos ready: ${files.length} / ${totalPhotos} downloaded and resized`);
 
     // ── Inject files into Facebook ────────────────────────────────────────
     stateLog(`Photo upload: injecting ${files.length} file(s)`);
     setStatus(`Uploading ${files.length} photo(s) to Facebook…`);
-    send({ type: "SEND_JOB_EVENT", jobId, event: "photo_upload_started",
-           details: `Uploading ${files.length} photos` }).catch(() => {});
+    send({
+      type: "SEND_JOB_EVENT", jobId, event: "photo_upload_started",
+      details: `Uploading ${files.length} photos`
+    }).catch(() => { });
 
     const dt = new DataTransfer();
     for (const file of files) dt.items.add(file);
     input.files = dt.files;
-    input.dispatchEvent(new Event("input",  { bubbles: true }));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
 
-    send({ type: "SEND_JOB_EVENT", jobId, event: "photo_upload_complete",
-           details: `${files.length} photos injected` }).catch(() => {});
+    send({
+      type: "SEND_JOB_EVENT", jobId, event: "photo_upload_complete",
+      details: `${files.length} photos injected`
+    }).catch(() => { });
 
     // ── Fast check: file input has our injected files ─────────────────────
     // input.files only proves the browser accepted our DataTransfer. It does
@@ -1655,22 +1754,24 @@
     // ── Wait for Facebook to render thumbnails (gives Next button time to enable) ──
     stateLog("Photo upload: waiting for Facebook thumbnail rendering…");
     setStatus(`Waiting for Facebook to process ${files.length} photo(s)…`);
-    send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_wait_started" }).catch(() => {});
+    send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_wait_started" }).catch(() => { });
     const confirmed = await waitForPhotoThumbnails(files.length, BUDGET.THUMBNAIL_WAIT_MS);
     if (confirmed && !_photosConfirmed) {
       stateLog(`Photo upload: Facebook thumbnails visible`);
       _photosConfirmed = true;
-      send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_detected",
-             details: `${files.length} photos confirmed via DOM` }).catch(() => {});
+      send({
+        type: "SEND_JOB_EVENT", jobId, event: "thumbnail_detected",
+        details: `${files.length} photos confirmed via DOM`
+      }).catch(() => { });
     } else if (!confirmed) {
       const reason = `Photo upload failed: Facebook did not confirm ${files.length} uploaded photo(s)`;
       stateError(reason);
       warnings.push(reason);
-      send({ type: "SEND_JOB_EVENT", jobId, event: "auto_publish_failed", details: reason }).catch(() => {});
+      send({ type: "SEND_JOB_EVENT", jobId, event: "auto_publish_failed", details: reason }).catch(() => { });
       return { uploaded: files.length, failed: true, reason };
     }
 
-    send({ type: "SEND_JOB_EVENT", jobId, event: "photos_uploaded", details: `${files.length} photos` }).catch(() => {});
+    send({ type: "SEND_JOB_EVENT", jobId, event: "photos_uploaded", details: `${files.length} photos` }).catch(() => { });
     setStatus(`Photos uploaded (${files.length}). Continuing…`);
     await sleep(200);
 
@@ -1761,7 +1862,7 @@
 
     stateLog(`Auto-retry: first failure — "${reason}" — will retry job #${job.id}`);
     setStatus("First attempt failed — auto-retrying in 4 s…", "err");
-    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_retry_pending", details: reason }).catch(() => {});
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_retry_pending", details: reason }).catch(() => { });
 
     try {
       await send({ type: "FAIL_JOB", jobId: job.id, reason: `${reason} [auto-retry pending]` });
@@ -1790,7 +1891,7 @@
   async function autoPublishFlow(job, { filled, missed, warnings }) {
     stateLog("Auto-publish: starting");
     setStatus("Auto-publishing — validating form before clicking Next…");
-    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_starting" }).catch(() => {});
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_starting" }).catch(() => { });
 
     await sleep(300);
 
@@ -1801,7 +1902,7 @@
     const validation = await validateBeforeNext(missed, warnings);
     if (!validation.ok) {
       stateError("Pre-Next validation failed", new Error(validation.reason));
-      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: validation.reason }).catch(() => {});
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: validation.reason }).catch(() => { });
       const retried = await handleAutoRetry(job, validation.reason);
       if (!retried) {
         setStatus(validation.reason, "err");
@@ -1818,7 +1919,7 @@
         ? `Next button blocked: ${fbErrors}`
         : "Could not find an enabled Next button — check the form for errors";
       stateError("Auto-publish: Next not found/enabled", new Error(reason));
-      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => { });
       const retried = await handleAutoRetry(job, reason);
       if (!retried) {
         setStatus(reason, "err");
@@ -1829,8 +1930,8 @@
 
     stateLog("Auto-publish: Next clicked, waiting for Publish button…");
     setStatus("Auto-publishing — waiting for Publish button…");
-    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "next_clicked" }).catch(() => {});
-    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_next" }).catch(() => {});
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "next_clicked" }).catch(() => { });
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_next" }).catch(() => { });
     await sleep(500);
 
     const publishOutcome = await clickPublishUntilListingUrl(job);
@@ -1839,9 +1940,9 @@
       const reason = publishOutcome.blockReason
         ? `Facebook blocked publishing: ${publishOutcome.blockReason}`
         : "Publish was clicked, but DealerPilot could not confirm a live Marketplace listing URL. " +
-          "Facebook may require one more Publish click or manual review.";
+        "Facebook may require one more Publish click or manual review.";
       stateError("Auto-publish: live listing not confirmed", new Error(reason));
-      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => { });
       const failResult = await send({ type: "FAIL_JOB", jobId: job.id, reason });
       await chrome.storage.local.remove("activeJob");
       if (!failResult || !failResult.ok) {
@@ -1853,8 +1954,10 @@
     }
 
     stateLog("Auto-publish: complete - " + listingUrl);
-    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "listing_url_captured",
-           details: listingUrl }).catch(() => {});
+    send({
+      type: "SEND_JOB_EVENT", jobId: job.id, event: "listing_url_captured",
+      details: listingUrl
+    }).catch(() => { });
 
     const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
@@ -1895,8 +1998,8 @@
       if (!clicked) return null;
 
       stateLog(`Auto-publish: Publish click ${attempt}, waiting for Marketplace confirmation...`);
-      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "publish_clicked" }).catch(() => {});
-      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_publish" }).catch(() => {});
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "publish_clicked" }).catch(() => { });
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_publish" }).catch(() => { });
       await sleep(900);
 
       const outcome = await waitForPublishOutcome(attempt === 1 ? 12000 : 22000);
@@ -2196,7 +2299,7 @@
   }
 
   function renderReview(job, result) {
-    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "ready_for_review" }).catch(() => {});
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "ready_for_review" }).catch(() => { });
     showOutput(`
       <div class="mai-section-label">Filled successfully</div>
       <div class="mai-chips">${chips(result.filled, "ok")}</div>
@@ -2297,7 +2400,7 @@
           await chrome.storage.local.remove("activeJob");
           // Fall through to else branch — show test listing button instead
           actionsEl.appendChild(
-            button("Fill Test Listing (job cleared)", () => {}),
+            button("Fill Test Listing (job cleared)", () => { }),
           );
           return;
         }
@@ -2323,28 +2426,28 @@
             const listing = res.data;
             const fill = {
               vehicleType: listing.vehicleType || "Car/Truck",
-              year:         listing.year        ?? null,
-              make:         listing.make        ?? "",
-              model:        listing.model       ?? "",
-              mileage:       listing.mileage      != null ? String(listing.mileage) : null,
-              price:         listing.price        != null ? String(listing.price)   : null,
-              title:         listing.title        ?? "",
-              description:   listing.description  ?? "",
-              location:      listing.location     ?? null,
-              condition:     listing.condition    ?? null,
-              transmission:  listing.transmission ?? null,
-              fuelType:      listing.fuelType     ?? null,
-              color:         listing.color        ?? null,
-              bodyStyle:     listing.bodyStyle    ?? null,
+              year: listing.year ?? null,
+              make: listing.make ?? "",
+              model: listing.model ?? "",
+              mileage: listing.mileage != null ? String(listing.mileage) : null,
+              price: listing.price != null ? String(listing.price) : null,
+              title: listing.title ?? "",
+              description: listing.description ?? "",
+              location: listing.location ?? null,
+              condition: listing.condition ?? null,
+              transmission: listing.transmission ?? null,
+              fuelType: listing.fuelType ?? null,
+              color: listing.color ?? null,
+              bodyStyle: listing.bodyStyle ?? null,
               exteriorColor: listing.exteriorColor ?? listing.color ?? null,
               interiorColor: listing.interiorColor ?? null,
             };
 
             const syntheticJob = {
-              id:            0,
-              listingTitle:  listing.title || "Test Listing",
-              vehicleLabel:  `${listing.year || ""} ${listing.make || ""} ${listing.model || ""}`.trim(),
-              dealerName:    "Test Mode",
+              id: 0,
+              listingTitle: listing.title || "Test Listing",
+              vehicleLabel: `${listing.year || ""} ${listing.make || ""} ${listing.model || ""}`.trim(),
+              dealerName: "Test Mode",
               _prefetchedPayload: { fill, images: [] },
             };
 
