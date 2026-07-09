@@ -33,6 +33,7 @@ import {
   eq,
   inArray,
   isNull,
+  lte,
   ne,
   or,
 } from "drizzle-orm";
@@ -307,6 +308,8 @@ async function maybeCreateAutomaticBatch(
 
   for (let i = 0; i < selected.length; i++) {
     const entry = selected[i]!;
+    const jobScheduledAt = new Date(now.getTime() + i * settings.minDelayMinutes * 60_000);
+    const jobDueNow = jobScheduledAt.getTime() <= Date.now() + 1000;
     await db
       .insert(publishPriorityScoresTable)
       .values({
@@ -336,9 +339,9 @@ async function maybeCreateAutomaticBatch(
       dealerId: DEALER_ID,
       batchId: batch.id,
       mode,
-      status: "Queued",
+      status: jobDueNow ? "Queued" : "Scheduled",
       priority: selected.length - i,
-      scheduledAt: now,
+      scheduledAt: jobScheduledAt,
       source: "auto_publish_batch",
       approvedByUser: true,
     });
@@ -383,7 +386,11 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
     .where(
       and(
         eq(publishingJobsTable.dealerId, DEALER_ID),
-        or(eq(publishingJobsTable.status, "Queued"), eq(publishingJobsTable.status, "Retry")),
+        or(
+          eq(publishingJobsTable.status, "Queued"),
+          eq(publishingJobsTable.status, "Retry"),
+          and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, new Date())),
+        ),
         isNull(publishingJobsTable.assignedExtensionId),
         isNull(publishingJobsTable.claimedByExtension),
       ),
@@ -425,7 +432,11 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
       .where(
         and(
           eq(publishingJobsTable.id, job.id),
-          or(eq(publishingJobsTable.status, "Queued"), eq(publishingJobsTable.status, "Retry")),
+          or(
+            eq(publishingJobsTable.status, "Queued"),
+            eq(publishingJobsTable.status, "Retry"),
+            and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, new Date())),
+          ),
         ),
       )
       .returning({ id: publishingJobsTable.id });

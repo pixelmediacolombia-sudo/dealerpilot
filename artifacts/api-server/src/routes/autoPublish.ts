@@ -648,6 +648,9 @@ router.post("/auto-publish/batches", async (req, res) => {
   const batchNumber = Number(batchCountResult[0]?.count ?? 0) + 1;
 
   const schedAt = scheduledAt ? new Date(scheduledAt) : null;
+  const baseTime = schedAt && !Number.isNaN(schedAt.getTime()) ? schedAt : new Date();
+  const spacingMs = (dealerAutoPublishSettings?.minDelayMinutes ?? 10) * 60_000;
+  const nowMs = Date.now();
 
   // Create the batch
   const [batch] = await db
@@ -655,11 +658,11 @@ router.post("/auto-publish/batches", async (req, res) => {
     .values({
       dealerId,
       batchNumber,
-      status: schedAt ? "Scheduled" : "Preparing",
+      status: baseTime.getTime() > nowMs ? "Scheduled" : "Preparing",
       mode,
       totalVehicles: eligible.length,
       needsReviewCount,
-      scheduledAt: schedAt ?? undefined,
+      scheduledAt: baseTime,
       lotLocation: lotLocation ?? null,
     })
     .returning();
@@ -668,6 +671,8 @@ router.post("/auto-publish/batches", async (req, res) => {
   const jobs = [];
   for (let i = 0; i < eligible.length; i++) {
     const s = eligible[i];
+    const jobScheduledAt = new Date(baseTime.getTime() + i * spacingMs);
+    const jobDueNow = jobScheduledAt.getTime() <= Date.now() + 1000;
     const [job] = await db
       .insert(publishingJobsTable)
       .values({
@@ -676,9 +681,9 @@ router.post("/auto-publish/batches", async (req, res) => {
         dealerId,
         batchId: batch.id,
         mode,
-        status: schedAt ? "Scheduled" : "Queued",
+        status: jobDueNow ? "Queued" : "Scheduled",
         priority: eligible.length - i,
-        scheduledAt: schedAt ?? undefined,
+        scheduledAt: jobScheduledAt,
         source: "auto_publish_batch",
         approvedByUser: !dealerAutoPublishSettings?.requireApproval,
       })

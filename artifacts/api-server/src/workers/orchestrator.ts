@@ -13,7 +13,7 @@
 //    failure is caught and recorded as a Failed cycle so the API can never
 //    crash because of it.
 import { db, workerStateTable, orchestratorStateTable, vehicleChangesTable, vehicleIntelligenceTable, vehiclesTable, aiPhotoSetsTable, aiStudioPacksTable, vehicleImagesTable, extensionConnectionsTable, publishingJobsTable, listingPerformanceTable, autoPublishSettingsTable } from "@workspace/db";
-import { and, count, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, count, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import type { Logger } from "pino";
 import { getAllWorkers } from "./registry";
 import { runWorkerOnce } from "./scheduler";
@@ -177,13 +177,17 @@ async function decidePublishing(): Promise<WorkerDecision> {
     return { workerId: "publishing", action: "SKIP", reason: "extension offline", dependencyStatus: "extension offline" };
   }
 
+  const now = new Date();
   const [queueRow] = await db
     .select({ n: count() })
     .from(publishingJobsTable)
     .where(
       and(
         eq(publishingJobsTable.dealerId, DEALER_ID),
-        or(...QUEUED_JOB_STATUSES.map((s) => eq(publishingJobsTable.status, s))),
+        or(
+          ...QUEUED_JOB_STATUSES.map((s) => eq(publishingJobsTable.status, s)),
+          and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, now)),
+        ),
         isNull(publishingJobsTable.assignedExtensionId),
         isNull(publishingJobsTable.claimedByExtension),
       ),
