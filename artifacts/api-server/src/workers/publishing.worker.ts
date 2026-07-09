@@ -12,7 +12,7 @@
 //    unless the job was explicitly approved by a human (approvedByUser=true).
 //  - Only jobs already in Queued/Retry with no assignment are touched — jobs
 //    created via manual publish-now flows are left exactly as-is.
-import { db, publishingJobsTable, vehiclesTable, extensionConnectionsTable } from "@workspace/db";
+import { db, pool, publishingJobsTable, vehiclesTable, extensionConnectionsTable } from "@workspace/db";
 import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
 import { getCachedGmDecision } from "../routes/gm";
 import { getDuplicateConflictVehicleIds } from "./market.worker";
@@ -23,13 +23,20 @@ const DEALER_ID = 1;
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // heartbeat within last 5 minutes = online
 const MAX_ASSIGNMENTS_PER_RUN = 3;
 
-async function findOnlineExtension(): Promise<{ id: string } | null> {
+async function findOnlineExtension(): Promise<{ id: string; name: string } | null> {
   const rows = await db.select().from(extensionConnectionsTable);
   const cutoff = Date.now() - ONLINE_THRESHOLD_MS;
   const online = rows.find(
     (r) => r.lastHeartbeatAt && r.lastHeartbeatAt.getTime() >= cutoff && r.status === "online",
   );
-  return online ? { id: online.name } : null;
+  const chromeId = online
+    ? await pool.query<{ chrome_extension_id: string | null }>(
+        "select chrome_extension_id from extension_connections where id = $1 limit 1",
+        [online.id],
+      )
+    : null;
+  const extensionId = chromeId?.rows[0]?.chrome_extension_id ?? online?.name ?? null;
+  return extensionId && online ? { id: extensionId, name: online.name } : null;
 }
 
 async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOutcome> {

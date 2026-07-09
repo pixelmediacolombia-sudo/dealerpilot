@@ -13,6 +13,7 @@ import {
   vehicleIntelligenceTable,
   marketplaceListingsTable,
   autoPublishSettingsTable,
+  pool,
   type PublishingJob,
 } from "@workspace/db";
 import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
@@ -277,13 +278,20 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
     return;
   }
 
+  const aliases = new Set<string>([extensionId]);
+  const connection = await pool.query<{ name: string }>(
+    "select name from extension_connections where chrome_extension_id = $1 limit 1",
+    [extensionId],
+  );
+  if (connection.rows[0]?.name) aliases.add(connection.rows[0].name);
+
   const [row] = await db
     .select()
     .from(publishingJobsTable)
     .where(
       and(
         eq(publishingJobsTable.status, "Assigned"),
-        eq(publishingJobsTable.assignedExtensionId, extensionId),
+        inArray(publishingJobsTable.assignedExtensionId, [...aliases]),
         isNull(publishingJobsTable.claimedByExtension),
       ),
     )
@@ -836,6 +844,8 @@ router.post("/publishing/jobs/:id/fail", async (req, res) => {
       status: nextStatus,
       failedReason: reason,
       claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
     })
     .where(
       and(
@@ -1292,6 +1302,8 @@ router.post("/publishing/jobs/:id/retry", async (req, res) => {
       status: "Queued",
       attempts: 0,
       claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
       failedReason: null,
     })
     .where(eq(publishingJobsTable.id, id))

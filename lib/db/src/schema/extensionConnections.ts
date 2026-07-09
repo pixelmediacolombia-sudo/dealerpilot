@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const extensionConnectionsTable = pgTable("extension_connections", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
+  chromeExtensionId: text("chrome_extension_id"),
   backendUrl: text("backend_url"),
   status: text("status").notNull().default("offline"),
   lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }),

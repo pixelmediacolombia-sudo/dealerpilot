@@ -1,5 +1,14 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.14
+
+**Fixed**
+- Full Auto photo safety — the extension no longer treats `input.files` as proof that Facebook accepted photos. It now waits for visible thumbnails or a non-zero Facebook photo counter before continuing.
+- Publish safety — if Facebook does not confirm uploaded photos, the job fails before `Next` / `Publish` instead of risking a live listing with zero photos.
+- Backend assignment recovery — assigned jobs now match the real Chrome extension id, and retry/expired jobs clear stale assignment fields so they can be picked up again.
+
+---
+
 ## v1.3.9
 
 **New**

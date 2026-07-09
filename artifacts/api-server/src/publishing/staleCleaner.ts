@@ -43,6 +43,8 @@ export function startStaleJobCleaner(logger: Logger): void {
             status: nextStatus,
             failedReason: `Auto-expired: no activity for ${ACTIVE_STALE_MS / 60000} minutes`,
             claimedByExtension: null,
+            assignedExtensionId: null,
+            assignedAt: null,
           })
           .where(eq(publishingJobsTable.id, job.id));
       }

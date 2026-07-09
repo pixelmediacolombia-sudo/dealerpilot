@@ -1645,16 +1645,11 @@
            details: `${files.length} photos injected` }).catch(() => {});
 
     // ── Fast check: file input has our injected files ─────────────────────
-    // If the DataTransfer injection succeeded the input.files array reflects
-    // the files immediately — this is the most reliable photo confirmation.
-    // Setting _photosConfirmed here prevents the false "thumbnails not
-    // confirmed" warning that fires when Facebook renders photos in a way
-    // our DOM selectors don't detect.
+    // input.files only proves the browser accepted our DataTransfer. It does
+    // not prove Facebook accepted/uploaded the photos, so Full Auto waits for
+    // visible thumbnails or a non-zero Facebook photo counter before moving on.
     if (input.files && input.files.length > 0) {
       stateLog(`Photo upload: ${input.files.length} file(s) confirmed on file input`);
-      _photosConfirmed = true;
-      send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_detected",
-             details: `${input.files.length} photos confirmed via file input` }).catch(() => {});
     }
 
     // ── Wait for Facebook to render thumbnails (gives Next button time to enable) ──
@@ -1668,10 +1663,11 @@
       send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_detected",
              details: `${files.length} photos confirmed via DOM` }).catch(() => {});
     } else if (!confirmed) {
-      stateLog("Photo upload: thumbnail selectors did not match — photos may still be present in Facebook");
-      if (!_photosConfirmed) {
-        warnings.push(`Photo upload: injected ${files.length} file(s); thumbnails not detected — form may still proceed`);
-      }
+      const reason = `Photo upload failed: Facebook did not confirm ${files.length} uploaded photo(s)`;
+      stateError(reason);
+      warnings.push(reason);
+      send({ type: "SEND_JOB_EVENT", jobId, event: "auto_publish_failed", details: reason }).catch(() => {});
+      return { uploaded: files.length, failed: true, reason };
     }
 
     send({ type: "SEND_JOB_EVENT", jobId, event: "photos_uploaded", details: `${files.length} photos` }).catch(() => {});
@@ -1958,11 +1954,6 @@
         '[role="presentation"] img[src^="blob:"]',
       ];
       while (Date.now() - photoStart < PHOTO_POLL_MS) {
-        // Check file input directly — most reliable (files present = injection worked)
-        const fileInputs = [...document.querySelectorAll('input[type="file"]')].filter(
-          (inp) => inp.files && inp.files.length > 0,
-        );
-        if (fileInputs.length > 0) { hasPhoto = true; break; }
         // Collect all matching DOM thumbnail elements, deduped
         const thumbs = [
           ...new Set(THUMB_SELECTORS.flatMap((sel) => [...document.querySelectorAll(sel)])),
@@ -1986,11 +1977,10 @@
     }
 
     if (!hasPhoto) {
-      // Do not hard-fail on photo detection — our selectors may miss Facebook's
-      // rendering. Log a warning and let Facebook's own Next-button validation
-      // catch a genuinely missing photo. False negatives abort valid publishes.
-      stateLog("⚠️ Photo thumbnails not detected by extension selectors — proceeding; Facebook will block Next if truly missing");
-      warnings.push("Photo detection: thumbnails not detected after 15 s scan — form proceeding anyway");
+      return {
+        ok: false,
+        reason: "Photo upload not confirmed by Facebook - refusing to continue to Next/Publish",
+      };
     }
 
     // 2. Check Next button exists and is not disabled
