@@ -1,7 +1,9 @@
-// Opportunity Worker — refreshes Opportunity Engine scores and the Top 10
-// recommendation list every 30 minutes.
+// Opportunity Worker — refreshes Opportunity Engine scores, Demand Engine scores,
+// and the Top 10 recommendation list every 30 minutes.
+// Ranking is now driven by demandScore (Marketplace Demand Engine v1) with
+// opportunityScore as one of 12 inputs rather than the sole ranking metric.
 import { db, vehiclesTable, vehicleIntelligenceTable, publishingJobsTable } from "@workspace/db";
-import { and, desc, eq, inArray, isNotNull, notInArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
 import { seedOpportunityScores } from "../intelligence/seed";
 import type { WorkerDefinition, WorkerRunOutcome } from "./types";
 
@@ -20,34 +22,48 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
       .where(inArray(publishingJobsTable.status, PUBLISHED_JOB_STATUSES))
   ).map((r) => r.vehicleId);
 
+  // Rank by demandScore (Marketplace Demand Engine v1).
+  // Fall back to opportunityScore for rows that haven't been demand-scored yet
+  // (e.g. first run before the demand engine has computed scores).
   const candidates = await db
     .select({
       vehicleId: vehicleIntelligenceTable.vehicleId,
+      demandScore: vehicleIntelligenceTable.demandScore,
+      demandLabel: vehicleIntelligenceTable.demandLabel,
       opportunityScore: vehicleIntelligenceTable.opportunityScore,
-      opportunityLabel: vehicleIntelligenceTable.opportunityLabel,
     })
     .from(vehicleIntelligenceTable)
     .innerJoin(vehiclesTable, eq(vehiclesTable.id, vehicleIntelligenceTable.vehicleId))
     .where(
       and(
         eq(vehiclesTable.dealerId, DEALER_ID),
-        isNotNull(vehicleIntelligenceTable.opportunityScore),
+        isNotNull(sql`coalesce(${vehicleIntelligenceTable.demandScore}, ${vehicleIntelligenceTable.opportunityScore})`),
         publishedVehicleIds.length > 0
           ? notInArray(vehicleIntelligenceTable.vehicleId, publishedVehicleIds)
           : undefined,
       ),
     )
-    .orderBy(desc(vehicleIntelligenceTable.opportunityScore))
+    .orderBy(
+      desc(
+        sql`coalesce(${vehicleIntelligenceTable.demandScore}, ${vehicleIntelligenceTable.opportunityScore})`,
+      ),
+    )
     .limit(10);
 
-  const hotCount = candidates.filter((c) => (c.opportunityScore ?? 0) >= 75).length;
+  const hotCount = candidates.filter(
+    (c) => (c.demandScore ?? c.opportunityScore ?? 0) >= 75,
+  ).length;
+
+  const hotDemandCount = candidates.filter((c) => c.demandLabel === "Hot Demand").length;
 
   return {
-    summary: `Opportunity scores refreshed — ${candidates.length} vehicles selected for today, ${hotCount} hot`,
+    summary: `Demand scores refreshed — ${candidates.length} vehicles ranked, ${hotCount} hot (${hotDemandCount} "Hot Demand")`,
     detail: {
       top10VehicleIds: candidates.map((c) => c.vehicleId),
       hotCount,
+      hotDemandCount,
       excludedPublished: publishedVehicleIds.length,
+      rankingMetric: "demandScore",
     },
   };
 }
@@ -55,7 +71,7 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
 export const opportunityWorker: WorkerDefinition = {
   id: "opportunity",
   name: "Opportunity Agent",
-  description: "Refreshes Opportunity Scores, Top 10, and Command Center strategy",
+  description: "Refreshes Demand + Opportunity Scores, Top 10, and Command Center strategy",
   intervalMs: INTERVAL_MS,
   enabled: true,
   run,

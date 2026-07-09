@@ -12,6 +12,7 @@ import {
   vehicleImagesTable,
   aiPhotoJobsTable,
   listingsTable,
+  workerStateTable,
   type Vehicle,
 } from "@workspace/db";
 import {
@@ -19,6 +20,12 @@ import {
   computePriceMedians,
   type PerfRecord,
 } from "./opportunityEngine";
+import {
+  computeDemandScores,
+  DEFAULT_DEMAND_WEIGHTS,
+  DEMAND_WEIGHTS_VERSION,
+  type DemandWeights,
+} from "./demandEngine";
 
 // ── Strategy Engine v2 ───────────────────────────────────────────────────────
 export const STRATEGY_ENGINE_VERSION = "v2";
@@ -397,6 +404,33 @@ export async function seedOpportunityScores(
 
   if (vehicles.length === 0) return;
 
+  // Load calibrated demand weights from the learning worker's last run
+  // (falls back to hardcoded defaults on first run or if no calibration exists)
+  let demandWeights: DemandWeights = DEFAULT_DEMAND_WEIGHTS;
+  let demandWeightsVersion = DEMAND_WEIGHTS_VERSION;
+  try {
+    const [learningState] = await db
+      .select({ lastResultJson: workerStateTable.lastResultJson })
+      .from(workerStateTable)
+      .where(eq(workerStateTable.workerId, "learning"))
+      .limit(1);
+
+    if (learningState?.lastResultJson) {
+      const stored = JSON.parse(learningState.lastResultJson) as {
+        detail?: { demandWeights?: DemandWeights; demandWeightsVersion?: string };
+      };
+      const w = stored.detail?.demandWeights;
+      const v = stored.detail?.demandWeightsVersion;
+      if (w && typeof w === "object" && Object.keys(w).length >= 10) {
+        demandWeights = w;
+        demandWeightsVersion = v ?? demandWeightsVersion;
+        logger.info({ version: demandWeightsVersion }, "Demand weights loaded from learning worker");
+      }
+    }
+  } catch {
+    logger.info("Using default demand weights (no calibration data yet)");
+  }
+
   // Batch-fetch all supporting data in one round-trip
   const [
     allPerf,
@@ -407,6 +441,8 @@ export async function seedOpportunityScores(
     allPhotoCounts,
     allAiJobs,
     allPublishedListings,
+    spanishConvoCount,
+    totalConvoCount,
   ] = await Promise.all([
     db.select().from(listingPerformanceTable).where(eq(listingPerformanceTable.dealerId, DEALER_ID)),
     db.select({ vehicleId: conversationsTable.vehicleId, id: conversationsTable.id })
@@ -427,6 +463,14 @@ export async function seedOpportunityScores(
     db.select({ vehicleId: listingsTable.vehicleId })
       .from(listingsTable)
       .where(eq(listingsTable.status, "Published")),
+    // Spanish conversation count (for Latino buyer preference signal)
+    db.select({ cnt: count() })
+      .from(conversationsTable)
+      .where(and(eq(conversationsTable.dealerId, DEALER_ID), eq(conversationsTable.language, "es"))),
+    // Total conversation count (denominator for Spanish ratio)
+    db.select({ cnt: count() })
+      .from(conversationsTable)
+      .where(eq(conversationsTable.dealerId, DEALER_ID)),
   ]);
 
   // Build lookup maps
@@ -463,6 +507,38 @@ export async function seedOpportunityScores(
     if (r.temperature === "Hot") {
       hotLeadsByVehicle.set(r.vehicleId, (hotLeadsByVehicle.get(r.vehicleId) ?? 0) + 1);
     }
+  }
+
+  // ── Demand Engine signal maps ───────────────────────────────────────────────
+
+  // Spanish conversation ratio (dealer-wide — used as a market signal for all vehicles)
+  const totalConvos = Number(totalConvoCount[0]?.cnt ?? 0);
+  const spanishConvos = Number(spanishConvoCount[0]?.cnt ?? 0);
+  const spanishConversationRatio = totalConvos > 0 ? spanishConvos / totalConvos : 0;
+
+  // Appointment and sales counts per vehicle (from listing_performance)
+  const apptCountByVehicle = new Map<number, number>();
+  const salesCountByVehicle = new Map<number, number>();
+  for (const r of allPerf) {
+    apptCountByVehicle.set(r.vehicleId, (apptCountByVehicle.get(r.vehicleId) ?? 0) + r.appointmentReadyCount);
+    salesCountByVehicle.set(r.vehicleId, (salesCountByVehicle.get(r.vehicleId) ?? 0) + r.soldCount);
+  }
+
+  // Body-type level outcome aggregates (marketplace popularity signal)
+  // vehicleId → bodyStyle lookup (built from vehicles we already have)
+  const bodyStyleByVehicle = new Map<number, string>();
+  for (const v of vehicles) {
+    if (v.bodyStyle) bodyStyleByVehicle.set(v.id, v.bodyStyle);
+  }
+
+  const bodyTypeOutcomeMap = new Map<string, { total: number; count: number }>();
+  for (const r of allPerf) {
+    const bs = bodyStyleByVehicle.get(r.vehicleId);
+    if (!bs) continue;
+    const existing = bodyTypeOutcomeMap.get(bs) ?? { total: 0, count: 0 };
+    existing.total += r.outcomeScore;
+    existing.count += 1;
+    bodyTypeOutcomeMap.set(bs, existing);
   }
 
   // Creative scores: version → score
@@ -511,6 +587,33 @@ export async function seedOpportunityScores(
       now,
     });
 
+    // ── Compute Marketplace Demand Score ──────────────────────────────────────
+    const bodyStyle = vehicle.bodyStyle ?? "";
+    const bodyTypeData = bodyTypeOutcomeMap.get(bodyStyle);
+    const bodyTypeAvgOutcome = bodyTypeData ? Math.round(bodyTypeData.total / bodyTypeData.count) : 0;
+    const bodyTypeListingCount = bodyTypeData?.count ?? 0;
+
+    const demand = computeDemandScores({
+      opportunityScore:          scores.opportunityScore,
+      buyerSegmentScore:         scores.buyerSegmentScore,
+      priceScore:                scores.priceScore,
+      inventoryHealthScore:      scores.inventoryHealthScore,
+      seasonalScore:             scores.seasonalScore,
+      suggestedLanguage:         scores.suggestedLanguage,
+      opportunityFactors:        scores.opportunityFactors,
+      vehiclePrice:              vehicle.price ?? null,
+      bodyTypeAvgOutcome,
+      bodyTypeListingCount,
+      spanishConversationRatio,
+      vehicleConversations:      convosByVehicle.get(vehicle.id) ?? 0,
+      vehicleHotLeads:           hotLeadsByVehicle.get(vehicle.id) ?? 0,
+      vehicleAppointments:       apptCountByVehicle.get(vehicle.id) ?? 0,
+      vehicleSales:              salesCountByVehicle.get(vehicle.id) ?? 0,
+      duplicateConflictCount:    0, // populated by market scan worker when available
+      learnedWeights:            demandWeights,
+      weightsVersion:            demandWeightsVersion,
+    });
+
     await db
       .insert(vehicleIntelligenceTable)
       .values({
@@ -518,6 +621,15 @@ export async function seedOpportunityScores(
         dealerId: DEALER_ID,
         ...scores,
         opportunityFactors: JSON.stringify(scores.opportunityFactors),
+        demandScore: demand.demandScore,
+        demandLabel: demand.demandLabel,
+        demandFactors: JSON.stringify(demand.demandFactors),
+        marketplacePopularityScore: demand.marketplacePopularityScore,
+        latinoPreferenceScore: demand.latinoPreferenceScore,
+        financingProbabilityScore: demand.financingProbabilityScore,
+        historicalEngagementScore: demand.historicalEngagementScore,
+        duplicateSaturationScore: demand.duplicateSaturationScore,
+        demandWeightsVersion: demand.demandWeightsVersion,
       })
       .onConflictDoUpdate({
         target: vehicleIntelligenceTable.vehicleId,
@@ -542,12 +654,22 @@ export async function seedOpportunityScores(
           adAngle: scores.adAngle,
           suggestedLanguage: scores.suggestedLanguage,
           whyThisAudience: scores.whyThisAudience,
+          // Demand Engine v1
+          demandScore: demand.demandScore,
+          demandLabel: demand.demandLabel,
+          demandFactors: JSON.stringify(demand.demandFactors),
+          marketplacePopularityScore: demand.marketplacePopularityScore,
+          latinoPreferenceScore: demand.latinoPreferenceScore,
+          financingProbabilityScore: demand.financingProbabilityScore,
+          historicalEngagementScore: demand.historicalEngagementScore,
+          duplicateSaturationScore: demand.duplicateSaturationScore,
+          demandWeightsVersion: demand.demandWeightsVersion,
         },
       });
     updated++;
   }
 
-  logger.info({ updated }, "Opportunity Scores seeded");
+  logger.info({ updated }, "Opportunity + Demand Scores seeded");
 }
 
 // ── Main seed function ────────────────────────────────────────────────────────

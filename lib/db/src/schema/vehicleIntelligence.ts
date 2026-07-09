@@ -16,9 +16,18 @@ import { z } from "zod/v4";
 // expectedLeadQuality: hot | warm | cold
 //
 // Opportunity Engine v1 (added columns):
-// opportunityScore = weighted composite of 7 sub-scores (0–100)
+// opportunityScore = weighted composite of 9 sub-scores (0–100)
 // pricingPosition: "Below Market" | "Market Average" | "Above Market"
 // opportunityFactors: JSON stringified string[]
+//
+// Marketplace Demand Engine v1 (added columns):
+// demandScore = 12-signal composite (0–100) — primary ranking metric
+// demandLabel: "Hot Demand" | "Strong" | "Moderate" | "Slow"
+// demandFactors: JSON stringified string[] — plain-English demand bullets
+// Sub-scores stored for breakdown display and weight calibration:
+//   marketplacePopularityScore, latinoPreferenceScore,
+//   financingProbabilityScore, historicalEngagementScore, duplicateSaturationScore
+// demandWeightsVersion: tracks which learned weights were used
 export const vehicleIntelligenceTable = pgTable(
   "vehicle_intelligence",
   {
@@ -57,6 +66,16 @@ export const vehicleIntelligenceTable = pgTable(
     adAngle: text("ad_angle"),
     suggestedLanguage: text("suggested_language"),
     whyThisAudience: text("why_this_audience"),
+    // ── Marketplace Demand Engine v1 ──────────────────────────────────────────
+    demandScore: integer("demand_score"),
+    demandLabel: text("demand_label"),
+    demandFactors: text("demand_factors"),
+    marketplacePopularityScore: integer("marketplace_popularity_score"),
+    latinoPreferenceScore: integer("latino_preference_score"),
+    financingProbabilityScore: integer("financing_probability_score"),
+    historicalEngagementScore: integer("historical_engagement_score"),
+    duplicateSaturationScore: integer("duplicate_saturation_score"),
+    demandWeightsVersion: text("demand_weights_version"),
   },
   (table) => [uniqueIndex("vehicle_intelligence_vehicle_idx").on(table.vehicleId)],
 );

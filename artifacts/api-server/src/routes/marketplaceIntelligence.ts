@@ -487,7 +487,8 @@ function computeEstimatedDaysToSell(price: number | null, confidenceScore: numbe
 router.get("/marketplace-intelligence/recommendations", async (req, res) => {
   const location = typeof req.query.location === "string" ? req.query.location : "";
 
-  // Sort by opportunityScore DESC — this is the single source of truth ranking
+  // Sort by demandScore DESC (Marketplace Demand Engine v1 — 12-signal composite).
+  // Falls back to opportunityScore for any rows that haven't been demand-scored yet.
   const intelligence = await db
     .select()
     .from(vehicleIntelligenceTable)
@@ -495,7 +496,7 @@ router.get("/marketplace-intelligence/recommendations", async (req, res) => {
       eq(vehicleIntelligenceTable.dealerId, DEALER_ID),
       isNotNull(vehicleIntelligenceTable.opportunityScore),
     ))
-    .orderBy(desc(vehicleIntelligenceTable.opportunityScore));
+    .orderBy(desc(sql`coalesce(${vehicleIntelligenceTable.demandScore}, ${vehicleIntelligenceTable.opportunityScore})`));
 
   // Include both Active and Price Changed vehicles (same filter as market intelligence)
   const vehicleConditions = [
@@ -569,7 +570,7 @@ router.get("/marketplace-intelligence/recommendations", async (req, res) => {
       supportingSignals: v2?.supportingSignals ?? [],
       expectedImpact: v2?.expectedImpact ?? null,
       actionCta: v2?.actionCta ?? null,
-      // Opportunity Engine — single source of truth ranking
+      // Opportunity Engine — quality baseline
       opportunityScore: vi.opportunityScore,
       opportunityLabel: vi.opportunityLabel ?? "Watch",
       primarySegment: vi.primarySegment ?? "General",
@@ -577,11 +578,34 @@ router.get("/marketplace-intelligence/recommendations", async (req, res) => {
       adAngle: vi.adAngle ?? "",
       suggestedLanguage: vi.suggestedLanguage ?? "English-first",
       whyThisAudience: vi.whyThisAudience ?? "",
+      // Marketplace Demand Engine v1 — primary ranking score
+      demandScore: vi.demandScore ?? vi.opportunityScore ?? 0,
+      demandLabel: vi.demandLabel ?? "Moderate",
+      demandFactors: (() => {
+        try {
+          return vi.demandFactors ? (JSON.parse(vi.demandFactors) as string[]) : [];
+        } catch {
+          return [];
+        }
+      })(),
+      marketplacePopularityScore: vi.marketplacePopularityScore ?? null,
+      latinoPreferenceScore: vi.latinoPreferenceScore ?? null,
+      financingProbabilityScore: vi.financingProbabilityScore ?? null,
+      historicalEngagementScore: vi.historicalEngagementScore ?? null,
+      duplicateSaturationScore: vi.duplicateSaturationScore ?? null,
+      demandWeightsVersion: vi.demandWeightsVersion ?? null,
+      // Opportunity sub-scores (for breakdown)
+      marketDemandScore: vi.marketDemandScore ?? null,
+      priceScore: vi.priceScore ?? null,
+      buyerSegmentScore: vi.buyerSegmentScore ?? null,
+      inventoryHealthScore: vi.inventoryHealthScore ?? null,
+      seasonalScore: vi.seasonalScore ?? null,
     };
   });
 
   res.json({
     strategyEngineVersion: "v2",
+    demandEngineVersion: "v1",
     recommendations,
   });
 });
@@ -780,12 +804,26 @@ router.get("/marketplace-intelligence/opportunity", async (req, res) => {
         recommendedTimeLabel: intel.recommendedTimeOfDay != null ? timeLabel(intel.recommendedTimeOfDay) : null,
         expectedLeadQuality: intel.expectedLeadQuality ?? "warm",
         confidenceScore: intel.confidenceScore,
+        // Marketplace Demand Engine v1
+        demandScore: intel.demandScore ?? intel.opportunityScore ?? 0,
+        demandLabel: intel.demandLabel ?? "Moderate",
+        demandFactors: (() => {
+          try { return JSON.parse(intel.demandFactors ?? "[]") as string[]; } catch { return []; }
+        })(),
+        marketplacePopularityScore: intel.marketplacePopularityScore ?? null,
+        latinoPreferenceScore: intel.latinoPreferenceScore ?? null,
+        financingProbabilityScore: intel.financingProbabilityScore ?? null,
+        historicalEngagementScore: intel.historicalEngagementScore ?? null,
+        duplicateSaturationScore: intel.duplicateSaturationScore ?? null,
+        demandWeightsVersion: intel.demandWeightsVersion ?? null,
       };
     })
     .filter((v): v is NonNullable<typeof v> => v !== null)
     .sort((a, b) => {
-      // Primary: score descending
-      if (b.opportunityScore !== a.opportunityScore) return b.opportunityScore - a.opportunityScore;
+      // Primary: demandScore descending (Marketplace Demand Engine v1)
+      const aDemand = a.demandScore ?? a.opportunityScore;
+      const bDemand = b.demandScore ?? b.opportunityScore;
+      if (bDemand !== aDemand) return bDemand - aDemand;
       // Secondary: price score descending (best value wins the tie)
       if (b.priceScore !== a.priceScore) return b.priceScore - a.priceScore;
       // Tertiary: vehicle id ascending (stable, deterministic)

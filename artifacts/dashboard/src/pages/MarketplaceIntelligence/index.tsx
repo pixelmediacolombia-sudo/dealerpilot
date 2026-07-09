@@ -66,6 +66,16 @@ interface OpportunityVehicle {
   recommendedTimeLabel: string | null;
   expectedLeadQuality: string;
   confidenceScore: number;
+  // Marketplace Demand Engine v1
+  demandScore: number;
+  demandLabel: string;
+  demandFactors: string[];
+  marketplacePopularityScore: number | null;
+  latinoPreferenceScore: number | null;
+  financingProbabilityScore: number | null;
+  historicalEngagementScore: number | null;
+  duplicateSaturationScore: number | null;
+  demandWeightsVersion: string | null;
 }
 
 interface Insights {
@@ -240,16 +250,17 @@ function SubScoreBar({
   label, score, accentClass,
 }: {
   label: string;
-  score: number;
+  score: number | null;
   accentClass: string;
 }) {
+  const display = score ?? 0;
   return (
     <div className="flex items-center gap-2">
       <span className="text-[9px] text-white/30 w-16 shrink-0 font-mono uppercase tracking-wide truncate">{label}</span>
       <div className="flex-1 h-[3px] bg-white/[0.06] rounded-full overflow-hidden">
-        <div className={cn("h-full rounded-full", accentClass)} style={{ width: `${score}%` }} />
+        <div className={cn("h-full rounded-full", score == null ? "bg-white/10" : accentClass)} style={{ width: `${display}%` }} />
       </div>
-      <span className="text-[9px] text-white/40 font-mono w-6 text-right">{score}</span>
+      <span className="text-[9px] text-white/40 font-mono w-6 text-right">{score == null ? "—" : display}</span>
     </div>
   );
 }
@@ -293,7 +304,7 @@ function applyDiversityTop10(sorted: OpportunityVehicle[]): OpportunityVehicle[]
     const isEV = EV_MAKES_MI.has(v.make.toLowerCase()) || v.primarySegment.toLowerCase().includes("ev");
     if (top10.length >= 10) { deferred.push(v); continue; }
     if (slotsTaken >= 2) { deferred.push(v); continue; }
-    if (isEV && evCount >= 3 && v.opportunityScore < 90) { deferred.push(v); continue; }
+    if (isEV && evCount >= 3 && v.demandScore < 90) { deferred.push(v); continue; }
     top10.push(v);
     modelSlots.set(modelKey, slotsTaken + 1);
     if (isEV) evCount++;
@@ -334,8 +345,8 @@ function VehicleRow({
     <div
       className={cn(
         "border-b border-white/[0.04] last:border-0 transition-colors hover:bg-white/[0.015]",
-        vehicle.opportunityScore >= 80 && "border-l-2 border-l-green-500/40",
-        vehicle.opportunityScore >= 65 && vehicle.opportunityScore < 80 && "border-l-2 border-l-amber-500/30",
+        vehicle.demandScore >= 80 && "border-l-2 border-l-green-500/40",
+        vehicle.demandScore >= 65 && vehicle.demandScore < 80 && "border-l-2 border-l-amber-500/30",
         vehicle.daysOnLot >= 90 && "border-l-2 border-l-red-500/30",
       )}
     >
@@ -403,14 +414,14 @@ function VehicleRow({
           )}
         </div>
 
-        {/* Opportunity Score */}
+        {/* Demand Score (primary) */}
         <div className="shrink-0 flex flex-col items-center gap-1 w-16" onClick={() => setExpanded((e) => !e)}>
-          <Stars score={vehicle.opportunityScore} />
-          <div className={cn("text-2xl font-black tabular-nums leading-none", scoreColor(vehicle.opportunityScore))}>
-            {vehicle.opportunityScore}
+          <Stars score={vehicle.demandScore} />
+          <div className={cn("text-2xl font-black tabular-nums leading-none", scoreColor(vehicle.demandScore))}>
+            {vehicle.demandScore}
           </div>
-          <span className={cn("text-[8px] font-black uppercase tracking-[0.2em]", labelColor(vehicle.opportunityLabel))}>
-            {vehicle.opportunityLabel}
+          <span className={cn("text-[8px] font-black uppercase tracking-[0.2em]", labelColor(vehicle.demandLabel as OpportunityLabel))}>
+            {vehicle.demandLabel}
           </span>
         </div>
 
@@ -445,10 +456,29 @@ function VehicleRow({
       {expanded && (
         <div className="px-5 pb-4 pl-[98px]">
           <div className="border border-white/[0.05] rounded-lg p-4 bg-white/[0.01] space-y-4">
-            {/* Why this vehicle */}
+            {/* Demand Signals (Marketplace Demand Engine v1) */}
+            {vehicle.demandFactors.length > 0 && (
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/25 mb-2">
+                  Marketplace Demand Signals
+                  {vehicle.demandWeightsVersion && (
+                    <span className="ml-2 text-[8px] font-mono text-white/15 normal-case tracking-normal">{vehicle.demandWeightsVersion}</span>
+                  )}
+                </p>
+                <ul className="space-y-1.5">
+                  {vehicle.demandFactors.map((factor, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="w-1 h-1 rounded-full shrink-0 mt-1.5 bg-cyan-400/50" />
+                      <span className="text-[11px] leading-relaxed text-white/55">{factor}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* Opportunity factors (secondary) */}
             {vehicle.opportunityFactors.length > 0 && (
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/25 mb-2">Why This Vehicle</p>
+                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/25 mb-2">Opportunity Factors</p>
                 <ul className="space-y-1.5">
                   {vehicle.opportunityFactors.map((factor, i) => {
                     const isEstimate = factor.includes("internal estimate");
@@ -503,9 +533,21 @@ function VehicleRow({
                 )}
               </div>
             )}
-            {/* Score breakdown bars */}
+            {/* Demand signal bars */}
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/25 mb-2">Score Breakdown</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/25 mb-2">Demand Signals (12-factor composite)</p>
+              <div className="space-y-1.5">
+                <SubScoreBar label="Opportunity" score={vehicle.opportunityScore} accentClass="bg-green-500/70" />
+                <SubScoreBar label="Mkt Popular." score={vehicle.marketplacePopularityScore} accentClass="bg-teal-500/70" />
+                <SubScoreBar label="Latino Pref." score={vehicle.latinoPreferenceScore} accentClass="bg-orange-500/70" />
+                <SubScoreBar label="Financing" score={vehicle.financingProbabilityScore} accentClass="bg-blue-500/70" />
+                <SubScoreBar label="Engagement" score={vehicle.historicalEngagementScore} accentClass="bg-fuchsia-500/70" />
+                <SubScoreBar label="Saturation" score={vehicle.duplicateSaturationScore != null ? 100 - vehicle.duplicateSaturationScore : null} accentClass="bg-rose-500/70" />
+              </div>
+            </div>
+            {/* Opportunity sub-score bars */}
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/25 mb-2">Opportunity Sub-scores</p>
               <div className="space-y-1.5">
                 <SubScoreBar label="Mkt Demand" score={vehicle.marketDemandScore} accentClass="bg-green-500/70" />
                 <SubScoreBar label="Price" score={vehicle.priceScore} accentClass="bg-blue-500/70" />

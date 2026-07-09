@@ -22,3 +22,4 @@
 - [AI Orchestrator](ai-orchestrator.md) — decision layer above the 6 workers picks RUN/SKIP/PAUSE per cycle instead of blind per-worker timers; decide() must stay read-mostly and never duplicate worker logic.
 - [Worker daily spend guardrails](worker-budget-guardrails.md) — FAL+OpenAI hard-stop budgets check real per-call usage before every call; pauseReason isn't sticky, so workers auto-resume after midnight reset.
 - [Worker Framework v1.0](worker-framework.md) — one generic worker_state-driven catch-up scheduler for all background jobs; workers wrap existing engines, never reimplement logic; cost-sensitive workers check a shared budget guardrail.
+- [Marketplace Demand Engine v1](demand-engine.md) — 12-signal composite replaces pure Opportunity Score ranking; drizzle has no `coalesce` export — use sql`coalesce(...)` instead.
