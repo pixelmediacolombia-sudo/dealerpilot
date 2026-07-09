@@ -255,7 +255,6 @@ async function maybeCreateAutomaticBatch(
     .map((vehicle) => {
       const images = imagesByVehicle.get(vehicle.id) ?? [];
       const listing = listingByVehicle.get(vehicle.id);
-      const version = versionByVehicle.get(vehicle.id);
       const gm = getCachedGmDecision(vehicle.id);
       const lotCity = vehicle.lotLocation ? LOT_CITY_MAP[vehicle.lotLocation] : undefined;
       const photoAnalysis = analyzePhotos(images);
@@ -265,7 +264,6 @@ async function maybeCreateAutomaticBatch(
         !vehicle.price ||
         !vehicle.mileage ||
         images.length < 5 ||
-        !version ||
         listing?.status === "Published" ||
         !lotCity ||
         duplicateConflictIds.has(vehicle.id) ||
@@ -274,7 +272,7 @@ async function maybeCreateAutomaticBatch(
       const neverPublished = !listing || listing.status !== "Published";
       return {
         vehicle,
-        version,
+        version: versionByVehicle.get(vehicle.id) ?? null,
         photoAnalysis,
         priorityScore: computePriorityScore(vehicle, photoAnalysis.photoScore, neverPublished),
       };
@@ -333,7 +331,7 @@ async function maybeCreateAutomaticBatch(
         set: { ...entry.photoAnalysis, analyzedAt: now, updatedAt: now },
       });
     await db.insert(publishingJobsTable).values({
-      listingVersionId: entry.version.id,
+      listingVersionId: entry.version?.id ?? null,
       vehicleId: entry.vehicle.id,
       dealerId: DEALER_ID,
       batchId: batch.id,

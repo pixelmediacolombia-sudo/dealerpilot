@@ -196,13 +196,12 @@ function validateVehicleForPublish(vehicle: {
   model: string;
   price: number | null;
   mileage: number | null;
-}, imageCount: number, hasListing: boolean): { eligible: boolean; reason: string | null } {
+}, imageCount: number): { eligible: boolean; reason: string | null } {
   if (!vehicle.vin) return { eligible: false, reason: "Missing VIN" };
   if (!vehicle.year) return { eligible: false, reason: "Missing year" };
   if (!vehicle.price) return { eligible: false, reason: "Missing price" };
   if (!vehicle.mileage) return { eligible: false, reason: "Missing mileage" };
   if (imageCount < 5) return { eligible: false, reason: `Only ${imageCount} photo(s) — need at least 5` };
-  if (!hasListing) return { eligible: false, reason: "No listing generated yet" };
   return { eligible: true, reason: null };
 }
 
@@ -498,9 +497,8 @@ router.post("/auto-publish/batches", async (req, res) => {
     if (hasPublishedListing) continue; // already live
 
     const bestVersion = versionByVehicle.get(v.id);
-    const hasListing = !!bestVersion;
     const photoAnalysis = analyzePhotos(imgs);
-    let validation = validateVehicleForPublish(v, imgs.length, hasListing);
+    let validation = validateVehicleForPublish(v, imgs.length);
 
     // Lot location must exist and be a known, mapped city (Manassas or Fredericksburg).
     if (validation.eligible && (!v.lotLocation || !LOT_CITY_MAP[v.lotLocation])) {
@@ -670,11 +668,10 @@ router.post("/auto-publish/batches", async (req, res) => {
   const jobs = [];
   for (let i = 0; i < eligible.length; i++) {
     const s = eligible[i];
-    if (!s.bestVersionId) continue;
     const [job] = await db
       .insert(publishingJobsTable)
       .values({
-        listingVersionId: s.bestVersionId,
+        listingVersionId: s.bestVersionId ?? null,
         vehicleId: s.vehicle.id,
         dealerId,
         batchId: batch.id,
@@ -1168,9 +1165,8 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     }
 
     const bestVersion = versionByVehicle.get(v.id);
-    const hasListing = !!bestVersion;
     const photoAnalysis = analyzePhotos(imgs);
-    let validation = validateVehicleForPublish(v, imgs.length, hasListing);
+    let validation = validateVehicleForPublish(v, imgs.length);
 
     if (validation.eligible && (!v.lotLocation || !LOT_CITY_MAP[v.lotLocation])) {
       validation = { eligible: false, reason: `Unmapped lot location "${v.lotLocation ?? "unknown"}"` };
