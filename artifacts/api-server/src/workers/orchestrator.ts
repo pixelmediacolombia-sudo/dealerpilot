@@ -12,7 +12,7 @@
 //  - This module must never throw out of runOrchestrationCycle() — any
 //    failure is caught and recorded as a Failed cycle so the API can never
 //    crash because of it.
-import { db, workerStateTable, orchestratorStateTable, vehicleChangesTable, vehicleIntelligenceTable, vehiclesTable, aiPhotoSetsTable, aiStudioPacksTable, vehicleImagesTable, extensionConnectionsTable, publishingJobsTable, listingPerformanceTable } from "@workspace/db";
+import { db, workerStateTable, orchestratorStateTable, vehicleChangesTable, vehicleIntelligenceTable, vehiclesTable, aiPhotoSetsTable, aiStudioPacksTable, vehicleImagesTable, extensionConnectionsTable, publishingJobsTable, listingPerformanceTable, autoPublishSettingsTable } from "@workspace/db";
 import { and, count, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import type { Logger } from "pino";
 import { getAllWorkers } from "./registry";
@@ -191,6 +191,18 @@ async function decidePublishing(): Promise<WorkerDecision> {
   const queued = queueRow?.n ?? 0;
 
   if (queued === 0) {
+    const [settings] = await db
+      .select()
+      .from(autoPublishSettingsTable)
+      .where(eq(autoPublishSettingsTable.dealerId, DEALER_ID));
+    if (settings?.enabled && !settings.requireApproval) {
+      return {
+        workerId: "publishing",
+        action: "RUN",
+        reason: "auto-publish plan active, extension online",
+        dependencyStatus: "extension online, auto plan active",
+      };
+    }
     return { workerId: "publishing", action: "SKIP", reason: "no approved vehicles in queue", dependencyStatus: "extension online, queue empty" };
   }
 

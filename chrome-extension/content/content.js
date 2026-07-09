@@ -1713,7 +1713,7 @@
             }
 
             // Default: skip this image and continue with others
-            continue;
+            return;
           }
 
           stateLog(`Photo ${idx + 1}: ${Math.round(originalBlob.size / 1024)} KB → ${Math.round(finalBlob.size / 1024)} KB (final)`);

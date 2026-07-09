@@ -444,7 +444,17 @@ router.post("/auto-publish/batches", async (req, res) => {
     .where(
       and(
         inArray(publishingJobsTable.vehicleId, vehicleIds),
-        inArray(publishingJobsTable.status, ["Queued", "Publishing", "Scheduled"]),
+        inArray(publishingJobsTable.status, [
+          "Queued",
+          "Retry",
+          "Scheduled",
+          "Assigned",
+          "Claimed",
+          "Publishing",
+          "Opening Facebook",
+          "Filling Form",
+          "Auto Publishing",
+        ]),
       ),
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
@@ -673,7 +683,7 @@ router.post("/auto-publish/batches", async (req, res) => {
         priority: eligible.length - i,
         scheduledAt: schedAt ?? undefined,
         source: "auto_publish_batch",
-        approvedByUser: false,
+        approvedByUser: !dealerAutoPublishSettings?.requireApproval,
       })
       .returning();
     jobs.push(job);
@@ -1098,7 +1108,17 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     .where(
       and(
         inArray(publishingJobsTable.vehicleId, vehicleIds),
-        inArray(publishingJobsTable.status, ["Queued", "Publishing", "Scheduled"]),
+        inArray(publishingJobsTable.status, [
+          "Queued",
+          "Retry",
+          "Scheduled",
+          "Assigned",
+          "Claimed",
+          "Publishing",
+          "Opening Facebook",
+          "Filling Form",
+          "Auto Publishing",
+        ]),
       ),
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));

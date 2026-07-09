@@ -492,16 +492,18 @@ const handlers = {
     }
 
     // SAFETY GATE: Only auto-start recent jobs from direct user actions.
-    // auto_publish_batch and stale jobs require explicit popup approval.
+    // auto_publish_batch jobs require approval unless the backend marks them
+    // approvedByUser=true after the operator disabled "Require approval".
     // publish_now jobs bypass the age check — they are direct operator clicks.
     const RECENT_JOB_MS = 5 * 60 * 1000;
     const jobAge = nextJob.createdAt ? Date.now() - new Date(nextJob.createdAt).getTime() : Infinity;
     const jobSource = nextJob.source || null;
     const isPublishNow = jobSource === "publish_now";
     const isAutoPublishBatch = jobSource === "auto_publish_batch";
+    const isApprovedAutoBatch = isAutoPublishBatch && nextJob.approvedByUser === true;
     const isTooOld = jobAge > RECENT_JOB_MS;
 
-    if (((isTooOld && !isPublishNow) || isAutoPublishBatch) && !(forceUserAction && isPublishNow)) {
+    if (((isTooOld && !isPublishNow && !isApprovedAutoBatch) || (isAutoPublishBatch && !isApprovedAutoBatch)) && !(forceUserAction && isPublishNow)) {
       const reason = isAutoPublishBatch
         ? "Job source is auto_publish_batch — user must approve from popup"
         : "Job is older than 5 minutes — user must trigger from popup";

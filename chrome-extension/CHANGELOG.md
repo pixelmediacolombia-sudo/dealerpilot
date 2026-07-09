@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.19
+
+**Fixed**
+- Automatic batches - `auto_publish_batch` jobs marked as approved by the backend can now start without popup approval.
+
+---
+
 ## v1.3.18
 
 **Fixed**
