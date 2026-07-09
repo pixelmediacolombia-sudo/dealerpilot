@@ -1680,7 +1680,6 @@
           const originalBlob = new Blob([bytes], { type: mimeType });
 
           // Resize to max 1600 px wide, JPEG quality 0.82
-          const resizedBlob = await resizeImage(originalBlob, 1600, 0.82);
           // Produce final JPEG bajo 10 MB (límite Facebook), con compresión progresiva.
           const TARGET_MAX_BYTES = 10 * 1024 * 1024;
           const finalBlob = await ensureUnderLimit(originalBlob, 1600, 0.82, TARGET_MAX_BYTES);
