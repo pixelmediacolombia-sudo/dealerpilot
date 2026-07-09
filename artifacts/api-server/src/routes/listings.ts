@@ -387,7 +387,12 @@ router.get("/listings/:id", async (req, res) => {
 
 // POST /listings/:vehicleId/mark-published — operator manually marks a listing live.
 const MarkPublishedBody = z.object({
-  marketplaceUrl: z.string().url().optional(),
+  marketplaceUrl: z
+    .string()
+    .url()
+    .refine((url) => url.includes("/marketplace/item/"), {
+      message: "A live Facebook Marketplace item URL is required",
+    }),
   publishedByExtensionId: z.string().optional(),
 });
 
@@ -400,7 +405,10 @@ router.post("/listings/:vehicleId/mark-published", async (req, res) => {
 
   const parsed = MarkPublishedBody.safeParse(req.body ?? {});
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid request body" });
+    res.status(400).json({
+      error: "A live Facebook Marketplace listing URL is required",
+      issues: parsed.error.issues,
+    });
     return;
   }
 

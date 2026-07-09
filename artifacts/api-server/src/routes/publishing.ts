@@ -33,6 +33,51 @@ const DEALER_ID = 1;
 
 const router: IRouter = Router();
 
+async function moveJobToNeedsReviewWithoutListingUrl(
+  job: PublishingJob,
+  reason = "Publish completion was reported without a Marketplace listing URL. Verify Facebook manually before marking live.",
+) {
+  const [updated] = await db
+    .update(publishingJobsTable)
+    .set({
+      status: "Needs Review",
+      needsReview: true,
+      reviewReason: reason,
+      failedReason: "Missing Marketplace listing URL confirmation",
+      listingUrl: null,
+      completedAt: null,
+      claimedByExtension: null,
+    })
+    .where(eq(publishingJobsTable.id, job.id))
+    .returning();
+
+  await db
+    .update(vehiclesTable)
+    .set({ status: "Active" })
+    .where(eq(vehiclesTable.id, job.vehicleId));
+
+  await db
+    .update(listingsTable)
+    .set({
+      status: "Needs Review",
+      externalUrl: null,
+      publishedAt: null,
+      publishedByExtensionId: null,
+    })
+    .where(and(eq(listingsTable.vehicleId, job.vehicleId), eq(listingsTable.channel, "marketplace")));
+
+  await db
+    .update(marketplaceListingsTable)
+    .set({
+      status: "Needs Review",
+      listingUrl: null,
+      publishedAt: null,
+    })
+    .where(eq(marketplaceListingsTable.vehicleId, job.vehicleId));
+
+  return updated;
+}
+
 /**
  * Returns the best available photos for a vehicle.
  * Prefers AI-processed photos from aiPhotoImagesTable when the vehicle has
@@ -607,9 +652,39 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
   // ── Already Published → idempotent 200 ───────────────────────────────────
   // Covers duplicate complete calls (e.g. retry after a network timeout).
   if (job.status === "Published") {
-    req.log.info({ jobId: id, extensionId }, "complete: already Published — idempotent 200");
-    const [enriched] = await enrich([job]);
-    res.json(enriched);
+    if (!job.listingUrl && !listingUrl) {
+      req.log.warn({ jobId: id, extensionId },
+        "complete: Published job has no listing URL; moving to Needs Review");
+      await moveJobToNeedsReviewWithoutListingUrl(job);
+      res.status(422).json({
+        error: "Published job has no Marketplace listing URL and was moved to Needs Review",
+        code: "PUBLISHED_WITHOUT_LISTING_URL",
+        needsReview: true,
+        jobId: id,
+      });
+      return;
+    }
+    if (!job.listingUrl && listingUrl) {
+      req.log.warn({ jobId: id, extensionId, listingUrl },
+        "complete: Published job missing URL; backfilling live listing URL");
+    } else {
+      req.log.info({ jobId: id, extensionId }, "complete: already Published — idempotent 200");
+      const [enriched] = await enrich([job]);
+      res.json(enriched);
+      return;
+    }
+  }
+
+  if (!listingUrl) {
+    req.log.warn({ jobId: id, status: job.status, extensionId },
+      "complete: listingUrl missing; refusing to mark Published without live listing proof");
+    await moveJobToNeedsReviewWithoutListingUrl(job);
+    res.status(422).json({
+      error: "listingUrl is required to mark a job Published",
+      code: "MISSING_LISTING_URL",
+      needsReview: true,
+      jobId: id,
+    });
     return;
   }
 
@@ -819,6 +894,43 @@ router.post("/publishing/jobs/:id/cancel", async (req, res) => {
     .returning();
 
   req.log.info({ jobId: id, reason }, "Publishing job cancelled by operator");
+  const [enriched] = await enrich([updated]);
+  res.json({ job: enriched });
+});
+
+const NeedsReviewBody = z.object({
+  reason: z.string().optional(),
+});
+
+// POST /publishing/jobs/:id/needs-review — operator repair path for a job that
+// was incorrectly marked Published without a real Facebook listing URL.
+router.post("/publishing/jobs/:id/needs-review", async (req, res) => {
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Invalid job id" });
+    return;
+  }
+  const parsed = NeedsReviewBody.safeParse(req.body ?? {});
+  const reason = parsed.success
+    ? parsed.data.reason ?? "Manually moved to Needs Review by operator"
+    : "Manually moved to Needs Review by operator";
+
+  const [job] = await db
+    .select()
+    .from(publishingJobsTable)
+    .where(eq(publishingJobsTable.id, id));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  const updated = await moveJobToNeedsReviewWithoutListingUrl(job, reason);
+  if (!updated) {
+    res.status(500).json({ error: "Failed to move job to Needs Review" });
+    return;
+  }
+
+  req.log.warn({ jobId: id, vehicleId: job.vehicleId, reason }, "Publishing job moved to Needs Review");
   const [enriched] = await enrich([updated]);
   res.json({ job: enriched });
 });

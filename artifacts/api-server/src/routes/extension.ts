@@ -1,11 +1,43 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
-import { db, leadsTable, extensionConnectionsTable } from "@workspace/db";
+import { db, pool, leadsTable, extensionConnectionsTable } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
 
 const EXTENSION_NAME = "Chrome Extension";
 
 const router: IRouter = Router();
+
+let chromeExtensionIdColumnReady: Promise<void> | null = null;
+
+function ensureChromeExtensionIdColumn(): Promise<void> {
+  chromeExtensionIdColumnReady ??= pool
+    .query("alter table extension_connections add column if not exists chrome_extension_id text")
+    .then(() => undefined)
+    .catch((err) => {
+      chromeExtensionIdColumnReady = null;
+      throw err;
+    });
+  return chromeExtensionIdColumnReady;
+}
+
+async function saveChromeExtensionId(rowId: number, chromeExtensionId: string | undefined): Promise<void> {
+  if (!chromeExtensionId) return;
+  await ensureChromeExtensionIdColumn();
+  await pool.query("update extension_connections set chrome_extension_id = $1 where id = $2", [
+    chromeExtensionId,
+    rowId,
+  ]);
+}
+
+async function getChromeExtensionId(rowId: number | undefined): Promise<string | null> {
+  if (!rowId) return null;
+  await ensureChromeExtensionIdColumn();
+  const result = await pool.query<{ chrome_extension_id: string | null }>(
+    "select chrome_extension_id from extension_connections where id = $1 limit 1",
+    [rowId],
+  );
+  return result.rows[0]?.chrome_extension_id ?? null;
+}
 
 const TEST_LISTING = {
   title: "2021 Toyota Tacoma",
@@ -127,6 +159,7 @@ async function upsertExtRow(
 const HeartbeatBody = z.object({
   backendUrl: z.string().optional(),
   status: z.string().optional(),
+  chromeExtensionId: z.string().optional(),
   fbLoggedIn: z.boolean().nullable().optional(),
   marketplaceConnected: z.boolean().nullable().optional(),
 });
@@ -137,7 +170,7 @@ router.post("/extension/heartbeat", async (req, res) => {
     res.status(400).json({ error: "Invalid heartbeat" });
     return;
   }
-  const { status = "online", backendUrl, fbLoggedIn, marketplaceConnected } =
+  const { status = "online", backendUrl, chromeExtensionId, fbLoggedIn, marketplaceConnected } =
     parsed.data;
 
   const existing = await getExtRow();
@@ -154,11 +187,13 @@ router.post("/extension/heartbeat", async (req, res) => {
     updates.backendUrl = existing.backendUrl;
 
   const row = await upsertExtRow(updates);
+  await saveChromeExtensionId(row.id, chromeExtensionId);
 
   req.log.info({ fbLoggedIn, marketplaceConnected }, "Recorded extension heartbeat");
   res.json({
     id: row.id,
     name: row.name,
+    extensionId: chromeExtensionId ?? (await getChromeExtensionId(row.id)),
     backendUrl: row.backendUrl ?? null,
     status: row.status,
     lastHeartbeatAt: row.lastHeartbeatAt ? row.lastHeartbeatAt.toISOString() : null,
@@ -207,6 +242,7 @@ router.get("/extension/connect-status", async (req, res) => {
   res.json({
     connectRequested,
     connectAction: connectRequested ? (ext?.connectAction ?? "marketplace") : null,
+    extensionId: await getChromeExtensionId(ext?.id),
     fbLoggedIn: ext?.fbLoggedIn ?? null,
     marketplaceConnected: ext?.marketplaceConnected ?? null,
   });

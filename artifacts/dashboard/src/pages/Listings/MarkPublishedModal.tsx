@@ -16,7 +16,7 @@ type MarkPublishedModalProps = {
   open: boolean;
   onClose: () => void;
   vehicleLabel: string;
-  onConfirm: (marketplaceUrl?: string) => void;
+  onConfirm: (marketplaceUrl: string) => void;
   isLoading?: boolean;
 };
 
@@ -28,9 +28,16 @@ export function MarkPublishedModal({
   isLoading,
 }: MarkPublishedModalProps) {
   const [url, setUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const handleConfirm = () => {
-    onConfirm(url.trim() || undefined);
+    const trimmed = url.trim();
+    if (!trimmed.includes("/marketplace/item/")) {
+      setError("Paste the live Facebook Marketplace item URL before marking this vehicle published.");
+      return;
+    }
+    setError(null);
+    onConfirm(trimmed);
   };
 
   return (
@@ -51,14 +58,18 @@ export function MarkPublishedModal({
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
               <ExternalLink className="w-3.5 h-3.5" />
-              Marketplace URL (optional but recommended)
+              Marketplace URL
             </Label>
             <Input
               placeholder="https://www.facebook.com/marketplace/item/..."
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                if (error) setError(null);
+              }}
               className="bg-background/50 border-border/50 text-sm font-mono"
             />
+            {error && <p className="text-[11px] text-destructive">{error}</p>}
           </div>
           <p className="text-[11px] text-muted-foreground">
             DealerPilot will use this URL to track views, messages, and engagement from the listing.
@@ -71,7 +82,7 @@ export function MarkPublishedModal({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isLoading}
+            disabled={isLoading || !url.trim()}
             className="gap-2 bg-success/90 hover:bg-success text-success-foreground border-0"
           >
             <CheckCircle2 className="w-4 h-4" />

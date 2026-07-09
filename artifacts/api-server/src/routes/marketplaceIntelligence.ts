@@ -12,7 +12,7 @@ import {
   feedRunsTable,
   type ListingPerformance,
 } from "@workspace/db";
-import { seedMarketplaceIntelligence } from "../intelligence/seed";
+import { ensureVehicleIntelligenceSchema, seedMarketplaceIntelligence } from "../intelligence/seed";
 
 const router = Router();
 
@@ -260,6 +260,8 @@ async function getRealSummary() {
 
 // GET /api/marketplace-intelligence/dashboard
 router.get("/marketplace-intelligence/dashboard", async (req, res) => {
+  await ensureVehicleIntelligenceSchema(req.log);
+
   const records = await db
     .select()
     .from(listingPerformanceTable)
@@ -485,6 +487,8 @@ function computeEstimatedDaysToSell(price: number | null, confidenceScore: numbe
 
 // GET /api/marketplace-intelligence/recommendations
 router.get("/marketplace-intelligence/recommendations", async (req, res) => {
+  await ensureVehicleIntelligenceSchema(req.log);
+
   const location = typeof req.query.location === "string" ? req.query.location : "";
 
   // Sort by demandScore DESC (Marketplace Demand Engine v1 — 12-signal composite).
@@ -612,6 +616,8 @@ router.get("/marketplace-intelligence/recommendations", async (req, res) => {
 
 // GET /api/marketplace-intelligence/vehicles/:vehicleId
 router.get("/marketplace-intelligence/vehicles/:vehicleId", async (req, res) => {
+  await ensureVehicleIntelligenceSchema(req.log);
+
   const vehicleId = parseInt(req.params["vehicleId"] ?? "0", 10);
   if (!vehicleId) { res.status(400).json({ error: "Invalid vehicleId" }); return; }
 
@@ -707,6 +713,8 @@ router.post("/marketplace-intelligence/seed", async (req, res) => {
 // Sections: hot (≥80), cooling (aging ≥60 days), competitive (best priceScore),
 //           byLot (regional breakdown), and market-level insights.
 router.get("/marketplace-intelligence/opportunity", async (req, res) => {
+  await ensureVehicleIntelligenceSchema(req.log);
+
   // Fetch available vehicles: Active + Price Changed (price updated but still in lot)
   const vehicles = await db
     .select()

@@ -113,6 +113,7 @@ const handlers = {
       const data = await apiPost("/api/extension/heartbeat", {
         backendUrl: base,
         status: "online",
+        chromeExtensionId: chrome.runtime.id,
         fbLoggedIn: fbLoggedIn ?? null,
         marketplaceConnected: marketplaceConnected ?? null,
       });
