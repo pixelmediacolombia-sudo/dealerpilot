@@ -34,8 +34,58 @@ const V2_MARKER = "v2:"; // prefix in recommendedTemplateKey to detect v2 seeded
 const DEALER_ID = 1;
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-async function ensureVehicleIntelligenceUpsertTarget(logger: Logger): Promise<void> {
+let vehicleIntelligenceSchemaReady: Promise<void> | null = null;
+
+export async function ensureVehicleIntelligenceSchema(logger: Logger): Promise<void> {
+  vehicleIntelligenceSchemaReady ??= ensureVehicleIntelligenceSchemaOnce(logger);
+  return vehicleIntelligenceSchemaReady;
+}
+
+async function ensureVehicleIntelligenceSchemaOnce(logger: Logger): Promise<void> {
   try {
+    await db.execute(sql`
+      alter table vehicle_intelligence
+        add column if not exists recommended_price_strategy text not null default 'full_price',
+        add column if not exists recommended_down_payment integer,
+        add column if not exists recommended_photo_strategy text not null default 'original',
+        add column if not exists recommended_template_key text,
+        add column if not exists recommended_day_of_week integer,
+        add column if not exists recommended_time_of_day integer,
+        add column if not exists confidence_score integer not null default 0,
+        add column if not exists explanation text,
+        add column if not exists expected_lead_quality text default 'warm',
+        add column if not exists generated_at timestamp with time zone not null default now(),
+        add column if not exists opportunity_score integer,
+        add column if not exists market_demand_score integer,
+        add column if not exists price_score integer,
+        add column if not exists seasonal_score integer,
+        add column if not exists dealer_performance_score integer,
+        add column if not exists buyer_demand_score integer,
+        add column if not exists inventory_health_score integer,
+        add column if not exists creative_performance_score integer,
+        add column if not exists pricing_position text,
+        add column if not exists days_on_lot integer,
+        add column if not exists opportunity_factors text,
+        add column if not exists opportunity_label text,
+        add column if not exists recommended_action text,
+        add column if not exists vehicle_quality_score integer,
+        add column if not exists buyer_segment_score integer,
+        add column if not exists primary_segment text,
+        add column if not exists secondary_segment text,
+        add column if not exists ad_angle text,
+        add column if not exists suggested_language text,
+        add column if not exists why_this_audience text,
+        add column if not exists demand_score integer,
+        add column if not exists demand_label text,
+        add column if not exists demand_factors text,
+        add column if not exists marketplace_popularity_score integer,
+        add column if not exists latino_preference_score integer,
+        add column if not exists financing_probability_score integer,
+        add column if not exists historical_engagement_score integer,
+        add column if not exists duplicate_saturation_score integer,
+        add column if not exists demand_weights_version text
+    `);
+
     await db.execute(sql`
       with ranked as (
         select
@@ -62,7 +112,8 @@ async function ensureVehicleIntelligenceUpsertTarget(logger: Logger): Promise<vo
       on vehicle_intelligence (vehicle_id)
     `);
   } catch (err) {
-    logger.error({ err }, "Failed to ensure vehicle_intelligence upsert target");
+    vehicleIntelligenceSchemaReady = null;
+    logger.error({ err }, "Failed to ensure vehicle_intelligence schema");
     throw err;
   }
 }
@@ -393,7 +444,7 @@ export async function seedOpportunityScores(
   logger: Logger,
   opts?: { forceRefresh?: boolean; force?: boolean },
 ): Promise<void> {
-  await ensureVehicleIntelligenceUpsertTarget(logger);
+  await ensureVehicleIntelligenceSchema(logger);
 
   // Check if any rows are missing v1.2 buyer segment fields
   const [nullCheck] = await db
@@ -710,7 +761,7 @@ export async function seedOpportunityScores(
 // ── Main seed function ────────────────────────────────────────────────────────
 
 export async function seedMarketplaceIntelligence(logger: Logger): Promise<void> {
-  await ensureVehicleIntelligenceUpsertTarget(logger);
+  await ensureVehicleIntelligenceSchema(logger);
 
   // Check if already seeded with v2 strategy engine
   const [existing] = await db
