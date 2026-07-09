@@ -448,7 +448,7 @@ const handlers = {
     if (assignedJob) {
       return handlers.AUTO_START_ASSIGNED({
         jobId: assignedJob.id,
-        createdAt: assignedJob.createdAt || null,
+        createdAt: assignedJob.assignedAt || assignedJob.createdAt || null,
         mode: assignedJob.mode || "Controlled",
         source: "assigned",
         approvedByUser: true,

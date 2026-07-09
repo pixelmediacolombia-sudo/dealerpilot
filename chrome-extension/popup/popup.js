@@ -501,7 +501,9 @@ startBtn.addEventListener("click", async () => {
       return;
     }
     await refresh();
-    setStatus("No approved job found yet. Confirm Publish Now in DealerPilot, then try again.", "err");
+    const reason = pollData?.reason || pollData?.skipped || poll?.error || "none";
+    const detail = pollData?.jobId ? ` Job #${pollData.jobId}: ${reason}.` : "";
+    setStatus(`No approved job started.${detail} Confirm Publish Now in DealerPilot, then try again.`, "err");
     startBtn.disabled = !lastConnectionOk;
     return;
   }

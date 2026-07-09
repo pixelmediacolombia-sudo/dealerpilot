@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.18
+
+**Fixed**
+- Assigned job pickup - the extension now uses `assignedAt` instead of the original `createdAt` when deciding whether an assigned job is stale.
+- Rescue diagnostics - the popup now shows the backend skip reason when `Check For Approved Job` cannot start a job.
+
+---
+
 ## v1.3.17
 
 **Fixed**
