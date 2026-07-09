@@ -413,6 +413,7 @@ export function buildDailyMarketplacePlan(
 
   // ── Duplicate groups for display ────────────────────────────────────────────
   const duplicateGroups: DuplicateGroup[] = [];
+  const duplicateConflictIds = new Set<number>();
   for (const [, group] of groupMap.entries()) {
     if (group.length <= 1) continue;
     const sorted = [...group].sort((a, b) => b.planScore - a.planScore);
@@ -437,7 +438,10 @@ export function buildDailyMarketplacePlan(
         ? `Chosen because: ${winSignals.join(", ")}. Hold the others to avoid competing against yourself on Marketplace.`
         : "Publish this unit first to avoid flooding Marketplace with the same model.",
     });
+    for (const rec of sorted) duplicateConflictIds.add(rec.vehicleId);
   }
+
+  const publishable = eligible.filter((rec) => !duplicateConflictIds.has(rec.vehicleId));
 
   // ── Diversity-guardrailed Top 10 selection ──────────────────────────────────
   // Rules:
@@ -452,7 +456,7 @@ export function buildDailyMarketplacePlan(
   const top10: DailyVehicleRec[] = [];
   const deferred: DailyVehicleRec[] = [];
 
-  for (const rec of eligible) {
+  for (const rec of publishable) {
     const modelKey = rec.duplicateGroupKey ?? `${rec.make.toLowerCase()}_${rec.model.toLowerCase()}`;
     const slotsTaken = modelSlots.get(modelKey) ?? 0;
     const ev = isEVRec(rec);
@@ -500,15 +504,22 @@ export function buildDailyMarketplacePlan(
   const top10Set = new Set(balancedTop10.map((r) => r.vehicleId));
   const holdToday: DailyVehicleRec[] = eligible
     .filter((r) => !top10Set.has(r.vehicleId))
-    .map((r) => ({ ...r, holdReason: "Lower priority — not in today's top 10" }));
+    .map((r) => ({
+      ...r,
+      holdReason: duplicateConflictIds.has(r.vehicleId)
+        ? "Protected from publishing - Market Agent flagged a duplicate-listing conflict"
+        : "Lower priority - not in today's top 10",
+    }));
 
   // ── Build summary ───────────────────────────────────────────────────────────
   const total = eligibleWorkspaces.length;
   const summary = top10.length > 0
-    ? `DealerPilot found ${top10.length} opportunit${top10.length === 1 ? "y" : "ies"} today from ${total} eligible vehicles.`
+    ? `DealerPilot found ${top10.length} publishable opportunit${top10.length === 1 ? "y" : "ies"} today from ${total} eligible vehicles.`
     : alreadyQueuedRecs.length > 0
       ? `${alreadyQueuedRecs.length} vehicle${alreadyQueuedRecs.length !== 1 ? "s" : ""} already queued for publishing. No additional vehicles recommended right now.`
-      : "No eligible vehicles ready to publish today. Check inventory sync or review the queue.";
+      : duplicateConflictIds.size > 0
+        ? "No publishable vehicles ready right now. Duplicate-listing protection is holding today's highest-scoring candidates."
+        : "No eligible vehicles ready to publish today. Check inventory sync or review the queue.";
 
   return {
     recommendedToday,
@@ -517,7 +528,7 @@ export function buildDailyMarketplacePlan(
     needsReview,
     alreadyQueued: alreadyQueuedRecs,
     duplicateGroups,
-    totalEligible: total,
+    totalEligible: publishable.length,
     summary,
     dataSource: "Estimated Strategy",
   };
