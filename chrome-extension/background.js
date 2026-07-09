@@ -201,6 +201,16 @@ const handlers = {
     return apiGet(`/api/publishing/jobs/${message.jobId}/payload`);
   },
 
+  // Stores the payload endpoint's debug fields (v1.3.13) so the popup debug
+  // panel can display the server's live publishMode/controlledMode/
+  // autoClickPublish/backendEnvironment resolution without a separate call.
+  async STORE_PAYLOAD_DEBUG(message) {
+    await chrome.storage.local.set({
+      lastPayloadDebug: { ...message.data, at: new Date().toISOString() },
+    });
+    return { ok: true };
+  },
+
   async COMPLETE_JOB(message) {
     const extensionId = await getExtensionId();
     const body = { extensionId };
@@ -644,6 +654,7 @@ const handlers = {
       "auditLog",
       "lastHeartbeatUrl",
       "lastHeartbeatResponse",
+      "lastPayloadDebug",
     ];
     const stored = await chrome.storage.local.get(keys);
     const base = await getBackendUrl();
@@ -658,6 +669,7 @@ const handlers = {
       lastHeartbeat: stored.lastHeartbeat || null,
       lastHeartbeatUrl: stored.lastHeartbeatUrl || null,
       lastHeartbeatResponse: stored.lastHeartbeatResponse || null,
+      lastPayloadDebug: stored.lastPayloadDebug || null,
       lastClaimedJob: stored.lastClaimedJob || null,
       lastPublishedJob: stored.lastPublishedJob || null,
       lastError: stored.lastError || null,

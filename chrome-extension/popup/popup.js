@@ -49,6 +49,9 @@ const dbg = {
   environment:   document.getElementById("d-environment"),
   heartbeatUrl:      document.getElementById("d-heartbeat-url"),
   heartbeatResponse: document.getElementById("d-heartbeat-response"),
+  payloadMode:       document.getElementById("d-payload-mode"),
+  payloadFlags:      document.getElementById("d-payload-flags"),
+  payloadEnv:        document.getElementById("d-payload-env"),
   connStatus:    document.getElementById("d-conn-status"),
   fbLogin:       document.getElementById("d-fb-login"),
   mkpAccess:     document.getElementById("d-mkp-access"),
@@ -255,6 +258,17 @@ async function loadDebugState() {
   dbg.heartbeatResponse.className   = "value " + (d.lastHeartbeatResponse
     ? (d.lastHeartbeatResponse.ok ? "ok" : "err")
     : "");
+
+  const pd = d.lastPayloadDebug;
+  if (pd) {
+    dbg.payloadMode.textContent = `${pd.publishMode || "—"} (${fmtTime(pd.at)})`;
+    dbg.payloadFlags.textContent = `controlled=${pd.controlledMode === true} · autoClick=${pd.autoClickPublish === true}`;
+    dbg.payloadEnv.textContent = pd.backendEnvironment || "—";
+  } else {
+    dbg.payloadMode.textContent = "—";
+    dbg.payloadFlags.textContent = "—";
+    dbg.payloadEnv.textContent = "—";
+  }
 
   dbg.connStatus.textContent  = lastConnectionOk ? "Connected" : "Unreachable";
   dbg.connStatus.className    = "value " + (lastConnectionOk ? "ok" : "err");

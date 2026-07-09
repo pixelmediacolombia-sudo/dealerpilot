@@ -663,6 +663,24 @@
       }
       fill   = res.data.fill;
       images = res.data.images;
+
+      // Adopt the server-healed mode + new debug fields (v1.3.13). job.mode may
+      // be stale ("Assisted") on the queue/claim object; the payload endpoint
+      // always re-derives it from live env vars and heals the DB row, so trust
+      // res.data over the job we were handed.
+      if (res.data.job && res.data.job.mode) job.mode = res.data.job.mode;
+      job.autoClickPublish = res.data.autoClickPublish === true;
+      job.publishMode = res.data.publishMode;
+      job.backendEnvironment = res.data.backendEnvironment;
+      send({
+        type: "STORE_PAYLOAD_DEBUG",
+        data: {
+          publishMode: res.data.publishMode,
+          controlledMode: res.data.controlledMode,
+          autoClickPublish: res.data.autoClickPublish,
+          backendEnvironment: res.data.backendEnvironment,
+        },
+      }).catch(() => {});
     }
 
     const filled   = [];
@@ -1238,7 +1256,7 @@
       if (images && images.length) {
         const photoResult = await uploadPhotos(images, job.id, warnings);
         if (photoResult.failed) {
-          if (job.mode === "Controlled") {
+          if (job.mode === "Controlled" || job.autoClickPublish === true) {
             const reason = photoResult.reason || "Photo upload failed";
             stateError("Photo upload failed — aborting", new Error(reason));
             setStatus(reason, "err");
@@ -1472,7 +1490,7 @@
       log("Publishing flow crashed", err);
     }
 
-    if (job.mode === "Controlled") {
+    if (job.mode === "Controlled" || job.autoClickPublish === true) {
       await autoPublishFlow(job, { filled, missed, warnings });
     } else {
       setStatus("Fields filled. Review, then mark the result. Publish was NOT clicked.", "ok");
