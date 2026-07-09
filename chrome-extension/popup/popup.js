@@ -2,7 +2,7 @@ const DEFAULT_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
 const REPLIT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 
 // Build date is bumped manually alongside manifest.json's version field.
-const BUILD_DATE = "2026-07-08";
+const BUILD_DATE = "2026-07-09";
 
 (function initVersionDisplay() {
   const manifest = chrome.runtime.getManifest();
