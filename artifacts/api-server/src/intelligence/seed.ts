@@ -358,7 +358,7 @@ function generateVehicleStrategy(
 
 export async function seedOpportunityScores(
   logger: Logger,
-  opts?: { forceRefresh?: boolean },
+  opts?: { forceRefresh?: boolean; force?: boolean },
 ): Promise<void> {
   // Check if any rows are missing v1.2 buyer segment fields
   const [nullCheck] = await db
@@ -386,7 +386,7 @@ export async function seedOpportunityScores(
     .where(eq(vehicleIntelligenceTable.dealerId, DEALER_ID));
 
   const needsScoring =
-    !!opts?.forceRefresh ||
+    (opts?.forceRefresh ?? opts?.force ?? false) ||
     (nullCheck?.cnt ?? 0) > 0 ||
     (intelligenceCount?.cnt ?? 0) < (vehicleCount?.cnt ?? 0);
   if (!needsScoring) {
