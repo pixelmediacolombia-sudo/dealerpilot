@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.16
+
+**Fixed**
+- Photo confirmation in Spanish Facebook sessions - the extension now accepts counters like `Fotos · 7/20` and Spanish upload labels as valid proof that Marketplace rendered uploaded thumbnails.
+
+---
+
 ## v1.3.15
 
 **Fixed**

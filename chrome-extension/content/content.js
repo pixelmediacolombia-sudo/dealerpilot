@@ -1680,11 +1680,34 @@
   async function waitForPhotoThumbnails(expectedCount, timeoutMs) {
     const start = Date.now();
     let lastMsg = 0;
+    const getPhotoCounter = () => {
+      const text = document.body?.innerText || "";
+      const slashMatch = text.match(/(?:photos?|fotos?)\s*[·:\-]?\s*(\d+)\s*\/\s*\d+/i);
+      if (slashMatch) return Number.parseInt(slashMatch[1], 10) || 0;
+      const wordMatch = text.match(/(\d+)\s*(?:photos?|fotos?)\b/i);
+      return wordMatch ? Number.parseInt(wordMatch[1], 10) || 0 : 0;
+    };
+
     while (Date.now() - start < timeoutMs) {
+      const photoCount = getPhotoCounter();
+      if (photoCount > 0) {
+        stateLog(`Photo counter found: ${photoCount} / ${expectedCount}`);
+        return true;
+      }
+
       // Facebook renders uploaded photo thumbnails in a few different ways
       const thumbs = [
         ...document.querySelectorAll('[data-testid="media-attachment-delete-button"]'),
         ...document.querySelectorAll('img[src^="blob:"]'),
+        ...document.querySelectorAll('[aria-label*="photo" i] img'),
+        ...document.querySelectorAll('[aria-label*="foto" i] img'),
+        ...document.querySelectorAll('[aria-label*="image" i] img'),
+        ...document.querySelectorAll('[aria-label*="imagen" i] img'),
+        ...document.querySelectorAll('[aria-label*="upload" i] img'),
+        ...document.querySelectorAll('[aria-label*="subir" i] img'),
+        ...document.querySelectorAll('[aria-label*="agregar" i] img'),
+        ...document.querySelectorAll('[aria-label*="eliminar" i]'),
+        ...document.querySelectorAll('[aria-label*="remove" i]'),
       ];
       // Deduplicate by filtering to unique elements
       const unique = [...new Set(thumbs)];
@@ -1694,7 +1717,15 @@
       }
       // Also accept: any visible image that appeared inside the upload area
       const uploadArea = document.querySelector(
-        '[aria-label*="photo" i], [aria-label*="image" i], [aria-label*="upload" i]'
+        [
+          '[aria-label*="photo" i]',
+          '[aria-label*="foto" i]',
+          '[aria-label*="image" i]',
+          '[aria-label*="imagen" i]',
+          '[aria-label*="upload" i]',
+          '[aria-label*="subir" i]',
+          '[aria-label*="agregar" i]',
+        ].join(", ")
       );
       if (uploadArea) {
         const imgs = uploadArea.querySelectorAll("img");
@@ -1961,12 +1992,23 @@
           ...new Set(THUMB_SELECTORS.flatMap((sel) => [...document.querySelectorAll(sel)])),
         ];
         if (thumbs.length > 0) { hasPhoto = true; break; }
-        // Also accept Facebook's text counter ("1 photo", "3 photos")
-        const countText = (document.body.innerText || "").match(/(\d+)\s*photo/i);
+        // Also accept Facebook's text counter ("1 photo", "3 photos", "Fotos · 7/20")
+        const pageText = document.body.innerText || "";
+        const countText =
+          pageText.match(/(?:photos?|fotos?)\s*[·:\-]?\s*(\d+)\s*\/\s*\d+/i) ||
+          pageText.match(/(\d+)\s*(?:photos?|fotos?)\b/i);
         if (countText && parseInt(countText[1], 10) > 0) { hasPhoto = true; break; }
         // Accept any naturally loaded image inside a photo container
         const uploadZone = document.querySelector(
-          '[aria-label*="photo" i], [aria-label*="image" i], [aria-label*="upload" i]',
+          [
+            '[aria-label*="photo" i]',
+            '[aria-label*="foto" i]',
+            '[aria-label*="image" i]',
+            '[aria-label*="imagen" i]',
+            '[aria-label*="upload" i]',
+            '[aria-label*="subir" i]',
+            '[aria-label*="agregar" i]',
+          ].join(", "),
         );
         if (uploadZone) {
           const loaded = [...uploadZone.querySelectorAll("img")].filter(
