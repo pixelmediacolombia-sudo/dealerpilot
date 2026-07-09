@@ -36,6 +36,7 @@ import {
   LOT_CITY_MAP,
   resolvePublishMode,
 } from "../publishing/controlledMode";
+import { getInitialBatchTiming } from "../publishing/batchProgress";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
@@ -651,6 +652,7 @@ router.post("/auto-publish/batches", async (req, res) => {
   const baseTime = schedAt && !Number.isNaN(schedAt.getTime()) ? schedAt : new Date();
   const spacingMs = (dealerAutoPublishSettings?.minDelayMinutes ?? 10) * 60_000;
   const nowMs = Date.now();
+  const batchTiming = getInitialBatchTiming(baseTime, nowMs);
 
   // Create the batch
   const [batch] = await db
@@ -658,10 +660,11 @@ router.post("/auto-publish/batches", async (req, res) => {
     .values({
       dealerId,
       batchNumber,
-      status: baseTime.getTime() > nowMs ? "Scheduled" : "Preparing",
+      status: batchTiming.status,
       mode,
       totalVehicles: eligible.length,
       needsReviewCount,
+      startedAt: batchTiming.startedAt,
       scheduledAt: baseTime,
       lotLocation: lotLocation ?? null,
     })

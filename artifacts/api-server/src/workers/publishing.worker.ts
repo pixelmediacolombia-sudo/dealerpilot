@@ -41,6 +41,7 @@ import { getCachedGmDecision } from "../routes/gm";
 import { getDuplicateConflictVehicleIds } from "./market.worker";
 import type { WorkerDefinition, WorkerRunOutcome } from "./types";
 import { LOT_CITY_MAP, resolvePublishMode } from "../publishing/controlledMode";
+import { getInitialBatchTiming } from "../publishing/batchProgress";
 
 const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const DEALER_ID = 1;
@@ -291,17 +292,19 @@ async function maybeCreateAutomaticBatch(
     .from(publishingBatchesTable)
     .where(eq(publishingBatchesTable.dealerId, DEALER_ID));
   const batchNumber = batchCountResult.length + 1;
+  const batchTiming = getInitialBatchTiming(now, now.getTime());
 
   const [batch] = await db
     .insert(publishingBatchesTable)
     .values({
       dealerId: DEALER_ID,
       batchNumber,
-      status: "Preparing",
+      status: batchTiming.status,
       mode,
       totalVehicles: selected.length,
       needsReviewCount: 0,
       scheduledAt: now,
+      startedAt: batchTiming.startedAt,
       notes: "Created automatically by Publishing Agent",
     })
     .returning();

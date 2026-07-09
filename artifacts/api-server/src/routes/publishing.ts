@@ -10,6 +10,7 @@ import {
   listingsTable,
   listingVersionsTable,
   publishingJobsTable,
+  publishingBatchesTable,
   vehicleIntelligenceTable,
   marketplaceListingsTable,
   autoPublishSettingsTable,
@@ -26,6 +27,7 @@ import {
   resolvePublishMode,
   LOT_CITY_MAP,
 } from "../publishing/controlledMode";
+import { deriveBatchProgress } from "../publishing/batchProgress";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
@@ -33,6 +35,45 @@ import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 const DEALER_ID = 1;
 
 const router: IRouter = Router();
+
+async function reconcileBatchProgress(batchId: number | null | undefined) {
+  if (!batchId) return;
+
+  const [counts] = await db
+    .select({
+      completed: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Published')`,
+      failed: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Failed')`,
+      skipped: sql<number>`count(*) filter (where ${publishingJobsTable.status} in ('Cancelled', 'Needs Review'))`,
+      total: sql<number>`count(*)`,
+    })
+    .from(publishingJobsTable)
+    .where(eq(publishingJobsTable.batchId, batchId));
+
+  const [batch] = await db
+    .select({ totalVehicles: publishingBatchesTable.totalVehicles })
+    .from(publishingBatchesTable)
+    .where(eq(publishingBatchesTable.id, batchId));
+
+  const totalVehicles = Number(batch?.totalVehicles ?? counts?.total ?? 0);
+  const progress = deriveBatchProgress({
+    completed: Number(counts?.completed ?? 0),
+    failed: Number(counts?.failed ?? 0),
+    skipped: Number(counts?.skipped ?? 0),
+    totalVehicles,
+  });
+
+  await db
+    .update(publishingBatchesTable)
+    .set({
+      status: progress.status,
+      completedCount: progress.completed,
+      failedCount: progress.failed,
+      skippedCount: progress.skipped,
+      startedAt: new Date(),
+      completedAt: progress.isDone ? new Date() : null,
+    })
+    .where(eq(publishingBatchesTable.id, batchId));
+}
 
 async function moveJobToNeedsReviewWithoutListingUrl(
   job: PublishingJob,
@@ -75,6 +116,8 @@ async function moveJobToNeedsReviewWithoutListingUrl(
       publishedAt: null,
     })
     .where(eq(marketplaceListingsTable.vehicleId, job.vehicleId));
+
+  await reconcileBatchProgress(job.batchId);
 
   return updated;
 }
@@ -609,6 +652,8 @@ router.post("/publishing/jobs/:id/claim", async (req, res) => {
       .where(eq(listingVersionsTable.id, updated.listingVersionId));
   }
 
+  await reconcileBatchProgress(updated.batchId);
+
   req.log.info({ jobId: id, extensionId: parsed.data.extensionId }, "Publishing job claimed");
   const [enriched] = await enrich([updated]);
   res.json(enriched);
@@ -801,6 +846,8 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
       },
     });
 
+  await reconcileBatchProgress(updated.batchId);
+
   req.log.info({ jobId: id, listingUrl, previousStatus: job.status }, "complete: job Published successfully");
   const [enriched] = await enrich([updated]);
   res.json(enriched);
@@ -868,6 +915,8 @@ router.post("/publishing/jobs/:id/fail", async (req, res) => {
     return;
   }
 
+  await reconcileBatchProgress(updated.batchId);
+
   req.log.warn({ jobId: id, reason, nextStatus }, "Publishing job failed");
   const [enriched] = await enrich([updated]);
   res.json(enriched);
@@ -905,6 +954,8 @@ router.post("/publishing/jobs/:id/cancel", async (req, res) => {
     .set({ status: "Failed", failedReason: reason, claimedByExtension: null })
     .where(eq(publishingJobsTable.id, id))
     .returning();
+
+  await reconcileBatchProgress(updated.batchId);
 
   req.log.info({ jobId: id, reason }, "Publishing job cancelled by operator");
   const [enriched] = await enrich([updated]);
