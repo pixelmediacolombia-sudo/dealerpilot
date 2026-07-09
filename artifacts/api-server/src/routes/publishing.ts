@@ -1198,16 +1198,6 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
   // inventory, mapped lot location, GM Coach, duplicate conflicts, and (for
   // Controlled Mode) an online extension all must pass before a job is created.
   const mode = resolvePublishMode(true);
-  const guardrail = await checkPublishGuardrails({
-    vehicle: { id: vehicle.id, status: vehicle.status, lotLocation: vehicle.lotLocation },
-    gmOverride,
-    requireExtensionOnline: mode === "Controlled",
-  });
-  if (!guardrail.ok) {
-    req.log.warn({ vehicleId, code: guardrail.code, reason: guardrail.reason }, "Publish Now blocked by guardrail");
-    res.status(422).json({ error: guardrail.reason, code: guardrail.code });
-    return;
-  }
 
   // Cancel stale active jobs (>10 min old) for this DEALER before creating a new one.
   // Any stale job from any vehicle blocks the extension queue — clear them all.
@@ -1251,6 +1241,17 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
       resumed: true,
       message: `Publishing already in progress — resuming job #${existing.id}`,
     });
+    return;
+  }
+
+  const guardrail = await checkPublishGuardrails({
+    vehicle: { id: vehicle.id, status: vehicle.status, lotLocation: vehicle.lotLocation },
+    gmOverride,
+    requireExtensionOnline: mode === "Controlled",
+  });
+  if (!guardrail.ok) {
+    req.log.warn({ vehicleId, code: guardrail.code, reason: guardrail.reason }, "Publish Now blocked by guardrail");
+    res.status(422).json({ error: guardrail.reason, code: guardrail.code });
     return;
   }
 
