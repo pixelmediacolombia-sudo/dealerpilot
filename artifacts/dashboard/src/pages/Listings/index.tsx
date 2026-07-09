@@ -511,11 +511,11 @@ export function ListingsWorkspace() {
       <span className="text-[9px] font-black tabular-nums opacity-60">{n}</span>
     ) : null;
 
-  const handleMarkPublished = (marketplaceUrl?: string) => {
+  const handleMarkPublished = (marketplaceUrl: string) => {
     if (!markPublishedVehicle) return;
     markPublishedMutation.mutate({
       vehicleId: markPublishedVehicle.id,
-      data: marketplaceUrl ? { marketplaceUrl } : {},
+      data: { marketplaceUrl },
     });
   };
 

@@ -1788,36 +1788,28 @@
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_next" }).catch(() => {});
     await sleep(500);
 
-    const publishClicked = await clickButtonByText(
-      ["publish listing", "publish", "post listing", "post"],
-      15000,
-    );
-    if (!publishClicked) {
-      const reason = "Could not find the Publish button after clicking Next";
-      stateError("Auto-publish: Publish not found", new Error(reason));
+    const listingUrl = await clickPublishUntilListingUrl(job);
+    if (!listingUrl) {
+      const reason =
+        "Publish was clicked, but DealerPilot could not confirm a live Marketplace listing URL. " +
+        "Facebook may require one more Publish click or manual review.";
+      stateError("Auto-publish: live listing not confirmed", new Error(reason));
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => {});
-      const retried = await handleAutoRetry(job, reason);
-      if (!retried) {
-        setStatus("Auto-publish failed: " + reason, "err");
-        renderReview(job, { filled, missed, warnings });
+      const failResult = await send({ type: "FAIL_JOB", jobId: job.id, reason });
+      await chrome.storage.local.remove("activeJob");
+      if (!failResult || !failResult.ok) {
+        setStatus("Auto-publish failed and backend fail-sync failed: " + (failResult && failResult.error), "err");
+      } else {
+        setStatus(reason, "err");
       }
       return;
     }
 
-    stateLog("Auto-publish: Publish clicked, waiting for Marketplace confirmation…");
-    setStatus("Auto-publishing — waiting for Marketplace to confirm…");
-    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "publish_clicked" }).catch(() => {});
-    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_publish" }).catch(() => {});
-    await sleep(700);
+    stateLog("Auto-publish: complete - " + listingUrl);
+    send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "listing_url_captured",
+           details: listingUrl }).catch(() => {});
 
-    const listingUrl = await waitForPublishSuccess(20000);
-    stateLog("Auto-publish: complete — " + (listingUrl || "no URL detected"));
-    if (listingUrl) {
-      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "listing_url_captured",
-             details: listingUrl }).catch(() => {});
-    }
-
-    const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl: listingUrl || undefined });
+    const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     // Always clear activeJob — Facebook published, so the slot is done regardless of
     // whether the backend acknowledged it cleanly. A 409/500 here must never leave
@@ -1846,6 +1838,46 @@
   }
 
   // clickEnabledButtonByText — only clicks buttons that are NOT disabled.
+  async function clickPublishUntilListingUrl(job) {
+    const publishTexts = ["publish listing", "publish", "post listing", "post"];
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      setStatus(attempt === 1
+        ? "Auto-publishing - clicking Publish..."
+        : "Auto-publishing - confirming final Publish...");
+      const clicked = await clickButtonByText(publishTexts, attempt === 1 ? 15000 : 7000);
+      if (!clicked) return null;
+
+      stateLog(`Auto-publish: Publish click ${attempt}, waiting for Marketplace confirmation...`);
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "publish_clicked" }).catch(() => {});
+      send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_publish" }).catch(() => {});
+      await sleep(900);
+
+      const listingUrl = await waitForPublishSuccess(attempt === 1 ? 12000 : 22000);
+      if (listingUrl) return listingUrl;
+
+      // Some Facebook sessions show a final confirmation dialog with another
+      // Publish/Post button. Try once more only when that button is still visible.
+      if (!findEnabledButtonByText(publishTexts)) return null;
+    }
+    return null;
+  }
+
+  function findEnabledButtonByText(textOptions) {
+    const candidates = Array.from(
+      document.querySelectorAll('div[role="button"], button, [role="button"]'),
+    );
+    for (const el of candidates) {
+      if (
+        el.disabled ||
+        el.getAttribute("aria-disabled") === "true" ||
+        el.hasAttribute("disabled")
+      ) continue;
+      const text = (el.innerText || el.textContent || "").toLowerCase().trim();
+      if (textOptions.some((t) => text === t || text === t + " ")) return el;
+    }
+    return null;
+  }
+
   async function clickEnabledButtonByText(textOptions, timeoutMs) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -2007,17 +2039,17 @@
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const cur = window.location.href;
-      if (cur !== startUrl && (cur.includes("/marketplace/item/") || cur.includes("/marketplace/"))) {
+      if (cur !== startUrl && cur.includes("/marketplace/item/")) {
         return cur;
       }
       const successEl =
         document.querySelector('[aria-label*="listed" i]') ||
         document.querySelector('[data-testid*="success" i]');
-      if (successEl) return window.location.href !== startUrl ? window.location.href : null;
+      if (successEl && window.location.href.includes("/marketplace/item/")) return window.location.href;
       await sleep(500);
     }
     const final = window.location.href;
-    return final !== startUrl && final.includes("marketplace") ? final : null;
+    return final !== startUrl && final.includes("/marketplace/item/") ? final : null;
   }
 
   function chips(items, cls) {
@@ -2041,15 +2073,19 @@
     reviewActions.appendChild(
       button("Mark Published", async () => {
         const listingUrl = window.prompt(
-          "Paste the Marketplace listing URL (optional, leave blank to skip):",
+          "Paste the live Marketplace listing URL:",
           "",
         );
         if (listingUrl === null) return;
+        if (!listingUrl.trim()) {
+          setStatus("A Marketplace listing URL is required to mark this job Published.", "err");
+          return;
+        }
         setStatus("Marking job as published…");
         const r = await send({
           type: "COMPLETE_JOB",
           jobId: job.id,
-          listingUrl: listingUrl.trim() || undefined,
+          listingUrl: listingUrl.trim(),
         });
         if (!r || !r.ok) {
           if (r?.error === CTXI) return;
