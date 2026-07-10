@@ -375,6 +375,85 @@
     });
   }
 
+  function isVisibleElement(el) {
+    if (!el) return false;
+    const rect = el.getBoundingClientRect?.();
+    return el.offsetParent !== null || Boolean(rect && rect.width > 0 && rect.height > 0);
+  }
+
+  function checkboxIsChecked(el) {
+    if (!el) return false;
+    if (el.matches?.('input[type="checkbox"]')) return el.checked === true;
+    return el.getAttribute("aria-checked") === "true" || el.getAttribute("data-checked") === "true";
+  }
+
+  function textNearElement(el) {
+    const parts = [
+      el.getAttribute?.("aria-label"),
+      el.getAttribute?.("title"),
+      el.getAttribute?.("name"),
+    ];
+    let cur = el;
+    for (let depth = 0; cur && depth < 5; depth += 1, cur = cur.parentElement) {
+      const text = cur.innerText || cur.textContent || "";
+      if (text && text.length < 900) parts.push(text);
+    }
+    return normalizeText(parts.filter(Boolean).join(" "));
+  }
+
+  function findCheckbox(keywords) {
+    const normalizedKeywords = keywords.map(normalizeText);
+    const selector = '[role="checkbox"], input[type="checkbox"], [aria-checked]';
+    const candidates = Array.from(document.querySelectorAll(selector)).filter(isVisibleElement);
+
+    for (const el of candidates) {
+      const combined = textNearElement(el);
+      if (normalizedKeywords.some((kw) => combined.includes(kw))) return el;
+    }
+
+    const textNodes = Array.from(document.querySelectorAll("label, div, span, strong"))
+      .filter(isVisibleElement);
+    for (const node of textNodes) {
+      const text = normalizeText(node.innerText || node.textContent || "");
+      if (!text || text.length > 700) continue;
+      if (!normalizedKeywords.some((kw) => text.includes(kw))) continue;
+
+      let cur = node;
+      for (let depth = 0; cur && depth < 6; depth += 1, cur = cur.parentElement) {
+        const checkbox = cur.querySelector?.(selector);
+        if (checkbox && isVisibleElement(checkbox)) return checkbox;
+      }
+    }
+
+    return null;
+  }
+
+  function waitForCheckbox(label, keywords, maxWaitMs = 8000) {
+    const limit = maxWaitMs;
+    const kwStr = keywords.join("/");
+    return new Promise((resolve) => {
+      const interval = 300;
+      let elapsed = 0;
+      const tick = () => {
+        const el = findCheckbox(keywords);
+        if (el) {
+          console.log(`[FOUND] "${label}" checkbox (${kwStr}) appeared at ${elapsed}ms`);
+          resolve(el);
+          return;
+        }
+        elapsed += interval;
+        if (elapsed > 900 && elapsed % 900 === 0) nudgeMarketplaceFormScroll();
+        if (elapsed >= limit) {
+          console.log(`[TIMEOUT] "${label}" checkbox (${kwStr}) did not appear after ${limit}ms`);
+          resolve(null);
+          return;
+        }
+        setTimeout(tick, interval);
+      };
+      tick();
+    });
+  }
+
   function waitForNamedField(label, keywords, maxWaitMs) {
     const limit = maxWaitMs === undefined ? 20000 : maxWaitMs;
     return new Promise((resolve) => {
@@ -1076,6 +1155,47 @@
       return true;
     }
 
+    async function checkCheckboxStep(label, keywords, isRequired = false) {
+      console.log(`[STEP] ${label}`);
+      stateLog(`Step: ${label}`);
+      setStatus(`Checking "${label}" checkbox...`);
+
+      const checkbox = await waitForCheckbox(label, keywords, 8000);
+      if (!checkbox) {
+        if (isRequired) {
+          missed.push(label);
+          warnings.push(`${label}: checkbox did not appear`);
+        } else {
+          warnings.push(`${label}: checkbox did not appear — skipped`);
+        }
+        return false;
+      }
+
+      if (!checkboxIsChecked(checkbox)) {
+        checkbox.click();
+        await sleep(500);
+      }
+
+      if (!checkboxIsChecked(checkbox)) {
+        const clickTarget = checkbox.closest?.("label") || checkbox.parentElement || checkbox;
+        if (clickTarget && clickTarget !== checkbox) {
+          clickTarget.click();
+          await sleep(500);
+        }
+      }
+
+      if (checkboxIsChecked(checkbox)) {
+        filled.push(label);
+        stateLog(`${label} checked`);
+        log(`${label} checked`);
+        return true;
+      }
+
+      missed.push(label);
+      warnings.push(`${label}: checkbox found but could not be checked`);
+      return false;
+    }
+
     // ------------------------------------------------------------------
     // selectVehicleTypeStep — dedicated, 7-strategy Vehicle Type selector.
     //
@@ -1669,6 +1789,23 @@
         true,
       );
 
+      // ---- Phase 6b: Clean title checkbox. Newer Facebook vehicle forms keep
+      // this as a required declaration below the vehicle detail dropdowns.
+      stateLog("Phase 6b: clean title checkbox");
+      await checkCheckboxStep(
+        "clean title",
+        [
+          "clean title",
+          "title is clean",
+          "has a clean title",
+          "titulo limpio",
+          "título limpio",
+          "este vehiculo tiene titulo limpio",
+          "este vehículo tiene título limpio",
+        ],
+        true,
+      );
+
       checkBudget("workflow complete");
       stateLog(`Workflow Complete — ${elapsed()}s elapsed`);
 
@@ -2248,6 +2385,28 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     return null;
   }
 
+  function findButtonByText(textOptions) {
+    const candidates = Array.from(
+      document.querySelectorAll('div[role="button"], button, [role="button"]'),
+    );
+    const normalizedOptions = textOptions.map(normalizeText);
+    for (const el of candidates) {
+      const text = normalizeText(el.innerText || el.textContent || "");
+      if (normalizedOptions.some((t) => text === t || text === t + " ")) return el;
+    }
+    return null;
+  }
+
+  async function waitForEnabledButtonByText(textOptions, timeoutMs = 12000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const btn = findEnabledButtonByText(textOptions);
+      if (btn) return btn;
+      await sleep(400);
+    }
+    return findEnabledButtonByText(textOptions);
+  }
+
   async function clickEnabledButtonByText(textOptions, timeoutMs) {
     const start = Date.now();
     const normalizedOptions = textOptions.map(normalizeText);
@@ -2383,17 +2542,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       };
     }
 
-    // 2. Check Next button exists and is not disabled
+    // 2. Check Next button exists and becomes enabled. Facebook can take a few
+    // seconds after the last checkbox/dropdown change to recalculate readiness.
     const NEXT_TEXTS = ["next", "continue", "next step", "siguiente", "continuar"];
-    const NORMALIZED_NEXT_TEXTS = NEXT_TEXTS.map(normalizeText);
-    const allButtons = Array.from(
-      document.querySelectorAll('div[role="button"], button, [role="button"]'),
-    );
-    const nextBtn = allButtons.find((el) => {
-      const t = normalizeText(el.innerText || el.textContent || "");
-      return NORMALIZED_NEXT_TEXTS.some((n) => t === n || t === n + " ");
-    });
+    const readyNext = await waitForEnabledButtonByText(NEXT_TEXTS, 12000);
+    if (readyNext) return { ok: true };
 
+    const nextBtn = findButtonByText(NEXT_TEXTS);
     if (!nextBtn) {
       const fbErrors = scrapeFacebookErrors();
       return {
@@ -2404,26 +2559,17 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       };
     }
 
-    const isDisabled =
-      nextBtn.disabled ||
-      nextBtn.getAttribute("aria-disabled") === "true" ||
-      nextBtn.hasAttribute("disabled");
-
-    if (isDisabled) {
-      const fbErrors = scrapeFacebookErrors();
-      return {
-        ok: false,
-        reason: fbErrors
-          ? `Next button is disabled: ${fbErrors}`
-          : effectiveMissed.length > 0
-            ? `Next button is disabled — required fields not selected: ${effectiveMissed.join(", ")}. Check those fields on the form.`
-            : skippedVehicleDetailFields.length > 0
-              ? `Next button is disabled — required vehicle details not selected: ${skippedVehicleDetailFields.join(", ")}. Check those fields on the form.`
-              : "Next button is disabled — Facebook still has a required field unselected. Review the visible vehicle details on the form.",
-      };
-    }
-
-    return { ok: true };
+    const fbErrors = scrapeFacebookErrors();
+    return {
+      ok: false,
+      reason: fbErrors
+        ? `Next button is disabled: ${fbErrors}`
+        : effectiveMissed.length > 0
+          ? `Next button is disabled — required fields not selected: ${effectiveMissed.join(", ")}. Check those fields on the form.`
+          : skippedVehicleDetailFields.length > 0
+            ? `Next button is disabled — required vehicle details not selected: ${skippedVehicleDetailFields.join(", ")}. Check those fields on the form.`
+            : "Next button is disabled — Facebook still has a required field unselected after waiting 12 seconds. Check clean title and visible vehicle details on the form.",
+    };
   }
 
   // scrapeFacebookErrors — collect visible validation error messages from the form.

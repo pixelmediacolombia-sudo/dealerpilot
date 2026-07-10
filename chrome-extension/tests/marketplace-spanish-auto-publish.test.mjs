@@ -19,6 +19,7 @@ test("Marketplace filler recognizes Spanish vehicle form labels", () => {
     "tipo de combustible",
     "transmisi\u00f3n",
     "estado del veh\u00edculo",
+    "t\u00edtulo limpio",
   ]) {
     assert.match(content, new RegExp(keyword, "i"), `missing Spanish keyword: ${keyword}`);
   }
@@ -62,6 +63,14 @@ test("Required vehicle detail dropdowns have Spanish-safe fallbacks", () => {
     /Year and Make may not have been selected/,
     "disabled Next fallback must not blame Year/Make when those fields can already be filled",
   );
+});
+
+test("Marketplace clean-title checkbox is handled before Next validation", () => {
+  assert.match(content, /function findCheckbox\(keywords\)/);
+  assert.match(content, /async function checkCheckboxStep\(label, keywords, isRequired = false\)/);
+  assert.match(content, /"clean title"[\s\S]*"titulo limpio"[\s\S]*"este vehiculo tiene titulo limpio"/);
+  assert.match(content, /waitForEnabledButtonByText\(NEXT_TEXTS, 12000\)/);
+  assert.match(content, /after waiting 12 seconds/);
 });
 
 test("Successful publish wakes the queue for the next eligible job", () => {

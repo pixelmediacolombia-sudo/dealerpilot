@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.24
+
+**Fixed**
+- Marketplace clean title - the extension now checks Facebook's clean-title declaration when the vehicle form renders it as a required checkbox.
+- Pre-Next patience - validation now waits briefly for Facebook to enable Next after the final vehicle detail is selected.
+
+---
+
 ## v1.3.23
 
 **Fixed**
