@@ -1546,7 +1546,7 @@
             ["exterior color", "exterior", "color", "color exterior"],
             extColor,
             null,
-            false,
+            true,
           );
           if (!ecOk && !missed.includes("exterior color")) {
             missed.push("exterior color");
@@ -1570,7 +1570,7 @@
             ["interior color", "interior", "color interior"],
             candidate,
             null,
-            false,
+            true,
           );
           if (ok) { interiorFilled = true; break; }
           // Not the final fallback — undo spurious missed/warning entries and retry
