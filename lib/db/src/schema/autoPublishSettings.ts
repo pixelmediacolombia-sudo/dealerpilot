@@ -23,7 +23,7 @@ export const autoPublishSettingsTable = pgTable(
     maxPostsPerDay: integer("max_posts_per_day").notNull().default(4),
     minDelayMinutes: integer("min_delay_minutes").notNull().default(10),
     maxDelayMinutes: integer("max_delay_minutes").notNull().default(20),
-    requireApproval: boolean("require_approval").notNull().default(true),
+    requireApproval: boolean("require_approval").notNull().default(false),
     autoClickPublish: boolean("auto_click_publish").notNull().default(false),
     useOriginalPhotos: boolean("use_original_photos").notNull().default(true),
     aiCreativeIfLow: boolean("ai_creative_if_low").notNull().default(true),
