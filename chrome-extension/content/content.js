@@ -901,16 +901,24 @@
         "hybrid": ["hybrid", "híbrido", "hibrido"],
         "plug-in hybrid": ["plug-in hybrid", "plugin hybrid", "híbrido enchufable", "hibrido enchufable"],
         "flex": ["flex", "flex fuel", "combustible flexible"],
-        "other": ["other", "otro", "otra"],
+        "other": ["other", "otro", "otra", "gasoline", "gasolina"],
       };
 
       const CONDITION_MAP = {
-        "used": ["used", "pre-owned", "usado", "usada"],
-        "new": ["new", "nuevo", "nueva"],
+        "used": ["used", "pre-owned", "usado", "usada", "bueno", "aceptable"],
+        "new": ["new", "nuevo", "nueva", "excelente"],
         "excellent": ["excellent", "excelente"],
+        "very good": ["very good", "muy bueno", "muy buena"],
         "good": ["good", "bueno", "buena"],
         "fair": ["fair", "aceptable", "regular"],
-        "salvage": ["salvage", "salvamento"],
+        "poor": ["poor", "malo", "mala"],
+        "salvage": ["salvage", "salvamento", "malo", "mala"],
+      };
+
+      const TRANSMISSION_MAP = {
+        "automatic": ["automatic", "auto", "a/t", "cvt", "automatica", "automatico", "transmision automatica"],
+        "manual": ["manual", "m/t", "standard", "transmision manual"],
+        "other": ["other", "otro", "otra", "automatic", "automatica", "transmision automatica"],
       };
 
       let pick =
@@ -969,6 +977,20 @@
         (label === "condition"
           ? (() => {
             for (const [canonical, aliases] of Object.entries(CONDITION_MAP)) {
+              if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
+                const found = options.find((o) => {
+                  const text = getText(o);
+                  return text.includes(canonical) || aliases.some((a) => text.includes(a));
+                });
+                if (found) return found;
+              }
+            }
+            return undefined;
+          })()
+          : undefined) ||
+        (label === "transmission"
+          ? (() => {
+            for (const [canonical, aliases] of Object.entries(TRANSMISSION_MAP)) {
               if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
                 const found = options.find((o) => {
                   const text = getText(o);
@@ -1628,23 +1650,23 @@
       await selectComboboxStep(
         "condition",
         ["condition", "estado", "estado del vehículo", "estado del vehiculo"],
-        fill.condition || "Used",
+        fill.condition || "Good",
         null,
-        false,
+        true,
       );
       await selectComboboxStep(
         "fuel type",
         ["fuel", "fuel type", "tipo de combustible", "combustible"],
-        fill.fuelType,
+        fill.fuelType || "Gasoline",
         null,
-        false,
+        true,
       );
       await selectComboboxStep(
         "transmission",
         ["transmission", "transmisión", "transmision"],
-        fill.transmission,
+        fill.transmission || "Automatic",
         null,
-        false,
+        true,
       );
 
       checkBudget("workflow complete");
@@ -2338,6 +2360,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     const skippedColorFields = missed.filter((m) => {
       return isMarketplaceColorField(m) && fieldPresentOnPage(m) === false;
     });
+    const skippedVehicleDetailFields = [...new Set(warnings
+      .map((w) => String(w || "").match(/^(condition|fuel type|transmission): skipped\b/i)?.[1])
+      .filter(Boolean))];
 
     // Debug: log presence map and persist for inspection if auto-start still fails
     try {
@@ -2392,7 +2417,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           ? `Next button is disabled: ${fbErrors}`
           : effectiveMissed.length > 0
             ? `Next button is disabled — required fields not selected: ${effectiveMissed.join(", ")}. Check those fields on the form.`
-            : "Next button is disabled — Year and Make may not have been selected. Check those fields on the form.",
+            : skippedVehicleDetailFields.length > 0
+              ? `Next button is disabled — required vehicle details not selected: ${skippedVehicleDetailFields.join(", ")}. Check those fields on the form.`
+              : "Next button is disabled — Facebook still has a required field unselected. Review the visible vehicle details on the form.",
       };
     }
 

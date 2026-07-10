@@ -50,6 +50,20 @@ test("Color fields are treated as non-blocking when the form variant does not re
   assert.match(content, /skippedMissingControls\.has\("interior color"\)/);
 });
 
+test("Required vehicle detail dropdowns have Spanish-safe fallbacks", () => {
+  assert.match(content, /"used": \["used", "pre-owned", "usado", "usada", "bueno", "aceptable"\]/);
+  assert.match(content, /"other": \["other", "otro", "otra", "automatic", "automatica", "transmision automatica"\]/);
+  assert.match(content, /fill\.condition \|\| "Good"/);
+  assert.match(content, /fill\.fuelType \|\| "Gasoline"/);
+  assert.match(content, /fill\.transmission \|\| "Automatic"/);
+  assert.match(content, /required vehicle details not selected: \$\{skippedVehicleDetailFields\.join\(", "\)\}/);
+  assert.doesNotMatch(
+    content,
+    /Year and Make may not have been selected/,
+    "disabled Next fallback must not blame Year/Make when those fields can already be filled",
+  );
+});
+
 test("Successful publish wakes the queue for the next eligible job", () => {
   const completeIndex = content.indexOf('type: "COMPLETE_JOB"');
   const pollIndex = content.indexOf('type: "POLL_NOW"');

@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.23
+
+**Fixed**
+- Marketplace vehicle details - condition, fuel type, and transmission now select Spanish Facebook options instead of being skipped and leaving Next disabled.
+- Pre-Next diagnostics - disabled Next now reports skipped vehicle detail fields instead of blaming Year/Make when those fields are already filled.
+
+---
+
 ## v1.3.22
 
 **Fixed**
