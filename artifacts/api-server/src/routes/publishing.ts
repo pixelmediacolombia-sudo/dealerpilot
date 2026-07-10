@@ -951,7 +951,13 @@ router.post("/publishing/jobs/:id/cancel", async (req, res) => {
 
   const [updated] = await db
     .update(publishingJobsTable)
-    .set({ status: "Failed", failedReason: reason, claimedByExtension: null })
+    .set({
+      status: "Cancelled",
+      failedReason: reason,
+      claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
+    })
     .where(eq(publishingJobsTable.id, id))
     .returning();
 
