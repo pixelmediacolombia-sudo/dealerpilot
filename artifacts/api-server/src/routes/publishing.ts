@@ -1221,6 +1221,31 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
     enqueued.push(job!.id);
   }
 
+  // If this is an immediate batch (not scheduled) and an extension is online,
+  // assign the newly created jobs directly to the extension so the extension
+  // can pick them up immediately without requiring the operator to press
+  // "Check For Approved Job" in the popup.
+  if (!scheduledAtStr && enqueued.length > 0 && extensionOnline) {
+    try {
+      const conn = await pool.query(
+        "select id, name, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+      );
+      const row = conn.rows[0];
+      if (row) {
+        const extensionId = row.chrome_extension_id ?? row.name ?? null;
+        if (extensionId) {
+          await db
+            .update(publishingJobsTable)
+            .set({ status: "Assigned", assignedExtensionId: extensionId, assignedAt: new Date() })
+            .where(inArray(publishingJobsTable.id, enqueued));
+          req.log.info({ assigned: enqueued.length, extensionId }, "Bulk-schedule: assigned jobs to online extension");
+        }
+      }
+    } catch (err) {
+      req.log.warn({ err }, "Bulk-schedule: failed to auto-assign jobs to extension — will remain queued");
+    }
+  }
+
   req.log.info(
     { vehicleIds: eligible.map((v) => v.id), enqueued: enqueued.length, skipped },
     "Bulk publishing jobs scheduled",
@@ -1333,6 +1358,29 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     .returning();
 
   req.log.info({ vehicleId, jobId: job.id, source: "publish_now", mode }, "Publish Now job created");
+  // If Controlled Mode and an extension is online, assign the new job immediately
+  // so the extension will pick it up without manual intervention.
+  if (mode === "Controlled") {
+    try {
+      const conn = await pool.query(
+        "select id, name, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+      );
+      const row = conn.rows[0];
+      if (row) {
+        const extensionId = row.chrome_extension_id ?? row.name ?? null;
+        if (extensionId) {
+          await db
+            .update(publishingJobsTable)
+            .set({ status: "Assigned", assignedExtensionId: extensionId, assignedAt: new Date() })
+            .where(eq(publishingJobsTable.id, job.id));
+          req.log.info({ jobId: job.id, extensionId }, "Publish Now: job assigned to online extension");
+        }
+      }
+    } catch (err) {
+      req.log.warn({ err }, "Publish Now: failed to auto-assign job to extension — will remain queued");
+    }
+  }
+
   const [enriched] = await enrich([job]);
   res.status(201).json({ jobId: job.id, job: enriched });
 });
