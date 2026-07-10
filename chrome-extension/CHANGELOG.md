@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.22
+
+**Fixed**
+- Marketplace color controls - exterior/interior color no longer block auto-publish when the current Facebook vehicle form variant does not render those fields.
+
+---
+
 ## v1.3.19
 
 **Fixed**

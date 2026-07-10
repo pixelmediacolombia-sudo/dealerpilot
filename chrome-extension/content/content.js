@@ -226,6 +226,29 @@
     return null;
   }
 
+  function isMarketplaceColorField(fieldName) {
+    const normalized = normalizeText(fieldName);
+    return normalized.includes("exterior")
+      || normalized.includes("interior")
+      || normalized.includes("color");
+  }
+
+  function colorControlKeywords(fieldName) {
+    const normalized = normalizeText(fieldName);
+    if (normalized.includes("exterior")) return ["exterior color", "color exterior"];
+    if (normalized.includes("interior")) return ["interior color", "color interior"];
+    return ["exterior color", "color exterior", "interior color", "color interior"];
+  }
+
+  function findVisibleColorControl(fieldName) {
+    const exactColorKeywords = colorControlKeywords(fieldName);
+    const cb = findCombobox(exactColorKeywords);
+    if (cb) return cb;
+    const txt = findField(exactColorKeywords);
+    if (txt) return txt;
+    return null;
+  }
+
   function waitForCombobox(keywords, maxWaitMs) {
     const limit = maxWaitMs === undefined ? 10000 : maxWaitMs;
     const kwStr = keywords.join("/");
@@ -719,6 +742,7 @@
     const filled = [];
     const missed = [];
     const warnings = [];
+    const skippedMissingControls = new Set();
 
     // ------------------------------------------------------------------
     // selectComboboxStep — interact with a Facebook [role="combobox"].
@@ -736,10 +760,12 @@
       setStatus(`Waiting for "${label}" combobox…`);
       const combobox = await waitForCombobox(keywords, BUDGET.COMBOBOX_WAIT_MS);
       if (!combobox) {
-        const isColorField = /color|exterior|interior/i.test(label);
-        const renderedControlPresent = Boolean(findVisibleColorControl());
+        const isColorField = isMarketplaceColorField(label);
+        const renderedControlPresent = Boolean(findVisibleColorControl(label));
         if (isColorField && !renderedControlPresent) {
+          skippedMissingControls.add(label);
           stateLog(`Skipping "${label}" — no color control rendered in this form variant`);
+          warnings.push(`${label}: skipped — no color control rendered in this form variant`);
           return false;
         }
         stateError(`Could not find ${label} combobox`);
@@ -1544,8 +1570,13 @@
       {
         const extColor = fill.exteriorColor || fill.color || null;
         if (!extColor) {
-          missed.push("exterior color");
-          warnings.push("exterior color: missing from vehicle data");
+          if (findVisibleColorControl("exterior color")) {
+            missed.push("exterior color");
+            warnings.push("exterior color: missing from vehicle data");
+          } else {
+            skippedMissingControls.add("exterior color");
+            warnings.push("exterior color: skipped — no color control rendered in this form variant");
+          }
         } else {
           const ecOk = await selectComboboxStep(
             "exterior color",
@@ -1554,7 +1585,7 @@
             null,
             true,
           );
-          if (!ecOk && !missed.includes("exterior color")) {
+          if (!ecOk && !skippedMissingControls.has("exterior color") && !missed.includes("exterior color")) {
             missed.push("exterior color");
             warnings.push(`exterior color: "${extColor}" not found in Facebook options`);
           }
@@ -1585,7 +1616,7 @@
             warnings.splice(warnsBefore);
           }
         }
-        if (!interiorFilled && !missed.includes("interior color")) {
+        if (!interiorFilled && !skippedMissingControls.has("interior color") && !missed.includes("interior color")) {
           missed.push("interior color");
           warnings.push("interior color: no fallback color (Black/Gray/Other) available in Facebook options");
         }
@@ -2296,34 +2327,16 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     // treat it as non-blocking for the pre-Next validation. This prevents
     // blocking auto-publish when Facebook's form variant simply doesn't
     // render exterior/interior color controls.
-    function findVisibleColorControl() {
-      const exactColorKeywords = [
-        "exterior color",
-        "color exterior",
-        "interior color",
-        "color interior",
-      ];
-      const cb = findCombobox(exactColorKeywords);
-      if (cb) return cb;
-      const txt = findField(exactColorKeywords);
-      if (txt) return txt;
-      return null;
-    }
-
     function fieldPresentOnPage(fieldName) {
-      const lname = String(fieldName || "").toLowerCase();
-      const isColorField = lname.includes("exterior") || lname.includes("interior") || lname.includes("color");
-      if (!isColorField) return true;
+      if (!isMarketplaceColorField(fieldName)) return true;
 
-      const control = findVisibleColorControl();
+      const control = findVisibleColorControl(fieldName);
       return Boolean(control);
     }
 
     const effectiveMissed = missed.filter((m) => fieldPresentOnPage(m));
     const skippedColorFields = missed.filter((m) => {
-      const lname = String(m || "").toLowerCase();
-      return (lname.includes("exterior") || lname.includes("interior") || lname.includes("color"))
-        && fieldPresentOnPage(m) === false;
+      return isMarketplaceColorField(m) && fieldPresentOnPage(m) === false;
     });
 
     // Debug: log presence map and persist for inspection if auto-start still fails
@@ -3011,5 +3024,5 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     );
   }
 
-  log("Panel loaded v1.3.9", { isMessenger, isMarketplaceCreate });
+  log("Panel loaded", { version: EXT_VERSION, isMessenger, isMarketplaceCreate });
 })();

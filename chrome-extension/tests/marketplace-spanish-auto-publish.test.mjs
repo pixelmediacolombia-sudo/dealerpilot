@@ -39,6 +39,15 @@ test("Auto publish can click localized Next and Publish buttons", () => {
 test("Color fields are treated as non-blocking when the form variant does not render them", () => {
   assert.match(content, /no color control rendered in this form variant/i);
   assert.match(content, /non-blocking/i);
+  assert.match(content, /const effectiveMissed = missed\.filter\(\(m\) => fieldPresentOnPage\(m\)\)/);
+  assert.match(content, /required fields not selected: \$\{effectiveMissed\.join\(", "\)\}/);
+  assert.doesNotMatch(
+    content,
+    /required fields not selected: \$\{missed\.join\(", "\)\}/,
+    "pre-Next validation must not block on raw missed color fields",
+  );
+  assert.match(content, /skippedMissingControls\.has\("exterior color"\)/);
+  assert.match(content, /skippedMissingControls\.has\("interior color"\)/);
 });
 
 test("Successful publish wakes the queue for the next eligible job", () => {
