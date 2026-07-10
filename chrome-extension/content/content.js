@@ -2284,6 +2284,29 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         await sleep(600);
       }
     }
+    // Some localized Marketplace forms omit certain optional fields
+    // entirely (no combobox / input rendered).  If a "missed" field
+    // refers to a color field that does not exist in the current DOM,
+    // treat it as non-blocking for the pre-Next validation. This prevents
+    // blocking auto-publish when Facebook's form variant simply doesn't
+    // render exterior/interior color controls.
+    function fieldPresentOnPage(fieldName) {
+      const lname = String(fieldName || "").toLowerCase();
+      if (lname.includes("exterior") || lname.includes("interior") || lname.includes("color")) {
+        // Check for any matching combobox or text input/label
+        const cb = findCombobox(["exterior color", "exterior", "color", "color exterior", "interior color", "interior", "color interior"]);
+        if (cb) return true;
+        const txt = findField(["exterior color", "exterior", "color", "color exterior", "interior color", "interior", "color interior"]);
+        if (txt) return true;
+        // Finally, do a loose label scan for visible text
+        const bodyText = (document.body && (document.body.innerText || document.body.textContent || "") || "").toLowerCase();
+        if (bodyText.includes("color exterior") || bodyText.includes("color interior") || bodyText.includes("color")) return true;
+        return false;
+      }
+      return true;
+    }
+
+    const effectiveMissed = missed.filter((m) => fieldPresentOnPage(m));
 
     if (!hasPhoto) {
       return {
@@ -2324,8 +2347,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         ok: false,
         reason: fbErrors
           ? `Next button is disabled: ${fbErrors}`
-          : missed.length > 0
-            ? `Next button is disabled — required fields not selected: ${missed.join(", ")}. Check those fields on the form.`
+          : effectiveMissed.length > 0
+            ? `Next button is disabled — required fields not selected: ${effectiveMissed.join(", ")}. Check those fields on the form.`
             : "Next button is disabled — Year and Make may not have been selected. Check those fields on the form.",
       };
     }
