@@ -47,13 +47,13 @@
 
   // Set to true once waitForPhotoThumbnails confirms at least one thumbnail.
   // validateBeforeNext skips its own photo re-scan when this is already true,
-  // preventing false "0 photos" failures when photos are clearly visible.
-  let _photosConfirmed = false;
-
-  function _runtimeAlive() {
-    try {
-      const id = (typeof chrome !== "undefined") && chrome.runtime && chrome.runtime.id;
-      return !!id;
+          const ecOk = await selectComboboxStep(
+          "exterior color",
+          ["exterior color", "exterior", "color", "color exterior"],
+          extColor,
+          null,
+          true,
+          );
     } catch (_) {
       return false;
     }
@@ -1744,15 +1744,26 @@
       const options = await scanForAnyOptions(5000, "location-suggestions");
       if (options.length) {
         const optionText = (option) => normalizeText(option.innerText || option.textContent || "");
-        const pick =
+        let pick =
           options.find((option) => optionText(option).includes(normalizedTarget)) ||
           options.find((option) => cityPart && optionText(option).includes(cityPart) && (!stateAlias || optionText(option).includes(stateAlias))) ||
           options.find((option) => cityPart && optionText(option).includes(cityPart)) ||
           null;
+
+        // If no suggestion matched our heuristics but suggestions exist, pick
+        // the first suggestion as a fallback. Facebook sometimes requires an
+        // explicit suggestion selection for the location to be considered
+        // valid; selecting the first visible suggestion is a pragmatic
+        // fallback that fixes the "invalid location" error in many cases.
+        if (!pick && options.length > 0) {
+          pick = options[0];
+          stateLog("location suggestion fallback -> selecting first suggestion");
+        }
+
         if (pick) {
           const pickedText = (pick.innerText || pick.textContent || "").trim();
           stateLog(`location suggestion -> "${pickedText}"`);
-          pick.click();
+          try { pick.click(); } catch (e) { try { pick.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); } catch(_){} }
           pickedSuggestion = true;
           await sleep(700);
         }
