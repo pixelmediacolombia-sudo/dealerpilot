@@ -37,7 +37,7 @@ test("Auto publish can click localized Next and Publish buttons", () => {
 });
 
 test("Color fields are treated as non-blocking when the form variant does not render them", () => {
-  assert.match(content, /no control rendered in this form variant/i);
+  assert.match(content, /no color control rendered in this form variant/i);
   assert.match(content, /non-blocking/i);
 });
 

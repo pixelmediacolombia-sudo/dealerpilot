@@ -737,9 +737,9 @@
       const combobox = await waitForCombobox(keywords, BUDGET.COMBOBOX_WAIT_MS);
       if (!combobox) {
         const isColorField = /color|exterior|interior/i.test(label);
-        const renderedControlPresent = Boolean(findCombobox(keywords) || findField(keywords));
+        const renderedControlPresent = Boolean(findVisibleColorControl());
         if (isColorField && !renderedControlPresent) {
-          stateLog(`Skipping "${label}" — no control rendered in this form variant`);
+          stateLog(`Skipping "${label}" — no color control rendered in this form variant`);
           return false;
         }
         stateError(`Could not find ${label} combobox`);
@@ -2296,37 +2296,27 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     // treat it as non-blocking for the pre-Next validation. This prevents
     // blocking auto-publish when Facebook's form variant simply doesn't
     // render exterior/interior color controls.
+    function findVisibleColorControl() {
+      const exactColorKeywords = [
+        "exterior color",
+        "color exterior",
+        "interior color",
+        "color interior",
+      ];
+      const cb = findCombobox(exactColorKeywords);
+      if (cb) return cb;
+      const txt = findField(exactColorKeywords);
+      if (txt) return txt;
+      return null;
+    }
+
     function fieldPresentOnPage(fieldName) {
       const lname = String(fieldName || "").toLowerCase();
       const isColorField = lname.includes("exterior") || lname.includes("interior") || lname.includes("color");
       if (!isColorField) return true;
 
-      const colorKeywords = [
-        "exterior color",
-        "exterior",
-        "color exterior",
-        "interior color",
-        "interior",
-        "color interior",
-      ];
-
-      // Strong signal: a real combobox or field exists.
-      const cb = findCombobox(colorKeywords);
-      if (cb) return true;
-      const txt = findField(colorKeywords);
-      if (txt) return true;
-
-      // Heuristic: page text may mention the label without an actual control.
-      // Treat those as not rendered in this form variant and therefore non-blocking.
-      const bodyText = (document.body && (document.body.innerText || document.body.textContent || "") || "").toLowerCase();
-      const explicitColorLabels = ["color exterior", "color interior", "exterior color", "interior color"];
-      const hasExplicitLabel = explicitColorLabels.some((label) => bodyText.includes(label));
-      if (hasExplicitLabel) {
-        // If the label is present but no control exists, this variant is a
-        // non-rendered field case; keep the field out of the blocking set.
-        return false;
-      }
-      return false;
+      const control = findVisibleColorControl();
+      return Boolean(control);
     }
 
     const effectiveMissed = missed.filter((m) => fieldPresentOnPage(m));
