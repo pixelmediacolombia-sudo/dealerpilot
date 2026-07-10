@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.26
+
+**Fixed**
+- Marketplace description textbox - the extension now writes to Facebook textboxes/contenteditable fields, not only normal inputs and textareas.
+- Next diagnostics - filled dropdown values such as `Año 2021` and `Carrocería Camioneta` are no longer misreported as blocked placeholders.
+
+---
+
 ## v1.3.25
 
 **Fixed**

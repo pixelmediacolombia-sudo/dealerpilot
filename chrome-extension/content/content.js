@@ -126,6 +126,43 @@
     el.dispatchEvent(new Event("blur", { bubbles: true }));
   }
 
+  function setFieldValue(el, value) {
+    if (!el) return;
+    const text = String(value);
+    if (el.matches?.('input, textarea')) {
+      setNativeValue(el, text);
+      return;
+    }
+
+    el.focus?.();
+    el.textContent = text;
+    el.dispatchEvent(new InputEvent("beforeinput", {
+      bubbles: true,
+      cancelable: true,
+      inputType: "insertText",
+      data: text,
+    }));
+    el.dispatchEvent(new InputEvent("input", {
+      bubbles: true,
+      inputType: "insertText",
+      data: text,
+    }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+  }
+
+  function fieldCurrentValue(el) {
+    if (!el) return "";
+    if ("value" in el) return String(el.value || "").trim();
+    return String(el.innerText || el.textContent || "").trim();
+  }
+
+  function fieldHasMeaningfulValue(el, placeholderValues = []) {
+    const value = normalizeText(fieldCurrentValue(el));
+    if (!value) return false;
+    return !placeholderValues.map(normalizeText).includes(value);
+  }
+
   function normalizeText(value) {
     return String(value || "")
       .normalize("NFD")
@@ -153,7 +190,7 @@
   function findField(keywords) {
     const fields = Array.from(
       document.querySelectorAll(
-        'input[type="text"], input:not([type]), input[type="number"], textarea',
+        'input[type="text"], input:not([type]), input[type="number"], textarea, [role="textbox"], [contenteditable="true"]',
       ),
     ).filter((el) => el.offsetParent !== null);
     const normalizedKeywords = keywords.map(normalizeText);
@@ -499,25 +536,34 @@
       add(text || "invalid visible control");
     });
 
-    const placeholderLike = [
+    const placeholderLike = new Set([
       "ano", "año", "marca", "modelo", "precio", "millaje", "ubicacion",
       "carroceria", "estado del vehiculo", "tipo de combustible", "transmision",
       "description", "descripcion",
-    ];
+    ]);
 
     document.querySelectorAll('[role="combobox"]').forEach((el) => {
       if (!isVisibleElement(el)) return;
       const text = normalizeText(el.innerText || el.textContent || el.getAttribute("aria-label") || "");
-      if (!text || placeholderLike.some((p) => text === p || text.startsWith(`${p} `))) {
+      if (!text || placeholderLike.has(text)) {
         add(text || "empty combobox");
       }
     });
 
-    document.querySelectorAll('input[required], textarea[required], [aria-required="true"]').forEach((el) => {
+    document.querySelectorAll('input[required], textarea[required], [aria-required="true"], [role="textbox"][aria-required="true"]').forEach((el) => {
       if (!isVisibleElement(el)) return;
-      const value = "value" in el ? String(el.value || "").trim() : (el.innerText || el.textContent || "").trim();
-      if (!value && !checkboxIsChecked(el)) add(textNearElement(el) || "empty required control");
+      if (!fieldHasMeaningfulValue(el, Array.from(placeholderLike)) && !checkboxIsChecked(el)) {
+        add(textNearElement(el) || "empty required control");
+      }
     });
+
+    const descriptionField = findField(["description", "describe", "details", "descripción", "descripcion", "detalles"]);
+    if (
+      descriptionField
+      && !fieldHasMeaningfulValue(descriptionField, ["description", "describe", "details", "descripción", "descripcion", "detalles"])
+    ) {
+      add("description field is visible but empty");
+    }
 
     const cleanTitle = findCheckbox([
       "clean title",
@@ -1573,7 +1619,12 @@
       stateLog(`Filling ${label}`);
       const el = await waitForField(keywords, 6000);
       if (el) {
-        setNativeValue(el, String(value));
+        setFieldValue(el, String(value));
+        await sleep(150);
+        if (!fieldCurrentValue(el)) {
+          setFieldValue(el, String(value));
+          await sleep(150);
+        }
         filled.push(label);
         log(`${label} filled`);
         return true;
@@ -1592,7 +1643,7 @@
       }
       const textField = await waitForNamedField(label, textKeywords, 1800);
       if (textField) {
-        setNativeValue(textField, String(value));
+        setFieldValue(textField, String(value));
         filled.push(label);
         log(`${label} filled`);
         return true;
@@ -1683,10 +1734,7 @@
       stateLog("Waiting for Model text input");
       const modelInput = await waitForNamedField("model", ["model", "modelo"], 10000);
       if (modelInput && fill.model) {
-        setNativeValue(modelInput, String(fill.model));
-        modelInput.dispatchEvent(new Event("input", { bubbles: true }));
-        modelInput.dispatchEvent(new Event("change", { bubbles: true }));
-        modelInput.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+        setFieldValue(modelInput, String(fill.model));
         filled.push("model");
         log(`model → "${fill.model}"`);
       } else if (!fill.model) {
@@ -1717,10 +1765,7 @@
         const titleEl = await waitForField(TITLE_KWS, 8000);
         if (titleEl) {
           if (fill.title) {
-            setNativeValue(titleEl, String(fill.title));
-            titleEl.dispatchEvent(new Event("input", { bubbles: true }));
-            titleEl.dispatchEvent(new Event("change", { bubbles: true }));
-            titleEl.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+            setFieldValue(titleEl, String(fill.title));
             filled.push("title");
             log(`title → "${fill.title}"`);
           } else {

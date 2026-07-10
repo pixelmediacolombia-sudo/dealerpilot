@@ -82,6 +82,24 @@ test("Marketplace form state is settled and diagnosed before failing Next", () =
   assert.match(content, /Possible blocked controls:/);
 });
 
+test("Marketplace description supports Facebook textbox variants", () => {
+  assert.match(content, /function setFieldValue\(el, value\)/);
+  assert.match(content, /\[role="textbox"\]/);
+  assert.match(content, /\[contenteditable="true"\]/);
+  assert.match(content, /new InputEvent\("input"/);
+  assert.match(content, /description field is visible but empty/);
+});
+
+test("Next diagnostics only flag exact empty dropdown placeholders", () => {
+  assert.match(content, /const placeholderLike = new Set\(\[/);
+  assert.match(content, /placeholderLike\.has\(text\)/);
+  assert.doesNotMatch(
+    content,
+    /text\.startsWith\(`\$\{p\} `\)/,
+    "filled controls like Año 2021 must not be reported as blocked placeholders",
+  );
+});
+
 test("Successful publish wakes the queue for the next eligible job", () => {
   const completeIndex = content.indexOf('type: "COMPLETE_JOB"');
   const pollIndex = content.indexOf('type: "POLL_NOW"');
