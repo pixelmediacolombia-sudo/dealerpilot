@@ -93,11 +93,20 @@ test("Marketplace description supports Facebook textbox variants", () => {
 test("Next diagnostics only flag exact empty dropdown placeholders", () => {
   assert.match(content, /const placeholderLike = new Set\(\[/);
   assert.match(content, /placeholderLike\.has\(text\)/);
+  assert.match(content, /function hasMeaningfulDisplayedValue\(el, placeholderValues = \[\]\)/);
+  assert.match(content, /visibleValueCandidates\(el\)/);
   assert.doesNotMatch(
     content,
     /text\.startsWith\(`\$\{p\} `\)/,
     "filled controls like Año 2021 must not be reported as blocked placeholders",
   );
+});
+
+test("Marketplace location selects autocomplete suggestions before validating Next", () => {
+  assert.match(content, /async function fillLocationStep\(value\)/);
+  assert.match(content, /location-suggestions/);
+  assert.match(content, /location suggestion selected/);
+  assert.match(content, /await fillLocationStep\(fill\.location\)/);
 });
 
 test("Successful publish wakes the queue for the next eligible job", () => {

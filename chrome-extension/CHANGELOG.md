@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.27
+
+**Fixed**
+- Marketplace location commit - the extension now tries to select Facebook's location autocomplete suggestion after writing the city.
+- Next diagnostics - visible values inside Facebook field wrappers are now considered before reporting placeholder-only blockers like `ubicacion`.
+
+---
+
 ## v1.3.26
 
 **Fixed**

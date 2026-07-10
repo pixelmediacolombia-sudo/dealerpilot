@@ -163,6 +163,40 @@
     return !placeholderValues.map(normalizeText).includes(value);
   }
 
+  function visibleValueCandidates(el) {
+    const candidates = [
+      el?.getAttribute?.("aria-valuetext"),
+      el?.getAttribute?.("data-value"),
+      fieldCurrentValue(el),
+    ];
+    let cur = el;
+    for (let depth = 0; cur && depth < 4; depth += 1, cur = cur.parentElement) {
+      const text = cur.innerText || cur.textContent || "";
+      if (text && text.length < 260) {
+        candidates.push(...text.split(/\r?\n/));
+        candidates.push(text);
+      }
+    }
+    return candidates.filter(Boolean);
+  }
+
+  function hasMeaningfulDisplayedValue(el, placeholderValues = []) {
+    const placeholders = new Set(placeholderValues.map(normalizeText).filter(Boolean));
+    const genericEmpty = new Set(["select", "seleccionar", "elige", "elija", "choose"]);
+    for (const candidate of visibleValueCandidates(el)) {
+      let text = normalizeText(candidate);
+      if (!text || placeholders.has(text) || genericEmpty.has(text)) continue;
+      for (const placeholder of placeholders) {
+        if (text.startsWith(`${placeholder} `)) {
+          text = text.slice(placeholder.length).trim();
+          break;
+        }
+      }
+      if (text && !placeholders.has(text) && !genericEmpty.has(text)) return true;
+    }
+    return false;
+  }
+
   function normalizeText(value) {
     return String(value || "")
       .normalize("NFD")
@@ -532,8 +566,10 @@
 
     document.querySelectorAll('[aria-invalid="true"], [data-invalid="true"]').forEach((el) => {
       if (!isVisibleElement(el)) return;
-      const text = textNearElement(el);
-      add(text || "invalid visible control");
+      if (!hasMeaningfulDisplayedValue(el, [])) {
+        const text = textNearElement(el);
+        add(text || "invalid visible control");
+      }
     });
 
     const placeholderLike = new Set([
@@ -545,14 +581,18 @@
     document.querySelectorAll('[role="combobox"]').forEach((el) => {
       if (!isVisibleElement(el)) return;
       const text = normalizeText(el.innerText || el.textContent || el.getAttribute("aria-label") || "");
-      if (!text || placeholderLike.has(text)) {
+      if ((!text || placeholderLike.has(text)) && !hasMeaningfulDisplayedValue(el, Array.from(placeholderLike))) {
         add(text || "empty combobox");
       }
     });
 
     document.querySelectorAll('input[required], textarea[required], [aria-required="true"], [role="textbox"][aria-required="true"]').forEach((el) => {
       if (!isVisibleElement(el)) return;
-      if (!fieldHasMeaningfulValue(el, Array.from(placeholderLike)) && !checkboxIsChecked(el)) {
+      if (
+        !fieldHasMeaningfulValue(el, Array.from(placeholderLike))
+        && !hasMeaningfulDisplayedValue(el, Array.from(placeholderLike))
+        && !checkboxIsChecked(el)
+      ) {
         add(textNearElement(el) || "empty required control");
       }
     });
@@ -1635,6 +1675,61 @@
       }
     }
 
+    async function fillLocationStep(value) {
+      const keywords = ["location", "city", "where", "ubicación", "ubicacion", "ciudad"];
+      if (value === null || value === undefined || value === "") {
+        stateLog('Skipping "location" - no value in listing data');
+        warnings.push("location: no value in listing data - skipped");
+        return false;
+      }
+
+      stateLog("Filling location");
+      const el = await waitForField(keywords, 6000);
+      if (!el) {
+        stateError("Could not find location field");
+        missed.push("location");
+        return false;
+      }
+
+      const textValue = String(value);
+      setFieldValue(el, textValue);
+      await sleep(700);
+
+      const normalizedTarget = normalizeText(textValue);
+      const cityPart = normalizeText(textValue.split(",")[0] || textValue);
+      const statePart = normalizeText((textValue.split(",")[1] || "").trim());
+      let pickedSuggestion = false;
+      const options = await scanForAnyOptions(3000, "location-suggestions");
+      if (options.length) {
+        const optionText = (option) => normalizeText(option.innerText || option.textContent || "");
+        const pick =
+          options.find((option) => optionText(option).includes(normalizedTarget)) ||
+          options.find((option) => cityPart && optionText(option).includes(cityPart) && (!statePart || optionText(option).includes(statePart))) ||
+          (options.length === 1 ? options[0] : null);
+        if (pick) {
+          const pickedText = (pick.innerText || pick.textContent || "").trim();
+          stateLog(`location suggestion -> "${pickedText}"`);
+          pick.click();
+          pickedSuggestion = true;
+          await sleep(700);
+        }
+      }
+
+      if (!pickedSuggestion) {
+        el.focus?.();
+        el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
+        await sleep(250);
+        el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
+        await sleep(500);
+      }
+
+      dispatchCommitEvents(el);
+      await sleep(300);
+      filled.push("location");
+      log(pickedSuggestion ? "location suggestion selected" : "location filled");
+      return true;
+    }
+
     async function fillTextOrSelectComboboxStep(label, textKeywords, comboKeywords, value, afterWait) {
       if (value === null || value === undefined || value === "") {
         stateLog(`Skipping "${label}" — no value in listing data`);
@@ -1778,7 +1873,7 @@
       }
 
       await fillStep("description", ["description", "describe", "details", "descripción", "descripcion", "detalles"], fill.description);
-      await fillStep("location", ["location", "city", "where", "ubicación", "ubicacion", "ciudad"], fill.location);
+      await fillLocationStep(fill.location);
 
       // ---- Phase 4: Mileage (required for Next button) ──────────────────
       // Always attempted regardless of FAST_MODE — Facebook requires mileage.
