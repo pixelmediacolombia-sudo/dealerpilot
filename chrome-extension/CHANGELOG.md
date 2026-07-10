@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.28
+
+**Fixed**
+- Marketplace location autocomplete - location now writes without blurring first, waits longer for Facebook suggestions, and matches state abbreviations such as `VA` to `Virginia`.
+- Location validation - the extension no longer presses `Enter` blindly when no autocomplete suggestion is available, avoiding Facebook's invalid raw-location state.
+
+---
+
 ## v1.3.27
 
 **Fixed**

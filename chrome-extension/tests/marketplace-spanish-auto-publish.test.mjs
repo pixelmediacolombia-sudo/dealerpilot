@@ -103,10 +103,18 @@ test("Next diagnostics only flag exact empty dropdown placeholders", () => {
 });
 
 test("Marketplace location selects autocomplete suggestions before validating Next", () => {
+  assert.match(content, /function setFocusedFieldValue\(el, value\)/);
   assert.match(content, /async function fillLocationStep\(value\)/);
   assert.match(content, /location-suggestions/);
+  assert.match(content, /va: "virginia"/);
   assert.match(content, /location suggestion selected/);
+  assert.match(content, /no autocomplete suggestion matched/);
   assert.match(content, /await fillLocationStep\(fill\.location\)/);
+  assert.doesNotMatch(
+    content,
+    /key: "ArrowDown"[\s\S]{0,300}key: "Enter"[\s\S]{0,300}location filled/,
+    "location must not force Enter when no autocomplete suggestion was selected",
+  );
 });
 
 test("Successful publish wakes the queue for the next eligible job", () => {

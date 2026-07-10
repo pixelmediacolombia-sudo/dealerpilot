@@ -151,6 +151,32 @@
     el.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
   }
 
+  function setFocusedFieldValue(el, value) {
+    if (!el) return;
+    const text = String(value);
+    el.focus?.();
+    if (el.matches?.('input, textarea')) {
+      const proto = el.tagName === "TEXTAREA"
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
+      setter.call(el, text);
+    } else {
+      el.textContent = text;
+    }
+    el.dispatchEvent(new InputEvent("beforeinput", {
+      bubbles: true,
+      cancelable: true,
+      inputType: "insertText",
+      data: text,
+    }));
+    el.dispatchEvent(new InputEvent("input", {
+      bubbles: true,
+      inputType: "insertText",
+      data: text,
+    }));
+  }
+
   function fieldCurrentValue(el) {
     if (!el) return "";
     if ("value" in el) return String(el.value || "").trim();
@@ -1677,6 +1703,19 @@
 
     async function fillLocationStep(value) {
       const keywords = ["location", "city", "where", "ubicación", "ubicacion", "ciudad"];
+      const STATE_ALIASES = {
+        al: "alabama", ak: "alaska", az: "arizona", ar: "arkansas", ca: "california",
+        co: "colorado", ct: "connecticut", de: "delaware", fl: "florida", ga: "georgia",
+        hi: "hawaii", id: "idaho", il: "illinois", in: "indiana", ia: "iowa",
+        ks: "kansas", ky: "kentucky", la: "louisiana", me: "maine", md: "maryland",
+        ma: "massachusetts", mi: "michigan", mn: "minnesota", ms: "mississippi", mo: "missouri",
+        mt: "montana", ne: "nebraska", nv: "nevada", nh: "new hampshire", nj: "new jersey",
+        nm: "new mexico", ny: "new york", nc: "north carolina", nd: "north dakota", oh: "ohio",
+        ok: "oklahoma", or: "oregon", pa: "pennsylvania", ri: "rhode island", sc: "south carolina",
+        sd: "south dakota", tn: "tennessee", tx: "texas", ut: "utah", vt: "vermont",
+        va: "virginia", wa: "washington", wv: "west virginia", wi: "wisconsin", wy: "wyoming",
+        dc: "district of columbia",
+      };
       if (value === null || value === undefined || value === "") {
         stateLog('Skipping "location" - no value in listing data');
         warnings.push("location: no value in listing data - skipped");
@@ -1692,20 +1731,24 @@
       }
 
       const textValue = String(value);
-      setFieldValue(el, textValue);
-      await sleep(700);
+      setFocusedFieldValue(el, "");
+      await sleep(150);
+      setFocusedFieldValue(el, textValue);
+      await sleep(1200);
 
       const normalizedTarget = normalizeText(textValue);
       const cityPart = normalizeText(textValue.split(",")[0] || textValue);
       const statePart = normalizeText((textValue.split(",")[1] || "").trim());
+      const stateAlias = STATE_ALIASES[statePart] || statePart;
       let pickedSuggestion = false;
-      const options = await scanForAnyOptions(3000, "location-suggestions");
+      const options = await scanForAnyOptions(5000, "location-suggestions");
       if (options.length) {
         const optionText = (option) => normalizeText(option.innerText || option.textContent || "");
         const pick =
           options.find((option) => optionText(option).includes(normalizedTarget)) ||
-          options.find((option) => cityPart && optionText(option).includes(cityPart) && (!statePart || optionText(option).includes(statePart))) ||
-          (options.length === 1 ? options[0] : null);
+          options.find((option) => cityPart && optionText(option).includes(cityPart) && (!stateAlias || optionText(option).includes(stateAlias))) ||
+          options.find((option) => cityPart && optionText(option).includes(cityPart)) ||
+          null;
         if (pick) {
           const pickedText = (pick.innerText || pick.textContent || "").trim();
           stateLog(`location suggestion -> "${pickedText}"`);
@@ -1715,15 +1758,8 @@
         }
       }
 
-      if (!pickedSuggestion) {
-        el.focus?.();
-        el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
-        await sleep(250);
-        el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
-        await sleep(500);
-      }
-
-      dispatchCommitEvents(el);
+      if (pickedSuggestion) dispatchCommitEvents(el);
+      else warnings.push(`location: no autocomplete suggestion matched "${textValue}"`);
       await sleep(300);
       filled.push("location");
       log(pickedSuggestion ? "location suggestion selected" : "location filled");
