@@ -393,6 +393,46 @@ async function loadDebugState() {
   dbg.messenger.textContent = msgYes ? "Yes ✓" : "No";
   dbg.messenger.className   = "value " + (msgYes ? "ok" : "");
 
+  // Extra: load lastValidationDebug and poll skip reason from storage
+  try {
+    const extra = await chrome.storage.local.get([
+      "lastValidationDebug",
+      "lastPollSkipReason",
+      "lastSkippedJobId",
+      "lastSkippedAt",
+    ]);
+    const lv = extra.lastValidationDebug;
+    const vEl = document.getElementById("d-last-validation");
+    if (vEl) {
+      if (lv && lv.effectiveMissed && lv.effectiveMissed.length > 0) {
+        vEl.textContent = `${lv.effectiveMissed.length} missing: ${truncate(lv.effectiveMissed.join(", "), 32)}`;
+        vEl.title = JSON.stringify(lv);
+      } else if (lv) {
+        vEl.textContent = `OK (${lv.at || "?"})`;
+        vEl.title = JSON.stringify(lv);
+      } else {
+        vEl.textContent = "—";
+        vEl.title = "";
+      }
+    }
+
+    const ps = extra.lastPollSkipReason;
+    const pEl = document.getElementById("d-last-poll-skip");
+    if (pEl) {
+      if (ps) {
+        const jobId = extra.lastSkippedJobId ? ` job #${extra.lastSkippedJobId}` : "";
+        const at = extra.lastSkippedAt ? ` at ${fmtTime(extra.lastSkippedAt)}` : "";
+        pEl.textContent = `${ps}${jobId}${at}`;
+        pEl.title = `${ps}${jobId} ${extra.lastSkippedAt || ""}`;
+      } else {
+        pEl.textContent = "—";
+        pEl.title = "";
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to load extra debug keys", e);
+  }
+
   // Sync pills with latest stored state
   updateFbPills(d.fbLoggedIn, d.marketplaceConnected);
 }
@@ -648,6 +688,19 @@ document.getElementById("clear-active-job").addEventListener("click", async () =
 
 document.getElementById("reload-debug").addEventListener("click", () => {
   loadDebugState();
+});
+
+// Buttons to dump full objects to console for easier inspection
+document.getElementById("btn-show-validation")?.addEventListener("click", async () => {
+  const obj = await chrome.storage.local.get("lastValidationDebug");
+  console.log("[DealerPilot AI] lastValidationDebug:", obj.lastValidationDebug);
+  setStatus("Validation debug dumped to console.", "ok");
+});
+
+document.getElementById("btn-show-poll")?.addEventListener("click", async () => {
+  const obj = await chrome.storage.local.get(["lastPollSkipReason", "lastSkippedJobId", "lastSkippedAt"]);
+  console.log("[DealerPilot AI] Poll diagnostics:", obj);
+  setStatus("Poll diagnostics dumped to console.", "ok");
 });
 
 // ---- Save backend URL ----
