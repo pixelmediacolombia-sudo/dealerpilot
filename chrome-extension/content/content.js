@@ -2309,6 +2309,18 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     const effectiveMissed = missed.filter((m) => fieldPresentOnPage(m));
 
+    // Debug: log presence map and persist for inspection if auto-start still fails
+    try {
+      const presenceMap = {};
+      for (const m of missed) {
+        try { presenceMap[m] = fieldPresentOnPage(m); } catch (e) { presenceMap[m] = `error: ${e && e.message}`; }
+      }
+      console.log(`[VALIDATION DEBUG] missed:`, missed, `effectiveMissed:`, effectiveMissed, `presenceMap:`, presenceMap);
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ lastValidationDebug: { at: new Date().toISOString(), missed, effectiveMissed, presenceMap } }).catch(() => {});
+      }
+    } catch (e) { console.warn('[VALIDATION DEBUG] failed to write debug storage', e); }
+
     if (!hasPhoto) {
       return {
         ok: false,
