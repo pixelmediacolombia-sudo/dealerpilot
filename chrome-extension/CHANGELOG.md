@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.25
+
+**Fixed**
+- Marketplace form settling - the extension now commits visible form controls with input/change/blur before validating Next, helping Facebook recalculate readiness after automated selections.
+- Next diagnostics - disabled Next failures now capture visible invalid/empty controls to make the remaining blocker explicit.
+
+---
+
 ## v1.3.24
 
 **Fixed**

@@ -454,6 +454,83 @@
     });
   }
 
+  function dispatchCommitEvents(el) {
+    if (!el) return;
+    for (const eventName of ["input", "change"]) {
+      try { el.dispatchEvent(new Event(eventName, { bubbles: true })); } catch (_) { /* noop */ }
+    }
+    try { el.dispatchEvent(new FocusEvent("blur", { bubbles: true })); } catch (_) { /* noop */ }
+    try { el.blur?.(); } catch (_) { /* noop */ }
+  }
+
+  async function settleMarketplaceFormBeforeNext() {
+    stateLog("Settling Marketplace form state before Next");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+    await sleep(250);
+
+    const controls = Array.from(document.querySelectorAll([
+      'input[type="text"]',
+      'input[type="number"]',
+      'input:not([type])',
+      'textarea',
+      '[role="combobox"]',
+      '[role="checkbox"]',
+      'input[type="checkbox"]',
+    ].join(", "))).filter(isVisibleElement);
+
+    for (const el of controls) dispatchCommitEvents(el);
+    dispatchCommitEvents(document.activeElement);
+    nudgeMarketplaceFormScroll();
+    await sleep(900);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+    await sleep(600);
+  }
+
+  function collectDisabledNextDiagnostics() {
+    const hints = [];
+    const add = (value) => {
+      const text = String(value || "").trim();
+      if (text && !hints.includes(text)) hints.push(text);
+    };
+
+    document.querySelectorAll('[aria-invalid="true"], [data-invalid="true"]').forEach((el) => {
+      if (!isVisibleElement(el)) return;
+      const text = textNearElement(el);
+      add(text || "invalid visible control");
+    });
+
+    const placeholderLike = [
+      "ano", "año", "marca", "modelo", "precio", "millaje", "ubicacion",
+      "carroceria", "estado del vehiculo", "tipo de combustible", "transmision",
+      "description", "descripcion",
+    ];
+
+    document.querySelectorAll('[role="combobox"]').forEach((el) => {
+      if (!isVisibleElement(el)) return;
+      const text = normalizeText(el.innerText || el.textContent || el.getAttribute("aria-label") || "");
+      if (!text || placeholderLike.some((p) => text === p || text.startsWith(`${p} `))) {
+        add(text || "empty combobox");
+      }
+    });
+
+    document.querySelectorAll('input[required], textarea[required], [aria-required="true"]').forEach((el) => {
+      if (!isVisibleElement(el)) return;
+      const value = "value" in el ? String(el.value || "").trim() : (el.innerText || el.textContent || "").trim();
+      if (!value && !checkboxIsChecked(el)) add(textNearElement(el) || "empty required control");
+    });
+
+    const cleanTitle = findCheckbox([
+      "clean title",
+      "titulo limpio",
+      "título limpio",
+      "este vehiculo tiene titulo limpio",
+      "este vehículo tiene título limpio",
+    ]);
+    if (cleanTitle && !checkboxIsChecked(cleanTitle)) add("clean title checkbox is visible but unchecked");
+
+    return hints.slice(0, 8);
+  }
+
   function waitForNamedField(label, keywords, maxWaitMs) {
     const limit = maxWaitMs === undefined ? 20000 : maxWaitMs;
     return new Promise((resolve) => {
@@ -2243,6 +2320,7 @@
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_starting" }).catch(() => { });
 
     await sleep(300);
+    await settleMarketplaceFormBeforeNext();
 
     // ---- Pre-Next validation ----
     // Ensure the form is ready before we click Next. If the Next button is
@@ -2542,6 +2620,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       };
     }
 
+    await settleMarketplaceFormBeforeNext();
+
     // 2. Check Next button exists and becomes enabled. Facebook can take a few
     // seconds after the last checkbox/dropdown change to recalculate readiness.
     const NEXT_TEXTS = ["next", "continue", "next step", "siguiente", "continuar"];
@@ -2560,15 +2640,31 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     }
 
     const fbErrors = scrapeFacebookErrors();
+    const nextDiagnostics = collectDisabledNextDiagnostics();
+    try {
+      console.log("[VALIDATION DEBUG] next disabled diagnostics:", nextDiagnostics);
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({
+          lastNextDisabledDiagnostics: {
+            at: new Date().toISOString(),
+            diagnostics: nextDiagnostics,
+            bodySnippet: (document.body?.innerText || "").slice(0, 4000),
+          },
+        }).catch(() => {});
+      }
+    } catch (_) { /* noop */ }
+    const diagnosticSuffix = nextDiagnostics.length
+      ? ` Possible blocked controls: ${nextDiagnostics.join(" | ")}.`
+      : "";
     return {
       ok: false,
       reason: fbErrors
         ? `Next button is disabled: ${fbErrors}`
         : effectiveMissed.length > 0
-          ? `Next button is disabled — required fields not selected: ${effectiveMissed.join(", ")}. Check those fields on the form.`
+          ? `Next button is disabled — required fields not selected: ${effectiveMissed.join(", ")}. Check those fields on the form.${diagnosticSuffix}`
           : skippedVehicleDetailFields.length > 0
-            ? `Next button is disabled — required vehicle details not selected: ${skippedVehicleDetailFields.join(", ")}. Check those fields on the form.`
-            : "Next button is disabled — Facebook still has a required field unselected after waiting 12 seconds. Check clean title and visible vehicle details on the form.",
+            ? `Next button is disabled — required vehicle details not selected: ${skippedVehicleDetailFields.join(", ")}. Check those fields on the form.${diagnosticSuffix}`
+            : `Next button is disabled — Facebook still has a required field unselected after waiting 12 seconds. Check clean title and visible vehicle details on the form.${diagnosticSuffix}`,
     };
   }
 

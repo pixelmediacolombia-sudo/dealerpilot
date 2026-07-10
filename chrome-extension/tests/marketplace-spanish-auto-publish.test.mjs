@@ -73,6 +73,15 @@ test("Marketplace clean-title checkbox is handled before Next validation", () =>
   assert.match(content, /after waiting 12 seconds/);
 });
 
+test("Marketplace form state is settled and diagnosed before failing Next", () => {
+  assert.match(content, /async function settleMarketplaceFormBeforeNext\(\)/);
+  assert.match(content, /dispatchCommitEvents\(el\)/);
+  assert.match(content, /await settleMarketplaceFormBeforeNext\(\)/);
+  assert.match(content, /function collectDisabledNextDiagnostics\(\)/);
+  assert.match(content, /lastNextDisabledDiagnostics/);
+  assert.match(content, /Possible blocked controls:/);
+});
+
 test("Successful publish wakes the queue for the next eligible job", () => {
   const completeIndex = content.indexOf('type: "COMPLETE_JOB"');
   const pollIndex = content.indexOf('type: "POLL_NOW"');
