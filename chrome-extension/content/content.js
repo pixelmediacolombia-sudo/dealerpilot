@@ -1982,7 +1982,9 @@
       details: listingUrl
     }).catch(() => { });
 
-    const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
+    // Wait a moment to ensure Facebook has finalized the post before notifying the backend
+await new Promise((resolve) => setTimeout(resolve, 2000));
+const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     // Always clear activeJob — Facebook published, so the slot is done regardless of
     // whether the backend acknowledged it cleanly. A 409/500 here must never leave
