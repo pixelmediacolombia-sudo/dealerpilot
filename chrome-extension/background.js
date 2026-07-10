@@ -500,10 +500,11 @@ const handlers = {
     const jobSource = nextJob.source || null;
     const isPublishNow = jobSource === "publish_now";
     const isAutoPublishBatch = jobSource === "auto_publish_batch";
-    const isApprovedAutoBatch = isAutoPublishBatch && nextJob.approvedByUser === true;
+    const isApproved = nextJob.approvedByUser === true;
+    const isApprovedAutoBatch = isAutoPublishBatch && isApproved;
     const isTooOld = jobAge > RECENT_JOB_MS;
 
-    if (((isTooOld && !isPublishNow && !isApprovedAutoBatch) || (isAutoPublishBatch && !isApprovedAutoBatch)) && !(forceUserAction && isPublishNow)) {
+    if (((isTooOld && !isPublishNow && !isApproved) || (isAutoPublishBatch && !isApprovedAutoBatch)) && !(forceUserAction && isPublishNow)) {
       const reason = isAutoPublishBatch
         ? "Job source is auto_publish_batch — user must approve from popup"
         : "Job is older than 5 minutes — user must trigger from popup";
