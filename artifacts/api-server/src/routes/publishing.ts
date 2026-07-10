@@ -335,6 +335,7 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
       and(
         eq(publishingJobsTable.status, "Assigned"),
         inArray(publishingJobsTable.assignedExtensionId, [...aliases]),
+        or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
         isNull(publishingJobsTable.claimedByExtension),
       ),
     )
@@ -361,7 +362,10 @@ router.get("/publishing/jobs/next", async (req, res) => {
     .where(
       and(
         or(
-          eq(publishingJobsTable.status, "Queued"),
+          and(
+            eq(publishingJobsTable.status, "Queued"),
+            or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, now)),
+          ),
           eq(publishingJobsTable.status, "Retry"),
           and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, now)),
         ),
@@ -1197,11 +1201,14 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
   }
 
   const baseTime = scheduledAtStr ? new Date(scheduledAtStr) : new Date();
+  const nowMs = Date.now();
   const enqueued: number[] = [];
+  const claimableNow: number[] = [];
 
   for (let i = 0; i < eligible.length; i++) {
     const vehicle = eligible[i]!;
     const scheduledAt = new Date(baseTime.getTime() + i * spacingMinutes * 60_000);
+    const jobDueNow = scheduledAt.getTime() <= nowMs + 1000;
 
     const [job] = await db
       .insert(publishingJobsTable)
@@ -1210,7 +1217,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
         dealerId: vehicle.dealerId,
         listingVersionId: null,
         mode,
-        status: scheduledAtStr ? "Scheduled" : "Queued",
+        status: jobDueNow ? "Queued" : "Scheduled",
         priority,
         scheduledAt,
         source: "bulk_schedule",
@@ -1219,13 +1226,14 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
       .returning({ id: publishingJobsTable.id });
 
     enqueued.push(job!.id);
+    if (jobDueNow) claimableNow.push(job!.id);
   }
 
   // If this is an immediate batch (not scheduled) and an extension is online,
   // assign the newly created jobs directly to the extension so the extension
   // can pick them up immediately without requiring the operator to press
   // "Check For Approved Job" in the popup.
-  if (!scheduledAtStr && enqueued.length > 0 && extensionOnline) {
+  if (claimableNow.length > 0 && extensionOnline) {
     try {
       const conn = await pool.query(
         "select id, name, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
@@ -1237,8 +1245,8 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
           await db
             .update(publishingJobsTable)
             .set({ status: "Assigned", assignedExtensionId: extensionId, assignedAt: new Date() })
-            .where(inArray(publishingJobsTable.id, enqueued));
-          req.log.info({ assigned: enqueued.length, extensionId }, "Bulk-schedule: assigned jobs to online extension");
+            .where(inArray(publishingJobsTable.id, claimableNow));
+          req.log.info({ assigned: claimableNow.length, extensionId }, "Bulk-schedule: assigned due jobs to online extension");
         }
       }
     } catch (err) {

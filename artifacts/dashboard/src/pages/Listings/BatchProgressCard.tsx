@@ -266,25 +266,25 @@ export function BatchProgressCard({ dealerId, refreshKey, location }: BatchProgr
 
   const handleClearFailed = () => {
     const failedIds = batches
-      .filter((b) => b.status === "Failed" || b.status === "Cancelled")
+      .filter((b) => b.status === "Failed")
       .map((b) => b.id);
     setDismissed((prev) => new Set([...prev, ...failedIds]));
   };
 
   const allBatches = data?.batches ?? [];
-  const batches = allBatches.filter((b) => !dismissed.has(b.id));
+  const batches = allBatches.filter((b) => b.status !== "Cancelled" && !dismissed.has(b.id));
 
   const activeBatches = batches.filter(
     (b) => b.status === "Active" || b.status === "Preparing" || b.status === "Scheduled",
   );
   const recentCompleted = batches
-    .filter((b) => b.status === "Completed" || b.status === "Failed" || b.status === "Cancelled")
+    .filter((b) => b.status === "Completed" || b.status === "Failed")
     .slice(0, 3);
 
   const shown = [...activeBatches, ...recentCompleted].slice(0, 5);
 
   const completedCount = batches.filter((b) => b.status === "Completed").length;
-  const failedCount = batches.filter((b) => b.status === "Failed" || b.status === "Cancelled").length;
+  const failedCount = batches.filter((b) => b.status === "Failed").length;
 
   if (isLoading || shown.length === 0) return null;
 

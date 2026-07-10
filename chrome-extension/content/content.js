@@ -126,6 +126,15 @@
     el.dispatchEvent(new Event("blur", { bubbles: true }));
   }
 
+  function normalizeText(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   function labelText(el) {
     const parts = [
       el.getAttribute("aria-label"),
@@ -138,7 +147,7 @@
     }
     const wrapLabel = el.closest("label");
     if (wrapLabel) parts.push(wrapLabel.textContent);
-    return parts.filter(Boolean).join(" ").toLowerCase();
+    return normalizeText(parts.filter(Boolean).join(" "));
   }
 
   function findField(keywords) {
@@ -147,7 +156,8 @@
         'input[type="text"], input:not([type]), input[type="number"], textarea',
       ),
     ).filter((el) => el.offsetParent !== null);
-    for (const kw of keywords) {
+    const normalizedKeywords = keywords.map(normalizeText);
+    for (const kw of normalizedKeywords) {
       const match = fields.find((el) => labelText(el).includes(kw));
       if (match) return match;
     }
@@ -162,6 +172,7 @@
         const field = findField(keywords);
         if (field) { resolve(field); return; }
         elapsed += interval;
+        if (elapsed > 900 && elapsed % 900 === 0) nudgeMarketplaceFormScroll();
         if (elapsed >= maxWaitMs) { resolve(null); return; }
         setTimeout(tick, interval);
       };
@@ -174,22 +185,43 @@
   function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
   function waitForReactRender(ms) { return sleep(ms === undefined ? 900 : ms); }
 
+  function nudgeMarketplaceFormScroll() {
+    const candidates = [
+      document.scrollingElement,
+      ...Array.from(document.querySelectorAll("div")).filter((el) => {
+        const style = window.getComputedStyle(el);
+        const canScroll = /(auto|scroll)/.test(style.overflowY || "");
+        return canScroll && el.scrollHeight > el.clientHeight + 80;
+      }),
+    ].filter(Boolean);
+
+    const target = candidates.find((el) => {
+      const text = normalizeText(el.innerText || el.textContent || "");
+      return text.includes("vehiculo en venta") || text.includes("vehicle for sale") || text.includes("marketplace");
+    }) || document.scrollingElement;
+
+    if (!target) return;
+    target.scrollBy?.({ top: 360, behavior: "auto" });
+    if (!target.scrollBy) target.scrollTop += 360;
+  }
+
   // ---- ARIA combobox helpers ----
 
   function findCombobox(keywords) {
     const boxes = Array.from(document.querySelectorAll('[role="combobox"]'))
       .filter((el) => el.offsetParent !== null);
+    const normalizedKeywords = keywords.map(normalizeText);
     for (const el of boxes) {
-      const inner = (el.innerText || el.textContent || "").toLowerCase().trim();
-      const ariaLabel = (el.getAttribute("aria-label") || "").toLowerCase();
+      const inner = normalizeText(el.innerText || el.textContent || "");
+      const ariaLabel = normalizeText(el.getAttribute("aria-label") || "");
       const labelledBy = el.getAttribute("aria-labelledby");
       let labelTxt = "";
       if (labelledBy) {
         const lbEl = document.getElementById(labelledBy);
-        if (lbEl) labelTxt = (lbEl.innerText || lbEl.textContent || "").toLowerCase().trim();
+        if (lbEl) labelTxt = normalizeText(lbEl.innerText || lbEl.textContent || "");
       }
       const combined = `${inner} ${labelTxt} ${ariaLabel}`;
-      if (keywords.some((k) => combined.includes(k.toLowerCase()))) return el;
+      if (normalizedKeywords.some((k) => combined.includes(k))) return el;
     }
     return null;
   }
@@ -209,6 +241,7 @@
         }
         console.log(`[WAIT] combobox(${kwStr}) not in DOM — ${elapsed}ms / ${limit}ms`);
         elapsed += interval;
+        if (elapsed > 900 && elapsed % 900 === 0) nudgeMarketplaceFormScroll();
         if (elapsed >= limit) {
           console.log(`[TIMEOUT] combobox(${kwStr}) not found after ${limit}ms`);
           resolve(null);
@@ -333,6 +366,7 @@
         }
         console.log(`[WAIT] waiting for "${label}" field — ${elapsed}ms / ${limit}ms`);
         elapsed += interval;
+        if (elapsed > 750 && elapsed % 1000 === 0) nudgeMarketplaceFormScroll();
         if (elapsed >= limit) {
           console.log(`[TIMEOUT] "${label}" field did not appear after ${limit}ms`);
           resolve(null);
@@ -776,6 +810,11 @@
       }
 
       if (!options.length) {
+        stateLog(`${label} — trying broad Facebook popup option scan`);
+        options = await scanForAnyOptions(5000, `${label}-broad-scan`);
+      }
+
+      if (!options.length) {
         stateError(`No [role="option"] elements appeared for ${label} (all retries exhausted)`);
         missed.push(label);
         warnings.push(`${label}: no options appeared after clicking combobox`);
@@ -783,43 +822,63 @@
       }
 
       // ---- Fuzzy option matching ----
-      const needle = String(targetValue).toLowerCase().trim();
-      const getText = (o) => (o.innerText || o.textContent || "").toLowerCase().trim();
-      const norm = (s) => s.replace(/[^a-z0-9]/g, "");
+      const needle = normalizeText(targetValue);
+      const getText = (o) => normalizeText(o.innerText || o.textContent || "");
+      const norm = (s) => normalizeText(s).replace(/[^a-z0-9]/g, "");
 
       // Vehicle-type alias set — Facebook has used many different labels
       const VT_ALIASES = [
         "car/truck", "cars & trucks", "cars and trucks",
         "vehicle", "car", "truck", "automobile", "cars", "trucks",
+        "auto/camioneta", "auto", "camioneta", "vehiculo", "vehiculos",
       ];
 
       // Color normalization map — handle Facebook label variants
       const COLOR_MAP = {
-        "beige": ["beige", "tan"],
-        "black": ["black"],
-        "blue": ["blue", "navy", "dark blue", "light blue"],
-        "brown": ["brown", "burgundy", "maroon", "wine"],
-        "gold": ["gold", "champagne", "bronze", "copper"],
-        "gray": ["gray", "grey", "silver", "charcoal", "dark gray", "light gray"],
-        "green": ["green", "olive", "dark green", "light green"],
-        "orange": ["orange"],
-        "purple": ["purple", "violet", "lavender"],
-        "red": ["red", "dark red"],
-        "white": ["white", "pearl", "cream", "ivory", "off-white"],
-        "yellow": ["yellow"],
-        "other": ["other"],
+        "beige": ["beige", "tan", "cafe claro"],
+        "black": ["black", "negro", "negra"],
+        "blue": ["blue", "navy", "dark blue", "light blue", "azul"],
+        "brown": ["brown", "burgundy", "maroon", "wine", "marron", "cafe", "vino", "vinotinto"],
+        "gold": ["gold", "champagne", "bronze", "copper", "dorado", "bronce", "cobre"],
+        "gray": ["gray", "grey", "silver", "charcoal", "dark gray", "light gray", "gris", "plateado", "plata"],
+        "green": ["green", "olive", "dark green", "light green", "verde", "oliva"],
+        "orange": ["orange", "naranja"],
+        "purple": ["purple", "violet", "lavender", "morado", "purpura", "violeta", "lavanda"],
+        "red": ["red", "dark red", "rojo", "roja"],
+        "white": ["white", "pearl", "cream", "ivory", "off-white", "blanco", "blanca", "perla", "crema", "marfil"],
+        "yellow": ["yellow", "amarillo", "amarilla"],
+        "other": ["other", "otro", "otra"],
       };
 
       // Body style map — normalize vehicle body type to Facebook's option labels
       const BODY_STYLE_MAP = {
-        "suv": ["suv", "sport utility", "sport-utility"],
-        "sedan": ["sedan", "saloon"],
-        "truck": ["truck", "pickup", "pick-up", "pick up"],
-        "coupe": ["coupe", "2-door", "2door"],
-        "hatchback": ["hatchback", "hatch", "5-door"],
-        "van": ["van", "minivan", "mini-van"],
-        "wagon": ["wagon", "estate", "touring"],
-        "convertible": ["convertible", "cabriolet", "roadster", "cabrio"],
+        "suv": ["suv", "sport utility", "sport-utility", "utilitario deportivo"],
+        "sedan": ["sedan", "saloon", "sedan"],
+        "truck": ["truck", "pickup", "pick-up", "pick up", "camioneta", "camion", "camioneta pickup"],
+        "coupe": ["coupe", "2-door", "2door", "cupe"],
+        "hatchback": ["hatchback", "hatch", "5-door", "compacto"],
+        "van": ["van", "minivan", "mini-van", "furgoneta", "minivan"],
+        "wagon": ["wagon", "estate", "touring", "familiar"],
+        "convertible": ["convertible", "cabriolet", "roadster", "cabrio", "descapotable"],
+      };
+
+      const FUEL_MAP = {
+        "gasoline": ["gasoline", "gas", "petrol", "gasolina"],
+        "diesel": ["diesel"],
+        "electric": ["electric", "ev", "eléctrico", "electrico"],
+        "hybrid": ["hybrid", "híbrido", "hibrido"],
+        "plug-in hybrid": ["plug-in hybrid", "plugin hybrid", "híbrido enchufable", "hibrido enchufable"],
+        "flex": ["flex", "flex fuel", "combustible flexible"],
+        "other": ["other", "otro", "otra"],
+      };
+
+      const CONDITION_MAP = {
+        "used": ["used", "pre-owned", "usado", "usada"],
+        "new": ["new", "nuevo", "nueva"],
+        "excellent": ["excellent", "excelente"],
+        "good": ["good", "bueno", "buena"],
+        "fair": ["fair", "aceptable", "regular"],
+        "salvage": ["salvage", "salvamento"],
       };
 
       let pick =
@@ -836,7 +895,10 @@
           ? (() => {
             for (const [canonical, aliases] of Object.entries(COLOR_MAP)) {
               if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
-                const found = options.find((o) => getText(o).includes(canonical));
+                const found = options.find((o) => {
+                  const text = getText(o);
+                  return text.includes(canonical) || aliases.some((a) => text.includes(a));
+                });
                 if (found) return found;
               }
             }
@@ -848,7 +910,38 @@
           ? (() => {
             for (const [canonical, aliases] of Object.entries(BODY_STYLE_MAP)) {
               if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
-                const found = options.find((o) => getText(o).includes(canonical));
+                const found = options.find((o) => {
+                  const text = getText(o);
+                  return text.includes(canonical) || aliases.some((a) => text.includes(a));
+                });
+                if (found) return found;
+              }
+            }
+            return undefined;
+          })()
+          : undefined) ||
+        (label === "fuel type"
+          ? (() => {
+            for (const [canonical, aliases] of Object.entries(FUEL_MAP)) {
+              if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
+                const found = options.find((o) => {
+                  const text = getText(o);
+                  return text.includes(canonical) || aliases.some((a) => text.includes(a));
+                });
+                if (found) return found;
+              }
+            }
+            return undefined;
+          })()
+          : undefined) ||
+        (label === "condition"
+          ? (() => {
+            for (const [canonical, aliases] of Object.entries(CONDITION_MAP)) {
+              if (aliases.some((a) => needle.includes(a) || a.includes(needle))) {
+                const found = options.find((o) => {
+                  const text = getText(o);
+                  return text.includes(canonical) || aliases.some((a) => text.includes(a));
+                });
                 if (found) return found;
               }
             }
@@ -1224,7 +1317,7 @@
       if (value === null || value === undefined || value === "") {
         stateLog(`Skipping "${label}" — no value in listing data`);
         warnings.push(`${label}: no value in listing data — skipped`);
-        return;
+        return false;
       }
       stateLog(`Filling ${label}`);
       const el = await waitForField(keywords, 6000);
@@ -1232,10 +1325,28 @@
         setNativeValue(el, String(value));
         filled.push(label);
         log(`${label} filled`);
+        return true;
       } else {
         stateError(`Could not find ${label} field`);
         missed.push(label);
+        return false;
       }
+    }
+
+    async function fillTextOrSelectComboboxStep(label, textKeywords, comboKeywords, value, afterWait) {
+      if (value === null || value === undefined || value === "") {
+        stateLog(`Skipping "${label}" — no value in listing data`);
+        warnings.push(`${label}: no value in listing data — skipped`);
+        return false;
+      }
+      const textField = await waitForNamedField(label, textKeywords, 1800);
+      if (textField) {
+        setNativeValue(textField, String(value));
+        filled.push(label);
+        log(`${label} filled`);
+        return true;
+      }
+      return selectComboboxStep(label, comboKeywords, value, afterWait, false);
     }
 
     // ==================================================================
@@ -1292,19 +1403,19 @@
       setStatus("Selecting year…");
       const yearFilled = await selectComboboxStep(
         "year",
-        ["year"],
+        ["year", "año", "ano"],
         fill.year ? String(fill.year) : null,
         "generic",
         false,  // false = don't auto-pick first option on no-match
       );
 
       setStatus("Selecting make…");
-      const makeFilled = await selectComboboxStep(
+      const makeFilled = await fillTextOrSelectComboboxStep(
         "make",
-        ["make"],
+        ["make", "marca"],
+        ["make", "marca"],
         fill.make,
         "generic",
-        false,
       );
 
       if (!yearFilled || !makeFilled) {
@@ -1319,7 +1430,7 @@
       // Model — text input that appears after Make cascade
       setStatus("Filling model…");
       stateLog("Waiting for Model text input");
-      const modelInput = await waitForNamedField("model", ["model"], 10000);
+      const modelInput = await waitForNamedField("model", ["model", "modelo"], 10000);
       if (modelInput && fill.model) {
         setNativeValue(modelInput, String(fill.model));
         modelInput.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1342,13 +1453,14 @@
       } else {
         log(`pricing mode: FULL_PRICE — posting $${fill.price}`);
       }
-      await fillStep("price", ["price", "listing price", "asking price"], fill.price);
+      await fillStep("price", ["price", "listing price", "asking price", "precio"], fill.price);
 
       // Title — may be auto-generated by Facebook from Year/Make/Model
       {
         const TITLE_KWS = [
           "title", "listing title", "what are you selling",
           "vehicle name", "add a title", "item title",
+          "título", "titulo",
         ];
         stateLog("Checking for title field");
         const titleEl = await waitForField(TITLE_KWS, 8000);
@@ -1369,8 +1481,8 @@
         }
       }
 
-      await fillStep("description", ["description", "describe", "details"], fill.description);
-      await fillStep("location", ["location", "city", "where"], fill.location);
+      await fillStep("description", ["description", "describe", "details", "descripción", "descripcion", "detalles"], fill.description);
+      await fillStep("location", ["location", "city", "where", "ubicación", "ubicacion", "ciudad"], fill.location);
 
       // ---- Phase 4: Mileage (required for Next button) ──────────────────
       // Always attempted regardless of FAST_MODE — Facebook requires mileage.
@@ -1393,6 +1505,7 @@
           await fillStep("mileage", [
             "mileage", "odometer", "miles", "vehicle mileage",
             "number of miles", "mileage (optional)", "odometer reading",
+            "millaje", "kilometraje", "kilómetros", "kilometros",
           ], normalizedMileage);
         }
       }
@@ -1409,7 +1522,7 @@
         }
         const bsOk = await selectComboboxStep(
           "body style",
-          ["body style", "vehicle style", "body type", "style"],
+          ["body style", "vehicle style", "body type", "style", "carrocería", "carroceria"],
           bodyStyleValue,
           null,
           false,
@@ -1430,7 +1543,7 @@
         } else {
           const ecOk = await selectComboboxStep(
             "exterior color",
-            ["exterior color", "exterior", "color"],
+            ["exterior color", "exterior", "color", "color exterior"],
             extColor,
             null,
             false,
@@ -1454,7 +1567,7 @@
           const warnsBefore = warnings.length;
           const ok = await selectComboboxStep(
             "interior color",
-            ["interior color", "interior"],
+            ["interior color", "interior", "color interior"],
             candidate,
             null,
             false,
@@ -1472,13 +1585,30 @@
         }
       }
 
-      if (!MARKETPLACE_FAST_MODE) {
-        // ---- Phase 6: Condition dropdown (non-blocking, skipped in fast mode) ----
-        stateLog("Phase 6: condition (non-blocking)");
-        await selectComboboxStep("condition", ["condition"], fill.condition, false, false);
-      } else {
-        stateLog("Fast mode: skipping condition");
-      }
+      // ---- Phase 6: Additional vehicle details. Facebook often keeps these
+      // below the fold in localized Marketplace forms.
+      stateLog("Phase 6: condition / fuel / transmission");
+      await selectComboboxStep(
+        "condition",
+        ["condition", "estado", "estado del vehículo", "estado del vehiculo"],
+        fill.condition || "Used",
+        null,
+        false,
+      );
+      await selectComboboxStep(
+        "fuel type",
+        ["fuel", "fuel type", "tipo de combustible", "combustible"],
+        fill.fuelType,
+        null,
+        false,
+      );
+      await selectComboboxStep(
+        "transmission",
+        ["transmission", "transmisión", "transmision"],
+        fill.transmission,
+        null,
+        false,
+      );
 
       checkBudget("workflow complete");
       stateLog(`Workflow Complete — ${elapsed()}s elapsed`);
@@ -1935,7 +2065,7 @@
     }
 
     setStatus("Auto-publishing — clicking Next…");
-    const nextClicked = await clickEnabledButtonByText(["next", "continue", "next step"], 10000);
+    const nextClicked = await clickEnabledButtonByText(["next", "continue", "next step", "siguiente", "continuar"], 10000);
     if (!nextClicked) {
       const fbErrors = scrapeFacebookErrors();
       const reason = fbErrors
@@ -2001,20 +2131,24 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return;
     }
 
+    setTimeout(() => {
+      send({ type: "POLL_NOW" }).catch(() => { });
+    }, 1500);
+
     setStatus("✓ Published successfully!" + (listingUrl ? " Listing is live." : ""), "ok");
     clearOutput();
     jobBoxEl.innerHTML = `
       <div class="mai-job">
         <div class="mai-job-title">Published ✓</div>
         <div class="mai-job-meta">Job #${escapeHtml(String(job.id))} complete.${listingUrl ? ` <a href="${escapeHtml(listingUrl)}" target="_blank" style="color:#4ade80">View listing ↗</a>` : ""}</div>
-        <div class="mai-job-meta">Open the popup to claim the next job.</div>
+        <div class="mai-job-meta">Checking the queue for the next eligible job.</div>
       </div>`;
     log("Auto-publish complete", { job, filled, missed, warnings, listingUrl });
   }
 
   // clickEnabledButtonByText — only clicks buttons that are NOT disabled.
   async function clickPublishUntilListingUrl(job) {
-    const publishTexts = ["publish listing", "publish", "post listing", "post"];
+    const publishTexts = ["publish listing", "publish", "post listing", "post", "publicar", "publicar anuncio"];
     for (let attempt = 1; attempt <= 2; attempt++) {
       setStatus(attempt === 1
         ? "Auto-publishing - clicking Publish..."
@@ -2041,20 +2175,23 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     const candidates = Array.from(
       document.querySelectorAll('div[role="button"], button, [role="button"]'),
     );
+    const normalizedOptions = textOptions.map(normalizeText);
     for (const el of candidates) {
       if (
         el.disabled ||
         el.getAttribute("aria-disabled") === "true" ||
         el.hasAttribute("disabled")
       ) continue;
-      const text = (el.innerText || el.textContent || "").toLowerCase().trim();
+      const text = normalizeText(el.innerText || el.textContent || "");
       if (textOptions.some((t) => text === t || text === t + " ")) return el;
+      if (normalizedOptions.some((t) => text === t || text === t + " ")) return el;
     }
     return null;
   }
 
   async function clickEnabledButtonByText(textOptions, timeoutMs) {
     const start = Date.now();
+    const normalizedOptions = textOptions.map(normalizeText);
     while (Date.now() - start < timeoutMs) {
       const candidates = Array.from(
         document.querySelectorAll('div[role="button"], button, [role="button"]'),
@@ -2066,8 +2203,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           el.getAttribute("aria-disabled") === "true" ||
           el.hasAttribute("disabled")
         ) continue;
-        const text = (el.innerText || el.textContent || "").toLowerCase().trim();
-        if (textOptions.some((t) => text === t || text === t + " ")) {
+        const text = normalizeText(el.innerText || el.textContent || "");
+        if (normalizedOptions.some((t) => text === t || text === t + " ")) {
           log("Auto-publish clicking:", text);
           el.click();
           return true;
@@ -2156,13 +2293,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     }
 
     // 2. Check Next button exists and is not disabled
-    const NEXT_TEXTS = ["next", "continue", "next step"];
+    const NEXT_TEXTS = ["next", "continue", "next step", "siguiente", "continuar"];
+    const NORMALIZED_NEXT_TEXTS = NEXT_TEXTS.map(normalizeText);
     const allButtons = Array.from(
       document.querySelectorAll('div[role="button"], button, [role="button"]'),
     );
     const nextBtn = allButtons.find((el) => {
-      const t = (el.innerText || el.textContent || "").toLowerCase().trim();
-      return NEXT_TEXTS.some((n) => t === n || t === n + " ");
+      const t = normalizeText(el.innerText || el.textContent || "");
+      return NORMALIZED_NEXT_TEXTS.some((n) => t === n || t === n + " ");
     });
 
     if (!nextBtn) {
@@ -2359,11 +2497,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           return;
         }
         await chrome.storage.local.remove("activeJob");
-        setStatus("Job marked Published. Listing updated to Published.", "ok");
+        setTimeout(() => {
+          send({ type: "POLL_NOW" }).catch(() => { });
+        }, 1500);
+        setStatus("Job marked Published. Listing updated to Published. Claiming the next eligible job.", "ok");
         clearOutput();
         jobBoxEl.innerHTML = `<div class="mai-job"><div class="mai-job-title">Done ✓</div><div class="mai-job-meta">Job #${escapeHtml(
           String(job.id),
-        )} published. Open the popup to claim the next job.</div></div>`;
+        )} published. Checking the queue for the next eligible job.</div></div>`;
       }),
     );
 

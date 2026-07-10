@@ -38,6 +38,8 @@ import {
 } from "../publishing/controlledMode";
 import { getInitialBatchTiming } from "../publishing/batchProgress";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
+import { publishingWorker } from "../workers/publishing.worker";
+import { runWorkerOnce } from "../workers/scheduler";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
 // Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
@@ -45,6 +47,10 @@ const DEALER_ID = 1;
 const DEALER_FILTER = eq(vehiclesTable.dealerId, DEALER_ID);
 
 const router: IRouter = Router();
+
+function shouldKickAutoPublish(settings: AutoPublishSettings): boolean {
+  return settings.enabled && !settings.requireApproval && resolvePublishMode(settings.autoClickPublish) === "Controlled";
+}
 
 // ─── Photo Quality Analyzer ──────────────────────────────────────────────────
 
@@ -296,6 +302,11 @@ router.put("/auto-publish/settings/:dealerId", async (req, res) => {
   }
 
   req.log.info({ dealerId }, "Auto-publish settings updated");
+  if (shouldKickAutoPublish(row)) {
+    void runWorkerOnce(publishingWorker, req.log, "manual", null).catch((err) => {
+      req.log.error({ err, dealerId }, "Failed to kick auto-publish worker after settings update");
+    });
+  }
   res.json({ settings: row });
 });
 
@@ -719,6 +730,7 @@ router.get("/auto-publish/batches", async (req, res) => {
     .where(
       and(
         eq(publishingBatchesTable.dealerId, dealerId),
+        ne(publishingBatchesTable.status, "Cancelled"),
         location ? eq(publishingBatchesTable.lotLocation, location) : undefined,
       ),
     )

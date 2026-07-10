@@ -202,7 +202,12 @@ async function maybeCreateAutomaticBatch(
   const [lastBatch] = await db
     .select({ createdAt: publishingBatchesTable.createdAt })
     .from(publishingBatchesTable)
-    .where(eq(publishingBatchesTable.dealerId, DEALER_ID))
+    .where(
+      and(
+        eq(publishingBatchesTable.dealerId, DEALER_ID),
+        ne(publishingBatchesTable.status, "Cancelled"),
+      ),
+    )
     .orderBy(desc(publishingBatchesTable.createdAt))
     .limit(1);
   if (lastBatch) {
@@ -390,7 +395,10 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
       and(
         eq(publishingJobsTable.dealerId, DEALER_ID),
         or(
-          eq(publishingJobsTable.status, "Queued"),
+          and(
+            eq(publishingJobsTable.status, "Queued"),
+            or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
+          ),
           eq(publishingJobsTable.status, "Retry"),
           and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, new Date())),
         ),
@@ -436,7 +444,10 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
         and(
           eq(publishingJobsTable.id, job.id),
           or(
-            eq(publishingJobsTable.status, "Queued"),
+            and(
+              eq(publishingJobsTable.status, "Queued"),
+              or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
+            ),
             eq(publishingJobsTable.status, "Retry"),
             and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, new Date())),
           ),
