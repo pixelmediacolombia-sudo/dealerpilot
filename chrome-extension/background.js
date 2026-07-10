@@ -424,10 +424,12 @@ const handlers = {
           await chrome.storage.local.remove("activeJob");
           // fall through to normal poll
         } else {
+          await chrome.storage.local.set({ lastPollSkipReason: "active_job_in_progress", lastSkippedJobId: activeJob.id, lastSkippedAt: new Date().toISOString() }).catch(() => {});
           return { skipped: true, jobId: activeJob.id };
         }
       } catch {
         // Can't verify — keep skipping to avoid thrashing
+        await chrome.storage.local.set({ lastPollSkipReason: "active_job_progress_check_failed", lastSkippedJobId: activeJob.id, lastSkippedAt: new Date().toISOString() }).catch(() => {});
         return { skipped: true, jobId: activeJob.id };
       }
     }
@@ -515,6 +517,7 @@ const handlers = {
         source: jobSource,
         reason,
       });
+      await chrome.storage.local.set({ lastPollSkipReason: reason, lastSkippedJobId: nextJob.id, lastSkippedAt: new Date().toISOString() }).catch(() => {});
       const staleLabel = isAutoPublishBatch
         ? `[needs approval] job #${nextJob.id} — ${nextJob.vehicleLabel || nextJob.status}`
         : `[stale] job #${nextJob.id} — ${nextJob.vehicleLabel || nextJob.status}`;

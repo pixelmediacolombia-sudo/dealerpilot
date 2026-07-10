@@ -2300,7 +2300,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         if (txt) return true;
         // Finally, do a loose label scan for visible text
         const bodyText = (document.body && (document.body.innerText || document.body.textContent || "") || "").toLowerCase();
-        if (bodyText.includes("color exterior") || bodyText.includes("color interior") || bodyText.includes("color")) return true;
+        // Only accept explicit label phrases — avoid matching generic "color"
+        if (bodyText.includes("color exterior") || bodyText.includes("color interior")) return true;
         return false;
       }
       return true;
