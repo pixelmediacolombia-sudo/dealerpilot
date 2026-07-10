@@ -736,6 +736,12 @@
       setStatus(`Waiting for "${label}" combobox…`);
       const combobox = await waitForCombobox(keywords, BUDGET.COMBOBOX_WAIT_MS);
       if (!combobox) {
+        const isColorField = /color|exterior|interior/i.test(label);
+        const renderedControlPresent = Boolean(findCombobox(keywords) || findField(keywords));
+        if (isColorField && !renderedControlPresent) {
+          stateLog(`Skipping "${label}" — no control rendered in this form variant`);
+          return false;
+        }
         stateError(`Could not find ${label} combobox`);
         missed.push(label);
         warnings.push(`${label}: combobox did not appear`);
@@ -2285,29 +2291,50 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       }
     }
     // Some localized Marketplace forms omit certain optional fields
-    // entirely (no combobox / input rendered).  If a "missed" field
+    // entirely (no combobox / input rendered). If a "missed" field
     // refers to a color field that does not exist in the current DOM,
     // treat it as non-blocking for the pre-Next validation. This prevents
     // blocking auto-publish when Facebook's form variant simply doesn't
     // render exterior/interior color controls.
     function fieldPresentOnPage(fieldName) {
       const lname = String(fieldName || "").toLowerCase();
-      if (lname.includes("exterior") || lname.includes("interior") || lname.includes("color")) {
-        // Check for any matching combobox or text input/label
-        const cb = findCombobox(["exterior color", "exterior", "color", "color exterior", "interior color", "interior", "color interior"]);
-        if (cb) return true;
-        const txt = findField(["exterior color", "exterior", "color", "color exterior", "interior color", "interior", "color interior"]);
-        if (txt) return true;
-        // Finally, do a loose label scan for visible text
-        const bodyText = (document.body && (document.body.innerText || document.body.textContent || "") || "").toLowerCase();
-        // Only accept explicit label phrases — avoid matching generic "color"
-        if (bodyText.includes("color exterior") || bodyText.includes("color interior")) return true;
+      const isColorField = lname.includes("exterior") || lname.includes("interior") || lname.includes("color");
+      if (!isColorField) return true;
+
+      const colorKeywords = [
+        "exterior color",
+        "exterior",
+        "color exterior",
+        "interior color",
+        "interior",
+        "color interior",
+      ];
+
+      // Strong signal: a real combobox or field exists.
+      const cb = findCombobox(colorKeywords);
+      if (cb) return true;
+      const txt = findField(colorKeywords);
+      if (txt) return true;
+
+      // Heuristic: page text may mention the label without an actual control.
+      // Treat those as not rendered in this form variant and therefore non-blocking.
+      const bodyText = (document.body && (document.body.innerText || document.body.textContent || "") || "").toLowerCase();
+      const explicitColorLabels = ["color exterior", "color interior", "exterior color", "interior color"];
+      const hasExplicitLabel = explicitColorLabels.some((label) => bodyText.includes(label));
+      if (hasExplicitLabel) {
+        // If the label is present but no control exists, this variant is a
+        // non-rendered field case; keep the field out of the blocking set.
         return false;
       }
-      return true;
+      return false;
     }
 
     const effectiveMissed = missed.filter((m) => fieldPresentOnPage(m));
+    const skippedColorFields = missed.filter((m) => {
+      const lname = String(m || "").toLowerCase();
+      return (lname.includes("exterior") || lname.includes("interior") || lname.includes("color"))
+        && fieldPresentOnPage(m) === false;
+    });
 
     // Debug: log presence map and persist for inspection if auto-start still fails
     try {
@@ -2315,7 +2342,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       for (const m of missed) {
         try { presenceMap[m] = fieldPresentOnPage(m); } catch (e) { presenceMap[m] = `error: ${e && e.message}`; }
       }
-      console.log(`[VALIDATION DEBUG] missed:`, missed, `effectiveMissed:`, effectiveMissed, `presenceMap:`, presenceMap);
+      console.log(`[VALIDATION DEBUG] missed:`, missed, `effectiveMissed:`, effectiveMissed, `skippedColorFields:`, skippedColorFields, `presenceMap:`, presenceMap);
       if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
         chrome.storage.local.set({ lastValidationDebug: { at: new Date().toISOString(), missed, effectiveMissed, presenceMap } }).catch(() => {});
       }

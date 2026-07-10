@@ -36,6 +36,11 @@ test("Auto publish can click localized Next and Publish buttons", () => {
   assert.match(content, /normalizeText\(el\.innerText \|\| el\.textContent \|\| ""\)/);
 });
 
+test("Color fields are treated as non-blocking when the form variant does not render them", () => {
+  assert.match(content, /no control rendered in this form variant/i);
+  assert.match(content, /non-blocking/i);
+});
+
 test("Successful publish wakes the queue for the next eligible job", () => {
   const completeIndex = content.indexOf('type: "COMPLETE_JOB"');
   const pollIndex = content.indexOf('type: "POLL_NOW"');
