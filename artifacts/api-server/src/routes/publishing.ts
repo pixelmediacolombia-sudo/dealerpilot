@@ -788,6 +788,8 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
       completedAt: now,
       failedReason: null,
       listingUrl: listingUrl ?? job.listingUrl,
+      progressPercent: 100,
+      currentStep: "Published on Marketplace",
     })
     .where(eq(publishingJobsTable.id, id))
     .returning();
