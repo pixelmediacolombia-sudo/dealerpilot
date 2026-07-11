@@ -6,7 +6,7 @@ const routeSource = readFileSync(new URL("./publishing.ts", import.meta.url), "u
 const autoPublishSource = readFileSync(new URL("./autoPublish.ts", import.meta.url), "utf8");
 const workerSource = readFileSync(new URL("../workers/publishing.worker.ts", import.meta.url), "utf8");
 const batchProgressCardSource = readFileSync(
-  new URL("../../../dashboard/src/pages/Listings/BatchProgressCard.tsx", import.meta.url),
+  new URL("../../../dashboard/src/features/listings/components/BatchProgressCard.tsx", import.meta.url),
   "utf8",
 );
 

@@ -41,6 +41,11 @@
         "https://messenger.com/*"
       ],
       "js": [
+        "src/content/facebook/selectors.js",
+        "src/content/facebook/formFiller.js",
+        "src/content/facebook/photoUploader.js",
+        "src/content/facebook/validation.js",
+        "src/content/facebook/publisherFlow.js",
         "content/content.js"
       ],
       "css": [

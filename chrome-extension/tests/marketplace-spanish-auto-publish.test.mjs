@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-const content = readFileSync(new URL("../content/content.js", import.meta.url), "utf8");
+const content = readFileSync(
+  new URL("../src/content/facebook/publisherFlow.js", import.meta.url),
+  "utf8",
+);
 
 test("Marketplace filler recognizes Spanish vehicle form labels", () => {
   for (const keyword of [

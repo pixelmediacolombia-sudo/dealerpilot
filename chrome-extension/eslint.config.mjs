@@ -10,6 +10,10 @@ export default [
         ...globals.browser,
         ...globals.serviceworker,
         chrome: "readonly",
+        DealerPilotApiClient: "readonly",
+        DealerPilotPhotoProxy: "readonly",
+        DealerPilotPopupDiagnostics: "readonly",
+        DealerPilotPopupSettings: "readonly",
       },
     },
     rules: {
