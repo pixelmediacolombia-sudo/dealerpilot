@@ -71,16 +71,85 @@ async function clearConnectRequested() {
   }
 }
 
+function detectFacebookTabStateFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname;
+    const isFacebook =
+      host === "facebook.com" ||
+      host.endsWith(".facebook.com") ||
+      host === "web.facebook.com";
+    if (!isFacebook) return null;
+
+    const isLoginPage =
+      /^\/(login(\.php)?|checkpoint|recover|two_step_verification|privacy\/consent)/.test(path) ||
+      parsed.search.includes("reauth=1") ||
+      (parsed.search.includes("next=") && path === "/login.php");
+
+    return {
+      fbLoggedIn: !isLoginPage,
+      marketplaceConnected: path.startsWith("/marketplace/create"),
+      marketplaceDetected: path.includes("/marketplace"),
+      marketplacePath: path.includes("/marketplace") ? path : null,
+      marketplaceUrl: path.includes("/marketplace") ? url : null,
+    };
+  } catch (_err) {
+    return null;
+  }
+}
+
+async function detectFacebookTabState() {
+  try {
+    const tabs = await chrome.tabs.query({
+      url: [
+        "https://www.facebook.com/*",
+        "https://web.facebook.com/*",
+        "https://facebook.com/*",
+      ],
+    });
+    let best = null;
+    for (const tab of tabs) {
+      const state = detectFacebookTabStateFromUrl(tab.url || "");
+      if (!state) continue;
+      if (!best || state.marketplaceConnected || (!best.marketplaceConnected && state.marketplaceDetected)) {
+        best = state;
+      }
+      if (state.marketplaceConnected) break;
+    }
+    if (!best) return {};
+
+    const now = new Date().toISOString();
+    const patch = {
+      fbLoggedIn: best.fbLoggedIn,
+      marketplaceConnected: best.marketplaceConnected,
+      marketplaceDetected: best.marketplaceDetected,
+      marketplacePath: best.marketplacePath,
+      marketplaceUrl: best.marketplaceUrl,
+      marketplaceDetectedAt: best.marketplaceDetected ? now : null,
+    };
+    await chrome.storage.local.set(patch);
+    return patch;
+  } catch (err) {
+    console.warn("[DealerPilot AI] Facebook tab state detection failed", err);
+    return {};
+  }
+}
+
 // ---- Message handlers ----
 
 const handlers = {
   async PING() {
     const base = await getBackendUrl();
     await apiGet("/api/healthz");
+    const detected = await detectFacebookTabState();
     const { fbLoggedIn, marketplaceConnected } = await chrome.storage.local.get([
       "fbLoggedIn",
       "marketplaceConnected",
     ]);
+    const resolvedFbLoggedIn = detected.fbLoggedIn ?? fbLoggedIn ?? null;
+    const resolvedMarketplaceConnected =
+      detected.marketplaceConnected ?? marketplaceConnected ?? null;
     const now = new Date().toISOString();
     const heartbeatUrl = `${base}/api/extension/heartbeat`;
     try {
@@ -88,8 +157,8 @@ const handlers = {
         backendUrl: base,
         status: "online",
         chromeExtensionId: chrome.runtime.id,
-        fbLoggedIn: fbLoggedIn ?? null,
-        marketplaceConnected: marketplaceConnected ?? null,
+        fbLoggedIn: resolvedFbLoggedIn,
+        marketplaceConnected: resolvedMarketplaceConnected,
       });
       await chrome.storage.local.set({
         lastHeartbeat: now,

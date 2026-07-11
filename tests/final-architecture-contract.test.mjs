@@ -99,6 +99,16 @@ test("backend-extension sacred endpoints are centralized and shape-compatible", 
   assert.match(extensionRoute, /const SessionReportBody = z\.object\(\{/);
 });
 
+test("extension heartbeat falls back to open Facebook tabs for Marketplace connection", () => {
+  assert.match(extensionQueueClient, /async function detectFacebookTabState\(\)/);
+  assert.match(extensionQueueClient, /chrome\.tabs\.query\(\{/);
+  assert.match(extensionQueueClient, /"https:\/\/www\.facebook\.com\/\*"/);
+  assert.match(extensionQueueClient, /path\.startsWith\("\/marketplace\/create"\)/);
+  assert.match(extensionQueueClient, /const detected = await detectFacebookTabState\(\)/);
+  assert.match(extensionQueueClient, /fbLoggedIn: resolvedFbLoggedIn/);
+  assert.match(extensionQueueClient, /marketplaceConnected: resolvedMarketplaceConnected/);
+});
+
 test("Alpha Flow E2E contract is still dashboard to backend to extension to completion", () => {
   assert.match(dashboardRouter, /path="\/publishing"/);
   assert.match(dashboardRouter, /path="\/listings"/);
