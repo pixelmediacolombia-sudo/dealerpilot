@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { AppLayout } from "@/shared/layout/AppLayout";
 import { 
   useListDealers, 
   useGetDealer, 
@@ -14,9 +14,9 @@ import {
   getGetVehicleStatsQueryKey
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/format";
 import { 
@@ -24,8 +24,8 @@ import {
   Settings as SettingsIcon, Server, Database, Rss, Puzzle, 
   Facebook, Store, MessageCircle, Bot, Activity, History
 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { PageHeader, SectionCard, StatusPulse } from "@/components/shared";
+import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
+import { PageHeader, SectionCard, StatusPulse } from "@/shared/ui";
 import { cn } from "@/lib/utils";
 
 export function Settings() {

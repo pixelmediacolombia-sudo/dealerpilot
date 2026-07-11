@@ -1,7 +1,7 @@
-import { AppLayout } from "@/components/layout/AppLayout";
+import { AppLayout } from "@/shared/layout/AppLayout";
 import { ComingSoon } from "@/pages/ComingSoon";
-import { InventoryDashboard } from "@/pages/Inventory";
-import { VehicleDetail } from "@/pages/Inventory/VehicleDetail";
+import { InventoryDashboard } from "@/features/inventory/pages";
+import { VehicleDetail } from "@/features/inventory/pages/VehicleDetail";
 import { Settings } from "@/pages/Settings";
 
 export { AppLayout, ComingSoon, InventoryDashboard, VehicleDetail, Settings };

@@ -4,8 +4,8 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+} from "@/shared/ui/sheet";
+import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
 import {
   Brain,

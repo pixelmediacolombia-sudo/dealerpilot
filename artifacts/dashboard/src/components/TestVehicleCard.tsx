@@ -1,11 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetTestListing, getGetTestListingQueryKey, getTestListing } from "@workspace/api-client-react";
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/shared/ui/card";
+import { Button } from "@/shared/ui/button";
+import { Badge } from "@/shared/ui/badge";
 import { CheckCircle2, Car, Send } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/shared/ui/skeleton";
 
 export function TestVehicleCard() {
   const queryClient = useQueryClient();

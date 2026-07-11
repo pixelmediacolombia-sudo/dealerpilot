@@ -6,7 +6,7 @@ import {
   getGetConnectionStatusQueryKey,
   type ConnectionStatus,
 } from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import {
   CheckCircle2,
   XCircle,

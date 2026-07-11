@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { AppLayout } from "@/shared/layout/AppLayout";
 import {
   useListDealers,
   useGetDealerBrandDna,
@@ -10,17 +10,17 @@ import {
   type DealerBrandDna,
   type CreativeRenderSpec,
 } from "@workspace/api-client-react";
-import { PageHeader, SectionCard } from "@/components/shared";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PageHeader, SectionCard } from "@/shared/ui";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/shared/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { CreativePreviewCard } from "@/components/CreativePreview";
 import { Loader2, Save, Dna, Plus, X, Palette, Type, LayoutTemplate } from "lucide-react";

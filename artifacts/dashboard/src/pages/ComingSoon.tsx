@@ -1,4 +1,4 @@
-import { AppLayout } from "@/components/layout/AppLayout";
+import { AppLayout } from "@/shared/layout/AppLayout";
 import { useLocation } from "wouter";
 
 const moduleMap: Record<string, { name: string; eyebrow: string; accent: string }> = {
