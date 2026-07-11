@@ -3,19 +3,15 @@ import { z } from "zod/v4";
 import { getCachedGmDecision, recordGmDecision } from "./gm";
 import {
   db,
-  vehiclesTable,
-  vehicleImagesTable,
-  aiPhotoImagesTable,
   dealersTable,
+  vehiclesTable,
   listingsTable,
   listingVersionsTable,
   publishingJobsTable,
-  publishingBatchesTable,
   vehicleIntelligenceTable,
   marketplaceListingsTable,
   autoPublishSettingsTable,
   pool,
-  type PublishingJob,
 } from "@workspace/db";
 import { and, asc, desc, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { getMarketplacePricing } from "../listings/pricing";
@@ -27,208 +23,19 @@ import {
   resolvePublishMode,
   LOT_CITY_MAP,
 } from "../publishing/controlledMode";
-import { deriveBatchProgress } from "../publishing/batchProgress";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
+import {
+  enrich,
+  getVehiclePhotos,
+  moveJobToNeedsReviewWithoutListingUrl,
+  reconcileBatchProgress,
+} from "../features/publishing/infrastructure/publishingRepository";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
 // Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
 const DEALER_ID = 1;
 
 const router: IRouter = Router();
-
-async function reconcileBatchProgress(batchId: number | null | undefined) {
-  if (!batchId) return;
-
-  const [counts] = await db
-    .select({
-      completed: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Published')`,
-      failed: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Failed')`,
-      skipped: sql<number>`count(*) filter (where ${publishingJobsTable.status} in ('Cancelled', 'Needs Review'))`,
-      total: sql<number>`count(*)`,
-    })
-    .from(publishingJobsTable)
-    .where(eq(publishingJobsTable.batchId, batchId));
-
-  const [batch] = await db
-    .select({ totalVehicles: publishingBatchesTable.totalVehicles })
-    .from(publishingBatchesTable)
-    .where(eq(publishingBatchesTable.id, batchId));
-
-  const totalVehicles = Number(batch?.totalVehicles ?? counts?.total ?? 0);
-  const progress = deriveBatchProgress({
-    completed: Number(counts?.completed ?? 0),
-    failed: Number(counts?.failed ?? 0),
-    skipped: Number(counts?.skipped ?? 0),
-    totalVehicles,
-  });
-
-  await db
-    .update(publishingBatchesTable)
-    .set({
-      status: progress.status,
-      completedCount: progress.completed,
-      failedCount: progress.failed,
-      skippedCount: progress.skipped,
-      startedAt: new Date(),
-      completedAt: progress.isDone ? new Date() : null,
-    })
-    .where(eq(publishingBatchesTable.id, batchId));
-}
-
-async function moveJobToNeedsReviewWithoutListingUrl(
-  job: PublishingJob,
-  reason = "Publish completion was reported without a Marketplace listing URL. Verify Facebook manually before marking live.",
-) {
-  const [updated] = await db
-    .update(publishingJobsTable)
-    .set({
-      status: "Needs Review",
-      needsReview: true,
-      reviewReason: reason,
-      failedReason: "Missing Marketplace listing URL confirmation",
-      listingUrl: null,
-      completedAt: null,
-      claimedByExtension: null,
-    })
-    .where(eq(publishingJobsTable.id, job.id))
-    .returning();
-
-  await db
-    .update(vehiclesTable)
-    .set({ status: "Active" })
-    .where(eq(vehiclesTable.id, job.vehicleId));
-
-  await db
-    .update(listingsTable)
-    .set({
-      status: "Needs Review",
-      externalUrl: null,
-      publishedAt: null,
-      publishedByExtensionId: null,
-    })
-    .where(and(eq(listingsTable.vehicleId, job.vehicleId), eq(listingsTable.channel, "marketplace")));
-
-  await db
-    .update(marketplaceListingsTable)
-    .set({
-      status: "Needs Review",
-      listingUrl: null,
-      publishedAt: null,
-    })
-    .where(eq(marketplaceListingsTable.vehicleId, job.vehicleId));
-
-  await reconcileBatchProgress(job.batchId);
-
-  return updated;
-}
-
-/**
- * Returns the best available photos for a vehicle.
- * Prefers AI-processed photos from aiPhotoImagesTable when the vehicle has
- * aiPhotoStatus = 'Done' and a valid aiPhotoSetId; falls back to raw vehicleImagesTable.
- */
-async function getVehiclePhotos(
-  vehicleId: number,
-  aiPhotoSetId: number | null,
-  aiPhotoStatus: string | null,
-): Promise<Array<{ url: string | null; position: number | null; source: "ai" | "raw" }>> {
-  if ((aiPhotoStatus === "Ready" || aiPhotoStatus === "Done") && aiPhotoSetId !== null) {
-    const aiImages = await db
-      .select()
-      .from(aiPhotoImagesTable)
-      .where(eq(aiPhotoImagesTable.setId, aiPhotoSetId))
-      .orderBy(asc(aiPhotoImagesTable.position));
-    if (aiImages.length > 0) {
-      return aiImages.map((img) => ({ url: img.processedUrl ?? img.originalUrl, position: img.position, source: "ai" as const }));
-    }
-  }
-  const rawImages = await db
-    .select()
-    .from(vehicleImagesTable)
-    .where(eq(vehicleImagesTable.vehicleId, vehicleId))
-    .orderBy(asc(vehicleImagesTable.position));
-  return rawImages.map((img) => ({ url: img.url, position: img.position, source: "raw" as const }));
-}
-
-type JobExtras = {
-  vehicleLabel: string | null;
-  dealerName: string | null;
-  listingTitle: string | null;
-};
-
-function toJob(j: PublishingJob, extras: JobExtras = {
-  vehicleLabel: null,
-  dealerName: null,
-  listingTitle: null,
-}) {
-  return {
-    id: j.id,
-    listingVersionId: j.listingVersionId,
-    vehicleId: j.vehicleId,
-    dealerId: j.dealerId,
-    mode: j.mode,
-    status: j.status,
-    currentStep: j.currentStep ?? null,
-    progressPercent: j.progressPercent,
-    priority: j.priority,
-    scheduledAt: j.scheduledAt ? j.scheduledAt.toISOString() : null,
-    claimedByExtension: j.claimedByExtension ?? null,
-    assignedExtensionId: j.assignedExtensionId ?? null,
-    assignedAt: j.assignedAt ? j.assignedAt.toISOString() : null,
-    startedAt: j.startedAt ? j.startedAt.toISOString() : null,
-    completedAt: j.completedAt ? j.completedAt.toISOString() : null,
-    failedReason: j.failedReason ?? null,
-    listingUrl: j.listingUrl ?? null,
-    needsReview: j.needsReview,
-    reviewReason: j.reviewReason ?? null,
-    attempts: j.attempts,
-    source: j.source ?? null,
-    approvedByUser: j.approvedByUser ?? null,
-    createdAt: j.createdAt.toISOString(),
-    updatedAt: j.updatedAt.toISOString(),
-    ...extras,
-  };
-}
-
-async function enrich(jobs: PublishingJob[]) {
-  if (jobs.length === 0) return [];
-  const vehicleIds = [...new Set(jobs.map((j) => j.vehicleId))];
-  const dealerIds = [...new Set(jobs.map((j) => j.dealerId))];
-  const versionIds = [...new Set(jobs.map((j) => j.listingVersionId).filter((id): id is number => id !== null))];
-
-  const vehicles = await db
-    .select()
-    .from(vehiclesTable)
-    .where(inArray(vehiclesTable.id, vehicleIds));
-  const dealers = await db
-    .select()
-    .from(dealersTable)
-    .where(inArray(dealersTable.id, dealerIds));
-  const versions =
-    versionIds.length > 0
-      ? await db
-          .select()
-          .from(listingVersionsTable)
-          .where(inArray(listingVersionsTable.id, versionIds))
-      : [];
-
-  const vMap = new Map(vehicles.map((v) => [v.id, v]));
-  const dMap = new Map(dealers.map((d) => [d.id, d]));
-  const verMap = new Map(versions.map((v) => [v.id, v]));
-
-  return jobs.map((j) => {
-    const v = vMap.get(j.vehicleId);
-    const d = dMap.get(j.dealerId);
-    const ver = j.listingVersionId != null ? verMap.get(j.listingVersionId) : undefined;
-    return toJob(j, {
-      vehicleLabel: v
-        ? `${v.year ?? ""} ${v.make} ${v.model}${v.trim ? ` ${v.trim}` : ""}`.trim()
-        : null,
-      dealerName: d?.name ?? null,
-      listingTitle: ver?.title ?? null,
-    });
-  });
-}
 
 // GET /publishing/jobs — full queue for the UI.
 router.get("/publishing/jobs", async (req, res) => {

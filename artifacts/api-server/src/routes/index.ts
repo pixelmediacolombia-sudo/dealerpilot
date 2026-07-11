@@ -1,12 +1,12 @@
 import { Router, type IRouter } from "express";
-import healthRouter from "./health";
+import healthRouter from "../features/health/presentation/http/healthRouter";
 import extensionRouter from "./extension";
 import dealersRouter from "./dealers";
 import vehiclesRouter from "./vehicles";
-import connectionRouter from "./connection";
+import connectionRouter from "../features/connection/presentation/http/connectionRouter";
 import feedRouter from "./feed";
 import listingsRouter from "./listings";
-import publishingRouter from "./publishing";
+import publishingRouter from "../features/publishing/presentation/http/publishingRouter";
 import autoPublishRouter from "./autoPublish";
 import creativeRouter from "./creative";
 import conversationsRouter from "./conversations";
