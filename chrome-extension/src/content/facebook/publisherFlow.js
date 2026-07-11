@@ -1725,18 +1725,26 @@
       }
 
       const textValue = String(value);
-      setFocusedFieldValue(el, "");
-      await sleep(150);
-      setFocusedFieldValue(el, textValue);
-      await sleep(1200);
-
       const normalizedTarget = normalizeText(textValue);
       const cityPart = normalizeText(textValue.split(",")[0] || textValue);
       const statePart = normalizeText((textValue.split(",")[1] || "").trim());
       const stateAlias = STATE_ALIASES[statePart] || statePart;
       let pickedSuggestion = false;
-      const options = await scanForAnyOptions(5000, "location-suggestions");
-      if (options.length) {
+      const locationQueries = Array.from(new Set([
+        textValue,
+        stateAlias && cityPart ? `${textValue.split(",")[0].trim()} ${stateAlias}` : "",
+        textValue.split(",")[0].trim(),
+      ].filter(Boolean)));
+
+      for (const query of locationQueries) {
+        setFocusedFieldValue(el, "");
+        await sleep(150);
+        setFocusedFieldValue(el, query);
+        await sleep(query === textValue ? 1500 : 1000);
+
+        const options = await scanForAnyOptions(4500, "location-suggestions");
+        if (!options.length) continue;
+
         const optionText = (option) => normalizeText(option.innerText || option.textContent || "");
         let pick =
           options.find((option) => optionText(option).includes(normalizedTarget)) ||
@@ -1757,9 +1765,22 @@
         if (pick) {
           const pickedText = (pick.innerText || pick.textContent || "").trim();
           stateLog(`location suggestion -> "${pickedText}"`);
-          try { pick.click(); } catch (e) { try { pick.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); } catch(_){} }
+          try { pick.scrollIntoView?.({ block: "center", inline: "nearest" }); } catch (_) { /* noop */ }
+          for (const eventName of ["pointerdown", "mousedown", "mouseup", "click"]) {
+            try { pick.dispatchEvent(new MouseEvent(eventName, { bubbles: true, cancelable: true, view: window })); } catch (_) { /* noop */ }
+          }
+          try { pick.click(); } catch (_) { /* noop */ }
           pickedSuggestion = true;
-          await sleep(700);
+          await sleep(900);
+          const committed = normalizeText(fieldCurrentValue(el) || el.innerText || el.textContent || "");
+          if (!committed || committed === normalizeText(query)) {
+            el.focus?.();
+            document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
+            await sleep(150);
+            document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
+            await sleep(700);
+          }
+          break;
         }
       }
 

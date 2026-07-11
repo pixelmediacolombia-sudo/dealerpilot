@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.31
+
+**Fixed**
+- Marketplace location autocomplete - retries location lookup with city/state variants such as `Fredericksburg Virginia` and the city-only value when Facebook does not accept the raw `City, ST` text.
+- Location suggestion commit - uses mouse-style selection events and a guarded keyboard fallback only after a visible Facebook suggestion exists, preventing the invalid raw-location state that keeps `Siguiente` disabled.
+
+---
+
 ## v1.3.28
 
 **Fixed**
