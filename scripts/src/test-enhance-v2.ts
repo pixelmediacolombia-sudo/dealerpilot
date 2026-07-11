@@ -213,7 +213,7 @@ function scoreCell(v: number | null, rating: PhotoRating | null): string {
   </td>`;
 }
 
-function buildDimensionRows(r: PhotoQualityReport, profile: PhotoQualityProfile): string {
+function buildDimensionRows(r: PhotoQualityReport, profile: QualityProfile): string {
   const gateDims = new Map([
     ["marketplaceReady", profile.marketplaceReadyThreshold],
     ["naturalness",      profile.naturalnessThreshold],
@@ -250,7 +250,7 @@ function buildAnalysisBullets(items: string[], isEnhanced: boolean): string {
     .join("\n");
 }
 
-function buildSection(report: PhotoQualityReport, origFile: string, enhFile: string, profile: PhotoQualityProfile): string {
+function buildSection(report: PhotoQualityReport, origFile: string, enhFile: string, profile: QualityProfile): string {
   const passed    = report.gate.passed;
   const deltaStr  = fmtDelta(report.overallDelta);
   const deltaPos  = report.overallDelta > 0;
@@ -371,7 +371,7 @@ function buildReportHtml(
   reports: PhotoQualityReport[],
   origFiles: string[],
   enhFiles: string[],
-  profile: PhotoQualityProfile,
+  profile: QualityProfile,
 ): string {
   const pass      = reports.filter(r => r.gate.passed).length;
   const fail      = reports.length - pass;

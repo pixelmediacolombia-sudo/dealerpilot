@@ -8,6 +8,7 @@
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "lint:extension": "node node_modules/eslint/bin/eslint.js --config chrome-extension/eslint.config.mjs chrome-extension/background.js chrome-extension/content/content.js chrome-extension/popup/popup.js chrome-extension/src/**/*.js chrome-extension/popup/modules/**/*.js",
+    "test:qa:final": "node --test tests/final-architecture-contract.test.mjs chrome-extension/tests/marketplace-spanish-auto-publish.test.mjs artifacts/api-server/src/routes/publishing-queue-scheduling.test.mjs",
     "test:extension:marketplace": "node --test chrome-extension/tests/marketplace-spanish-auto-publish.test.mjs",
     "test:publishing-flow": "node --test chrome-extension/tests/marketplace-spanish-auto-publish.test.mjs artifacts/api-server/src/routes/publishing-queue-scheduling.test.mjs"
   },
