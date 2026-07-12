@@ -189,6 +189,9 @@ test("Facebook Your Listings landing captures item URL before completing", () =>
   assert.match(content, /function findMarketplaceListingUrlOnPage\(job\)/);
   assert.match(content, /a\[href\*="\/marketplace\/item\/"\]/);
   assert.match(content, /function marketplaceTextMatchesExpectedListing\(text, expectedTokens\)/);
+  assert.match(content, /async function findMarketplaceListingUrlFromSellerDialog\(job\)/);
+  assert.match(content, /querySelectorAll\('\[role="dialog"\]'\)/);
+  assert.match(content, /findMarketplaceListingUrlOnPage\(job\) \|\|[\s\S]*await findMarketplaceListingUrlFromSellerDialog\(job\)/);
   assert.match(content, /Facebook Your Listings did not expose a Marketplace item URL matching this vehicle/);
   assert.match(content, /publishedLanding: true/);
   assert.match(content, /outcome\.listingUrl \|\| outcome\.blockReason \|\| outcome\.publishedLanding/);

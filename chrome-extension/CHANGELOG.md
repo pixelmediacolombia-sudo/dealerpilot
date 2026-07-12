@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.42
+
+**Fixed**
+- Opens the matching vehicle card on Your Listings to capture the correct Marketplace item URL after Facebook publishes.
+
+---
+
 ## v1.3.41
 
 **Fixed**

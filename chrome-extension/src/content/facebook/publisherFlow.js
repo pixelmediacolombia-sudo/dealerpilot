@@ -3070,6 +3070,43 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     return marketplaceTextMatchesExpectedListing(document.body?.innerText || "", expectedTokens);
   }
 
+  async function findMarketplaceListingUrlFromSellerDialog(job) {
+    const expectedTokens = expectedMarketplaceListingTokens(job);
+    if (expectedTokens.length === 0) return null;
+
+    const candidates = Array.from(document.querySelectorAll('[role="button"], button, a'))
+      .filter((el) => {
+        const text = normalizeText(el.innerText || el.textContent || el.getAttribute("aria-label") || "");
+        if (!marketplaceTextMatchesExpectedListing(text, expectedTokens)) return false;
+        if (/mas opciones|more options|marcar como|compartir|share|promocionar|boost|edit|editar|eliminar/.test(text)) {
+          return false;
+        }
+        const rect = el.getBoundingClientRect?.();
+        return !rect || (rect.width > 0 && rect.height > 0);
+      });
+
+    for (const candidate of candidates) {
+      try {
+        candidate.scrollIntoView?.({ block: "center", inline: "nearest" });
+        await sleep(250);
+        candidate.click();
+        await sleep(1800);
+
+        const dialog = Array.from(document.querySelectorAll('[role="dialog"]'))
+          .find((el) => marketplaceTextMatchesExpectedListing(el.innerText || el.textContent || "", expectedTokens));
+        if (!dialog) continue;
+
+        const listingLink = Array.from(dialog.querySelectorAll('a[href*="/marketplace/item/"]'))
+          .find((anchor) => marketplaceTextMatchesExpectedListing(anchor.innerText || anchor.textContent || dialog.innerText || "", expectedTokens));
+        if (listingLink?.href) return listingLink.href;
+      } catch (err) {
+        console.warn("[DealerPilot AI] seller dialog listing URL lookup failed", err);
+      }
+    }
+
+    return null;
+  }
+
   async function waitForPublishOutcome(job, timeoutMs) {
     const startUrl = window.location.href;
     const start = Date.now();
@@ -3083,7 +3120,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       }
       if (cur !== startUrl && cur.includes("/marketplace/you/selling")) {
         sawSellingLanding = true;
-        const listingUrl = findMarketplaceListingUrlOnPage(job);
+        const listingUrl =
+          findMarketplaceListingUrlOnPage(job) ||
+          await findMarketplaceListingUrlFromSellerDialog(job);
         if (listingUrl) return { listingUrl, blockReason: null, publishedLanding: true };
       }
       const successEl =
@@ -3108,7 +3147,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       };
     }
     if (final !== startUrl && final.includes("/marketplace/you/selling")) {
-      const listingUrl = findMarketplaceListingUrlOnPage(job);
+      const listingUrl =
+        findMarketplaceListingUrlOnPage(job) ||
+        await findMarketplaceListingUrlFromSellerDialog(job);
       if (!listingUrl) {
         return {
           listingUrl: null,
