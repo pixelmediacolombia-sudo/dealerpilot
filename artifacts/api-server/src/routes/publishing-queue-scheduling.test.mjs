@@ -5,6 +5,10 @@ import { test } from "node:test";
 const routeSource = readFileSync(new URL("./publishing.ts", import.meta.url), "utf8");
 const autoPublishSource = readFileSync(new URL("./autoPublish.ts", import.meta.url), "utf8");
 const workerSource = readFileSync(new URL("../workers/publishing.worker.ts", import.meta.url), "utf8");
+const publishingRepositorySource = readFileSync(
+  new URL("../features/publishing/infrastructure/publishingRepository.ts", import.meta.url),
+  "utf8",
+);
 const batchProgressCardSource = readFileSync(
   new URL("../../../dashboard/src/features/listings/components/BatchProgressCard.tsx", import.meta.url),
   "utf8",
@@ -96,6 +100,15 @@ test("dashboard batch progress counts Needs Review jobs as terminal", () => {
     /batch\.completedCount \+ batch\.failedCount \+ batch\.skippedCount \+ batch\.needsReviewCount/,
   );
   assert.match(batchProgressCardSource, /batch\.needsReviewCount > 0/);
+});
+
+test("moving a published job to Needs Review clears contradictory published state", () => {
+  assert.match(publishingRepositorySource, /status:\s*"Needs Review"/);
+  assert.match(publishingRepositorySource, /currentStep:\s*"Needs Review"/);
+  assert.match(publishingRepositorySource, /listingUrl:\s*null/);
+  assert.match(publishingRepositorySource, /claimedByExtension:\s*null/);
+  assert.match(publishingRepositorySource, /assignedExtensionId:\s*null/);
+  assert.match(publishingRepositorySource, /assignedAt:\s*null/);
 });
 
 test("batch list derives terminal counters from jobs instead of stale batch columns", () => {

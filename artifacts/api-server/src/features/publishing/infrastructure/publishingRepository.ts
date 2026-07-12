@@ -69,8 +69,12 @@ export async function moveJobToNeedsReviewWithoutListingUrl(
       reviewReason: reason,
       failedReason: "Missing Marketplace listing URL confirmation",
       listingUrl: null,
+      currentStep: "Needs Review",
+      progressPercent: 100,
       completedAt: null,
       claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
     })
     .where(eq(publishingJobsTable.id, job.id))
     .returning();
