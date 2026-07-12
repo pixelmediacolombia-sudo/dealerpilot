@@ -80,6 +80,7 @@ function createHarness(payload, options = {}) {
         }
         return { job: null };
       }
+      if (path === "/api/publishing/jobs") return { jobs: options.jobs ?? [] };
       if (path === "/api/publishing/jobs/next") return { job: null };
       if (path === "/api/extension/connect-status") return { connectRequested: false };
       throw new Error(`Unexpected GET ${path}`);
@@ -156,7 +157,7 @@ test("incomplete assigned vehicle moves to Needs Review and polls the next job w
   });
 
   assert.equal(result.job, null);
-  assert.deepEqual(calls.claims, [{ jobId: 101, extensionId: "ext-e2e" }]);
+  assert.deepEqual(calls.claims, []);
   assert.equal(storage.activeJob, undefined);
   assert.equal(calls.createdTabs.length, 0);
   assert.equal(calls.updatedTabs.length, 0);
@@ -173,12 +174,40 @@ test("incomplete assigned vehicle moves to Needs Review and polls the next job w
   assert.equal(audit.some((entry) => entry.event === "AUTO_START_SKIPPED_INCOMPLETE"), true);
 });
 
+test("claimed active jobs can be restored when activeJob storage is lost", async () => {
+  const payload = { fill: {}, images: [] };
+  const { handlers, storage } = createHarness(payload, {
+    jobs: [
+      {
+        id: 301,
+        vehicleId: 601,
+        status: "Publishing",
+        claimedByExtension: "ext-e2e",
+        vehicleLabel: "2024 RESTORE TEST",
+      },
+      {
+        id: 302,
+        vehicleId: 602,
+        status: "Needs Review",
+        claimedByExtension: "ext-e2e",
+        vehicleLabel: "2024 TERMINAL TEST",
+      },
+    ],
+  });
+
+  const result = await handlers.RESTORE_ACTIVE_JOB();
+
+  assert.equal(result.job.id, 301);
+  assert.equal(storage.activeJob.id, 301);
+  assert.equal(storage.lastClaimedJob.restoredAt != null, true);
+});
+
 test("assigned queue poll uses the Chrome runtime id while claiming with storage id", async () => {
   const payload = {
     fill: {
       year: 2020,
       make: "Toyota",
-      model: "",
+      model: "Camry",
       mileage: 75000,
       bodyStyle: "SUV",
       exteriorColor: "White",

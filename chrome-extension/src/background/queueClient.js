@@ -364,7 +364,34 @@ const handlers = {
       return { skipped: true, reason: "wrong_mode", jobId: message.jobId };
     }
 
-    // Record that we are attempting to claim this job
+    // Preflight before claiming/opening Facebook. Incomplete vehicles must not
+    // become orphaned in Publishing if the service worker restarts mid-claim.
+    let payload;
+    try {
+      payload = await apiGet(`/api/publishing/jobs/${message.jobId}/payload`);
+    } catch (err) {
+      const reason = `Marketplace preflight could not load vehicle data: ${err instanceof Error ? err.message : String(err)}`;
+      await apiPost(`/api/publishing/jobs/${message.jobId}/needs-review`, { reason });
+      await chrome.storage.local.remove("activeJob");
+      await logAudit("AUTO_START_SKIPPED_PREFLIGHT", { jobId: message.jobId, reason });
+      return handlers.POLL_ASSIGNED_JOB();
+    }
+
+    const missingFields = findMissingMarketplaceFields(payload);
+    if (missingFields.length > 0) {
+      const reason = `Missing required Marketplace data: ${missingFields.join(", ")}`;
+      await apiPost(`/api/publishing/jobs/${message.jobId}/needs-review`, { reason });
+      await chrome.storage.local.remove("activeJob");
+      await logAudit("AUTO_START_SKIPPED_INCOMPLETE", {
+        jobId: message.jobId,
+        vehicleId: payload?.vehicleId || null,
+        missingFields,
+        reason,
+      });
+      return handlers.POLL_ASSIGNED_JOB();
+    }
+
+    // Record that we are attempting to claim this job only after preflight passes.
     await chrome.storage.local.set({
       lastClaimAttempt: { jobId: message.jobId, at: now },
     });
@@ -384,7 +411,6 @@ const handlers = {
     }
 
     await chrome.storage.local.set({
-      activeJob: job,
       lastClaimedJob: {
         id: job.id,
         title: job.listingTitle || job.vehicleLabel || `Job #${job.id}`,
@@ -397,33 +423,6 @@ const handlers = {
       event: "job_claimed",
       extensionId,
     });
-
-    // Preflight before opening Facebook. Incomplete vehicles must not block
-    // later jobs in the publishing queue.
-    let payload;
-    try {
-      payload = await apiGet(`/api/publishing/jobs/${job.id}/payload`);
-    } catch (err) {
-      const reason = `Marketplace preflight could not load vehicle data: ${err instanceof Error ? err.message : String(err)}`;
-      await apiPost(`/api/publishing/jobs/${job.id}/needs-review`, { reason });
-      await chrome.storage.local.remove("activeJob");
-      await logAudit("AUTO_START_SKIPPED_PREFLIGHT", { jobId: job.id, reason });
-      return handlers.POLL_ASSIGNED_JOB();
-    }
-
-    const missingFields = findMissingMarketplaceFields(payload);
-    if (missingFields.length > 0) {
-      const reason = `Missing required Marketplace data: ${missingFields.join(", ")}`;
-      await apiPost(`/api/publishing/jobs/${job.id}/needs-review`, { reason });
-      await chrome.storage.local.remove("activeJob");
-      await logAudit("AUTO_START_SKIPPED_INCOMPLETE", {
-        jobId: job.id,
-        vehicleId: job.vehicleId || null,
-        missingFields,
-        reason,
-      });
-      return handlers.POLL_ASSIGNED_JOB();
-    }
 
     await chrome.storage.local.set({ activeJob: { ...job, _prefetchedPayload: payload } });
 
@@ -698,6 +697,42 @@ const handlers = {
   // activeJob is still active on the backend (not stale/terminal/cancelled).
   async VALIDATE_JOB(message) {
     return apiGet(`/api/publishing/jobs/${message.jobId}/progress`);
+  },
+
+  async RESTORE_ACTIVE_JOB() {
+    const extensionId = await getExtensionId();
+    const data = await apiGet("/api/publishing/jobs");
+    const activeStatuses = new Set([
+      "Publishing",
+      "Opening Facebook",
+      "Filling Form",
+      "Auto Publishing",
+      "Downloading Photos",
+      "Uploading Photos",
+      "Waiting For Thumbnails",
+      "Ready for Review",
+    ]);
+    const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
+    const job = jobs
+      .filter((candidate) =>
+        activeStatuses.has(candidate.status) &&
+        candidate.claimedByExtension === extensionId,
+      )
+      .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0];
+
+    if (!job) return { job: null };
+
+    await chrome.storage.local.set({
+      activeJob: job,
+      lastClaimedJob: {
+        id: job.id,
+        title: job.listingTitle || job.vehicleLabel || `Job #${job.id}`,
+        claimedAt: new Date().toISOString(),
+        restoredAt: new Date().toISOString(),
+      },
+    });
+    await logAudit("ACTIVE_JOB_RESTORED", { jobId: job.id, extensionId });
+    return { job };
   },
 
   // ---- Emergency kill switch ----

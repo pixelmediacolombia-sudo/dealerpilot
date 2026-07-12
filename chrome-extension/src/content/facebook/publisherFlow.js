@@ -3204,6 +3204,17 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         );
         setTimeout(() => runPublishingFlow(activeJob), 1200);
       } else {
+        const restoreRes = await send({ type: "RESTORE_ACTIVE_JOB" }).catch(() => null);
+        const restoredJob = restoreRes?.ok && restoreRes.data?.job ? restoreRes.data.job : null;
+        if (restoredJob) {
+          console.log(`[DealerPilot AI] [AUDIT] restored activeJob #${restoredJob.id} — auto-starting flow`);
+          actionsEl.appendChild(
+            button("Fill Marketplace Fields", () => runPublishingFlow(restoredJob)),
+          );
+          setTimeout(() => runPublishingFlow(restoredJob), 1200);
+          return;
+        }
+
         actionsEl.appendChild(
           button("Fill Test Listing", async () => {
             setStatus("Loading test listing…");

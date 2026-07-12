@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.38
+
+**Fixed**
+- Runs Marketplace preflight before claiming jobs so incomplete vehicles cannot get stuck in Publishing.
+- Restores an active claimed job if Chrome loses local activeJob state after a reload/update.
+
+---
+
 ## v1.3.37
 
 **Fixed**
