@@ -663,6 +663,13 @@
     });
   }
 
+  function makeModelTextFieldsAreVisible() {
+    return Boolean(
+      findField(["make", "marca"]) ||
+      findField(["model", "modelo"]),
+    );
+  }
+
   // ---- Page detection (SPA-aware) ----
 
   function detectPageState() {
@@ -1319,10 +1326,21 @@
 
       // ---- Post-selection wait ----
       if (afterWait === "generic") {
-        stateLog(`Waiting for next combobox after ${label} (generic count wait)`);
-        const appeared = await waitForMoreComboboxes(countBefore, 6000);
-        if (!appeared) {
-          console.log(`[WARN] combobox count did not increase after selecting ${label}`);
+        let skipGenericComboboxWait = false;
+        if (label === "year") {
+          await sleep(500);
+          skipGenericComboboxWait = makeModelTextFieldsAreVisible();
+          if (skipGenericComboboxWait) {
+            stateLog("Skipping next-combobox wait after year because make/model text fields are already visible");
+          }
+        }
+
+        if (!skipGenericComboboxWait) {
+          stateLog(`Waiting for next combobox after ${label} (generic count wait)`);
+          const appeared = await waitForMoreComboboxes(countBefore, 6000);
+          if (!appeared) {
+            console.log(`[WARN] combobox count did not increase after selecting ${label}`);
+          }
         }
       } else if (afterWait && typeof afterWait === "object" && afterWait.keywords) {
         console.log(`[STEP] Waiting for "${afterWait.label}" combobox after ${label}…`);

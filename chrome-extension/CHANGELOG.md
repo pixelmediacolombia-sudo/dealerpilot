@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.39
+
+**Fixed**
+- Continues after selecting Year when Facebook renders Make/Model as text fields instead of new comboboxes.
+
+---
+
 ## v1.3.38
 
 **Fixed**

@@ -37,6 +37,13 @@ test("Make can fall back to a text input instead of requiring a combobox", () =>
   assert.match(content, /"make"[\s\S]*\["make", "marca"\][\s\S]*\["make", "marca"\]/);
 });
 
+test("Year selection continues when Facebook renders make/model as text fields", () => {
+  assert.match(content, /function makeModelTextFieldsAreVisible\(\)/);
+  assert.match(content, /findField\(\["make", "marca"\]\)/);
+  assert.match(content, /findField\(\["model", "modelo"\]\)/);
+  assert.match(content, /Skipping next-combobox wait after year because make\/model text fields are already visible/);
+});
+
 test("Auto publish can click localized Next and Publish buttons", () => {
   assert.match(content, /"siguiente"/);
   assert.match(content, /"continuar"/);
