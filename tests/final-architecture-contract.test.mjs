@@ -56,6 +56,8 @@ test("publishing application guardrails keep Alpha Flow safe", () => {
   assert.match(controlledMode, /"Ready for Review"/);
   assert.match(controlledMode, /"Auto Publishing"/);
   assert.match(staleCleaner, /IN_FLIGHT_PUBLISHING_JOB_STATUSES/);
+  assert.match(staleCleaner, /REVIEW_STALE_STATUSES = new Set<string>\(\["Auto Publishing"\]\)/);
+  assert.match(staleCleaner, /status: "Needs Review"/);
 });
 
 test("publishing queue and completion contracts are idempotent and extension-owned", () => {

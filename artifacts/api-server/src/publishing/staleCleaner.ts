@@ -5,11 +5,13 @@ import {
   IN_FLIGHT_PUBLISHING_JOB_STATUSES,
   QUEUED_PUBLISHING_JOB_STATUSES,
 } from "./controlledMode";
+import { reconcileBatchProgress } from "../features/publishing/infrastructure/publishingRepository";
 
 // ── In-flight stale jobs (extension crashed mid-fill) ────────────────────────
 // Jobs stuck in an active extension status for > 30 min → Retry or Failed.
 const ACTIVE_STALE_MS = 30 * 60 * 1000; // 30 minutes
 const MAX_ATTEMPTS = 3;
+const REVIEW_STALE_STATUSES = new Set<string>(["Auto Publishing"]);
 
 // ── Queued/Scheduled stale jobs (extension offline, never claimed) ────────────
 // Jobs sitting in Queued or Scheduled for > 4 hours without being claimed
@@ -26,7 +28,12 @@ export function startStaleJobCleaner(logger: Logger): void {
     // ── 1. Active-status stale jobs (extension crashed) ──────────────────────
     const activeCutoff = new Date(now - ACTIVE_STALE_MS);
     const activeStale = await db
-      .select({ id: publishingJobsTable.id, attempts: publishingJobsTable.attempts })
+      .select({
+        id: publishingJobsTable.id,
+        attempts: publishingJobsTable.attempts,
+        batchId: publishingJobsTable.batchId,
+        status: publishingJobsTable.status,
+      })
       .from(publishingJobsTable)
       .where(
         and(
@@ -38,8 +45,26 @@ export function startStaleJobCleaner(logger: Logger): void {
     if (activeStale.length > 0) {
       logger.warn({ count: activeStale.length, cutoff: activeCutoff }, "Stale in-flight jobs — transitioning");
       for (const job of activeStale) {
+        if (REVIEW_STALE_STATUSES.has(job.status)) {
+          const [updated] = await db
+            .update(publishingJobsTable)
+            .set({
+              status: "Needs Review",
+              needsReview: true,
+              reviewReason: "Auto-expired during auto-publish confirmation. Verify Facebook before marking live.",
+              failedReason: "Auto-expired during Auto Publishing without Marketplace listing URL confirmation",
+              claimedByExtension: null,
+              assignedExtensionId: null,
+              assignedAt: null,
+            })
+            .where(eq(publishingJobsTable.id, job.id))
+            .returning({ batchId: publishingJobsTable.batchId });
+          await reconcileBatchProgress(updated?.batchId ?? job.batchId);
+          continue;
+        }
+
         const nextStatus = job.attempts >= MAX_ATTEMPTS ? "Failed" : "Retry";
-        await db
+        const [updated] = await db
           .update(publishingJobsTable)
           .set({
             status: nextStatus,
@@ -48,7 +73,11 @@ export function startStaleJobCleaner(logger: Logger): void {
             assignedExtensionId: null,
             assignedAt: null,
           })
-          .where(eq(publishingJobsTable.id, job.id));
+          .where(eq(publishingJobsTable.id, job.id))
+          .returning({ batchId: publishingJobsTable.batchId });
+        if (nextStatus === "Failed") {
+          await reconcileBatchProgress(updated?.batchId ?? job.batchId);
+        }
       }
       logger.warn({ jobIds: activeStale.map((j) => j.id) }, "In-flight stale jobs transitioned");
     }
