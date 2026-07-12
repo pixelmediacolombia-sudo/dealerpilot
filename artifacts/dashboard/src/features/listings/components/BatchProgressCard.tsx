@@ -74,7 +74,7 @@ function BatchStatusIcon({ status }: { status: string }) {
 }
 
 interface BatchCardProps {
-  batch: PublishingBatch;
+  batch: PublishingBatch & { progressPercent?: number; currentStep?: string | null };
   onCancel: (id: number) => void;
   onDismiss: (id: number) => void;
   isMutating: boolean;
@@ -82,8 +82,12 @@ interface BatchCardProps {
 
 function BatchCard({ batch, onCancel, onDismiss, isMutating }: BatchCardProps) {
   const doneCount = batch.completedCount + batch.failedCount + batch.skippedCount;
-  const progress =
+  const terminalProgress =
     batch.totalVehicles > 0 ? Math.round((doneCount / batch.totalVehicles) * 100) : 0;
+  const liveVehicleProgress = Math.max(0, Math.min(100, batch.progressPercent ?? 0));
+  const progress = batch.totalVehicles > 0
+    ? Math.max(terminalProgress, Math.round(((doneCount * 100) + liveVehicleProgress) / batch.totalVehicles))
+    : 0;
 
   const scheduledTime = batch.scheduledAt
     ? new Date(batch.scheduledAt).toLocaleString(undefined, {
@@ -191,6 +195,9 @@ function BatchCard({ batch, onCancel, onDismiss, isMutating }: BatchCardProps) {
           />
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {batch.currentStep && !isDone && (
+            <span className="truncate max-w-[55%]">{batch.currentStep}</span>
+          )}
           {batch.completedCount > 0 && (
             <span className="flex items-center gap-1 text-success">
               <CheckCircle2 className="w-3 h-3" />

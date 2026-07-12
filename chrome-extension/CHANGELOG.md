@@ -1,5 +1,16 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.32
+
+**Fixed**
+- Dashboard connection telemetry refreshes while Facebook is open, without a manual page reload.
+- Publishing batches show live job progress and the current Marketplace step.
+- Body style is required and truck/pickup inventory values map to Spanish Facebook options.
+- Full-auto reports form completion and an enabled Next button before continuing automatically.
+- Successful completion wakes the same sequential queue flow for the next eligible vehicle.
+
+---
+
 ## v1.3.31
 
 **Fixed**

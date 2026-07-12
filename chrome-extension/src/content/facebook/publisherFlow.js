@@ -1148,7 +1148,7 @@
       const BODY_STYLE_MAP = {
         "suv": ["suv", "sport utility", "sport-utility", "utilitario deportivo"],
         "sedan": ["sedan", "saloon", "sedan"],
-        "truck": ["truck", "pickup", "pick-up", "pick up", "camioneta", "camion", "camioneta pickup"],
+        "truck": ["truck", "pickup", "pick-up", "pick up", "pickup truck", "camioneta", "camion", "camioneta pickup", "camioneta tipo pickup"],
         "coupe": ["coupe", "2-door", "2door", "cupe"],
         "hatchback": ["hatchback", "hatch", "5-door", "compacto"],
         "van": ["van", "minivan", "mini-van", "furgoneta", "minivan"],
@@ -1978,7 +1978,7 @@
           ["body style", "vehicle style", "body type", "style", "carrocería", "carroceria"],
           bodyStyleValue,
           null,
-          false,
+          true,
         );
         if (!bsOk && !missed.includes("body style")) {
           missed.push("body style");
@@ -2087,6 +2087,12 @@
 
       checkBudget("workflow complete");
       stateLog(`Workflow Complete — ${elapsed()}s elapsed`);
+      await send({
+        type: "SEND_JOB_EVENT",
+        jobId: job.id,
+        event: "form_complete",
+        details: "All Marketplace fields filled",
+      }).catch(() => { });
 
     } catch (err) {
       stateError("Unexpected error in publishing workflow", err);
@@ -2539,6 +2545,8 @@
       }
       return;
     }
+
+    await send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "next_enabled" }).catch(() => { });
 
     setStatus("Auto-publishing — clicking Next…");
     const nextClicked = await clickEnabledButtonByText(["next", "continue", "next step", "siguiente", "continuar"], 10000);

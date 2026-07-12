@@ -3358,6 +3358,8 @@ components:
         failedCount: { type: integer }
         skippedCount: { type: integer }
         needsReviewCount: { type: integer }
+        progressPercent: { type: integer, minimum: 0, maximum: 100 }
+        currentStep: { type: ["string", "null"] }
         scheduledAt: { type: ["string", "null"] }
         startedAt: { type: ["string", "null"] }
         completedAt: { type: ["string", "null"] }

@@ -131,3 +131,17 @@ test("Successful publish wakes the queue for the next eligible job", () => {
   assert.match(content, /Checking the queue for the next eligible job/);
   assert.match(content, /Claiming the next eligible job/);
 });
+
+test("Body style is required and truck inventory values map to Spanish Marketplace options", () => {
+  assert.match(content, /"truck": \[[^\]]*"pickup truck"[^\]]*"camioneta tipo pickup"/);
+  assert.match(content, /"body style"[\s\S]*bodyStyleValue[\s\S]*null,[\s\S]*true,/);
+});
+
+test("Form completion and enabled Next are reported before auto-clicking", () => {
+  const formComplete = content.indexOf('event: "form_complete"');
+  const nextEnabled = content.indexOf('event: "next_enabled"');
+  const nextClick = content.indexOf('event: "next_clicked"');
+  assert.ok(formComplete > -1, "form_complete progress event is missing");
+  assert.ok(nextEnabled > formComplete, "next_enabled must follow form completion");
+  assert.ok(nextClick > nextEnabled, "Next must only be reported clicked after it was enabled");
+});

@@ -10,6 +10,13 @@ const batchProgressCardSource = readFileSync(
   "utf8",
 );
 
+test("batch list exposes live job progress instead of terminal counts only", () => {
+  assert.match(autoPublishSource, /max\(\$\{publishingJobsTable\.progressPercent\}\)/);
+  assert.match(autoPublishSource, /progressPercent: Number\(row\.progressPercent \?\? 0\)/);
+  assert.match(autoPublishSource, /currentStep: row\.currentStep \?\? null/);
+  assert.match(batchProgressCardSource, /batch\.progressPercent \?\? 0/);
+});
+
 test("publishing next endpoint does not expose queued jobs before scheduledAt", () => {
   assert.match(
     routeSource,

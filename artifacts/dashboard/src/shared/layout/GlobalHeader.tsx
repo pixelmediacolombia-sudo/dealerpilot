@@ -127,7 +127,12 @@ export function GlobalHeader() {
   const dealerId = dealersData?.dealers[0]?.id;
 
   const { data: connData } = useGetConnectionStatus({
-    query: { queryKey: getGetConnectionStatusQueryKey(), refetchInterval: 12000 },
+    query: {
+      queryKey: getGetConnectionStatusQueryKey(),
+      refetchInterval: 5000,
+      refetchIntervalInBackground: true,
+      refetchOnWindowFocus: "always",
+    },
   });
   const { data: feedRunsData } = useListFeedRuns(dealerId ?? 1, {
     query: { queryKey: getListFeedRunsQueryKey(dealerId ?? 1), enabled: true, staleTime: 60000 },

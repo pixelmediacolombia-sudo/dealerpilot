@@ -735,7 +735,36 @@ router.get("/auto-publish/batches", async (req, res) => {
       ),
     )
     .orderBy(desc(publishingBatchesTable.createdAt));
-  res.json({ batches: rows });
+  const batchIds = rows.map((row) => row.id);
+  const liveProgressRows = batchIds.length > 0
+    ? await db
+        .select({
+          batchId: publishingJobsTable.batchId,
+          progressPercent: sql<number>`coalesce(max(${publishingJobsTable.progressPercent}) filter (where ${publishingJobsTable.status} not in ('Published', 'Failed', 'Cancelled', 'Needs Review')), 0)`,
+          currentStep: sql<string | null>`max(${publishingJobsTable.currentStep}) filter (where ${publishingJobsTable.progressPercent} = (
+            select max(inner_job.progress_percent)
+            from publishing_jobs inner_job
+            where inner_job.batch_id = ${publishingJobsTable.batchId}
+              and inner_job.status not in ('Published', 'Failed', 'Cancelled', 'Needs Review')
+          ))`,
+        })
+        .from(publishingJobsTable)
+        .where(inArray(publishingJobsTable.batchId, batchIds))
+        .groupBy(publishingJobsTable.batchId)
+    : [];
+  const liveProgressByBatch = new Map(
+    liveProgressRows.map((row) => [row.batchId, {
+      progressPercent: Number(row.progressPercent ?? 0),
+      currentStep: row.currentStep ?? null,
+    }]),
+  );
+
+  res.json({
+    batches: rows.map((row) => ({
+      ...row,
+      ...liveProgressByBatch.get(row.id),
+    })),
+  });
 });
 
 // GET /auto-publish/batches/:id — batch detail with jobs
