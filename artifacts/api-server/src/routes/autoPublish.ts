@@ -729,6 +729,20 @@ router.get("/auto-publish/batches", async (req, res) => {
     )
     .orderBy(desc(publishingBatchesTable.createdAt));
   const batchIds = rows.map((row) => row.id);
+  const terminalCountRows = batchIds.length > 0
+    ? await db
+        .select({
+          batchId: publishingJobsTable.batchId,
+          totalVehicles: sql<number>`count(*)`,
+          completedCount: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Published')`,
+          failedCount: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Failed')`,
+          skippedCount: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Skipped')`,
+          needsReviewCount: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Needs Review')`,
+        })
+        .from(publishingJobsTable)
+        .where(inArray(publishingJobsTable.batchId, batchIds))
+        .groupBy(publishingJobsTable.batchId)
+    : [];
   const liveProgressRows = batchIds.length > 0
     ? await db
         .select({
@@ -745,6 +759,15 @@ router.get("/auto-publish/batches", async (req, res) => {
         .where(inArray(publishingJobsTable.batchId, batchIds))
         .groupBy(publishingJobsTable.batchId)
     : [];
+  const terminalCountsByBatch = new Map(
+    terminalCountRows.map((row) => [row.batchId, {
+      totalVehicles: Number(row.totalVehicles ?? 0),
+      completedCount: Number(row.completedCount ?? 0),
+      failedCount: Number(row.failedCount ?? 0),
+      skippedCount: Number(row.skippedCount ?? 0),
+      needsReviewCount: Number(row.needsReviewCount ?? 0),
+    }]),
+  );
   const liveProgressByBatch = new Map(
     liveProgressRows.map((row) => [row.batchId, {
       progressPercent: Number(row.progressPercent ?? 0),
@@ -753,10 +776,22 @@ router.get("/auto-publish/batches", async (req, res) => {
   );
 
   res.json({
-    batches: rows.map((row) => ({
-      ...row,
-      ...liveProgressByBatch.get(row.id),
-    })),
+    batches: rows.map((row) => {
+      const terminalCounts = terminalCountsByBatch.get(row.id);
+      return {
+        ...row,
+        ...(terminalCounts
+          ? {
+              totalVehicles: terminalCounts.totalVehicles || row.totalVehicles,
+              completedCount: terminalCounts.completedCount,
+              failedCount: terminalCounts.failedCount,
+              skippedCount: terminalCounts.skippedCount,
+              needsReviewCount: terminalCounts.needsReviewCount,
+            }
+          : {}),
+        ...liveProgressByBatch.get(row.id),
+      };
+    }),
   });
 });
 

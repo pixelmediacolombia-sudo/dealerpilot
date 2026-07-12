@@ -92,6 +92,13 @@ test("dashboard batch progress counts Needs Review jobs as terminal", () => {
   assert.match(batchProgressCardSource, /batch\.needsReviewCount > 0/);
 });
 
+test("batch list derives terminal counters from jobs instead of stale batch columns", () => {
+  assert.match(autoPublishSource, /terminalCountRows[\s\S]*from\(publishingJobsTable\)/);
+  assert.match(autoPublishSource, /needsReviewCount:\s*sql<number>`count\(\*\) filter \(where \$\{publishingJobsTable\.status\} = 'Needs Review'\)`/);
+  assert.match(autoPublishSource, /completedCount:\s*terminalCounts\.completedCount/);
+  assert.match(autoPublishSource, /needsReviewCount:\s*terminalCounts\.needsReviewCount/);
+});
+
 test("enabling a fully automatic plan kicks the publishing worker without Schedule Batch", () => {
   assert.match(
     autoPublishSource,
