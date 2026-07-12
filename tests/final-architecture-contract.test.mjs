@@ -104,13 +104,16 @@ test("backend-extension sacred endpoints are centralized and shape-compatible", 
   assert.match(extensionQueueClient, /DealerPilotApiClient\.sendSessionReport\(\{/);
   assert.match(extensionRoute, /const HeartbeatBody = z\.object\(\{/);
   assert.match(extensionRoute, /const SessionReportBody = z\.object\(\{/);
+  assert.match(extensionRoute, /router\.post\("\/extension\/session-report"[\s\S]*status: "online"/);
+  assert.match(extensionRoute, /router\.post\("\/extension\/session-report"[\s\S]*lastHeartbeatAt: new Date\(\)/);
+  assert.match(extensionRoute, /router\.post\("\/extension\/session-report"[\s\S]*await saveChromeExtensionId\(row\.id, extensionId\)/);
 });
 
 test("extension heartbeat falls back to open Facebook tabs for Marketplace connection", () => {
   assert.match(extensionQueueClient, /async function detectFacebookTabState\(\)/);
   assert.match(extensionQueueClient, /chrome\.tabs\.query\(\{/);
   assert.match(extensionQueueClient, /"https:\/\/www\.facebook\.com\/\*"/);
-  assert.match(extensionQueueClient, /path\.startsWith\("\/marketplace\/create"\)/);
+  assert.match(extensionQueueClient, /const marketplaceDetected = path\.includes\("\/marketplace"\)/);
   assert.match(extensionQueueClient, /const detected = await detectFacebookTabState\(\)/);
   assert.match(extensionQueueClient, /fbLoggedIn: resolvedFbLoggedIn/);
   assert.match(extensionQueueClient, /marketplaceConnected: resolvedMarketplaceConnected/);

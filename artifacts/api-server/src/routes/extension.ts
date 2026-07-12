@@ -262,18 +262,24 @@ router.post("/extension/session-report", async (req, res) => {
     res.status(400).json({ error: "Invalid session report" });
     return;
   }
-  const { fbLoggedIn, marketplaceConnected } = parsed.data;
+  const { extensionId, fbLoggedIn, marketplaceConnected } = parsed.data;
 
   const row = await upsertExtRow({
+    status: "online",
+    lastHeartbeatAt: new Date(),
     fbLoggedIn,
     marketplaceConnected,
     connectRequestedAt: null, // clear the request
     connectAction: null,
   });
+  await saveChromeExtensionId(row.id, extensionId);
 
   req.log.info({ fbLoggedIn, marketplaceConnected }, "Extension session report saved");
   res.json({
     ok: true,
+    extensionId: extensionId ?? (await getChromeExtensionId(row.id)),
+    status: row.status,
+    lastHeartbeatAt: row.lastHeartbeatAt ? row.lastHeartbeatAt.toISOString() : null,
     fbLoggedIn: row.fbLoggedIn ?? null,
     marketplaceConnected: row.marketplaceConnected ?? null,
   });
