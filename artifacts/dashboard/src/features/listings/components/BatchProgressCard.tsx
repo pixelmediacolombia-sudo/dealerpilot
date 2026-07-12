@@ -239,7 +239,6 @@ interface BatchProgressCardProps {
 export function BatchProgressCard({ dealerId, refreshKey, location }: BatchProgressCardProps) {
   const qc = useQueryClient();
   const [confirmCancel, setConfirmCancel] = useState<number | null>(null);
-  const [dismissed, setDismissed] = useState<Set<number>>(new Set());
 
   const { data, isLoading } = useListPublishingBatches(
     { dealerId, location },
@@ -261,26 +260,36 @@ export function BatchProgressCard({ dealerId, refreshKey, location }: BatchProgr
     },
   });
 
+  const dismissBatch = useUpdatePublishingBatch({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListPublishingBatchesQueryKey({ dealerId, location }) });
+        toast({ title: "Batch removed", description: "Batch hidden from the dashboard view." });
+      },
+      onError: () => toast({ title: "Error", description: "Failed to remove batch from view", variant: "destructive" }),
+    },
+  });
+
   const handleCancel = (id: number) => setConfirmCancel(id);
 
   const handleDismiss = (id: number) => {
-    setDismissed((prev) => new Set([...prev, id]));
+    dismissBatch.mutate({ id, data: { status: "Dismissed" } });
   };
 
   const handleClearCompleted = () => {
-    const completedIds = batches.filter((b) => b.status === "Completed").map((b) => b.id);
-    setDismissed((prev) => new Set([...prev, ...completedIds]));
+    batches
+      .filter((b) => b.status === "Completed")
+      .forEach((b) => dismissBatch.mutate({ id: b.id, data: { status: "Dismissed" } }));
   };
 
   const handleClearFailed = () => {
-    const failedIds = batches
+    batches
       .filter((b) => b.status === "Failed")
-      .map((b) => b.id);
-    setDismissed((prev) => new Set([...prev, ...failedIds]));
+      .forEach((b) => dismissBatch.mutate({ id: b.id, data: { status: "Dismissed" } }));
   };
 
   const allBatches = data?.batches ?? [];
-  const batches = allBatches.filter((b) => b.status !== "Cancelled" && !dismissed.has(b.id));
+  const batches = allBatches.filter((b) => b.status !== "Cancelled" && b.status !== "Dismissed");
 
   const activeBatches = batches.filter(
     (b) => b.status === "Active" || b.status === "Preparing" || b.status === "Scheduled",
@@ -353,7 +362,7 @@ export function BatchProgressCard({ dealerId, refreshKey, location }: BatchProgr
               batch={b}
               onCancel={handleCancel}
               onDismiss={handleDismiss}
-              isMutating={updateBatch.isPending}
+              isMutating={updateBatch.isPending || dismissBatch.isPending}
             />
           ))}
         </div>

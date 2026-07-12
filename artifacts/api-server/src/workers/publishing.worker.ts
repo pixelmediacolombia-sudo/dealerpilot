@@ -198,6 +198,7 @@ async function maybeCreateAutomaticBatch(
       and(
         eq(publishingBatchesTable.dealerId, DEALER_ID),
         ne(publishingBatchesTable.status, "Cancelled"),
+        ne(publishingBatchesTable.status, "Dismissed"),
       ),
     )
     .orderBy(desc(publishingBatchesTable.createdAt))

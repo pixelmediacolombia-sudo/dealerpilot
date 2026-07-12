@@ -72,16 +72,22 @@ test("publishing worker also respects scheduledAt for queued jobs", () => {
   );
 });
 
-test("cancelled auto-publish batches are excluded from the operational list", () => {
+test("cancelled and dismissed auto-publish batches are excluded from the operational list", () => {
   assert.match(
     autoPublishSource,
     /GET \/auto-publish\/batches[\s\S]*ne\(publishingBatchesTable\.status,\s*"Cancelled"\)/,
   );
+  assert.match(
+    autoPublishSource,
+    /GET \/auto-publish\/batches[\s\S]*ne\(publishingBatchesTable\.status,\s*"Dismissed"\)/,
+  );
 });
 
-test("dashboard also hides cancelled batches defensively", () => {
-  assert.match(batchProgressCardSource, /b\.status !== "Cancelled" && !dismissed\.has\(b\.id\)/);
+test("dashboard persists removed batches as dismissed", () => {
+  assert.match(batchProgressCardSource, /data: \{ status: "Dismissed" \}/);
+  assert.match(batchProgressCardSource, /b\.status !== "Cancelled" && b\.status !== "Dismissed"/);
   assert.doesNotMatch(batchProgressCardSource, /recentCompleted[\s\S]*b\.status === "Cancelled"/);
+  assert.doesNotMatch(batchProgressCardSource, /useState<Set<number>>/);
 });
 
 test("dashboard batch progress counts Needs Review jobs as terminal", () => {
@@ -110,9 +116,13 @@ test("enabling a fully automatic plan kicks the publishing worker without Schedu
   );
 });
 
-test("cancelled batches do not block the auto-publish frequency gate", () => {
+test("cancelled and dismissed batches do not block the auto-publish frequency gate", () => {
   assert.match(
     workerSource,
     /from\(publishingBatchesTable\)[\s\S]*eq\(publishingBatchesTable\.dealerId,\s*DEALER_ID\)[\s\S]*ne\(publishingBatchesTable\.status,\s*"Cancelled"\)[\s\S]*orderBy\(desc\(publishingBatchesTable\.createdAt\)\)/,
+  );
+  assert.match(
+    workerSource,
+    /from\(publishingBatchesTable\)[\s\S]*eq\(publishingBatchesTable\.dealerId,\s*DEALER_ID\)[\s\S]*ne\(publishingBatchesTable\.status,\s*"Dismissed"\)[\s\S]*orderBy\(desc\(publishingBatchesTable\.createdAt\)\)/,
   );
 });

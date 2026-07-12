@@ -9,7 +9,7 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-// Statuses: Scheduled | Preparing | Active | Paused | Completed | Failed | Cancelled
+// Statuses: Scheduled | Preparing | Active | Paused | Completed | Failed | Cancelled | Dismissed
 export const publishingBatchesTable = pgTable(
   "publishing_batches",
   {

@@ -724,6 +724,7 @@ router.get("/auto-publish/batches", async (req, res) => {
       and(
         eq(publishingBatchesTable.dealerId, dealerId),
         ne(publishingBatchesTable.status, "Cancelled"),
+        ne(publishingBatchesTable.status, "Dismissed"),
         location ? eq(publishingBatchesTable.lotLocation, location) : undefined,
       ),
     )
@@ -1542,7 +1543,7 @@ router.get("/auto-publish/launch-checklist", async (req, res) => {
 
 // PATCH /auto-publish/batches/:id — update batch status
 const PatchBatchBody = z.object({
-  status: z.enum(["Scheduled", "Preparing", "Active", "Paused", "Completed", "Failed", "Cancelled"]).optional(),
+  status: z.enum(["Scheduled", "Preparing", "Active", "Paused", "Completed", "Failed", "Cancelled", "Dismissed"]).optional(),
   startedAt: z.string().optional(),
   completedAt: z.string().optional(),
 });
