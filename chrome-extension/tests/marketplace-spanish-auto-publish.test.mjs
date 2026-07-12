@@ -163,3 +163,9 @@ test("Incomplete vehicles move to review and the queue continues before Facebook
 test("A repeated Facebook form failure is reviewed and wakes the next queue job", () => {
   assert.match(content, /retryCount >= 1[\s\S]*MARK_NEEDS_REVIEW[\s\S]*POLL_NOW/);
 });
+
+test("The next claimed vehicle reloads a clean Marketplace create form", () => {
+  assert.match(queueClient, /chrome\.tabs\.update\(existing\.id, \{[\s\S]*url: MARKETPLACE_CREATE_URL,[\s\S]*active: true/);
+  assert.match(queueClient, /MARKETPLACE_FORM_RELOADED_FOR_JOB/);
+  assert.match(content, /MARK_NEEDS_REVIEW[\s\S]*window\.location\.replace\("https:\/\/www\.facebook\.com\/marketplace\/create\/vehicle"\)[\s\S]*POLL_NOW/);
+});

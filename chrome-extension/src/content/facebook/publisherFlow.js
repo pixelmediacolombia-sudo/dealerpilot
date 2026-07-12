@@ -2493,6 +2493,12 @@
       await send({ type: "MARK_NEEDS_REVIEW", jobId: job.id, reason });
       await chrome.storage.local.remove("activeJob");
       setStatus(`Skipped job #${job.id}: ${reason}. Checking the next vehicle…`, "err");
+      // Background normally reloads this tab as soon as it claims the next job.
+      // Keep a navigation fallback so a transient tab-update failure cannot
+      // leave the rejected Facebook form on screen.
+      setTimeout(() => {
+        window.location.replace("https://www.facebook.com/marketplace/create/vehicle");
+      }, 2000);
       await send({ type: "POLL_NOW" }).catch(() => { });
       return true;
     }

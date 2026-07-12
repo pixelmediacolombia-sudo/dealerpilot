@@ -1,5 +1,14 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.34
+
+**Fixed**
+- Reloads the existing Marketplace create tab after a job moves to Needs Review and the next job is claimed.
+- Clears stale Facebook values and validation errors before filling the next vehicle.
+- Adds a navigation fallback so a failed tab refresh cannot interrupt the automatic queue.
+
+---
+
 ## v1.3.33
 
 **Fixed**

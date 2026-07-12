@@ -449,8 +449,19 @@ const handlers = {
     const [existing] = await chrome.tabs.query({ url: MARKETPLACE_CREATE_URL + "*" });
     let tab;
     if (existing && fbLoggedIn) {
-      tab = await chrome.tabs.update(existing.id, { active: true });
+      // Always reset the existing create form for the newly claimed job. Merely
+      // focusing the tab can retain validation errors and values from the job
+      // that was just moved to Needs Review.
+      tab = await chrome.tabs.update(existing.id, {
+        url: MARKETPLACE_CREATE_URL,
+        active: true,
+      });
       await chrome.windows.update(existing.windowId, { focused: true });
+      await logAudit("MARKETPLACE_FORM_RELOADED_FOR_JOB", {
+        jobId: job.id,
+        vehicleId: job.vehicleId || null,
+        tabId: existing.id,
+      });
     } else {
       tab = await chrome.tabs.create({ url: targetUrl, active: true });
     }
