@@ -1,5 +1,14 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.35
+
+**Fixed**
+- Recognizes Facebook's `Your Listings` landing page as proof that the publish action completed.
+- Moves jobs with a missing individual listing URL to Needs Review without showing a false 409 failure.
+- Clears the active loading state and continues automatically with the next queue vehicle.
+
+---
+
 ## v1.3.34
 
 **Fixed**

@@ -717,6 +717,8 @@ router.post("/publishing/jobs/:id/fail", async (req, res) => {
           eq(publishingJobsTable.status, "Publishing"),
           eq(publishingJobsTable.status, "Filling Form"),
           eq(publishingJobsTable.status, "Ready for Review"),
+          eq(publishingJobsTable.status, "Auto Publishing"),
+          eq(publishingJobsTable.status, "Opening Facebook"),
         ),
         eq(publishingJobsTable.claimedByExtension, extensionId),
       ),

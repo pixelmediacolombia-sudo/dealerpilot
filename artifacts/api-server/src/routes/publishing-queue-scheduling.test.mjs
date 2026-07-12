@@ -17,6 +17,11 @@ test("batch list exposes live job progress instead of terminal counts only", () 
   assert.match(batchProgressCardSource, /batch\.progressPercent \?\? 0/);
 });
 
+test("failure sync accepts active auto-publishing states instead of returning 409", () => {
+  assert.match(routeSource, /eq\(publishingJobsTable\.status, "Auto Publishing"\)/);
+  assert.match(routeSource, /eq\(publishingJobsTable\.status, "Opening Facebook"\)/);
+});
+
 test("publishing next endpoint does not expose queued jobs before scheduledAt", () => {
   assert.match(
     routeSource,

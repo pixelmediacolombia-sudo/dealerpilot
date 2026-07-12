@@ -2583,19 +2583,36 @@
     const publishOutcome = await clickPublishUntilListingUrl(job);
     const listingUrl = publishOutcome.listingUrl;
     if (!listingUrl) {
+      if (publishOutcome.publishedLanding) {
+        const reason = "Facebook accepted the publish and opened Your Listings, but the individual listing URL was not available.";
+        stateLog("Auto-publish: Facebook selling page confirmed; URL pending review");
+        await send({ type: "MARK_NEEDS_REVIEW", jobId: job.id, reason });
+        await chrome.storage.local.remove("activeJob");
+        setStatus("✓ Published on Facebook. URL pending review; continuing with the next vehicle.", "ok");
+        clearOutput();
+        jobBoxEl.innerHTML = `
+          <div class="mai-job">
+            <div class="mai-job-title">Published on Facebook ✓</div>
+            <div class="mai-job-meta">Job #${escapeHtml(String(job.id))} moved to Needs Review only because Facebook did not expose its individual URL.</div>
+            <div class="mai-job-meta">Loading the next eligible vehicle…</div>
+          </div>`;
+        await send({ type: "POLL_NOW" }).catch(() => { });
+        return;
+      }
       const reason = publishOutcome.blockReason
         ? `Facebook blocked publishing: ${publishOutcome.blockReason}`
         : "Publish was clicked, but DealerPilot could not confirm a live Marketplace listing URL. " +
         "Facebook may require one more Publish click or manual review.";
       stateError("Auto-publish: live listing not confirmed", new Error(reason));
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => { });
-      const failResult = await send({ type: "FAIL_JOB", jobId: job.id, reason });
+      const failResult = await send({ type: "MARK_NEEDS_REVIEW", jobId: job.id, reason });
       await chrome.storage.local.remove("activeJob");
       if (!failResult || !failResult.ok) {
-        setStatus("Auto-publish failed and backend fail-sync failed: " + (failResult && failResult.error), "err");
+        setStatus("Could not record review state: " + (failResult && failResult.error), "err");
       } else {
-        setStatus(reason, "err");
+        setStatus(reason + " Continuing with the next vehicle.", "err");
       }
+      await send({ type: "POLL_NOW" }).catch(() => { });
       return;
     }
 
@@ -2647,7 +2664,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         ? "Auto-publishing - clicking Publish..."
         : "Auto-publishing - confirming final Publish...");
       const clicked = await clickButtonByText(publishTexts, attempt === 1 ? 15000 : 7000);
-      if (!clicked) return null;
+      if (!clicked) {
+        return { listingUrl: null, blockReason: "Publish button was not available.", publishedLanding: false };
+      }
 
       stateLog(`Auto-publish: Publish click ${attempt}, waiting for Marketplace confirmation...`);
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "publish_clicked" }).catch(() => { });
@@ -2661,7 +2680,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       // Publish/Post button. Try once more only when that button is still visible.
       if (!findEnabledButtonByText(publishTexts)) return outcome;
     }
-    return { listingUrl: null, blockReason: null };
+    return { listingUrl: null, blockReason: null, publishedLanding: false };
   }
 
   function findEnabledButtonByText(textOptions) {
@@ -2991,23 +3010,29 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     while (Date.now() - start < timeoutMs) {
       const cur = window.location.href;
       if (cur !== startUrl && cur.includes("/marketplace/item/")) {
-        return { listingUrl: cur, blockReason: null };
+        return { listingUrl: cur, blockReason: null, publishedLanding: false };
+      }
+      if (cur !== startUrl && cur.includes("/marketplace/you/selling")) {
+        return { listingUrl: null, blockReason: null, publishedLanding: true };
       }
       const successEl =
         document.querySelector('[aria-label*="listed" i]') ||
         document.querySelector('[data-testid*="success" i]');
       if (successEl && window.location.href.includes("/marketplace/item/")) {
-        return { listingUrl: window.location.href, blockReason: null };
+        return { listingUrl: window.location.href, blockReason: null, publishedLanding: false };
       }
       const blockReason = detectMarketplacePublishBlock();
-      if (blockReason) return { listingUrl: null, blockReason };
+      if (blockReason) return { listingUrl: null, blockReason, publishedLanding: false };
       await sleep(500);
     }
     const final = window.location.href;
     if (final !== startUrl && final.includes("/marketplace/item/")) {
-      return { listingUrl: final, blockReason: null };
+      return { listingUrl: final, blockReason: null, publishedLanding: false };
     }
-    return { listingUrl: null, blockReason: detectMarketplacePublishBlock() };
+    if (final !== startUrl && final.includes("/marketplace/you/selling")) {
+      return { listingUrl: null, blockReason: null, publishedLanding: true };
+    }
+    return { listingUrl: null, blockReason: detectMarketplacePublishBlock(), publishedLanding: false };
   }
 
   function chips(items, cls) {
