@@ -3025,10 +3025,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     const anchors = Array.from(document.querySelectorAll('a[href*="/marketplace/item/"]'));
     if (anchors.length === 0) return null;
 
-    const expectedLabel = normalizeText(job?.vehicleLabel || job?.listingTitle || "");
-    const expectedTokens = expectedLabel
-      ? expectedLabel.split(/\s+/).filter((token) => token.length >= 3)
-      : [];
+    const expectedTokens = expectedMarketplaceListingTokens(job);
 
     for (const anchor of anchors) {
       const href = anchor.href;
@@ -3039,15 +3036,38 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           anchor.closest('[role="button"], [role="article"], div')?.innerText || "",
         ].join(" "),
       );
-      if (
-        expectedTokens.length === 0 ||
-        expectedTokens.every((token) => text.includes(token))
-      ) {
+      if (marketplaceTextMatchesExpectedListing(text, expectedTokens)) {
         return href;
       }
     }
 
-    return anchors[0]?.href || null;
+    return null;
+  }
+
+  function expectedMarketplaceListingTokens(job) {
+    const fallbackVehicleLabel = [
+      job?.year,
+      job?.make,
+      job?.model,
+    ].filter(Boolean).join(" ");
+    const expectedLabel = normalizeText(
+      job?.vehicleLabel || job?.listingTitle || job?.title || fallbackVehicleLabel,
+    );
+    return expectedLabel
+      ? expectedLabel.split(/\s+/).filter((token) => token.length >= 3)
+      : [];
+  }
+
+  function marketplaceTextMatchesExpectedListing(text, expectedTokens) {
+    if (expectedTokens.length === 0) return false;
+    const normalized = normalizeText(text);
+    return expectedTokens.every((token) => normalized.includes(token));
+  }
+
+  function currentMarketplaceItemMatchesJob(job) {
+    if (!window.location.href.includes("/marketplace/item/")) return false;
+    const expectedTokens = expectedMarketplaceListingTokens(job);
+    return marketplaceTextMatchesExpectedListing(document.body?.innerText || "", expectedTokens);
   }
 
   async function waitForPublishOutcome(job, timeoutMs) {
@@ -3057,7 +3077,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     while (Date.now() - start < timeoutMs) {
       const cur = window.location.href;
       if (cur !== startUrl && cur.includes("/marketplace/item/")) {
-        return { listingUrl: cur, blockReason: null, publishedLanding: false };
+        if (currentMarketplaceItemMatchesJob(job)) {
+          return { listingUrl: cur, blockReason: null, publishedLanding: false };
+        }
       }
       if (cur !== startUrl && cur.includes("/marketplace/you/selling")) {
         sawSellingLanding = true;
@@ -3076,11 +3098,26 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     }
     const final = window.location.href;
     if (final !== startUrl && final.includes("/marketplace/item/")) {
-      return { listingUrl: final, blockReason: null, publishedLanding: false };
+      if (currentMarketplaceItemMatchesJob(job)) {
+        return { listingUrl: final, blockReason: null, publishedLanding: false };
+      }
+      return {
+        listingUrl: null,
+        blockReason: "Facebook opened a Marketplace item URL that does not match this vehicle.",
+        publishedLanding: false,
+      };
     }
     if (final !== startUrl && final.includes("/marketplace/you/selling")) {
+      const listingUrl = findMarketplaceListingUrlOnPage(job);
+      if (!listingUrl) {
+        return {
+          listingUrl: null,
+          blockReason: "Facebook Your Listings did not expose a Marketplace item URL matching this vehicle.",
+          publishedLanding: false,
+        };
+      }
       return {
-        listingUrl: findMarketplaceListingUrlOnPage(job),
+        listingUrl,
         blockReason: null,
         publishedLanding: true,
       };

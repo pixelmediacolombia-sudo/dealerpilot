@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.41
+
+**Fixed**
+- Only completes a Marketplace publish with a captured item URL when the listing text matches the vehicle being published.
+
+---
+
 ## v1.3.40
 
 **Fixed**
