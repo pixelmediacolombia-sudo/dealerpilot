@@ -200,6 +200,7 @@ function updateFbPills(fbLoggedIn, marketplaceConnected) {
 // ---- Debug panel ----
 function envBadgeClass(env) {
   switch (env) {
+    case "Production": return "env-render";
     case "Render": return "env-render";
     case "Replit": return "env-replit";
     case "Local":  return "env-local";
@@ -209,6 +210,7 @@ function envBadgeClass(env) {
 
 function envBadgeLabel(env) {
   switch (env) {
+    case "Production": return "Production ✓";
     case "Render": return "Render ✓";
     case "Replit": return "Replit (dev)";
     case "Local":  return "Local ⚠";
@@ -242,7 +244,7 @@ async function loadDebugState() {
   dbg.backendUrl.title       = d.backendUrl || "";
 
   dbg.environment.textContent = d.environment || "Unknown";
-  dbg.environment.className   = "value " + (d.environment === "Render" ? "ok" : d.environment === "Replit" ? "" : "warn-text");
+  dbg.environment.className   = "value " + (["Production", "Render"].includes(d.environment) ? "ok" : d.environment === "Replit" ? "" : "warn-text");
 
   el.vEnvBadge.textContent = envBadgeLabel(d.environment);
   el.vEnvBadge.className   = "env-badge " + envBadgeClass(d.environment);

@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.43
+
+**Fixed**
+- Keeps the extension online by refreshing the backend heartbeat from the background polling loop, not only when the popup is opened.
+- Uses `https://1987dealerpilot.com` as the production default backend and labels it as `Production` in the popup.
+
+---
+
 ## v1.3.42
 
 **Fixed**

@@ -1,4 +1,5 @@
-const DEFAULT_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
+const DEFAULT_BACKEND_URL = "https://1987dealerpilot.com";
+const LEGACY_RENDER_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
 const REPLIT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 
 const MARKETPLACE_CREATE_URL = "https://www.facebook.com/marketplace/create/vehicle";
@@ -15,6 +16,7 @@ async function getBackendUrl() {
 // live publish test.
 function detectEnvironment(url) {
   if (!url) return "Unknown";
+  if (/1987dealerpilot\.com/i.test(url)) return "Production";
   if (/onrender\.com/i.test(url)) return "Render";
   if (/replit\.(app|dev)/i.test(url)) return "Replit";
   if (/localhost|127\.0\.0\.1/i.test(url)) return "Local";
@@ -156,50 +158,57 @@ async function detectFacebookTabState() {
   }
 }
 
+async function sendHeartbeatSnapshot() {
+  const base = await getBackendUrl();
+  const detected = await detectFacebookTabState();
+  const { fbLoggedIn, marketplaceConnected } = await chrome.storage.local.get([
+    "fbLoggedIn",
+    "marketplaceConnected",
+  ]);
+  const resolvedFbLoggedIn = detected.fbLoggedIn ?? fbLoggedIn ?? null;
+  const resolvedMarketplaceConnected =
+    detected.marketplaceConnected ?? marketplaceConnected ?? null;
+  const now = new Date().toISOString();
+  const heartbeatUrl = `${base}/api/extension/heartbeat`;
+
+  try {
+    const data = await DealerPilotApiClient.sendHeartbeat({
+      backendUrl: base,
+      status: "online",
+      chromeExtensionId: chrome.runtime.id,
+      fbLoggedIn: resolvedFbLoggedIn,
+      marketplaceConnected: resolvedMarketplaceConnected,
+    });
+    await chrome.storage.local.set({
+      lastHeartbeat: now,
+      lastHeartbeatUrl: heartbeatUrl,
+      lastHeartbeatResponse: { ok: true, status: 200, body: data, at: now },
+    });
+    return { backendUrl: base, environment: detectEnvironment(base), ok: true };
+  } catch (heartbeatErr) {
+    console.warn("[DealerPilot AI] heartbeat failed", heartbeatErr);
+    await chrome.storage.local
+      .set({
+        lastHeartbeatUrl: heartbeatUrl,
+        lastHeartbeatResponse: {
+          ok: false,
+          status: heartbeatErr && heartbeatErr.status ? heartbeatErr.status : null,
+          error: heartbeatErr instanceof Error ? heartbeatErr.message : String(heartbeatErr),
+          at: now,
+        },
+      })
+      .catch(() => {});
+    return { backendUrl: base, environment: detectEnvironment(base), ok: false };
+  }
+}
+
 // ---- Message handlers ----
 
 const handlers = {
   async PING() {
-    const base = await getBackendUrl();
     await apiGet("/api/healthz");
-    const detected = await detectFacebookTabState();
-    const { fbLoggedIn, marketplaceConnected } = await chrome.storage.local.get([
-      "fbLoggedIn",
-      "marketplaceConnected",
-    ]);
-    const resolvedFbLoggedIn = detected.fbLoggedIn ?? fbLoggedIn ?? null;
-    const resolvedMarketplaceConnected =
-      detected.marketplaceConnected ?? marketplaceConnected ?? null;
-    const now = new Date().toISOString();
-    const heartbeatUrl = `${base}/api/extension/heartbeat`;
-    try {
-      const data = await DealerPilotApiClient.sendHeartbeat({
-        backendUrl: base,
-        status: "online",
-        chromeExtensionId: chrome.runtime.id,
-        fbLoggedIn: resolvedFbLoggedIn,
-        marketplaceConnected: resolvedMarketplaceConnected,
-      });
-      await chrome.storage.local.set({
-        lastHeartbeat: now,
-        lastHeartbeatUrl: heartbeatUrl,
-        lastHeartbeatResponse: { ok: true, status: 200, body: data, at: now },
-      });
-    } catch (heartbeatErr) {
-      console.warn("[DealerPilot AI] heartbeat failed", heartbeatErr);
-      await chrome.storage.local
-        .set({
-          lastHeartbeatUrl: heartbeatUrl,
-          lastHeartbeatResponse: {
-            ok: false,
-            status: heartbeatErr && heartbeatErr.status ? heartbeatErr.status : null,
-            error: heartbeatErr instanceof Error ? heartbeatErr.message : String(heartbeatErr),
-            at: now,
-          },
-        })
-        .catch(() => {});
-    }
-    return { backendUrl: base, environment: detectEnvironment(base) };
+    const heartbeat = await sendHeartbeatSnapshot();
+    return { backendUrl: heartbeat.backendUrl, environment: heartbeat.environment };
   },
 
   // ---- Backend URL switching (no rebuild required) ----
@@ -544,6 +553,7 @@ const handlers = {
 
     const now = new Date().toISOString();
     await chrome.storage.local.set({ lastPollTime: now });
+    await sendHeartbeatSnapshot();
 
     const extensionId = chrome.runtime.id || await getExtensionId();
 
@@ -986,9 +996,10 @@ const STATE_KEYS_TO_CLEAR = [
   // Replit URL stored. Upgrade it silently on first startup after this change.
   // The `replitUrlMigrated` flag prevents re-running if the dealer later
   // deliberately re-points to Replit via the popup.
-  const { backendUrl: storedUrl, replitUrlMigrated } = await chrome.storage.local.get([
+  const { backendUrl: storedUrl, replitUrlMigrated, publicDomainUrlMigrated } = await chrome.storage.local.get([
     "backendUrl",
     "replitUrlMigrated",
+    "publicDomainUrlMigrated",
   ]);
   if (!replitUrlMigrated) {
     if (storedUrl === REPLIT_BACKEND_URL) {
@@ -996,6 +1007,13 @@ const STATE_KEYS_TO_CLEAR = [
       console.log(`[DealerPilot AI] URL migration: Replit default → Render (${DEFAULT_BACKEND_URL})`);
     }
     await chrome.storage.local.set({ replitUrlMigrated: true });
+  }
+  if (!publicDomainUrlMigrated) {
+    if (!storedUrl || storedUrl === LEGACY_RENDER_BACKEND_URL) {
+      await chrome.storage.local.set({ backendUrl: DEFAULT_BACKEND_URL });
+      console.log(`[DealerPilot AI] URL migration: legacy Render -> Production (${DEFAULT_BACKEND_URL})`);
+    }
+    await chrome.storage.local.set({ publicDomainUrlMigrated: true });
   }
 })();
 

@@ -10,6 +10,7 @@ function createHarness(payload, options = {}) {
     apiPost: [],
     claims: [],
     createdTabs: [],
+    heartbeats: [],
     updatedTabs: [],
   };
   const storage = { extensionId: "ext-e2e", fbLoggedIn: true };
@@ -99,7 +100,8 @@ function createHarness(payload, options = {}) {
         vehicleLabel: "2020 Test Car",
       };
     },
-    async sendHeartbeat() {
+    async sendHeartbeat(body) {
+      calls.heartbeats.push(body);
       return { ok: true };
     },
     async sendSessionReport() {
@@ -230,6 +232,9 @@ test("assigned queue poll uses the Chrome runtime id while claiming with storage
 
   await handlers.POLL_ASSIGNED_JOB();
 
+  assert.equal(calls.heartbeats.length, 1);
+  assert.equal(calls.heartbeats[0].backendUrl, "https://1987dealerpilot.com");
+  assert.equal(calls.heartbeats[0].chromeExtensionId, "chrome-runtime-e2e");
   assert.ok(
     calls.apiGet.includes("/api/publishing/jobs/assigned?extensionId=chrome-runtime-e2e"),
     "assigned poll should use chrome.runtime.id so it matches backend heartbeat assignment",
