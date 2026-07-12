@@ -637,7 +637,6 @@ router.post("/auto-publish/batches", async (req, res) => {
   }
 
   const ineligible = scored.filter((s) => !s.eligible);
-  const needsReviewCount = ineligible.length;
 
   if (eligible.length === 0) {
     res.status(422).json({
@@ -674,7 +673,10 @@ router.post("/auto-publish/batches", async (req, res) => {
       status: batchTiming.status,
       mode,
       totalVehicles: eligible.length,
-      needsReviewCount,
+      // This counter belongs only to jobs inside this batch. Inventory rows
+      // rejected before batch creation are not batch jobs and must not appear
+      // as "needs review" in its progress card.
+      needsReviewCount: 0,
       startedAt: batchTiming.startedAt,
       scheduledAt: baseTime,
       lotLocation: lotLocation ?? null,

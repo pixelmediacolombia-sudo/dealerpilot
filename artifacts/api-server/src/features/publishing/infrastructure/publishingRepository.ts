@@ -22,7 +22,8 @@ export async function reconcileBatchProgress(batchId: number | null | undefined)
     .select({
       completed: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Published')`,
       failed: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Failed')`,
-      skipped: sql<number>`count(*) filter (where ${publishingJobsTable.status} in ('Cancelled', 'Needs Review'))`,
+      skipped: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Cancelled')`,
+      needsReview: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Needs Review')`,
       total: sql<number>`count(*)`,
     })
     .from(publishingJobsTable)
@@ -38,6 +39,7 @@ export async function reconcileBatchProgress(batchId: number | null | undefined)
     completed: Number(counts?.completed ?? 0),
     failed: Number(counts?.failed ?? 0),
     skipped: Number(counts?.skipped ?? 0),
+    needsReview: Number(counts?.needsReview ?? 0),
     totalVehicles,
   });
 
@@ -48,6 +50,7 @@ export async function reconcileBatchProgress(batchId: number | null | undefined)
       completedCount: progress.completed,
       failedCount: progress.failed,
       skippedCount: progress.skipped,
+      needsReviewCount: progress.needsReview,
       startedAt: new Date(),
       completedAt: progress.isDone ? new Date() : null,
     })

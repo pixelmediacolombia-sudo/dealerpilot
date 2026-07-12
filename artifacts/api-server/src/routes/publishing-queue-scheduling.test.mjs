@@ -22,6 +22,11 @@ test("failure sync accepts active auto-publishing states instead of returning 40
   assert.match(routeSource, /eq\(publishingJobsTable\.status, "Opening Facebook"\)/);
 });
 
+test("batch review counters include only jobs that belong to the batch", () => {
+  assert.match(autoPublishSource, /needsReviewCount: 0/);
+  assert.doesNotMatch(autoPublishSource, /const needsReviewCount = ineligible\.length/);
+});
+
 test("publishing next endpoint does not expose queued jobs before scheduledAt", () => {
   assert.match(
     routeSource,
