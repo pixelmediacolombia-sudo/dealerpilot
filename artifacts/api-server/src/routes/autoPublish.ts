@@ -32,6 +32,7 @@ import {
   sql,
 } from "drizzle-orm";
 import {
+  ACTIVE_PUBLISHING_JOB_STATUSES,
   isExtensionOnline,
   LOT_CITY_MAP,
   resolvePublishMode,
@@ -455,17 +456,7 @@ router.post("/auto-publish/batches", async (req, res) => {
     .where(
       and(
         inArray(publishingJobsTable.vehicleId, vehicleIds),
-        inArray(publishingJobsTable.status, [
-          "Queued",
-          "Retry",
-          "Scheduled",
-          "Assigned",
-          "Claimed",
-          "Publishing",
-          "Opening Facebook",
-          "Filling Form",
-          "Auto Publishing",
-        ]),
+        inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
       ),
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
@@ -1156,17 +1147,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     .where(
       and(
         inArray(publishingJobsTable.vehicleId, vehicleIds),
-        inArray(publishingJobsTable.status, [
-          "Queued",
-          "Retry",
-          "Scheduled",
-          "Assigned",
-          "Claimed",
-          "Publishing",
-          "Opening Facebook",
-          "Filling Form",
-          "Auto Publishing",
-        ]),
+        inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
       ),
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));

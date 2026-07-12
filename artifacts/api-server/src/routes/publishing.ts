@@ -22,6 +22,7 @@ import {
   isFullAutoMode,
   resolvePublishMode,
   LOT_CITY_MAP,
+  ACTIVE_PUBLISHING_JOB_STATUSES,
 } from "../publishing/controlledMode";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 import {
@@ -923,7 +924,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
     .where(
       and(
         inArray(publishingJobsTable.vehicleId, vehicleIds),
-        inArray(publishingJobsTable.status, ["Queued", "Scheduled", "Publishing"]),
+        inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
       ),
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
@@ -1113,11 +1114,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     .where(
       and(
         eq(publishingJobsTable.dealerId, DEALER_ID),
-        inArray(publishingJobsTable.status, [
-          "Queued", "Retry", "Assigned", "Scheduled", "Claimed", "Publishing",
-          "Opening Facebook", "Filling Form", "Auto Publishing",
-          "Downloading Photos", "Uploading Photos", "Waiting For Thumbnails",
-        ]),
+        inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
         lt(publishingJobsTable.createdAt, STALE_THRESHOLD),
       ),
     );
@@ -1129,10 +1126,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     .where(
       and(
         eq(publishingJobsTable.vehicleId, vehicleId),
-        inArray(publishingJobsTable.status, [
-          "Queued", "Scheduled", "Claimed", "Publishing",
-          "Opening Facebook", "Filling Form", "Auto Publishing",
-        ]),
+        inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
       ),
     )
     .limit(1);
@@ -1393,7 +1387,7 @@ router.post("/publishing/jobs/clear-queue", async (req, res) => {
   const cutoff = new Date(Date.now() - olderThanMinutes * 60_000);
 
   const conditions = [
-    inArray(publishingJobsTable.status, ["Queued", "Scheduled", "Retry", "Claimed", "Publishing"]),
+    inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
     lt(publishingJobsTable.createdAt, cutoff),
     eq(publishingJobsTable.dealerId, dealerId),
   ];

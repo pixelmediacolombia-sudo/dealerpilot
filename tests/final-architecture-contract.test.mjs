@@ -9,6 +9,7 @@ const listingScoring = read("artifacts/api-server/src/listings/scoring.ts");
 const publishing = read("artifacts/api-server/src/routes/publishing.ts");
 const controlledMode = read("artifacts/api-server/src/publishing/controlledMode.ts");
 const batchProgress = read("artifacts/api-server/src/publishing/batchProgress.ts");
+const staleCleaner = read("artifacts/api-server/src/publishing/staleCleaner.ts");
 const extensionRoute = read("artifacts/api-server/src/routes/extension.ts");
 const conversations = read("artifacts/api-server/src/routes/conversations.ts");
 const vehicles = read("artifacts/api-server/src/routes/vehicles.ts");
@@ -51,6 +52,10 @@ test("publishing application guardrails keep Alpha Flow safe", () => {
   assert.match(controlledMode, /DUPLICATE_ACTIVE_JOB/);
   assert.match(controlledMode, /DUPLICATE_LISTING_CONFLICT/);
   assert.match(controlledMode, /EXTENSION_OFFLINE/);
+  assert.match(controlledMode, /ACTIVE_PUBLISHING_JOB_STATUSES/);
+  assert.match(controlledMode, /"Ready for Review"/);
+  assert.match(controlledMode, /"Auto Publishing"/);
+  assert.match(staleCleaner, /IN_FLIGHT_PUBLISHING_JOB_STATUSES/);
 });
 
 test("publishing queue and completion contracts are idempotent and extension-owned", () => {
@@ -145,7 +150,7 @@ test("dashboard no longer references moved technical page folders for core featu
 });
 
 test("batch progress application service preserves done and failed states", () => {
-  assert.match(batchProgress, /const terminal = completed \+ failed \+ skipped/);
+  assert.match(batchProgress, /const terminal = completed \+ failed \+ skipped \+ needsReview/);
   assert.match(batchProgress, /const isDone = totalVehicles > 0 && terminal >= totalVehicles/);
   assert.match(batchProgress, /status: isDone \? \(failed > 0 \? "Failed" : "Completed"\) : "Active"/);
 });

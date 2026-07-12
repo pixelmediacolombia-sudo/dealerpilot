@@ -81,7 +81,8 @@ interface BatchCardProps {
 }
 
 function BatchCard({ batch, onCancel, onDismiss, isMutating }: BatchCardProps) {
-  const doneCount = batch.completedCount + batch.failedCount + batch.skippedCount;
+  const doneCount =
+    batch.completedCount + batch.failedCount + batch.skippedCount + batch.needsReviewCount;
   const terminalProgress =
     batch.totalVehicles > 0 ? Math.round((doneCount / batch.totalVehicles) * 100) : 0;
   const liveVehicleProgress = Math.max(0, Math.min(100, batch.progressPercent ?? 0));

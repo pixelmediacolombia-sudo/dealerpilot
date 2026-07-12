@@ -40,25 +40,17 @@ import {
 import { getCachedGmDecision } from "../routes/gm";
 import { getDuplicateConflictVehicleIds } from "./market.worker";
 import type { WorkerDefinition, WorkerRunOutcome } from "./types";
-import { LOT_CITY_MAP, resolvePublishMode } from "../publishing/controlledMode";
+import {
+  ACTIVE_PUBLISHING_JOB_STATUSES,
+  LOT_CITY_MAP,
+  resolvePublishMode,
+} from "../publishing/controlledMode";
 import { getInitialBatchTiming } from "../publishing/batchProgress";
 
 const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const DEALER_ID = 1;
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // heartbeat within last 5 minutes = online
 const MAX_ASSIGNMENTS_PER_RUN = 1;
-const ACTIVE_JOB_STATUSES = [
-  "Queued",
-  "Retry",
-  "Scheduled",
-  "Assigned",
-  "Claimed",
-  "Publishing",
-  "Opening Facebook",
-  "Filling Form",
-  "Auto Publishing",
-] as const;
-
 function newYorkDateKey(date: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/New_York",
@@ -181,7 +173,7 @@ async function maybeCreateAutomaticBatch(
     .where(
       and(
         eq(publishingJobsTable.dealerId, DEALER_ID),
-        inArray(publishingJobsTable.status, [...ACTIVE_JOB_STATUSES]),
+        inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
       ),
     );
   if (activeJobs.length > 0) {

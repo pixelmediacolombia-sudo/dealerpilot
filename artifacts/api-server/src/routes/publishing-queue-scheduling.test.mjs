@@ -67,6 +67,14 @@ test("dashboard also hides cancelled batches defensively", () => {
   assert.doesNotMatch(batchProgressCardSource, /recentCompleted[\s\S]*b\.status === "Cancelled"/);
 });
 
+test("dashboard batch progress counts Needs Review jobs as terminal", () => {
+  assert.match(
+    batchProgressCardSource,
+    /batch\.completedCount \+ batch\.failedCount \+ batch\.skippedCount \+ batch\.needsReviewCount/,
+  );
+  assert.match(batchProgressCardSource, /batch\.needsReviewCount > 0/);
+});
+
 test("enabling a fully automatic plan kicks the publishing worker without Schedule Batch", () => {
   assert.match(
     autoPublishSource,

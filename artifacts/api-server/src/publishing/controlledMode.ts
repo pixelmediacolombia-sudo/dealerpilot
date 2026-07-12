@@ -23,8 +23,24 @@ export const LOT_CITY_MAP: Record<string, string> = {
 
 const EXTENSION_ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
 
-const ACTIVE_JOB_STATUSES = [
+export const QUEUED_PUBLISHING_JOB_STATUSES = ["Queued", "Scheduled", "Retry"] as const;
+
+export const IN_FLIGHT_PUBLISHING_JOB_STATUSES = [
+  "Assigned",
+  "Claimed",
+  "Publishing",
+  "Opening Facebook",
+  "Filling Form",
+  "Auto Publishing",
+  "Ready for Review",
+  "Downloading Photos",
+  "Uploading Photos",
+  "Waiting For Thumbnails",
+] as const;
+
+export const ACTIVE_PUBLISHING_JOB_STATUSES = [
   "Queued",
+  "Retry",
   "Scheduled",
   "Assigned",
   "Claimed",
@@ -32,6 +48,10 @@ const ACTIVE_JOB_STATUSES = [
   "Opening Facebook",
   "Filling Form",
   "Auto Publishing",
+  "Ready for Review",
+  "Downloading Photos",
+  "Uploading Photos",
+  "Waiting For Thumbnails",
 ] as const;
 
 const NOT_ELIGIBLE_STATUSES = new Set(["Published", "Sold", "Removed"]);
@@ -124,7 +144,7 @@ export async function checkPublishGuardrails(params: {
     .where(
       and(
         eq(publishingJobsTable.vehicleId, vehicle.id),
-        inArray(publishingJobsTable.status, [...ACTIVE_JOB_STATUSES]),
+        inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
       ),
     )
     .limit(1);

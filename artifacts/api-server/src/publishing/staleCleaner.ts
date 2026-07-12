@@ -1,11 +1,14 @@
 import { db, publishingJobsTable } from "@workspace/db";
 import { and, eq, inArray, lt } from "drizzle-orm";
 import type { Logger } from "pino";
+import {
+  IN_FLIGHT_PUBLISHING_JOB_STATUSES,
+  QUEUED_PUBLISHING_JOB_STATUSES,
+} from "./controlledMode";
 
 // ── In-flight stale jobs (extension crashed mid-fill) ────────────────────────
 // Jobs stuck in an active extension status for > 30 min → Retry or Failed.
 const ACTIVE_STALE_MS = 30 * 60 * 1000; // 30 minutes
-const ACTIVE_STALE_STATUSES = ["Publishing", "Assigned", "Filling Form", "Opening Facebook"] as const;
 const MAX_ATTEMPTS = 3;
 
 // ── Queued/Scheduled stale jobs (extension offline, never claimed) ────────────
@@ -13,7 +16,6 @@ const MAX_ATTEMPTS = 3;
 // are cancelled automatically. The operator can re-queue when the extension
 // is back online. Threshold is intentionally long to survive overnight gaps.
 const QUEUED_STALE_MS = 4 * 60 * 60 * 1000; // 4 hours
-const QUEUED_STALE_STATUSES = ["Queued", "Scheduled", "Retry"] as const;
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
 
@@ -28,7 +30,7 @@ export function startStaleJobCleaner(logger: Logger): void {
       .from(publishingJobsTable)
       .where(
         and(
-          inArray(publishingJobsTable.status, [...ACTIVE_STALE_STATUSES]),
+          inArray(publishingJobsTable.status, [...IN_FLIGHT_PUBLISHING_JOB_STATUSES]),
           lt(publishingJobsTable.updatedAt, activeCutoff),
         ),
       );
@@ -58,7 +60,7 @@ export function startStaleJobCleaner(logger: Logger): void {
       .from(publishingJobsTable)
       .where(
         and(
-          inArray(publishingJobsTable.status, [...QUEUED_STALE_STATUSES]),
+          inArray(publishingJobsTable.status, [...QUEUED_PUBLISHING_JOB_STATUSES]),
           lt(publishingJobsTable.createdAt, queuedCutoff),
         ),
       );
@@ -76,7 +78,7 @@ export function startStaleJobCleaner(logger: Logger): void {
         })
         .where(
           and(
-            inArray(publishingJobsTable.status, [...QUEUED_STALE_STATUSES]),
+            inArray(publishingJobsTable.status, [...QUEUED_PUBLISHING_JOB_STATUSES]),
             lt(publishingJobsTable.createdAt, queuedCutoff),
           ),
         );

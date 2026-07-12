@@ -17,6 +17,7 @@ import { and, asc, desc, eq, ilike, inArray, isNull, or, type SQL } from "drizzl
 import { generateListing } from "../listings/generator";
 import { scoreListing } from "../listings/scoring";
 import { priorityScore } from "../listings/rules";
+import { ACTIVE_PUBLISHING_JOB_STATUSES } from "../publishing/controlledMode";
 
 const DEALER_ID = 1;
 
@@ -457,7 +458,7 @@ router.post("/listings/:vehicleId/mark-published", async (req, res) => {
     .where(
       and(
         eq(publishingJobsTable.vehicleId, vehicleId),
-        inArray(publishingJobsTable.status, ["Queued", "Scheduled", "Assigned", "Publishing", "Ready for Review"]),
+        inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
       ),
     )
     .orderBy(desc(publishingJobsTable.createdAt))
