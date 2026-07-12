@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import vm from "node:vm";
 
-function createHarness(payload) {
+function createHarness(payload, options = {}) {
+  let assignedJobReturned = false;
   const calls = {
     apiGet: [],
     apiPost: [],
@@ -72,7 +73,13 @@ function createHarness(payload) {
     async apiGet(path) {
       calls.apiGet.push(path);
       if (path.endsWith("/payload")) return payload;
-      if (path.startsWith("/api/publishing/jobs/assigned")) return { job: null };
+      if (path.startsWith("/api/publishing/jobs/assigned")) {
+        if (!assignedJobReturned && options.assignedJob) {
+          assignedJobReturned = true;
+          return { job: options.assignedJob };
+        }
+        return { job: null };
+      }
       if (path === "/api/publishing/jobs/next") return { job: null };
       if (path === "/api/extension/connect-status") return { connectRequested: false };
       throw new Error(`Unexpected GET ${path}`);
@@ -164,4 +171,39 @@ test("incomplete assigned vehicle moves to Needs Review and polls the next job w
   const audit = storage.auditLog ?? [];
   assert.equal(audit.some((entry) => entry.event === "MARKETPLACE_TAB_OPENED"), false);
   assert.equal(audit.some((entry) => entry.event === "AUTO_START_SKIPPED_INCOMPLETE"), true);
+});
+
+test("assigned queue poll uses the Chrome runtime id while claiming with storage id", async () => {
+  const payload = {
+    fill: {
+      year: 2020,
+      make: "Toyota",
+      model: "",
+      mileage: 75000,
+      bodyStyle: "SUV",
+      exteriorColor: "White",
+      fuelType: "Gasoline",
+      transmission: "Automatic",
+      location: "Manassas, VA",
+      description: "Clean unit ready for financing.",
+      price: 1000,
+    },
+    images: ["https://1987dealerpilot.com/photo.jpg"],
+  };
+  const { handlers, calls } = createHarness(payload, {
+    assignedJob: {
+      id: 202,
+      assignedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      mode: "Controlled",
+    },
+  });
+
+  await handlers.POLL_ASSIGNED_JOB();
+
+  assert.ok(
+    calls.apiGet.includes("/api/publishing/jobs/assigned?extensionId=chrome-runtime-e2e"),
+    "assigned poll should use chrome.runtime.id so it matches backend heartbeat assignment",
+  );
+  assert.deepEqual(calls.claims, [{ jobId: 202, extensionId: "ext-e2e" }]);
 });

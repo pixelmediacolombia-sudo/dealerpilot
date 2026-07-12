@@ -135,6 +135,14 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
     [extensionId],
   );
   if (connection.rows[0]?.name) aliases.add(connection.rows[0].name);
+  if (!connection.rows[0]?.name) {
+    const onlineConnection = await pool.query<{ name: string | null; chrome_extension_id: string | null }>(
+      "select name, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+    );
+    const online = onlineConnection.rows[0];
+    if (online?.name) aliases.add(online.name);
+    if (online?.chrome_extension_id) aliases.add(online.chrome_extension_id);
+  }
 
   const [row] = await db
     .select()

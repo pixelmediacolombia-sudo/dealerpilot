@@ -328,7 +328,7 @@ const handlers = {
   // ---- App-controlled bridge mode ----
 
   async GET_ASSIGNED_JOB() {
-    const extensionId = await getExtensionId();
+    const extensionId = chrome.runtime.id || await getExtensionId();
     return apiGet(`/api/publishing/jobs/assigned?extensionId=${encodeURIComponent(extensionId)}`);
   },
 
@@ -544,7 +544,7 @@ const handlers = {
     const now = new Date().toISOString();
     await chrome.storage.local.set({ lastPollTime: now });
 
-    const extensionId = await getExtensionId();
+    const extensionId = chrome.runtime.id || await getExtensionId();
 
     // Check for a job explicitly assigned to this extension
     let data;

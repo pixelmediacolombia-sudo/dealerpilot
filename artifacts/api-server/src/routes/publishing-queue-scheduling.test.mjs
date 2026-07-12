@@ -41,6 +41,15 @@ test("assigned endpoint only returns due assigned jobs", () => {
   );
 });
 
+test("assigned endpoint can map the extension storage id to the online Chrome connection", () => {
+  assert.match(
+    routeSource,
+    /select name, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now\(\) - interval '5 minutes'/,
+  );
+  assert.match(routeSource, /if \(online\?\.name\) aliases\.add\(online\.name\);/);
+  assert.match(routeSource, /if \(online\?\.chrome_extension_id\) aliases\.add\(online\.chrome_extension_id\);/);
+});
+
 test("bulk schedule keeps future vehicles scheduled and assigns only due jobs", () => {
   assert.match(routeSource, /const claimableNow: number\[\] = \[\];/);
   assert.match(routeSource, /status:\s*jobDueNow\s*\?\s*"Queued"\s*:\s*"Scheduled"/);
