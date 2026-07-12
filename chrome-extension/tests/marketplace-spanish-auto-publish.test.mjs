@@ -6,6 +6,10 @@ const content = readFileSync(
   new URL("../src/content/facebook/publisherFlow.js", import.meta.url),
   "utf8",
 );
+const queueClient = readFileSync(
+  new URL("../src/background/queueClient.js", import.meta.url),
+  "utf8",
+);
 
 test("Marketplace filler recognizes Spanish vehicle form labels", () => {
   for (const keyword of [
@@ -122,7 +126,7 @@ test("Marketplace location selects autocomplete suggestions before validating Ne
 
 test("Successful publish wakes the queue for the next eligible job", () => {
   const completeIndex = content.indexOf('type: "COMPLETE_JOB"');
-  const pollIndex = content.indexOf('type: "POLL_NOW"');
+  const pollIndex = content.indexOf('type: "POLL_NOW"', completeIndex);
   const failIndex = content.indexOf('type: "FAIL_JOB"');
   assert.notEqual(completeIndex, -1, "COMPLETE_JOB call is missing");
   assert.notEqual(pollIndex, -1, "POLL_NOW call is missing");
@@ -144,4 +148,18 @@ test("Form completion and enabled Next are reported before auto-clicking", () =>
   assert.ok(formComplete > -1, "form_complete progress event is missing");
   assert.ok(nextEnabled > formComplete, "next_enabled must follow form completion");
   assert.ok(nextClick > nextEnabled, "Next must only be reported clicked after it was enabled");
+});
+
+test("Incomplete vehicles move to review and the queue continues before Facebook opens", () => {
+  assert.match(queueClient, /function findMissingMarketplaceFields\(payload\)/);
+  assert.match(queueClient, /Missing required Marketplace data:/);
+  assert.match(queueClient, /AUTO_START_SKIPPED_INCOMPLETE/);
+  const preflightIndex = queueClient.indexOf("findMissingMarketplaceFields(payload)");
+  const tabOpenIndex = queueClient.indexOf('logAudit("MARKETPLACE_TAB_OPENED"', preflightIndex);
+  assert.ok(preflightIndex > -1 && tabOpenIndex > preflightIndex, "preflight must run before Facebook opens");
+  assert.match(queueClient, /return handlers\.POLL_ASSIGNED_JOB\(\)/);
+});
+
+test("A repeated Facebook form failure is reviewed and wakes the next queue job", () => {
+  assert.match(content, /retryCount >= 1[\s\S]*MARK_NEEDS_REVIEW[\s\S]*POLL_NOW/);
 });

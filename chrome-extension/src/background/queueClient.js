@@ -39,6 +39,24 @@ async function apiPost(path, body) {
   return DealerPilotApiClient.apiPost(path, body);
 }
 
+function findMissingMarketplaceFields(payload) {
+  const fill = payload?.fill || {};
+  const missing = [];
+  const required = [
+    ["year", fill.year], ["make", fill.make], ["model", fill.model],
+    ["mileage", fill.mileage], ["body style", fill.bodyStyle],
+    ["exterior color", fill.exteriorColor], ["fuel type", fill.fuelType],
+    ["transmission", fill.transmission], ["location", fill.location],
+    ["description", fill.description],
+  ];
+  for (const [label, value] of required) {
+    if (value === null || value === undefined || String(value).trim() === "") missing.push(label);
+  }
+  if (!Number.isFinite(Number(fill.price)) || Number(fill.price) <= 0) missing.push("price");
+  if (!Array.isArray(payload?.images) || payload.images.filter(Boolean).length === 0) missing.push("photos");
+  return missing;
+}
+
 // ---- Debug state helpers ----
 
 function saveLastError(err) {
@@ -291,6 +309,12 @@ const handlers = {
     return apiPost(`/api/publishing/jobs/${message.jobId}/retry`, {});
   },
 
+  async MARK_NEEDS_REVIEW(message) {
+    return apiPost(`/api/publishing/jobs/${message.jobId}/needs-review`, {
+      reason: message.reason || "Required Marketplace data is incomplete",
+    });
+  },
+
   async SEND_JOB_EVENT(message) {
     const extensionId = await getExtensionId();
     return apiPost(`/api/publishing/jobs/${message.jobId}/event`, {
@@ -373,6 +397,35 @@ const handlers = {
       event: "job_claimed",
       extensionId,
     });
+
+    // Preflight before opening Facebook. Incomplete vehicles must not block
+    // later jobs in the publishing queue.
+    let payload;
+    try {
+      payload = await apiGet(`/api/publishing/jobs/${job.id}/payload`);
+    } catch (err) {
+      const reason = `Marketplace preflight could not load vehicle data: ${err instanceof Error ? err.message : String(err)}`;
+      await apiPost(`/api/publishing/jobs/${job.id}/needs-review`, { reason });
+      await chrome.storage.local.remove("activeJob");
+      await logAudit("AUTO_START_SKIPPED_PREFLIGHT", { jobId: job.id, reason });
+      return handlers.POLL_ASSIGNED_JOB();
+    }
+
+    const missingFields = findMissingMarketplaceFields(payload);
+    if (missingFields.length > 0) {
+      const reason = `Missing required Marketplace data: ${missingFields.join(", ")}`;
+      await apiPost(`/api/publishing/jobs/${job.id}/needs-review`, { reason });
+      await chrome.storage.local.remove("activeJob");
+      await logAudit("AUTO_START_SKIPPED_INCOMPLETE", {
+        jobId: job.id,
+        vehicleId: job.vehicleId || null,
+        missingFields,
+        reason,
+      });
+      return handlers.POLL_ASSIGNED_JOB();
+    }
+
+    await chrome.storage.local.set({ activeJob: { ...job, _prefetchedPayload: payload } });
 
     // ── AUDIT LOG: every tab open must be logged with a reason ────────────────
     await logAudit("MARKETPLACE_TAB_OPENED", {

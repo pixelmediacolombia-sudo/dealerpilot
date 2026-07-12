@@ -2488,10 +2488,13 @@
   async function handleAutoRetry(job, reason, extras) {
     const retryCount = job._retryCount ?? 0;
     if (retryCount >= 1) {
-      // Already retried once — do a final fail and let caller render review
-      await send({ type: "FAIL_JOB", jobId: job.id, reason });
+      // Already retried once. Move on so one incompatible form cannot block
+      // every later vehicle in the queue.
+      await send({ type: "MARK_NEEDS_REVIEW", jobId: job.id, reason });
       await chrome.storage.local.remove("activeJob");
-      return false;
+      setStatus(`Skipped job #${job.id}: ${reason}. Checking the next vehicle…`, "err");
+      await send({ type: "POLL_NOW" }).catch(() => { });
+      return true;
     }
 
     stateLog(`Auto-retry: first failure — "${reason}" — will retry job #${job.id}`);

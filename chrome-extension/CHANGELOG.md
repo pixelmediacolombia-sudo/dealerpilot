@@ -1,5 +1,14 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.33
+
+**Fixed**
+- Preflights required Marketplace data before opening Facebook.
+- Moves incomplete vehicles to Needs Review and immediately continues with the next eligible queue job.
+- Prevents a repeatedly incompatible Facebook form from blocking every later vehicle.
+
+---
+
 ## v1.3.32
 
 **Fixed**
