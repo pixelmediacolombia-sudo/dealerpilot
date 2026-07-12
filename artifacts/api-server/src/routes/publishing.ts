@@ -906,10 +906,16 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
   const { vehicleIds, scheduledAt: scheduledAtStr, spacingMinutes, priority, notes: _notes, gmOverrides } = parsed.data;
   const gmOverrideSet = new Set(gmOverrides);
 
-  const vehicles = await db
+  const vehicleOrder = new Map(vehicleIds.map((id, index) => [id, index]));
+  const vehicles = (await db
     .select()
     .from(vehiclesTable)
-    .where(inArray(vehiclesTable.id, vehicleIds));
+    .where(inArray(vehiclesTable.id, vehicleIds)))
+    .sort(
+      (a, b) =>
+        (vehicleOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+        (vehicleOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+    );
 
   if (vehicles.length === 0) {
     res.status(404).json({ error: "No matching vehicles found" });

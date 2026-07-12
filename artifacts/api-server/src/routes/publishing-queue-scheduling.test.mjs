@@ -57,6 +57,14 @@ test("bulk schedule keeps future vehicles scheduled and assigns only due jobs", 
   assert.match(routeSource, /\.where\(inArray\(publishingJobsTable\.id,\s*claimableNow\)\)/);
 });
 
+test("bulk schedule preserves the operator selected vehicle order", () => {
+  assert.match(routeSource, /const vehicleOrder = new Map\(vehicleIds\.map\(\(id, index\) => \[id, index\]\)\);/);
+  assert.match(
+    routeSource,
+    /\.sort\([\s\S]*vehicleOrder\.get\(a\.id\)[\s\S]*Number\.MAX_SAFE_INTEGER[\s\S]*vehicleOrder\.get\(b\.id\)[\s\S]*Number\.MAX_SAFE_INTEGER[\s\S]*\)/,
+  );
+});
+
 test("publishing worker also respects scheduledAt for queued jobs", () => {
   assert.match(
     workerSource,
