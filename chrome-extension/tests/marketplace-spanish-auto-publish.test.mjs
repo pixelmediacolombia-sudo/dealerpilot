@@ -170,10 +170,12 @@ test("The next claimed vehicle reloads a clean Marketplace create form", () => {
   assert.match(content, /MARK_NEEDS_REVIEW[\s\S]*window\.location\.replace\("https:\/\/www\.facebook\.com\/marketplace\/create\/vehicle"\)[\s\S]*POLL_NOW/);
 });
 
-test("Facebook Your Listings landing is accepted without triggering a 409 fail transition", () => {
+test("Facebook Your Listings landing captures item URL before completing", () => {
   assert.match(content, /cur\.includes\("\/marketplace\/you\/selling"\)/);
+  assert.match(content, /function findMarketplaceListingUrlOnPage\(job\)/);
+  assert.match(content, /a\[href\*="\/marketplace\/item\/"\]/);
   assert.match(content, /publishedLanding: true/);
-  assert.match(content, /Published on Facebook\. URL pending review; continuing with the next vehicle/);
-  assert.match(content, /publishedLanding[\s\S]*MARK_NEEDS_REVIEW[\s\S]*POLL_NOW/);
+  assert.match(content, /outcome\.listingUrl \|\| outcome\.blockReason \|\| outcome\.publishedLanding/);
+  assert.match(content, /type: "COMPLETE_JOB"[\s\S]*listingUrl/);
   assert.doesNotMatch(content, /Auto-publish failed and backend fail-sync failed/);
 });

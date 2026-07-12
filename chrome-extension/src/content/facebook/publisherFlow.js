@@ -2673,8 +2673,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "clicking_publish" }).catch(() => { });
       await sleep(900);
 
-      const outcome = await waitForPublishOutcome(attempt === 1 ? 12000 : 22000);
-      if (outcome.listingUrl || outcome.blockReason) return outcome;
+      const outcome = await waitForPublishOutcome(job, attempt === 1 ? 12000 : 22000);
+      if (outcome.listingUrl || outcome.blockReason || outcome.publishedLanding) return outcome;
 
       // Some Facebook sessions show a final confirmation dialog with another
       // Publish/Post button. Try once more only when that button is still visible.
@@ -3004,16 +3004,48 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     return null;
   }
 
-  async function waitForPublishOutcome(timeoutMs) {
+  function findMarketplaceListingUrlOnPage(job) {
+    const anchors = Array.from(document.querySelectorAll('a[href*="/marketplace/item/"]'));
+    if (anchors.length === 0) return null;
+
+    const expectedLabel = normalizeText(job?.vehicleLabel || job?.listingTitle || "");
+    const expectedTokens = expectedLabel
+      ? expectedLabel.split(/\s+/).filter((token) => token.length >= 3)
+      : [];
+
+    for (const anchor of anchors) {
+      const href = anchor.href;
+      if (!href) continue;
+      const text = normalizeText(
+        [
+          anchor.innerText || anchor.textContent || "",
+          anchor.closest('[role="button"], [role="article"], div')?.innerText || "",
+        ].join(" "),
+      );
+      if (
+        expectedTokens.length === 0 ||
+        expectedTokens.every((token) => text.includes(token))
+      ) {
+        return href;
+      }
+    }
+
+    return anchors[0]?.href || null;
+  }
+
+  async function waitForPublishOutcome(job, timeoutMs) {
     const startUrl = window.location.href;
     const start = Date.now();
+    let sawSellingLanding = false;
     while (Date.now() - start < timeoutMs) {
       const cur = window.location.href;
       if (cur !== startUrl && cur.includes("/marketplace/item/")) {
         return { listingUrl: cur, blockReason: null, publishedLanding: false };
       }
       if (cur !== startUrl && cur.includes("/marketplace/you/selling")) {
-        return { listingUrl: null, blockReason: null, publishedLanding: true };
+        sawSellingLanding = true;
+        const listingUrl = findMarketplaceListingUrlOnPage(job);
+        if (listingUrl) return { listingUrl, blockReason: null, publishedLanding: true };
       }
       const successEl =
         document.querySelector('[aria-label*="listed" i]') ||
@@ -3030,9 +3062,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return { listingUrl: final, blockReason: null, publishedLanding: false };
     }
     if (final !== startUrl && final.includes("/marketplace/you/selling")) {
-      return { listingUrl: null, blockReason: null, publishedLanding: true };
+      return {
+        listingUrl: findMarketplaceListingUrlOnPage(job),
+        blockReason: null,
+        publishedLanding: true,
+      };
     }
-    return { listingUrl: null, blockReason: detectMarketplacePublishBlock(), publishedLanding: false };
+    return { listingUrl: null, blockReason: detectMarketplacePublishBlock(), publishedLanding: sawSellingLanding };
   }
 
   function chips(items, cls) {

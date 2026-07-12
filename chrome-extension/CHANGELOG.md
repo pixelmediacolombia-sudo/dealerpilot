@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.37
+
+**Fixed**
+- Captures Marketplace item URLs from the seller listings page after Facebook publishes.
+- Stops after the first publish when Facebook lands on Your Listings, preventing duplicate listings.
+
+---
+
 ## v1.3.36
 
 **Fixed**
