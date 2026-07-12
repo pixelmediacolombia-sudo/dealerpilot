@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.36
+
+**Fixed**
+- Polls assigned queue jobs with the Chrome runtime id used by backend heartbeat assignment.
+- Keeps job ownership/reporting on the extension storage id, preserving existing complete/fail flow.
+
+---
+
 ## v1.3.35
 
 **Fixed**
