@@ -44,6 +44,13 @@ test("Year selection continues when Facebook renders make/model as text fields",
   assert.match(content, /Skipping next-combobox wait after year because make\/model text fields are already visible/);
 });
 
+test("Marketplace connection is ready on any Marketplace route", () => {
+  assert.match(queueClient, /const marketplaceDetected = path\.includes\("\/marketplace"\)/);
+  assert.match(queueClient, /marketplaceConnected: marketplaceDetected && !isLoginPage/);
+  assert.match(content, /const marketplaceConnected = isMarketplaceNow && fbLoggedIn/);
+  assert.doesNotMatch(queueClient, /marketplaceConnected: path\.startsWith\("\/marketplace\/create"\)/);
+});
+
 test("Auto publish can click localized Next and Publish buttons", () => {
   assert.match(content, /"siguiente"/);
   assert.match(content, /"continuar"/);

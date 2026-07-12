@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.40
+
+**Fixed**
+- Reports Marketplace as ready on any Marketplace route, not only the create vehicle form.
+
+---
+
 ## v1.3.39
 
 **Fixed**

@@ -689,8 +689,7 @@
       location.search.includes("reauth=1") ||
       (location.search.includes("next=") && pathname === "/login.php");
     const fbLoggedIn = hostname.includes("facebook.com") && !isLoginPage;
-    const isMarketplaceCreate = pathname.startsWith("/marketplace/create");
-    const marketplaceConnected = isMarketplaceCreate && fbLoggedIn;
+    const marketplaceConnected = isMarketplaceNow && fbLoggedIn;
 
     chrome.storage.local
       .set({

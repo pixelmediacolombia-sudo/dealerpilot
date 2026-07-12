@@ -105,12 +105,14 @@ function detectFacebookTabStateFromUrl(url) {
       parsed.search.includes("reauth=1") ||
       (parsed.search.includes("next=") && path === "/login.php");
 
+    const marketplaceDetected = path.includes("/marketplace");
+
     return {
       fbLoggedIn: !isLoginPage,
-      marketplaceConnected: path.startsWith("/marketplace/create"),
-      marketplaceDetected: path.includes("/marketplace"),
-      marketplacePath: path.includes("/marketplace") ? path : null,
-      marketplaceUrl: path.includes("/marketplace") ? url : null,
+      marketplaceConnected: marketplaceDetected && !isLoginPage,
+      marketplaceDetected,
+      marketplacePath: marketplaceDetected ? path : null,
+      marketplaceUrl: marketplaceDetected ? url : null,
     };
   } catch (_err) {
     return null;
