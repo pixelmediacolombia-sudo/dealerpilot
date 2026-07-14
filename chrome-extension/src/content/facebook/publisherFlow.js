@@ -217,6 +217,23 @@
     return false;
   }
 
+  function displayedComboboxMatchesTarget(label, targetValue, el) {
+    const target = normalizeText(targetValue);
+    if (!target || !el) return false;
+    const candidates = visibleValueCandidates(el)
+      .map(normalizeText)
+      .filter((text) => text && text.length < 140);
+
+    if (label === "year") {
+      return candidates.some((text) => {
+        const years = text.match(/\b(?:19|20)\d{2}\b/g) || [];
+        return years.length === 1 && years[0] === target;
+      });
+    }
+
+    return candidates.some((text) => text.includes(target));
+  }
+
   function normalizeText(value) {
     return String(value || "")
       .normalize("NFD")
@@ -1309,17 +1326,22 @@
       filled.push(label);
       log(`${label} → "${pickedText}"`);
 
-      // ---- Post-selection verification (year / make) ─────────────────
+      // ---- Post-selection verification (year / make) -----------------
       if (label === "year" || label === "make") {
         await sleep(400);
         const cbNow = (await waitForCombobox(keywords, 2000)) || combobox;
         const displayedNow = (cbNow.innerText || cbNow.textContent || "").trim();
-        const expectedNorm = String(targetValue).toLowerCase().trim();
-        if (displayedNow.toLowerCase().includes(expectedNorm)) {
-          stateLog(`${label} verified — combobox shows "${displayedNow}"`);
+        if (displayedComboboxMatchesTarget(label, targetValue, cbNow)) {
+          stateLog(`${label} verified - combobox shows "${displayedNow}"`);
+        } else if (label === "year") {
+          const warning = `${label}: selected "${pickedText}" but combobox shows "${displayedNow}" - expected "${targetValue}"`;
+          warnings.push(warning);
+          if (!missed.includes(label)) missed.push(label);
+          stateError(`Selected year does not match target "${targetValue}"`, new Error(warning));
+          return false;
         } else {
-          stateLog(`${label} — combobox shows "${displayedNow}" (expected "${targetValue}") — proceeding`);
-          warnings.push(`${label}: selected "${pickedText}" but combobox shows "${displayedNow}" — verify manually`);
+          stateLog(`${label} - combobox shows "${displayedNow}" (expected "${targetValue}") - verify manually`);
+          warnings.push(`${label}: selected "${pickedText}" but combobox shows "${displayedNow}" - verify manually`);
         }
       }
 
@@ -2667,6 +2689,7 @@
         setStatus(reason + " Continuing with the next vehicle.", "err");
       }
       await send({ type: "POLL_NOW" }).catch(() => { });
+      closeMarketplaceTabSoon();
       return;
     }
 
@@ -2916,6 +2939,16 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     await settleMarketplaceFormBeforeNext();
 
+    const blockingIdentityFields = effectiveMissed.filter((fieldName) => {
+      return ["year", "make"].includes(normalizeText(fieldName));
+    });
+    if (blockingIdentityFields.length > 0) {
+      return {
+        ok: false,
+        reason: `Vehicle identity fields did not verify: ${blockingIdentityFields.join(", ")}. Refusing to click Next/Publish.`,
+      };
+    }
+
     // 2. Check Next button exists and becomes enabled. Facebook can take a few
     // seconds after the last checkbox/dropdown change to recalculate readiness.
     const NEXT_TEXTS = ["next", "continue", "next step", "siguiente", "continuar"];
@@ -3109,6 +3142,24 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     return expectedTokens.every((token) => normalized.includes(token));
   }
 
+  function escapeRegExp(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function detectMarketplaceYearMismatchOnPage(job) {
+    const expectedYear = String(job?.year || "").trim();
+    const make = normalizeText(job?.make || "");
+    const model = normalizeText(job?.model || "");
+    if (!/^(?:19|20)\d{2}$/.test(expectedYear) || !make || !model) return null;
+
+    const normalizedBody = normalizeText(document.body?.innerText || "");
+    const pattern = new RegExp(`\\b((?:19|20)\\d{2})\\s+${escapeRegExp(make)}\\s+${escapeRegExp(model)}\\b`, "i");
+    const match = normalizedBody.match(pattern);
+    if (!match || match[1] === expectedYear) return null;
+
+    return `Facebook appears to show this vehicle as ${match[1]} ${job.make} ${job.model}, but DealerPilot expected ${expectedYear} ${job.make} ${job.model}.`;
+  }
+
   function currentMarketplaceItemMatchesJob(job) {
     if (!window.location.href.includes("/marketplace/item/")) return false;
     const expectedTokens = expectedMarketplaceListingTokens(job);
@@ -3165,6 +3216,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       }
       if (cur !== startUrl && cur.includes("/marketplace/you/selling")) {
         sawSellingLanding = true;
+        const yearMismatch = detectMarketplaceYearMismatchOnPage(job);
+        if (yearMismatch) return { listingUrl: null, blockReason: yearMismatch, publishedLanding: false };
         const listingUrl =
           findMarketplaceListingUrlOnPage(job) ||
           await findMarketplaceListingUrlFromSellerDialog(job);
@@ -3192,6 +3245,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       };
     }
     if (final !== startUrl && final.includes("/marketplace/you/selling")) {
+      const yearMismatch = detectMarketplaceYearMismatchOnPage(job);
+      if (yearMismatch) {
+        return {
+          listingUrl: null,
+          blockReason: yearMismatch,
+          publishedLanding: false,
+        };
+      }
       const listingUrl =
         findMarketplaceListingUrlOnPage(job) ||
         await findMarketplaceListingUrlFromSellerDialog(job);

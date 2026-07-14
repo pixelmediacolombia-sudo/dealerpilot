@@ -150,6 +150,14 @@ test("Positive Facebook validation text is not treated as a blocking form error"
   assert.match(content, /after waiting 20 seconds/);
 });
 
+test("Marketplace refuses to publish when the selected year does not verify", () => {
+  assert.match(content, /function displayedComboboxMatchesTarget\(label, targetValue, el\)/);
+  assert.match(content, /const years = text\.match/);
+  assert.match(content, /Selected year does not match target/);
+  assert.match(content, /Vehicle identity fields did not verify/);
+  assert.match(content, /Refusing to click Next\/Publish/);
+});
+
 test("Successful publish wakes the queue for the next eligible job", () => {
   const completeIndex = content.indexOf('type: "COMPLETE_JOB"');
   const pollIndex = content.indexOf('type: "POLL_NOW"', completeIndex);
@@ -210,4 +218,11 @@ test("Facebook Your Listings landing captures item URL before completing", () =>
   assert.match(content, /type: "COMPLETE_JOB"[\s\S]*listingUrl/);
   assert.doesNotMatch(content, /return anchors\[0\]\?\.href \|\| null/);
   assert.doesNotMatch(content, /Auto-publish failed and backend fail-sync failed/);
+});
+
+test("Facebook Your Listings detects visible vehicle year mismatches", () => {
+  assert.match(content, /function detectMarketplaceYearMismatchOnPage\(job\)/);
+  assert.match(content, /Facebook appears to show this vehicle as/);
+  assert.match(content, /detectMarketplaceYearMismatchOnPage\(job\)/);
+  assert.match(content, /closeMarketplaceTabSoon\(\)/);
 });

@@ -156,14 +156,16 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
   });
 
   const isDone   = progress?.status === "Published";
+  const isReview = progress?.status === "Needs Review";
   const isFailed = progress?.status === "Failed" || progress?.status === "Cancelled";
 
   const pct = progress?.progressPercent ?? (isCreating ? 0 : jobId ? 5 : 0);
+  const displayPct = isDone ? 100 : Math.min(pct, 99);
   const currentStepLabel = progress?.currentStep
     ?? (isCreating ? "Creating job…" : jobId ? "Waiting for extension…" : "");
 
   // Determine which step is active based on progress %
-  const activeStepIdx = PUBLISH_STEPS.reduce((last, s, i) => (pct >= s.minPct ? i : last), 0);
+  const activeStepIdx = PUBLISH_STEPS.reduce((last, s, i) => (displayPct >= s.minPct ? i : last), 0);
 
   useEffect(() => {
     if (isDone && jobId && onSuccess) {
@@ -196,7 +198,7 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
         {/* Header */}
         <SheetHeader className="px-5 pt-5 pb-4 border-b border-white/[0.06]">
           <SheetTitle className="text-sm font-semibold">
-            {isDone ? "✓ Published to Marketplace" : isFailed ? "Publish Failed" : "Publishing Now…"}
+            {isDone ? "Published to Marketplace" : isReview ? "Needs Review" : isFailed ? "Publish Failed" : "Publishing Now..."}
           </SheetTitle>
           {vehicleLabel && (
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{vehicleLabel}</p>
@@ -222,16 +224,16 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
           )}
 
           {/* In-progress state */}
-          {!createError && !isDone && !isFailed && (
+          {!createError && !isDone && !isReview && !isFailed && (
             <>
               {/* Progress bar + live status */}
               <div className="space-y-2">
                 <Progress
-                  value={pct}
+                  value={displayPct}
                   className="h-1.5 bg-white/10 [&>div]:bg-primary [&>div]:transition-all [&>div]:duration-500"
                 />
                 <div className="flex items-center gap-1.5 min-h-[18px]">
-                  {(isCreating || (!!jobId && !isDone && !isFailed)) && (
+                  {(isCreating || (!!jobId && !isDone && !isReview && !isFailed)) && (
                     <Loader2 className="w-3 h-3 animate-spin text-primary flex-shrink-0" />
                   )}
                   <p className="text-[11px] text-muted-foreground truncate">
@@ -275,6 +277,22 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
                 </div>
               )}
             </>
+          )}
+
+          {/* Needs review state */}
+          {isReview && (
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                <XCircle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-xs text-amber-300 font-medium">Marketplace publish needs review</p>
+                  {progress?.failedReason && (
+                    <p className="text-[11px] text-amber-300/80">{progress.failedReason}</p>
+                  )}
+                </div>
+              </div>
+              <Button size="sm" onClick={handleClose} className="w-full">Close</Button>
+            </div>
           )}
 
           {/* Success state */}
