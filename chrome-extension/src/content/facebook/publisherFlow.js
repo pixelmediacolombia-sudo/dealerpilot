@@ -1811,7 +1811,6 @@
       }
 
       const textValue = String(value);
-      const normalizedTarget = normalizeText(textValue);
       const cityPart = normalizeText(textValue.split(",")[0] || textValue);
       const statePart = normalizeText((textValue.split(",")[1] || "").trim());
       const stateAlias = STATE_ALIASES[statePart] || statePart;
@@ -1819,13 +1818,24 @@
         .filter(([abbr, name]) => abbr !== statePart && name !== stateAlias)
         .flatMap(([abbr, name]) => [abbr, name]);
       let pickedSuggestion = false;
-      const locationQueries = Array.from(new Set([
-        textValue,
-        stateAlias && cityPart ? `${textValue.split(",")[0].trim()} ${stateAlias}` : "",
-        textValue.split(",")[0].trim(),
-      ].filter(Boolean)));
+      const dealerFallbackLocation = "Manassas, VA";
+      const fallbackCityPart = "manassas";
+      const fallbackStatePart = "va";
+      const fallbackStateAlias = STATE_ALIASES[fallbackStatePart];
+      const locationQueries = [
+        { query: textValue, city: cityPart, state: statePart, stateAlias, allowFirstFallback: false },
+        { query: stateAlias && cityPart ? `${textValue.split(",")[0].trim()} ${stateAlias}` : "", city: cityPart, state: statePart, stateAlias, allowFirstFallback: false },
+        { query: textValue.split(",")[0].trim(), city: cityPart, state: statePart, stateAlias, allowFirstFallback: false },
+        { query: dealerFallbackLocation, city: fallbackCityPart, state: fallbackStatePart, stateAlias: fallbackStateAlias, allowFirstFallback: true },
+        { query: "Manassas Virginia", city: fallbackCityPart, state: fallbackStatePart, stateAlias: fallbackStateAlias, allowFirstFallback: true },
+      ].filter((entry, index, entries) => {
+        if (!entry.query) return false;
+        const normalizedQuery = normalizeText(entry.query);
+        return entries.findIndex((candidate) => normalizeText(candidate.query) === normalizedQuery) === index;
+      });
 
-      for (const query of locationQueries) {
+      for (const locationQuery of locationQueries) {
+        const { query } = locationQuery;
         setFocusedFieldValue(el, "");
         await sleep(150);
         setFocusedFieldValue(el, query);
@@ -1843,15 +1853,19 @@
         const optionScore = (option) => {
           const text = optionText(option);
           const firstLine = normalizeText((option.innerText || option.textContent || "").split(/\r?\n/)[0] || "");
+          const queryCityPart = locationQuery.city;
+          const queryStatePart = locationQuery.state;
+          const queryStateAlias = locationQuery.stateAlias;
           let score = 0;
-          if (firstLine === cityPart) score += 45;
-          if (text.includes(`${cityPart}, ${statePart}`)) score += 60;
-          if (stateAlias && text.includes(`${cityPart}, ${stateAlias}`)) score += 55;
-          if (cityPart && text.includes(cityPart)) score += 25;
-          if (statePart && containsToken(text, statePart)) score += 80;
-          if (stateAlias && text.includes(stateAlias)) score += 80;
-          if ((statePart || stateAlias) && otherStateTokens.some((token) => containsToken(text, token))) score -= 75;
+          if (firstLine === queryCityPart) score += 45;
+          if (text.includes(`${queryCityPart}, ${queryStatePart}`)) score += 60;
+          if (queryStateAlias && text.includes(`${queryCityPart}, ${queryStateAlias}`)) score += 55;
+          if (queryCityPart && text.includes(queryCityPart)) score += 25;
+          if (queryStatePart && containsToken(text, queryStatePart)) score += 80;
+          if (queryStateAlias && text.includes(queryStateAlias)) score += 80;
+          if ((queryStatePart || queryStateAlias) && otherStateTokens.some((token) => containsToken(text, token))) score -= 75;
           if (text.includes("lake ") || text.includes("park ") || text.includes("county ")) score -= 35;
+          if (text.includes("downtown ") || text.includes("registraron una visita") || text.includes("checked in")) score -= 80;
           return score;
         };
         let pick = null;
@@ -1865,10 +1879,11 @@
         }
 
         if (!pick) {
+          const normalizedQueryTarget = normalizeText(query);
           pick =
-            options.find((option) => optionText(option).includes(normalizedTarget)) ||
-            options.find((option) => cityPart && optionText(option).includes(cityPart) && (!stateAlias || optionText(option).includes(stateAlias))) ||
-            options.find((option) => cityPart && optionText(option).includes(cityPart)) ||
+            options.find((option) => optionText(option).includes(normalizedQueryTarget)) ||
+            options.find((option) => locationQuery.city && optionText(option).includes(locationQuery.city) && (!locationQuery.stateAlias || optionText(option).includes(locationQuery.stateAlias))) ||
+            (!locationQuery.state && options.find((option) => locationQuery.city && optionText(option).includes(locationQuery.city))) ||
             null;
         }
 
@@ -1877,7 +1892,7 @@
         // explicit suggestion selection for the location to be considered
         // valid; selecting the first visible suggestion is a pragmatic
         // fallback that fixes the "invalid location" error in many cases.
-        if (!pick && options.length > 0) {
+        if (!pick && options.length > 0 && locationQuery.allowFirstFallback) {
           pick = options[0];
           stateLog("location suggestion fallback -> selecting first suggestion");
         }
