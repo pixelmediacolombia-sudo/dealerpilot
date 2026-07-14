@@ -6,6 +6,8 @@ import {
   useUpdateConversationStatus,
   useUpdateConversationAutoReply,
   useUpdateLead,
+  useGetConnectionStatus,
+  getGetConnectionStatusQueryKey,
 } from "@workspace/api-client-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -629,34 +631,69 @@ function LeadPanel({ convId }: { convId: number }) {
 
 function EmptyPane() {
   const [, navigate] = useLocation();
+  const { data: connectionStatus } = useGetConnectionStatus({
+    query: {
+      queryKey: getGetConnectionStatusQueryKey(),
+      refetchInterval: 8000,
+      refetchOnWindowFocus: "always",
+    },
+  });
+  const extStatus = (connectionStatus?.chromeExtension as { status?: string } | null | undefined)?.status?.toLowerCase() ?? "";
+  const extOnline = extStatus === "connected" || extStatus === "online";
+  const fbLoggedIn = (connectionStatus?.facebookSession as { fbLoggedIn?: boolean | null } | undefined)?.fbLoggedIn === true;
+  const mktConnected = (connectionStatus?.marketplace as { marketplaceConnected?: boolean | null } | undefined)?.marketplaceConnected === true;
+  const facebookReady = extOnline && fbLoggedIn && mktConnected;
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
       {/* Icon */}
-      <div className="w-20 h-20 rounded-3xl bg-violet-500/[0.06] border border-violet-500/10 flex items-center justify-center mb-6">
-        <MessageSquare className="w-10 h-10 text-violet-400/25" />
+      <div className={cn(
+        "w-20 h-20 rounded-3xl border flex items-center justify-center mb-6",
+        facebookReady
+          ? "bg-emerald-500/[0.06] border-emerald-500/15"
+          : "bg-violet-500/[0.06] border-violet-500/10",
+      )}>
+        {facebookReady
+          ? <CheckCircle2 className="w-10 h-10 text-emerald-400/35" />
+          : <MessageSquare className="w-10 h-10 text-violet-400/25" />}
       </div>
 
       {/* Headline */}
-      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-violet-400/40 mb-3">
-        Sales AI · Inbox
+      <p className={cn(
+        "text-[9px] font-black uppercase tracking-[0.22em] mb-3",
+        facebookReady ? "text-emerald-400/50" : "text-violet-400/40",
+      )}>
+        {facebookReady ? "Facebook Connected" : "Sales AI · Inbox"}
       </p>
       <div className="text-[17px] font-semibold text-white/50 mb-3">
-        No buyer conversations yet
+        {facebookReady ? "Waiting for the first buyer message" : "No buyer conversations yet"}
       </div>
       <div className="text-[13px] text-white/25 max-w-[320px] leading-relaxed mb-8">
-        DealerPilot will automatically display Marketplace buyers once your
-        Facebook account is connected and your first message is received.
+        {facebookReady
+          ? "Your Chrome extension, Facebook session, and Marketplace access are ready. DealerPilot will display buyers here as soon as a real Marketplace message is received."
+          : "DealerPilot will automatically display Marketplace buyers once your Facebook account is connected and your first message is received."}
       </div>
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row items-center gap-3">
-        <Button
-          className="gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm h-9 px-4"
-          onClick={() => navigate("/connection-center")}
-        >
-          <ExternalLink className="w-4 h-4" />
-          Connect Facebook
-        </Button>
+        {facebookReady ? (
+          <a href="https://www.facebook.com/marketplace/you/selling" target="_blank" rel="noopener noreferrer">
+            <Button
+              className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm h-9 px-4"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open Marketplace
+            </Button>
+          </a>
+        ) : (
+          <Button
+            className="gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm h-9 px-4"
+            onClick={() => navigate("/connection-center")}
+          >
+            <ExternalLink className="w-4 h-4" />
+            Connect Facebook
+          </Button>
+        )}
         <Button
           variant="outline"
           className="gap-2 border-white/[0.08] text-white/35 hover:bg-white/[0.04] hover:text-white/60 text-sm h-9 px-4"

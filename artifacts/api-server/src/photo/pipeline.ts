@@ -50,6 +50,14 @@ export interface PipelineImage {
   totalProcessingTimeMs?: number;
   qualityScore?: number;
   qualityFlags?: string;
+  promptVersion?: string;
+  restorationProvider?: string;
+  restorationModel?: string;
+  restorationTimeMs?: number;
+  restorationUsed?: boolean;
+  restorationRejectedReason?: string;
+  photoFidelityScore?: number;
+  photoFidelityFlags?: string;
   /** Set by Stage 3 when logo zone is significantly obscured by the vehicle */
   logoObscured?: boolean;
   /** Set by Stage 5 when AI output is measurably worse than the original */

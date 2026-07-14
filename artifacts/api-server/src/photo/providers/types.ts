@@ -1,5 +1,6 @@
 // Provider-agnostic interfaces for AI photo pipeline operations.
 // Swap implementations by changing the factory in providers/index.ts.
+import type { Buffer } from "node:buffer";
 
 export interface BackgroundRemovalResult {
   url: string;          // URL to the transparent-background PNG
@@ -10,10 +11,26 @@ export interface BackgroundRemovalResult {
 
 export interface ClassificationResult {
   label: string;        // One of PHOTO_CLASSIFICATIONS
-  confidence: number;   // 0–1
+  confidence: number;   // 0-1
   isExterior: boolean;
   provider: string;
   model: string;
+}
+
+export interface ImageRestorationInput {
+  imageBuffer: Buffer;
+  classification: string;
+  prompt: string;
+  negativePrompt: string;
+  promptVersion: string;
+  pipelineSteps: readonly string[];
+}
+
+export interface ImageRestorationResult {
+  buffer: Buffer;
+  provider: string;
+  model: string;
+  timeMs: number;
 }
 
 // Canonical photo classifications.
@@ -140,4 +157,10 @@ export interface IClassificationProvider {
   readonly name: string;
   readonly model: string;
   classify(imageUrl: string): Promise<ClassificationResult>;
+}
+
+export interface IImageRestorationProvider {
+  readonly name: string;
+  readonly model: string;
+  restore(input: ImageRestorationInput): Promise<ImageRestorationResult>;
 }

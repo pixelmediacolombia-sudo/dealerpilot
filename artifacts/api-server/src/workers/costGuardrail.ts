@@ -18,6 +18,7 @@ import { and, eq, gte, sql } from "drizzle-orm";
 // per single classification call. Conservative estimate, not billing truth —
 // exists purely to stop runaway per-image spend.
 export const ESTIMATED_COST_PER_OPENAI_CLASSIFICATION_USD = 0.002;
+export const ESTIMATED_COST_PER_OPENAI_RESTORATION_USD = 0.08;
 
 // Estimated FAL cost per real API call, split by operation since AI Studio
 // compositing (queued, ~20-60s/image) is far more expensive than background
@@ -30,6 +31,12 @@ export const ESTIMATED_COST_PER_PHOTO_JOB_USD =
   ESTIMATED_COST_PER_FAL_BG_REMOVAL_USD + ESTIMATED_COST_PER_FAL_COMPOSITE_USD;
 
 export type FalUsagePurpose = "fal_bg_removal" | "fal_composite";
+export type OpenAiUsagePurpose = "photo_classification" | "photo_restoration";
+
+const OPENAI_COST_BY_PURPOSE: Record<OpenAiUsagePurpose, number> = {
+  photo_classification: ESTIMATED_COST_PER_OPENAI_CLASSIFICATION_USD,
+  photo_restoration: ESTIMATED_COST_PER_OPENAI_RESTORATION_USD,
+};
 
 const FAL_COST_BY_PURPOSE: Record<FalUsagePurpose, number> = {
   fal_bg_removal: ESTIMATED_COST_PER_FAL_BG_REMOVAL_USD,
@@ -56,9 +63,26 @@ export async function getTodayOpenAiClassificationCount(): Promise<number> {
   return row?.count ?? 0;
 }
 
+export async function getTodayOpenAiSpend(): Promise<number> {
+  const rows = await db
+    .select({ purpose: aiUsageEventsTable.purpose, count: sql<number>`count(*)::int` })
+    .from(aiUsageEventsTable)
+    .where(and(eq(aiUsageEventsTable.provider, "openai"), gte(aiUsageEventsTable.createdAt, todayStart())))
+    .groupBy(aiUsageEventsTable.purpose);
+
+  return rows.reduce((sum, r) => {
+    const cost = OPENAI_COST_BY_PURPOSE[r.purpose as OpenAiUsagePurpose] ?? 0;
+    return sum + r.count * cost;
+  }, 0);
+}
+
 /** Records one real OpenAI classification call against today's usage counter. */
 export async function recordOpenAiClassification(): Promise<void> {
   await db.insert(aiUsageEventsTable).values({ provider: "openai", purpose: "photo_classification" });
+}
+
+export async function recordOpenAiRestoration(): Promise<void> {
+  await db.insert(aiUsageEventsTable).values({ provider: "openai", purpose: "photo_restoration" });
 }
 
 export interface OpenAiBudgetCheck {
@@ -84,6 +108,21 @@ export async function checkOpenAiBudget(): Promise<OpenAiBudgetCheck> {
   const estimatedSpentTodayUsd = callsToday * ESTIMATED_COST_PER_OPENAI_CLASSIFICATION_USD;
   const remainingBudgetUsd = Math.max(0, dailyBudgetUsd - estimatedSpentTodayUsd);
   const remainingCallsAllowed = Math.floor(remainingBudgetUsd / ESTIMATED_COST_PER_OPENAI_CLASSIFICATION_USD);
+
+  return {
+    dailyBudgetUsd,
+    estimatedSpentTodayUsd,
+    remainingBudgetUsd,
+    remainingCallsAllowed,
+    budgetExhausted: remainingCallsAllowed <= 0,
+  };
+}
+
+export async function checkOpenAiRestorationBudget(): Promise<OpenAiBudgetCheck> {
+  const dailyBudgetUsd = getOpenAiDailyBudgetUsd();
+  const estimatedSpentTodayUsd = await getTodayOpenAiSpend();
+  const remainingBudgetUsd = Math.max(0, dailyBudgetUsd - estimatedSpentTodayUsd);
+  const remainingCallsAllowed = Math.floor(remainingBudgetUsd / ESTIMATED_COST_PER_OPENAI_RESTORATION_USD);
 
   return {
     dailyBudgetUsd,
@@ -164,13 +203,14 @@ export async function getPhotoBudgetStatus(): Promise<PhotoBudgetStatus> {
   const falDailyBudgetUsd = getFalDailyBudgetUsd();
   const todayFALSpendEstimate = await getTodayFalSpend();
   const openAi = await checkOpenAiBudget();
+  const todayOpenAISpendEstimate = await getTodayOpenAiSpend();
 
   return {
     todayFALSpendEstimate,
     falBudgetRemaining: Math.max(0, falDailyBudgetUsd - todayFALSpendEstimate),
     falDailyBudgetUsd,
-    todayOpenAISpendEstimate: openAi.estimatedSpentTodayUsd,
-    openAIBudgetRemaining: openAi.remainingBudgetUsd,
+    todayOpenAISpendEstimate,
+    openAIBudgetRemaining: Math.max(0, openAi.dailyBudgetUsd - todayOpenAISpendEstimate),
     openAIDailyBudgetUsd: openAi.dailyBudgetUsd,
   };
 }

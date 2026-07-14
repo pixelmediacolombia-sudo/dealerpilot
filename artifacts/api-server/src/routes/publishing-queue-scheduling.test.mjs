@@ -28,6 +28,22 @@ const authGateSource = readFileSync(
   new URL("../../../dashboard/src/app/AuthGate.tsx", import.meta.url),
   "utf8",
 );
+const salesAiSource = readFileSync(
+  new URL("../../../dashboard/src/features/sales-ai/pages/index.tsx", import.meta.url),
+  "utf8",
+);
+const restorationSpecSource = readFileSync(
+  new URL("../photo/restorationSpec.ts", import.meta.url),
+  "utf8",
+);
+const enhanceStageSource = readFileSync(
+  new URL("../photo/stages/4_enhance.ts", import.meta.url),
+  "utf8",
+);
+const openAiRestorationSource = readFileSync(
+  new URL("../photo/providers/openaiRestoration.ts", import.meta.url),
+  "utf8",
+);
 
 test("batch list exposes live job progress instead of terminal counts only", () => {
   assert.match(autoPublishSource, /max\(\$\{publishingJobsTable\.progressPercent\}\)/);
@@ -181,6 +197,26 @@ test("publishing payload prefers the latest ready AI photo set before raw images
   assert.match(publishingRepositorySource, /source: "ai" as const/);
 });
 
+test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity validation", () => {
+  assert.match(restorationSpecSource, /dealerpilot-photo-enhancement-v2/);
+  assert.match(restorationSpecSource, /Super Resolution/);
+  assert.match(restorationSpecSource, /Deblur/);
+  assert.match(restorationSpecSource, /Noise Reduction/);
+  assert.match(restorationSpecSource, /White Balance/);
+  assert.match(restorationSpecSource, /Dynamic Range Recovery/);
+  assert.match(restorationSpecSource, /Shadow Recovery/);
+  assert.match(restorationSpecSource, /Micro Detail Enhancement/);
+  assert.match(restorationSpecSource, /MIN_PHOTO_FIDELITY_SCORE = 9\.5/);
+  assert.match(enhanceStageSource, /DealerPilot Vision Engine/);
+  assert.match(enhanceStageSource, /VehicleGeometryFidelity|vehicleGeometryFidelity/);
+  assert.match(enhanceStageSource, /restoreWithValidation/);
+  assert.match(enhanceStageSource, /conservative/);
+  assert.match(enhanceStageSource, /enhancement_rejected_original_preserved/);
+  assert.match(enhanceStageSource, /photoFidelityFlags/);
+  assert.match(openAiRestorationSource, /PHOTO_RESTORATION_ALLOW_GENERATIVE/);
+  assert.match(openAiRestorationSource, /vision-engine/);
+});
+
 test("Sales AI intake writes Messenger messages to the CRM and Marketplace metrics", () => {
   assert.match(publisherFlowSource, /type: "CONVERSATION_INTAKE"/);
   assert.match(publisherFlowSource, /externalThreadRef/);
@@ -190,6 +226,15 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(conversationsSource, /syncMarketplaceListingMetrics/);
   assert.match(conversationsSource, /messagesReceived/);
   assert.match(conversationsSource, /unreadMessages/);
+});
+
+test("Sales AI empty state shows connected Facebook readiness instead of reconnecting", () => {
+  assert.match(salesAiSource, /useGetConnectionStatus/);
+  assert.match(salesAiSource, /facebookReady = extOnline && fbLoggedIn && mktConnected/);
+  assert.match(salesAiSource, /Facebook Connected/);
+  assert.match(salesAiSource, /Waiting for the first buyer message/);
+  assert.match(salesAiSource, /Open Marketplace/);
+  assert.match(salesAiSource, /Connect Facebook/);
 });
 
 test("extension closes Marketplace after a completed publish and respects scheduled spacing", () => {

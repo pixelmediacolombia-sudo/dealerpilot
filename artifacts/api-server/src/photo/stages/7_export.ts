@@ -43,7 +43,7 @@ export async function stageExport(ctx: PipelineContext): Promise<void> {
           removalModel: img.removalModel ?? null,
           removalTimeMs: img.removalTimeMs ?? null,
           backgroundVersion: img.backgroundVersion ?? null,
-          promptVersion: "v1",
+          promptVersion: img.promptVersion ?? "v1",
           totalProcessingTimeMs: img.totalProcessingTimeMs ?? null,
           qualityScore: img.qualityScore ?? null,
           qualityFlags: img.qualityFlags ?? null,

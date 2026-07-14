@@ -98,6 +98,15 @@ function scoreFlags(flags: QualityFlags): number {
   return score;
 }
 
+function parseJson(value: string | undefined): unknown {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
 // ── Main validate stage ───────────────────────────────────────────────────────
 
 export async function stageValidate(ctx: PipelineContext): Promise<void> {
@@ -212,6 +221,19 @@ export async function stageValidate(ctx: PipelineContext): Promise<void> {
             contrastDelta:     img.enhancementDelta.contrastDelta,
           }
         : {}),
+      restoration: img.restorationProvider
+        ? {
+            provider: img.restorationProvider,
+            model: img.restorationModel,
+            timeMs: img.restorationTimeMs,
+            used: img.restorationUsed === true,
+            rejectedReason: img.restorationRejectedReason,
+          }
+        : img.restorationRejectedReason
+          ? { used: false, rejectedReason: img.restorationRejectedReason }
+          : undefined,
+      photoFidelity: parseJson(img.photoFidelityFlags),
+      promptVersion: img.promptVersion,
     });
 
     ctx.log.debug(

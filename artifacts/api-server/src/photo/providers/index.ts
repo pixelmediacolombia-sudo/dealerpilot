@@ -2,12 +2,14 @@
 // Add new providers here; stages only depend on the interfaces in types.ts.
 import { FalAiBackgroundRemoval } from "./falai";
 import { OpenAiClassifier } from "./openai";
-import type { IBackgroundRemovalProvider, IClassificationProvider } from "./types";
+import { OpenAiImageRestorationProvider } from "./openaiRestoration";
+import type { IBackgroundRemovalProvider, IClassificationProvider, IImageRestorationProvider } from "./types";
 
-export type { IBackgroundRemovalProvider, IClassificationProvider };
+export type { IBackgroundRemovalProvider, IClassificationProvider, IImageRestorationProvider };
 
 let _bgRemoval: IBackgroundRemovalProvider | null = null;
 let _classifier: IClassificationProvider | null = null;
+let _restoration: IImageRestorationProvider | null = null;
 
 export function getBackgroundRemovalProvider(): IBackgroundRemovalProvider | null {
   if (_bgRemoval !== undefined && _bgRemoval !== null) return _bgRemoval;
@@ -24,4 +26,13 @@ export function getClassificationProvider(): IClassificationProvider {
   return _classifier;
 }
 
-export { FalAiBackgroundRemoval, OpenAiClassifier };
+export function getImageRestorationProvider(): IImageRestorationProvider | null {
+  if (_restoration) return _restoration;
+  if (OpenAiImageRestorationProvider.isConfigured()) {
+    _restoration = new OpenAiImageRestorationProvider();
+    return _restoration;
+  }
+  return null;
+}
+
+export { FalAiBackgroundRemoval, OpenAiClassifier, OpenAiImageRestorationProvider };
