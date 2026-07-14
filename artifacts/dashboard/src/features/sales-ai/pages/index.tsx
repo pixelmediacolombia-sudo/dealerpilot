@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const API_BASE = "/api";
 const DEALER_ID = 1;
-const STORE_PHONE = "703-763-4675";
+const STORE_PHONE = "+1 703-763-4675";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

@@ -18,11 +18,11 @@ const router = Router();
 const DEALER_ID = 1;
 
 const STORE_PHONES: Record<string, string> = {
-  manassas: "703-763-4675",
-  fredericksburg: "703-763-4675", // same until Fredericksburg number is confirmed
+  manassas: "+1 703-763-4675",
+  fredericksburg: "+1 703-763-4675", // same until Fredericksburg number is confirmed
 };
 
-const DEFAULT_STORE_PHONE = "703-763-4675";
+const DEFAULT_STORE_PHONE = "+1 703-763-4675";
 
 function resolveStorePhone(lotLocation?: string | null): string {
   if (!lotLocation) return DEFAULT_STORE_PHONE;

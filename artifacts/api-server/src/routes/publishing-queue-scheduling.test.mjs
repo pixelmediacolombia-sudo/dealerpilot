@@ -185,6 +185,7 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(publisherFlowSource, /type: "CONVERSATION_INTAKE"/);
   assert.match(publisherFlowSource, /externalThreadRef/);
   assert.match(publisherFlowSource, /href="tel:\+17037634675"/);
+  assert.match(conversationsSource, /\+1 703-763-4675/);
   assert.match(conversationsSource, /role:\s*"user"/);
   assert.match(conversationsSource, /syncMarketplaceListingMetrics/);
   assert.match(conversationsSource, /messagesReceived/);
