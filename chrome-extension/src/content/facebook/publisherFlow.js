@@ -2383,8 +2383,16 @@
           } else {
             const res = await send({ type: "FETCH_JOB_PHOTO", jobId, index: idx });
             if (!res || !res.ok) {
-              console.error(`[PHOTO] proxy FAILED idx ${idx}:`, res?.error);
+              console.log(`[PHOTO] proxy skipped idx ${idx}:`, res?.error);
               stateLog(`Photo ${idx + 1}: proxy failed — ${res?.error}`);
+              warnings.push(`photo ${idx + 1}: skipped — ${res?.error || "proxy failed"}`);
+              return;
+            }
+            if (res.data?.skipped || !res.data?.base64) {
+              const reason = res.data?.error || "proxy returned no image data";
+              console.log(`[PHOTO] proxy skipped idx ${idx}:`, reason);
+              stateLog(`Photo ${idx + 1}: skipped — ${reason}`);
+              warnings.push(`photo ${idx + 1}: skipped — ${reason}`);
               return;
             }
             ({ base64, type } = res.data);

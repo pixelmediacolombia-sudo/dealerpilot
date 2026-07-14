@@ -10,6 +10,10 @@ const queueClient = readFileSync(
   new URL("../src/background/queueClient.js", import.meta.url),
   "utf8",
 );
+const photoProxy = readFileSync(
+  new URL("../src/background/photoProxy.js", import.meta.url),
+  "utf8",
+);
 
 test("Marketplace filler recognizes Spanish vehicle form labels", () => {
   for (const keyword of [
@@ -43,6 +47,18 @@ test("Marketplace vehicle type matches Spanish car-truck options without warning
     aliasesStart < content.indexOf('No exact match for "${target}"', aliasesStart),
     "Spanish car/truck aliases must be considered before warning fallback",
   );
+});
+
+test("Photo proxy 5xx responses are skipped without extension error noise", () => {
+  const responseOkStart = photoProxy.indexOf("if (!response.ok)");
+  const contentTypeStart = photoProxy.indexOf("if (!contentType.toLowerCase()", responseOkStart);
+  const responseOkBlock = photoProxy.slice(responseOkStart, contentTypeStart);
+  assert.match(responseOkBlock, /return \{ skipped: true, retryable: response\.status >= 500/);
+  assert.doesNotMatch(responseOkBlock, /console\.error/);
+  assert.doesNotMatch(responseOkBlock, /throw new Error/);
+  assert.match(content, /res\.data\?\.skipped \|\| !res\.data\?\.base64/);
+  assert.match(content, /photo \$\{idx \+ 1\}: skipped/);
+  assert.doesNotMatch(content, /console\.error\(`\[PHOTO\] proxy FAILED idx/);
 });
 
 test("Make can fall back to a text input instead of requiring a combobox", () => {

@@ -22,8 +22,8 @@
     const contentType = response.headers.get("content-type") || "image/jpeg";
     if (!response.ok) {
       const errMsg = `[PHOTO] Image fetch failed: HTTP ${response.status} ${response.statusText} — ${url}`;
-      console.error(errMsg);
-      throw new Error(errMsg);
+      console.log(errMsg);
+      return { skipped: true, retryable: response.status >= 500, status: response.status, error: errMsg };
     }
 
     if (!contentType.toLowerCase().startsWith("image/")) {
