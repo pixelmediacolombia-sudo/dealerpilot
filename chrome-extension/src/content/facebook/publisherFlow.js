@@ -651,6 +651,16 @@
     ]);
     if (cleanTitle && !checkboxIsChecked(cleanTitle)) add("clean title checkbox is visible but unchecked");
 
+    const visibleOptions = Array.from(document.querySelectorAll('[role="option"]')).filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    });
+    const locationOptionsOpen = visibleOptions.some((el) => {
+      const text = normalizeText(el.innerText || el.textContent || "");
+      return text.includes("ciudad") || text.includes("city") || text.includes(" virginia") || /\bva\b/.test(text);
+    });
+    if (locationOptionsOpen) add("location autocomplete suggestions are still open");
+
     return hints.slice(0, 8);
   }
 
@@ -1805,6 +1815,9 @@
       const cityPart = normalizeText(textValue.split(",")[0] || textValue);
       const statePart = normalizeText((textValue.split(",")[1] || "").trim());
       const stateAlias = STATE_ALIASES[statePart] || statePart;
+      const otherStateTokens = Object.entries(STATE_ALIASES)
+        .filter(([abbr, name]) => abbr !== statePart && name !== stateAlias)
+        .flatMap(([abbr, name]) => [abbr, name]);
       let pickedSuggestion = false;
       const locationQueries = Array.from(new Set([
         textValue,
@@ -1822,23 +1835,26 @@
         if (!options.length) continue;
 
         const optionText = (option) => normalizeText(option.innerText || option.textContent || "");
+        const containsToken = (text, token) => {
+          if (!token) return false;
+          const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(text);
+        };
         const optionScore = (option) => {
           const text = optionText(option);
           const firstLine = normalizeText((option.innerText || option.textContent || "").split(/\r?\n/)[0] || "");
           let score = 0;
-          if (firstLine === cityPart) score += 80;
+          if (firstLine === cityPart) score += 45;
           if (text.includes(`${cityPart}, ${statePart}`)) score += 60;
           if (stateAlias && text.includes(`${cityPart}, ${stateAlias}`)) score += 55;
           if (cityPart && text.includes(cityPart)) score += 25;
-          if (stateAlias && text.includes(stateAlias)) score += 15;
+          if (statePart && containsToken(text, statePart)) score += 80;
+          if (stateAlias && text.includes(stateAlias)) score += 80;
+          if ((statePart || stateAlias) && otherStateTokens.some((token) => containsToken(text, token))) score -= 75;
           if (text.includes("lake ") || text.includes("park ") || text.includes("county ")) score -= 35;
           return score;
         };
-        let pick =
-          options.find((option) => optionText(option).includes(normalizedTarget)) ||
-          options.find((option) => cityPart && optionText(option).includes(cityPart) && (!stateAlias || optionText(option).includes(stateAlias))) ||
-          options.find((option) => cityPart && optionText(option).includes(cityPart)) ||
-          null;
+        let pick = null;
 
         if (cityPart) {
           const scored = options
@@ -1846,6 +1862,14 @@
             .filter((entry) => entry.score > 0)
             .sort((a, b) => b.score - a.score);
           if (scored.length) pick = scored[0].option;
+        }
+
+        if (!pick) {
+          pick =
+            options.find((option) => optionText(option).includes(normalizedTarget)) ||
+            options.find((option) => cityPart && optionText(option).includes(cityPart) && (!stateAlias || optionText(option).includes(stateAlias))) ||
+            options.find((option) => cityPart && optionText(option).includes(cityPart)) ||
+            null;
         }
 
         // If no suggestion matched our heuristics but suggestions exist, pick
@@ -1876,6 +1900,8 @@
             document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
             await sleep(700);
           }
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+          await sleep(250);
           break;
         }
       }

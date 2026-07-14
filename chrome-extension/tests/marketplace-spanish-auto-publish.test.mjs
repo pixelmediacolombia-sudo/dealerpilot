@@ -176,9 +176,14 @@ test("Marketplace location selects autocomplete suggestions before validating Ne
   assert.match(content, /async function fillLocationStep\(value\)/);
   assert.match(content, /location-suggestions/);
   assert.match(content, /va: "virginia"/);
+  assert.match(content, /otherStateTokens/);
+  assert.match(content, /statePart && containsToken\(text, statePart\)\) score \+= 80/);
+  assert.match(content, /stateAlias && text\.includes\(stateAlias\)\) score \+= 80/);
+  assert.match(content, /otherStateTokens\.some/);
   assert.match(content, /const optionScore = \(option\) =>/);
   assert.match(content, /firstLine === cityPart/);
   assert.match(content, /text\.includes\("lake "\)/);
+  assert.match(content, /location autocomplete suggestions are still open/);
   assert.match(content, /location suggestion selected/);
   assert.match(content, /no autocomplete suggestion matched/);
   assert.match(content, /await fillLocationStep\(fill\.location\)/);
