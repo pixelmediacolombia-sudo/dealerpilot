@@ -1767,11 +1767,31 @@
         if (!options.length) continue;
 
         const optionText = (option) => normalizeText(option.innerText || option.textContent || "");
+        const optionScore = (option) => {
+          const text = optionText(option);
+          const firstLine = normalizeText((option.innerText || option.textContent || "").split(/\r?\n/)[0] || "");
+          let score = 0;
+          if (firstLine === cityPart) score += 80;
+          if (text.includes(`${cityPart}, ${statePart}`)) score += 60;
+          if (stateAlias && text.includes(`${cityPart}, ${stateAlias}`)) score += 55;
+          if (cityPart && text.includes(cityPart)) score += 25;
+          if (stateAlias && text.includes(stateAlias)) score += 15;
+          if (text.includes("lake ") || text.includes("park ") || text.includes("county ")) score -= 35;
+          return score;
+        };
         let pick =
           options.find((option) => optionText(option).includes(normalizedTarget)) ||
           options.find((option) => cityPart && optionText(option).includes(cityPart) && (!stateAlias || optionText(option).includes(stateAlias))) ||
           options.find((option) => cityPart && optionText(option).includes(cityPart)) ||
           null;
+
+        if (cityPart) {
+          const scored = options
+            .map((option) => ({ option, score: optionScore(option) }))
+            .filter((entry) => entry.score > 0)
+            .sort((a, b) => b.score - a.score);
+          if (scored.length) pick = scored[0].option;
+        }
 
         // If no suggestion matched our heuristics but suggestions exist, pick
         // the first suggestion as a fallback. Facebook sometimes requires an
@@ -2899,7 +2919,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     // 2. Check Next button exists and becomes enabled. Facebook can take a few
     // seconds after the last checkbox/dropdown change to recalculate readiness.
     const NEXT_TEXTS = ["next", "continue", "next step", "siguiente", "continuar"];
-    const readyNext = await waitForEnabledButtonByText(NEXT_TEXTS, 12000);
+    const readyNext = await waitForEnabledButtonByText(NEXT_TEXTS, 20000);
     if (readyNext) return { ok: true };
 
     const nextBtn = findButtonByText(NEXT_TEXTS);
@@ -2938,7 +2958,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           ? `Next button is disabled — required fields not selected: ${effectiveMissed.join(", ")}. Check those fields on the form.${diagnosticSuffix}`
           : skippedVehicleDetailFields.length > 0
             ? `Next button is disabled — required vehicle details not selected: ${skippedVehicleDetailFields.join(", ")}. Check those fields on the form.${diagnosticSuffix}`
-            : `Next button is disabled — Facebook still has a required field unselected after waiting 12 seconds. Check clean title and visible vehicle details on the form.${diagnosticSuffix}`,
+            : `Next button is disabled — Facebook still has a required field unselected after waiting 20 seconds. Check clean title and visible vehicle details on the form.${diagnosticSuffix}`,
     };
   }
 
@@ -2951,10 +2971,16 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       '[role="alert"]',
     ];
     const errors = [];
+    const isNonBlockingValidationText = (value) => {
+      const text = normalizePublishText(value);
+      if (!text) return true;
+      return /\b(valid|valido|valida|correct|correcto|correcta)\b/.test(text)
+        && !/\b(invalid|invalido|invalida|error|required|obligatorio|obligatoria|missing|falta)\b/.test(text);
+    };
     for (const sel of errorSelectors) {
       document.querySelectorAll(sel).forEach((el) => {
         const t = (el.innerText || el.textContent || "").trim();
-        if (t && t.length < 200) errors.push(t);
+        if (t && t.length < 200 && !isNonBlockingValidationText(t)) errors.push(t);
       });
     }
     // Deduplicate

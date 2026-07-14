@@ -90,8 +90,8 @@ test("Marketplace clean-title checkbox is handled before Next validation", () =>
   assert.match(content, /function findCheckbox\(keywords\)/);
   assert.match(content, /async function checkCheckboxStep\(label, keywords, isRequired = false\)/);
   assert.match(content, /"clean title"[\s\S]*"titulo limpio"[\s\S]*"este vehiculo tiene titulo limpio"/);
-  assert.match(content, /waitForEnabledButtonByText\(NEXT_TEXTS, 12000\)/);
-  assert.match(content, /after waiting 12 seconds/);
+  assert.match(content, /waitForEnabledButtonByText\(NEXT_TEXTS, 20000\)/);
+  assert.match(content, /after waiting 20 seconds/);
 });
 
 test("Marketplace form state is settled and diagnosed before failing Next", () => {
@@ -128,6 +128,9 @@ test("Marketplace location selects autocomplete suggestions before validating Ne
   assert.match(content, /async function fillLocationStep\(value\)/);
   assert.match(content, /location-suggestions/);
   assert.match(content, /va: "virginia"/);
+  assert.match(content, /const optionScore = \(option\) =>/);
+  assert.match(content, /firstLine === cityPart/);
+  assert.match(content, /text\.includes\("lake "\)/);
   assert.match(content, /location suggestion selected/);
   assert.match(content, /no autocomplete suggestion matched/);
   assert.match(content, /await fillLocationStep\(fill\.location\)/);
@@ -136,6 +139,15 @@ test("Marketplace location selects autocomplete suggestions before validating Ne
     /key: "ArrowDown"[\s\S]{0,300}key: "Enter"[\s\S]{0,300}location filled/,
     "location must not force Enter when no autocomplete suggestion was selected",
   );
+});
+
+test("Positive Facebook validation text is not treated as a blocking form error", () => {
+  assert.match(content, /function scrapeFacebookErrors\(\)/);
+  assert.match(content, /isNonBlockingValidationText/);
+  assert.match(content, /valid\|valido\|valida/);
+  assert.match(content, /invalid\|invalido\|invalida\|error\|required/);
+  assert.match(content, /waitForEnabledButtonByText\(NEXT_TEXTS, 20000\)/);
+  assert.match(content, /after waiting 20 seconds/);
 });
 
 test("Successful publish wakes the queue for the next eligible job", () => {
