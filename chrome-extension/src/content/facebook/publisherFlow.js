@@ -1462,7 +1462,11 @@
       const VT_KWS = ["vehicle type", "tipo de veh", "category", "tipo"];
       // Also include body-style keywords for vehicles whose bodyStyle value
       // might land in the vehicle-type combobox (depends on form version)
-      const CAR_ALIASES = ["car/truck", "cars & trucks", "cars and trucks", "vehicle", "vehicles", "vehiculos", "vehículos", "automobile"];
+      const CAR_ALIASES = [
+        "car/truck", "cars & trucks", "cars and trucks",
+        "auto/camioneta", "auto", "camioneta", "vehiculo", "vehiculos", "vehículos",
+        "automovil", "automóvil", "automobile", "vehicle", "vehicles",
+      ];
 
       console.log(`[VT] selectVehicleTypeStep: "${rawValue}" → "${mapped}"`);
       stateLog(`Vehicle type: "${rawValue}" → "${mapped}"`);

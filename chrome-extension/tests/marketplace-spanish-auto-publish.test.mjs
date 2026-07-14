@@ -32,6 +32,19 @@ test("Marketplace filler recognizes Spanish vehicle form labels", () => {
   }
 });
 
+test("Marketplace vehicle type matches Spanish car-truck options without warning fallback", () => {
+  const aliasesStart = content.indexOf("const CAR_ALIASES = [");
+  const aliasesEnd = content.indexOf("];", aliasesStart);
+  const aliasesBlock = content.slice(aliasesStart, aliasesEnd);
+  assert.match(aliasesBlock, /"auto\/camioneta"/);
+  assert.match(aliasesBlock, /"camioneta"/);
+  assert.match(content, /CAR_ALIASES\.includes\(needle\)/);
+  assert.ok(
+    aliasesStart < content.indexOf('No exact match for "${target}"', aliasesStart),
+    "Spanish car/truck aliases must be considered before warning fallback",
+  );
+});
+
 test("Make can fall back to a text input instead of requiring a combobox", () => {
   assert.match(content, /fillTextOrSelectComboboxStep\s*\(/);
   assert.match(content, /"make"[\s\S]*\["make", "marca"\][\s\S]*\["make", "marca"\]/);
