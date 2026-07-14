@@ -9,8 +9,23 @@ const publishingRepositorySource = readFileSync(
   new URL("../features/publishing/infrastructure/publishingRepository.ts", import.meta.url),
   "utf8",
 );
+const pricingSource = readFileSync(new URL("../listings/pricing.ts", import.meta.url), "utf8");
+const conversationsSource = readFileSync(new URL("./conversations.ts", import.meta.url), "utf8");
+const authSource = readFileSync(new URL("./auth.ts", import.meta.url), "utf8");
+const queueClientSource = readFileSync(
+  new URL("../../../../chrome-extension/src/background/queueClient.js", import.meta.url),
+  "utf8",
+);
+const publisherFlowSource = readFileSync(
+  new URL("../../../../chrome-extension/src/content/facebook/publisherFlow.js", import.meta.url),
+  "utf8",
+);
 const batchProgressCardSource = readFileSync(
   new URL("../../../dashboard/src/features/listings/components/BatchProgressCard.tsx", import.meta.url),
+  "utf8",
+);
+const authGateSource = readFileSync(
+  new URL("../../../dashboard/src/app/AuthGate.tsx", import.meta.url),
   "utf8",
 );
 
@@ -90,7 +105,8 @@ test("cancelled and dismissed auto-publish batches are excluded from the operati
 test("dashboard persists removed batches as dismissed", () => {
   assert.match(batchProgressCardSource, /data: \{ status: "Dismissed" \}/);
   assert.match(batchProgressCardSource, /b\.status !== "Cancelled" && b\.status !== "Dismissed"/);
-  assert.doesNotMatch(batchProgressCardSource, /recentCompleted[\s\S]*b\.status === "Cancelled"/);
+  assert.doesNotMatch(batchProgressCardSource, /const recentCompleted/);
+  assert.match(batchProgressCardSource, /const shown = activeBatches\.slice\(0,\s*5\)/);
   assert.doesNotMatch(batchProgressCardSource, /useState<Set<number>>/);
 });
 
@@ -138,4 +154,56 @@ test("cancelled and dismissed batches do not block the auto-publish frequency ga
     workerSource,
     /from\(publishingBatchesTable\)[\s\S]*eq\(publishingBatchesTable\.dealerId,\s*DEALER_ID\)[\s\S]*ne\(publishingBatchesTable\.status,\s*"Dismissed"\)[\s\S]*orderBy\(desc\(publishingBatchesTable\.createdAt\)\)/,
   );
+});
+
+test("Alpha auth seeds the requested login and logout removes the access token in the UI", () => {
+  assert.match(authSource, /const ALPHA_USERNAME = "alpha\.manassas"/);
+  assert.match(authSource, /const ALPHA_PASSWORD = "Alpha2026"/);
+  assert.match(authSource, /create table if not exists dealer_users/);
+  assert.match(authSource, /dealer_id integer not null references dealers\(id\)/);
+  assert.match(authGateSource, /const TOKEN_KEY = "dealerpilot\.sessionToken"/);
+  assert.match(authGateSource, /authFetch\("\/auth\/logout", token/);
+  assert.match(authGateSource, /localStorage\.removeItem\(TOKEN_KEY\)/);
+  assert.match(authGateSource, /Log out/);
+});
+
+test("Marketplace pricing always posts the full vehicle price", () => {
+  assert.match(pricingSource, /marketplaceDisplayedPrice: actualVehiclePrice/);
+  assert.match(pricingSource, /priceMode: "FULL_PRICE"/);
+  assert.doesNotMatch(pricingSource, /FULL_PRICE_THRESHOLD/);
+  assert.doesNotMatch(pricingSource, /marketplaceDisplayedPrice:\s*(recommendedDownPayment|dp)/);
+});
+
+test("publishing payload prefers the latest ready AI photo set before raw images", () => {
+  assert.match(publishingRepositorySource, /findLatestReadySetId/);
+  assert.match(publishingRepositorySource, /eq\(aiPhotoSetsTable\.status,\s*"Ready"\)/);
+  assert.match(publishingRepositorySource, /desc\(aiPhotoSetsTable\.isLatest\)/);
+  assert.match(publishingRepositorySource, /source: "ai" as const/);
+});
+
+test("Sales AI intake writes Messenger messages to the CRM and Marketplace metrics", () => {
+  assert.match(publisherFlowSource, /type: "CONVERSATION_INTAKE"/);
+  assert.match(publisherFlowSource, /externalThreadRef/);
+  assert.match(publisherFlowSource, /href="tel:\+17037634675"/);
+  assert.match(conversationsSource, /role:\s*"user"/);
+  assert.match(conversationsSource, /syncMarketplaceListingMetrics/);
+  assert.match(conversationsSource, /messagesReceived/);
+  assert.match(conversationsSource, /unreadMessages/);
+});
+
+test("extension closes Marketplace after a completed publish and respects scheduled spacing", () => {
+  assert.match(queueClientSource, /async CLOSE_CURRENT_TAB/);
+  assert.match(queueClientSource, /chrome\.tabs\.remove\(tabId\)/);
+  assert.match(queueClientSource, /handler\(message,\s*_sender\)/);
+  assert.match(publisherFlowSource, /closeMarketplaceTabSoon/);
+  assert.match(publisherFlowSource, /type: "CLOSE_CURRENT_TAB"/);
+  assert.match(queueClientSource, /scheduled_at_wait/);
+  assert.match(queueClientSource, /Math\.max\(finishedMs \+ INTER_JOB_DELAY_MS/);
+});
+
+test("Marketplace vehicle category selector prefers the broad Vehicles option", () => {
+  assert.match(publisherFlowSource, /"truck": "Car\/Truck"/);
+  assert.match(publisherFlowSource, /"suv": "Car\/Truck"/);
+  assert.match(publisherFlowSource, /"vehicles"/);
+  assert.match(publisherFlowSource, /CAR_ALIASES\.some/);
 });

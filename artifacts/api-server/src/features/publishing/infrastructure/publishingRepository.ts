@@ -1,5 +1,6 @@
 import {
   aiPhotoImagesTable,
+  aiPhotoSetsTable,
   db,
   dealersTable,
   listingVersionsTable,
@@ -11,7 +12,7 @@ import {
   vehiclesTable,
   type PublishingJob,
 } from "@workspace/db";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { deriveBatchProgress } from "../../../publishing/batchProgress";
 import { toJob } from "../domain/jobPresenter";
 
@@ -113,12 +114,36 @@ export async function getVehiclePhotos(
   aiPhotoSetId: number | null,
   aiPhotoStatus: string | null,
 ): Promise<Array<{ url: string | null; position: number | null; source: "ai" | "raw" }>> {
-  if ((aiPhotoStatus === "Ready" || aiPhotoStatus === "Done") && aiPhotoSetId !== null) {
-    const aiImages = await db
+  async function findLatestReadySetId() {
+    const [latestReadySet] = await db
+      .select({ id: aiPhotoSetsTable.id })
+      .from(aiPhotoSetsTable)
+      .where(and(eq(aiPhotoSetsTable.vehicleId, vehicleId), eq(aiPhotoSetsTable.status, "Ready")))
+      .orderBy(desc(aiPhotoSetsTable.isLatest), desc(aiPhotoSetsTable.version), desc(aiPhotoSetsTable.createdAt))
+      .limit(1);
+    return latestReadySet?.id ?? null;
+  }
+
+  async function readAiImages(setId: number) {
+    return db
       .select()
       .from(aiPhotoImagesTable)
-      .where(eq(aiPhotoImagesTable.setId, aiPhotoSetId))
+      .where(eq(aiPhotoImagesTable.setId, setId))
       .orderBy(asc(aiPhotoImagesTable.position));
+  }
+
+  let resolvedAiPhotoSetId = aiPhotoSetId;
+  if (resolvedAiPhotoSetId === null || (aiPhotoStatus !== "Ready" && aiPhotoStatus !== "Done")) {
+    resolvedAiPhotoSetId = await findLatestReadySetId();
+  }
+
+  if (resolvedAiPhotoSetId !== null) {
+    let aiImages = await readAiImages(resolvedAiPhotoSetId);
+    const latestReadySetId = aiImages.length === 0 ? await findLatestReadySetId() : null;
+    if (latestReadySetId !== null && latestReadySetId !== resolvedAiPhotoSetId) {
+      resolvedAiPhotoSetId = latestReadySetId;
+      aiImages = resolvedAiPhotoSetId !== null ? await readAiImages(resolvedAiPhotoSetId) : [];
+    }
     if (aiImages.length > 0) {
       return aiImages.map((img) => ({
         url: img.processedUrl ?? img.originalUrl,

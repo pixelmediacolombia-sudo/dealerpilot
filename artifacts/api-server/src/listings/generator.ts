@@ -188,8 +188,9 @@ Your listings maximize: Click Through Rate, Message Rate, Save Rate, Marketplace
 - NEVER use: "This vehicle features...", "This is a great option...", "The exterior color...", "Equipped with..."
 
 === PRICING RULES (strictly enforced) ===
-- priceMode DOWN_PAYMENT: frame the ENTIRE offer around the down payment. Use "Down payment starting at $X" or "Available with $X down for qualified buyers". DO NOT mention the full vehicle price.
-- priceMode FULL_PRICE: mention the full price directly.
+- Always mention the full vehicle price directly.
+- Do not make the down payment the public Marketplace price.
+- Financing may be mentioned only as "financing available for qualified buyers".
 - NEVER say "guaranteed approval", "everyone approved", "no credit check guaranteed", or imply unconditional financing.
 - NEVER say a buyer is guaranteed to qualify. Use "for qualified buyers" or "financing available".
 
@@ -245,23 +246,17 @@ export async function generateListing(vehicle: Vehicle): Promise<GeneratedListin
   const category = detectCategory(vehicle);
   const strategyBlock = CATEGORY_STRATEGIES[category];
 
-  const FULL_PRICE_THRESHOLD = 16_000;
   const price = vehicle.price ?? 0;
-  const priceMode = price < FULL_PRICE_THRESHOLD ? "FULL_PRICE" : "DOWN_PAYMENT";
+  const priceMode = "FULL_PRICE";
 
   const hookVariation = HOOK_VARIATIONS[variationIndex(vehicle.id, HOOK_VARIATIONS.length)];
   const ctaVariation = CTA_VARIATIONS[variationIndex(vehicle.id, CTA_VARIATIONS.length)];
 
-  const pricingBlock =
-    priceMode === "DOWN_PAYMENT"
-      ? `priceMode: DOWN_PAYMENT
-- Marketplace display price: $${suggestion.downPayment} down payment
-- Actual vehicle price: $${price} — DO NOT mention this in the listing
-- Frame everything around the down payment: "Down payment starting at $${suggestion.downPayment}" or "Available with $${suggestion.downPayment} down for qualified buyers"
-- Down payment tier: ${suggestion.category} (typical range ${suggestion.rangeLabel})`
-      : `priceMode: FULL_PRICE
+  const pricingBlock = `priceMode: FULL_PRICE
 - Full asking price: $${price}
-- You may reference the full price in the copy`;
+- Marketplace display price: $${price}
+- Internal down-payment context only: $${suggestion.downPayment} (${suggestion.category}, typical range ${suggestion.rangeLabel})
+- Mention financing only as available for qualified buyers; never post the down payment as the vehicle price`;
 
   const userMessage = `Vehicle facts (only use what is provided — never invent anything):
 ${JSON.stringify(facts, null, 2)}

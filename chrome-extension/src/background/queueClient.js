@@ -249,7 +249,24 @@ const handlers = {
   },
 
   async SEND_MESSAGE_CONTEXT(message) {
-    return apiPost("/api/extension/message-context", message.payload);
+    const payload = message.payload || {};
+    const visibleMessages = payload.visibleMessages || [];
+    const currentMessage = payload.currentMessage || visibleMessages[visibleMessages.length - 1] || payload.chatText || "";
+    return handlers.CONVERSATION_INTAKE({
+      externalThreadRef: payload.externalThreadRef || [
+        payload.detectedMarketplaceListingUrl || payload.sourceUrl || "legacy-message-context",
+        payload.buyerName || "unknown-buyer",
+      ].join("::"),
+      sourceUrl: payload.sourceUrl,
+      buyerName: payload.buyerName,
+      visibleMessages,
+      currentMessage,
+      detectedMarketplaceListingUrl: payload.detectedMarketplaceListingUrl,
+      detectedVehicleTitle: payload.detectedVehicleTitle,
+      marketplaceDownPayment: payload.marketplaceDownPayment,
+      marketplaceAskingPrice: payload.marketplaceAskingPrice,
+      vehicleType: payload.vehicleType,
+    });
   },
 
   // ---- Publishing queue ----
@@ -373,6 +390,22 @@ const handlers = {
         reason: "Only Controlled-mode jobs are processed by extension",
       });
       return { skipped: true, reason: "wrong_mode", jobId: message.jobId };
+    }
+
+    if (message.scheduledAt) {
+      const scheduledMs = new Date(message.scheduledAt).getTime();
+      const waitMs = scheduledMs - Date.now();
+      if (Number.isFinite(waitMs) && waitMs > 1000) {
+        const remainingSec = Math.ceil(waitMs / 1000);
+        await chrome.storage.local.set({
+          queueCooldownUntil: new Date(scheduledMs).toISOString(),
+          queueCooldownRemainingS: remainingSec,
+          lastPollSkipReason: "scheduled_at_wait",
+          lastSkippedJobId: message.jobId,
+          lastSkippedAt: new Date().toISOString(),
+        });
+        return { skipped: true, reason: "scheduled_at_wait", cooldownRemainingS: remainingSec };
+      }
     }
 
     // Preflight before claiming/opening Facebook. Incomplete vehicles must not
@@ -571,6 +604,7 @@ const handlers = {
         createdAt: assignedJob.assignedAt || assignedJob.createdAt || null,
         mode: assignedJob.mode || "Controlled",
         source: "assigned",
+        scheduledAt: assignedJob.scheduledAt || null,
         approvedByUser: true,
         forceUserAction,
       });
@@ -654,7 +688,8 @@ const handlers = {
       if (lastJobFinishedAt) {
         const INTER_JOB_DELAY_MS = 2 * 60_000;
         const finishedMs  = new Date(lastJobFinishedAt).getTime();
-        const cooldownEnd = finishedMs + INTER_JOB_DELAY_MS;
+        const scheduledMs = nextJob.scheduledAt ? new Date(nextJob.scheduledAt).getTime() : 0;
+        const cooldownEnd = Math.max(finishedMs + INTER_JOB_DELAY_MS, Number.isFinite(scheduledMs) ? scheduledMs : 0);
         const remaining   = cooldownEnd - Date.now();
         if (remaining > 0) {
           const remainingSec = Math.round(remaining / 1000);
@@ -674,6 +709,7 @@ const handlers = {
       createdAt: nextJob.createdAt || null,
       mode: nextJob.mode || "Controlled",
       source: jobSource || "publish_now",
+      scheduledAt: nextJob.scheduledAt || null,
       approvedByUser: true,
       forceUserAction,
     });
@@ -702,6 +738,13 @@ const handlers = {
     });
     const tab = await chrome.tabs.create({ url: MARKETPLACE_CREATE_URL });
     return { tabId: tab.id };
+  },
+
+  async CLOSE_CURRENT_TAB(_message, sender) {
+    const tabId = sender && sender.tab && sender.tab.id;
+    if (!tabId) return { ok: true, closed: false };
+    await chrome.tabs.remove(tabId);
+    return { ok: true, closed: true, tabId };
   },
 
   // ---- Job validation ----
@@ -1051,7 +1094,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ ok: false, error: `Unknown message type: ${message.type}` });
         return;
       }
-      const data = await handler(message);
+      const data = await handler(message, _sender);
       sendResponse({ ok: true, data });
     } catch (err) {
       saveLastError(err);

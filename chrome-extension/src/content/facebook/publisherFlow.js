@@ -1409,26 +1409,26 @@
       // the old "Car/Truck" category.  Map whichever value the server sends
       // to the label Facebook is most likely to display.
       const VT_MAP = {
-        "truck": "Truck",
-        "pickup": "Truck",
-        "pickup truck": "Truck",
-        "suv": "SUV",
-        "sport utility": "SUV",
-        "sport-utility": "SUV",
-        "sedan": "Sedan",
-        "saloon": "Sedan",
-        "coupe": "Coupe",
-        "2-door": "Coupe",
-        "hatchback": "Hatchback",
-        "hatch": "Hatchback",
-        "van": "Van",
-        "minivan": "Van",
-        "mini-van": "Van",
-        "wagon": "Wagon",
-        "estate": "Wagon",
-        "convertible": "Convertible",
-        "cabriolet": "Convertible",
-        "roadster": "Convertible",
+        "truck": "Car/Truck",
+        "pickup": "Car/Truck",
+        "pickup truck": "Car/Truck",
+        "suv": "Car/Truck",
+        "sport utility": "Car/Truck",
+        "sport-utility": "Car/Truck",
+        "sedan": "Car/Truck",
+        "saloon": "Car/Truck",
+        "coupe": "Car/Truck",
+        "2-door": "Car/Truck",
+        "hatchback": "Car/Truck",
+        "hatch": "Car/Truck",
+        "van": "Car/Truck",
+        "minivan": "Car/Truck",
+        "mini-van": "Car/Truck",
+        "wagon": "Car/Truck",
+        "estate": "Car/Truck",
+        "convertible": "Car/Truck",
+        "cabriolet": "Car/Truck",
+        "roadster": "Car/Truck",
         "car/truck": "Car/Truck",
         "cars & trucks": "Car/Truck",
         "cars and trucks": "Car/Truck",
@@ -1440,7 +1440,7 @@
       const VT_KWS = ["vehicle type", "tipo de veh", "category", "tipo"];
       // Also include body-style keywords for vehicles whose bodyStyle value
       // might land in the vehicle-type combobox (depends on form version)
-      const CAR_ALIASES = ["car/truck", "cars & trucks", "cars and trucks", "vehicle", "automobile"];
+      const CAR_ALIASES = ["car/truck", "cars & trucks", "cars and trucks", "vehicle", "vehicles", "vehiculos", "vehículos", "automobile"];
 
       console.log(`[VT] selectVehicleTypeStep: "${rawValue}" → "${mapped}"`);
       stateLog(`Vehicle type: "${rawValue}" → "${mapped}"`);
@@ -1460,6 +1460,10 @@
           (CAR_ALIASES.includes(needle)
             ? optionEls.find((o) => CAR_ALIASES.some((a) => getText(o).includes(a)))
             : undefined);
+
+        if (!pick) {
+          pick = optionEls.find((o) => CAR_ALIASES.some((a) => getText(o).includes(a)));
+        }
 
         if (!pick) {
           // Fallback: first option — log the discrepancy
@@ -2502,6 +2506,12 @@
   // navigates back to the Marketplace create page so the content script picks
   // it up fresh. On second+ failure: returns false so the caller renders review.
 
+  function closeMarketplaceTabSoon(delayMs = 1200) {
+    setTimeout(() => {
+      send({ type: "CLOSE_CURRENT_TAB" }).catch(() => { });
+    }, delayMs);
+  }
+
   async function handleAutoRetry(job, reason, extras) {
     const retryCount = job._retryCount ?? 0;
     if (retryCount >= 1) {
@@ -2614,6 +2624,7 @@
             <div class="mai-job-meta">Loading the next eligible vehicle…</div>
           </div>`;
         await send({ type: "POLL_NOW" }).catch(() => { });
+        closeMarketplaceTabSoon();
         return;
       }
       const reason = publishOutcome.blockReason
@@ -2655,12 +2666,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         "Open the popup to claim the next job.",
         "err",
       );
+      closeMarketplaceTabSoon();
       return;
     }
 
     setTimeout(() => {
       send({ type: "POLL_NOW" }).catch(() => { });
     }, 1500);
+    closeMarketplaceTabSoon(2200);
 
     setStatus("✓ Published successfully!" + (listingUrl ? " Listing is live." : ""), "ok");
     clearOutput();
@@ -3210,6 +3223,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         setTimeout(() => {
           send({ type: "POLL_NOW" }).catch(() => { });
         }, 1500);
+        closeMarketplaceTabSoon(2200);
         setStatus("Job marked Published. Listing updated to Published. Claiming the next eligible job.", "ok");
         clearOutput();
         jobBoxEl.innerHTML = `<div class="mai-job"><div class="mai-job-title">Done ✓</div><div class="mai-job-meta">Job #${escapeHtml(
@@ -3456,9 +3470,19 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       }
 
       // Build the payload — structured messages preferred over rawText
+      const currentMessage =
+        messages.length > 0
+          ? messages[messages.length - 1].text
+          : rawText.split("\n").map((line) => line.trim()).filter(Boolean).slice(-1)[0] || "";
+      const externalThreadRef = [
+        context.listingUrl || href.split("?")[0],
+        buyerName || "unknown-buyer",
+      ].join("::");
       const payload = {
+        externalThreadRef,
         sourceUrl: href,
         buyerName: buyerName || undefined,
+        currentMessage,
         detectedVehicleTitle: context.vehicleTitle || undefined,
         detectedMarketplaceListingUrl: context.listingUrl || undefined,
         marketplaceAskingPrice: context.price || undefined,
@@ -3470,10 +3494,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         payload.visibleMessages = messages.map((m) => `${m.speaker}: ${m.text}`);
         payload.chatText = messages.map((m) => `${m.speaker}: ${m.text}`).join("\n").slice(-4000);
       } else {
+        payload.visibleMessages = rawText.split("\n").map((line) => line.trim()).filter(Boolean).slice(-12);
         payload.chatText = rawText;
       }
 
-      const res = await send({ type: "SEND_MESSAGE_CONTEXT", payload });
+      const res = await send({ type: "CONVERSATION_INTAKE", ...payload });
       if (!res || !res.ok) {
         if (res?.error === CTXI) return;
         setStatus("Failed: " + (res && res.error), "err");
@@ -3489,7 +3514,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         `<div class="mai-reply">${escapeHtml(lastReply)}</div>` +
         `${context.vehicleTitle ? `<div class="mai-line" style="opacity:.7;font-size:11px;margin-top:4px;">Vehicle: ${escapeHtml(context.vehicleTitle)}</div>` : ""}` +
         `<button class="mai-btn mai-btn-secondary" id="mai-insert">Insert Reply</button>` +
-        `<button class="mai-btn mai-btn-secondary" id="mai-copy" style="margin-top:4px;">Copy Reply</button>`,
+        `<button class="mai-btn mai-btn-secondary" id="mai-copy" style="margin-top:4px;">Copy Reply</button>` +
+        `<a class="mai-btn" id="mai-call" href="tel:+17037634675" style="margin-top:6px;text-align:center;text-decoration:none;display:block;background:linear-gradient(135deg,#22c55e,#2563eb);border-color:rgba(255,255,255,.18);color:white;font-weight:700;box-shadow:0 8px 18px rgba(37,99,235,.25);">Call +1 703-763-4675</a>`,
       );
 
       outputEl.querySelector("#mai-insert").addEventListener("click", () => insertReply(lastReply));

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "../features/health/presentation/http/healthRouter";
 import extensionRouter from "./extension";
+import authRouter from "./auth";
 import dealersRouter from "./dealers";
 import vehiclesRouter from "./vehicles";
 import connectionRouter from "../features/connection/presentation/http/connectionRouter";
@@ -27,6 +28,7 @@ router.use(gmRouter);
 router.use(workersRouter);
 router.use(orchestratorRouter);
 router.use(healthRouter);
+router.use(authRouter);
 router.use(extensionRouter);
 router.use(dealersRouter);
 router.use(vehiclesRouter);

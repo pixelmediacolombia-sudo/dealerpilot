@@ -294,11 +294,7 @@ export function BatchProgressCard({ dealerId, refreshKey, location }: BatchProgr
   const activeBatches = batches.filter(
     (b) => b.status === "Active" || b.status === "Preparing" || b.status === "Scheduled",
   );
-  const recentCompleted = batches
-    .filter((b) => b.status === "Completed" || b.status === "Failed")
-    .slice(0, 3);
-
-  const shown = [...activeBatches, ...recentCompleted].slice(0, 5);
+  const shown = activeBatches.slice(0, 5);
 
   const completedCount = batches.filter((b) => b.status === "Completed").length;
   const failedCount = batches.filter((b) => b.status === "Failed").length;

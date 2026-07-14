@@ -1,10 +1,13 @@
 import { AppProviders } from "./providers";
 import { AppRouter } from "./router";
+import { AuthGate } from "./AuthGate";
 
 export function App() {
   return (
     <AppProviders>
-      <AppRouter />
+      <AuthGate>
+        <AppRouter />
+      </AuthGate>
     </AppProviders>
   );
 }

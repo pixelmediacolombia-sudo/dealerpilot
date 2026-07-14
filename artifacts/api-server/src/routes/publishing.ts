@@ -316,18 +316,21 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     const autoTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
 
     function buildAISalesCopy(): string {
-      const modelKeyword = vehicle.model.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const priceText = pricing.actualVehiclePrice > 0
+        ? `$${pricing.actualVehiclePrice.toLocaleString("en-US")}`
+        : "Call for price";
+      const mileageText = vehicle.mileage != null
+        ? `${vehicle.mileage.toLocaleString("en-US")} miles`
+        : null;
       return [
-        `🔥 ${autoTitle} lista para manejar`,
+        `${autoTitle} available now at Alpha Motorsport.`,
+        `Total price: ${priceText}.`,
+        mileageText,
+        "Easy financing options available based on qualification.",
+        "Clean, simple buying process for serious buyers.",
         "",
-        "💰 Financiamiento desde $1,000, $2,000 o $3,000 de inicial",
-        "✅ Identificación válida",
-        "✅ Cuenta de banco activa",
-        "✅ Precios bajos para compradores serios",
-        "⏳ Solo personas interesadas en comprar este mes",
-        "",
-        `📩 Escríbenos "${modelKeyword}" hoy y te damos más detalles.`,
-      ].join("\n");
+        "Call +1 703-763-4675 for fast details or to schedule a visit today.",
+      ].filter(Boolean).join("\n");
     }
 
     if (version) {

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, desc, eq, ilike, isNull, or } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import {
   db,
   conversationsTable,
@@ -8,6 +8,7 @@ import {
   downPaymentIntelligenceTable,
   vehiclesTable,
   listingsTable,
+  marketplaceListingsTable,
 } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
 
@@ -27,6 +28,13 @@ function resolveStorePhone(lotLocation?: string | null): string {
   if (!lotLocation) return DEFAULT_STORE_PHONE;
   const key = lotLocation.toLowerCase().trim();
   return STORE_PHONES[key] ?? DEFAULT_STORE_PHONE;
+}
+
+function parseMoney(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
+  if (typeof value !== "string") return undefined;
+  const parsed = Number(value.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : undefined;
 }
 
 const ALPHA_RULES = `
@@ -148,6 +156,35 @@ Write a short phone-first reply. Must include 📞 ${storePhone} on its own line
   return `Yes, it's available ✅\n\nFor the fastest details and financing options, call our store directly:\n\n📞 ${storePhone}\n\nMention you're asking about the ${vehicle} from Marketplace. Would you like to set up a time to see it today?`;
 }
 
+async function syncMarketplaceListingMetrics(params: {
+  vehicleId?: number | null;
+  leadQuality?: string | null;
+}) {
+  if (!params.vehicleId) return;
+
+  const [messageCounts] = await db
+    .select({
+      messagesReceived: sql<number>`count(*) filter (where ${conversationMessagesTable.role} in ('user', 'buyer'))`,
+      lastMessageAt: sql<Date | null>`max(${conversationMessagesTable.createdAt}) filter (where ${conversationMessagesTable.role} in ('user', 'buyer'))`,
+    })
+    .from(conversationMessagesTable)
+    .innerJoin(conversationsTable, eq(conversationsTable.id, conversationMessagesTable.conversationId))
+    .where(eq(conversationsTable.vehicleId, params.vehicleId));
+
+  const messagesReceived = Number(messageCounts?.messagesReceived ?? 0);
+  const updateFields: Partial<typeof marketplaceListingsTable.$inferInsert> = {
+    messagesReceived,
+    unreadMessages: messagesReceived,
+    lastMessageAt: messageCounts?.lastMessageAt ?? null,
+  };
+  if (params.leadQuality) updateFields.leadQuality = params.leadQuality;
+
+  await db
+    .update(marketplaceListingsTable)
+    .set(updateFields)
+    .where(eq(marketplaceListingsTable.vehicleId, params.vehicleId));
+}
+
 router.post("/conversations/intake", async (req, res) => {
   const {
     extensionId,
@@ -171,8 +208,8 @@ router.post("/conversations/intake", async (req, res) => {
     currentMessage?: string;
     detectedMarketplaceListingUrl?: string;
     detectedVehicleTitle?: string;
-    marketplaceDownPayment?: number;
-    marketplaceAskingPrice?: number;
+    marketplaceDownPayment?: number | string;
+    marketplaceAskingPrice?: number | string;
     vehicleType?: string;
     timestamp?: string;
   };
@@ -185,12 +222,25 @@ router.post("/conversations/intake", async (req, res) => {
   const msgs = Array.isArray(visibleMessages) ? visibleMessages : [];
   const inbound = currentMessage || msgs[msgs.length - 1] || "";
   const language = detectLanguage(inbound + " " + (buyerName ?? ""));
+  const parsedDownPayment = parseMoney(marketplaceDownPayment);
+  const parsedAskingPrice = parseMoney(marketplaceAskingPrice);
 
   let vehicleId: number | undefined;
   let listingId: number | undefined;
   let lotLocation: string | null = null;
 
-  if (detectedVehicleTitle) {
+  if (detectedMarketplaceListingUrl) {
+    const [marketplaceListing] = await db
+      .select()
+      .from(marketplaceListingsTable)
+      .where(eq(marketplaceListingsTable.listingUrl, detectedMarketplaceListingUrl))
+      .limit(1);
+    if (marketplaceListing) {
+      vehicleId = marketplaceListing.vehicleId;
+    }
+  }
+
+  if (!vehicleId && detectedVehicleTitle) {
     const vRow = await db
       .select()
       .from(vehiclesTable)
@@ -206,6 +256,15 @@ router.post("/conversations/intake", async (req, res) => {
       vehicleId = match.id;
       lotLocation = match.lotLocation ?? null;
     }
+  }
+
+  if (vehicleId && !lotLocation) {
+    const [vehicle] = await db
+      .select({ lotLocation: vehiclesTable.lotLocation })
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.id, vehicleId))
+      .limit(1);
+    lotLocation = vehicle?.lotLocation ?? null;
   }
 
   const storePhone = resolveStorePhone(lotLocation);
@@ -239,9 +298,9 @@ router.post("/conversations/intake", async (req, res) => {
         vehicleId: vehicleId ?? existingConv.vehicleId,
         listingId: listingId ?? existingConv.listingId,
         marketplaceDownPayment:
-          marketplaceDownPayment ?? existingConv.marketplaceDownPayment,
+          parsedDownPayment ?? existingConv.marketplaceDownPayment,
         marketplaceAskingPrice:
-          marketplaceAskingPrice ?? existingConv.marketplaceAskingPrice,
+          parsedAskingPrice ?? existingConv.marketplaceAskingPrice,
         vehicleType: vehicleType ?? existingConv.vehicleType,
         detectedListingUrl:
           detectedMarketplaceListingUrl ?? existingConv.detectedListingUrl,
@@ -265,8 +324,8 @@ router.post("/conversations/intake", async (req, res) => {
         detectedVehicleTitle,
         vehicleId,
         listingId,
-        marketplaceDownPayment,
-        marketplaceAskingPrice,
+        marketplaceDownPayment: parsedDownPayment,
+        marketplaceAskingPrice: parsedAskingPrice,
         vehicleType,
         lastMessageAt: new Date(),
         status: "active",
@@ -288,7 +347,7 @@ router.post("/conversations/intake", async (req, res) => {
     if (msg && !existingContents.has(msg.trim())) {
       await db.insert(conversationMessagesTable).values({
         conversationId,
-        role: "buyer",
+        role: "user",
         content: msg,
       });
       existingContents.add(msg.trim());
@@ -307,7 +366,7 @@ router.post("/conversations/intake", async (req, res) => {
       language,
       detectedVehicleTitle,
       vehicleType,
-      marketplaceDownPayment,
+      parsedDownPayment,
       storePhone,
     );
 
@@ -325,13 +384,14 @@ router.post("/conversations/intake", async (req, res) => {
     .limit(1);
 
   let leadId: number;
+  let resolvedLeadQuality: "Hot" | "Warm" | "Cold" | null = null;
   if (existingLead) {
     leadId = existingLead.id;
     const resolvedPhone = extractedPhone ?? existingLead.phone;
     const { score, temperature } = computeLeadScore({
       buyerTimeline: existingLead.buyerTimeline,
       buyerAvailableDownPayment: existingLead.buyerAvailableDownPayment,
-      publishedDownPayment: marketplaceDownPayment ?? existingLead.publishedDownPayment,
+      publishedDownPayment: parsedDownPayment ?? existingLead.publishedDownPayment,
       hasId: existingLead.hasId,
       hasProofOfIncome: existingLead.hasProofOfIncome,
       phone: resolvedPhone,
@@ -339,6 +399,7 @@ router.post("/conversations/intake", async (req, res) => {
     });
     // Buyer providing phone number → force HOT, assign to BDC
     const finalTemperature = extractedPhone ? "Hot" : temperature;
+    resolvedLeadQuality = finalTemperature;
     await db
       .update(leadsTable)
       .set({
@@ -348,7 +409,7 @@ router.post("/conversations/intake", async (req, res) => {
         listingId: listingId ?? existingLead.listingId,
         sourceUrl: sourceUrl ?? existingLead.sourceUrl,
         publishedDownPayment:
-          marketplaceDownPayment ?? existingLead.publishedDownPayment,
+          parsedDownPayment ?? existingLead.publishedDownPayment,
         suggestedReply: suggestedReply ?? existingLead.suggestedReply,
         phone: resolvedPhone,
         leadScore: extractedPhone ? Math.max(score, 70) : score,
@@ -359,10 +420,11 @@ router.post("/conversations/intake", async (req, res) => {
       .where(eq(leadsTable.id, existingLead.id));
   } else {
     const { score, temperature } = computeLeadScore({
-      publishedDownPayment: marketplaceDownPayment,
+      publishedDownPayment: parsedDownPayment,
       phone: extractedPhone,
     });
     const finalTemperature = extractedPhone ? "Hot" : temperature;
+    resolvedLeadQuality = finalTemperature;
     const [newLead] = await db
       .insert(leadsTable)
       .values({
@@ -373,7 +435,7 @@ router.post("/conversations/intake", async (req, res) => {
         vehicleId,
         listingId,
         sourceUrl,
-        publishedDownPayment: marketplaceDownPayment,
+        publishedDownPayment: parsedDownPayment,
         suggestedReply,
         phone: extractedPhone,
         leadScore: extractedPhone ? Math.max(score, 70) : score,
@@ -392,13 +454,18 @@ router.post("/conversations/intake", async (req, res) => {
       vehicleId,
       listingId,
       vehicleType,
-      publishedDownPayment: marketplaceDownPayment,
+      publishedDownPayment: parsedDownPayment,
       outcome: "pending",
     })
     .onConflictDoNothing();
 
+  await syncMarketplaceListingMetrics({
+    vehicleId: vehicleId ?? conversation.vehicleId,
+    leadQuality: resolvedLeadQuality,
+  });
+
   req.log.info(
-    { conversationId, leadId, language },
+    { conversationId, leadId, language, extensionId: extensionId ?? null },
     "Conversation intake processed",
   );
   res.json({ conversationId, leadId, suggestedReply, language });

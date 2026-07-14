@@ -16,21 +16,13 @@
  */
 
 // ─── Marketplace price rule (Part 4 of sprint spec) ──────────────────────────
-// If vehicle actual price < $16,000 → full price
-// If vehicle actual price >= $16,000 → show recommended down payment
+// Always show the full vehicle price on Marketplace.
 export function computeMarketplacePrice(
   actualPrice: number | null,
-  recommendedDownPayment: number | null,
-  recommendedPriceStrategy: string,
+  _recommendedDownPayment: number | null,
+  _recommendedPriceStrategy: string,
 ): { marketplacePrice: number | null; priceMode: "FULL_PRICE" | "DOWN_PAYMENT" } {
   if (actualPrice == null) return { marketplacePrice: null, priceMode: "FULL_PRICE" };
-  if (
-    actualPrice >= 16_000 &&
-    recommendedDownPayment != null &&
-    recommendedPriceStrategy === "down_payment"
-  ) {
-    return { marketplacePrice: recommendedDownPayment, priceMode: "DOWN_PAYMENT" };
-  }
   return { marketplacePrice: actualPrice, priceMode: "FULL_PRICE" };
 }
 
@@ -155,7 +147,7 @@ function compositeScore(
   listingScore: number | null,
   priorityScore: number | null,
   actualPrice: number | null,
-  priceMode: "FULL_PRICE" | "DOWN_PAYMENT",
+  _priceMode: "FULL_PRICE" | "DOWN_PAYMENT",
 ): number {
   // Strategy engine confidence: 0–100 → 35 pts max (reduced — price now co-anchors)
   let score = confidenceScore * 0.35;
@@ -181,9 +173,6 @@ function compositeScore(
     else if (actualPrice < 60_000) score -= 10;  // poor FB fit
     else score -= 20;                            // luxury/exotic — not FB Marketplace material
   }
-
-  // Down payment display preferred for higher-priced vehicles → +3
-  if (priceMode === "DOWN_PAYMENT") score += 3;
 
   return Math.round(score);
 }
@@ -230,10 +219,8 @@ export function buildDailyMarketplacePlan(
     if (rec?.strategyName) reasons.push(rec.strategyName);
     if (imageCount >= 15) reasons.push(`${imageCount} photos available`);
     else if (imageCount > 0) reasons.push(`${imageCount} photos`);
-    if (priceMode === "DOWN_PAYMENT" && marketplacePrice != null) {
-      reasons.push(`Marketplace price: $${marketplacePrice.toLocaleString()} down`);
-    } else if (actualPrice != null && actualPrice < 16_000) {
-      reasons.push(`Affordable price: $${actualPrice.toLocaleString()}`);
+    if (actualPrice != null) {
+      reasons.push(`Marketplace price: $${actualPrice.toLocaleString()} total`);
     }
     if (rec?.reason && !reasons.some((r) => r === rec.reason)) {
       const shortReason = rec.reason.split(".")[0];
