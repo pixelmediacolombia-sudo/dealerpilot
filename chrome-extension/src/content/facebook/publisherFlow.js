@@ -1987,6 +1987,9 @@
       stateLog("Phase 1: vehicle type (required)");
       setStatus("Selecting vehicle type…");
       await selectVehicleTypeStep(fill.vehicleType || fill.bodyStyle || "Car/Truck");
+      stateLog("Phase 2: location");
+      setStatus("Selecting location...");
+      await fillLocationStep(fill.location);
 
       // ---- Phase 2: Year / Make / Model ──────────────────────────────────
       // Year and Make are required for Facebook to enable the Next button.
@@ -2072,7 +2075,6 @@
       }
 
       await fillStep("description", ["description", "describe", "details", "descripción", "descripcion", "detalles"], fill.description);
-      await fillLocationStep(fill.location);
 
       // ---- Phase 4: Mileage (required for Next button) ──────────────────
       // Always attempted regardless of FAST_MODE — Facebook requires mileage.

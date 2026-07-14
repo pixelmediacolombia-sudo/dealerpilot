@@ -192,6 +192,10 @@ test("Marketplace location selects autocomplete suggestions before validating Ne
   assert.match(content, /location suggestion selected/);
   assert.match(content, /no autocomplete suggestion matched/);
   assert.match(content, /await fillLocationStep\(fill\.location\)/);
+  assert.ok(
+    content.indexOf("await fillLocationStep(fill.location)") < content.indexOf('setStatus("Selecting year'),
+    "location must be committed before year/make/model because Facebook can revalidate the form after location changes",
+  );
   assert.doesNotMatch(
     content,
     /key: "ArrowDown"[\s\S]{0,300}key: "Enter"[\s\S]{0,300}location filled/,
