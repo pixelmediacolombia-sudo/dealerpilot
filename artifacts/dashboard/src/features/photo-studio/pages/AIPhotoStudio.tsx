@@ -67,12 +67,26 @@ interface InventoryVehicle {
   mileage: number | null;
 }
 
+interface PhotoStudioStats {
+  vehicles?: {
+    ready?: number | string;
+    processing?: number | string;
+    failed?: number | string;
+  };
+}
+
 // ── API calls ─────────────────────────────────────────────────────────────────
 
 async function fetchJobs(): Promise<{ jobs: PhotoJob[] }> {
   const r = await fetch(`${API_BASE}/photo-studio/jobs?limit=200`);
   if (!r.ok) throw new Error("Failed to fetch jobs");
   return r.json() as Promise<{ jobs: PhotoJob[] }>;
+}
+
+async function fetchStats(): Promise<PhotoStudioStats> {
+  const r = await fetch(`${API_BASE}/photo-studio/stats`);
+  if (!r.ok) throw new Error("Failed to fetch photo studio stats");
+  return r.json() as Promise<PhotoStudioStats>;
 }
 
 async function fetchInventory(location?: string): Promise<{ vehicles: InventoryVehicle[] }> {
@@ -133,6 +147,11 @@ function timeAgo(iso: string): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+function toCount(value: number | string | undefined): number {
+  const parsed = typeof value === "string" ? Number(value) : value;
+  return Number.isFinite(parsed) ? Number(parsed) : 0;
 }
 
 // ── AI Status badge ───────────────────────────────────────────────────────────
@@ -452,6 +471,11 @@ export function AIPhotoStudio() {
       return hasActive ? 5000 : 30000;
     },
   });
+  const { data: stats } = useQuery({
+    queryKey: ["photo-studio-stats"],
+    queryFn: fetchStats,
+    refetchInterval: 30000,
+  });
 
   const reprocessMutation = useMutation({
     mutationFn: triggerProcess,
@@ -461,6 +485,7 @@ export function AIPhotoStudio() {
     onSuccess: (_data, vehicleId) => {
       setPendingIds((prev) => { const s = new Set(prev); s.delete(vehicleId); return s; });
       void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
+      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
       toast({ title: "Enhancement started", description: "Photos are being processed." });
     },
     onError: (err: Error, vehicleId) => {
@@ -473,6 +498,7 @@ export function AIPhotoStudio() {
     mutationFn: () => enqueueAll(selectedLocation),
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
+      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
       toast({
         title: "Enhancement queued",
         description: `${data.enqueued} vehicle${data.enqueued !== 1 ? "s" : ""} added to the queue.`,
@@ -499,11 +525,17 @@ export function AIPhotoStudio() {
   const failedCount = processedVehicles.filter(
     (v) => v.status === "Failed" || v.status === "Cancelled",
   ).length;
+  const statsReadyCount = toCount(stats?.vehicles?.ready);
+  const statsProcessingCount = toCount(stats?.vehicles?.processing);
+  const statsFailedCount = toCount(stats?.vehicles?.failed);
+  const displayReadyCount = statsReadyCount || readyCount;
+  const displayProcessingCount = statsProcessingCount || processingCount;
+  const displayFailedCount = statsFailedCount || failedCount;
 
   const kpis = [
-    { label: "Enhanced", value: readyCount, icon: Sparkles, color: "text-amber-400" },
-    { label: "In Progress", value: processingCount, icon: Loader2, color: processingCount > 0 ? "text-blue-400" : "text-white/30", spin: processingCount > 0 },
-    { label: "Needs Attention", value: failedCount, icon: Clock, color: failedCount > 0 ? "text-red-400" : "text-white/30" },
+    { label: "Enhanced", value: displayReadyCount, icon: Sparkles, color: "text-amber-400" },
+    { label: "In Progress", value: displayProcessingCount, icon: Loader2, color: displayProcessingCount > 0 ? "text-blue-400" : "text-white/30", spin: displayProcessingCount > 0 },
+    { label: "Needs Attention", value: displayFailedCount, icon: Clock, color: displayFailedCount > 0 ? "text-red-400" : "text-white/30" },
   ];
 
   if (openVehicleId !== null) {
