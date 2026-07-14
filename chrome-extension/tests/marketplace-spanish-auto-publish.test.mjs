@@ -111,6 +111,25 @@ test("Marketplace description supports Facebook textbox variants", () => {
   assert.match(content, /description field is visible but empty/);
 });
 
+test("Marketplace numeric fields cannot overwrite description textboxes", () => {
+  assert.match(content, /function findField\(keywords, options = \{\}\)/);
+  assert.match(content, /options\.inputOnly/);
+  assert.match(content, /const inputOnly = label === "mileage" \|\| label === "price"/);
+  assert.match(content, /waitForField\(keywords, 6000, \{ inputOnly \}\)/);
+});
+
+test("Marketplace description is reverified before auto-publish", () => {
+  assert.match(content, /async function ensureDescriptionStep\(value\)/);
+  assert.match(content, /Description changed or was overwritten - restoring before publish/);
+  assert.match(content, /description: restored before publish after final field validation/);
+  const ensureIndex = content.indexOf("await ensureDescriptionStep(fill.description)");
+  const formCompleteIndex = content.indexOf('event: "form_complete"');
+  const autoPublishIndex = content.indexOf("await autoPublishFlow(job");
+  assert.ok(ensureIndex > -1, "ensureDescriptionStep call is missing");
+  assert.ok(formCompleteIndex > ensureIndex, "description must be verified before form_complete");
+  assert.ok(autoPublishIndex > ensureIndex, "description must be verified before autoPublishFlow");
+});
+
 test("Next diagnostics only flag exact empty dropdown placeholders", () => {
   assert.match(content, /const placeholderLike = new Set\(\[/);
   assert.match(content, /placeholderLike\.has\(text\)/);

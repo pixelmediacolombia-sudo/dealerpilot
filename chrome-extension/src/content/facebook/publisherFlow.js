@@ -258,11 +258,12 @@
     return normalizeText(parts.filter(Boolean).join(" "));
   }
 
-  function findField(keywords) {
+  function findField(keywords, options = {}) {
+    const selector = options.inputOnly
+      ? 'input[type="text"], input:not([type]), input[type="number"]'
+      : 'input[type="text"], input:not([type]), input[type="number"], textarea, [role="textbox"], [contenteditable="true"]';
     const fields = Array.from(
-      document.querySelectorAll(
-        'input[type="text"], input:not([type]), input[type="number"], textarea, [role="textbox"], [contenteditable="true"]',
-      ),
+      document.querySelectorAll(selector),
     ).filter((el) => el.offsetParent !== null);
     const normalizedKeywords = keywords.map(normalizeText);
     for (const kw of normalizedKeywords) {
@@ -272,12 +273,12 @@
     return null;
   }
 
-  function waitForField(keywords, maxWaitMs = 5000) {
+  function waitForField(keywords, maxWaitMs = 5000, options = {}) {
     return new Promise((resolve) => {
       const interval = 300;
       let elapsed = 0;
       const tick = () => {
-        const field = findField(keywords);
+        const field = findField(keywords, options);
         if (field) { resolve(field); return; }
         elapsed += interval;
         if (elapsed > 900 && elapsed % 900 === 0) nudgeMarketplaceFormScroll();
@@ -532,7 +533,6 @@
         if (checkbox && isVisibleElement(checkbox)) return checkbox;
       }
     }
-
     return null;
   }
 
@@ -1720,7 +1720,8 @@
         return false;
       }
       stateLog(`Filling ${label}`);
-      const el = await waitForField(keywords, 6000);
+      const inputOnly = label === "mileage" || label === "price";
+      const el = await waitForField(keywords, 6000, { inputOnly });
       if (el) {
         setFieldValue(el, String(value));
         await sleep(150);
@@ -1736,6 +1737,34 @@
         missed.push(label);
         return false;
       }
+    }
+
+    async function ensureDescriptionStep(value) {
+      if (value === null || value === undefined || value === "") return false;
+      const descriptionKeywords = ["description", "describe", "details", "descripcion", "detalles"];
+      const el = await waitForField(descriptionKeywords, 3000);
+      if (!el) {
+        warnings.push("description: could not re-verify before publish");
+        return false;
+      }
+
+      const current = fieldCurrentValue(el);
+      const normalizedCurrent = normalizeText(current);
+      const normalizedExpected = normalizeText(value);
+      const numericOnly = /^[0-9\s,.$]+$/.test(normalizedCurrent);
+      const hasExpectedCopy =
+        normalizedCurrent.includes("english") ||
+        normalizedCurrent.includes("espanol") ||
+        normalizedCurrent.includes(normalizedExpected.slice(0, 60));
+
+      if (!normalizedCurrent || numericOnly || !hasExpectedCopy) {
+        stateLog("Description changed or was overwritten - restoring before publish");
+        setFieldValue(el, String(value));
+        await sleep(250);
+        warnings.push("description: restored before publish after final field validation");
+      }
+
+      return true;
     }
 
     async function fillLocationStep(value) {
@@ -2147,6 +2176,8 @@
         ],
         true,
       );
+
+      await ensureDescriptionStep(fill.description);
 
       checkBudget("workflow complete");
       stateLog(`Workflow Complete — ${elapsed()}s elapsed`);
@@ -3118,6 +3149,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         return href;
       }
     }
+
 
     return null;
   }
