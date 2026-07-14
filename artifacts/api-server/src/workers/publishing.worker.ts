@@ -136,7 +136,13 @@ function computePriorityScore(vehicle: {
           ? 10
           : 5;
   const price = vehicle.price ?? 0;
-  const priceBonus = price >= 40000 ? 20 : price >= 25000 ? 15 : price >= 15000 ? 10 : price >= 5000 ? 5 : 0;
+  const priceBonus =
+    price >= 7000 && price < 16000 ? 22 :
+    price < 22000 ? 18 :
+    price < 28000 ? 12 :
+    price < 35000 ? 6 :
+    price >= 45000 ? -10 :
+    0;
   const daysSinceSeen = Math.floor((Date.now() - vehicle.firstSeenAt.getTime()) / 86_400_000);
   const freshnessBonus = daysSinceSeen <= 3 ? 15 : daysSinceSeen <= 7 ? 10 : daysSinceSeen <= 14 ? 5 : 0;
   const photoBonus = photoScore >= 80 ? 10 : photoScore >= 60 ? 6 : photoScore >= 40 ? 3 : 0;

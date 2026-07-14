@@ -171,13 +171,14 @@ function computePriorityScore(vehicle: {
   else if (bs.includes("sedan") || bs.includes("coupe")) bodyStyleBonus = 10;
   else bodyStyleBonus = 5;
 
-  // Price bonus — higher price = higher margin potential
+  // Price bonus — Facebook Marketplace rewards accessible, click-friendly prices.
   const price = vehicle.price ?? 0;
   let priceBonus = 0;
-  if (price >= 40000) priceBonus = 20;
-  else if (price >= 25000) priceBonus = 15;
-  else if (price >= 15000) priceBonus = 10;
-  else if (price >= 5000) priceBonus = 5;
+  if (price >= 7000 && price < 16000) priceBonus = 22;
+  else if (price < 22000) priceBonus = 18;
+  else if (price < 28000) priceBonus = 12;
+  else if (price < 35000) priceBonus = 6;
+  else if (price >= 45000) priceBonus = -10;
 
   // Freshness — how recently the vehicle was first seen
   const daysSinceSeen = Math.floor(

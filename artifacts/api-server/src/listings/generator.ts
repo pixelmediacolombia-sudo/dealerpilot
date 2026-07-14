@@ -225,6 +225,12 @@ SECTION 4 — CTA (1 emotional line, use the CTA variation specified below)
 - Spanish hooks: 🔥 ¿Buscas...? / 🔥 Maneja a casa hoy / 💰 Financiamiento disponible hoy
 - Spanish CTAs: 📩 Escríbenos hoy mismo. / 🚗 Ven a manejarla. / ⏳ No dejes pasar esta oportunidad.
 
+=== PUBLIC MARKETPLACE COPY ===
+- DealerPilot publishes bilingual Marketplace descriptions: English first, Spanish second.
+- Both languages must be friendly, skimmable, and lead with value, trust, and action.
+- Use tasteful emojis from the allowed list in both English and Spanish.
+- Avoid plain flat blocks with no emoji, no CTA, or no emotional hook.
+
 === ALLOWED EMOJIS ===
 Only these: 🔥 🚗 ✅ 💥 📩 💰 ⚡ ⏳ — use only where they improve readability. Never spam.
 

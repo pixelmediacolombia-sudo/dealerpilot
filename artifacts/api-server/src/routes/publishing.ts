@@ -306,6 +306,12 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       return t.length >= 15 && /\s/.test(t) && !/^\d+$/.test(t);
     }
 
+    function ensureEmojiLead(text: string, emoji: string): string {
+      const trimmed = text.trim();
+      if (/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(trimmed)) return trimmed;
+      return `${emoji} ${trimmed}`;
+    }
+
     let fillTitle: string;
     let fillDescription: string;
     let fillDescriptionEs: string | null = null;
@@ -315,7 +321,7 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     const trimStr = vehicle.trim ? ` ${vehicle.trim}` : "";
     const autoTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
 
-    function buildAISalesCopy(): string {
+    function buildEnglishSalesCopy(): string {
       const priceText = pricing.actualVehiclePrice > 0
         ? `$${pricing.actualVehiclePrice.toLocaleString("en-US")}`
         : "Call for price";
@@ -323,27 +329,58 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
         ? `${vehicle.mileage.toLocaleString("en-US")} miles`
         : null;
       return [
-        `${autoTitle} available now at Alpha Motorsport.`,
-        `Total price: ${priceText}.`,
-        mileageText,
-        "Easy financing options available based on qualification.",
-        "Clean, simple buying process for serious buyers.",
+        `🚗 ${autoTitle} available now at Alpha Motorsport.`,
+        `💰 Total price: ${priceText}.`,
+        mileageText ? `✅ ${mileageText}.` : null,
+        "✅ Easy financing options available for qualified buyers.",
+        "✅ Clean, simple buying process for serious buyers.",
         "",
-        "Call +1 703-763-4675 for fast details or to schedule a visit today.",
+        "📞 Call +1 703-763-4675 for fast details or to schedule a visit today.",
+      ].filter(Boolean).join("\n");
+    }
+
+    function buildSpanishSalesCopy(): string {
+      const priceText = pricing.actualVehiclePrice > 0
+        ? `$${pricing.actualVehiclePrice.toLocaleString("en-US")}`
+        : "Llama para precio";
+      const mileageText = vehicle.mileage != null
+        ? `${vehicle.mileage.toLocaleString("en-US")} millas`
+        : null;
+      return [
+        `🚗 ${autoTitle} disponible ahora en Alpha Motorsport.`,
+        `💰 Precio total: ${priceText}.`,
+        mileageText ? `✅ ${mileageText}.` : null,
+        "✅ Financiamiento disponible para compradores calificados.",
+        "✅ Proceso fácil, claro y rápido para compradores serios.",
+        "",
+        "📲 Llama al +1 703-763-4675 o escríbenos para verla hoy.",
+      ].filter(Boolean).join("\n");
+    }
+
+    function buildBilingualMarketplaceDescription(rawEn?: string | null, rawEs?: string | null, rawCta?: string | null): string {
+      const english = isProseText(rawEn) ? ensureEmojiLead(rawEn, "🚗") : buildEnglishSalesCopy();
+      const spanish = isProseText(rawEs) ? ensureEmojiLead(rawEs, "🚗") : buildSpanishSalesCopy();
+      const cta = isProseText(rawCta) ? ensureEmojiLead(rawCta, "📞") : null;
+      return [
+        "🇺🇸 English",
+        english,
+        cta,
+        "",
+        "🇪🇸 Español",
+        spanish,
       ].filter(Boolean).join("\n");
     }
 
     if (version) {
       const rawEn  = version.descriptionEn?.trim() ?? "";
       const rawCta = version.callToAction?.trim()  ?? "";
-      const descParts = [rawEn, rawCta].filter(isProseText);
       fillTitle         = version.title;
       fillDescriptionEs = version.descriptionEs ?? null;
       fillDownPayment   = version.downPayment ?? null;
-      fillDescription   = descParts.length > 0 ? descParts.join("\n\n") : buildAISalesCopy();
+      fillDescription   = buildBilingualMarketplaceDescription(rawEn, fillDescriptionEs, rawCta);
     } else {
       fillTitle       = autoTitle;
-      fillDescription = buildAISalesCopy();
+      fillDescription = buildBilingualMarketplaceDescription();
     }
 
     // Enrich using the healed mode so the extension always sees the correct value.

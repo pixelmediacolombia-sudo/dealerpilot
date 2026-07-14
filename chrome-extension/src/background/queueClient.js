@@ -158,6 +158,54 @@ async function detectFacebookTabState() {
   }
 }
 
+function isCloseableMarketplaceUrl(url) {
+  const state = detectFacebookTabStateFromUrl(url || "");
+  if (!state?.marketplaceDetected) return false;
+  const path = state.marketplacePath || "";
+  return (
+    path.includes("/marketplace/create") ||
+    path.includes("/marketplace/you/selling") ||
+    path.includes("/marketplace/item/")
+  );
+}
+
+async function closeMarketplaceTabs(sender, message = {}) {
+  const ids = new Set();
+  const senderTabId = sender?.tab?.id;
+  if (senderTabId) ids.add(senderTabId);
+
+  const requestedTabId = Number(message.tabId);
+  if (Number.isFinite(requestedTabId) && requestedTabId > 0) ids.add(requestedTabId);
+
+  try {
+    const tabs = await chrome.tabs.query({
+      url: [
+        "https://www.facebook.com/marketplace/*",
+        "https://web.facebook.com/marketplace/*",
+        "https://facebook.com/marketplace/*",
+      ],
+    });
+    for (const tab of tabs) {
+      if (!tab?.id) continue;
+      if (tab.id === senderTabId || isCloseableMarketplaceUrl(tab.url)) ids.add(tab.id);
+    }
+  } catch (err) {
+    console.warn("[DealerPilot AI] Marketplace tab sweep failed:", err);
+  }
+
+  const closed = [];
+  for (const id of ids) {
+    try {
+      await chrome.tabs.remove(id);
+      closed.push(id);
+    } catch (err) {
+      console.warn("[DealerPilot AI] Could not close Marketplace tab:", id, err);
+    }
+  }
+
+  return { ok: true, closed: closed.length > 0, tabIds: closed };
+}
+
 async function sendHeartbeatSnapshot() {
   const base = await getBackendUrl();
   const detected = await detectFacebookTabState();
@@ -740,11 +788,12 @@ const handlers = {
     return { tabId: tab.id };
   },
 
-  async CLOSE_CURRENT_TAB(_message, sender) {
-    const tabId = sender && sender.tab && sender.tab.id;
-    if (!tabId) return { ok: true, closed: false };
-    await chrome.tabs.remove(tabId);
-    return { ok: true, closed: true, tabId };
+  async CLOSE_CURRENT_TAB(message = {}, sender) {
+    return closeMarketplaceTabs(sender, message);
+  },
+
+  async CLOSE_MARKETPLACE_TABS(message = {}, sender) {
+    return closeMarketplaceTabs(sender, message);
   },
 
   // ---- Job validation ----

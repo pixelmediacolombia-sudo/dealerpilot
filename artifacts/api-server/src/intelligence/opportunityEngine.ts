@@ -48,8 +48,8 @@ const MAKE_DEMAND: Record<string, number> = {
 const MODEL_BOOST: Array<[string, number]> = [
   ["f-150", 12], ["silverado", 10], ["ram 1500", 10], ["tacoma", 12],
   ["tundra", 10], ["rav4", 12], ["cr-v", 10], ["camry", 10],
-  ["accord", 10], ["civic", 8], ["corolla", 8], ["model 3", 15],
-  ["model y", 15], ["wrangler", 12], ["outback", 10], ["equinox", 8],
+  ["accord", 10], ["civic", 8], ["corolla", 8], ["model 3", 6],
+  ["model y", 6], ["wrangler", 12], ["outback", 10], ["equinox", 8],
   ["rogue", 8], ["explorer", 8], ["pilot", 9], ["cx-5", 8],
   ["escape", 7], ["highlander", 10], ["4runner", 11], ["bronco", 11],
   ["maverick", 9], ["telluride", 10], ["sorento", 8], ["tucson", 8],
@@ -220,6 +220,50 @@ function avg(nums: number[]): number {
   return nums.reduce((s, n) => s + n, 0) / nums.length;
 }
 
+function computeMarketplaceFitAdjustment(vehicle: Vehicle): { adjustment: number; factors: string[] } {
+  const make = (vehicle.make ?? "").toLowerCase();
+  const model = (vehicle.model ?? "").toLowerCase();
+  const fuel = (vehicle.fuelType ?? "").toLowerCase();
+  const price = vehicle.price ?? null;
+  const factors: string[] = [];
+  let adjustment = 0;
+
+  if (make === "toyota" || make === "honda") {
+    adjustment += 8;
+    factors.push("Toyota/Honda trust signal - high-click Marketplace make (internal estimate)");
+  } else if (["nissan", "hyundai", "kia", "mazda", "subaru", "ford", "chevrolet", "gmc"].includes(make)) {
+    adjustment += 4;
+    factors.push("Mainstream brand with broad Marketplace demand (internal estimate)");
+  }
+
+  if (price != null) {
+    if (price >= 7_000 && price < 16_000) {
+      adjustment += 10;
+      factors.push("Accessible price range - strongest Marketplace click fit");
+    } else if (price < 22_000) {
+      adjustment += 8;
+      factors.push("Buyer-friendly price range for Facebook Marketplace");
+    } else if (price < 28_000) {
+      adjustment += 5;
+      factors.push("Price still accessible for financed Marketplace buyers");
+    } else if (price >= 45_000 && price < 60_000) {
+      adjustment -= 8;
+      factors.push("High price softens Marketplace click volume");
+    } else if (price >= 60_000) {
+      adjustment -= 14;
+      factors.push("Luxury price band - lower Facebook Marketplace click fit");
+    }
+  }
+
+  const isEv = fuel.includes("electric") || make === "tesla" || model.includes("ev");
+  if (isEv && (price == null || price > 25_000)) {
+    adjustment -= 7;
+    factors.push("EV lead kept selective unless price is highly accessible");
+  }
+
+  return { adjustment, factors };
+}
+
 function median(nums: number[]): number | null {
   if (nums.length === 0) return null;
   const sorted = [...nums].sort((a, b) => a - b);
@@ -283,7 +327,7 @@ function computeMarketDemandScore(vehicle: Vehicle): { score: number; factors: s
   }
 
   if (fuel.includes("electric") || make === "tesla") {
-    score += 8; factors.push("EV demand rising — tax credit season amplifies interest (internal estimate)");
+    score += 2; factors.push("EV demand present but price-sensitive on Marketplace (internal estimate)");
   } else if (fuel.includes("hybrid")) {
     score += 5; factors.push("Hybrid in demand — fuel economy buyers active (internal estimate)");
   }
@@ -669,6 +713,7 @@ export function computeOpportunityScores(input: OpportunityInput): OpportunitySc
   const buyerDemand = computeBuyerDemandScore(input.conversationCount, input.hotLeadCount, input.leadCount);
   const inventoryHealth = computeInventoryHealthScore(input.vehicle, now);
   const creative = computeCreativePerformanceScore(input.avgCreativeScore, input.photoCount, input.hasAiPhotos);
+  const marketplaceFit = computeMarketplaceFitAdjustment(input.vehicle);
 
   const opportunityScore = clamp(
     demand.score * WEIGHTS.marketDemand +
@@ -679,7 +724,8 @@ export function computeOpportunityScores(input: OpportunityInput): OpportunitySc
     buyerDemand.score * WEIGHTS.buyerDemand +
     seasonal.score * WEIGHTS.seasonal +
     inventoryHealth.score * WEIGHTS.inventoryHealth +
-    creative.score * WEIGHTS.creativePerformance,
+    creative.score * WEIGHTS.creativePerformance +
+    marketplaceFit.adjustment,
   );
 
   const opportunityLabel = computeOpportunityLabel(opportunityScore);
@@ -704,6 +750,7 @@ export function computeOpportunityScores(input: OpportunityInput): OpportunitySc
     ...buyerDemand.factors,
     ...inventoryHealth.factors,
     ...creative.factors,
+    ...marketplaceFit.factors,
   ].filter(Boolean).slice(0, 7);
 
   return {

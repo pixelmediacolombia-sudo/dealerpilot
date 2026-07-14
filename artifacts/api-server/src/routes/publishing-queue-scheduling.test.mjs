@@ -10,6 +10,8 @@ const publishingRepositorySource = readFileSync(
   "utf8",
 );
 const pricingSource = readFileSync(new URL("../listings/pricing.ts", import.meta.url), "utf8");
+const listingGeneratorSource = readFileSync(new URL("../listings/generator.ts", import.meta.url), "utf8");
+const opportunityEngineSource = readFileSync(new URL("../intelligence/opportunityEngine.ts", import.meta.url), "utf8");
 const conversationsSource = readFileSync(new URL("./conversations.ts", import.meta.url), "utf8");
 const authSource = readFileSync(new URL("./auth.ts", import.meta.url), "utf8");
 const queueClientSource = readFileSync(
@@ -30,6 +32,10 @@ const authGateSource = readFileSync(
 );
 const salesAiSource = readFileSync(
   new URL("../../../dashboard/src/features/sales-ai/pages/index.tsx", import.meta.url),
+  "utf8",
+);
+const dailyPlanSource = readFileSync(
+  new URL("../../../dashboard/src/lib/dailyPlan.ts", import.meta.url),
   "utf8",
 );
 const restorationSpecSource = readFileSync(
@@ -190,6 +196,33 @@ test("Marketplace pricing always posts the full vehicle price", () => {
   assert.doesNotMatch(pricingSource, /marketplaceDisplayedPrice:\s*(recommendedDownPayment|dp)/);
 });
 
+test("publishing payload sends friendly bilingual Marketplace descriptions", () => {
+  assert.match(routeSource, /buildBilingualMarketplaceDescription/);
+  assert.match(routeSource, /English/);
+  assert.match(routeSource, /Español/);
+  assert.match(routeSource, /descriptionEs: fillDescriptionEs/);
+  assert.match(routeSource, /Call \+1 703-763-4675/);
+  assert.match(listingGeneratorSource, /PUBLIC MARKETPLACE COPY/);
+  assert.match(listingGeneratorSource, /bilingual Marketplace descriptions/);
+  assert.match(listingGeneratorSource, /Use tasteful emojis/);
+});
+
+test("daily plan ranking prioritizes click-friendly Marketplace fit", () => {
+  assert.match(dailyPlanSource, /marketplaceFitAdjustment/);
+  assert.match(dailyPlanSource, /TRUST_LEADER_MAKES = new Set\(\["toyota", "honda"\]\)/);
+  assert.match(dailyPlanSource, /price >= 7_000 && price < 16_000/);
+  assert.match(dailyPlanSource, /High-click Marketplace price range/);
+  assert.match(dailyPlanSource, /segment\.includes\("ev"\)/);
+});
+
+test("opportunity and auto-publish scoring reward accessible mainstream vehicles", () => {
+  assert.match(opportunityEngineSource, /computeMarketplaceFitAdjustment/);
+  assert.match(opportunityEngineSource, /Toyota\/Honda trust signal/);
+  assert.match(opportunityEngineSource, /Luxury price band - lower Facebook Marketplace click fit/);
+  assert.match(autoPublishSource, /price >= 7000 && price < 16000\) priceBonus = 22/);
+  assert.match(workerSource, /price >= 7000 && price < 16000 \? 22/);
+});
+
 test("publishing payload prefers the latest ready AI photo set before raw images", () => {
   assert.match(publishingRepositorySource, /findLatestReadySetId/);
   assert.match(publishingRepositorySource, /eq\(aiPhotoSetsTable\.status,\s*"Ready"\)/);
@@ -239,10 +272,12 @@ test("Sales AI empty state shows connected Facebook readiness instead of reconne
 
 test("extension closes Marketplace after a completed publish and respects scheduled spacing", () => {
   assert.match(queueClientSource, /async CLOSE_CURRENT_TAB/);
-  assert.match(queueClientSource, /chrome\.tabs\.remove\(tabId\)/);
+  assert.match(queueClientSource, /async CLOSE_MARKETPLACE_TABS/);
+  assert.match(queueClientSource, /closeMarketplaceTabs/);
+  assert.match(queueClientSource, /chrome\.tabs\.remove\(id\)/);
   assert.match(queueClientSource, /handler\(message,\s*_sender\)/);
   assert.match(publisherFlowSource, /closeMarketplaceTabSoon/);
-  assert.match(publisherFlowSource, /type: "CLOSE_CURRENT_TAB"/);
+  assert.match(publisherFlowSource, /type: "CLOSE_MARKETPLACE_TABS"/);
   assert.match(queueClientSource, /scheduled_at_wait/);
   assert.match(queueClientSource, /Math\.max\(finishedMs \+ INTER_JOB_DELAY_MS/);
 });

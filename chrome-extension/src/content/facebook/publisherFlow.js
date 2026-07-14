@@ -2508,7 +2508,13 @@
 
   function closeMarketplaceTabSoon(delayMs = 1200) {
     setTimeout(() => {
-      send({ type: "CLOSE_CURRENT_TAB" }).catch(() => { });
+      send({
+        type: "CLOSE_MARKETPLACE_TABS",
+        currentUrl: window.location.href,
+        reason: "publish_flow_finished",
+      }).catch(() => {
+        send({ type: "CLOSE_CURRENT_TAB" }).catch(() => { });
+      });
     }, delayMs);
   }
 

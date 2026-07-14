@@ -177,6 +177,45 @@ function compositeScore(
   return Math.round(score);
 }
 
+const HIGH_CLICK_MAKES = new Set([
+  "toyota", "honda", "nissan", "hyundai", "kia", "mazda", "subaru",
+  "ford", "chevrolet", "chevy",
+]);
+const TRUST_LEADER_MAKES = new Set(["toyota", "honda"]);
+
+function marketplaceFitAdjustment(rec: {
+  make: string;
+  primarySegment?: string | null;
+  actualPrice?: number | null;
+}): number {
+  const make = rec.make.toLowerCase();
+  const segment = (rec.primarySegment ?? "").toLowerCase();
+  const price = rec.actualPrice ?? null;
+  let adjustment = 0;
+
+  if (TRUST_LEADER_MAKES.has(make)) adjustment += 12;
+  else if (HIGH_CLICK_MAKES.has(make)) adjustment += 7;
+
+  if (segment.includes("family") || segment.includes("affordable")) adjustment += 6;
+  if (segment.includes("performance") || segment.includes("luxury")) adjustment -= 4;
+
+  if (price != null) {
+    if (price >= 7_000 && price < 16_000) adjustment += 15;
+    else if (price < 22_000) adjustment += 12;
+    else if (price < 28_000) adjustment += 8;
+    else if (price < 35_000) adjustment += 2;
+    else if (price < 45_000) adjustment -= 6;
+    else if (price < 60_000) adjustment -= 14;
+    else adjustment -= 24;
+  }
+
+  if (segment.includes("ev") || segment.includes("tech")) {
+    adjustment += price != null && price <= 25_000 ? 2 : -10;
+  }
+
+  return adjustment;
+}
+
 // ─── Main function ────────────────────────────────────────────────────────────
 
 export function buildDailyMarketplacePlan(
@@ -210,9 +249,14 @@ export function buildDailyMarketplacePlan(
     const priorityScore = w.priorityScore ?? null;
     // Opportunity Engine score is the single source of truth.
     // Fall back to compositeScore only when intelligence hasn't run yet.
-    const planScore = rec?.opportunityScore != null
+    const rawPlanScore = rec?.opportunityScore != null
       ? rec.opportunityScore
       : compositeScore(confidenceScore, imageCount, listingScore, priorityScore, actualPrice, priceMode);
+    const planScore = Math.max(0, Math.min(100, Math.round(rawPlanScore + marketplaceFitAdjustment({
+      make: w.make,
+      primarySegment: rec?.primarySegment ?? null,
+      actualPrice,
+    }))));
 
     // Build human-readable reason bullets from real signals
     const reasons: string[] = [];
@@ -221,7 +265,9 @@ export function buildDailyMarketplacePlan(
     else if (imageCount > 0) reasons.push(`${imageCount} photos`);
     if (actualPrice != null) {
       reasons.push(`Marketplace price: $${actualPrice.toLocaleString()} total`);
+      if (actualPrice < 28_000) reasons.push("High-click Marketplace price range");
     }
+    if (["toyota", "honda"].includes(w.make.toLowerCase())) reasons.push("High-trust Marketplace make");
     if (rec?.reason && !reasons.some((r) => r === rec.reason)) {
       const shortReason = rec.reason.split(".")[0];
       // Skip backend reasons that say "under $16k" when the car is actually above $16k —

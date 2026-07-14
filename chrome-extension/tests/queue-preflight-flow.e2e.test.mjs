@@ -11,6 +11,7 @@ function createHarness(payload, options = {}) {
     claims: [],
     createdTabs: [],
     heartbeats: [],
+    removedTabs: [],
     updatedTabs: [],
   };
   const storage = { extensionId: "ext-e2e", fbLoggedIn: true };
@@ -38,11 +39,14 @@ function createHarness(payload, options = {}) {
     },
     tabs: {
       async query() {
-        return [];
+        return options.facebookTabs ?? [];
       },
       async create(tab) {
         calls.createdTabs.push(tab);
         return { id: 1001, ...tab };
+      },
+      async remove(id) {
+        calls.removedTabs.push(id);
       },
       async update(id, patch) {
         calls.updatedTabs.push({ id, patch });
@@ -240,4 +244,23 @@ test("assigned queue poll uses the Chrome runtime id while claiming with storage
     "assigned poll should use chrome.runtime.id so it matches backend heartbeat assignment",
   );
   assert.deepEqual(calls.claims, [{ jobId: 202, extensionId: "ext-e2e" }]);
+});
+
+test("publish completion closes current and related Marketplace tabs", async () => {
+  const payload = { fill: {}, images: [] };
+  const { handlers, calls } = createHarness(payload, {
+    facebookTabs: [
+      { id: 77, url: "https://www.facebook.com/marketplace/you/selling" },
+      { id: 78, url: "https://www.facebook.com/marketplace/create/vehicle" },
+      { id: 79, url: "https://www.facebook.com/messages" },
+    ],
+  });
+
+  const result = await handlers.CLOSE_MARKETPLACE_TABS(
+    { reason: "publish_flow_finished" },
+    { tab: { id: 76, url: "https://www.facebook.com/marketplace/item/123" } },
+  );
+
+  assert.equal(result.closed, true);
+  assert.deepEqual(calls.removedTabs.sort((a, b) => a - b), [76, 77, 78]);
 });
