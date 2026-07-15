@@ -18,7 +18,7 @@ import {
   type AiPhotoJob,
   type AiStudioPack,
 } from "@workspace/db";
-import { asc, and, eq } from "drizzle-orm";
+import { asc, and, eq, inArray } from "drizzle-orm";
 import type { Logger } from "pino";
 import { stageClassify } from "./stages/1_classify";
 import { stageRemoveBackground } from "./stages/2_removeBackground";
@@ -27,11 +27,16 @@ import { stageEnhance } from "./stages/4_enhance";
 import { stageValidate } from "./stages/5_validate";
 import { stageOrder } from "./stages/6_order";
 import { stageExport } from "./stages/7_export";
-import type { ProviderTrace, QualityImprovementClass } from "./restorationPolicy";
+import {
+  selectedPhotoIdsFromPresetVersion,
+  type ProviderTrace,
+  type QualityImprovementClass,
+} from "./restorationPolicy";
 
 // Per-image working state threaded through stages
 export interface PipelineImage {
   originalUrl: string;
+  sourcePhotoId?: number;
   backgroundRemovedUrl?: string;
   compositedUrl?: string;
   processedUrl?: string;
@@ -141,11 +146,33 @@ export async function runPhotoPipeline(job: AiPhotoJob, log: Logger): Promise<vo
   const vehicleBodyStyle = vehicleData?.bodyStyle?.toUpperCase() ?? "OTHER";
 
   // Load vehicle photos
-  const rawImages = await db
+  let rawImages: Array<{ url: string; position: number; sourcePhotoId?: number }> = await db
     .select({ url: vehicleImagesTable.url, position: vehicleImagesTable.position })
     .from(vehicleImagesTable)
     .where(eq(vehicleImagesTable.vehicleId, job.vehicleId))
     .orderBy(asc(vehicleImagesTable.position));
+
+  const selectedPhotoIds = selectedPhotoIdsFromPresetVersion(job.presetVersion);
+  if (job.sourceSetId && selectedPhotoIds.length > 0) {
+    const sourceImages = await db
+      .select({
+        id: aiPhotoImagesTable.id,
+        originalUrl: aiPhotoImagesTable.originalUrl,
+        position: aiPhotoImagesTable.position,
+      })
+      .from(aiPhotoImagesTable)
+      .where(and(eq(aiPhotoImagesTable.setId, job.sourceSetId), inArray(aiPhotoImagesTable.id, selectedPhotoIds)));
+
+    const byId = new Map(sourceImages.map((image) => [image.id, image]));
+    const selectedRawImages: Array<{ url: string; position: number; sourcePhotoId?: number }> = [];
+    selectedPhotoIds.forEach((id, index) => {
+      const image = byId.get(id);
+      if (image) {
+        selectedRawImages.push({ url: image.originalUrl, position: image.position ?? index, sourcePhotoId: id });
+      }
+    });
+    rawImages = selectedRawImages;
+  }
 
   if (rawImages.length === 0) {
     throw new Error(`Vehicle ${job.vehicleId} has no images`);
@@ -183,8 +210,9 @@ export async function runPhotoPipeline(job: AiPhotoJob, log: Logger): Promise<vo
     .where(eq(aiPhotoJobsTable.id, job.id));
 
   // Build initial pipeline images from raw vehicle images
-  const pipelineImages: PipelineImage[] = rawImages.map(({ url }, i) => ({
+  const pipelineImages: PipelineImage[] = rawImages.map(({ url, sourcePhotoId }, i) => ({
     originalUrl: url,
+    sourcePhotoId,
     position: i,
     processingStatus: "Processing",
     usedFallback: 0,

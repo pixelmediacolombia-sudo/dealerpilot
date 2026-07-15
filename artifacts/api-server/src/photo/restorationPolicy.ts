@@ -42,13 +42,38 @@ export function normalizePhotoProcessingMode(value: unknown): PhotoProcessingMod
   return "fidelity-first";
 }
 
-export function presetVersionForMode(mode: PhotoProcessingMode): string {
-  return `v1:${mode}`;
+export function presetVersionForMode(
+  mode: PhotoProcessingMode,
+  selectedPhotoIds: number[] = [],
+  aiRestorationPhotoIds: number[] = selectedPhotoIds,
+): string {
+  const suffix = selectedPhotoIds.length > 0 ? `:ids=${selectedPhotoIds.join(",")}` : "";
+  const aiSuffix = aiRestorationPhotoIds.length > 0 ? `:ai=${aiRestorationPhotoIds.join(",")}` : "";
+  return `v1:${mode}${suffix}${aiSuffix}`;
 }
 
 export function processingModeFromPresetVersion(value: string | null | undefined): PhotoProcessingMode {
   const [, mode] = String(value ?? "").split(":");
   return normalizePhotoProcessingMode(mode);
+}
+
+export function selectedPhotoIdsFromPresetVersion(value: string | null | undefined): number[] {
+  return photoIdsFromPresetPart(value, "ids");
+}
+
+export function aiRestorationPhotoIdsFromPresetVersion(value: string | null | undefined): number[] {
+  return photoIdsFromPresetPart(value, "ai");
+}
+
+function photoIdsFromPresetPart(value: string | null | undefined, key: string): number[] {
+  const parts = String(value ?? "").split(":");
+  const idsPart = parts.find((part) => part.startsWith(`${key}=`));
+  if (!idsPart) return [];
+  return idsPart
+    .slice(key.length + 1)
+    .split(",")
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0);
 }
 
 export function isRestorableClassification(classification: string): boolean {

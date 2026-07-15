@@ -11,6 +11,7 @@ import {
   aiStudioPacksTable,
   vehiclesTable,
   vehicleImagesTable,
+  type AiPhotoImage,
 } from "@workspace/db";
 import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { computePhotoHash, hasChanged } from "../photo/changeDetection";
@@ -24,6 +25,7 @@ import {
   presetVersionForMode,
   type PhotoProcessingMode,
 } from "../photo/restorationPolicy";
+import { CLASSIFICATION_PRIORITY, type PhotoClassification } from "../photo/providers/types";
 
 
 // ── Multer: background image upload ─────────────────────────────────────────
@@ -178,6 +180,209 @@ async function estimateRestorationCost(
   };
 }
 
+type PhotoSelectionMode = "economy" | "balanced" | "premium";
+
+function normalizeSelectedPhotoIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<number>();
+  const ids: number[] = [];
+  for (const raw of value) {
+    const id = Number(raw);
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids.slice(0, 20);
+}
+
+function normalizePhotoSelectionMode(value: unknown): PhotoSelectionMode {
+  const raw = String(value ?? "").toLowerCase().trim();
+  if (raw === "premium") return "premium";
+  if (raw === "economy") return "economy";
+  return "balanced";
+}
+
+function paidRestorationLimitForMode(mode: PhotoSelectionMode): number {
+  if (mode === "premium") return 4;
+  if (mode === "economy") return 0;
+  return 2;
+}
+
+function sortByPublishingPriority<T extends { classification: string | null; position: number }>(photos: T[]): T[] {
+  return [...photos].sort((a, b) => {
+    const pa = CLASSIFICATION_PRIORITY[a.classification as PhotoClassification] ?? 99;
+    const pb = CLASSIFICATION_PRIORITY[b.classification as PhotoClassification] ?? 99;
+    if (pa !== pb) return pa - pb;
+    return a.position - b.position;
+  });
+}
+
+async function getLatestPhotoSet(vehicleId: number) {
+  const [set] = await db
+    .select()
+    .from(aiPhotoSetsTable)
+    .where(and(eq(aiPhotoSetsTable.vehicleId, vehicleId), eq(aiPhotoSetsTable.isLatest, true)))
+    .orderBy(desc(aiPhotoSetsTable.version))
+    .limit(1);
+  return set ?? null;
+}
+
+async function getLatestPhotoSetImages(vehicleId: number) {
+  const set = await getLatestPhotoSet(vehicleId);
+  if (!set) return { set: null, images: [] as AiPhotoImage[] };
+  const images = await db
+    .select()
+    .from(aiPhotoImagesTable)
+    .where(eq(aiPhotoImagesTable.setId, set.id))
+    .orderBy(asc(aiPhotoImagesTable.position));
+  return { set, images };
+}
+
+async function buildSmartPhotoSelectionPlan(
+  vehicleId: number,
+  processingMode: PhotoProcessingMode,
+  selectionMode: PhotoSelectionMode,
+  maxPhotos = 10,
+) {
+  const { set, images } = await getLatestPhotoSetImages(vehicleId);
+  const sorted = sortByPublishingPriority(
+    images.map((image) => ({
+      id: image.id,
+      originalUrl: image.originalUrl,
+      classification: image.classification ?? "Miscellaneous",
+      position: image.position ?? 0,
+    })),
+  );
+
+  const selected = sorted.slice(0, Math.max(1, Math.min(10, maxPhotos)));
+  const selectedIds = selected.map((photo) => photo.id);
+  const duplicateRejected = Math.max(0, images.length - selected.length);
+  const paidLimit = paidRestorationLimitForMode(selectionMode);
+  let paidRestorations = 0;
+
+  const photos: Array<{
+    id: number;
+    position: number;
+    photoType: string;
+    originalUrl: string;
+    selected: boolean;
+    selectionReason: string;
+    treatment: "Publish As-Is" | "Local Enhancement" | "AI Restoration" | "Reject";
+    estimatedCostUsd: number;
+    restorationReasons: string[];
+    qualityScore: number;
+  }> = [];
+
+  for (let i = 0; i < selected.length; i++) {
+    const photo = selected[i]!;
+    let assessment = { needsRestoration: false, reasons: [] as string[], score: 0 };
+    try {
+      const buffer = await fetchImageBufferForPolicy(photo.originalUrl);
+      assessment = await assessRestorationNeed(buffer, photo.classification, processingMode);
+    } catch (err) {
+      assessment = {
+        needsRestoration: false,
+        reasons: [`preflight_failed:${err instanceof Error ? err.message : String(err)}`],
+        score: 0,
+      };
+    }
+
+    let treatment: "Publish As-Is" | "Local Enhancement" | "AI Restoration" | "Reject" = "Publish As-Is";
+    let estimatedCostUsd = 0;
+    if (assessment.needsRestoration) {
+      if (paidRestorations < paidLimit) {
+        paidRestorations++;
+        treatment = "AI Restoration";
+        estimatedCostUsd = ESTIMATED_PROVIDER_RESTORATION_COST_USD;
+      } else {
+        treatment = "Local Enhancement";
+      }
+    }
+
+    photos.push({
+      id: photo.id,
+      position: i,
+      photoType: photo.classification,
+      originalUrl: photo.originalUrl,
+      selected: true,
+      selectionReason: `${i + 1}. ${photo.classification}`,
+      treatment,
+      estimatedCostUsd,
+      restorationReasons: assessment.reasons,
+      qualityScore: Math.max(0, 10 - assessment.score),
+    });
+  }
+
+  const estimatedCostUsd = Number(photos.reduce((sum, photo) => sum + photo.estimatedCostUsd, 0).toFixed(3));
+  return {
+    vehicleId,
+    sourceSetId: set?.id ?? null,
+    totalPhotosAnalyzed: images.length,
+    selectedPhotoIds: selectedIds,
+    topSelectedCount: selected.length,
+    duplicateRejectedCount: duplicateRejected,
+    publishAsIsCount: photos.filter((photo) => photo.treatment === "Publish As-Is").length,
+    localEnhancementCount: photos.filter((photo) => photo.treatment === "Local Enhancement").length,
+    paidAiRestorationCount: photos.filter((photo) => photo.treatment === "AI Restoration").length,
+    paidAiRestorationPhotoIds: photos
+      .filter((photo) => photo.treatment === "AI Restoration")
+      .map((photo) => photo.id),
+    estimatedCostUsd,
+    photos,
+    finalImageOrder: selectedIds,
+  };
+}
+
+async function resolveProcessingPhotos(
+  vehicleId: number,
+  selectedPhotoIds: number[],
+  processingMode: PhotoProcessingMode,
+  selectionMode: PhotoSelectionMode,
+) {
+  if (selectedPhotoIds.length > 0) {
+    const { set, images } = await getLatestPhotoSetImages(vehicleId);
+    if (!set) throw new Error("Selected photo processing requires an existing photo set");
+    const byId = new Map(images.map((image) => [image.id, image]));
+    const selectedImages = selectedPhotoIds
+      .map((id) => byId.get(id))
+      .filter((image): image is AiPhotoImage => image !== undefined);
+    if (selectedImages.length !== selectedPhotoIds.length) {
+      throw new Error("One or more selected photos do not belong to the latest vehicle photo set");
+    }
+    return {
+      sourceSetId: set.id,
+      selectedPhotoIds,
+      paidAiRestorationPhotoIds: selectedPhotoIds,
+      photoUrls: selectedImages.map((image) => image.originalUrl),
+      selectionPlan: null,
+    };
+  }
+
+  const smartPlan = await buildSmartPhotoSelectionPlan(vehicleId, processingMode, selectionMode);
+  if (smartPlan.sourceSetId !== null && smartPlan.selectedPhotoIds.length > 0) {
+    return {
+      sourceSetId: smartPlan.sourceSetId,
+      selectedPhotoIds: smartPlan.selectedPhotoIds,
+      paidAiRestorationPhotoIds: smartPlan.paidAiRestorationPhotoIds,
+      photoUrls: smartPlan.photos.map((photo) => photo.originalUrl),
+      selectionPlan: smartPlan,
+    };
+  }
+
+  const images = await db
+    .select({ url: vehicleImagesTable.url })
+    .from(vehicleImagesTable)
+    .where(eq(vehicleImagesTable.vehicleId, vehicleId))
+    .orderBy(asc(vehicleImagesTable.position));
+  return {
+    sourceSetId: null,
+    selectedPhotoIds: [],
+    paidAiRestorationPhotoIds: [],
+    photoUrls: images.map((image) => image.url),
+    selectionPlan: null,
+  };
+}
+
 // ── Queue list (all jobs, recent first) ─────────────────────────────────────
 router.get("/photo-studio/jobs", async (req: Request, res: Response) => {
   try {
@@ -272,12 +477,50 @@ router.get("/photo-studio/jobs/:id", async (req: Request, res: Response) => {
 });
 
 // ── Manually trigger AI processing for a vehicle ────────────────────────────
+router.get("/photo-studio/vehicles/:vehicleId/selection-plan", async (req: Request, res: Response) => {
+  try {
+    const vehicleId = Number(req.params.vehicleId);
+    const processingMode = normalizePhotoProcessingMode(req.query["processingMode"]);
+    const selectionMode = normalizePhotoSelectionMode(req.query["selectionMode"]);
+    const maxPhotos = Number(req.query["maxPhotos"] ?? 10);
+    const plan = await buildSmartPhotoSelectionPlan(vehicleId, processingMode, selectionMode, maxPhotos);
+    res.json({ plan });
+  } catch (err) {
+    req.log.error({ err }, "GET /photo-studio/vehicles/:vehicleId/selection-plan failed");
+    res.status(500).json({ error: "Failed to build photo selection plan" });
+  }
+});
+
 router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, res: Response) => {
   try {
     const vehicleId = Number(req.params.vehicleId);
-    const body = req.body as { processingMode?: string; confirmCost?: boolean };
+    const body = req.body as {
+      processingMode?: string;
+      confirmCost?: boolean;
+      selectedPhotoIds?: unknown;
+      selectionMode?: string;
+      maxCostUsd?: unknown;
+    };
     const processingMode = normalizePhotoProcessingMode(body.processingMode);
-    const presetVersion = presetVersionForMode(processingMode);
+    const selectionMode = normalizePhotoSelectionMode(body.selectionMode);
+    const requestedSelectedPhotoIds = normalizeSelectedPhotoIds(body.selectedPhotoIds);
+    let processingPhotos: Awaited<ReturnType<typeof resolveProcessingPhotos>>;
+    try {
+      processingPhotos = await resolveProcessingPhotos(
+        vehicleId,
+        requestedSelectedPhotoIds,
+        processingMode,
+        selectionMode,
+      );
+    } catch (err) {
+      res.status(422).json({ error: err instanceof Error ? err.message : "Invalid selected photos" });
+      return;
+    }
+    const presetVersion = presetVersionForMode(
+      processingMode,
+      processingPhotos.selectedPhotoIds,
+      processingPhotos.paidAiRestorationPhotoIds,
+    );
     const [vehicle] = await db
       .select()
       .from(vehiclesTable)
@@ -289,19 +532,22 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
       return;
     }
 
-    const images = await db
-      .select({ url: vehicleImagesTable.url })
-      .from(vehicleImagesTable)
-      .where(eq(vehicleImagesTable.vehicleId, vehicleId))
-      .orderBy(asc(vehicleImagesTable.position));
-
-    if (images.length === 0) {
+    if (processingPhotos.photoUrls.length === 0) {
       res.status(422).json({ error: "Vehicle has no photos — cannot process" });
       return;
     }
 
     const activeJob = await getActivePhotoJob(vehicleId);
     if (activeJob) {
+      if (activeJob.presetVersion !== presetVersion) {
+        res.status(409).json({
+          error: "Vehicle already has an active photo job with a different photo selection",
+          activeJob,
+          requestedPresetVersion: presetVersion,
+        });
+        return;
+      }
+
       let job = activeJob;
       const vehicleAiStatus = activeJob.status === "Processing" ? "Processing" : "Queued";
 
@@ -319,22 +565,56 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
         .set({ aiPhotoStatus: vehicleAiStatus })
         .where(eq(vehiclesTable.id, vehicleId));
 
-      req.log.info({ jobId: job.id, vehicleId }, "photo:manual trigger reused active vehicle job");
-      res.status(202).json({ job, reused: true });
+      req.log.info({ jobId: job.id, vehicleId, presetVersion }, "photo:manual trigger reused active vehicle job");
+      res.status(202).json({
+        job,
+        reused: true,
+        selectedPhotoIds: processingPhotos.selectedPhotoIds,
+        paidAiRestorationPhotoIds: processingPhotos.paidAiRestorationPhotoIds,
+        sourceSetId: processingPhotos.sourceSetId,
+      });
       return;
     }
 
-    const restorationEstimate = await estimateRestorationCost(
+    const rawRestorationEstimate = await estimateRestorationCost(
       vehicleId,
-      images.map((i) => i.url),
+      processingPhotos.photoUrls,
       processingMode,
     );
+    const restorationEstimate = processingPhotos.selectionPlan
+      ? {
+          ...rawRestorationEstimate,
+          photosNeedingRestoration: processingPhotos.selectionPlan.paidAiRestorationCount,
+          estimatedOpenAiCalls: processingPhotos.selectionPlan.paidAiRestorationCount,
+          estimatedCostUsd: processingPhotos.selectionPlan.estimatedCostUsd,
+          estimatedCostPerImageUsd: processingPhotos.photoUrls.length > 0
+            ? Number((processingPhotos.selectionPlan.estimatedCostUsd / processingPhotos.photoUrls.length).toFixed(4))
+            : 0,
+        }
+      : rawRestorationEstimate;
+
+    const maxCostUsd = Number(body.maxCostUsd);
+    if (Number.isFinite(maxCostUsd) && restorationEstimate.estimatedCostUsd > maxCostUsd) {
+      res.status(422).json({
+        error: "Estimated AI restoration cost exceeds the requested job cap",
+        estimate: restorationEstimate,
+        maxCostUsd,
+        selectedPhotoIds: processingPhotos.selectedPhotoIds,
+        paidAiRestorationPhotoIds: processingPhotos.paidAiRestorationPhotoIds,
+        selectionPlan: processingPhotos.selectionPlan,
+      });
+      return;
+    }
 
     if (restorationEstimate.estimatedOpenAiCalls > 0 && body.confirmCost !== true) {
       res.status(409).json({
         error: "AI restoration cost confirmation required",
         requiresConfirmation: true,
         estimate: restorationEstimate,
+        selectedPhotoIds: processingPhotos.selectedPhotoIds,
+        paidAiRestorationPhotoIds: processingPhotos.paidAiRestorationPhotoIds,
+        sourceSetId: processingPhotos.sourceSetId,
+        selectionPlan: processingPhotos.selectionPlan,
         message: `${restorationEstimate.photosNeedingRestoration} of ${restorationEstimate.totalPhotos} photos need AI restoration. Estimated cost: $${restorationEstimate.estimatedCostUsd}.`,
       });
       return;
@@ -360,7 +640,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
       .limit(1);
 
     const imageHash = computePhotoHash({
-      photoUrls: images.map((i) => i.url),
+      photoUrls: processingPhotos.photoUrls,
       backgroundVersion: defaultPack?.backgroundVersion ?? "v1",
       modelVersion: "bria-rmbg-2.0",
       presetVersion,
@@ -378,6 +658,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
         modelVersion: "bria-rmbg-2.0",
         presetVersion,
         priority: -10, // manual trigger = highest priority for this vehicle
+        ...(processingPhotos.sourceSetId !== null ? { sourceSetId: processingPhotos.sourceSetId } : {}),
       })
       .returning();
 
@@ -386,8 +667,26 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
       .set({ aiPhotoStatus: "Queued" })
       .where(eq(vehiclesTable.id, vehicleId));
 
-    req.log.info({ jobId: job!.id, vehicleId, processingMode, restorationEstimate }, "photo:manual trigger queued");
-    res.status(201).json({ job, estimate: restorationEstimate });
+    req.log.info(
+      {
+        jobId: job!.id,
+        vehicleId,
+        processingMode,
+        selectedPhotoIds: processingPhotos.selectedPhotoIds,
+        paidAiRestorationPhotoIds: processingPhotos.paidAiRestorationPhotoIds,
+        sourceSetId: processingPhotos.sourceSetId,
+        restorationEstimate,
+      },
+      "photo:manual trigger queued",
+    );
+    res.status(201).json({
+      job,
+      estimate: restorationEstimate,
+      selectedPhotoIds: processingPhotos.selectedPhotoIds,
+      paidAiRestorationPhotoIds: processingPhotos.paidAiRestorationPhotoIds,
+      sourceSetId: processingPhotos.sourceSetId,
+      selectionPlan: processingPhotos.selectionPlan,
+    });
   } catch (err) {
     req.log.error({ err }, "POST /photo-studio/vehicles/:vehicleId/process failed");
     res.status(500).json({ error: "Failed to enqueue photo job" });

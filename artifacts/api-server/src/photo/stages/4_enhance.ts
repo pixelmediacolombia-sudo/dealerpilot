@@ -25,6 +25,7 @@ import {
 } from "../../workers/costGuardrail";
 import {
   assessRestorationNeed,
+  aiRestorationPhotoIdsFromPresetVersion,
   ESTIMATED_PROVIDER_RESTORATION_COST_USD,
   isRestorableClassification,
   processingModeFromPresetVersion,
@@ -479,12 +480,27 @@ async function restoreWithValidation(
   buf: Buffer,
   classification: string,
   preset: EnhancementPreset,
+  sourcePhotoId?: number,
 ): Promise<RestorationDecision> {
   const originalStats = await measureImageStats(buf);
   const initialIntensity = chooseInitialIntensity(originalStats);
   const processingMode = processingModeFromPresetVersion(ctx.job.presetVersion);
   const needAssessment = await assessRestorationNeed(buf, classification, processingMode);
-  const providerAttempt = await maybeRunProviderRestoration(ctx, buf, classification, needAssessment);
+  const authorizedPhotoIds = aiRestorationPhotoIdsFromPresetVersion(ctx.job.presetVersion);
+  const providerAllowed =
+    authorizedPhotoIds.length === 0 ||
+    (sourcePhotoId !== undefined && authorizedPhotoIds.includes(sourcePhotoId));
+  const providerAttempt = providerAllowed
+    ? await maybeRunProviderRestoration(ctx, buf, classification, needAssessment)
+    : {
+        requestedProvider: getImageRestorationProvider()?.name ?? null,
+        attemptedProvider: null,
+        returnedProvider: null,
+        model: getImageRestorationProvider()?.model ?? null,
+        output: null,
+        costUsd: 0,
+        rejectedReason: "paid_restoration_not_selected_for_this_photo",
+      };
   const originalFidelity: PhotoFidelityScore = {
     vehicleGeometryFidelity: 10,
     materialFidelity: 10,
@@ -680,7 +696,7 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
       const beforeStats = await measureImageStats(buf);
       const classification = img.classification ?? "Miscellaneous";
       const preset = routePreset(classification);
-      const restored = await restoreWithValidation(ctx, buf, classification, preset);
+      const restored = await restoreWithValidation(ctx, buf, classification, preset, img.sourcePhotoId);
       const afterStats = await measureImageStats(restored.output);
       const brightnessDelta = afterStats.meanBrightness - beforeStats.meanBrightness;
       const contrastDelta = afterStats.meanContrast - beforeStats.meanContrast;

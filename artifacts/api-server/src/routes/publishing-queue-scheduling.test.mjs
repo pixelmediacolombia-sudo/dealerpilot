@@ -308,7 +308,9 @@ test("manual photo reprocess stays pinned to the selected vehicle", () => {
   assert.match(photoStudioRouteSource, /eq\(aiPhotoJobsTable\.vehicleId,\s*vehicleId\)/);
   assert.match(photoStudioRouteSource, /inArray\(aiPhotoJobsTable\.status,\s*\["Queued",\s*"Processing"\]\)/);
   assert.match(photoStudioRouteSource, /activeJobs\.find\(\(job\) => job\.status === "Processing"\)/);
-  assert.match(photoStudioRouteSource, /res\.status\(202\)\.json\(\{ job,\s*reused: true \}\)/);
+  assert.match(photoStudioRouteSource, /res\.status\(202\)\.json\(\{\s*job,\s*reused: true,/);
+  assert.match(photoStudioRouteSource, /selectedPhotoIds: processingPhotos\.selectedPhotoIds/);
+  assert.match(photoStudioRouteSource, /sourceSetId: processingPhotos\.sourceSetId/);
   assert.match(photoStudioRouteSource, /priority:\s*-10/);
   assert.match(photoStudioRouteSource, /manual trigger = highest priority for this vehicle/);
 });
