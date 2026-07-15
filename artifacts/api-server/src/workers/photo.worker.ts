@@ -21,6 +21,10 @@ import type { WorkerDefinition, WorkerRunOutcome } from "./types";
 const INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const DEALER_ID = 1;
 
+function isPhotoAutoQueueWorkerEnabled(): boolean {
+  return process.env["PHOTO_AUTO_QUEUE_WORKER_ENABLED"] === "true";
+}
+
 async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOutcome> {
   const openAiBudget = await checkOpenAiBudget();
   if (openAiBudget.budgetExhausted) {
@@ -79,8 +83,8 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
 export const photoWorker: WorkerDefinition = {
   id: "photo",
   name: "Photo Agent",
-  description: "Finds vehicles without AI photo sets, enqueues jobs within cost guardrails",
+  description: "Optionally finds vehicles without AI photo sets and enqueues jobs within cost guardrails",
   intervalMs: INTERVAL_MS,
-  enabled: true,
+  enabled: isPhotoAutoQueueWorkerEnabled(),
   run,
 };

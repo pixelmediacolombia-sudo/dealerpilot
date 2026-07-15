@@ -36,7 +36,7 @@ export type InventorySyncResult = {
  * 2. Import vehicles (delta detection, no duplicates, preserves status)
  * 3. Scrape Alpha Motorsport lot locations
  * 4. Refresh Opportunity Engine rankings for all vehicles
- * 5. Auto-enqueue AI photo jobs for new/updated vehicles
+ * 5. Optionally auto-enqueue AI photo jobs when explicitly enabled
  */
 async function syncDealer(
   dealerId: number,
@@ -84,7 +84,8 @@ async function syncDealer(
     log.warn({ trigger, dealerId, err }, "Opportunity Engine refresh failed — non-fatal, sync still succeeded");
   }
 
-  // Auto-enqueue AI photo jobs for new/updated vehicles
+  // Disabled by default: photo enhancement is run per selected/publishing vehicle,
+  // not across every imported vehicle.
   if (summary.created > 0 || summary.updated > 0) {
     try {
       const { enqueued, skipped } = await autoEnqueueAfterImport(dealer.id, log);

@@ -39,6 +39,22 @@ const bgUpload = multer({
 
 const router = Router();
 
+async function getActivePhotoJob(vehicleId: number) {
+  const activeJobs = await db
+    .select()
+    .from(aiPhotoJobsTable)
+    .where(
+      and(
+        eq(aiPhotoJobsTable.vehicleId, vehicleId),
+        inArray(aiPhotoJobsTable.status, ["Queued", "Processing"]),
+      ),
+    )
+    .orderBy(desc(aiPhotoJobsTable.createdAt))
+    .limit(10);
+
+  return activeJobs.find((job) => job.status === "Processing") ?? activeJobs[0] ?? null;
+}
+
 // ── Queue list (all jobs, recent first) ─────────────────────────────────────
 router.get("/photo-studio/jobs", async (req: Request, res: Response) => {
   try {
@@ -158,6 +174,30 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
       return;
     }
 
+    const activeJob = await getActivePhotoJob(vehicleId);
+    if (activeJob) {
+      let job = activeJob;
+      const vehicleAiStatus = activeJob.status === "Processing" ? "Processing" : "Queued";
+
+      if (activeJob.status === "Queued") {
+        const [bumpedJob] = await db
+          .update(aiPhotoJobsTable)
+          .set({ priority: -10, updatedAt: new Date() })
+          .where(eq(aiPhotoJobsTable.id, activeJob.id))
+          .returning();
+        job = bumpedJob ?? activeJob;
+      }
+
+      await db
+        .update(vehiclesTable)
+        .set({ aiPhotoStatus: vehicleAiStatus })
+        .where(eq(vehiclesTable.id, vehicleId));
+
+      req.log.info({ jobId: job.id, vehicleId }, "photo:manual trigger reused active vehicle job");
+      res.status(202).json({ job, reused: true });
+      return;
+    }
+
     // Cancel any existing queued jobs for this vehicle
     await db
       .update(aiPhotoJobsTable)
@@ -195,13 +235,13 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
         studioVersion: defaultPack?.backgroundVersion ?? "v1",
         modelVersion: "bria-rmbg-2.0",
         presetVersion: "v1",
-        priority: 1, // manual trigger = higher priority
+        priority: -10, // manual trigger = highest priority for this vehicle
       })
       .returning();
 
     await db
       .update(vehiclesTable)
-      .set({ aiPhotoStatus: "Pending" })
+      .set({ aiPhotoStatus: "Queued" })
       .where(eq(vehiclesTable.id, vehicleId));
 
     req.log.info({ jobId: job!.id, vehicleId }, "photo:manual trigger queued");
@@ -545,6 +585,8 @@ router.get("/photo-studio/sets/:vehicleId", async (req: Request, res: Response) 
       return;
     }
 
+    const activeJob = await getActivePhotoJob(vehicleId);
+
     // Get the latest set for this vehicle
     const [set] = await db
       .select()
@@ -560,6 +602,7 @@ router.get("/photo-studio/sets/:vehicleId", async (req: Request, res: Response) 
         summary: null,
         vehicle: { id: vehicle.id, year: vehicle.year, make: vehicle.make, model: vehicle.model, trim: vehicle.trim, vin: vehicle.vin, aiPhotoStatus: vehicle.aiPhotoStatus },
         isActiveForMarketplace: false,
+        activeJob,
       });
       return;
     }
@@ -588,6 +631,7 @@ router.get("/photo-studio/sets/:vehicleId", async (req: Request, res: Response) 
       summary: { total: images.length, exteriorCount, interiorCount, miscCount, fallbackCount, compositedCount },
       vehicle: { id: vehicle.id, year: vehicle.year, make: vehicle.make, model: vehicle.model, trim: vehicle.trim, vin: vehicle.vin, aiPhotoStatus: vehicle.aiPhotoStatus },
       isActiveForMarketplace: vehicle.aiPhotoSetId === set.id,
+      activeJob,
     });
   } catch (err) {
     req.log.error({ err }, "GET /photo-studio/sets/:vehicleId failed");

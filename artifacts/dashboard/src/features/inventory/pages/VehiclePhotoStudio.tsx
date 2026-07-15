@@ -58,6 +58,15 @@ export interface PhotoSetData {
     aiPhotoStatus: string | null;
   };
   isActiveForMarketplace: boolean;
+  activeJob: {
+    id: number;
+    status: string;
+    totalPhotos: number;
+    processedPhotos: number;
+    failedPhotos: number;
+    currentStage: string | null;
+    progressPercent: number;
+  } | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -103,6 +112,8 @@ export function VehiclePhotoStudio({
     queryKey: PHOTO_SET_QUERY_KEY(vehicleId),
     queryFn: () => fetchPhotoSet(vehicleId),
     refetchInterval: (query) => {
+      const activeJob = query.state.data?.activeJob;
+      if (activeJob?.status === "Queued" || activeJob?.status === "Processing") return 3000;
       const status = query.state.data?.set?.status;
       const aiStatus = query.state.data?.vehicle?.aiPhotoStatus;
       if (status === "Processing") return 3000;
@@ -123,6 +134,8 @@ export function VehiclePhotoStudio({
   });
 
   const set = data?.set;
+  const activeJob = data?.activeJob;
+  const hasActiveJob = activeJob?.status === "Queued" || activeJob?.status === "Processing";
   const aiStatus = data?.vehicle?.aiPhotoStatus;
   const summary = data?.summary;
   const exteriorImages = (data?.images ?? []).filter((i) => i.isExterior === 1);
@@ -130,11 +143,15 @@ export function VehiclePhotoStudio({
   const isReady = set?.status === "Ready";
   const isNeedsReview = set?.status === "Needs Review";
   const isFailed = set?.status === "Failed";
-  const isProcessing = set?.status === "Processing" || aiStatus === "Processing";
+  const isProcessing = set?.status === "Processing" || aiStatus === "Processing" || activeJob?.status === "Processing";
   const isQueued =
-    !set && (aiStatus === "Queued" || processMutation.isPending);
+    activeJob?.status === "Queued" || (!set && (aiStatus === "Queued" || processMutation.isPending));
   const isNotProcessed =
     !set && !isProcessing && !isQueued && !processMutation.isPending;
+  const progressTotal = activeJob?.totalPhotos || set?.totalPhotos || summary?.total || 0;
+  const progressDone = activeJob?.processedPhotos ?? set?.processedPhotos ?? 0;
+  const progressPercent = activeJob?.progressPercent ??
+    (progressTotal > 0 ? Math.round((progressDone / progressTotal) * 100) : 0);
 
   return (
     <SectionCard
@@ -174,19 +191,19 @@ export function VehiclePhotoStudio({
                 {isQueued ? "Queued for AI processing…" : "Generating AI photos…"}
               </span>
             </div>
-            {set && (
+            {(set || activeJob) && (
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Progress</span>
+                  <span>{activeJob?.currentStage ?? "Progress"}</span>
                   <span>
-                    {set.processedPhotos} / {set.totalPhotos} photos
+                    {progressDone} / {progressTotal} photos
                   </span>
                 </div>
                 <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary rounded-full transition-all duration-500"
                     style={{
-                      width: `${set.totalPhotos > 0 ? Math.round((set.processedPhotos / set.totalPhotos) * 100) : 0}%`,
+                      width: `${progressPercent}%`,
                     }}
                   />
                 </div>
@@ -196,7 +213,7 @@ export function VehiclePhotoStudio({
         )}
 
         {/* ── Ready or Needs Review ── */}
-        {!isLoading && (isReady || isNeedsReview) && (
+        {!isLoading && !hasActiveJob && (isReady || isNeedsReview) && (
           <div className="space-y-4">
             {/* Status */}
             <div className="flex items-center justify-between">

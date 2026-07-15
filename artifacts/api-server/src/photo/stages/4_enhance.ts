@@ -6,6 +6,8 @@
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
+import { aiPhotoJobsTable, db } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import type { PipelineContext } from "../pipeline";
 import { EXTERIOR_CLASSIFICATIONS, STUDIO_EXTERIOR_CLASSIFICATIONS } from "../providers/types";
 import { getImageRestorationProvider } from "../providers";
@@ -382,6 +384,25 @@ async function restoreWithValidation(
   return { output: buf, fidelity: originalFidelity, intensity: "minimal", usedProvider: false };
 }
 
+async function reportEnhancementProgress(ctx: PipelineContext): Promise<void> {
+  const total = ctx.images.length;
+  const processed = ctx.images.filter((img) => img.processedUrl || img.processingStatus === "Failed").length;
+  const failed = ctx.images.filter((img) => img.processingStatus === "Failed").length;
+  const progressPercent = total > 0
+    ? Math.min(49, 30 + Math.floor((processed / total) * 18))
+    : 30;
+
+  await db
+    .update(aiPhotoJobsTable)
+    .set({
+      currentStage: "Enhance",
+      processedPhotos: processed,
+      failedPhotos: failed,
+      progressPercent,
+    })
+    .where(eq(aiPhotoJobsTable.id, ctx.job.id));
+}
+
 export async function presetExteriorPremium(input: Buffer): Promise<Buffer> {
   return runVisionEngine(input, "exterior_premium", "standard");
 }
@@ -475,5 +496,7 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
       img.restorationRejectedReason = err instanceof Error ? err.message : String(err);
       ctx.log.warn({ err, url: src }, "photo:enhance vision engine failed - using source as-is");
     }
+
+    await reportEnhancementProgress(ctx);
   }
 }

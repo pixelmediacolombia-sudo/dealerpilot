@@ -43,6 +43,22 @@ const restorationSpecSource = readFileSync(
   new URL("../photo/restorationSpec.ts", import.meta.url),
   "utf8",
 );
+const photoStudioRouteSource = readFileSync(
+  new URL("./photoStudio.ts", import.meta.url),
+  "utf8",
+);
+const photoAutoEnqueueSource = readFileSync(
+  new URL("../photo/autoEnqueue.ts", import.meta.url),
+  "utf8",
+);
+const photoQueueWorkerSource = readFileSync(
+  new URL("../workers/photo.worker.ts", import.meta.url),
+  "utf8",
+);
+const orchestratorSource = readFileSync(
+  new URL("../workers/orchestrator.ts", import.meta.url),
+  "utf8",
+);
 const enhanceStageSource = readFileSync(
   new URL("../photo/stages/4_enhance.ts", import.meta.url),
   "utf8",
@@ -285,6 +301,25 @@ test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity v
   assert.match(photoExportSource, /processingStatus: img\.processingStatus === "Failed" \? "Failed" : "Completed"/);
   assert.match(photoSetViewerSource, /function FallbackImage/);
   assert.match(photoSetViewerSource, /fallbackSrc/);
+});
+
+test("manual photo reprocess stays pinned to the selected vehicle", () => {
+  assert.match(photoStudioRouteSource, /async function getActivePhotoJob\(vehicleId: number\)/);
+  assert.match(photoStudioRouteSource, /eq\(aiPhotoJobsTable\.vehicleId,\s*vehicleId\)/);
+  assert.match(photoStudioRouteSource, /inArray\(aiPhotoJobsTable\.status,\s*\["Queued",\s*"Processing"\]\)/);
+  assert.match(photoStudioRouteSource, /activeJobs\.find\(\(job\) => job\.status === "Processing"\)/);
+  assert.match(photoStudioRouteSource, /res\.status\(202\)\.json\(\{ job,\s*reused: true \}\)/);
+  assert.match(photoStudioRouteSource, /priority:\s*-10/);
+  assert.match(photoStudioRouteSource, /manual trigger = highest priority for this vehicle/);
+});
+
+test("automatic photo queueing is disabled unless explicitly enabled", () => {
+  assert.match(photoAutoEnqueueSource, /PHOTO_AUTO_ENQUEUE_ON_IMPORT/);
+  assert.match(photoAutoEnqueueSource, /!opts\.force && !isAutoEnqueueEnabled\(\)/);
+  assert.match(photoAutoEnqueueSource, /photo:auto-enqueue skipped - disabled by default/);
+  assert.match(photoQueueWorkerSource, /PHOTO_AUTO_QUEUE_WORKER_ENABLED/);
+  assert.match(photoQueueWorkerSource, /enabled:\s*isPhotoAutoQueueWorkerEnabled\(\)/);
+  assert.match(orchestratorSource, /automatic photo queue disabled - photos run per selected vehicle/);
 });
 
 test("Sales AI intake writes Messenger messages to the CRM and Marketplace metrics", () => {

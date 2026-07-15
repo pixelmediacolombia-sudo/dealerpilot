@@ -243,7 +243,17 @@ async function decideAll(definitions: WorkerDefinition[]): Promise<WorkerDecisio
   const marketDef = byId.get("market");
   if (marketDef) decisions.push(await decideMarket(marketDef.intervalMs));
 
-  if (byId.get("photo")) decisions.push(await decidePhoto());
+  const photoDef = byId.get("photo");
+  if (photoDef?.enabled) {
+    decisions.push(await decidePhoto());
+  } else if (photoDef) {
+    decisions.push({
+      workerId: "photo",
+      action: "SKIP",
+      reason: "automatic photo queue disabled - photos run per selected vehicle",
+      dependencyStatus: "manual only",
+    });
+  }
   if (byId.get("publishing")) decisions.push(await decidePublishing());
 
   const learningDef = byId.get("learning");

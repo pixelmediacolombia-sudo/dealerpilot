@@ -77,6 +77,8 @@ export function VehicleDetail() {
     queryFn: () => fetchPhotoSet(id),
     enabled: !!id,
     refetchInterval: (query) => {
+      const activeJob = query.state.data?.activeJob;
+      if (activeJob?.status === "Queued" || activeJob?.status === "Processing") return 3000;
       const status = query.state.data?.set?.status;
       const aiStatus = query.state.data?.vehicle?.aiPhotoStatus;
       if (status === "Processing") return 3000;

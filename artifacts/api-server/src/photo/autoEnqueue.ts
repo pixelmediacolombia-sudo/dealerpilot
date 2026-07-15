@@ -16,11 +16,20 @@ import { computePhotoHash } from "./changeDetection";
 
 const ELIGIBLE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish"];
 
+function isAutoEnqueueEnabled(): boolean {
+  return process.env["PHOTO_AUTO_ENQUEUE_ON_IMPORT"] === "true";
+}
+
 export async function autoEnqueueAfterImport(
   dealerId: number,
   log: Logger,
-  opts: { maxCount?: number } = {},
+  opts: { maxCount?: number; force?: boolean } = {},
 ): Promise<{ enqueued: number; skipped: number }> {
+  if (!opts.force && !isAutoEnqueueEnabled()) {
+    log.info({ dealerId }, "photo:auto-enqueue skipped - disabled by default");
+    return { enqueued: 0, skipped: 0 };
+  }
+
   const maxCount = opts.maxCount ?? Infinity;
   const [defaultPack] = await db
     .select()
