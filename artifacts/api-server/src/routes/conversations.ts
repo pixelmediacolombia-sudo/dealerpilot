@@ -37,6 +37,84 @@ function parseMoney(value: unknown): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : undefined;
 }
 
+type ParsedConversationMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+const UI_MESSAGE_TEXT = new Set([
+  "aa",
+  "active",
+  "archive",
+  "chat members",
+  "close",
+  "compose",
+  "customize chat",
+  "delete chat",
+  "edit nicknames",
+  "emoji",
+  "enter",
+  "esc",
+  "mark as pending",
+  "media, files and links",
+  "message",
+  "message...",
+  "messenger",
+  "more options",
+  "mute",
+  "notifications",
+  "people",
+  "privacy & support",
+  "saved",
+  "search",
+  "search in conversation",
+  "send",
+  "view profile",
+  "write to saved",
+]);
+
+function cleanConversationText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .replace(/^\s*(Enter|Return)\s*,?\s*/i, "")
+    .replace(/\bMessage sent\s+\d{1,2}:\d{2}\s*(AM|PM)\s+by\s+You\s*:?\s*/gi, "You sent: ")
+    .replace(/^\w+day\s+\d{1,2}:\d{2}\s*(AM|PM)\s+by\s+You\s*:?\s*/i, "You sent: ")
+    .replace(/^You sent\s*,\s*/i, "You sent: ")
+    .replace(/^\s*[:.,;]\s*/, "")
+    .trim();
+}
+
+function isUiConversationText(value: string): boolean {
+  const normalized = value.toLowerCase().replace(/[.。:;,\-–—]+$/g, "").trim();
+  if (!normalized) return true;
+  if (UI_MESSAGE_TEXT.has(normalized)) return true;
+  if (/^(enter|escape|tab|shift|control|option|command|alt)\b/i.test(normalized)) return true;
+  if (/^(write to|saved|compose|mute|search|customize chat|chat members|mark as pending|more options)\b/i.test(normalized)) return true;
+  if (/^\d{1,2}:\d{2}\s*(am|pm)$/i.test(normalized)) return true;
+  if (/^marketplace\s+\$?[\d,]+/i.test(normalized)) return true;
+  if (/^[a-z][\w .'-]{1,60}\s+-\s+(19|20)\d{2}\s+/i.test(normalized)) return true;
+  return false;
+}
+
+function parseConversationMessage(value: unknown): ParsedConversationMessage | null {
+  let text = cleanConversationText(value);
+  if (!text || isUiConversationText(text)) return null;
+
+  let role: ParsedConversationMessage["role"] = "user";
+  const roleMatch = text.match(/^(Dealer|DealerPilot AI|Assistant|Buyer|Customer|User|You|You sent)\s*:\s*(.+)$/i);
+  if (roleMatch) {
+    const label = roleMatch[1]?.toLowerCase() ?? "";
+    role = /dealer|assistant|dealerpilot|you/.test(label) ? "assistant" : "user";
+    text = cleanConversationText(roleMatch[2] ?? "");
+  } else if (/^(You sent|Sent by you|Enviaste|Enviado por ti)\b/i.test(text)) {
+    role = "assistant";
+    text = cleanConversationText(text.replace(/^(You sent|Sent by you|Enviaste|Enviado por ti)\s*:?\s*/i, ""));
+  }
+
+  if (!text || isUiConversationText(text)) return null;
+  return { role, content: text.slice(0, 1000) };
+}
+
 const ALPHA_RULES = `
 You are a professional car sales representative for Alpha Motorsport, a used car dealership.
 
@@ -219,8 +297,15 @@ router.post("/conversations/intake", async (req, res) => {
     return;
   }
 
-  const msgs = Array.isArray(visibleMessages) ? visibleMessages : [];
-  const inbound = currentMessage || msgs[msgs.length - 1] || "";
+  const rawMsgs = Array.isArray(visibleMessages) ? visibleMessages : [];
+  const parsedMsgs = rawMsgs.map(parseConversationMessage).filter((msg): msg is ParsedConversationMessage => !!msg);
+  const currentParsed = parseConversationMessage(currentMessage);
+  const latestParsed = currentParsed ?? parsedMsgs[parsedMsgs.length - 1] ?? null;
+  const latestBuyerMessage =
+    latestParsed?.role === "user"
+      ? latestParsed.content
+      : [...parsedMsgs].reverse().find((msg) => msg.role === "user")?.content ?? "";
+  const inbound = latestBuyerMessage;
   const language = detectLanguage(inbound + " " + (buyerName ?? ""));
   const parsedDownPayment = parseMoney(marketplaceDownPayment);
   const parsedAskingPrice = parseMoney(marketplaceAskingPrice);
@@ -341,16 +426,32 @@ router.post("/conversations/intake", async (req, res) => {
     .where(eq(conversationMessagesTable.conversationId, conversationId))
     .orderBy(desc(conversationMessagesTable.createdAt));
 
-  const existingContents = new Set(existingMsgs.map((m) => m.content.trim()));
+  const existingContents = new Set(existingMsgs.map((m) => `${m.role}:${m.content.trim()}`));
+  let hasNewBuyerMessage = false;
 
-  for (const msg of msgs) {
-    if (msg && !existingContents.has(msg.trim())) {
+  for (const msg of parsedMsgs) {
+    const key = `${msg.role}:${msg.content.trim()}`;
+    if (!existingContents.has(key)) {
       await db.insert(conversationMessagesTable).values({
         conversationId,
-        role: "user",
-        content: msg,
+        role: msg.role,
+        content: msg.content,
       });
-      existingContents.add(msg.trim());
+      existingContents.add(key);
+      if (msg.role === "user") hasNewBuyerMessage = true;
+    }
+  }
+
+  if (currentParsed) {
+    const key = `${currentParsed.role}:${currentParsed.content.trim()}`;
+    if (!existingContents.has(key)) {
+      await db.insert(conversationMessagesTable).values({
+        conversationId,
+        role: currentParsed.role,
+        content: currentParsed.content,
+      });
+      existingContents.add(key);
+      if (currentParsed.role === "user") hasNewBuyerMessage = true;
     }
   }
 
@@ -359,9 +460,16 @@ router.post("/conversations/intake", async (req, res) => {
   const extractedPhone = phoneMatch ? phoneMatch[1].replace(/[-.\s]/g, "-") : null;
 
   let suggestedReply: string | null = null;
-  if (inbound) {
+  const latestExistingAssistant = existingMsgs.find((m) => m.role === "assistant");
+  const shouldGenerateReply =
+    !!inbound &&
+    !!hasNewBuyerMessage &&
+    latestParsed?.role === "user" &&
+    latestExistingAssistant?.content.trim() !== inbound.trim();
+
+  if (shouldGenerateReply) {
     suggestedReply = await generateAiReply(
-      msgs,
+      parsedMsgs.map((msg) => `${msg.role === "assistant" ? "Dealer" : "Buyer"}: ${msg.content}`),
       inbound,
       language,
       detectedVehicleTitle,

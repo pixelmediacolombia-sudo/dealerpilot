@@ -3742,6 +3742,83 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return { listingUrl, vehicleTitle, price, downPayment };
     }
 
+    function normalizeThreadToken(value) {
+      return (value || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 120);
+    }
+
+    function buildMessengerThreadRef(buyerName, vehicleTitle, fallbackUrl = location.href) {
+      const buyer = normalizeThreadToken(buyerName || "unknown-buyer");
+      const vehicle = normalizeThreadToken(vehicleTitle || "vehicle-inquiry");
+      if (buyer && vehicle && buyer !== "unknown-buyer") {
+        return `marketplace-thread::${buyer}::${vehicle}`;
+      }
+      return `${fallbackUrl.split("?")[0]}::${buyer || "unknown-buyer"}`;
+    }
+
+    function parseInboxThreadText(text) {
+      const lines = (text || "")
+        .split("\n")
+        .map(cleanMessengerText)
+        .filter((line) => line && !isMessengerUiText(line));
+      const joined = lines.join(" ");
+      const titleMatch = joined.match(/([A-Za-z][A-Za-z .'-]{1,60})\s*[·-]\s*((?:19|20)\d{2}\s+[A-Za-z][A-Za-z0-9 .'-]{2,80})/);
+      if (!titleMatch) return null;
+      const buyerName = cleanMessengerText(titleMatch[1] ?? "");
+      const vehicleTitle = cleanMessengerText(titleMatch[2] ?? "");
+      if (!buyerName || !vehicleTitle) return null;
+
+      const previewLine =
+        lines.find((line) => /^(you|buyer|customer|dealer)\s*:/i.test(line)) ||
+        lines.find((line) => !line.includes(vehicleTitle) && line !== buyerName) ||
+        "";
+      const previewIsDealer = /^(you|dealer)\s*:/i.test(previewLine);
+      const preview = cleanMessengerText(previewLine.replace(/^(you|dealer|buyer|customer)\s*:\s*/i, ""));
+
+      return {
+        buyerName,
+        vehicleTitle,
+        preview,
+        previewIsDealer,
+        externalThreadRef: buildMessengerThreadRef(buyerName, vehicleTitle),
+      };
+    }
+
+    async function discoverMessengerInboxThreads() {
+      const candidates = Array.from(document.querySelectorAll('a, [role="row"], [role="listitem"], [role="button"]'))
+        .filter((el) => {
+          if (!visible(el)) return false;
+          const rect = el.getBoundingClientRect();
+          if (rect.left > Math.max(360, window.innerWidth * 0.42)) return false;
+          if (rect.height < 28 || rect.height > 140) return false;
+          const text = (el.innerText || el.textContent || "").trim();
+          return /(19|20)\d{2}/.test(text) && /[·-]/.test(text);
+        });
+
+      const seen = new Set();
+      for (const el of candidates.slice(0, 12)) {
+        const thread = parseInboxThreadText(el.innerText || el.textContent || "");
+        if (!thread || seen.has(thread.externalThreadRef)) continue;
+        seen.add(thread.externalThreadRef);
+
+        const visibleMessages = thread.preview
+          ? [`${thread.previewIsDealer ? "Dealer" : "Buyer"}: ${thread.preview}`]
+          : [];
+        await send({
+          type: "CONVERSATION_INTAKE",
+          externalThreadRef: thread.externalThreadRef,
+          sourceUrl: location.href,
+          buyerName: thread.buyerName,
+          visibleMessages,
+          currentMessage: thread.preview ? visibleMessages[visibleMessages.length - 1] : "",
+          detectedVehicleTitle: thread.vehicleTitle,
+        });
+      }
+    }
+
     function getMessengerMessageBox() {
       const root = findMessengerRoot() || document;
       return (
@@ -3836,9 +3913,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           ? messages[messages.length - 1].text
           : rawText.split("\n").map((line) => line.trim()).filter(Boolean).slice(-1)[0] || "";
       const externalThreadRef = [
-        context.listingUrl || location.href.split("?")[0],
-        buyerName || "unknown-buyer",
-      ].join("::");
+        buildMessengerThreadRef(buyerName, context.vehicleTitle, context.listingUrl || location.href),
+      ].join("");
       const payload = {
         externalThreadRef,
         sourceUrl: location.href,
@@ -3911,12 +3987,18 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     actionsEl.appendChild(readBtn);
 
     setTimeout(() => {
+      discoverMessengerInboxThreads().catch((err) => {
+        console.warn("[DealerPilot AI] Messenger inbox discovery failed", err);
+      });
       captureConversation({ silent: true }).catch((err) => {
         console.warn("[DealerPilot AI] Messenger auto-capture failed", err);
       });
     }, 1200);
     setInterval(() => {
       if (!isMessengerUiVisible()) return;
+      discoverMessengerInboxThreads().catch((err) => {
+        console.warn("[DealerPilot AI] Messenger inbox discovery failed", err);
+      });
       captureConversation({ silent: true }).catch((err) => {
         console.warn("[DealerPilot AI] Messenger auto-capture failed", err);
       });
