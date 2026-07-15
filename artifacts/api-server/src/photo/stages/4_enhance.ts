@@ -488,8 +488,9 @@ async function restoreWithValidation(
   const needAssessment = await assessRestorationNeed(buf, classification, processingMode);
   const authorizedPhotoIds = aiRestorationPhotoIdsFromPresetVersion(ctx.job.presetVersion);
   const providerAllowed =
-    authorizedPhotoIds.length === 0 ||
-    (sourcePhotoId !== undefined && authorizedPhotoIds.includes(sourcePhotoId));
+    authorizedPhotoIds.length > 0 &&
+    sourcePhotoId !== undefined &&
+    authorizedPhotoIds.includes(sourcePhotoId);
   const providerAttempt = providerAllowed
     ? await maybeRunProviderRestoration(ctx, buf, classification, needAssessment)
     : {
@@ -752,6 +753,7 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
           },
           "photo:enhance final selection preserved original",
         );
+        await reportEnhancementProgress(ctx);
         continue;
       }
 

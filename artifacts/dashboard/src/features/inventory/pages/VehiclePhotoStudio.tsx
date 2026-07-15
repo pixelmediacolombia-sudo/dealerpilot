@@ -70,6 +70,28 @@ export interface PhotoSetData {
 }
 
 type PhotoProcessingMode = "fidelity-first" | "balanced" | "strong-restoration";
+type PhotoDirectorMode = "economy" | "balanced" | "premium";
+
+interface PhotoDirectorPlan {
+  sourceSetId: number | null;
+  totalPhotosAnalyzed: number;
+  selectedPhotoIds: number[];
+  heroPhotoId: number | null;
+  duplicateRejectedCount: number;
+  publishAsIsCount: number;
+  localEnhancementCount: number;
+  paidAiRestorationCount: number;
+  paidAiRestorationPhotoIds: number[];
+  estimatedCostUsd: number;
+  defaultCostCapUsd: number;
+  photos: Array<{
+    id: number;
+    order: number | null;
+    photoType: string;
+    treatmentLabel: string;
+    qualityScore: number;
+  }>;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -96,6 +118,14 @@ export async function fetchPhotoSet(vehicleId: number): Promise<PhotoSetData> {
   return r.json() as Promise<PhotoSetData>;
 }
 
+async function fetchPhotoDirectorPlan(vehicleId: number, mode: PhotoDirectorMode): Promise<PhotoDirectorPlan> {
+  const params = new URLSearchParams({ selectionMode: mode, maxPhotos: "10" });
+  const r = await fetch(`/api/photo-studio/vehicles/${vehicleId}/selection-plan?${params.toString()}`);
+  if (!r.ok) throw new Error("Failed to fetch Photo Director plan");
+  const body = (await r.json()) as { plan: PhotoDirectorPlan };
+  return body.plan;
+}
+
 // ── VehiclePhotoStudio panel ───────────────────────────────────────────────────
 
 export function VehiclePhotoStudio({
@@ -109,6 +139,7 @@ export function VehiclePhotoStudio({
 }) {
   const [showBeforeAfter, setShowBeforeAfter] = useState(false);
   const [processingMode, setProcessingMode] = useState<PhotoProcessingMode>("fidelity-first");
+  const [photoDirectorMode, setPhotoDirectorMode] = useState<PhotoDirectorMode>("balanced");
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<PhotoSetData>({
@@ -125,13 +156,27 @@ export function VehiclePhotoStudio({
     },
   });
 
+  const { data: directorPlan } = useQuery<PhotoDirectorPlan>({
+    queryKey: ["vehicle-photo-director-plan", vehicleId, photoDirectorMode],
+    queryFn: () => fetchPhotoDirectorPlan(vehicleId, photoDirectorMode),
+    staleTime: 30_000,
+  });
+
   const processMutation = useMutation({
     mutationFn: async () => {
       const start = (confirmCost = false) =>
         fetch(`/api/photo-studio/vehicles/${vehicleId}/process`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ processingMode, confirmCost }),
+          body: JSON.stringify({
+            processingMode,
+            confirmCost,
+            selectionMode: photoDirectorMode,
+            sourceSetId: directorPlan?.sourceSetId ?? undefined,
+            selectedPhotoIds: directorPlan?.selectedPhotoIds ?? undefined,
+            paidAiRestorationPhotoIds: directorPlan?.paidAiRestorationPhotoIds ?? undefined,
+            maxCostUsd: directorPlan?.defaultCostCapUsd ?? undefined,
+          }),
         });
       const r = await start();
       if (r.status === 409) {
@@ -159,6 +204,7 @@ export function VehiclePhotoStudio({
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: PHOTO_SET_QUERY_KEY(vehicleId) });
+      void queryClient.invalidateQueries({ queryKey: ["vehicle-photo-director-plan", vehicleId] });
     },
   });
 
@@ -204,6 +250,52 @@ export function VehiclePhotoStudio({
       ))}
     </div>
   );
+  const directorModeSelector = (
+    <div className="grid grid-cols-3 gap-1 rounded-lg border border-white/[0.08] bg-white/[0.03] p-1">
+      {([
+        ["economy", "Economy"],
+        ["balanced", "Balanced"],
+        ["premium", "Premium"],
+      ] as const).map(([mode, label]) => (
+        <button
+          key={mode}
+          type="button"
+          onClick={() => setPhotoDirectorMode(mode)}
+          className={cn(
+            "py-1.5 text-[10px] font-semibold rounded-md transition-colors",
+            photoDirectorMode === mode
+              ? "bg-emerald-500/15 text-emerald-300 border border-emerald-400/20"
+              : "text-muted-foreground hover:text-white/70",
+          )}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+  const directorSummary = directorPlan ? (
+    <div className="rounded-lg border border-emerald-400/15 bg-emerald-500/[0.04] p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold text-emerald-300">Photo Director</span>
+        <span className="text-[10px] text-muted-foreground">
+          ${directorPlan.estimatedCostUsd.toFixed(2)} est.
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
+        <span>{directorPlan.totalPhotosAnalyzed} analyzed</span>
+        <span>{directorPlan.selectedPhotoIds.length} selected</span>
+        <span>{directorPlan.publishAsIsCount} as-is</span>
+        <span>{directorPlan.localEnhancementCount} local</span>
+        <span>{directorPlan.paidAiRestorationCount} paid AI</span>
+        <span>{directorPlan.duplicateRejectedCount} duplicates</span>
+      </div>
+      {directorPlan.heroPhotoId && (
+        <div className="text-[10px] text-emerald-200/80">
+          Recommended Cover Photo #{directorPlan.heroPhotoId}
+        </div>
+      )}
+    </div>
+  ) : null;
 
   return (
     <SectionCard
@@ -224,6 +316,8 @@ export function VehiclePhotoStudio({
               Generate professional studio photos for this vehicle using the Alpha Motorsport
               background.
             </p>
+            {directorModeSelector}
+            {directorSummary}
             {modeSelector}
             <Button
               className="w-full gap-2 premium-gradient-btn"
@@ -425,6 +519,8 @@ export function VehiclePhotoStudio({
             )}
 
             {/* Re-process */}
+            {directorModeSelector}
+            {directorSummary}
             {modeSelector}
             <Button
               variant="ghost"
