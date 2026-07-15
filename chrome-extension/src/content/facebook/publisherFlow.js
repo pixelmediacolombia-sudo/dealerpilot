@@ -3596,6 +3596,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   // ==================================================================
   let messengerControlsStarted = false;
   let lastMessengerCaptureHash = "";
+  let lastMessengerAutoSendHash = "";
   let lastReply = "";
 
   function initMessengerAiControls() {
@@ -3677,7 +3678,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           // Heuristic: elements with aria-label containing "you" or sent indicators
           const ariaLabel = (el.getAttribute("aria-label") || "").toLowerCase();
           if (isMessengerUiText(ariaLabel)) continue;
-          const isSent = ariaLabel.includes("you") || el.querySelector('[data-testid*="outgoing" i]');
+          const isSent =
+            ariaLabel.includes("you") ||
+            ariaLabel.includes("sent by you") ||
+            ariaLabel.includes("enviaste") ||
+            ariaLabel.includes("enviado por ti") ||
+            el.matches?.('[data-testid*="outgoing" i], [aria-label*="You sent" i]') ||
+            el.closest?.('[data-testid*="outgoing" i], [aria-label*="You sent" i]') ||
+            el.querySelector('[data-testid*="outgoing" i], [aria-label*="You sent" i]');
 
           messages.push({
             speaker: isSent ? "Dealer" : (buyerName || "Buyer"),
@@ -3734,6 +3742,82 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return { listingUrl, vehicleTitle, price, downPayment };
     }
 
+    function getMessengerMessageBox() {
+      const root = findMessengerRoot() || document;
+      return (
+        root.querySelector('[contenteditable="true"][role="textbox"]') ||
+        root.querySelector('[contenteditable="true"][aria-label*="message" i]') ||
+        root.querySelector('textarea[aria-label*="message" i]') ||
+        document.querySelector('[contenteditable="true"][role="textbox"]') ||
+        document.querySelector('[contenteditable="true"][aria-label*="message" i]') ||
+        document.querySelector('[contenteditable="true"]') ||
+        document.querySelector('textarea[aria-label*="message" i]') ||
+        document.querySelector('textarea')
+      );
+    }
+
+    function findMessengerSendButton() {
+      const root = findMessengerRoot() || document;
+      const candidates = Array.from(
+        root.querySelectorAll(
+          [
+            '[aria-label="Send"]',
+            '[aria-label="Enviar"]',
+            '[aria-label*="send" i]',
+            '[aria-label*="enviar" i]',
+            '[data-testid*="send" i]',
+            '[role="button"]',
+            'button',
+          ].join(", "),
+        ),
+      ).filter((el) => {
+        const text = (el.textContent || "").trim().toLowerCase();
+        const label = (el.getAttribute("aria-label") || "").trim().toLowerCase();
+        const title = (el.getAttribute("title") || "").trim().toLowerCase();
+        const descriptor = `${text} ${label} ${title}`;
+        if (!/(^|\b)(send|enviar)(\b|$)/i.test(descriptor)) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && !el.disabled && el.getAttribute("aria-disabled") !== "true";
+      });
+      return candidates[0] || null;
+    }
+
+    async function clickMessengerSend() {
+      await sleep(250);
+      const sendBtn = findMessengerSendButton();
+      if (sendBtn) {
+        sendBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
+        sendBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
+        sendBtn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+        return true;
+      }
+
+      const box = getMessengerMessageBox();
+      if (!box) return false;
+      box.focus();
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+      box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+      return true;
+    }
+
+    async function autoSendReply(reply, captureHash, messages) {
+      if (!reply || !captureHash || captureHash === lastMessengerAutoSendHash) return false;
+      if (!messages.length) return false;
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.speaker === "Dealer") return false;
+
+      const inserted = insertReply(reply);
+      if (!inserted) return false;
+      const sent = await clickMessengerSend();
+      if (!sent) {
+        setStatus("Reply inserted, but DealerPilot could not find Messenger Send.", "err");
+        return false;
+      }
+      lastMessengerAutoSendHash = captureHash;
+      setStatus("AI reply sent automatically. Lead saved to CRM.", "ok");
+      return true;
+    }
+
     async function captureConversation(options = {}) {
       const silent = !!options.silent;
       setStatus("Reading conversation…");
@@ -3780,7 +3864,15 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         currentMessage,
         visibleMessages: payload.visibleMessages,
       });
-      if (silent && captureHash === lastMessengerCaptureHash) return;
+      const buyerReplyPending =
+        silent &&
+        messages.length > 0 &&
+        messages[messages.length - 1].speaker !== "Dealer";
+      if (
+        silent &&
+        captureHash === lastMessengerCaptureHash &&
+        (!buyerReplyPending || captureHash === lastMessengerAutoSendHash)
+      ) return;
 
       const res = await send({ type: "CONVERSATION_INTAKE", ...payload });
       if (!res || !res.ok) {
@@ -3792,10 +3884,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       lastMessengerCaptureHash = captureHash;
       lastReply = res.data.suggestedReply;
       const msgCount = messages.length || "?";
-      setStatus(`Reply ready (${msgCount} messages read). Lead saved to CRM.`, "ok");
+      const autoSent = silent ? await autoSendReply(lastReply, captureHash, messages) : false;
+      if (!autoSent) {
+        setStatus(`Reply ready (${msgCount} messages read). Lead saved to CRM.`, "ok");
+      }
 
       showOutput(
-        `<div class="mai-line"><strong>Suggested reply:</strong></div>` +
+        `<div class="mai-line"><strong>${autoSent ? "AI auto reply sent:" : "Suggested reply:"}</strong></div>` +
         `<div class="mai-reply">${escapeHtml(lastReply)}</div>` +
         `${context.vehicleTitle ? `<div class="mai-line" style="opacity:.7;font-size:11px;margin-top:4px;">Vehicle: ${escapeHtml(context.vehicleTitle)}</div>` : ""}` +
         `<button class="mai-btn mai-btn-secondary" id="mai-insert">Insert Reply</button>` +
@@ -3812,7 +3907,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       });
     }
 
-    const readBtn = button("Read Chat & Suggest Reply", () => captureConversation({ silent: false }));
+    const readBtn = button("Read Chat & Send AI Reply", () => captureConversation({ silent: true }));
     actionsEl.appendChild(readBtn);
 
     setTimeout(() => {
@@ -3842,7 +3937,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     if (!box) {
       setStatus("Could not find the message box.", "err");
-      return;
+      return false;
     }
 
     if (box.tagName === "TEXTAREA") {
@@ -3855,7 +3950,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       document.execCommand("selectAll", false, undefined);
       document.execCommand("insertText", false, text);
     }
-    setStatus("Reply inserted. Review it before sending — Send was NOT clicked.", "ok");
+    setStatus("Reply inserted.", "ok");
+    return true;
   }
 
   // ==================================================================

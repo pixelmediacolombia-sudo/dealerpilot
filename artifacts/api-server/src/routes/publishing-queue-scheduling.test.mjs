@@ -269,9 +269,15 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(publisherFlowSource, /function initMessengerAiControls/);
   assert.match(publisherFlowSource, /isMessengerUiVisible/);
   assert.match(publisherFlowSource, /lastMessengerCaptureHash/);
+  assert.match(publisherFlowSource, /lastMessengerAutoSendHash/);
   assert.match(publisherFlowSource, /MESSENGER_UI_TEXT/);
   assert.match(publisherFlowSource, /write to saved/);
   assert.match(publisherFlowSource, /customize chat/);
+  assert.match(publisherFlowSource, /async function autoSendReply/);
+  assert.match(publisherFlowSource, /function findMessengerSendButton/);
+  assert.match(publisherFlowSource, /AI reply sent automatically/);
+  assert.match(publisherFlowSource, /Read Chat & Send AI Reply/);
+  assert.doesNotMatch(publisherFlowSource, /Send was NOT clicked/);
   assert.doesNotMatch(publisherFlowSource, /href="tel:\+17037634675"/);
   assert.match(conversationsSource, /\+1 703-763-4675/);
   assert.match(conversationsSource, /role:\s*"user"/);
