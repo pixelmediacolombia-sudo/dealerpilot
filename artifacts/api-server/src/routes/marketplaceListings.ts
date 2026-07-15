@@ -5,10 +5,128 @@ import {
   vehiclesTable,
   vehicleImagesTable,
   marketplaceListingsTable,
+  listingsTable,
+  publishingJobsTable,
 } from "@workspace/db";
-import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+const ReconcilePublishedBody = z.object({
+  dealerId: z.number().int().positive().optional().default(1),
+  publishedVehicleIds: z.array(z.number().int().positive()).min(1),
+  note: z.string().optional(),
+});
+
+router.post("/marketplace-listings/reconcile-published", async (req: Request, res: Response) => {
+  try {
+    const parsed = ReconcilePublishedBody.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid request body", issues: parsed.error.issues });
+      return;
+    }
+
+    const { dealerId, publishedVehicleIds, note } = parsed.data;
+    const keepIds = [...new Set(publishedVehicleIds)];
+    const now = new Date();
+    const liveRows = await db
+      .select({ vehicleId: marketplaceListingsTable.vehicleId })
+      .from(marketplaceListingsTable)
+      .where(and(eq(marketplaceListingsTable.dealerId, dealerId), eq(marketplaceListingsTable.status, "Live")));
+    const demoteIds = liveRows.map((row) => row.vehicleId).filter((vehicleId) => !keepIds.includes(vehicleId));
+
+    await db.transaction(async (tx) => {
+      await tx
+        .insert(marketplaceListingsTable)
+        .values(
+          keepIds.map((vehicleId) => ({
+            vehicleId,
+            dealerId,
+            status: "Live",
+            publishedAt: now,
+            notes: note ?? null,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [marketplaceListingsTable.vehicleId],
+          set: {
+            dealerId,
+            status: "Live",
+            publishedAt: now,
+            notes: note ?? null,
+          },
+        });
+
+      await tx
+        .insert(listingsTable)
+        .values(
+          keepIds.map((vehicleId) => ({
+            vehicleId,
+            channel: "marketplace",
+            status: "Published",
+            publishedAt: now,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [listingsTable.vehicleId, listingsTable.channel],
+          set: {
+            status: "Published",
+            publishedAt: now,
+          },
+        });
+
+      await tx
+        .update(vehiclesTable)
+        .set({ status: "Published" })
+        .where(inArray(vehiclesTable.id, keepIds));
+
+      await tx
+        .update(publishingJobsTable)
+        .set({ status: "Published", completedAt: now, currentStep: "Published", progressPercent: 100 })
+        .where(and(eq(publishingJobsTable.dealerId, dealerId), inArray(publishingJobsTable.vehicleId, keepIds), ne(publishingJobsTable.status, "Published")));
+
+      if (demoteIds.length > 0) {
+        await tx
+          .update(marketplaceListingsTable)
+          .set({
+            status: "Needs Review",
+            publishedAt: null,
+            listingUrl: null,
+            notes: note ?? "Demoted during Marketplace live-list reconciliation.",
+          })
+          .where(and(eq(marketplaceListingsTable.dealerId, dealerId), inArray(marketplaceListingsTable.vehicleId, demoteIds)));
+
+        await tx
+          .update(listingsTable)
+          .set({ status: "Needs Review", publishedAt: null, externalUrl: null })
+          .where(and(eq(listingsTable.channel, "marketplace"), inArray(listingsTable.vehicleId, demoteIds)));
+
+        await tx
+          .update(vehiclesTable)
+          .set({ status: "Active" })
+          .where(inArray(vehiclesTable.id, demoteIds));
+
+        await tx
+          .update(publishingJobsTable)
+          .set({
+            status: "Needs Review",
+            needsReview: true,
+            reviewReason: note ?? "Not present in operator-confirmed Marketplace live list.",
+            listingUrl: null,
+            completedAt: null,
+            currentStep: "Needs Review",
+            progressPercent: 100,
+          })
+          .where(and(eq(publishingJobsTable.dealerId, dealerId), inArray(publishingJobsTable.vehicleId, demoteIds)));
+      }
+    });
+
+    res.json({ ok: true, keptLiveVehicleIds: keepIds, demotedVehicleIds: demoteIds });
+  } catch (err) {
+    req.log.error({ err }, "POST /marketplace-listings/reconcile-published failed");
+    res.status(500).json({ error: "Failed to reconcile marketplace listings" });
+  }
+});
 
 // ── List marketplace listings ─────────────────────────────────────────────────
 // GET /api/marketplace-listings?dealerId=1&status=Live

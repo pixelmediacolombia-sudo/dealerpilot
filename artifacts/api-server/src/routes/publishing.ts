@@ -27,7 +27,7 @@ import {
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 import {
   enrich,
-  getVehiclePhotos,
+  getVehicleRawPhotos,
   moveJobToNeedsReviewWithoutListingUrl,
   reconcileBatchProgress,
 } from "../features/publishing/infrastructure/publishingRepository";
@@ -294,8 +294,8 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       return;
     }
 
-    const images = await getVehiclePhotos(vehicle.id, vehicle.aiPhotoSetId, vehicle.aiPhotoStatus);
-    const usingAiPhotos = images.length > 0 && images[0].source === "ai";
+    const images = await getVehicleRawPhotos(vehicle.id);
+    const usingAiPhotos = false;
 
     const pricing = getMarketplacePricing(vehicle, intel?.recommendedDownPayment ?? null);
 
@@ -1354,15 +1354,11 @@ router.get("/publishing/jobs/:id/photo/:index", async (req, res) => {
   }
 
   const [vehicle] = await db
-    .select({ id: vehiclesTable.id, aiPhotoStatus: vehiclesTable.aiPhotoStatus, aiPhotoSetId: vehiclesTable.aiPhotoSetId })
+    .select({ id: vehiclesTable.id })
     .from(vehiclesTable)
     .where(eq(vehiclesTable.id, job.vehicleId));
 
-  const images = await getVehiclePhotos(
-    job.vehicleId,
-    vehicle?.aiPhotoSetId ?? null,
-    vehicle?.aiPhotoStatus ?? null,
-  );
+  const images = await getVehicleRawPhotos(vehicle?.id ?? job.vehicleId);
 
   const image = images[index];
   if (!image || !image.url) {

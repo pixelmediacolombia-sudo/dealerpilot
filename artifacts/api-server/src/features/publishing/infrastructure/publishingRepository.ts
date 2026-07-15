@@ -160,6 +160,17 @@ export async function getVehiclePhotos(
   return rawImages.map((img) => ({ url: img.url, position: img.position, source: "raw" as const }));
 }
 
+export async function getVehicleRawPhotos(
+  vehicleId: number,
+): Promise<Array<{ url: string | null; position: number | null; source: "raw" }>> {
+  const rawImages = await db
+    .select()
+    .from(vehicleImagesTable)
+    .where(eq(vehicleImagesTable.vehicleId, vehicleId))
+    .orderBy(asc(vehicleImagesTable.position));
+  return rawImages.map((img) => ({ url: img.url, position: img.position, source: "raw" as const }));
+}
+
 export async function enrich(jobs: PublishingJob[]) {
   if (jobs.length === 0) return [];
   const vehicleIds = [...new Set(jobs.map((j) => j.vehicleId))];

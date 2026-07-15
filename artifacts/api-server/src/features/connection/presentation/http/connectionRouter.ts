@@ -292,7 +292,7 @@ router.get("/connection-center", async (req, res) => {
     chromeExtension,
     facebookSession,
     marketplace,
-    messenger: messagingWebhook,
+    messenger,
     messagingWebhook,
     facebookPage,
     openai: aiEngine,

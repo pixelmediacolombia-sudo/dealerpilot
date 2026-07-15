@@ -699,6 +699,42 @@
 
   // ---- Page detection (SPA-aware) ----
 
+  function isMessengerUrl() {
+    const hostname = location.hostname;
+    const pathname = location.pathname;
+    return hostname.includes("messenger.com") || /\/messages\b/.test(pathname);
+  }
+
+  function visible(el) {
+    if (!el || !(el instanceof Element)) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  function findMessengerRoot() {
+    const textboxes = Array.from(
+      document.querySelectorAll(
+        '[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label*="message" i], textarea[aria-label*="message" i]',
+      ),
+    ).filter(visible);
+
+    for (const box of textboxes) {
+      const root =
+        box.closest('[role="dialog"]') ||
+        box.closest('[aria-label*="Messenger" i]') ||
+        box.closest('[aria-label*="Chat" i]') ||
+        box.closest('[role="main"]');
+      if (root && visible(root)) return root;
+    }
+
+    return null;
+  }
+
+  function isMessengerUiVisible() {
+    if (isMessengerUrl()) return true;
+    return !!findMessengerRoot();
+  }
+
   function detectPageState() {
     const hostname = location.hostname;
     const pathname = location.pathname;
@@ -708,14 +744,14 @@
     const isMarketplaceNow =
       hostname.includes("facebook.com") && pathname.includes("/marketplace");
 
-    const isMessengerNow =
-      hostname.includes("messenger.com") || /\/messages\b/.test(pathname);
+    const isMessengerNow = isMessengerUiVisible();
 
     const isLoginPage =
       /^\/(login(\.php)?|checkpoint|recover|two_step_verification|privacy\/consent)/.test(pathname) ||
       location.search.includes("reauth=1") ||
       (location.search.includes("next=") && pathname === "/login.php");
-    const fbLoggedIn = hostname.includes("facebook.com") && !isLoginPage;
+    const fbLoggedIn =
+      (hostname.includes("facebook.com") || hostname.includes("messenger.com")) && !isLoginPage;
     const marketplaceConnected = isMarketplaceNow && fbLoggedIn;
 
     chrome.storage.local
@@ -768,7 +804,6 @@
     }
   }).observe(document.documentElement, { subtree: true, childList: true });
 
-  const href = location.href;
   const isMessenger = _initial.isMessengerNow;
   const isMarketplaceCreate = /\/marketplace\/create/.test(location.pathname);
 
@@ -3559,13 +3594,67 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   // ==================================================================
   // Messenger AI — improved chat scraping + structured reply
   // ==================================================================
-  if (isMessenger) {
-    let lastReply = "";
+  let messengerControlsStarted = false;
+  let lastMessengerCaptureHash = "";
+  let lastReply = "";
+
+  function initMessengerAiControls() {
+    if (messengerControlsStarted || !isMessengerUiVisible()) return;
+    messengerControlsStarted = true;
 
     // ---- Structured chat scraping ----
     // Extracts individual messages with speaker attribution instead of raw innerText.
+    const MESSENGER_UI_TEXT = new Set([
+      "aa",
+      "active",
+      "archive",
+      "chat members",
+      "close",
+      "compose",
+      "customize chat",
+      "delete chat",
+      "edit nicknames",
+      "emoji",
+      "enter",
+      "esc",
+      "message",
+      "message...",
+      "messenger",
+      "mute",
+      "notifications",
+      "people",
+      "privacy & support",
+      "saved",
+      "search",
+      "search in conversation",
+      "send",
+      "view profile",
+      "write to saved",
+    ]);
+
+    function cleanMessengerText(text) {
+      return (text || "")
+        .replace(/\s+/g, " ")
+        .replace(/^\s*(Enter|Return)\s*,?\s*/i, "")
+        .replace(/\bMessage sent\s+\d{1,2}:\d{2}\s*(AM|PM)\s+by\s+You\s*:?\s*/gi, "")
+        .replace(/\bMessage sent\b/gi, "")
+        .replace(/^\s*[:.,;]\s*/, "")
+        .trim();
+    }
+
+    function isMessengerUiText(text) {
+      const cleaned = cleanMessengerText(text);
+      const normalized = cleaned.toLowerCase().replace(/[.。:;,\-–—]+$/g, "").trim();
+      if (!normalized) return true;
+      if (MESSENGER_UI_TEXT.has(normalized)) return true;
+      if (/^(enter|escape|tab|shift|control|option|command|alt)\b/i.test(normalized)) return true;
+      if (/^(write to saved|saved|compose|mute|search|customize chat|chat members)\b/i.test(normalized)) return true;
+      if (/^\d{1,2}:\d{2}\s*(am|pm)$/i.test(normalized)) return true;
+      return false;
+    }
+
     function scrapeConversation() {
-      const main = document.querySelector('[role="main"]') || document.body;
+      const main = findMessengerRoot() || document.querySelector('[role="main"]') || document.body;
 
       // Try to detect buyer name from page heading
       let buyerName = "";
@@ -3582,11 +3671,12 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       if (messageEls.length > 4) {
         // Structured extraction: detect sent (you) vs received (buyer)
         for (const el of messageEls.slice(-40)) {
-          const text = (el.innerText || el.textContent || "").trim();
-          if (!text || text.length < 2) continue;
+          const text = cleanMessengerText(el.innerText || el.textContent || "");
+          if (!text || text.length < 2 || isMessengerUiText(text)) continue;
 
           // Heuristic: elements with aria-label containing "you" or sent indicators
           const ariaLabel = (el.getAttribute("aria-label") || "").toLowerCase();
+          if (isMessengerUiText(ariaLabel)) continue;
           const isSent = ariaLabel.includes("you") || el.querySelector('[data-testid*="outgoing" i]');
 
           messages.push({
@@ -3598,7 +3688,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
       // Fallback: raw text from [role="main"]
       if (messages.length < 2) {
-        const rawText = (main.innerText || "").trim().slice(-4000);
+        const rawText = (main.innerText || "")
+          .split("\n")
+          .map(cleanMessengerText)
+          .filter((line) => line && !isMessengerUiText(line))
+          .join("\n")
+          .trim()
+          .slice(-4000);
         return { buyerName, rawText, messages: [] };
       }
 
@@ -3638,7 +3734,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return { listingUrl, vehicleTitle, price, downPayment };
     }
 
-    const readBtn = button("Read Chat & Suggest Reply", async () => {
+    async function captureConversation(options = {}) {
+      const silent = !!options.silent;
       setStatus("Reading conversation…");
 
       const { buyerName, messages, rawText } = scrapeConversation();
@@ -3655,12 +3752,12 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           ? messages[messages.length - 1].text
           : rawText.split("\n").map((line) => line.trim()).filter(Boolean).slice(-1)[0] || "";
       const externalThreadRef = [
-        context.listingUrl || href.split("?")[0],
+        context.listingUrl || location.href.split("?")[0],
         buyerName || "unknown-buyer",
       ].join("::");
       const payload = {
         externalThreadRef,
-        sourceUrl: href,
+        sourceUrl: location.href,
         buyerName: buyerName || undefined,
         currentMessage,
         detectedVehicleTitle: context.vehicleTitle || undefined,
@@ -3678,6 +3775,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         payload.chatText = rawText;
       }
 
+      const captureHash = JSON.stringify({
+        thread: externalThreadRef,
+        currentMessage,
+        visibleMessages: payload.visibleMessages,
+      });
+      if (silent && captureHash === lastMessengerCaptureHash) return;
+
       const res = await send({ type: "CONVERSATION_INTAKE", ...payload });
       if (!res || !res.ok) {
         if (res?.error === CTXI) return;
@@ -3685,6 +3789,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         return;
       }
 
+      lastMessengerCaptureHash = captureHash;
       lastReply = res.data.suggestedReply;
       const msgCount = messages.length || "?";
       setStatus(`Reply ready (${msgCount} messages read). Lead saved to CRM.`, "ok");
@@ -3694,8 +3799,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         `<div class="mai-reply">${escapeHtml(lastReply)}</div>` +
         `${context.vehicleTitle ? `<div class="mai-line" style="opacity:.7;font-size:11px;margin-top:4px;">Vehicle: ${escapeHtml(context.vehicleTitle)}</div>` : ""}` +
         `<button class="mai-btn mai-btn-secondary" id="mai-insert">Insert Reply</button>` +
-        `<button class="mai-btn mai-btn-secondary" id="mai-copy" style="margin-top:4px;">Copy Reply</button>` +
-        `<a class="mai-btn" id="mai-call" href="tel:+17037634675" style="margin-top:6px;text-align:center;text-decoration:none;display:block;background:linear-gradient(135deg,#22c55e,#2563eb);border-color:rgba(255,255,255,.18);color:white;font-weight:700;box-shadow:0 8px 18px rgba(37,99,235,.25);">Call +1 703-763-4675</a>`,
+        `<button class="mai-btn mai-btn-secondary" id="mai-copy" style="margin-top:4px;">Copy Reply</button>`,
       );
 
       outputEl.querySelector("#mai-insert").addEventListener("click", () => insertReply(lastReply));
@@ -3706,10 +3810,26 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           setStatus("Could not copy — use the Insert Reply button instead.", "err");
         });
       });
-    });
+    }
 
+    const readBtn = button("Read Chat & Suggest Reply", () => captureConversation({ silent: false }));
     actionsEl.appendChild(readBtn);
+
+    setTimeout(() => {
+      captureConversation({ silent: true }).catch((err) => {
+        console.warn("[DealerPilot AI] Messenger auto-capture failed", err);
+      });
+    }, 1200);
+    setInterval(() => {
+      if (!isMessengerUiVisible()) return;
+      captureConversation({ silent: true }).catch((err) => {
+        console.warn("[DealerPilot AI] Messenger auto-capture failed", err);
+      });
+    }, 8000);
   }
+
+  initMessengerAiControls();
+  setInterval(initMessengerAiControls, 1500);
 
   function insertReply(text) {
     // Try contenteditable first (Messenger's message box)

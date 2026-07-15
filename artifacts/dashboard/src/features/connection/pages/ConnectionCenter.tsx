@@ -706,7 +706,7 @@ function AiOrchestratorPanel() {
 
 const SERVICES = [
   { key: "chromeExtension", name: "Publishing Agent", icon: Puzzle, description: "Chrome extension status for Marketplace publishing" },
-  { key: "messagingWebhook", name: "Messaging Webhook", icon: MessageCircle, description: "Meta Messenger webhook intake and Sales AI replies" },
+  { key: "messenger", name: "Messenger AI", icon: MessageCircle, description: "Chrome extension chat capture and Sales AI replies" },
   { key: "facebookPage", name: "Facebook Page", icon: Facebook, description: "Page token and Page ID for Messenger Send API" },
   { key: "openai", name: "AI Engine", icon: Bot, description: "Opportunity Engine · GM Coach · Photo Studio · OpenAI · FAL.ai" },
   { key: "xmlFeed", name: "Inventory Sync", icon: Rss, description: "Nightly feed keeps inventory current" },

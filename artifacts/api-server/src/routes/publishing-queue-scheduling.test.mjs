@@ -14,6 +14,7 @@ const listingGeneratorSource = readFileSync(new URL("../listings/generator.ts", 
 const opportunityEngineSource = readFileSync(new URL("../intelligence/opportunityEngine.ts", import.meta.url), "utf8");
 const conversationsSource = readFileSync(new URL("./conversations.ts", import.meta.url), "utf8");
 const authSource = readFileSync(new URL("./auth.ts", import.meta.url), "utf8");
+const marketplaceListingsSource = readFileSync(new URL("./marketplaceListings.ts", import.meta.url), "utf8");
 const queueClientSource = readFileSync(
   new URL("../../../../chrome-extension/src/background/queueClient.js", import.meta.url),
   "utf8",
@@ -223,11 +224,23 @@ test("opportunity and auto-publish scoring reward accessible mainstream vehicles
   assert.match(workerSource, /price >= 7000 && price < 16000 \? 22/);
 });
 
-test("publishing payload prefers the latest ready AI photo set before raw images", () => {
-  assert.match(publishingRepositorySource, /findLatestReadySetId/);
-  assert.match(publishingRepositorySource, /eq\(aiPhotoSetsTable\.status,\s*"Ready"\)/);
-  assert.match(publishingRepositorySource, /desc\(aiPhotoSetsTable\.isLatest\)/);
-  assert.match(publishingRepositorySource, /source: "ai" as const/);
+test("publishing payload uses original inventory photos, not AI-enhanced photos", () => {
+  assert.match(publishingRepositorySource, /export async function getVehicleRawPhotos/);
+  assert.match(routeSource, /const images = await getVehicleRawPhotos\(vehicle\.id\)/);
+  assert.match(routeSource, /const usingAiPhotos = false/);
+  assert.match(routeSource, /const images = await getVehicleRawPhotos\(vehicle\?\.id \?\? job\.vehicleId\)/);
+});
+
+test("Marketplace live-list reconciliation can keep confirmed vehicles and demote missing live rows", () => {
+  assert.match(marketplaceListingsSource, /\/marketplace-listings\/reconcile-published/);
+  assert.match(marketplaceListingsSource, /publishedVehicleIds/);
+  assert.match(marketplaceListingsSource, /demoteIds/);
+  assert.match(marketplaceListingsSource, /\.insert\(marketplaceListingsTable\)/);
+  assert.match(marketplaceListingsSource, /target: \[marketplaceListingsTable\.vehicleId\]/);
+  assert.match(marketplaceListingsSource, /\.insert\(listingsTable\)/);
+  assert.match(marketplaceListingsSource, /target: \[listingsTable\.vehicleId, listingsTable\.channel\]/);
+  assert.match(marketplaceListingsSource, /keptLiveVehicleIds/);
+  assert.match(marketplaceListingsSource, /demotedVehicleIds/);
 });
 
 test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity validation", () => {
@@ -253,7 +266,13 @@ test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity v
 test("Sales AI intake writes Messenger messages to the CRM and Marketplace metrics", () => {
   assert.match(publisherFlowSource, /type: "CONVERSATION_INTAKE"/);
   assert.match(publisherFlowSource, /externalThreadRef/);
-  assert.match(publisherFlowSource, /href="tel:\+17037634675"/);
+  assert.match(publisherFlowSource, /function initMessengerAiControls/);
+  assert.match(publisherFlowSource, /isMessengerUiVisible/);
+  assert.match(publisherFlowSource, /lastMessengerCaptureHash/);
+  assert.match(publisherFlowSource, /MESSENGER_UI_TEXT/);
+  assert.match(publisherFlowSource, /write to saved/);
+  assert.match(publisherFlowSource, /customize chat/);
+  assert.doesNotMatch(publisherFlowSource, /href="tel:\+17037634675"/);
   assert.match(conversationsSource, /\+1 703-763-4675/);
   assert.match(conversationsSource, /role:\s*"user"/);
   assert.match(conversationsSource, /syncMarketplaceListingMetrics/);
