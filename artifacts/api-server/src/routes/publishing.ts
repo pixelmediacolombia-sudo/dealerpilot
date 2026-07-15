@@ -787,6 +787,7 @@ router.post("/publishing/jobs/:id/fail", async (req, res) => {
 });
 
 const CancelBody = z.object({ reason: z.string().optional() });
+const RescheduleBody = z.object({ scheduledAt: z.string().min(1) });
 
 // POST /publishing/jobs/:id/cancel — operator cancels a job from the dashboard.
 // Moves the job to Failed so it is removed from the active queue.
@@ -828,6 +829,59 @@ router.post("/publishing/jobs/:id/cancel", async (req, res) => {
   await reconcileBatchProgress(updated.batchId);
 
   req.log.info({ jobId: id, reason }, "Publishing job cancelled by operator");
+  const [enriched] = await enrich([updated]);
+  res.json({ job: enriched });
+});
+
+// PATCH /publishing/jobs/:id/schedule - operator changes the planned publish time.
+router.patch("/publishing/jobs/:id/schedule", async (req, res) => {
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Invalid job id" });
+    return;
+  }
+
+  const parsed = RescheduleBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "scheduledAt is required", issues: parsed.error.issues });
+    return;
+  }
+
+  const scheduledAt = new Date(parsed.data.scheduledAt);
+  if (Number.isNaN(scheduledAt.getTime())) {
+    res.status(400).json({ error: "Invalid scheduledAt value" });
+    return;
+  }
+
+  const [job] = await db
+    .select()
+    .from(publishingJobsTable)
+    .where(eq(publishingJobsTable.id, id));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  if (!["Queued", "Scheduled", "Retry"].includes(job.status)) {
+    res.status(409).json({ error: `Cannot reschedule a ${job.status} job` });
+    return;
+  }
+
+  const nextStatus = scheduledAt.getTime() > Date.now() + 1000 ? "Scheduled" : "Queued";
+  const [updated] = await db
+    .update(publishingJobsTable)
+    .set({
+      status: nextStatus,
+      scheduledAt,
+      currentStep: nextStatus === "Scheduled" ? "Scheduled" : "Queued",
+      claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
+      startedAt: null,
+    })
+    .where(eq(publishingJobsTable.id, id))
+    .returning();
+
+  req.log.info({ jobId: id, scheduledAt: scheduledAt.toISOString(), nextStatus }, "Publishing job rescheduled by operator");
   const [enriched] = await enrich([updated]);
   res.json({ job: enriched });
 });

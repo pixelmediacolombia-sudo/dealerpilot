@@ -9,6 +9,7 @@ import {
   publishingJobsTable,
   listingsTable,
   listingPerformanceTable,
+  marketplaceListingsTable,
   type Vehicle,
   type ListingVersion,
   type ListingScore,
@@ -188,7 +189,7 @@ router.get("/listings", async (req, res) => {
     .orderBy(desc(vehiclesTable.createdAt));
 
   const vehicleIds = vehicles.map((v) => v.id);
-  const [images, allListings, allPerformance] = await Promise.all([
+  const [images, allListings, allPerformance, allMarketplaceListings] = await Promise.all([
     imageInfo(vehicleIds),
     vehicleIds.length > 0
       ? db.select().from(listingsTable).where(inArray(listingsTable.vehicleId, vehicleIds))
@@ -200,9 +201,20 @@ router.get("/listings", async (req, res) => {
           .where(inArray(listingPerformanceTable.vehicleId, vehicleIds))
           .orderBy(desc(listingPerformanceTable.publishedAt))
       : Promise.resolve([]),
+    vehicleIds.length > 0
+      ? db
+          .select()
+          .from(marketplaceListingsTable)
+          .where(inArray(marketplaceListingsTable.vehicleId, vehicleIds))
+          .orderBy(desc(marketplaceListingsTable.publishedAt))
+      : Promise.resolve([]),
   ]);
 
   const listingByVehicle = new Map(allListings.map((l) => [l.vehicleId, l]));
+  const marketplaceListingByVehicle = new Map<number, (typeof allMarketplaceListings)[number]>();
+  for (const ml of allMarketplaceListings) {
+    if (!marketplaceListingByVehicle.has(ml.vehicleId)) marketplaceListingByVehicle.set(ml.vehicleId, ml);
+  }
   const performanceByVehicle = new Map<number, (typeof allPerformance)[number]>();
   for (const p of allPerformance) {
     if (!performanceByVehicle.has(p.vehicleId)) performanceByVehicle.set(p.vehicleId, p);
@@ -248,18 +260,22 @@ router.get("/listings", async (req, res) => {
     const score = current ? (scores.get(current.id) ?? null) : null;
     const latestJob = latestJobByVehicle.get(v.id) ?? null;
     const listing = listingByVehicle.get(v.id) ?? null;
+    const marketplaceListing = marketplaceListingByVehicle.get(v.id) ?? null;
+    const isMarketplaceLive = marketplaceListing?.status === "Live";
     const perf = performanceByVehicle.get(v.id) ?? null;
 
     const aiStatus = vVersions.length > 0 ? "AI Generated" : "Not Started";
-    const publishStatus = latestJob
+    const publishStatus = isMarketplaceLive
+      ? "Published"
+      : latestJob
       ? latestJob.status
       : current?.status === "Approved"
         ? "Approved"
         : "Not Queued";
 
     // Published-listing engagement
-    const publishedAt = listing?.publishedAt ?? perf?.publishedAt ?? null;
-    const marketplaceUrl = listing?.externalUrl ?? perf?.marketplaceUrl ?? null;
+    const publishedAt = marketplaceListing?.publishedAt ?? listing?.publishedAt ?? perf?.publishedAt ?? null;
+    const marketplaceUrl = marketplaceListing?.listingUrl ?? listing?.externalUrl ?? perf?.marketplaceUrl ?? null;
     const messageCount = perf?.conversationsCount ?? 0;
     const hotLeadCount = perf?.hotLeadsCount ?? 0;
     const appointmentReadyCount = perf?.appointmentReadyCount ?? 0;
@@ -268,7 +284,7 @@ router.get("/listings", async (req, res) => {
       ? Math.max(0, (now.getTime() - publishedAt.getTime()) / (1000 * 60 * 60 * 24))
       : 0;
 
-    const isPublished = publishStatus === "Published" || listing?.status === "Published";
+    const isPublished = publishStatus === "Published" || listing?.status === "Published" || isMarketplaceLive;
     const { engagementStatus, recommendation } = isPublished
       ? deriveEngagement(messageCount, leadCount, hotLeadCount, appointmentReadyCount, daysLive, v.status)
       : { engagementStatus: null, recommendation: null };

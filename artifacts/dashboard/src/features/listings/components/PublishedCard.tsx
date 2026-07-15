@@ -91,6 +91,7 @@ function liveBadgeLabel(tab: string, engagementStatus: string | null | undefined
 }
 
 export function PublishedCard({ workspace: w, tab, onMarkSold, onRenew, onUpdateListing, onRemoveFromMarketplace, onArchive }: PublishedCardProps) {
+  const isInventoryRemoved = w.vehicleStatus === "Sold/Removed";
   return (
     <div className="rounded-xl bg-card border border-border/40 hover:border-primary/30 transition-all duration-300 overflow-hidden hover-lift flex flex-col h-full">
       {/* Image */}
@@ -112,10 +113,10 @@ export function PublishedCard({ workspace: w, tab, onMarkSold, onRenew, onUpdate
         <Badge
           className={cn(
             "absolute top-3 right-3 z-10 uppercase text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full border-0",
-            liveBadgeClass(tab, w.engagementStatus),
+            isInventoryRemoved ? "bg-amber-500/90 text-white" : liveBadgeClass(tab, w.engagementStatus),
           )}
         >
-          {liveBadgeLabel(tab, w.engagementStatus)}
+          {isInventoryRemoved ? "INVENTORY REMOVED" : liveBadgeLabel(tab, w.engagementStatus)}
         </Badge>
 
         {/* Price overlay */}
@@ -184,6 +185,13 @@ export function PublishedCard({ workspace: w, tab, onMarkSold, onRenew, onUpdate
           </div>
         )}
 
+        {isInventoryRemoved && (
+          <div className="text-xs px-2.5 py-2 rounded-lg border mb-3 flex items-start gap-2 bg-amber-500/10 border-amber-500/20 text-amber-300">
+            <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+            Vehicle is Sold/Removed in inventory while Marketplace is still tracked.
+          </div>
+        )}
+
         {/* Marketplace URL */}
         {w.marketplaceUrl && (
           <a
@@ -199,7 +207,7 @@ export function PublishedCard({ workspace: w, tab, onMarkSold, onRenew, onUpdate
 
         {/* CTAs */}
         <div className="mt-auto pt-3 border-t border-border/50 flex items-center gap-2 flex-wrap">
-          {tab === "published" && (
+          {tab === "published" && !isInventoryRemoved && (
             <>
               <Link href={`/listings/${w.vehicleId}`}>
                 <Button size="sm" variant="outline" className="h-7 text-xs px-2.5 gap-1.5 border-border/60 hover:border-primary/50 hover:text-primary">
@@ -213,6 +221,11 @@ export function PublishedCard({ workspace: w, tab, onMarkSold, onRenew, onUpdate
                 <Tag className="w-3 h-3" /> Mark Sold
               </Button>
             </>
+          )}
+          {tab === "published" && isInventoryRemoved && (
+            <Button size="sm" variant="outline" onClick={() => onRemoveFromMarketplace(w.vehicleId)} className="h-7 text-xs px-2.5 gap-1.5 border-amber-500/40 text-amber-300 hover:bg-amber-500/10">
+              <Trash2 className="w-3 h-3" /> Remove
+            </Button>
           )}
           {tab === "needs-update" && (
             <>

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { AppLayout } from "@/shared/layout/AppLayout";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDealerLocation } from "@/context/LocationContext";
 import {
   useAssignPublishingJob,
@@ -13,6 +13,7 @@ import {
   getListListingWorkspacesQueryKey,
   getListPublishingJobsQueryKey,
   clearPublishingQueue,
+  reschedulePublishingJob,
 } from "../api/listingsApi";
 import { useListings } from "../hooks/useListings";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -91,6 +92,14 @@ import { toast } from "@/hooks/use-toast";
 type StrategyStatus = "recommended" | "not_prioritized" | "needs_strategy_review";
 
 const DEALER_ID = 1;
+
+function toDateTimeLocalValue(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
 
 function getStrategyStatus(
   intel: { strategyName: string | null } | undefined,
@@ -260,6 +269,7 @@ export function ListingsWorkspace() {
   const [batchTodayVehicles, setBatchTodayVehicles] = useState<BatchVehicle[]>([]);
   const [photoFilter, setPhotoFilter] = useState<string | null>(null);
   const [clearingQueue, setClearingQueue] = useState(false);
+  const [rescheduleValues, setRescheduleValues] = useState<Record<number, string>>({});
 
   const toggleSelected = (id: number) => {
     setSelectedVehicleIds((prev) => {
@@ -316,6 +326,16 @@ export function ListingsWorkspace() {
   });
   const cancelMutation = useCancelPublishingJob({
     mutation: { onSuccess: () => void invalidateWorkspaces() },
+  });
+  const rescheduleMutation = useMutation({
+    mutationFn: ({ jobId, scheduledAt }: { jobId: number; scheduledAt: string }) =>
+      reschedulePublishingJob(jobId, scheduledAt),
+    onSuccess: () => {
+      toast({ title: "Schedule updated", description: "The publishing queue was updated." });
+      void invalidateWorkspaces();
+    },
+    onError: (err: Error) =>
+      toast({ title: "Schedule update failed", description: err.message, variant: "destructive" }),
   });
   const retryMutation = useRetryPublishingJob({
     mutation: {
@@ -378,7 +398,7 @@ export function ListingsWorkspace() {
   const publishedWorkspacesCount = workspaces.filter(
     (w) => w.publishStatus === "Published" && w.vehicleStatus !== "Sold/Removed" && w.vehicleStatus !== "Price Changed",
   ).length;
-  const scheduledCount = workspaces.filter((w) => w.publishStatus === "Scheduled").length;
+  const scheduledWorkspaceCount = workspaces.filter((w) => w.publishStatus === "Scheduled").length;
   const publishingCount = workspaces.filter((w) => w.publishStatus === "Publishing").length;
   const needsReviewCount = workspaces.filter(
     (w) => w.publishStatus === "Needs Review",
@@ -393,8 +413,13 @@ export function ListingsWorkspace() {
   const allCount = workspaces.length;
 
   const jobs = jobsData?.jobs ?? [];
+  const scheduledJobs = jobs
+    .filter((j) => j.status === "Scheduled" || Boolean(j.scheduledAt && ["Queued", "Retry"].includes(j.status)))
+    .sort((a, b) => new Date(a.scheduledAt ?? a.createdAt).getTime() - new Date(b.scheduledAt ?? b.createdAt).getTime());
+  const scheduledJobVehicleIds = new Set(scheduledJobs.map((j) => j.vehicleId));
+  const scheduledCount = Math.max(scheduledWorkspaceCount, scheduledJobs.length);
   const ACTIVE_STATUSES = new Set([
-    "Queued", "Retry", "Assigned", "Claimed", "Publishing",
+    "Queued", "Scheduled", "Retry", "Assigned", "Claimed", "Publishing",
     "Opening Facebook", "Downloading Photos", "Uploading Photos",
     "Waiting For Thumbnails", "Filling Form", "Ready for Review", "Ready For Review",
   ]);
@@ -412,7 +437,7 @@ export function ListingsWorkspace() {
   const filteredWorkspaces = workspaces.filter((w) => {
     if (activeTab === "ready") return w.publishStatus === "Approved" || w.publishStatus === "Queued";
     if (activeTab === "generating") return w.aiStatus === "Generating";
-    if (activeTab === "scheduled") return w.publishStatus === "Scheduled";
+    if (activeTab === "scheduled") return w.publishStatus === "Scheduled" || scheduledJobVehicleIds.has(w.vehicleId);
     if (activeTab === "publishing") return w.publishStatus === "Publishing";
     if (activeTab === "published")
       return w.publishStatus === "Published" && w.vehicleStatus !== "Sold/Removed" && w.vehicleStatus !== "Price Changed";
@@ -715,6 +740,125 @@ export function ListingsWorkspace() {
                   </div>
                 </div>
               </div>
+
+              {activeTab === "scheduled" && (
+                <SectionCard className="p-0 overflow-hidden border-border/50">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/[0.04]">
+                    <div>
+                      <div className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        <CalendarClock className="w-4 h-4 text-primary" />
+                        Scheduled publishing plan
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        These are the vehicles waiting for the extension to publish at the planned time.
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                      {scheduledJobs.length} planned
+                    </Badge>
+                  </div>
+                  {scheduledJobs.length === 0 ? (
+                    <EmptyState
+                      icon={<CalendarClock className="w-8 h-8" />}
+                      title="No scheduled vehicles"
+                      description="Scheduled auto-publish jobs will appear here with their planned publish time."
+                    />
+                  ) : (
+                    <Table>
+                      <TableHeader className="bg-secondary/30">
+                        <TableRow className="hover:bg-transparent border-border/50">
+                          <TableHead className="font-medium">Vehicle</TableHead>
+                          <TableHead className="font-medium">Planned time</TableHead>
+                          <TableHead className="font-medium">Status</TableHead>
+                          <TableHead className="font-medium">Mode</TableHead>
+                          <TableHead className="font-medium text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {scheduledJobs.map((job) => {
+                          const value = rescheduleValues[job.id] ?? toDateTimeLocalValue(job.scheduledAt);
+                          return (
+                            <TableRow key={job.id} className="border-border/30 hover:bg-secondary/20 transition-colors">
+                              <TableCell className="font-medium">
+                                <Link
+                                  href={`/listings/${job.vehicleId}`}
+                                  className="text-foreground hover:text-primary hover:underline transition-colors"
+                                >
+                                  {job.vehicleLabel || `Vehicle #${job.vehicleId}`}
+                                </Link>
+                                {job.listingTitle && (
+                                  <div className="text-xs text-muted-foreground truncate max-w-[280px] mt-0.5">
+                                    {job.listingTitle}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col gap-1.5">
+                                  <Input
+                                    type="datetime-local"
+                                    value={value}
+                                    onChange={(e) =>
+                                      setRescheduleValues((prev) => ({ ...prev, [job.id]: e.target.value }))
+                                    }
+                                    className="h-8 w-[190px] text-xs bg-transparent border-white/[0.08]"
+                                  />
+                                  <span className="text-[10px] text-muted-foreground">
+                                    Current: {formatDate(job.scheduledAt)}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className={cn("px-2 py-0.5", publishStatusClass(job.status))}>
+                                  {job.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="bg-secondary/50 text-muted-foreground border-border text-[10px] uppercase tracking-wider">
+                                  {(job as { mode?: string }).mode ?? "Assisted"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs border-primary/40 text-primary hover:bg-primary/10"
+                                    disabled={!value || rescheduleMutation.isPending}
+                                    onClick={() => {
+                                      const next = new Date(value);
+                                      if (Number.isNaN(next.getTime())) {
+                                        toast({ title: "Invalid time", description: "Choose a valid publish time.", variant: "destructive" });
+                                        return;
+                                      }
+                                      rescheduleMutation.mutate({ jobId: job.id, scheduledAt: next.toISOString() });
+                                    }}
+                                  >
+                                    {rescheduleMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Change"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                                    disabled={cancelMutation.isPending}
+                                    onClick={() =>
+                                      cancelMutation.mutate({
+                                        id: job.id,
+                                        data: { reason: "Cancelled from scheduled plan" },
+                                      })
+                                    }
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </SectionCard>
+              )}
 
               <div className="text-[10px] text-white/18 font-mono">
                 {filteredSortedWorkspaces.length} vehicle{filteredSortedWorkspaces.length !== 1 ? "s" : ""}
@@ -1398,13 +1542,7 @@ export function ListingsWorkspace() {
                                   )}
                                 </Button>
                               )}
-                              {![
-                                "Published",
-                                "Failed",
-                                "Queued",
-                                "Retry",
-                                "Scheduled",
-                              ].includes(job.status) && (
+                              {!["Published", "Failed", "Cancelled"].includes(job.status) && (
                                 <Button
                                   size="sm"
                                   variant="ghost"

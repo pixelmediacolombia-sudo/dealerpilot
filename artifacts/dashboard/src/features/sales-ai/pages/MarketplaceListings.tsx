@@ -198,6 +198,7 @@ function ListingCard({
 
   const hasUnread = listing.unreadMessages > 0;
   const noMessages = listing.messagesReceived === 0;
+  const isInventoryRemoved = vehicle.status === "Sold/Removed";
 
   return (
     <div className="bg-card border border-white/[0.06] rounded-xl overflow-hidden hover:border-white/10 transition-colors">
@@ -218,6 +219,14 @@ function ListingCard({
         <div className="absolute top-2 left-2">
           <StatusBadge status={listing.status} />
         </div>
+        {isInventoryRemoved && (
+          <div className="absolute bottom-2 left-2">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/90 text-white shadow">
+              <AlertTriangle className="w-3 h-3" />
+              Inventory removed
+            </span>
+          </div>
+        )}
         {/* Unread badge */}
         {hasUnread && (
           <div className="absolute top-2 right-2">
@@ -254,6 +263,12 @@ function ListingCard({
         {listing.leadQuality && (
           <div>
             <LeadQualityBadge quality={listing.leadQuality} />
+          </div>
+        )}
+
+        {isInventoryRemoved && (
+          <div className="text-xs px-3 py-2 rounded-lg border bg-amber-500/10 border-amber-500/20 text-amber-300">
+            Vehicle is Sold/Removed in inventory while the Marketplace listing is still tracked as live.
           </div>
         )}
 
