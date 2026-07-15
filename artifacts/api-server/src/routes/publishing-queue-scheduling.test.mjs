@@ -51,6 +51,18 @@ const openAiRestorationSource = readFileSync(
   new URL("../photo/providers/openaiRestoration.ts", import.meta.url),
   "utf8",
 );
+const openAiClassifierSource = readFileSync(
+  new URL("../photo/providers/openai.ts", import.meta.url),
+  "utf8",
+);
+const photoExportSource = readFileSync(
+  new URL("../photo/stages/7_export.ts", import.meta.url),
+  "utf8",
+);
+const photoSetViewerSource = readFileSync(
+  new URL("../../../dashboard/src/features/photo-studio/components/PhotoSetViewer.tsx", import.meta.url),
+  "utf8",
+);
 
 test("batch list exposes live job progress instead of terminal counts only", () => {
   assert.match(autoPublishSource, /max\(\$\{publishingJobsTable\.progressPercent\}\)/);
@@ -267,6 +279,12 @@ test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity v
   assert.match(openAiRestorationSource, /PHOTO_RESTORATION_ALLOW_GENERATIVE/);
   assert.match(openAiRestorationSource, /PHOTO_RESTORATION_PROVIDER.*openai/s);
   assert.match(openAiRestorationSource, /disabled/);
+  assert.match(openAiClassifierSource, /data:image\/jpeg;base64/);
+  assert.match(openAiClassifierSource, /toOpenAiDataUrl/);
+  assert.match(openAiClassifierSource, /response_format: \{ type: "json_object" \}/);
+  assert.match(photoExportSource, /processingStatus: img\.processingStatus === "Failed" \? "Failed" : "Completed"/);
+  assert.match(photoSetViewerSource, /function FallbackImage/);
+  assert.match(photoSetViewerSource, /fallbackSrc/);
 });
 
 test("Sales AI intake writes Messenger messages to the CRM and Marketplace metrics", () => {

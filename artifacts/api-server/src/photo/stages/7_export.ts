@@ -33,7 +33,7 @@ export async function stageExport(ctx: PipelineContext): Promise<void> {
           classification: img.classification ?? "Miscellaneous",
           isExterior: img.isExterior ?? 0,
           position: img.position,
-          processingStatus: img.processingStatus,
+          processingStatus: img.processingStatus === "Failed" ? "Failed" : "Completed",
           failedReason: img.failedReason ?? null,
           usedFallback: img.usedFallback,
           classificationProvider: img.classificationProvider ?? null,

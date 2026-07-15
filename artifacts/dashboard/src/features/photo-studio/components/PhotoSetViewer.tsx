@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   X,
@@ -93,6 +93,52 @@ function isEnhanced(img: PhotoSetImage): boolean {
   return img.usedFallback !== 1 && aiOutputUrl(img) !== img.originalUrl;
 }
 
+function FallbackImage({
+  src,
+  fallbackSrc,
+  alt,
+  className,
+  loading,
+}: {
+  src: string;
+  fallbackSrc?: string | null;
+  alt: string;
+  className?: string;
+  loading?: "lazy" | "eager";
+}) {
+  const [currentSrc, setCurrentSrc] = useState(src);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setCurrentSrc(src);
+    setFailed(false);
+  }, [src]);
+
+  if (failed) {
+    return (
+      <div className={cn("flex items-center justify-center bg-white/[0.03] text-white/25", className)}>
+        <ImageOff className="w-5 h-5" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      className={className}
+      loading={loading}
+      onError={() => {
+        if (fallbackSrc && fallbackSrc !== currentSrc) {
+          setCurrentSrc(fallbackSrc);
+          return;
+        }
+        setFailed(true);
+      }}
+    />
+  );
+}
+
 // ── Tab types ─────────────────────────────────────────────────────────────────
 
 type Tab = "enhanced" | "original" | "compare" | "report";
@@ -118,8 +164,9 @@ function GalleryGrid({ images, urlFn, label }: { images: PhotoSetImage[]; urlFn:
     <div className="space-y-4">
       {/* Large preview */}
       <div className="relative rounded-2xl overflow-hidden bg-white/[0.03] border border-white/[0.06]" style={{ aspectRatio: "16/9" }}>
-        <img
+        <FallbackImage
           src={urlFn(selectedImg!)}
+          fallbackSrc={selectedImg?.originalUrl}
           alt={selectedImg?.classification ?? label ?? "photo"}
           className="w-full h-full object-contain"
         />
@@ -165,7 +212,13 @@ function GalleryGrid({ images, urlFn, label }: { images: PhotoSetImage[]; urlFn:
               i === selectedIdx ? "border-primary" : "border-white/[0.06] opacity-50 hover:opacity-80",
             )}
           >
-            <img src={urlFn(img)} alt="" className="w-full h-full object-cover" loading="lazy" />
+            <FallbackImage
+              src={urlFn(img)}
+              fallbackSrc={img.originalUrl}
+              alt=""
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
           </button>
         ))}
       </div>
@@ -205,7 +258,7 @@ function BeforeAfterView({ images }: { images: PhotoSetImage[] }) {
                 i === selectedIdx ? "border-primary" : "border-white/[0.06] opacity-50 hover:opacity-80",
               )}
             >
-              <img src={ph.originalUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+              <FallbackImage src={ph.originalUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
             </button>
           ))}
         </div>
@@ -217,7 +270,7 @@ function BeforeAfterView({ images }: { images: PhotoSetImage[] }) {
           <div className="space-y-2">
             <div className="text-[11px] font-medium text-white/40 uppercase tracking-wide pl-1">Original</div>
             <div className="rounded-xl overflow-hidden border border-white/[0.06]" style={{ aspectRatio: "4/3" }}>
-              <img src={img.originalUrl} alt="Original" className="w-full h-full object-cover" />
+              <FallbackImage src={img.originalUrl} alt="Original" className="w-full h-full object-cover" />
             </div>
           </div>
           <div className="space-y-2">
@@ -226,7 +279,12 @@ function BeforeAfterView({ images }: { images: PhotoSetImage[] }) {
               {enhanced && <span className="text-[10px] text-green-400">✓ Improved</span>}
             </div>
             <div className={cn("rounded-xl overflow-hidden border", enhanced ? "border-green-500/20" : "border-white/[0.06]")} style={{ aspectRatio: "4/3" }}>
-              <img src={aiOutputUrl(img)} alt="Enhanced" className="w-full h-full object-cover" />
+              <FallbackImage
+                src={aiOutputUrl(img)}
+                fallbackSrc={img.originalUrl}
+                alt="Enhanced"
+                className="w-full h-full object-cover"
+              />
             </div>
           </div>
         </div>

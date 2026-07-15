@@ -1,5 +1,8 @@
 // OpenAI GPT-5-mini vision — photo classification provider.
 // Uses the configured OpenAI integration.
+import fs from "node:fs";
+import path from "node:path";
+import sharp from "sharp";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import type { ClassificationResult, IClassificationProvider } from "./types";
 import { PHOTO_CLASSIFICATIONS, EXTERIOR_CLASSIFICATIONS } from "./types";
@@ -67,14 +70,41 @@ CRITICAL RULES:
 7. Respond ONLY with a JSON object: {"label": "<category>", "confidence": <0.0-1.0>}
 8. No extra text, no markdown, no explanation.`;
 
+async function readImageBuffer(urlOrPath: string): Promise<Buffer> {
+  if (urlOrPath.startsWith("/api/static/ai-photos/")) {
+    const filename = urlOrPath.replace("/api/static/ai-photos/", "");
+    return fs.readFileSync(path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos", filename));
+  }
+
+  if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
+    const response = await fetch(urlOrPath, { signal: AbortSignal.timeout(20_000) });
+    if (!response.ok) throw new Error(`Image fetch failed ${response.status}`);
+    return Buffer.from(await response.arrayBuffer());
+  }
+
+  return fs.readFileSync(urlOrPath);
+}
+
+async function toOpenAiDataUrl(urlOrPath: string): Promise<string> {
+  const source = await readImageBuffer(urlOrPath);
+  const normalized = await sharp(source)
+    .rotate()
+    .resize({ width: 1280, height: 1280, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 82, mozjpeg: true })
+    .toBuffer();
+  return `data:image/jpeg;base64,${normalized.toString("base64")}`;
+}
+
 export class OpenAiClassifier implements IClassificationProvider {
   readonly name = "openai";
   readonly model = MODEL;
 
   async classify(imageUrl: string): Promise<ClassificationResult> {
+    const imageDataUrl = await toOpenAiDataUrl(imageUrl);
     const response = await openai.chat.completions.create({
       model: MODEL,
       max_completion_tokens: 1024,
+      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
@@ -82,7 +112,7 @@ export class OpenAiClassifier implements IClassificationProvider {
           content: [
             {
               type: "image_url",
-              image_url: { url: imageUrl, detail: "low" },
+              image_url: { url: imageDataUrl, detail: "low" },
             },
           ],
         },
