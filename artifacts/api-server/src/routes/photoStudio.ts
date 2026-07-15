@@ -15,6 +15,7 @@ import {
 import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { computePhotoHash, hasChanged } from "../photo/changeDetection";
 import { OpenAiImageRestorationProvider } from "../photo/providers/openaiRestoration";
+import { resolveLocalAiPhotoUrl } from "../photo/staticAssets";
 
 
 // ── Multer: background image upload ─────────────────────────────────────────
@@ -568,16 +569,22 @@ router.get("/photo-studio/sets/:vehicleId", async (req: Request, res: Response) 
       .from(aiPhotoImagesTable)
       .where(eq(aiPhotoImagesTable.setId, set.id))
       .orderBy(asc(aiPhotoImagesTable.position));
+    const safeImages = images.map((image) => ({
+      ...image,
+      processedUrl: resolveLocalAiPhotoUrl(image.processedUrl, image.originalUrl),
+      compositedUrl: resolveLocalAiPhotoUrl(image.compositedUrl, null),
+      backgroundRemovedUrl: resolveLocalAiPhotoUrl(image.backgroundRemovedUrl, null),
+    }));
 
-    const exteriorCount = images.filter((i) => i.isExterior === 1).length;
-    const interiorCount = images.filter((i) => i.isExterior === 0 && i.classification !== "Miscellaneous").length;
-    const miscCount = images.filter((i) => i.classification === "Miscellaneous").length;
-    const fallbackCount = images.filter((i) => i.usedFallback === 1).length;
-    const compositedCount = images.filter((i) => i.compositedUrl && i.compositedUrl !== i.originalUrl).length;
+    const exteriorCount = safeImages.filter((i) => i.isExterior === 1).length;
+    const interiorCount = safeImages.filter((i) => i.isExterior === 0 && i.classification !== "Miscellaneous").length;
+    const miscCount = safeImages.filter((i) => i.classification === "Miscellaneous").length;
+    const fallbackCount = safeImages.filter((i) => i.usedFallback === 1 || i.processedUrl === i.originalUrl).length;
+    const compositedCount = safeImages.filter((i) => i.compositedUrl && i.compositedUrl !== i.originalUrl).length;
 
     res.json({
       set,
-      images,
+      images: safeImages,
       summary: { total: images.length, exteriorCount, interiorCount, miscCount, fallbackCount, compositedCount },
       vehicle: { id: vehicle.id, year: vehicle.year, make: vehicle.make, model: vehicle.model, trim: vehicle.trim, vin: vehicle.vin, aiPhotoStatus: vehicle.aiPhotoStatus },
       isActiveForMarketplace: vehicle.aiPhotoSetId === set.id,
@@ -598,7 +605,14 @@ router.get("/photo-studio/sets/:setId/images", async (req: Request, res: Respons
       .where(eq(aiPhotoImagesTable.setId, setId))
       .orderBy(asc(aiPhotoImagesTable.position));
 
-    res.json({ images });
+    res.json({
+      images: images.map((image) => ({
+        ...image,
+        processedUrl: resolveLocalAiPhotoUrl(image.processedUrl, image.originalUrl),
+        compositedUrl: resolveLocalAiPhotoUrl(image.compositedUrl, null),
+        backgroundRemovedUrl: resolveLocalAiPhotoUrl(image.backgroundRemovedUrl, null),
+      })),
+    });
   } catch (err) {
     req.log.error({ err }, "GET /photo-studio/sets/:setId/images failed");
     res.status(500).json({ error: "Failed to list set images" });

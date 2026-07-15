@@ -9,6 +9,7 @@ import sharp from "sharp";
 import type { PipelineContext } from "../pipeline";
 import { EXTERIOR_CLASSIFICATIONS, STUDIO_EXTERIOR_CLASSIFICATIONS } from "../providers/types";
 import { getImageRestorationProvider } from "../providers";
+import { aiPhotoStaticUrl, getAiPhotosDir, getLocalAiPhotoPath } from "../staticAssets";
 import {
   buildHighFidelityRestorationPrompt,
   getHighFidelityNegativePrompt,
@@ -55,17 +56,11 @@ interface PhotoFidelityScore {
 const TARGET_MAX_WIDTH = 2200;
 const TECHNICAL_MAX_WIDTH = 1800;
 
-function getAiPhotosDir(): string {
-  const dir = path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos");
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
 async function fetchBuffer(urlOrPath: string): Promise<Buffer> {
   if (urlOrPath.startsWith("/api/static/ai-photos/")) {
-    const filename = urlOrPath.replace("/api/static/ai-photos/", "");
-    const dir = path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos");
-    return fs.readFileSync(path.join(dir, filename));
+    const filepath = getLocalAiPhotoPath(urlOrPath);
+    if (!filepath) throw new Error(`Invalid AI photo path: ${urlOrPath}`);
+    return fs.readFileSync(filepath);
   }
   if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
     const res = await fetch(urlOrPath, { signal: AbortSignal.timeout(20_000) });
@@ -458,7 +453,7 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
 
       const filename = `enh-${ctx.job.vehicleId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
       fs.writeFileSync(path.join(uploadDir, filename), restored.output);
-      img.processedUrl = `/api/static/ai-photos/${filename}`;
+      img.processedUrl = aiPhotoStaticUrl(filename);
 
       ctx.log.debug(
         {

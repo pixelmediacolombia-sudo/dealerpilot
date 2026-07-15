@@ -14,6 +14,7 @@ import {
 } from "@workspace/db";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { deriveBatchProgress } from "../../../publishing/batchProgress";
+import { resolveLocalAiPhotoUrl } from "../../../photo/staticAssets";
 import { toJob } from "../domain/jobPresenter";
 
 export async function reconcileBatchProgress(batchId: number | null | undefined) {
@@ -146,7 +147,7 @@ export async function getVehiclePhotos(
     }
     if (aiImages.length > 0) {
       return aiImages.map((img) => ({
-        url: img.processedUrl ?? img.originalUrl,
+        url: resolveLocalAiPhotoUrl(img.processedUrl, img.originalUrl),
         position: img.position,
         source: "ai" as const,
       }));

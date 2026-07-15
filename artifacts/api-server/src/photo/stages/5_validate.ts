@@ -20,9 +20,9 @@
 // The export stage marks the photo set "Needs Review" instead of "Ready".
 import sharp from "sharp";
 import fs from "fs";
-import path from "path";
 import type { PipelineContext } from "../pipeline";
 import { STUDIO_EXTERIOR_CLASSIFICATIONS } from "../providers/types";
+import { getLocalAiPhotoPath } from "../staticAssets";
 
 const MIN_WIDTH  = 1024;
 const MIN_HEIGHT =  640;
@@ -50,10 +50,8 @@ interface QualityFlags {
 async function resolveBuffer(url: string): Promise<Buffer | null> {
   try {
     if (url.startsWith("/api/static/ai-photos/")) {
-      const filename = url.replace("/api/static/ai-photos/", "");
-      const dir = path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos");
-      const filepath = path.join(dir, filename);
-      if (fs.existsSync(filepath)) return fs.readFileSync(filepath);
+      const filepath = getLocalAiPhotoPath(url);
+      if (filepath && fs.existsSync(filepath)) return fs.readFileSync(filepath);
       return null;
     }
     if (url.startsWith("http://") || url.startsWith("https://")) {
@@ -111,6 +109,7 @@ function parseJson(value: string | undefined): unknown {
 
 export async function stageValidate(ctx: PipelineContext): Promise<void> {
   let anyNeedsReview = false;
+  const isStudioMode = ctx.pack?.processingMode === "studio";
 
   for (const img of ctx.images) {
     if (img.processingStatus === "Failed") continue;
@@ -177,15 +176,15 @@ export async function stageValidate(ctx: PipelineContext): Promise<void> {
       resolutionOk: outputW >= MIN_WIDTH && outputH >= MIN_HEIGHT,
       aspectRatioOk: outputW > 0 && outputH > 0 && outputW / outputH >= 0.75,
       studioComposited: isPrimaryExterior
-        ? !!(img.compositedUrl && img.compositedUrl !== img.originalUrl)
+        ? !isStudioMode || !!(img.compositedUrl && img.compositedUrl !== img.originalUrl)
         : true,
-      noFallback: img.usedFallback === 0,
+      noFallback: !isStudioMode || img.usedFallback === 0,
       classifiedOk: isPrimaryExterior
         ? (img.classification !== "Miscellaneous" && !!img.classification)
         : true,
       logoOk: !img.logoObscured,
       vehicleNotCropped: isPrimaryExterior
-        ? (outputW >= STUDIO_MIN_W && outputH >= STUDIO_MIN_H)
+        ? (!isStudioMode || (outputW >= STUDIO_MIN_W && outputH >= STUDIO_MIN_H))
         : true,
       aiNotWorse,
       needsReview: false,
@@ -200,10 +199,11 @@ export async function stageValidate(ctx: PipelineContext): Promise<void> {
 
     const score = scoreFlags(flags);
 
-    // Needs Review: primary exterior that failed critical checks
+    // Needs Review: primary exterior that failed critical checks.
+    // In enhance_only mode there is intentionally no studio composite or background removal.
     flags.needsReview = isPrimaryExterior && (
-      !flags.studioComposited ||
-      !flags.noFallback       ||
+      (isStudioMode && !flags.studioComposited) ||
+      (isStudioMode && !flags.noFallback)       ||
       !flags.logoOk           ||
       img.aiWorseThanOriginal === true
     );

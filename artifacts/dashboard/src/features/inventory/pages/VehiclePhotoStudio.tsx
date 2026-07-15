@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type SyntheticEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/shared/ui/button";
 import { SectionCard } from "@/shared/ui";
@@ -63,11 +63,18 @@ export interface PhotoSetData {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function aiOutputUrl(img: PhotoSetImage): string {
-  if (img.compositedUrl && img.compositedUrl !== img.originalUrl) return img.compositedUrl;
   if (img.processedUrl && img.processedUrl !== img.originalUrl) return img.processedUrl;
+  if (img.compositedUrl && img.compositedUrl !== img.originalUrl) return img.compositedUrl;
   if (img.backgroundRemovedUrl && img.backgroundRemovedUrl !== img.originalUrl)
     return img.backgroundRemovedUrl;
   return img.originalUrl;
+}
+
+function fallBackToOriginal(event: SyntheticEvent<HTMLImageElement>, originalUrl: string): void {
+  const image = event.currentTarget;
+  if (image.dataset.fallbackApplied === "true") return;
+  image.dataset.fallbackApplied = "true";
+  image.src = originalUrl;
 }
 
 export const PHOTO_SET_QUERY_KEY = (vehicleId: number) => ["vehicle-photo-set", vehicleId] as const;
@@ -327,6 +334,7 @@ export function VehiclePhotoStudio({
                                 alt="AI Enhanced"
                                 className="w-full h-full object-cover"
                                 loading="lazy"
+                                onError={(event) => fallBackToOriginal(event, img.originalUrl)}
                               />
                             </div>
                             <p className="text-[9px] text-muted-foreground/40 text-center mt-0.5">

@@ -1,5 +1,5 @@
 import { useRoute, Link } from "wouter";
-import { useState } from "react";
+import { useState, type SyntheticEvent } from "react";
 import { AppLayout } from "@/shared/layout/AppLayout";
 import { 
   useGetVehicle, 
@@ -43,6 +43,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { SectionCard, PageHeader, StatusPulse } from "@/shared/ui";
 import { cn } from "@/lib/utils";
+
+function fallBackToOriginal(event: SyntheticEvent<HTMLImageElement>, fallbackUrl?: string | null): void {
+  if (!fallbackUrl) return;
+  const image = event.currentTarget;
+  if (image.dataset.fallbackApplied === "true") return;
+  image.dataset.fallbackApplied = "true";
+  image.src = fallbackUrl;
+}
 
 export function VehicleDetail() {
   const [match, params] = useRoute("/inventory/:id");
@@ -135,14 +143,19 @@ export function VehicleDetail() {
   const aiDisplayImages =
     photoSetData?.images?.map((img) => ({
       id: img.id,
-      url: img.compositedUrl ?? img.processedUrl ?? img.originalUrl,
+      url: img.processedUrl ?? img.compositedUrl ?? img.backgroundRemovedUrl ?? img.originalUrl,
+      fallbackUrl: img.originalUrl,
       category: img.classification,
       isPrimary: img.position === 0,
     })) ?? [];
+  const rawDisplayImages = images.map((img) => ({
+    ...img,
+    fallbackUrl: img.url,
+  }));
   const displayImages =
     photoMode === "ai" && photoSetReady && aiDisplayImages.length > 0
       ? aiDisplayImages
-      : images;
+      : rawDisplayImages;
 
   const clampIdx = (i: number) => Math.max(0, Math.min(i, displayImages.length - 1));
 
@@ -314,6 +327,7 @@ export function VehicleDetail() {
                         src={displayImages[selectedIdx].url}
                         alt={`Photo ${selectedIdx + 1}`}
                         className="w-full h-full object-cover transition-opacity duration-300"
+                        onError={(event) => fallBackToOriginal(event, displayImages[selectedIdx].fallbackUrl)}
                       />
                     </div>
 
@@ -335,6 +349,7 @@ export function VehicleDetail() {
                               src={img.url}
                               alt={`Thumbnail ${i + 1}`}
                               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              onError={(event) => fallBackToOriginal(event, img.fallbackUrl)}
                             />
                             {img.isPrimary && i !== selectedIdx && (
                               <div className="absolute bottom-0.5 left-0.5">
