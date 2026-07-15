@@ -73,6 +73,15 @@ interface PhotoStudioStats {
     processing?: number | string;
     failed?: number | string;
   };
+  providers?: {
+    enhancement?: string;
+    restoration?: {
+      provider?: string;
+      model?: string;
+      promptVersion?: string;
+      enabled?: boolean;
+    };
+  };
 }
 
 // ── API calls ─────────────────────────────────────────────────────────────────
@@ -587,6 +596,36 @@ export function AIPhotoStudio() {
             );
           })}
         </div>
+
+        {stats?.providers?.enhancement && (
+          <div className={cn(
+            "flex items-center justify-between gap-4 rounded-xl border p-4",
+            stats.providers.restoration?.enabled
+              ? "border-emerald-500/20 bg-emerald-500/[0.04]"
+              : "border-amber-500/20 bg-amber-500/[0.04]",
+          )}>
+            <div className="flex items-center gap-3 min-w-0">
+              <Sparkles className={cn(
+                "w-4 h-4 shrink-0",
+                stats.providers.restoration?.enabled ? "text-emerald-400" : "text-amber-400",
+              )} />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-white/80 truncate">
+                  Enhancement engine: {stats.providers.enhancement}
+                </div>
+                <div className="text-xs text-white/35 truncate">
+                  Prompt {stats.providers.restoration?.promptVersion ?? "unknown"}
+                </div>
+              </div>
+            </div>
+            <div className={cn(
+              "text-[10px] font-black uppercase tracking-[0.18em]",
+              stats.providers.restoration?.enabled ? "text-emerald-400" : "text-amber-400",
+            )}>
+              {stats.providers.restoration?.enabled ? "GPT Image Active" : "Fallback Active"}
+            </div>
+          </div>
+        )}
 
         {/* Stale warning */}
         {(allJobs?.jobs ?? []).some((j) => j.status === "Failed") && (

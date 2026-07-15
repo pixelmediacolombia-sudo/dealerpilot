@@ -244,7 +244,11 @@ test("Marketplace live-list reconciliation can keep confirmed vehicles and demot
 });
 
 test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity validation", () => {
-  assert.match(restorationSpecSource, /dealerpilot-photo-enhancement-v2/);
+  assert.match(restorationSpecSource, /dealerpilot-photo-enhancement-v3-gpt-image/);
+  assert.match(restorationSpecSource, /Act as a professional automotive photo restoration AI/);
+  assert.match(restorationSpecSource, /Image restoration only/);
+  assert.match(restorationSpecSource, /No creative edits/);
+  assert.match(restorationSpecSource, /Preserve exact geometry/);
   assert.match(restorationSpecSource, /Super Resolution/);
   assert.match(restorationSpecSource, /Deblur/);
   assert.match(restorationSpecSource, /Noise Reduction/);
@@ -259,8 +263,10 @@ test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity v
   assert.match(enhanceStageSource, /conservative/);
   assert.match(enhanceStageSource, /enhancement_rejected_original_preserved/);
   assert.match(enhanceStageSource, /photoFidelityFlags/);
+  assert.match(enhanceStageSource, /localVisionNoImprovement/);
   assert.match(openAiRestorationSource, /PHOTO_RESTORATION_ALLOW_GENERATIVE/);
-  assert.match(openAiRestorationSource, /vision-engine/);
+  assert.match(openAiRestorationSource, /PHOTO_RESTORATION_PROVIDER.*openai/s);
+  assert.match(openAiRestorationSource, /disabled/);
 });
 
 test("Sales AI intake writes Messenger messages to the CRM and Marketplace metrics", () => {

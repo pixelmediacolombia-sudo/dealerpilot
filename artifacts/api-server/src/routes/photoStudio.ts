@@ -14,6 +14,7 @@ import {
 } from "@workspace/db";
 import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { computePhotoHash, hasChanged } from "../photo/changeDetection";
+import { OpenAiImageRestorationProvider } from "../photo/providers/openaiRestoration";
 
 
 // ── Multer: background image upload ─────────────────────────────────────────
@@ -912,6 +913,8 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
 
     const processingMode = defaultPack?.processingMode ?? "enhance_only";
     const isEnhanceOnly = processingMode !== "studio";
+    const openAiRestorationEnabled = OpenAiImageRestorationProvider.isConfigured();
+    const restorationModel = process.env["PHOTO_RESTORATION_OPENAI_MODEL"] ?? "gpt-image-1";
 
     res.json({
       jobs: statusCounts ?? { queued: 0, processing: 0, completed: 0, failed: 0, cancelled: 0 },
@@ -940,7 +943,15 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
         backgroundRemoval: isEnhanceOnly ? "Disabled (enhancement only)" : (falKey ? "fal.ai (BRIA RMBG 2.0)" : "Not configured"),
         classification: "OpenAI GPT-5-mini vision",
         compositing: isEnhanceOnly ? "Disabled (original background preserved)" : (backgroundConfigured ? "Sharp.js" : "Disabled — background not uploaded"),
-        enhancement: "Sharp.js",
+        enhancement: openAiRestorationEnabled
+          ? `OpenAI ${restorationModel} + DealerPilot fidelity gate`
+          : "DealerPilot Vision Engine (Sharp.js fallback)",
+        restoration: {
+          provider: openAiRestorationEnabled ? "openai" : "dealerpilot-vision-engine",
+          model: openAiRestorationEnabled ? restorationModel : "v4.0-vision-engine",
+          promptVersion: "dealerpilot-photo-enhancement-v3-gpt-image",
+          enabled: openAiRestorationEnabled,
+        },
       },
     });
   } catch (err) {

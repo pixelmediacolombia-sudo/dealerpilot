@@ -20,11 +20,11 @@ export class OpenAiImageRestorationProvider implements IImageRestorationProvider
   readonly model = MODEL;
 
   static isConfigured(): boolean {
-    const provider = (process.env["PHOTO_RESTORATION_PROVIDER"] ?? "vision-engine").toLowerCase();
-    const allowGenerative = process.env["PHOTO_RESTORATION_ALLOW_GENERATIVE"] === "true";
+    const provider = (process.env["PHOTO_RESTORATION_PROVIDER"] ?? "openai").toLowerCase();
+    const disabled = process.env["PHOTO_RESTORATION_ALLOW_GENERATIVE"] === "false";
     return (
       provider === "openai" &&
-      allowGenerative &&
+      !disabled &&
       !!process.env["AI_INTEGRATIONS_OPENAI_API_KEY"] &&
       !!process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"]
     );

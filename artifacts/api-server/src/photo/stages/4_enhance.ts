@@ -435,12 +435,22 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
         improvementLevel,
       };
 
-      if (restored.fidelity.reasons.includes("enhancement_rejected_original_preserved") || improvementLevel === "none") {
+      const originalPreserved = restored.fidelity.reasons.includes("enhancement_rejected_original_preserved");
+      const localVisionNoImprovement = !restored.usedProvider && improvementLevel === "none";
+
+      if (originalPreserved || localVisionNoImprovement) {
         img.processedUrl = src;
         img.usedFallback = 1;
         img.restorationRejectedReason = restored.fidelity.reasons.join(",");
         ctx.log.info(
-          { vehicleId: ctx.job.vehicleId, classification, score: restored.fidelity.overall, version: ENHANCE_PRESET_VERSION },
+          {
+            vehicleId: ctx.job.vehicleId,
+            classification,
+            score: restored.fidelity.overall,
+            improvementLevel,
+            usedProvider: restored.usedProvider,
+            version: ENHANCE_PRESET_VERSION,
+          },
           "photo:enhance fidelity gate preserved original",
         );
         continue;
