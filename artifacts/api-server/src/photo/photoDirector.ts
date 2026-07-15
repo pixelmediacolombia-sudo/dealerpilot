@@ -108,6 +108,7 @@ export interface PhotoDirectorPlan {
   localEnhancementCount: number;
   paidAiRestorationCount: number;
   paidAiRestorationPhotoIds: number[];
+  localEnhancementPhotoIds: number[];
   estimatedCostUsd: number;
   defaultCostCapUsd: number;
   estimatedCostAvoidedUsd: number;
@@ -507,8 +508,11 @@ export async function buildPhotoDirectorPlan(input: {
   const paidAiRestorationPhotoIds = photos
     .filter((photo) => photo.treatment === "PAID_AI_RESTORATION")
     .map((photo) => photo.id);
+  const localEnhancementPhotoIds = photos
+    .filter((photo) => photo.treatment === "LOCAL_ENHANCEMENT")
+    .map((photo) => photo.id);
   const publishAsIsCount = photos.filter((photo) => photo.treatment === "PUBLISH_AS_IS").length;
-  const localEnhancementCount = photos.filter((photo) => photo.treatment === "LOCAL_ENHANCEMENT").length;
+  const localEnhancementCount = localEnhancementPhotoIds.length;
   const paidAiRestorationCount = paidAiRestorationPhotoIds.length;
   const duplicateRejectedCount = analyzed.filter((photo) => photo.rejectionReason === "near_duplicate").length;
   const potentialAllPaidCost = analyzed.filter((photo) => !photo.rejected && decideBaseTreatment(photo) === "PAID_AI_RESTORATION").length * ESTIMATED_PROVIDER_RESTORATION_COST_USD;
@@ -528,6 +532,7 @@ export async function buildPhotoDirectorPlan(input: {
     localEnhancementCount,
     paidAiRestorationCount,
     paidAiRestorationPhotoIds,
+    localEnhancementPhotoIds,
     estimatedCostUsd: Number(estimatedCost.toFixed(3)),
     defaultCostCapUsd: costCap,
     estimatedCostAvoidedUsd,

@@ -82,6 +82,7 @@ interface PhotoDirectorPlan {
   localEnhancementCount: number;
   paidAiRestorationCount: number;
   paidAiRestorationPhotoIds: number[];
+  localEnhancementPhotoIds: number[];
   estimatedCostUsd: number;
   defaultCostCapUsd: number;
   photos: Array<{
@@ -175,6 +176,7 @@ export function VehiclePhotoStudio({
             sourceSetId: directorPlan?.sourceSetId ?? undefined,
             selectedPhotoIds: directorPlan?.selectedPhotoIds ?? undefined,
             paidAiRestorationPhotoIds: directorPlan?.paidAiRestorationPhotoIds ?? undefined,
+            localEnhancementPhotoIds: directorPlan?.localEnhancementPhotoIds ?? undefined,
             maxCostUsd: directorPlan?.defaultCostCapUsd ?? undefined,
           }),
         });

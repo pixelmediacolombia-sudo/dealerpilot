@@ -28,6 +28,7 @@ import {
   aiRestorationPhotoIdsFromPresetVersion,
   ESTIMATED_PROVIDER_RESTORATION_COST_USD,
   isRestorableClassification,
+  localEnhancementPhotoIdsFromPresetVersion,
   processingModeFromPresetVersion,
   type PhotoProcessingMode,
   type ProviderTrace,
@@ -487,10 +488,15 @@ async function restoreWithValidation(
   const processingMode = processingModeFromPresetVersion(ctx.job.presetVersion);
   const needAssessment = await assessRestorationNeed(buf, classification, processingMode);
   const authorizedPhotoIds = aiRestorationPhotoIdsFromPresetVersion(ctx.job.presetVersion);
+  const localEnhancementPhotoIds = localEnhancementPhotoIdsFromPresetVersion(ctx.job.presetVersion);
   const providerAllowed =
     authorizedPhotoIds.length > 0 &&
     sourcePhotoId !== undefined &&
     authorizedPhotoIds.includes(sourcePhotoId);
+  const localAllowed =
+    localEnhancementPhotoIds.length > 0 &&
+    sourcePhotoId !== undefined &&
+    localEnhancementPhotoIds.includes(sourcePhotoId);
   const providerAttempt = providerAllowed
     ? await maybeRunProviderRestoration(ctx, buf, classification, needAssessment)
     : {
@@ -619,6 +625,70 @@ async function restoreWithValidation(
         processing_mode: processingMode,
       },
       qualityGate: null,
+      needAssessment,
+    };
+  }
+
+  if (localAllowed) {
+    const localOutput = await runVisionEngine(buf, preset, processingMode === "strong-restoration" ? "standard" : "conservative");
+    const localStats = await measureImageStats(localOutput);
+    const localFidelity = scorePhotoFidelity(originalStats, localStats);
+    const localGate = buildQualityGate(originalStats, localStats, localFidelity);
+    const localAccepted =
+      localFidelity.accepted &&
+      (localGate.result === "Strong Improvement" || localGate.result === "Moderate Improvement");
+
+    if (localAccepted) {
+      return {
+        output: localOutput,
+        fidelity: localFidelity,
+        intensity: processingMode === "strong-restoration" ? "standard" : "conservative",
+        usedProvider: false,
+        finalProvider: "dealerpilot-vision-engine",
+        finalModel: ENHANCE_PRESET_VERSION,
+        providerTrace: {
+          requested_provider: providerAttempt.requestedProvider,
+          attempted_provider: providerAttempt.attemptedProvider,
+          returned_provider: providerAttempt.returnedProvider,
+          selected_final_provider: "dealerpilot-vision-engine",
+          provider_result_accepted: false,
+          rejection_reason: null,
+          provider_cost: 0,
+          fallback_used: false,
+          fallback_reason: null,
+          fidelity_score: localFidelity.overall,
+          improvement_score: localGate.score,
+          quality_gate_result: localGate.result,
+          processing_mode: processingMode,
+        },
+        qualityGate: localGate,
+        needAssessment,
+      };
+    }
+
+    return {
+      output: buf,
+      fidelity: { ...originalFidelity, reasons: [`local_enhancement_rejected:${localGate.result}`] },
+      intensity: "minimal",
+      usedProvider: false,
+      finalProvider: "original",
+      finalModel: "original-preserved",
+      providerTrace: {
+        requested_provider: providerAttempt.requestedProvider,
+        attempted_provider: providerAttempt.attemptedProvider,
+        returned_provider: providerAttempt.returnedProvider,
+        selected_final_provider: "original",
+        provider_result_accepted: false,
+        rejection_reason: localFidelity.reasons.length > 0 ? localFidelity.reasons.join(",") : localGate.result,
+        provider_cost: 0,
+        fallback_used: true,
+        fallback_reason: "local_enhancement_too_subtle_original_preserved",
+        fidelity_score: originalFidelity.overall,
+        improvement_score: localGate.score,
+        quality_gate_result: localGate.result === "Rejected - Fidelity Risk" ? "Rejected - Fidelity Risk" : "Too Subtle",
+        processing_mode: processingMode,
+      },
+      qualityGate: localGate,
       needAssessment,
     };
   }

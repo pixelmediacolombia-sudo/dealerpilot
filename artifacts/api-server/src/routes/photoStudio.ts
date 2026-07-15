@@ -263,6 +263,7 @@ async function resolveProcessingPhotos(
   selectionMode: PhotoDirectorMode,
   requestedSourceSetId: number | null,
   requestedPaidAiRestorationPhotoIds: number[],
+  requestedLocalEnhancementPhotoIds: number[],
 ) {
   if (selectedPhotoIds.length > 0) {
     const { set, images } = await getPhotoDirectorSourceImages(vehicleId, requestedSourceSetId);
@@ -276,10 +277,15 @@ async function resolveProcessingPhotos(
     }
     const selectedIdSet = new Set(selectedPhotoIds);
     const paidAiRestorationPhotoIds = requestedPaidAiRestorationPhotoIds.filter((id) => selectedIdSet.has(id));
+    const paidIdSet = new Set(paidAiRestorationPhotoIds);
+    const localEnhancementPhotoIds = requestedLocalEnhancementPhotoIds.length > 0
+      ? requestedLocalEnhancementPhotoIds.filter((id) => selectedIdSet.has(id) && !paidIdSet.has(id))
+      : [];
     return {
       sourceSetId: set.id,
       selectedPhotoIds,
       paidAiRestorationPhotoIds,
+      localEnhancementPhotoIds,
       photoUrls: selectedImages.map((image) => image.originalUrl),
       selectionPlan: null,
     };
@@ -291,6 +297,7 @@ async function resolveProcessingPhotos(
       sourceSetId: smartPlan.sourceSetId,
       selectedPhotoIds: smartPlan.selectedPhotoIds,
       paidAiRestorationPhotoIds: smartPlan.paidAiRestorationPhotoIds,
+      localEnhancementPhotoIds: smartPlan.localEnhancementPhotoIds,
       photoUrls: smartPlan.photos.map((photo) => photo.originalUrl),
       selectionPlan: smartPlan,
     };
@@ -305,6 +312,7 @@ async function resolveProcessingPhotos(
     sourceSetId: null,
     selectedPhotoIds: [],
     paidAiRestorationPhotoIds: [],
+    localEnhancementPhotoIds: [],
     photoUrls: images.map((image) => image.url),
     selectionPlan: null,
   };
@@ -426,6 +434,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
       confirmCost?: boolean;
       selectedPhotoIds?: unknown;
       paidAiRestorationPhotoIds?: unknown;
+      localEnhancementPhotoIds?: unknown;
       selectionMode?: string;
       sourceSetId?: unknown;
       maxCostUsd?: unknown;
@@ -435,6 +444,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
     const sourceSetId = normalizeOptionalSourceSetId(body.sourceSetId);
     const requestedSelectedPhotoIds = normalizeSelectedPhotoIds(body.selectedPhotoIds);
     const requestedPaidAiRestorationPhotoIds = normalizeSelectedPhotoIds(body.paidAiRestorationPhotoIds);
+    const requestedLocalEnhancementPhotoIds = normalizeSelectedPhotoIds(body.localEnhancementPhotoIds);
     let processingPhotos: Awaited<ReturnType<typeof resolveProcessingPhotos>>;
     try {
       processingPhotos = await resolveProcessingPhotos(
@@ -444,6 +454,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
         selectionMode,
         sourceSetId,
         requestedPaidAiRestorationPhotoIds,
+        requestedLocalEnhancementPhotoIds,
       );
     } catch (err) {
       res.status(422).json({ error: err instanceof Error ? err.message : "Invalid selected photos" });
@@ -453,6 +464,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
       processingMode,
       processingPhotos.selectedPhotoIds,
       processingPhotos.paidAiRestorationPhotoIds,
+      processingPhotos.localEnhancementPhotoIds,
     );
     const [vehicle] = await db
       .select()
@@ -504,6 +516,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
         reused: true,
         selectedPhotoIds: processingPhotos.selectedPhotoIds,
         paidAiRestorationPhotoIds: processingPhotos.paidAiRestorationPhotoIds,
+        localEnhancementPhotoIds: processingPhotos.localEnhancementPhotoIds,
         sourceSetId: processingPhotos.sourceSetId,
       });
       return;
@@ -547,6 +560,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
         maxCostUsd,
         selectedPhotoIds: processingPhotos.selectedPhotoIds,
         paidAiRestorationPhotoIds: processingPhotos.paidAiRestorationPhotoIds,
+        localEnhancementPhotoIds: processingPhotos.localEnhancementPhotoIds,
         selectionPlan: processingPhotos.selectionPlan,
       });
       return;
@@ -559,6 +573,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
         estimate: restorationEstimate,
         selectedPhotoIds: processingPhotos.selectedPhotoIds,
         paidAiRestorationPhotoIds: processingPhotos.paidAiRestorationPhotoIds,
+        localEnhancementPhotoIds: processingPhotos.localEnhancementPhotoIds,
         sourceSetId: processingPhotos.sourceSetId,
         selectionPlan: processingPhotos.selectionPlan,
         message: `${restorationEstimate.photosNeedingRestoration} of ${restorationEstimate.totalPhotos} photos need AI restoration. Estimated cost: $${restorationEstimate.estimatedCostUsd}.`,
@@ -620,6 +635,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
         processingMode,
         selectedPhotoIds: processingPhotos.selectedPhotoIds,
         paidAiRestorationPhotoIds: processingPhotos.paidAiRestorationPhotoIds,
+        localEnhancementPhotoIds: processingPhotos.localEnhancementPhotoIds,
         sourceSetId: processingPhotos.sourceSetId,
         restorationEstimate,
       },
@@ -630,6 +646,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
       estimate: restorationEstimate,
       selectedPhotoIds: processingPhotos.selectedPhotoIds,
       paidAiRestorationPhotoIds: processingPhotos.paidAiRestorationPhotoIds,
+      localEnhancementPhotoIds: processingPhotos.localEnhancementPhotoIds,
       sourceSetId: processingPhotos.sourceSetId,
       selectionPlan: processingPhotos.selectionPlan,
     });

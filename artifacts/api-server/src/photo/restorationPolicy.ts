@@ -46,10 +46,12 @@ export function presetVersionForMode(
   mode: PhotoProcessingMode,
   selectedPhotoIds: number[] = [],
   aiRestorationPhotoIds: number[] = selectedPhotoIds,
+  localEnhancementPhotoIds: number[] = [],
 ): string {
   const suffix = selectedPhotoIds.length > 0 ? `:ids=${selectedPhotoIds.join(",")}` : "";
   const aiSuffix = aiRestorationPhotoIds.length > 0 ? `:ai=${aiRestorationPhotoIds.join(",")}` : "";
-  return `v1:${mode}${suffix}${aiSuffix}`;
+  const localSuffix = localEnhancementPhotoIds.length > 0 ? `:local=${localEnhancementPhotoIds.join(",")}` : "";
+  return `v1:${mode}${suffix}${aiSuffix}${localSuffix}`;
 }
 
 export function processingModeFromPresetVersion(value: string | null | undefined): PhotoProcessingMode {
@@ -63,6 +65,10 @@ export function selectedPhotoIdsFromPresetVersion(value: string | null | undefin
 
 export function aiRestorationPhotoIdsFromPresetVersion(value: string | null | undefined): number[] {
   return photoIdsFromPresetPart(value, "ai");
+}
+
+export function localEnhancementPhotoIdsFromPresetVersion(value: string | null | undefined): number[] {
+  return photoIdsFromPresetPart(value, "local");
 }
 
 function photoIdsFromPresetPart(value: string | null | undefined, key: string): number[] {

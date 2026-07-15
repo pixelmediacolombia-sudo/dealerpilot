@@ -294,6 +294,8 @@ test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity v
   assert.match(enhanceStageSource, /VehicleGeometryFidelity|vehicleGeometryFidelity/);
   assert.match(enhanceStageSource, /restoreWithValidation/);
   assert.match(enhanceStageSource, /authorizedPhotoIds\.length > 0/);
+  assert.match(enhanceStageSource, /localEnhancementPhotoIdsFromPresetVersion/);
+  assert.match(enhanceStageSource, /local_enhancement_too_subtle_original_preserved/);
   assert.match(enhanceStageSource, /paid_restoration_not_selected_for_this_photo/);
   assert.match(enhanceStageSource, /conservative/);
   assert.match(enhanceStageSource, /enhancement_rejected_original_preserved/);
@@ -316,10 +318,12 @@ test("Photo Director limits paid AI and builds selected-photo handoff", () => {
   assert.match(photoDirectorSource, /premium: 0\.35/);
   assert.match(photoDirectorSource, /return 3/);
   assert.match(photoDirectorSource, /PAID_AI_RESTORATION/);
+  assert.match(photoDirectorSource, /localEnhancementPhotoIds/);
   assert.match(photoStudioRouteSource, /buildPhotoDirectorPlan/);
   assert.match(photoStudioRouteSource, /getPhotoDirectorSourceSet/);
   assert.match(photoStudioRouteSource, /desc\(aiPhotoSetsTable\.totalPhotos\)/);
   assert.match(photoStudioRouteSource, /paidAiRestorationPhotoIds/);
+  assert.match(photoStudioRouteSource, /localEnhancementPhotoIds/);
   assert.match(photoStudioRouteSource, /defaultCostCapUsd/);
   assert.match(photoStudioRouteSource, /sourceSetId/);
 });
