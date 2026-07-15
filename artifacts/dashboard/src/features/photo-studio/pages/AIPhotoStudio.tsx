@@ -84,6 +84,13 @@ interface PhotoStudioStats {
   };
 }
 
+type PhotoProcessingMode = "fidelity-first" | "balanced" | "strong-restoration";
+
+interface ProcessArgs {
+  vehicleId: number;
+  processingMode: PhotoProcessingMode;
+}
+
 // ── API calls ─────────────────────────────────────────────────────────────────
 
 async function fetchJobs(): Promise<{ jobs: PhotoJob[] }> {
@@ -106,12 +113,30 @@ async function fetchInventory(location?: string): Promise<{ vehicles: InventoryV
   return r.json() as Promise<{ vehicles: InventoryVehicle[] }>;
 }
 
-async function triggerProcess(vehicleId: number): Promise<void> {
+async function triggerProcess({ vehicleId, processingMode }: ProcessArgs, confirmCost = false): Promise<void> {
   const r = await fetch(`${API_BASE}/photo-studio/vehicles/${vehicleId}/process`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dealerId: 1 }),
+    body: JSON.stringify({ dealerId: 1, processingMode, confirmCost }),
   });
+  if (r.status === 409) {
+    const body = (await r.json().catch(() => ({}))) as {
+      requiresConfirmation?: boolean;
+      message?: string;
+      estimate?: { photosNeedingRestoration?: number; totalPhotos?: number; estimatedCostUsd?: number };
+      error?: string;
+    };
+    if (body.requiresConfirmation) {
+      const estimate = body.estimate;
+      const message = body.message ??
+        `${estimate?.photosNeedingRestoration ?? "Some"} of ${estimate?.totalPhotos ?? "the"} photos need AI restoration. Estimated cost: $${estimate?.estimatedCostUsd ?? "unknown"}.`;
+      if (window.confirm(message)) {
+        return triggerProcess({ vehicleId, processingMode }, true);
+      }
+      throw new Error("Enhancement cancelled before OpenAI spend.");
+    }
+    throw new Error(body.error ?? "Processing failed");
+  }
   if (!r.ok) {
     const body = (await r.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? "Processing failed");
@@ -467,6 +492,7 @@ function InventoryBrowser({
 export function AIPhotoStudio() {
   const [openVehicleId, setOpenVehicleId] = useState<number | null>(null);
   const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
+  const [processingMode, setProcessingMode] = useState<PhotoProcessingMode>("fidelity-first");
   const { toast } = useToast();
   const qc = useQueryClient();
   const { selectedLocation } = useDealerLocation();
@@ -487,17 +513,17 @@ export function AIPhotoStudio() {
   });
 
   const reprocessMutation = useMutation({
-    mutationFn: triggerProcess,
-    onMutate: (vehicleId) => {
+    mutationFn: (args: ProcessArgs) => triggerProcess(args),
+    onMutate: ({ vehicleId }) => {
       setPendingIds((prev) => new Set(prev).add(vehicleId));
     },
-    onSuccess: (_data, vehicleId) => {
+    onSuccess: (_data, { vehicleId }) => {
       setPendingIds((prev) => { const s = new Set(prev); s.delete(vehicleId); return s; });
       void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
       void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
       toast({ title: "Enhancement started", description: "Photos are being processed." });
     },
-    onError: (err: Error, vehicleId) => {
+    onError: (err: Error, { vehicleId }) => {
       setPendingIds((prev) => { const s = new Set(prev); s.delete(vehicleId); return s; });
       toast({ title: "Failed to start enhancement", description: err.message, variant: "destructive" });
     },
@@ -552,7 +578,7 @@ export function AIPhotoStudio() {
       <PhotoSetViewer
         vehicleId={openVehicleId}
         onClose={() => setOpenVehicleId(null)}
-        onReprocess={(id) => { reprocessMutation.mutate(id); setOpenVehicleId(null); }}
+        onReprocess={(id) => { reprocessMutation.mutate({ vehicleId: id, processingMode }); setOpenVehicleId(null); }}
       />
     );
   }
@@ -627,6 +653,36 @@ export function AIPhotoStudio() {
           </div>
         )}
 
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-card/40 p-3">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-white/75">Processing mode</div>
+            <div className="text-[11px] text-white/35">
+              Cost is confirmed before OpenAI restoration starts.
+            </div>
+          </div>
+          <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-1">
+            {([
+              ["fidelity-first", "Fidelity First"],
+              ["balanced", "Balanced"],
+              ["strong-restoration", "Strong Restoration"],
+            ] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setProcessingMode(mode)}
+                className={cn(
+                  "px-3 py-1.5 text-[11px] font-semibold rounded-md transition-colors",
+                  processingMode === mode
+                    ? "bg-primary/20 text-primary border border-primary/25"
+                    : "text-white/40 hover:text-white/70",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Stale warning */}
         {(allJobs?.jobs ?? []).some((j) => j.status === "Failed") && (
           <div className="flex items-center gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.04]">
@@ -662,7 +718,7 @@ export function AIPhotoStudio() {
                   key={job.vehicleId}
                   job={job}
                   onOpenStudio={setOpenVehicleId}
-                  onReprocess={(id) => reprocessMutation.mutate(id)}
+                  onReprocess={(id) => reprocessMutation.mutate({ vehicleId: id, processingMode })}
                 />
               ))}
             </div>
@@ -672,7 +728,7 @@ export function AIPhotoStudio() {
         {/* Always-visible inventory browser */}
         <InventoryBrowser
           jobsByVehicleId={jobsByVehicleId}
-          onEnhance={(id) => reprocessMutation.mutate(id)}
+          onEnhance={(id) => reprocessMutation.mutate({ vehicleId: id, processingMode })}
           onOpenStudio={setOpenVehicleId}
           pendingVehicleIds={pendingIds}
         />

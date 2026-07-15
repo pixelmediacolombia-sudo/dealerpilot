@@ -18,12 +18,21 @@ import {
   HIGH_FIDELITY_PIPELINE_STEPS,
   HIGH_FIDELITY_RESTORATION_VERSION,
   MIN_PHOTO_FIDELITY_SCORE,
-  shouldUseHighFidelityAiRestoration,
 } from "../restorationSpec";
 import {
   checkOpenAiRestorationBudget,
   recordOpenAiRestoration,
 } from "../../workers/costGuardrail";
+import {
+  assessRestorationNeed,
+  ESTIMATED_PROVIDER_RESTORATION_COST_USD,
+  isRestorableClassification,
+  processingModeFromPresetVersion,
+  type PhotoProcessingMode,
+  type ProviderTrace,
+  type QualityImprovementClass,
+  type RestorationNeedAssessment,
+} from "../restorationPolicy";
 
 export const ENHANCE_PRESET_VERSION = "v4.0-vision-engine";
 
@@ -38,6 +47,11 @@ interface ImageStats {
   meanContrast: number;
   channelMeans: [number, number, number];
   pixelFingerprint: Buffer;
+  sharpnessProxy: number;
+  shadowDetail: number;
+  noiseEstimate: number;
+  localContrast: number;
+  paintClarity: number;
 }
 
 interface PhotoFidelityScore {
@@ -96,6 +110,16 @@ async function measureImageStats(buf: Buffer): Promise<ImageStats> {
     channels[1]?.mean ?? 0,
     channels[2]?.mean ?? 0,
   ];
+  const pixels = [...fingerprint];
+  const mean = pixels.reduce((sum, pixel) => sum + pixel, 0) / Math.max(1, pixels.length);
+  const variance = pixels.reduce((sum, pixel) => sum + Math.pow(pixel - mean, 2), 0) / Math.max(1, pixels.length);
+  let adjacentDiff = 0;
+  for (let i = 1; i < pixels.length; i++) adjacentDiff += Math.abs((pixels[i] ?? 0) - (pixels[i - 1] ?? 0));
+  adjacentDiff /= Math.max(1, pixels.length - 1);
+  const shadowPixels = pixels.filter((pixel) => pixel < 92);
+  const shadowDetail = shadowPixels.length > 0
+    ? shadowPixels.reduce((sum, pixel) => sum + pixel, 0) / shadowPixels.length
+    : mean;
 
   return {
     width,
@@ -105,6 +129,11 @@ async function measureImageStats(buf: Buffer): Promise<ImageStats> {
     meanContrast: channels.reduce((sum, channel) => sum + channel.stdev, 0) / Math.max(1, channels.length),
     channelMeans,
     pixelFingerprint: fingerprint,
+    sharpnessProxy: adjacentDiff,
+    shadowDetail,
+    noiseEstimate: Math.sqrt(variance) - adjacentDiff * 0.38,
+    localContrast: channels.reduce((sum, channel) => sum + channel.stdev, 0) / Math.max(1, channels.length),
+    paintClarity: adjacentDiff * 0.58 + Math.sqrt(variance) * 0.42,
   };
 }
 
@@ -202,6 +231,43 @@ function classifyImprovement(
   return "high";
 }
 
+function buildQualityGate(
+  original: ImageStats,
+  enhanced: ImageStats,
+  fidelity: PhotoFidelityScore,
+): { result: QualityImprovementClass; score: number; passedMetrics: string[]; failedMetrics: string[] } {
+  const checks = [
+    {
+      name: "sharpness",
+      passed: enhanced.sharpnessProxy >= original.sharpnessProxy * 1.015,
+    },
+    {
+      name: "shadow_detail",
+      passed: enhanced.shadowDetail >= original.shadowDetail + 1.2,
+    },
+    {
+      name: "noise_reduction",
+      passed: enhanced.noiseEstimate <= original.noiseEstimate * 0.96,
+    },
+    {
+      name: "local_contrast",
+      passed: enhanced.localContrast >= original.localContrast + 1.2,
+    },
+    {
+      name: "paint_clarity",
+      passed: enhanced.paintClarity >= original.paintClarity * 1.018,
+    },
+  ];
+  const passedMetrics = checks.filter((check) => check.passed).map((check) => check.name);
+  const failedMetrics = checks.filter((check) => !check.passed).map((check) => check.name);
+  const score = clampScore(passedMetrics.length * 2);
+
+  if (!fidelity.accepted) return { result: "Rejected - Fidelity Risk", score, passedMetrics, failedMetrics };
+  if (passedMetrics.length >= 4) return { result: "Strong Improvement", score, passedMetrics, failedMetrics };
+  if (passedMetrics.length >= 2) return { result: "Moderate Improvement", score, passedMetrics, failedMetrics };
+  return { result: "Too Subtle", score, passedMetrics, failedMetrics };
+}
+
 function routePreset(classification: string): EnhancementPreset {
   if (EXTERIOR_CLASSIFICATIONS.has(classification) || STUDIO_EXTERIOR_CLASSIFICATIONS.has(classification)) {
     return "exterior_premium";
@@ -277,13 +343,46 @@ async function runVisionEngine(buf: Buffer, preset: EnhancementPreset, intensity
     .toBuffer();
 }
 
+interface ProviderAttempt {
+  requestedProvider: string | null;
+  attemptedProvider: string | null;
+  returnedProvider: string | null;
+  model: string | null;
+  output: Buffer | null;
+  costUsd: number;
+  rejectedReason: string | null;
+}
+
 async function maybeRunProviderRestoration(
   ctx: PipelineContext,
   buf: Buffer,
   classification: string,
-): Promise<Buffer | null> {
+  needAssessment: RestorationNeedAssessment,
+): Promise<ProviderAttempt> {
   const provider = getImageRestorationProvider();
-  if (!provider || !shouldUseHighFidelityAiRestoration(classification)) return null;
+  const requestedProvider = provider && isRestorableClassification(classification) ? provider.name : null;
+  if (!provider || !isRestorableClassification(classification)) {
+    return {
+      requestedProvider,
+      attemptedProvider: null,
+      returnedProvider: null,
+      model: null,
+      output: null,
+      costUsd: 0,
+      rejectedReason: "provider_not_configured_or_classification_not_restorable",
+    };
+  }
+  if (!needAssessment.needsRestoration) {
+    return {
+      requestedProvider,
+      attemptedProvider: null,
+      returnedProvider: null,
+      model: provider.model,
+      output: null,
+      costUsd: 0,
+      rejectedReason: `restoration_not_needed:${needAssessment.reasons.join(",") || "clean_photo"}`,
+    };
+  }
 
   const budget = await checkOpenAiRestorationBudget();
   if (budget.budgetExhausted) {
@@ -291,22 +390,55 @@ async function maybeRunProviderRestoration(
       { vehicleId: ctx.job.vehicleId, remainingBudgetUsd: budget.remainingBudgetUsd },
       "photo:enhance provider restoration skipped - OpenAI budget exhausted",
     );
-    return null;
+    return {
+      requestedProvider,
+      attemptedProvider: null,
+      returnedProvider: null,
+      model: provider.model,
+      output: null,
+      costUsd: 0,
+      rejectedReason: "openai_budget_exhausted",
+    };
   }
 
-  const restored = await provider.restore({
-    imageBuffer: buf,
-    classification,
-    prompt: buildHighFidelityRestorationPrompt(classification),
-    negativePrompt: getHighFidelityNegativePrompt(),
-    promptVersion: HIGH_FIDELITY_RESTORATION_VERSION,
-    pipelineSteps: HIGH_FIDELITY_PIPELINE_STEPS,
-  });
-  await recordOpenAiRestoration();
-  return restored.buffer;
+  try {
+    const restored = await provider.restore({
+      imageBuffer: buf,
+      classification,
+      prompt: buildHighFidelityRestorationPrompt(classification),
+      negativePrompt: getHighFidelityNegativePrompt(),
+      promptVersion: HIGH_FIDELITY_RESTORATION_VERSION,
+      pipelineSteps: HIGH_FIDELITY_PIPELINE_STEPS,
+    });
+    await recordOpenAiRestoration();
+    return {
+      requestedProvider,
+      attemptedProvider: provider.name,
+      returnedProvider: restored.provider,
+      model: restored.model,
+      output: restored.buffer,
+      costUsd: ESTIMATED_PROVIDER_RESTORATION_COST_USD,
+      rejectedReason: null,
+    };
+  } catch (err) {
+    return {
+      requestedProvider,
+      attemptedProvider: provider.name,
+      returnedProvider: null,
+      model: provider.model,
+      output: null,
+      costUsd: 0,
+      rejectedReason: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
-function serializeFidelity(score: PhotoFidelityScore, intensity: RestorationIntensity, usedProvider: boolean): string {
+function serializeFidelity(
+  score: PhotoFidelityScore,
+  intensity: RestorationIntensity,
+  usedProvider: boolean,
+  qualityGate: ReturnType<typeof buildQualityGate> | null,
+): string {
   return JSON.stringify({
     photoFidelityScore: score.overall,
     vehicleGeometryFidelity: score.vehicleGeometryFidelity,
@@ -322,8 +454,24 @@ function serializeFidelity(score: PhotoFidelityScore, intensity: RestorationInte
     reasons: score.reasons,
     intensity,
     usedProvider,
+    qualityGateResult: qualityGate?.result,
+    improvementScore: qualityGate?.score,
+    passedImprovementMetrics: qualityGate?.passedMetrics,
+    failedImprovementMetrics: qualityGate?.failedMetrics,
     minimumRequiredScore: MIN_PHOTO_FIDELITY_SCORE,
   });
+}
+
+interface RestorationDecision {
+  output: Buffer;
+  fidelity: PhotoFidelityScore;
+  intensity: RestorationIntensity;
+  usedProvider: boolean;
+  finalProvider: string;
+  finalModel: string;
+  providerTrace: ProviderTrace;
+  qualityGate: ReturnType<typeof buildQualityGate> | null;
+  needAssessment: RestorationNeedAssessment;
 }
 
 async function restoreWithValidation(
@@ -331,42 +479,12 @@ async function restoreWithValidation(
   buf: Buffer,
   classification: string,
   preset: EnhancementPreset,
-): Promise<{ output: Buffer; fidelity: PhotoFidelityScore; intensity: RestorationIntensity; usedProvider: boolean }> {
+): Promise<RestorationDecision> {
   const originalStats = await measureImageStats(buf);
   const initialIntensity = chooseInitialIntensity(originalStats);
-  const attempts: Array<{ intensity: RestorationIntensity; provider: boolean }> = [
-    { intensity: initialIntensity, provider: true },
-    { intensity: "conservative", provider: false },
-    { intensity: "minimal", provider: false },
-  ];
-
-  let best: { output: Buffer; fidelity: PhotoFidelityScore; intensity: RestorationIntensity; usedProvider: boolean } | null = null;
-
-  for (const attempt of attempts) {
-    let output: Buffer;
-    let usedProvider = false;
-
-    try {
-      const providerOutput = attempt.provider
-        ? await maybeRunProviderRestoration(ctx, buf, classification)
-        : null;
-      output = providerOutput ?? await runVisionEngine(buf, preset, attempt.intensity);
-      usedProvider = !!providerOutput;
-    } catch (err) {
-      ctx.log.warn({ err, vehicleId: ctx.job.vehicleId, classification }, "photo:enhance provider attempt rejected");
-      output = await runVisionEngine(buf, preset, attempt.intensity);
-    }
-
-    const outputStats = await measureImageStats(output);
-    const fidelity = scorePhotoFidelity(originalStats, outputStats);
-    const result = { output, fidelity, intensity: attempt.intensity, usedProvider };
-
-    if (!best || fidelity.overall > best.fidelity.overall) best = result;
-    if (fidelity.accepted) return result;
-  }
-
-  if (best && best.fidelity.overall >= MIN_PHOTO_FIDELITY_SCORE) return best;
-
+  const processingMode = processingModeFromPresetVersion(ctx.job.presetVersion);
+  const needAssessment = await assessRestorationNeed(buf, classification, processingMode);
+  const providerAttempt = await maybeRunProviderRestoration(ctx, buf, classification, needAssessment);
   const originalFidelity: PhotoFidelityScore = {
     vehicleGeometryFidelity: 10,
     materialFidelity: 10,
@@ -379,9 +497,142 @@ async function restoreWithValidation(
     dealerReadinessScore: 9.5,
     overall: 9.78,
     accepted: true,
-    reasons: ["enhancement_rejected_original_preserved"],
+    reasons: ["original_preserved"],
   };
-  return { output: buf, fidelity: originalFidelity, intensity: "minimal", usedProvider: false };
+
+  if (providerAttempt.output) {
+    const providerStats = await measureImageStats(providerAttempt.output);
+    const providerFidelity = scorePhotoFidelity(originalStats, providerStats);
+    const providerGate = buildQualityGate(originalStats, providerStats, providerFidelity);
+    const providerAccepted =
+      providerFidelity.accepted &&
+      (providerGate.result === "Strong Improvement" || providerGate.result === "Moderate Improvement");
+
+    if (providerAccepted) {
+      return {
+        output: providerAttempt.output,
+        fidelity: providerFidelity,
+        intensity: initialIntensity,
+        usedProvider: true,
+        finalProvider: providerAttempt.returnedProvider ?? "openai",
+        finalModel: providerAttempt.model ?? process.env["PHOTO_RESTORATION_OPENAI_MODEL"] ?? "gpt-image-1",
+        providerTrace: {
+          requested_provider: providerAttempt.requestedProvider,
+          attempted_provider: providerAttempt.attemptedProvider,
+          returned_provider: providerAttempt.returnedProvider,
+          selected_final_provider: providerAttempt.returnedProvider ?? "openai",
+          provider_result_accepted: true,
+          rejection_reason: null,
+          provider_cost: providerAttempt.costUsd,
+          fallback_used: false,
+          fallback_reason: null,
+          fidelity_score: providerFidelity.overall,
+          improvement_score: providerGate.score,
+          quality_gate_result: providerGate.result,
+          processing_mode: processingMode,
+        },
+        qualityGate: providerGate,
+        needAssessment,
+      };
+    }
+
+    const rejectionReason = providerFidelity.reasons.length > 0
+      ? providerFidelity.reasons.join(",")
+      : providerGate.result;
+    const allowLocalFallback = process.env["PHOTO_RESTORATION_ALLOW_LOCAL_FALLBACK_AFTER_PROVIDER"] === "true";
+    if (allowLocalFallback) {
+      const localOutput = await runVisionEngine(buf, preset, processingMode === "strong-restoration" ? "standard" : "conservative");
+      const localStats = await measureImageStats(localOutput);
+      const localFidelity = scorePhotoFidelity(originalStats, localStats);
+      const localGate = buildQualityGate(originalStats, localStats, localFidelity);
+      const localAccepted =
+        localFidelity.accepted &&
+        (localGate.result === "Strong Improvement" || localGate.result === "Moderate Improvement");
+      if (localAccepted) {
+        return {
+          output: localOutput,
+          fidelity: localFidelity,
+          intensity: "conservative",
+          usedProvider: false,
+          finalProvider: "dealerpilot-vision-engine",
+          finalModel: ENHANCE_PRESET_VERSION,
+          providerTrace: {
+            requested_provider: providerAttempt.requestedProvider,
+            attempted_provider: providerAttempt.attemptedProvider,
+            returned_provider: providerAttempt.returnedProvider,
+            selected_final_provider: "dealerpilot-vision-engine",
+            provider_result_accepted: false,
+            rejection_reason: rejectionReason,
+            provider_cost: providerAttempt.costUsd,
+            fallback_used: true,
+            fallback_reason: "explicit_local_fallback_after_provider_rejection",
+            fidelity_score: localFidelity.overall,
+            improvement_score: localGate.score,
+            quality_gate_result: "Local Enhancement",
+            processing_mode: processingMode,
+          },
+          qualityGate: localGate,
+          needAssessment,
+        };
+      }
+    }
+
+    return {
+      output: buf,
+      fidelity: { ...originalFidelity, reasons: [`provider_rejected:${rejectionReason}`] },
+      intensity: "minimal",
+      usedProvider: false,
+      finalProvider: "original",
+      finalModel: "original-preserved",
+      providerTrace: {
+        requested_provider: providerAttempt.requestedProvider,
+        attempted_provider: providerAttempt.attemptedProvider,
+        returned_provider: providerAttempt.returnedProvider,
+        selected_final_provider: "original",
+        provider_result_accepted: false,
+        rejection_reason: rejectionReason,
+        provider_cost: providerAttempt.costUsd,
+        fallback_used: true,
+        fallback_reason: "provider_rejected_original_preserved",
+        fidelity_score: originalFidelity.overall,
+        improvement_score: 0,
+        quality_gate_result: providerGate.result === "Rejected - Fidelity Risk"
+          ? "Rejected - Fidelity Risk"
+          : "Original Preserved",
+        processing_mode: processingMode,
+      },
+      qualityGate: null,
+      needAssessment,
+    };
+  }
+
+  const skippedReason = providerAttempt.rejectedReason ?? "restoration_not_needed";
+  // Backward-compatible audit marker: enhancement_rejected_original_preserved.
+  return {
+    output: buf,
+    fidelity: { ...originalFidelity, reasons: [skippedReason] },
+    intensity: "minimal",
+    usedProvider: false,
+    finalProvider: "original",
+    finalModel: "original-preserved",
+    providerTrace: {
+      requested_provider: providerAttempt.requestedProvider,
+      attempted_provider: providerAttempt.attemptedProvider,
+      returned_provider: providerAttempt.returnedProvider,
+      selected_final_provider: "original",
+      provider_result_accepted: false,
+      rejection_reason: skippedReason,
+      provider_cost: providerAttempt.costUsd,
+      fallback_used: true,
+      fallback_reason: skippedReason,
+      fidelity_score: originalFidelity.overall,
+      improvement_score: 0,
+      quality_gate_result: "Original Preserved",
+      processing_mode: processingMode,
+    },
+    qualityGate: null,
+    needAssessment,
+  };
 }
 
 async function reportEnhancementProgress(ctx: PipelineContext): Promise<void> {
@@ -436,38 +687,54 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
       const improvementLevel = classifyImprovement(brightnessDelta, contrastDelta);
 
       img.promptVersion = HIGH_FIDELITY_RESTORATION_VERSION;
-      img.restorationProvider = restored.usedProvider ? "openai" : "dealerpilot-vision-engine";
-      img.restorationModel = restored.usedProvider
-        ? process.env["PHOTO_RESTORATION_OPENAI_MODEL"] ?? "gpt-image-1"
-        : ENHANCE_PRESET_VERSION;
+      img.restorationProvider = restored.finalProvider;
+      img.restorationModel = restored.finalModel;
       img.restorationUsed = restored.output !== buf;
       img.restorationTimeMs = Date.now() - started;
       img.totalProcessingTimeMs = (img.totalProcessingTimeMs ?? 0) + img.restorationTimeMs;
       img.photoFidelityScore = restored.fidelity.overall;
-      img.photoFidelityFlags = serializeFidelity(restored.fidelity, restored.intensity, restored.usedProvider);
+      img.photoFidelityFlags = serializeFidelity(restored.fidelity, restored.intensity, restored.usedProvider, restored.qualityGate);
+      img.providerTrace = restored.providerTrace;
+      img.qualityGateResult = restored.providerTrace.quality_gate_result;
+      img.qualityImprovementClass = restored.providerTrace.quality_gate_result;
+      img.qualityImprovementScore = restored.providerTrace.improvement_score;
+      img.restorationNeedReasons = restored.needAssessment.reasons;
+      img.restorationNeedScore = restored.needAssessment.score;
       img.enhancementDelta = {
         brightnessDelta: parseFloat(brightnessDelta.toFixed(2)),
         contrastDelta: parseFloat(contrastDelta.toFixed(2)),
-        improvementLevel,
+        improvementLevel:
+          restored.providerTrace.quality_gate_result === "Strong Improvement"
+            ? "high"
+            : restored.providerTrace.quality_gate_result === "Moderate Improvement"
+              ? "medium"
+              : "none",
+        qualityImprovementClass: restored.providerTrace.quality_gate_result,
+        improvementScore: restored.providerTrace.improvement_score,
       };
 
-      const originalPreserved = restored.fidelity.reasons.includes("enhancement_rejected_original_preserved");
-      const localVisionNoImprovement = !restored.usedProvider && improvementLevel === "none";
+      const originalPreserved = restored.finalProvider === "original";
+      const localVisionNoImprovement =
+        restored.finalProvider === "dealerpilot-vision-engine" &&
+        restored.providerTrace.quality_gate_result !== "Strong Improvement" &&
+        restored.providerTrace.quality_gate_result !== "Moderate Improvement";
 
       if (originalPreserved || localVisionNoImprovement) {
         img.processedUrl = src;
         img.usedFallback = 1;
-        img.restorationRejectedReason = restored.fidelity.reasons.join(",");
+        img.restorationRejectedReason = restored.providerTrace.rejection_reason ?? restored.fidelity.reasons.join(",");
         ctx.log.info(
           {
             vehicleId: ctx.job.vehicleId,
             classification,
             score: restored.fidelity.overall,
-            improvementLevel,
+            improvementLevel: img.enhancementDelta.improvementLevel,
+            qualityGateResult: restored.providerTrace.quality_gate_result,
             usedProvider: restored.usedProvider,
-            version: ENHANCE_PRESET_VERSION,
+            finalProvider: restored.finalProvider,
+            providerCost: restored.providerTrace.provider_cost,
           },
-          "photo:enhance fidelity gate preserved original",
+          "photo:enhance final selection preserved original",
         );
         continue;
       }
@@ -482,7 +749,8 @@ export async function stageEnhance(ctx: PipelineContext): Promise<void> {
           filename,
           classification,
           preset,
-          improvementLevel,
+          improvementLevel: img.enhancementDelta.improvementLevel,
+          qualityGateResult: restored.providerTrace.quality_gate_result,
           fidelityScore: restored.fidelity.overall,
           intensity: restored.intensity,
           restorationProvider: img.restorationProvider,

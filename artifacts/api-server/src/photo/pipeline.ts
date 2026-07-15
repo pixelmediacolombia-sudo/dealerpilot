@@ -27,6 +27,7 @@ import { stageEnhance } from "./stages/4_enhance";
 import { stageValidate } from "./stages/5_validate";
 import { stageOrder } from "./stages/6_order";
 import { stageExport } from "./stages/7_export";
+import type { ProviderTrace, QualityImprovementClass } from "./restorationPolicy";
 
 // Per-image working state threaded through stages
 export interface PipelineImage {
@@ -58,6 +59,12 @@ export interface PipelineImage {
   restorationRejectedReason?: string;
   photoFidelityScore?: number;
   photoFidelityFlags?: string;
+  providerTrace?: ProviderTrace;
+  qualityImprovementClass?: QualityImprovementClass;
+  qualityGateResult?: QualityImprovementClass;
+  qualityImprovementScore?: number;
+  restorationNeedReasons?: string[];
+  restorationNeedScore?: number;
   /** Set by Stage 3 when logo zone is significantly obscured by the vehicle */
   logoObscured?: boolean;
   /** Set by Stage 5 when AI output is measurably worse than the original */
@@ -67,6 +74,8 @@ export interface PipelineImage {
     brightnessDelta: number;
     contrastDelta: number;
     improvementLevel: "none" | "low" | "medium" | "high";
+    qualityImprovementClass?: QualityImprovementClass;
+    improvementScore?: number;
   };
 }
 

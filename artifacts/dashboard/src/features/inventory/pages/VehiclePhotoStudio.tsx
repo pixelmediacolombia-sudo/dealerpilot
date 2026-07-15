@@ -69,6 +69,8 @@ export interface PhotoSetData {
   } | null;
 }
 
+type PhotoProcessingMode = "fidelity-first" | "balanced" | "strong-restoration";
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function aiOutputUrl(img: PhotoSetImage): string {
@@ -106,6 +108,7 @@ export function VehiclePhotoStudio({
   onPhotoModeChange: (mode: "original" | "ai") => void;
 }) {
   const [showBeforeAfter, setShowBeforeAfter] = useState(false);
+  const [processingMode, setProcessingMode] = useState<PhotoProcessingMode>("fidelity-first");
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<PhotoSetData>({
@@ -124,7 +127,33 @@ export function VehiclePhotoStudio({
 
   const processMutation = useMutation({
     mutationFn: async () => {
-      const r = await fetch(`/api/photo-studio/vehicles/${vehicleId}/process`, { method: "POST" });
+      const start = (confirmCost = false) =>
+        fetch(`/api/photo-studio/vehicles/${vehicleId}/process`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ processingMode, confirmCost }),
+        });
+      const r = await start();
+      if (r.status === 409) {
+        const body = (await r.json().catch(() => ({}))) as {
+          requiresConfirmation?: boolean;
+          message?: string;
+          estimate?: { photosNeedingRestoration?: number; totalPhotos?: number; estimatedCostUsd?: number };
+          error?: string;
+        };
+        if (body.requiresConfirmation) {
+          const estimate = body.estimate;
+          const message = body.message ??
+            `${estimate?.photosNeedingRestoration ?? "Some"} of ${estimate?.totalPhotos ?? "the"} photos need AI restoration. Estimated cost: $${estimate?.estimatedCostUsd ?? "unknown"}.`;
+          if (window.confirm(message)) {
+            const confirmed = await start(true);
+            if (!confirmed.ok) throw new Error("Failed to trigger processing");
+            return confirmed.json();
+          }
+          throw new Error("Enhancement cancelled before OpenAI spend.");
+        }
+        throw new Error(body.error ?? "Failed to trigger processing");
+      }
       if (!r.ok) throw new Error("Failed to trigger processing");
       return r.json();
     },
@@ -152,6 +181,29 @@ export function VehiclePhotoStudio({
   const progressDone = activeJob?.processedPhotos ?? set?.processedPhotos ?? 0;
   const progressPercent = activeJob?.progressPercent ??
     (progressTotal > 0 ? Math.round((progressDone / progressTotal) * 100) : 0);
+  const modeSelector = (
+    <div className="grid grid-cols-3 gap-1 rounded-lg border border-white/[0.08] bg-white/[0.03] p-1">
+      {([
+        ["fidelity-first", "Fidelity"],
+        ["balanced", "Balanced"],
+        ["strong-restoration", "Strong"],
+      ] as const).map(([mode, label]) => (
+        <button
+          key={mode}
+          type="button"
+          onClick={() => setProcessingMode(mode)}
+          className={cn(
+            "py-1.5 text-[10px] font-semibold rounded-md transition-colors",
+            processingMode === mode
+              ? "bg-primary/20 text-primary border border-primary/25"
+              : "text-muted-foreground hover:text-white/70",
+          )}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <SectionCard
@@ -172,6 +224,7 @@ export function VehiclePhotoStudio({
               Generate professional studio photos for this vehicle using the Alpha Motorsport
               background.
             </p>
+            {modeSelector}
             <Button
               className="w-full gap-2 premium-gradient-btn"
               onClick={() => processMutation.mutate()}
@@ -372,6 +425,7 @@ export function VehiclePhotoStudio({
             )}
 
             {/* Re-process */}
+            {modeSelector}
             <Button
               variant="ghost"
               size="sm"

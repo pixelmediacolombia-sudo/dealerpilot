@@ -34,6 +34,7 @@ interface PhotoSetImage {
   processingStatus: string;
   usedFallback: number;
   classificationConfidence: number | null;
+  qualityFlags: string | null;
 }
 
 interface PhotoSetSummary {
@@ -89,8 +90,25 @@ function aiOutputUrl(img: PhotoSetImage): string {
   return img.originalUrl;
 }
 
+function parseQualityFlags(img: PhotoSetImage): Record<string, unknown> {
+  if (!img.qualityFlags) return {};
+  try {
+    return JSON.parse(img.qualityFlags) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function qualityGateResult(img: PhotoSetImage): string {
+  const flags = parseQualityFlags(img);
+  return String(flags["qualityGateResult"] ?? flags["qualityImprovementClass"] ?? "");
+}
+
 function isEnhanced(img: PhotoSetImage): boolean {
-  return img.usedFallback !== 1 && aiOutputUrl(img) !== img.originalUrl;
+  const result = qualityGateResult(img);
+  return img.usedFallback !== 1 &&
+    aiOutputUrl(img) !== img.originalUrl &&
+    (result === "Strong Improvement" || result === "Moderate Improvement");
 }
 
 function FallbackImage({

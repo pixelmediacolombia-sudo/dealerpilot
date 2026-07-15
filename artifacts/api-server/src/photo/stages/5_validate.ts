@@ -217,6 +217,8 @@ export async function stageValidate(ctx: PipelineContext): Promise<void> {
       ...(img.enhancementDelta
         ? {
             improvementLevel:  img.enhancementDelta.improvementLevel,
+            qualityImprovementClass: img.enhancementDelta.qualityImprovementClass,
+            improvementScore: img.enhancementDelta.improvementScore,
             brightnessDelta:   img.enhancementDelta.brightnessDelta,
             contrastDelta:     img.enhancementDelta.contrastDelta,
           }
@@ -233,6 +235,12 @@ export async function stageValidate(ctx: PipelineContext): Promise<void> {
           ? { used: false, rejectedReason: img.restorationRejectedReason }
           : undefined,
       photoFidelity: parseJson(img.photoFidelityFlags),
+      providerTrace: img.providerTrace,
+      qualityGateResult: img.qualityGateResult,
+      qualityImprovementClass: img.qualityImprovementClass,
+      qualityImprovementScore: img.qualityImprovementScore,
+      restorationNeedReasons: img.restorationNeedReasons,
+      restorationNeedScore: img.restorationNeedScore,
       promptVersion: img.promptVersion,
     });
 
