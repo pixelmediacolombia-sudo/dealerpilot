@@ -499,7 +499,10 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(publisherFlowSource, /MESSENGER_UI_TEXT/);
   assert.match(publisherFlowSource, /write to saved/);
   assert.match(publisherFlowSource, /customize chat/);
-  assert.match(publisherFlowSource, /discoverMessengerInboxThreads/);
+  assert.match(publisherFlowSource, /automatic: true/);
+  assert.match(publisherFlowSource, /No new buyer message detected/);
+  assert.doesNotMatch(publisherFlowSource, /discoverMessengerInboxThreads/);
+  assert.doesNotMatch(publisherFlowSource, /parseInboxThreadText/);
   assert.match(publisherFlowSource, /marketplace-thread::/);
   assert.match(publisherFlowSource, /async function autoSendReply/);
   assert.match(publisherFlowSource, /function findMessengerSendButton/);
