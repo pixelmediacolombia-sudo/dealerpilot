@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.60
+
+**Fixed**
+- Restricts Marketplace Sales AI capture to real Messenger/Marketplace conversation surfaces with reliable buyer names and buyer messages, preventing group/page UI from becoming CRM conversations.
+
+---
+
 ## v1.3.59
 
 **Fixed**

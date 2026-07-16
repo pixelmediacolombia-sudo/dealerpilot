@@ -1004,6 +1004,11 @@ const handlers = {
       messageDetectedAt: message.messageDetectedAt,
       messageHash: message.messageHash,
       idempotencyKey: message.idempotencyKey,
+      conversationThreadDetected: message.conversationThreadDetected,
+      buyerMessageDetected: message.buyerMessageDetected,
+      buyerNameDetected: message.buyerNameDetected,
+      sellerIsCurrentUser: message.sellerIsCurrentUser,
+      marketplaceContextDetected: message.marketplaceContextDetected,
       timestamp: new Date().toISOString(),
     });
   },

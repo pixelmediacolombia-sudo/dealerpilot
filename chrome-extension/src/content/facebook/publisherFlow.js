@@ -705,6 +705,12 @@
     return hostname.includes("messenger.com") || /\/messages\b/.test(pathname);
   }
 
+  function isMarketplaceConversationUrl() {
+    const hostname = location.hostname;
+    const pathname = location.pathname;
+    return hostname.includes("facebook.com") && /\/marketplace\/(inbox|you\/selling|you\/buying)\b/.test(pathname);
+  }
+
   function visible(el) {
     if (!el || !(el instanceof Element)) return false;
     const rect = el.getBoundingClientRect();
@@ -732,7 +738,7 @@
 
   function isMessengerUiVisible() {
     if (isMessengerUrl()) return true;
-    return !!findMessengerRoot();
+    return isMarketplaceConversationUrl() && !!findMessengerRoot();
   }
 
   function detectPageState() {
@@ -3707,26 +3713,42 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       "aa",
       "active",
       "archive",
+      "anyone can find this group",
+      "anyone can see who's in the group and what they post",
+      "about",
       "chat members",
       "close",
       "compose",
+      "copy link",
       "customize chat",
       "delete chat",
       "edit nicknames",
       "emoji",
       "enter",
       "esc",
+      "facebook",
+      "feed",
+      "group",
       "message",
       "message...",
       "messenger",
+      "more",
       "mute",
       "notifications",
       "people",
       "privacy & support",
+      "public",
+      "recent media",
       "saved",
       "search",
       "search in conversation",
+      "see all",
       "send",
+      "send in messenger",
+      "share",
+      "share now",
+      "share to",
+      "visible",
       "view profile",
       "write to saved",
     ]);
@@ -3747,9 +3769,46 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       if (!normalized) return true;
       if (MESSENGER_UI_TEXT.has(normalized)) return true;
       if (/^(enter|escape|tab|shift|control|option|command|alt)\b/i.test(normalized)) return true;
-      if (/^(write to saved|saved|compose|mute|search|customize chat|chat members)\b/i.test(normalized)) return true;
+      if (/^(write to saved|saved|compose|mute|search|customize chat|chat members|older listings will be deleted|this group consist|anyone can)\b/i.test(normalized)) return true;
       if (/^\d{1,2}:\d{2}\s*(am|pm)$/i.test(normalized)) return true;
       return false;
+    }
+
+    function isReliableBuyerName(name) {
+      const cleaned = cleanMessengerText(name);
+      const normalized = cleaned.toLowerCase();
+      if (!cleaned || cleaned.length < 2 || cleaned.length > 80) return false;
+      if (normalized === "unknown buyer" || normalized === "buyer" || normalized === "facebook") return false;
+      if (isMessengerUiText(cleaned)) return false;
+      if (/\b(19|20)\d{2}\b/.test(cleaned)) return false;
+      if (/\b(honda|acura|toyota|marketplace|listing|vehicle|group|page|facebook)\b/i.test(cleaned)) return false;
+      if (/[/$•·]/.test(cleaned)) return false;
+      return true;
+    }
+
+    function validateMessengerSalesContext({ buyerName, messages, context }) {
+      const root = findMessengerRoot();
+      const lastMessage = messages[messages.length - 1] || null;
+      const conversationThreadDetected = !!root && (isMessengerUrl() || isMarketplaceConversationUrl());
+      const buyerMessageDetected = !!lastMessage && lastMessage.speaker !== "Dealer" && !isMessengerUiText(lastMessage.text);
+      const buyerNameDetected = isReliableBuyerName(buyerName);
+      const sellerIsCurrentUser = !!getMessengerMessageBox();
+      const marketplaceContextDetected = !!context.listingUrl || isMessengerUrl() || isMarketplaceConversationUrl();
+      const missing = [];
+      if (!conversationThreadDetected) missing.push("conversation_thread_missing");
+      if (!buyerMessageDetected) missing.push("buyer_message_missing");
+      if (!buyerNameDetected) missing.push("buyer_name_missing");
+      if (!sellerIsCurrentUser) missing.push("seller_current_user_missing");
+      if (!marketplaceContextDetected) missing.push("marketplace_context_missing");
+      return {
+        ok: missing.length === 0,
+        missing,
+        conversationThreadDetected,
+        buyerMessageDetected,
+        buyerNameDetected,
+        sellerIsCurrentUser,
+        marketplaceContextDetected,
+      };
     }
 
     function scrapeConversation() {
@@ -3767,7 +3826,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
       let messages = [];
 
-      if (messageEls.length > 4) {
+      if (messageEls.length > 0) {
         // Structured extraction: detect sent (you) vs received (buyer)
         for (const el of messageEls.slice(-40)) {
           const text = cleanMessengerText(el.innerText || el.textContent || "");
@@ -3793,15 +3852,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       }
 
       // Fallback: raw text from [role="main"]
-      if (messages.length < 2) {
-        const rawText = (main.innerText || "")
-          .split("\n")
-          .map(cleanMessengerText)
-          .filter((line) => line && !isMessengerUiText(line))
-          .join("\n")
-          .trim()
-          .slice(-4000);
-        return { buyerName, rawText, messages: [] };
+      if (messages.length < 1) {
+        return { buyerName, rawText: "", messages: [] };
       }
 
       // Deduplicate consecutive identical messages
@@ -3814,7 +3866,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     // Detect listing context from the page (vehicle title, price, etc.)
     function detectListingContext() {
-      const bodyText = (document.body.innerText || "").toLowerCase();
+      const root = findMessengerRoot() || document;
+      const bodyText = (root.innerText || "").toLowerCase();
       const urlMatch = document.querySelectorAll('a[href*="/marketplace/item/"]');
       const listingUrl = urlMatch.length > 0 ? urlMatch[0].href : null;
 
@@ -3828,12 +3881,19 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
       // Vehicle title — look for pattern like "2020 Toyota Camry" in headings or links
       let vehicleTitle = null;
-      const headings = Array.from(document.querySelectorAll('h1, h2, [role="heading"]'));
-      for (const h of headings) {
-        const t = (h.textContent || "").trim();
-        if (/\b(19|20)\d{2}\b/.test(t) && t.length > 8 && t.length < 120) {
-          vehicleTitle = t;
-          break;
+      if (listingUrl) {
+        const headings = Array.from(root.querySelectorAll('h1, h2, [role="heading"], a[href*="/marketplace/item/"]'));
+        for (const h of headings) {
+          const t = cleanMessengerText(h.textContent || "");
+          if (
+            /\b(19|20)\d{2}\b/.test(t) &&
+            t.length > 8 &&
+            t.length < 120 &&
+            !/\b(group|page|older listings|recent media|visible)\b/i.test(t)
+          ) {
+            vehicleTitle = t;
+            break;
+          }
         }
       }
 
@@ -3941,9 +4001,20 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
       const { buyerName, messages, rawText } = scrapeConversation();
       const context = detectListingContext();
+      const salesContext = validateMessengerSalesContext({ buyerName, messages, context });
 
       if (!messages.length && !rawText) {
         setStatus("No conversation text found.", "err");
+        return;
+      }
+
+      if (!salesContext.ok) {
+        console.log("[DealerPilot AI] Sales AI capture skipped", {
+          reasons: salesContext.missing,
+          buyerName,
+          url: location.href,
+        });
+        setStatus(`Sales AI skipped: ${salesContext.missing[0] || "invalid context"}.`, "muted");
         return;
       }
 
@@ -3969,6 +4040,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         buyerName: buyerName || undefined,
         dealerId: 1,
         messageDetectedAt: new Date(messageDetectedAtMs).toISOString(),
+        conversationThreadDetected: salesContext.conversationThreadDetected,
+        buyerMessageDetected: salesContext.buyerMessageDetected,
+        buyerNameDetected: salesContext.buyerNameDetected,
+        sellerIsCurrentUser: salesContext.sellerIsCurrentUser,
+        marketplaceContextDetected: salesContext.marketplaceContextDetected,
         currentMessage,
         detectedVehicleTitle: context.vehicleTitle || undefined,
         detectedMarketplaceListingUrl: context.listingUrl || undefined,

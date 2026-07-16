@@ -130,7 +130,7 @@ function fmtPrice(p: number | null): string {
 
 function vehicleLabel(v: VehicleInfo | null, fallback: string | null): string {
   if (v) return [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ");
-  return fallback ?? "Vehicle inquiry";
+  return fallback ?? "Vehicle not resolved";
 }
 
 function tempConfig(temp: string | null) {
@@ -501,7 +501,7 @@ function LeadPanel({ convId }: { convId: number }) {
               </>
             ) : (
               <div className="text-[12px] text-white/40">
-                {conv?.detectedVehicleTitle ?? "Vehicle inquiry"}
+                {conv?.detectedVehicleTitle ?? "Vehicle not resolved"}
               </div>
             )}
           </div>
