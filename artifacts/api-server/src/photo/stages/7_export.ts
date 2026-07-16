@@ -13,6 +13,7 @@ import {
 } from "@workspace/db";
 import { and, eq, ne } from "drizzle-orm";
 import type { PipelineContext } from "../pipeline";
+import { releasePublishingJobsWaitingForPhotoDirector } from "../publishingHandoff";
 
 export async function stageExport(ctx: PipelineContext): Promise<void> {
   const processingTimeMs = Date.now() - ctx.startedAt.getTime();
@@ -98,6 +99,10 @@ export async function stageExport(ctx: PipelineContext): Promise<void> {
       .where(eq(aiPhotoJobsTable.id, ctx.job.id));
   });
 
+  const handoff = ctx.qualityGateFailed
+    ? { released: 0 }
+    : await releasePublishingJobsWaitingForPhotoDirector(ctx.job.vehicleId);
+
   ctx.log.info(
     {
       jobId: ctx.job.id,
@@ -106,6 +111,7 @@ export async function stageExport(ctx: PipelineContext): Promise<void> {
       processedCount,
       failedCount,
       processingTimeMs,
+      publishingJobsReleased: handoff.released,
     },
     "photo:export complete",
   );

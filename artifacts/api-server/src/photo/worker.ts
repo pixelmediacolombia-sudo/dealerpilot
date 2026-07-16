@@ -10,6 +10,8 @@ import {
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Logger } from "pino";
 import { runPhotoPipeline } from "./pipeline";
+import { publishingWorker } from "../workers/publishing.worker";
+import { runWorkerOnce } from "../workers/scheduler";
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_ATTEMPTS = 3;
@@ -68,6 +70,9 @@ async function tick(log: Logger, state: { running: boolean }) {
     try {
       await processJob(job, log);
       log.info({ jobId: job.id, vehicleId: job.vehicleId }, "photo:worker job completed");
+      void runWorkerOnce(publishingWorker, log, "auto", new Date(Date.now() + publishingWorker.intervalMs)).catch((err) => {
+        log.error({ err, jobId: job.id, vehicleId: job.vehicleId }, "photo:worker failed to wake publishing worker");
+      });
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       const exhausted = job.attempts >= MAX_ATTEMPTS;

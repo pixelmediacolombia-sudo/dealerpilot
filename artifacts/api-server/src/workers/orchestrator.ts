@@ -26,6 +26,8 @@ const DEALER_ID = 1;
 const ELIGIBLE_PHOTO_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish"];
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
 const QUEUED_JOB_STATUSES = ["Queued", "Retry"];
+const INVENTORY_SYNC_TIME_ZONE = "America/New_York";
+const INVENTORY_SYNC_HOUR = 10;
 
 export type OrchestratorAction = "RUN" | "SKIP" | "PAUSE";
 
@@ -46,14 +48,129 @@ function ageMs(lastRunAt: Date | null | undefined): number {
   return lastRunAt ? Date.now() - lastRunAt.getTime() : Infinity;
 }
 
-async function decideInventory(intervalMs: number): Promise<WorkerDecision> {
-  const state = await workerState("inventory");
-  const age = ageMs(state?.lastRunAt);
-  if (age >= intervalMs) {
-    return { workerId: "inventory", action: "RUN", reason: `last sync ${state?.lastRunAt ? "over 24h ago" : "never ran"}` };
+function zonedParts(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(date);
+  const value = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  return {
+    year: value("year"),
+    month: value("month"),
+    day: value("day"),
+    hour: value("hour") % 24,
+    minute: value("minute"),
+    second: value("second"),
+  };
+}
+
+function zonedWallTimeToUtc(
+  timeZone: string,
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+): Date {
+  let guess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0));
+  for (let i = 0; i < 3; i++) {
+    const actual = zonedParts(guess, timeZone);
+    const actualWallMs = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute, actual.second);
+    const targetWallMs = Date.UTC(year, month - 1, day, hour, minute, 0);
+    guess = new Date(guess.getTime() - (actualWallMs - targetWallMs));
   }
-  const remainingH = ((intervalMs - age) / (60 * 60 * 1000)).toFixed(1);
-  return { workerId: "inventory", action: "SKIP", reason: `synced recently — next sync in ~${remainingH}h`, dependencyStatus: "up to date" };
+  return guess;
+}
+
+function addCalendarDays(
+  year: number,
+  month: number,
+  day: number,
+  days: number,
+): { year: number; month: number; day: number } {
+  const next = new Date(Date.UTC(year, month - 1, day + days, 12, 0, 0));
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate(),
+  };
+}
+
+function nextInventorySyncAtAfter(date: Date): Date {
+  const local = zonedParts(date, INVENTORY_SYNC_TIME_ZONE);
+  let target = zonedWallTimeToUtc(
+    INVENTORY_SYNC_TIME_ZONE,
+    local.year,
+    local.month,
+    local.day,
+    INVENTORY_SYNC_HOUR,
+    0,
+  );
+
+  if (target.getTime() <= date.getTime()) {
+    const nextDay = addCalendarDays(local.year, local.month, local.day, 1);
+    target = zonedWallTimeToUtc(
+      INVENTORY_SYNC_TIME_ZONE,
+      nextDay.year,
+      nextDay.month,
+      nextDay.day,
+      INVENTORY_SYNC_HOUR,
+      0,
+    );
+  }
+  return target;
+}
+
+function currentInventorySyncWindow(now: Date): Date {
+  const local = zonedParts(now, INVENTORY_SYNC_TIME_ZONE);
+  let today = zonedWallTimeToUtc(
+    INVENTORY_SYNC_TIME_ZONE,
+    local.year,
+    local.month,
+    local.day,
+    INVENTORY_SYNC_HOUR,
+    0,
+  );
+  if (today.getTime() > now.getTime()) {
+    const previousDay = addCalendarDays(local.year, local.month, local.day, -1);
+    today = zonedWallTimeToUtc(
+      INVENTORY_SYNC_TIME_ZONE,
+      previousDay.year,
+      previousDay.month,
+      previousDay.day,
+      INVENTORY_SYNC_HOUR,
+      0,
+    );
+  }
+  return today;
+}
+
+async function decideInventory(): Promise<WorkerDecision> {
+  const state = await workerState("inventory");
+  const now = new Date();
+  const currentWindow = currentInventorySyncWindow(now);
+  const nextSyncAt = nextInventorySyncAtAfter(now);
+  setNextSyncAt(nextSyncAt);
+
+  if (!state?.lastRunAt) {
+    return { workerId: "inventory", action: "RUN", reason: "no inventory sync recorded yet" };
+  }
+  if (state.lastRunAt.getTime() < currentWindow.getTime()) {
+    return { workerId: "inventory", action: "RUN", reason: "daily 10:00 AM inventory sync is due" };
+  }
+
+  return {
+    workerId: "inventory",
+    action: "SKIP",
+    reason: `synced for today's 10:00 AM window — next sync at ${nextSyncAt.toISOString()}`,
+    dependencyStatus: "up to date",
+  };
 }
 
 async function decideOpportunity(intervalMs: number): Promise<WorkerDecision> {
@@ -235,7 +352,7 @@ async function decideAll(definitions: WorkerDefinition[]): Promise<WorkerDecisio
   const decisions: WorkerDecision[] = [];
 
   const inventoryDef = byId.get("inventory");
-  if (inventoryDef) decisions.push(await decideInventory(inventoryDef.intervalMs));
+  if (inventoryDef) decisions.push(await decideInventory());
 
   const opportunityDef = byId.get("opportunity");
   if (opportunityDef) decisions.push(await decideOpportunity(opportunityDef.intervalMs));
@@ -307,7 +424,9 @@ export async function runOrchestrationCycle(log: Logger, trigger: "auto" | "manu
       if (!def) continue;
 
       if (decision.action === "RUN") {
-        const nextRunAt = new Date(Date.now() + def.intervalMs);
+        const nextRunAt = def.id === "inventory"
+          ? nextInventorySyncAtAfter(new Date())
+          : new Date(Date.now() + def.intervalMs);
         if (def.id === "inventory") setNextSyncAt(nextRunAt);
         await runWorkerOnce(def, log, trigger, nextRunAt);
         ranWorkerIds.push(def.id);

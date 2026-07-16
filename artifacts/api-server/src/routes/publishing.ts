@@ -1354,13 +1354,32 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
 
   const photoReadiness = await ensurePhotoDirectorReadyForPublish(vehicle, req.log);
   if (!photoReadiness.ready) {
+    const [job] = await db
+      .insert(publishingJobsTable)
+      .values({
+        vehicleId,
+        dealerId: DEALER_ID,
+        listingVersionId: null,
+        mode,
+        status: "Scheduled",
+        scheduledAt: new Date(Date.now() + 10 * 60_000),
+        currentStep: "Waiting for Photo Director",
+        failedReason: photoReadiness.reason,
+        priority: 100,
+        progressPercent: 0,
+        source: "publish_now",
+        approvedByUser: true,
+      })
+      .returning();
+
     req.log.info(
-      { vehicleId, code: photoReadiness.code, photoJobId: photoReadiness.photoJobId ?? null },
-      "Publish Now deferred until Photo Director is ready",
+      { vehicleId, jobId: job.id, code: photoReadiness.code, photoJobId: photoReadiness.photoJobId ?? null },
+      "Publish Now job created and deferred until Photo Director is ready",
     );
+    const [enriched] = await enrich([job]);
     res.status(202).json({
-      jobId: null,
-      job: null,
+      jobId: job.id,
+      job: enriched,
       deferred: true,
       queuedPhotoDirector: photoReadiness.code === "PHOTO_DIRECTOR_QUEUED",
       code: photoReadiness.code,

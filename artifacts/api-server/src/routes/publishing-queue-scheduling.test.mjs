@@ -99,6 +99,14 @@ const photoExportSource = readFileSync(
   new URL("../photo/stages/7_export.ts", import.meta.url),
   "utf8",
 );
+const photoWorkerRuntimeSource = readFileSync(
+  new URL("../photo/worker.ts", import.meta.url),
+  "utf8",
+);
+const photoPublishingHandoffSource = readFileSync(
+  new URL("../photo/publishingHandoff.ts", import.meta.url),
+  "utf8",
+);
 const photoSetViewerSource = readFileSync(
   new URL("../../../dashboard/src/features/photo-studio/components/PhotoSetViewer.tsx", import.meta.url),
   "utf8",
@@ -315,7 +323,8 @@ test("publishing jobs wait for Photo Director before reaching Marketplace", () =
   assert.match(photoPublishReadinessSource, /\.insert\(aiPhotoJobsTable\)/);
   assert.match(photoPublishReadinessSource, /priority: -5/);
   assert.match(routeSource, /deferPublishingJobForPhotoDirector/);
-  assert.match(routeSource, /Publish Now deferred until Photo Director is ready/);
+  assert.match(routeSource, /Publish Now job created and deferred until Photo Director is ready/);
+  assert.match(routeSource, /status: "Scheduled"[\s\S]*currentStep: "Waiting for Photo Director"[\s\S]*source: "publish_now"/);
   assert.match(routeSource, /Publishing payload blocked until Photo Director is ready/);
   assert.match(routeSource, /Bulk-schedule deferred vehicles until Photo Director is ready/);
   assert.match(autoPublishSource, /ensurePhotoDirectorReadyForPublish\(v, req\.log\)/);
@@ -323,6 +332,19 @@ test("publishing jobs wait for Photo Director before reaching Marketplace", () =
   assert.match(workerSource, /ensurePhotoDirectorReadyForPublish\(entry\.vehicle, log\)/);
   assert.match(workerSource, /deferJobForPhotoDirector/);
   assert.match(workerSource, /Publishing worker deferred job until Photo Director is ready/);
+  assert.match(photoPublishingHandoffSource, /releasePublishingJobsWaitingForPhotoDirector/);
+  assert.match(photoPublishingHandoffSource, /status: "Queued"[\s\S]*currentStep: "Queued"[\s\S]*failedReason: null/);
+  assert.match(photoExportSource, /releasePublishingJobsWaitingForPhotoDirector\(ctx\.job\.vehicleId\)/);
+  assert.match(photoWorkerRuntimeSource, /runWorkerOnce\(publishingWorker/);
+});
+
+test("inventory worker is anchored to the daily 10 AM dealer-local sync window", () => {
+  assert.match(orchestratorSource, /const INVENTORY_SYNC_TIME_ZONE = "America\/New_York"/);
+  assert.match(orchestratorSource, /const INVENTORY_SYNC_HOUR = 10/);
+  assert.match(orchestratorSource, /function nextInventorySyncAtAfter/);
+  assert.match(orchestratorSource, /function currentInventorySyncWindow/);
+  assert.match(orchestratorSource, /daily 10:00 AM inventory sync is due/);
+  assert.doesNotMatch(orchestratorSource, /last sync \$\{state\?\.lastRunAt \? "over 24h ago" : "never ran"\}/);
 });
 
 test("Marketplace live-list reconciliation can keep confirmed vehicles and demote missing live rows", () => {
