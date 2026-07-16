@@ -262,20 +262,30 @@ router.get("/listings", async (req, res) => {
     const listing = listingByVehicle.get(v.id) ?? null;
     const marketplaceListing = marketplaceListingByVehicle.get(v.id) ?? null;
     const isMarketplaceLive = marketplaceListing?.status === "Live";
+    const hasPublishedListing = listing?.status === "Published";
+    const latestJobHasLiveProof =
+      latestJob?.status === "Published" &&
+      Boolean(latestJob.listingUrl) &&
+      (!marketplaceListing || marketplaceListing.status === "Live");
+    const isPublishedFromSource = isMarketplaceLive || hasPublishedListing || latestJobHasLiveProof;
+    const latestJobStatus =
+      latestJob?.status === "Published" && !isPublishedFromSource
+        ? marketplaceListing?.status ?? listing?.status ?? "Needs Review"
+        : latestJob?.status;
     const perf = performanceByVehicle.get(v.id) ?? null;
 
     const aiStatus = vVersions.length > 0 ? "AI Generated" : "Not Started";
-    const publishStatus = isMarketplaceLive
+    const publishStatus = isPublishedFromSource
       ? "Published"
-      : latestJob
-      ? latestJob.status
+      : latestJobStatus
+      ? latestJobStatus
       : current?.status === "Approved"
         ? "Approved"
         : "Not Queued";
 
     // Published-listing engagement
     const publishedAt = marketplaceListing?.publishedAt ?? listing?.publishedAt ?? perf?.publishedAt ?? null;
-    const marketplaceUrl = marketplaceListing?.listingUrl ?? listing?.externalUrl ?? perf?.marketplaceUrl ?? null;
+    const marketplaceUrl = marketplaceListing?.listingUrl ?? listing?.externalUrl ?? latestJob?.listingUrl ?? perf?.marketplaceUrl ?? null;
     const messageCount = perf?.conversationsCount ?? 0;
     const hotLeadCount = perf?.hotLeadsCount ?? 0;
     const appointmentReadyCount = perf?.appointmentReadyCount ?? 0;
@@ -284,7 +294,7 @@ router.get("/listings", async (req, res) => {
       ? Math.max(0, (now.getTime() - publishedAt.getTime()) / (1000 * 60 * 60 * 24))
       : 0;
 
-    const isPublished = publishStatus === "Published" || listing?.status === "Published" || isMarketplaceLive;
+    const isPublished = publishStatus === "Published";
     const { engagementStatus, recommendation } = isPublished
       ? deriveEngagement(messageCount, leadCount, hotLeadCount, appointmentReadyCount, daysLive, v.status)
       : { engagementStatus: null, recommendation: null };

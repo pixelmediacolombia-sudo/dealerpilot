@@ -417,7 +417,7 @@ router.post("/auto-publish/batches", async (req, res) => {
         eq(vehiclesTable.dealerId, dealerId),
         // Not already published or sold
         ne(vehiclesTable.status, "Published"),
-        ne(vehiclesTable.status, "Sold"),
+        ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
         lotLocation ? eq(vehiclesTable.lotLocation, lotLocation) : undefined,
       ),
@@ -697,6 +697,12 @@ router.post("/auto-publish/batches", async (req, res) => {
       })
       .returning();
     jobs.push(job);
+  }
+
+  if (mode === "Controlled" && jobs.some((job) => job.status === "Queued")) {
+    void runWorkerOnce(publishingWorker, req.log, "manual", null).catch((err) => {
+      req.log.error({ err, batchId: batch.id, dealerId }, "Failed to kick publishing worker after batch creation");
+    });
   }
 
   req.log.info(
@@ -1152,7 +1158,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
       and(
         eq(vehiclesTable.dealerId, dealerId),
         ne(vehiclesTable.status, "Published"),
-        ne(vehiclesTable.status, "Sold"),
+        ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
       ),
     );
@@ -1463,7 +1469,7 @@ router.get("/auto-publish/launch-checklist", async (req, res) => {
       and(
         eq(vehiclesTable.dealerId, dealerId),
         ne(vehiclesTable.status, "Published"),
-        ne(vehiclesTable.status, "Sold"),
+        ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
       ),
     );

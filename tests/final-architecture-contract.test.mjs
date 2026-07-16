@@ -46,7 +46,7 @@ test("listing score protects title, bilingual description, price, down-payment, 
 test("publishing application guardrails keep Alpha Flow safe", () => {
   assert.match(controlledMode, /MARKETPLACE_CONTROLLED_MODE_ENABLED/);
   assert.match(controlledMode, /MARKETPLACE_PUBLISH_MODE === "full_auto"/);
-  assert.match(controlledMode, /NOT_ELIGIBLE_STATUSES = new Set\(\["Published", "Sold", "Removed"\]\)/);
+  assert.match(controlledMode, /NOT_ELIGIBLE_STATUSES = new Set\(\["Published", "Sold\/Removed", "Sold", "Removed", "Archived"\]\)/);
   assert.match(controlledMode, /UNKNOWN_LOT/);
   assert.match(controlledMode, /GM_BLOCKED/);
   assert.match(controlledMode, /DUPLICATE_ACTIVE_JOB/);

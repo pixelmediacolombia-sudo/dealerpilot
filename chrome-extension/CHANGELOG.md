@@ -1,5 +1,14 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.57
+
+**Fixed**
+- Publishes only DealerPilot Photo Director's final 10 Marketplace photos.
+- Polls DealerPilot sold-listing feedback and opens the matching Facebook Marketplace listing.
+- Attempts to mark matching Marketplace item pages as sold so sold inventory is not republished.
+
+---
+
 ## v1.3.43
 
 **Fixed**

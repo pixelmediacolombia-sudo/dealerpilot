@@ -14,7 +14,11 @@ const listingGeneratorSource = readFileSync(new URL("../listings/generator.ts", 
 const opportunityEngineSource = readFileSync(new URL("../intelligence/opportunityEngine.ts", import.meta.url), "utf8");
 const conversationsSource = readFileSync(new URL("./conversations.ts", import.meta.url), "utf8");
 const authSource = readFileSync(new URL("./auth.ts", import.meta.url), "utf8");
+const extensionRouteSource = readFileSync(new URL("./extension.ts", import.meta.url), "utf8");
 const marketplaceListingsSource = readFileSync(new URL("./marketplaceListings.ts", import.meta.url), "utf8");
+const vehiclesRouteSource = readFileSync(new URL("./vehicles.ts", import.meta.url), "utf8");
+const controlledModeSource = readFileSync(new URL("../publishing/controlledMode.ts", import.meta.url), "utf8");
+const listingsRouteSource = readFileSync(new URL("./listings.ts", import.meta.url), "utf8");
 const queueClientSource = readFileSync(
   new URL("../../../../chrome-extension/src/background/queueClient.js", import.meta.url),
   "utf8",
@@ -25,6 +29,14 @@ const publisherFlowSource = readFileSync(
 );
 const batchProgressCardSource = readFileSync(
   new URL("../../../dashboard/src/features/listings/components/BatchProgressCard.tsx", import.meta.url),
+  "utf8",
+);
+const listingsWorkspaceSource = readFileSync(
+  new URL("../../../dashboard/src/features/listings/components/ListingsWorkspaceContent.tsx", import.meta.url),
+  "utf8",
+);
+const publishedCardSource = readFileSync(
+  new URL("../../../dashboard/src/features/listings/components/PublishedCard.tsx", import.meta.url),
   "utf8",
 );
 const authGateSource = readFileSync(
@@ -206,6 +218,10 @@ test("enabling a fully automatic plan kicks the publishing worker without Schedu
     autoPublishSource,
     /if \(shouldKickAutoPublish\(row\)\) \{[\s\S]*runWorkerOnce\(publishingWorker,\s*req\.log,\s*"manual",\s*null\)/,
   );
+  assert.match(
+    autoPublishSource,
+    /if \(mode === "Controlled" && jobs\.some\(\(job\) => job\.status === "Queued"\)\) \{[\s\S]*runWorkerOnce\(publishingWorker,\s*req\.log,\s*"manual",\s*null\)/,
+  );
 });
 
 test("cancelled and dismissed batches do not block the auto-publish frequency gate", () => {
@@ -267,9 +283,15 @@ test("opportunity and auto-publish scoring reward accessible mainstream vehicles
 test("publishing payload uses approved Photo Director handoff when available", () => {
   assert.match(publishingRepositorySource, /export async function getVehiclePhotos/);
   assert.match(publishingRepositorySource, /export async function getVehicleRawPhotos/);
+  assert.match(publishingRepositorySource, /const MARKETPLACE_PHOTO_LIMIT = 10/);
+  assert.match(publishingRepositorySource, /function limitMarketplacePhotos/);
+  assert.match(publishingRepositorySource, /\.slice\(0,\s*MARKETPLACE_PHOTO_LIMIT\)/);
+  assert.match(publishingRepositorySource, /img\.processingStatus !== "Failed"/);
   assert.match(routeSource, /const images = await getVehiclePhotos\(vehicle\.id, vehicle\.aiPhotoSetId, vehicle\.aiPhotoStatus\)/);
   assert.match(routeSource, /const usingAiPhotos = images\.some\(\(image\) => image\.source === "ai"\)/);
   assert.match(routeSource, /const images = await getVehiclePhotos\(/);
+  assert.match(publisherFlowSource, /const DEFAULT_MAX = 10/);
+  assert.doesNotMatch(publisherFlowSource, /const DEFAULT_MAX = 20/);
 });
 
 test("Marketplace live-list reconciliation can keep confirmed vehicles and demote missing live rows", () => {
@@ -282,6 +304,53 @@ test("Marketplace live-list reconciliation can keep confirmed vehicles and demot
   assert.match(marketplaceListingsSource, /target: \[listingsTable\.vehicleId, listingsTable\.channel\]/);
   assert.match(marketplaceListingsSource, /keptLiveVehicleIds/);
   assert.match(marketplaceListingsSource, /demotedVehicleIds/);
+});
+
+test("listing workspace does not show stale published jobs as live without Marketplace proof", () => {
+  assert.match(listingsRouteSource, /const latestJobHasLiveProof =/);
+  assert.match(listingsRouteSource, /Boolean\(latestJob\.listingUrl\)/);
+  assert.match(listingsRouteSource, /!marketplaceListing \|\| marketplaceListing\.status === "Live"/);
+  assert.match(listingsRouteSource, /const isPublishedFromSource = isMarketplaceLive \|\| hasPublishedListing \|\| latestJobHasLiveProof/);
+  assert.match(listingsRouteSource, /latestJob\?\.status === "Published" && !isPublishedFromSource[\s\S]*"Needs Review"/);
+  assert.match(listingsRouteSource, /const isPublished = publishStatus === "Published"/);
+});
+
+test("sold inventory feeds Marketplace and extension state so vehicles cannot be republished", () => {
+  assert.match(vehiclesRouteSource, /async function syncSoldMarketplaceState\(vehicleIds: number\[\]\)/);
+  assert.match(vehiclesRouteSource, /marketplaceListingsTable[\s\S]*\.set\(\{ status: "Sold", notes: note, updatedAt: now \}\)/);
+  assert.match(vehiclesRouteSource, /listingsTable[\s\S]*\.set\(\{ status: "Sold", updatedAt: now \}\)/);
+  assert.match(vehiclesRouteSource, /publishingJobsTable[\s\S]*status: "Cancelled"[\s\S]*Vehicle marked Sold\/Removed in DealerPilot inventory/);
+  assert.match(vehiclesRouteSource, /action === "mark_sold"[\s\S]*syncSoldMarketplaceState\(updated\.map\(\(v\) => v\.id\)\)/);
+  assert.match(vehiclesRouteSource, /parsed\.data\.status === "Sold\/Removed"[\s\S]*syncSoldMarketplaceState\(\[id\]\)/);
+  assert.match(extensionRouteSource, /\/extension\/marketplace-sold-actions/);
+  assert.match(extensionRouteSource, /eq\(marketplaceListingsTable\.status, "Sold"\)/);
+  assert.match(extensionRouteSource, /eq\(vehiclesTable\.status, "Sold\/Removed"\)/);
+  assert.match(queueClientSource, /apiGet\("\/api\/extension\/marketplace-sold-actions"\)/);
+  assert.match(queueClientSource, /activeSoldAction: action/);
+  assert.match(queueClientSource, /MARKETPLACE_SOLD_ACTION_OPENED/);
+  assert.match(publisherFlowSource, /const isMarketplaceItem = \/\\\/marketplace\\\/item\\\//);
+  assert.match(publisherFlowSource, /async function runMarketplaceSoldAction\(\)/);
+  assert.match(publisherFlowSource, /currentPageMatchesSoldAction\(activeSoldAction\)/);
+  assert.match(publisherFlowSource, /"mark as sold"/);
+  assert.match(publisherFlowSource, /"marcar como vendido"/);
+  assert.match(publisherFlowSource, /soldActionCompletedId/);
+  assert.match(controlledModeSource, /NOT_ELIGIBLE_STATUSES = new Set\(\["Published", "Sold\/Removed", "Sold", "Removed", "Archived"\]\)/);
+  assert.match(routeSource, /\["Published", "Sold\/Removed", "Sold", "Removed", "Archived"\]\.includes\(v\.status\)/);
+});
+
+test("publishing cockpit shows only the primary owner-requested tabs and compact live cards", () => {
+  assert.match(listingsWorkspaceSource, /PRIMARY_TABS = new Set\(\["ready", "scheduled", "published", "failed", "all"\]\)/);
+  assert.match(listingsWorkspaceSource, /"needs-update": "published"/);
+  assert.match(listingsWorkspaceSource, /Live \{countBadge\(publishedWorkspacesCount\)\}/);
+  assert.match(listingsWorkspaceSource, /Schedule \{countBadge\(scheduledCount\)\}/);
+  assert.doesNotMatch(listingsWorkspaceSource, /<TabsTrigger value="generating"/);
+  assert.doesNotMatch(listingsWorkspaceSource, /<TabsTrigger value="needs-update"/);
+  assert.doesNotMatch(listingsWorkspaceSource, /<TabsTrigger value="sold"/);
+  assert.doesNotMatch(listingsWorkspaceSource, /<TabsTrigger value="queue"/);
+  assert.match(listingsWorkspaceSource, /lg:grid-cols-4 2xl:grid-cols-5 gap-4/);
+  assert.match(publishedCardSource, /rounded-lg bg-card/);
+  assert.match(publishedCardSource, /aspect-\[16\/9\]/);
+  assert.match(publishedCardSource, /p-3 flex flex-col flex-1/);
 });
 
 test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity validation", () => {

@@ -17,6 +17,15 @@ import { deriveBatchProgress } from "../../../publishing/batchProgress";
 import { resolveLocalAiPhotoUrl } from "../../../photo/staticAssets";
 import { toJob } from "../domain/jobPresenter";
 
+const MARKETPLACE_PHOTO_LIMIT = 10;
+
+function limitMarketplacePhotos<T extends { url: string | null; position: number | null }>(photos: T[]): T[] {
+  return photos
+    .filter((photo) => Boolean(photo.url))
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .slice(0, MARKETPLACE_PHOTO_LIMIT);
+}
+
 export async function reconcileBatchProgress(batchId: number | null | undefined) {
   if (!batchId) return;
 
@@ -146,11 +155,15 @@ export async function getVehiclePhotos(
       aiImages = resolvedAiPhotoSetId !== null ? await readAiImages(resolvedAiPhotoSetId) : [];
     }
     if (aiImages.length > 0) {
-      return aiImages.map((img) => ({
-        url: resolveLocalAiPhotoUrl(img.processedUrl, img.originalUrl),
-        position: img.position,
-        source: "ai" as const,
-      }));
+      return limitMarketplacePhotos(
+        aiImages
+          .filter((img) => img.processingStatus !== "Failed")
+          .map((img) => ({
+            url: resolveLocalAiPhotoUrl(img.processedUrl, img.originalUrl),
+            position: img.position,
+            source: "ai" as const,
+          })),
+      );
     }
   }
   const rawImages = await db
@@ -158,7 +171,9 @@ export async function getVehiclePhotos(
     .from(vehicleImagesTable)
     .where(eq(vehicleImagesTable.vehicleId, vehicleId))
     .orderBy(asc(vehicleImagesTable.position));
-  return rawImages.map((img) => ({ url: img.url, position: img.position, source: "raw" as const }));
+  return limitMarketplacePhotos(
+    rawImages.map((img) => ({ url: img.url, position: img.position, source: "raw" as const })),
+  );
 }
 
 export async function getVehicleRawPhotos(

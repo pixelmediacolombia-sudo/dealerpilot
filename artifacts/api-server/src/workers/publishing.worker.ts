@@ -203,6 +203,7 @@ async function maybeCreateAutomaticBatch(
     .where(
       and(
         eq(publishingBatchesTable.dealerId, DEALER_ID),
+        eq(publishingBatchesTable.notes, "Created automatically by Publishing Agent"),
         ne(publishingBatchesTable.status, "Cancelled"),
         ne(publishingBatchesTable.status, "Dismissed"),
       ),
@@ -223,7 +224,7 @@ async function maybeCreateAutomaticBatch(
       and(
         eq(vehiclesTable.dealerId, DEALER_ID),
         ne(vehiclesTable.status, "Published"),
-        ne(vehiclesTable.status, "Sold"),
+        ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
       ),
     );

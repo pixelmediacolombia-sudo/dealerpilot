@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
-import { db, pool, leadsTable, extensionConnectionsTable } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { db, pool, leadsTable, extensionConnectionsTable, marketplaceListingsTable, vehiclesTable } from "@workspace/db";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 
 const EXTENSION_NAME = "Chrome Extension";
 
@@ -245,6 +245,45 @@ router.get("/extension/connect-status", async (req, res) => {
     extensionId: await getChromeExtensionId(ext?.id),
     fbLoggedIn: ext?.fbLoggedIn ?? null,
     marketplaceConnected: ext?.marketplaceConnected ?? null,
+  });
+});
+
+// ── Marketplace Sold Actions ───────────────────────────────────────────────
+// Dashboard feedback channel for the extension/operator: when DealerPilot marks
+// inventory Sold/Removed, the extension can surface the live Marketplace URL so
+// the Facebook listing is also marked Sold and the vehicle cannot be republished.
+router.get("/extension/marketplace-sold-actions", async (_req, res) => {
+  const rows = await db
+    .select({
+      listingId: marketplaceListingsTable.id,
+      vehicleId: marketplaceListingsTable.vehicleId,
+      listingUrl: marketplaceListingsTable.listingUrl,
+      status: marketplaceListingsTable.status,
+      updatedAt: marketplaceListingsTable.updatedAt,
+      year: vehiclesTable.year,
+      make: vehiclesTable.make,
+      model: vehiclesTable.model,
+      trim: vehiclesTable.trim,
+      vehicleStatus: vehiclesTable.status,
+    })
+    .from(marketplaceListingsTable)
+    .innerJoin(vehiclesTable, eq(vehiclesTable.id, marketplaceListingsTable.vehicleId))
+    .where(
+      and(
+        eq(marketplaceListingsTable.status, "Sold"),
+        eq(vehiclesTable.status, "Sold/Removed"),
+        isNotNull(marketplaceListingsTable.listingUrl),
+      ),
+    )
+    .orderBy(desc(marketplaceListingsTable.updatedAt))
+    .limit(20);
+
+  res.json({
+    actions: rows.map((row) => ({
+      ...row,
+      label: `${row.year ?? ""} ${row.make} ${row.model}${row.trim ? ` ${row.trim}` : ""}`.trim(),
+      updatedAt: row.updatedAt.toISOString(),
+    })),
   });
 });
 

@@ -680,6 +680,32 @@ const handlers = {
     }
     const nextJob = nextData && nextData.job && nextData.job.id ? nextData.job : null;
     if (!nextJob) {
+      try {
+        const soldData = await apiGet("/api/extension/marketplace-sold-actions");
+        const action = Array.isArray(soldData?.actions) ? soldData.actions[0] : null;
+        if (action?.listingUrl) {
+          const { lastSoldActionOpenedId } = await chrome.storage.local.get("lastSoldActionOpenedId");
+          if (lastSoldActionOpenedId !== action.listingId) {
+            await chrome.storage.local.set({
+              activeSoldAction: action,
+              lastSoldActionOpenedId: action.listingId,
+              lastSoldActionOpenedAt: new Date().toISOString(),
+            });
+            await logAudit("MARKETPLACE_SOLD_ACTION_OPENED", {
+              listingId: action.listingId,
+              vehicleId: action.vehicleId,
+              vehicleLabel: action.label || null,
+              url: action.listingUrl,
+              source: "dealerpilot_sold_feedback",
+            });
+            const tab = await chrome.tabs.create({ url: action.listingUrl, active: true });
+            return { ok: true, soldAction: true, listingId: action.listingId, tabId: tab.id };
+          }
+        }
+      } catch (err) {
+        console.warn("[DealerPilot AI] sold action poll failed", err);
+      }
+
       // No publish job in queue — only now check connect-status so it never
       // interrupts an active Publish Now flow.
       try {

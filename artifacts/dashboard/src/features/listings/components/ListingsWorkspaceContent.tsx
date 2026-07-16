@@ -92,6 +92,15 @@ import { toast } from "@/hooks/use-toast";
 type StrategyStatus = "recommended" | "not_prioritized" | "needs_strategy_review";
 
 const DEALER_ID = 1;
+const PRIMARY_TABS = new Set(["ready", "scheduled", "published", "failed", "all"]);
+const LEGACY_TAB_MAP: Record<string, string> = {
+  generating: "all",
+  publishing: "all",
+  "needs-update": "published",
+  sold: "published",
+  "needs-review": "all",
+  queue: "all",
+};
 
 function toDateTimeLocalValue(value: string | null | undefined): string {
   if (!value) return "";
@@ -249,13 +258,11 @@ function PhotoBadge({
 export function ListingsWorkspace() {
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window === "undefined") return "ready";
-    const tab = new URLSearchParams(window.location.search).get("tab");
-    return tab || "ready";
+    const tab = new URLSearchParams(window.location.search).get("tab") ?? "ready";
+    return PRIMARY_TABS.has(tab) ? tab : LEGACY_TAB_MAP[tab] ?? "ready";
   });
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [jobStatusFilter, setJobStatusFilter] = useState<string>("all");
   const [queueTab, setQueueTab] = useState<"active" | "needs-review" | "completed" | "failed-history">("active");
   const [batchRefreshKey, setBatchRefreshKey] = useState(0);
   const [markPublishedVehicle, setMarkPublishedVehicle] = useState<{ id: number; label: string } | null>(null);
@@ -319,7 +326,7 @@ export function ListingsWorkspace() {
     photoScoreByVehicle,
     intelligenceMap,
     recommendations,
-  } = useListings({ search, statusFilter, location: locationFilter });
+  } = useListings({ search, statusFilter: "all", location: locationFilter });
 
   const assignMutation = useAssignPublishingJob({
     mutation: { onSuccess: () => void invalidateWorkspaces() },
@@ -391,25 +398,14 @@ export function ListingsWorkspace() {
   };
 
   const workspaces = workspacesData?.workspaces ?? [];
-  const generatingCount = workspaces.filter((w) => w.aiStatus === "Generating").length;
   const readyCount = workspaces.filter(
     (w) => w.publishStatus === "Approved" || w.publishStatus === "Queued",
   ).length;
   const publishedWorkspacesCount = workspaces.filter(
-    (w) => w.publishStatus === "Published" && w.vehicleStatus !== "Sold/Removed" && w.vehicleStatus !== "Price Changed",
+    (w) => w.publishStatus === "Published",
   ).length;
   const scheduledWorkspaceCount = workspaces.filter((w) => w.publishStatus === "Scheduled").length;
-  const publishingCount = workspaces.filter((w) => w.publishStatus === "Publishing").length;
-  const needsReviewCount = workspaces.filter(
-    (w) => w.publishStatus === "Needs Review",
-  ).length;
   const failedCount = workspaces.filter((w) => w.publishStatus === "Failed").length;
-  const needsUpdateCount = workspaces.filter(
-    (w) => w.publishStatus === "Published" && w.vehicleStatus === "Price Changed",
-  ).length;
-  const soldCount = workspaces.filter(
-    (w) => w.publishStatus === "Published" && w.vehicleStatus === "Sold/Removed",
-  ).length;
   const allCount = workspaces.length;
 
   const jobs = jobsData?.jobs ?? [];
@@ -432,21 +428,12 @@ export function ListingsWorkspace() {
   });
   const activeJobCount        = jobs.filter((j) => ACTIVE_STATUSES.has(j.status)).length;
   const queueNeedsReviewCount = jobs.filter((j) => j.status === "Needs Review").length;
-  const queuedJobs = jobs.filter((j) => j.status === "Queued" || j.status === "Scheduled").length;
 
   const filteredWorkspaces = workspaces.filter((w) => {
     if (activeTab === "ready") return w.publishStatus === "Approved" || w.publishStatus === "Queued";
-    if (activeTab === "generating") return w.aiStatus === "Generating";
     if (activeTab === "scheduled") return w.publishStatus === "Scheduled" || scheduledJobVehicleIds.has(w.vehicleId);
-    if (activeTab === "publishing") return w.publishStatus === "Publishing";
-    if (activeTab === "published")
-      return w.publishStatus === "Published" && w.vehicleStatus !== "Sold/Removed" && w.vehicleStatus !== "Price Changed";
-    if (activeTab === "needs-review") return w.publishStatus === "Needs Review";
+    if (activeTab === "published") return w.publishStatus === "Published";
     if (activeTab === "failed") return w.publishStatus === "Failed";
-    if (activeTab === "needs-update")
-      return w.publishStatus === "Published" && w.vehicleStatus === "Price Changed";
-    if (activeTab === "sold")
-      return w.publishStatus === "Published" && w.vehicleStatus === "Sold/Removed";
     return true;
   });
 
@@ -482,9 +469,9 @@ export function ListingsWorkspace() {
     return list;
   }, [filteredWorkspaces, sortBy, photoFilter, photoScoreByVehicle]);
 
-  const isPublishedTab = ["published", "needs-update", "sold"].includes(activeTab);
+  const isPublishedTab = activeTab === "published";
   const isCardTab = !isPublishedTab &&
-    ["ready", "generating", "scheduled", "publishing", "needs-review", "failed", "all"].includes(activeTab);
+    ["ready", "scheduled", "failed", "all"].includes(activeTab);
 
   const tabClass =
     "text-[10px] font-bold uppercase tracking-[0.15em] px-3 py-1.5 rounded-none border-0 border-b-2 border-transparent data-[state=active]:border-green-400 data-[state=active]:text-green-400 data-[state=inactive]:text-white/30 data-[state=inactive]:hover:text-white/55 gap-1.5 transition-all bg-transparent data-[state=active]:bg-transparent shadow-none";
@@ -551,32 +538,14 @@ export function ListingsWorkspace() {
               <TabsTrigger value="ready" className={tabClass}>
                 Ready {countBadge(readyCount)}
               </TabsTrigger>
-              <TabsTrigger value="generating" className={tabClass}>
-                Generating {countBadge(generatingCount)}
-              </TabsTrigger>
               <TabsTrigger value="scheduled" className={tabClass}>
-                Scheduled {countBadge(scheduledCount)}
-              </TabsTrigger>
-              <TabsTrigger value="publishing" className={tabClass}>
-                Publishing {countBadge(publishingCount)}
+                Schedule {countBadge(scheduledCount)}
               </TabsTrigger>
               <TabsTrigger value="published" className={tabClass}>
                 Live {countBadge(publishedWorkspacesCount)}
               </TabsTrigger>
-              <TabsTrigger value="needs-update" className={cn(tabClass, needsUpdateCount > 0 && "data-[state=inactive]:text-amber-400/60")}>
-                Needs Update {countBadge(needsUpdateCount)}
-              </TabsTrigger>
-              <TabsTrigger value="sold" className={tabClass}>
-                Sold {countBadge(soldCount)}
-              </TabsTrigger>
-              <TabsTrigger value="needs-review" className={tabClass}>
-                Needs Review {countBadge(needsReviewCount)}
-              </TabsTrigger>
               <TabsTrigger value="failed" className={cn(tabClass, failedCount > 0 && "data-[state=inactive]:text-red-400/60")}>
                 Failed {countBadge(failedCount)}
-              </TabsTrigger>
-              <TabsTrigger value="queue" className={tabClass}>
-                Queue {countBadge(queuedJobs)}
               </TabsTrigger>
               <TabsTrigger value="all" className={tabClass}>
                 All {countBadge(allCount)}
@@ -587,7 +556,7 @@ export function ListingsWorkspace() {
           <div className="space-y-6 mt-6">
 
           {/* AI Daily Operator Panel */}
-          {activeTab !== "published" && activeTab !== "needs-update" && activeTab !== "sold" && activeTab !== "queue" && (
+          {activeTab !== "published" && (
             <DailyOperatorPanel
               workspaces={workspacesData?.workspaces ?? []}
               recommendations={recommendations as never}
@@ -620,7 +589,7 @@ export function ListingsWorkspace() {
           {/* Batch Progress */}
           <BatchProgressCard dealerId={DEALER_ID} refreshKey={batchRefreshKey} location={locationFilter} />
 
-          {/* ── Published / Needs Update / Sold tabs — engagement-rich cards ── */}
+          {/* ── Live tab — engagement-rich cards ── */}
           {isPublishedTab && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
               <div className="flex items-center gap-3 py-3 border-b border-white/[0.04]">
@@ -636,14 +605,14 @@ export function ListingsWorkspace() {
               </div>
 
               {workspacesLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
                   {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div key={i} className="rounded-xl bg-card border border-border/50 h-[380px] animate-pulse">
-                      <div className="h-[200px] bg-secondary/50 rounded-t-xl" />
-                      <div className="p-4 space-y-3">
+                    <div key={i} className="rounded-lg bg-card border border-border/50 h-[310px] animate-pulse">
+                      <div className="h-[150px] bg-secondary/50 rounded-t-lg" />
+                      <div className="p-3 space-y-2.5">
                         <div className="h-5 bg-secondary/80 rounded w-2/3" />
                         <div className="h-4 bg-secondary/50 rounded w-1/3" />
-                        <div className="h-12 bg-secondary/30 rounded" />
+                        <div className="h-10 bg-secondary/30 rounded" />
                         <div className="flex gap-2 pt-2">
                           <div className="h-7 bg-secondary/80 rounded w-1/3" />
                           <div className="h-7 bg-secondary/50 rounded w-1/4" />
@@ -657,19 +626,16 @@ export function ListingsWorkspace() {
                   icon={<Share className="w-8 h-8" />}
                   title={
                     activeTab === "published" ? "No live listings" :
-                    activeTab === "needs-update" ? "All listings are up to date" :
-                    "No sold listings"
+                    "No live listings"
                   }
                   description={
                     activeTab === "published"
                       ? "Publish listings from the Ready tab to see them here with engagement tracking."
-                      : activeTab === "needs-update"
-                        ? "When a vehicle's price changes in your XML feed, published listings will appear here."
-                        : "Mark sold vehicles here to remove their listings from Marketplace."
+                      : "Publish listings from the Ready tab to see them here with engagement tracking."
                   }
                 />
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
                   {filteredWorkspaces.map((w) => (
                     <PublishedCard
                       key={w.vehicleId}

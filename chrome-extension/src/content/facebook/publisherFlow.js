@@ -806,6 +806,7 @@
 
   const isMessenger = _initial.isMessengerNow;
   const isMarketplaceCreate = /\/marketplace\/create/.test(location.pathname);
+  const isMarketplaceItem = /\/marketplace\/item\//.test(location.pathname);
 
   // ---- Panel UI ----
   const panel = document.createElement("div");
@@ -2405,8 +2406,8 @@
   // =====================================================================
 
   async function uploadPhotos(imageUrls, jobId, warnings) {
-    // Upload up to 20 photos — Facebook's per-listing maximum.
-    const DEFAULT_MAX = 20;
+    // DealerPilot publishes the Photo Director's final Marketplace set.
+    const DEFAULT_MAX = 10;
     const toUpload = imageUrls.slice(0, DEFAULT_MAX);
     const totalPhotos = toUpload.length;
 
@@ -3476,9 +3477,106 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     );
   }
 
+  function marketplaceItemKey(url) {
+    try {
+      const parsed = new URL(url, location.origin);
+      const match = parsed.pathname.match(/\/marketplace\/item\/([^/?#]+)/);
+      return match ? match[1] : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function currentPageMatchesSoldAction(action) {
+    const currentKey = marketplaceItemKey(location.href);
+    const targetKey = marketplaceItemKey(action?.listingUrl || "");
+    if (currentKey && targetKey) return currentKey === targetKey;
+    return action?.listingUrl && location.href.split("?")[0] === String(action.listingUrl).split("?")[0];
+  }
+
+  async function openMarketplaceListingActionMenu() {
+    const menuLabels = ["more options", "more", "options", "mas opciones", "más opciones", "opciones", "acciones"];
+    const candidates = Array.from(document.querySelectorAll('div[role="button"], button, [role="button"]'));
+    for (const el of candidates) {
+      if (el.disabled || el.getAttribute("aria-disabled") === "true" || el.hasAttribute("disabled")) continue;
+      const label = normalizeText(
+        [
+          el.getAttribute("aria-label"),
+          el.getAttribute("title"),
+          el.innerText,
+          el.textContent,
+        ].filter(Boolean).join(" "),
+      );
+      if (!label) continue;
+      if (menuLabels.some((text) => label.includes(text))) {
+        el.scrollIntoView?.({ block: "center", inline: "nearest" });
+        await sleep(250);
+        el.click();
+        await sleep(900);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async function runMarketplaceSoldAction() {
+    const { activeSoldAction, soldActionCompletedId } = await chrome.storage.local.get([
+      "activeSoldAction",
+      "soldActionCompletedId",
+    ]);
+    if (!activeSoldAction?.listingUrl || activeSoldAction.listingId === soldActionCompletedId) return;
+    if (!currentPageMatchesSoldAction(activeSoldAction)) return;
+
+    const soldTexts = [
+      "mark as sold",
+      "mark sold",
+      "sold",
+      "marcar como vendido",
+      "marcar vendido",
+      "vendido",
+    ];
+    setStatus(`Marking Marketplace listing sold: ${activeSoldAction.label || activeSoldAction.vehicleId || ""}`.trim());
+    await sleep(1200);
+
+    let clicked = await clickButtonByText(soldTexts, 2500);
+    if (!clicked) {
+      const menuOpened = await openMarketplaceListingActionMenu();
+      if (menuOpened) clicked = await clickButtonByText(soldTexts, 5000);
+    }
+
+    if (!clicked) {
+      const reason = "Could not find Facebook's Mark as Sold control on this listing.";
+      await chrome.storage.local.set({
+        soldActionLastError: reason,
+        soldActionLastErrorAt: new Date().toISOString(),
+      });
+      setStatus(reason, "err");
+      return;
+    }
+
+    await clickButtonByText(
+      ["confirm", "done", "save", "mark as sold", "confirmar", "listo", "guardar", "marcar como vendido"],
+      4000,
+    );
+    await chrome.storage.local.set({
+      soldActionCompletedId: activeSoldAction.listingId,
+      soldActionCompletedAt: new Date().toISOString(),
+    });
+    await chrome.storage.local.remove("activeSoldAction");
+    setStatus("Marketplace listing marked sold. DealerPilot will not republish this vehicle.", "ok");
+  }
+
   // ==================================================================
   // Marketplace create page — job flow + debug button
   // ==================================================================
+  if (isMarketplaceItem) {
+    setTimeout(() => {
+      runMarketplaceSoldAction().catch((err) => {
+        stateError("Marketplace sold action failed", err);
+      });
+    }, 1600);
+  }
+
   if (isMarketplaceCreate) {
     chrome.storage.local.get("activeJob").then(async ({ activeJob }) => {
       if (activeJob) {

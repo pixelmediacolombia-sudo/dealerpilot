@@ -1049,6 +1049,10 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
   const eligible = vehicles.filter((v) => {
     if (alreadyQueued.has(v.id)) return false;
 
+    if (["Published", "Sold/Removed", "Sold", "Removed", "Archived"].includes(v.status)) {
+      otherBlocked.push({ vehicleId: v.id, code: "NOT_ELIGIBLE_STATUS", reason: `Vehicle status is "${v.status}"` });
+      return false;
+    }
     if (mode === "Controlled" && !extensionOnline) {
       otherBlocked.push({ vehicleId: v.id, code: "EXTENSION_OFFLINE", reason: "Extension offline" });
       return false;
