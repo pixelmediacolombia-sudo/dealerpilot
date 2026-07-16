@@ -40,6 +40,7 @@ export const ENHANCE_PRESET_VERSION = "v4.0-vision-engine";
 
 type EnhancementPreset = "exterior_premium" | "interior_premium" | "technical_readability";
 type RestorationIntensity = "standard" | "conservative" | "minimal";
+type LocalEnhancementStrategy = "current_economy" | "front_pipeline_b";
 
 interface ImageStats {
   width: number;
@@ -73,6 +74,12 @@ interface PhotoFidelityScore {
 
 const TARGET_MAX_WIDTH = 2200;
 const TECHNICAL_MAX_WIDTH = 1800;
+
+function localEnhancementStrategyFor(classification: string): LocalEnhancementStrategy {
+  return classification === "Exterior Front" || classification === "Exterior Front 45"
+    ? "front_pipeline_b"
+    : "current_economy";
+}
 
 async function fetchBuffer(urlOrPath: string): Promise<Buffer> {
   if (urlOrPath.startsWith("/api/static/ai-photos/")) {
@@ -307,7 +314,40 @@ function paramsFor(preset: EnhancementPreset, intensity: RestorationIntensity) {
   };
 }
 
-async function runVisionEngine(buf: Buffer, preset: EnhancementPreset, intensity: RestorationIntensity): Promise<Buffer> {
+async function runVisionEngine(
+  buf: Buffer,
+  preset: EnhancementPreset,
+  intensity: RestorationIntensity,
+  strategy: LocalEnhancementStrategy = "current_economy",
+): Promise<Buffer> {
+  if (strategy === "front_pipeline_b") {
+    const metadata = await sharp(buf).rotate().metadata();
+    const sourceWidth = metadata.width ?? 800;
+    const targetWidth = Math.min(TARGET_MAX_WIDTH, Math.max(sourceWidth, Math.round(sourceWidth * 2)));
+    return sharp(buf)
+      .rotate()
+      .normalise({ lower: 0.12, upper: 99.82 })
+      .gamma(1.025)
+      .modulate({ brightness: 1.006, saturation: 1.022 })
+      .linear(1.042, -4.5)
+      .resize({
+        width: targetWidth,
+        fit: "inside",
+        withoutEnlargement: false,
+        kernel: sharp.kernel.lanczos3,
+      })
+      .sharpen({
+        sigma: 0.38,
+        m1: 0.32,
+        m2: 1.18,
+        x1: 2,
+        y2: 7,
+        y3: 13,
+      })
+      .jpeg({ quality: 96, chromaSubsampling: "4:4:4" })
+      .toBuffer();
+  }
+
   const p = paramsFor(preset, intensity);
   let pipeline = sharp(buf)
     .rotate()
@@ -564,7 +604,13 @@ async function restoreWithValidation(
       : providerGate.result;
     const allowLocalFallback = process.env["PHOTO_RESTORATION_ALLOW_LOCAL_FALLBACK_AFTER_PROVIDER"] === "true";
     if (allowLocalFallback) {
-      const localOutput = await runVisionEngine(buf, preset, processingMode === "strong-restoration" ? "standard" : "conservative");
+      const localStrategy = localEnhancementStrategyFor(classification);
+      const localOutput = await runVisionEngine(
+        buf,
+        preset,
+        processingMode === "strong-restoration" ? "standard" : "conservative",
+        localStrategy,
+      );
       const localStats = await measureImageStats(localOutput);
       const localFidelity = scorePhotoFidelity(originalStats, localStats);
       const localGate = buildQualityGate(originalStats, localStats, localFidelity);
@@ -630,7 +676,13 @@ async function restoreWithValidation(
   }
 
   if (localAllowed) {
-    const localOutput = await runVisionEngine(buf, preset, processingMode === "strong-restoration" ? "standard" : "conservative");
+    const localStrategy = localEnhancementStrategyFor(classification);
+    const localOutput = await runVisionEngine(
+      buf,
+      preset,
+      processingMode === "strong-restoration" ? "standard" : "conservative",
+      localStrategy,
+    );
     const localStats = await measureImageStats(localOutput);
     const localFidelity = scorePhotoFidelity(originalStats, localStats);
     const localGate = buildQualityGate(originalStats, localStats, localFidelity);
