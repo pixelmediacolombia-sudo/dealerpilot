@@ -49,26 +49,35 @@ const UI_MESSAGE_TEXT = new Set([
   "chat members",
   "close",
   "compose",
+  "copy link",
   "customize chat",
   "delete chat",
   "edit nicknames",
   "emoji",
   "enter",
   "esc",
+  "feed",
+  "group",
   "mark as pending",
   "media, files and links",
   "message",
   "message...",
   "messenger",
+  "more",
   "more options",
   "mute",
   "notifications",
   "people",
   "privacy & support",
+  "public",
   "saved",
   "search",
   "search in conversation",
   "send",
+  "send in messenger",
+  "share now",
+  "share to",
+  "vehicle inquiry",
   "view profile",
   "write to saved",
 ]);
@@ -89,10 +98,12 @@ function isUiConversationText(value: string): boolean {
   if (!normalized) return true;
   if (UI_MESSAGE_TEXT.has(normalized)) return true;
   if (/^(enter|escape|tab|shift|control|option|command|alt)\b/i.test(normalized)) return true;
-  if (/^(write to|saved|compose|mute|search|customize chat|chat members|mark as pending|more options)\b/i.test(normalized)) return true;
+  if (/^(write to|saved|compose|mute|search|customize chat|chat members|mark as pending|more options|say something about this)\b/i.test(normalized)) return true;
+  if (/^(older listings will be deleted|high net cars available)\b/i.test(normalized)) return true;
   if (/^\d{1,2}:\d{2}\s*(am|pm)$/i.test(normalized)) return true;
   if (/^marketplace\s+\$?[\d,]+/i.test(normalized)) return true;
   if (/^[a-z][\w .'-]{1,60}\s+-\s+(19|20)\d{2}\s+/i.test(normalized)) return true;
+  if (/^[A-Z][A-Za-zÀ-ÿ'’-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'’-]+){1,2}$/.test(value.trim())) return true;
   return false;
 }
 
@@ -113,6 +124,14 @@ function parseConversationMessage(value: unknown): ParsedConversationMessage | n
 
   if (!text || isUiConversationText(text)) return null;
   return { role, content: text.slice(0, 1000) };
+}
+
+function isDisplayMessage(message: { content?: string | null } | null | undefined): boolean {
+  return !!message?.content && !isUiConversationText(message.content);
+}
+
+function isBuyerDisplayMessage(message: { role?: string | null; content?: string | null } | null | undefined): boolean {
+  return message?.role === "user" && isDisplayMessage(message);
 }
 
 const ALPHA_RULES = `
@@ -305,6 +324,14 @@ router.post("/conversations/intake", async (req, res) => {
     latestParsed?.role === "user"
       ? latestParsed.content
       : [...parsedMsgs].reverse().find((msg) => msg.role === "user")?.content ?? "";
+  if (!latestBuyerMessage) {
+    req.log.info(
+      { externalThreadRef, extensionId: extensionId ?? null },
+      "Conversation intake skipped - no buyer message",
+    );
+    res.json({ skipped: true, reason: "no_buyer_message" });
+    return;
+  }
   const inbound = latestBuyerMessage;
   const language = detectLanguage(inbound + " " + (buyerName ?? ""));
   const parsedDownPayment = parseMoney(marketplaceDownPayment);
@@ -604,7 +631,10 @@ router.get("/conversations", async (req, res) => {
         .from(conversationMessagesTable)
         .where(eq(conversationMessagesTable.conversationId, c.id))
         .orderBy(desc(conversationMessagesTable.createdAt))
-        .limit(1);
+        .limit(20);
+      const displayMessages = messages.filter(isDisplayMessage);
+      const hasBuyerMessage = displayMessages.some(isBuyerDisplayMessage);
+      if (!hasBuyerMessage) return null;
 
       let vehicle = null;
       if (c.vehicleId) {
@@ -636,11 +666,11 @@ router.get("/conversations", async (req, res) => {
         listingUrl = listing?.externalUrl ?? null;
       }
 
-      return { ...c, lead: lead ?? null, lastMessage: messages[0] ?? null, vehicle, listingUrl };
+      return { ...c, lead: lead ?? null, lastMessage: displayMessages[0] ?? null, vehicle, listingUrl };
     }),
   );
 
-  res.json({ conversations: withLeads });
+  res.json({ conversations: withLeads.filter((c): c is NonNullable<typeof c> => !!c) });
 });
 
 router.get("/conversations/:id", async (req, res) => {
@@ -660,6 +690,7 @@ router.get("/conversations/:id", async (req, res) => {
     .from(conversationMessagesTable)
     .where(eq(conversationMessagesTable.conversationId, id))
     .orderBy(conversationMessagesTable.createdAt);
+  const displayMessages = messages.filter(isDisplayMessage);
 
   const [lead] = await db
     .select()
@@ -697,7 +728,7 @@ router.get("/conversations/:id", async (req, res) => {
     listingUrl = listing?.externalUrl ?? null;
   }
 
-  res.json({ conversation: conv, messages, lead: lead ?? null, vehicle, listingUrl });
+  res.json({ conversation: conv, messages: displayMessages, lead: lead ?? null, vehicle, listingUrl });
 });
 
 router.patch("/conversations/:id/status", async (req, res) => {

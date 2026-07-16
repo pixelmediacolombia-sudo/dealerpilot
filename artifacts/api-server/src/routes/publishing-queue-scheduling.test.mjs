@@ -510,6 +510,10 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(publisherFlowSource, /Read Chat & Send AI Reply/);
   assert.match(conversationsSource, /parseConversationMessage/);
   assert.match(conversationsSource, /UI_MESSAGE_TEXT/);
+  assert.match(conversationsSource, /send in messenger/);
+  assert.match(conversationsSource, /Conversation intake skipped - no buyer message/);
+  assert.match(conversationsSource, /messages\.filter\(isDisplayMessage\)/);
+  assert.match(conversationsSource, /hasBuyerMessage/);
   assert.match(conversationsSource, /hasNewBuyerMessage/);
   assert.match(conversationsSource, /shouldGenerateReply/);
   assert.match(conversationsSource, /latestParsed\?\.role === "user"/);
