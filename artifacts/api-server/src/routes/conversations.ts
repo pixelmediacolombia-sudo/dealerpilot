@@ -23,6 +23,7 @@ const STORE_PHONES: Record<string, string> = {
 };
 
 const DEFAULT_STORE_PHONE = "+1 703-763-4675";
+const SALES_AI_REPLY_TIMEOUT_MS = 3500;
 
 function resolveStorePhone(lotLocation?: string | null): string {
   if (!lotLocation) return DEFAULT_STORE_PHONE;
@@ -134,12 +135,35 @@ function isBuyerDisplayMessage(message: { role?: string | null; content?: string
   return message?.role === "user" && isDisplayMessage(message);
 }
 
+function parseTimestamp(value: unknown): Date | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function buildSafeFallbackReply(language: string, vehicleTitle?: string, storePhone: string = DEFAULT_STORE_PHONE): string {
+  const vehicle = vehicleTitle ?? (language === "es" ? "el vehiculo" : "the vehicle");
+  if (language === "es") {
+    return `Gracias por escribirnos sobre el ${vehicle}. Para confirmar disponibilidad y opciones, llama ahora al ${storePhone}. ¿Puedes llamar en este momento?`;
+  }
+  return `Thanks for asking about the ${vehicle}. To confirm availability and options, call us now at ${storePhone}. Are you able to call now?`;
+}
+
+type AiReplyResult = {
+  reply: string;
+  fallbackUsed: boolean;
+  fallbackReason: string | null;
+  aiStartedAt: Date;
+  aiCompletedAt: Date;
+  aiDurationMs: number;
+};
+
 const ALPHA_RULES = `
 You are a professional car sales representative for Alpha Motorsport, a used car dealership.
 
 PHONE-FIRST STRATEGY:
 Your goal is to get the buyer to call the store. Every reply must:
-1. Briefly confirm the vehicle is available (or address their question in 1 sentence)
+1. Answer the buyer's question directly without inventing availability, price, approval, or financing details
 2. Mention the specific vehicle by year, make, and model
 3. Direct them to call the store phone number provided
 4. Optionally ask if they want help scheduling a visit TODAY
@@ -151,6 +175,7 @@ Language rules:
 - If asked about financing details: say they can confirm all options by calling
 - NEVER say: guaranteed approval, everyone approved, bad credit, denied, rejected, disqualified
 - NEVER promise a loan or specific rate
+- NEVER invent price, down payment, availability, or financing terms; if missing, tell the buyer to call the store to confirm
 
 Reply format:
 - Keep it SHORT — 3–5 lines max including the phone number line
@@ -253,6 +278,59 @@ Write a short phone-first reply. Must include 📞 ${storePhone} on its own line
   return `Yes, it's available ✅\n\nFor the fastest details and financing options, call our store directly:\n\n📞 ${storePhone}\n\nMention you're asking about the ${vehicle} from Marketplace. Would you like to set up a time to see it today?`;
 }
 
+async function generateAiReplyWithFallback(
+  visibleMessages: string[],
+  currentMessage: string,
+  language: string,
+  vehicleTitle?: string,
+  vehicleType?: string,
+  publishedDownPayment?: number,
+  storePhone: string = DEFAULT_STORE_PHONE,
+): Promise<AiReplyResult> {
+  const aiStartedAt = new Date();
+  let fallbackReason: string | null = null;
+
+  try {
+    const reply = await Promise.race([
+      generateAiReply(
+        visibleMessages,
+        currentMessage,
+        language,
+        vehicleTitle,
+        vehicleType,
+        publishedDownPayment,
+        storePhone,
+      ),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("sales_ai_reply_timeout")), SALES_AI_REPLY_TIMEOUT_MS),
+      ),
+    ]);
+    const aiCompletedAt = new Date();
+    return {
+      reply,
+      fallbackUsed: false,
+      fallbackReason: null,
+      aiStartedAt,
+      aiCompletedAt,
+      aiDurationMs: aiCompletedAt.getTime() - aiStartedAt.getTime(),
+    };
+  } catch (err) {
+    fallbackReason = err instanceof Error && err.message === "sales_ai_reply_timeout"
+      ? "latency_timeout"
+      : "ai_error";
+  }
+
+  const aiCompletedAt = new Date();
+  return {
+    reply: buildSafeFallbackReply(language, vehicleTitle, storePhone),
+    fallbackUsed: true,
+    fallbackReason,
+    aiStartedAt,
+    aiCompletedAt,
+    aiDurationMs: aiCompletedAt.getTime() - aiStartedAt.getTime(),
+  };
+}
+
 async function syncMarketplaceListingMetrics(params: {
   vehicleId?: number | null;
   leadQuality?: string | null;
@@ -295,6 +373,10 @@ router.post("/conversations/intake", async (req, res) => {
     marketplaceDownPayment,
     marketplaceAskingPrice,
     vehicleType,
+    dealerId: _dealerId,
+    messageDetectedAt: rawMessageDetectedAt,
+    messageHash,
+    idempotencyKey,
     timestamp: _ts,
   } = req.body as {
     extensionId?: string;
@@ -308,8 +390,14 @@ router.post("/conversations/intake", async (req, res) => {
     marketplaceDownPayment?: number | string;
     marketplaceAskingPrice?: number | string;
     vehicleType?: string;
+    dealerId?: number | string;
+    messageDetectedAt?: string;
+    messageHash?: string;
+    idempotencyKey?: string;
     timestamp?: string;
   };
+  const backendReceivedAt = new Date();
+  const messageDetectedAt = parseTimestamp(rawMessageDetectedAt) ?? parseTimestamp(_ts) ?? backendReceivedAt;
 
   if (!externalThreadRef) {
     res.status(400).json({ error: "externalThreadRef required" });
@@ -326,10 +414,18 @@ router.post("/conversations/intake", async (req, res) => {
       : [...parsedMsgs].reverse().find((msg) => msg.role === "user")?.content ?? "";
   if (!latestBuyerMessage) {
     req.log.info(
-      { externalThreadRef, extensionId: extensionId ?? null },
+      { externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
       "Conversation intake skipped - no buyer message",
     );
-    res.json({ skipped: true, reason: "no_buyer_message" });
+    res.json({
+      skipped: true,
+      reason: "no_buyer_message",
+      timings: {
+        messageDetectedAt: messageDetectedAt.toISOString(),
+        backendReceivedAt: backendReceivedAt.toISOString(),
+        totalResponseMs: Date.now() - messageDetectedAt.getTime(),
+      },
+    });
     return;
   }
   const inbound = latestBuyerMessage;
@@ -482,11 +578,30 @@ router.post("/conversations/intake", async (req, res) => {
     }
   }
 
+  if (!hasNewBuyerMessage) {
+    req.log.info(
+      { conversationId, externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
+      "Conversation intake skipped - duplicate buyer message",
+    );
+    res.json({
+      skipped: true,
+      reason: "duplicate_buyer_message",
+      conversationId,
+      timings: {
+        messageDetectedAt: messageDetectedAt.toISOString(),
+        backendReceivedAt: backendReceivedAt.toISOString(),
+        totalResponseMs: Date.now() - messageDetectedAt.getTime(),
+      },
+    });
+    return;
+  }
+
   // Extract phone number if buyer included one in their message
   const phoneMatch = inbound.match(/\b(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})\b/);
   const extractedPhone = phoneMatch ? phoneMatch[1].replace(/[-.\s]/g, "-") : null;
 
   let suggestedReply: string | null = null;
+  let aiReplyResult: AiReplyResult | null = null;
   const latestExistingAssistant = existingMsgs.find((m) => m.role === "assistant");
   const shouldGenerateReply =
     !!inbound &&
@@ -495,7 +610,7 @@ router.post("/conversations/intake", async (req, res) => {
     latestExistingAssistant?.content.trim() !== inbound.trim();
 
   if (shouldGenerateReply) {
-    suggestedReply = await generateAiReply(
+    aiReplyResult = await generateAiReplyWithFallback(
       parsedMsgs.map((msg) => `${msg.role === "assistant" ? "Dealer" : "Buyer"}: ${msg.content}`),
       inbound,
       language,
@@ -504,6 +619,7 @@ router.post("/conversations/intake", async (req, res) => {
       parsedDownPayment,
       storePhone,
     );
+    suggestedReply = aiReplyResult.reply;
 
     await db.insert(conversationMessagesTable).values({
       conversationId,
@@ -599,11 +715,40 @@ router.post("/conversations/intake", async (req, res) => {
     leadQuality: resolvedLeadQuality,
   });
 
+  const backendRespondedAt = new Date();
+  const timings = {
+    messageDetectedAt: messageDetectedAt.toISOString(),
+    backendReceivedAt: backendReceivedAt.toISOString(),
+    aiStartedAt: aiReplyResult?.aiStartedAt.toISOString() ?? null,
+    aiCompletedAt: aiReplyResult?.aiCompletedAt.toISOString() ?? null,
+    backendRespondedAt: backendRespondedAt.toISOString(),
+    replySentAt: null,
+    aiDurationMs: aiReplyResult?.aiDurationMs ?? null,
+    totalResponseMs: backendRespondedAt.getTime() - messageDetectedAt.getTime(),
+  };
+
   req.log.info(
-    { conversationId, leadId, language, extensionId: extensionId ?? null },
+    {
+      conversationId,
+      leadId,
+      language,
+      extensionId: extensionId ?? null,
+      messageHash: messageHash ?? idempotencyKey ?? null,
+      fallbackUsed: aiReplyResult?.fallbackUsed ?? false,
+      fallbackReason: aiReplyResult?.fallbackReason ?? null,
+      timings,
+    },
     "Conversation intake processed",
   );
-  res.json({ conversationId, leadId, suggestedReply, language });
+  res.json({
+    conversationId,
+    leadId,
+    suggestedReply,
+    language,
+    fallbackUsed: aiReplyResult?.fallbackUsed ?? false,
+    fallbackReason: aiReplyResult?.fallbackReason ?? null,
+    timings,
+  });
 });
 
 router.get("/conversations", async (req, res) => {

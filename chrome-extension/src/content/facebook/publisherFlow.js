@@ -3936,6 +3936,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     async function captureConversation(options = {}) {
       const silent = !!options.silent;
       const automatic = !!options.automatic;
+      const messageDetectedAtMs = Date.now();
       setStatus("Reading conversation…");
 
       const { buyerName, messages, rawText } = scrapeConversation();
@@ -3966,6 +3967,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         externalThreadRef,
         sourceUrl: location.href,
         buyerName: buyerName || undefined,
+        dealerId: 1,
+        messageDetectedAt: new Date(messageDetectedAtMs).toISOString(),
         currentMessage,
         detectedVehicleTitle: context.vehicleTitle || undefined,
         detectedMarketplaceListingUrl: context.listingUrl || undefined,
@@ -3987,6 +3990,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         currentMessage,
         visibleMessages: payload.visibleMessages,
       });
+      payload.messageHash = captureHash;
+      payload.idempotencyKey = captureHash;
       const buyerReplyPending =
         silent &&
         messages.length > 0 &&
@@ -4003,11 +4008,25 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         setStatus("Failed: " + (res && res.error), "err");
         return;
       }
+      if (res.data?.skipped) {
+        lastMessengerCaptureHash = captureHash;
+        setStatus("No new buyer message to answer.", "muted");
+        return;
+      }
 
       lastMessengerCaptureHash = captureHash;
       lastReply = res.data.suggestedReply;
       const msgCount = messages.length || "?";
       const autoSent = silent ? await autoSendReply(lastReply, captureHash, messages) : false;
+      const replySentAt = autoSent ? new Date().toISOString() : null;
+      const totalResponseMs = Date.now() - messageDetectedAtMs;
+      console.log("[DealerPilot AI] Sales AI response timing", {
+        ...(res.data.timings || {}),
+        replySentAt,
+        totalResponseMs,
+        fallbackUsed: res.data.fallbackUsed === true,
+        fallbackReason: res.data.fallbackReason || null,
+      });
       if (!autoSent) {
         setStatus(`Reply ready (${msgCount} messages read). Lead saved to CRM.`, "ok");
       }

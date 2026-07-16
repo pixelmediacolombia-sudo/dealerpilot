@@ -512,6 +512,15 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(conversationsSource, /UI_MESSAGE_TEXT/);
   assert.match(conversationsSource, /send in messenger/);
   assert.match(conversationsSource, /Conversation intake skipped - no buyer message/);
+  assert.match(conversationsSource, /SALES_AI_REPLY_TIMEOUT_MS = 3500/);
+  assert.match(conversationsSource, /generateAiReplyWithFallback/);
+  assert.match(conversationsSource, /buildSafeFallbackReply/);
+  assert.match(conversationsSource, /duplicate_buyer_message/);
+  assert.match(conversationsSource, /messageDetectedAt/);
+  assert.match(conversationsSource, /backendReceivedAt/);
+  assert.match(conversationsSource, /aiStartedAt/);
+  assert.match(conversationsSource, /aiCompletedAt/);
+  assert.match(conversationsSource, /totalResponseMs/);
   assert.match(conversationsSource, /messages\.filter\(isDisplayMessage\)/);
   assert.match(conversationsSource, /hasBuyerMessage/);
   assert.match(conversationsSource, /hasNewBuyerMessage/);
@@ -524,6 +533,11 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(conversationsSource, /syncMarketplaceListingMetrics/);
   assert.match(conversationsSource, /messagesReceived/);
   assert.match(conversationsSource, /unreadMessages/);
+  assert.match(queueClientSource, /messageDetectedAt/);
+  assert.match(queueClientSource, /idempotencyKey/);
+  assert.match(publisherFlowSource, /Sales AI response timing/);
+  assert.match(publisherFlowSource, /messageHash/);
+  assert.match(publisherFlowSource, /res\.data\?\.skipped/);
 });
 
 test("Sales AI empty state shows connected Facebook readiness instead of reconnecting", () => {

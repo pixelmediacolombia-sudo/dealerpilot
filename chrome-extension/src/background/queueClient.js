@@ -1000,6 +1000,10 @@ const handlers = {
       marketplaceDownPayment: message.marketplaceDownPayment,
       marketplaceAskingPrice: message.marketplaceAskingPrice,
       vehicleType: message.vehicleType,
+      dealerId: message.dealerId || 1,
+      messageDetectedAt: message.messageDetectedAt,
+      messageHash: message.messageHash,
+      idempotencyKey: message.idempotencyKey,
       timestamp: new Date().toISOString(),
     });
   },

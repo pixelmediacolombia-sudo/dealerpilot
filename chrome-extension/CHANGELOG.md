@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.59
+
+**Fixed**
+- Adds Marketplace Sales AI v1.0 timing/idempotency metadata for real buyer-message replies and skips duplicate/no-op Messenger intake responses.
+
+---
+
 ## v1.3.58
 
 **Fixed**
