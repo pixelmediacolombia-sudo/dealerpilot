@@ -1,12 +1,18 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.58
+
+**Fixed**
+- Stops Messenger inbox previews from being imported as CRM conversations; automatic capture now only processes an open thread with a new buyer message.
+
+---
+
 ## v1.3.57
 
 **Fixed**
 - Publishes only DealerPilot Photo Director's final 10 Marketplace photos.
 - Polls DealerPilot sold-listing feedback and opens the matching Facebook Marketplace listing.
 - Attempts to mark matching Marketplace item pages as sold so sold inventory is not republished.
-- Stops Messenger inbox previews from being imported as CRM conversations; automatic capture now only processes an open thread with a new buyer message.
 
 ---
 
