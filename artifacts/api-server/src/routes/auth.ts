@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import crypto from "crypto";
 import { z } from "zod/v4";
 import { pool } from "@workspace/db";
@@ -7,10 +7,13 @@ const router: IRouter = Router();
 
 const ALPHA_DEALER_ID = 1;
 const ALPHA_USERNAME = "alpha.manassas";
-const ALPHA_PASSWORD = "Alpha2026";
+const ALPHA_INITIAL_PASSWORD = process.env.ALPHA_INITIAL_PASSWORD ?? "Alpha2026";
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const MAX_LOGIN_FAILURES = 5;
+const LOGIN_LOCK_MS = 15 * 60 * 1000;
 
-const sessions = new Map<string, { userId: number; expiresAt: number }>();
+const sessions = new Map<string, { userId: number; expiresAt: number; issuedAt: number }>();
+const loginFailures = new Map<string, { count: number; lockedUntil: number }>();
 let authSchemaReady: Promise<void> | null = null;
 
 type DealerUserRow = {
@@ -21,6 +24,9 @@ type DealerUserRow = {
   display_name: string;
   role: string;
   status: string;
+  failed_login_count: number | null;
+  locked_until: Date | null;
+  password_changed_at: Date | null;
 };
 
 function hashPassword(password: string, salt = crypto.randomBytes(16).toString("hex")) {
@@ -50,8 +56,27 @@ async function ensureAuthSchema() {
         role text not null default 'admin',
         status text not null default 'Active',
         last_login_at timestamptz,
+        failed_login_count integer not null default 0,
+        locked_until timestamptz,
+        password_changed_at timestamptz,
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
+      )
+    `);
+    await pool.query("alter table dealer_users add column if not exists failed_login_count integer not null default 0");
+    await pool.query("alter table dealer_users add column if not exists locked_until timestamptz");
+    await pool.query("alter table dealer_users add column if not exists password_changed_at timestamptz");
+    await pool.query(`
+      create table if not exists auth_events (
+        id serial primary key,
+        user_id integer references dealer_users(id),
+        username text,
+        event_type text not null,
+        success boolean not null default false,
+        ip_address text,
+        user_agent text,
+        details jsonb not null default '{}'::jsonb,
+        created_at timestamptz not null default now()
       )
     `);
   })().catch((err) => {
@@ -73,18 +98,17 @@ async function ensureAlphaUser() {
   const existing = existingResult.rows[0];
 
   if (existing) {
-    if (!verifyPassword(ALPHA_PASSWORD, existing.password_hash) || existing.dealer_id !== ALPHA_DEALER_ID) {
+    if (existing.dealer_id !== ALPHA_DEALER_ID || existing.status !== "Active") {
       const updated = await pool.query<DealerUserRow>(
         `update dealer_users
          set dealer_id = $1,
-             password_hash = $2,
              display_name = coalesce(nullif(display_name, ''), 'Alpha Manassas'),
              role = coalesce(nullif(role, ''), 'admin'),
              status = 'Active',
              updated_at = now()
-         where id = $3
+         where id = $2
          returning *`,
-        [ALPHA_DEALER_ID, hashPassword(ALPHA_PASSWORD), existing.id],
+        [ALPHA_DEALER_ID, existing.id],
       );
       return updated.rows[0]!;
     }
@@ -95,7 +119,7 @@ async function ensureAlphaUser() {
     `insert into dealer_users (dealer_id, username, password_hash, display_name, role, status)
      values ($1, $2, $3, 'Alpha Manassas', 'admin', 'Active')
      returning *`,
-    [ALPHA_DEALER_ID, ALPHA_USERNAME, hashPassword(ALPHA_PASSWORD)],
+    [ALPHA_DEALER_ID, ALPHA_USERNAME, hashPassword(ALPHA_INITIAL_PASSWORD)],
   );
   return created.rows[0]!;
 }
@@ -111,9 +135,123 @@ function safeUser(user: DealerUserRow) {
   };
 }
 
+function clientIp(req: Request) {
+  return String(req.headers["x-forwarded-for"] ?? req.ip ?? "").split(",")[0]?.trim() || "unknown";
+}
+
+function failureKey(req: Request, username: string) {
+  return `${clientIp(req)}:${username}`;
+}
+
+function passwordPolicyErrors(password: string, username: string) {
+  const errors: string[] = [];
+  const lowered = password.toLowerCase();
+  const normalizedUsername = username.toLowerCase();
+  if (password.length < 14) errors.push("Use at least 14 characters.");
+  if (!/[a-z]/.test(password)) errors.push("Add a lowercase letter.");
+  if (!/[A-Z]/.test(password)) errors.push("Add an uppercase letter.");
+  if (!/[0-9]/.test(password)) errors.push("Add a number.");
+  if (!/[^A-Za-z0-9]/.test(password)) errors.push("Add a symbol.");
+  if (normalizedUsername && lowered.includes(normalizedUsername)) {
+    errors.push("Do not include the username.");
+  }
+  if (/dealerpilot|alpha|manassas|password|facebook|marketplace/i.test(password)) {
+    errors.push("Avoid company, dealer, or common password words.");
+  }
+  return errors;
+}
+
+async function auditAuthEvent(
+  req: Request,
+  eventType: string,
+  success: boolean,
+  username: string,
+  userId: number | null,
+  details: Record<string, unknown> = {},
+) {
+  await ensureAuthSchema();
+  await pool.query(
+    `insert into auth_events (user_id, username, event_type, success, ip_address, user_agent, details)
+     values ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+    [
+      userId,
+      username || null,
+      eventType,
+      success,
+      clientIp(req),
+      req.get("user-agent") ?? null,
+      JSON.stringify(details),
+    ],
+  );
+}
+
+function removeUserSessions(userId: number) {
+  for (const [token, session] of sessions.entries()) {
+    if (session.userId === userId) sessions.delete(token);
+  }
+}
+
+async function recordLoginFailure(req: Request, username: string, user: DealerUserRow | null) {
+  const key = failureKey(req, username);
+  const current = loginFailures.get(key);
+  const count = (current?.count ?? 0) + 1;
+  const lockedUntil = count >= MAX_LOGIN_FAILURES ? Date.now() + LOGIN_LOCK_MS : 0;
+  loginFailures.set(key, { count, lockedUntil });
+
+  if (user) {
+    await pool.query(
+      `update dealer_users
+       set failed_login_count = $1,
+           locked_until = case when $1 >= $2 then now() + ($3::text || ' milliseconds')::interval else locked_until end,
+           updated_at = now()
+       where id = $4`,
+      [count, MAX_LOGIN_FAILURES, LOGIN_LOCK_MS, user.id],
+    );
+  }
+
+  await auditAuthEvent(req, "login_failed", false, username, user?.id ?? null, {
+    count,
+    locked: lockedUntil > 0,
+  });
+}
+
+async function authenticatedUser(req: Request) {
+  await ensureAlphaUser();
+  const auth = req.get("authorization") ?? "";
+  const token = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : "";
+  const session = token ? sessions.get(token) : null;
+  if (!session || session.expiresAt <= Date.now()) {
+    if (token) sessions.delete(token);
+    return null;
+  }
+
+  const userResult = await pool.query<DealerUserRow>(
+    "select * from dealer_users where id = $1 limit 1",
+    [session.userId],
+  );
+  const user = userResult.rows[0];
+  if (!user || user.status !== "Active") {
+    sessions.delete(token);
+    return null;
+  }
+
+  const passwordChangedAt = user.password_changed_at?.getTime() ?? 0;
+  if (passwordChangedAt > session.issuedAt) {
+    sessions.delete(token);
+    return null;
+  }
+
+  return { token, session, user };
+}
+
 const LoginBody = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
+});
+
+const ChangePasswordBody = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(1),
 });
 
 router.post("/auth/login", async (req, res) => {
@@ -126,56 +264,113 @@ router.post("/auth/login", async (req, res) => {
   await ensureAlphaUser();
 
   const username = parsed.data.username.trim().toLowerCase();
+  const memoryLock = loginFailures.get(failureKey(req, username));
+  if (memoryLock?.lockedUntil && memoryLock.lockedUntil > Date.now()) {
+    await auditAuthEvent(req, "login_locked", false, username, null, { source: "memory" });
+    res.status(429).json({ error: "Too many failed attempts. Try again later." });
+    return;
+  }
+
   const userResult = await pool.query<DealerUserRow>(
     "select * from dealer_users where username = $1 limit 1",
     [username],
   );
   const user = userResult.rows[0];
+  if (user?.locked_until && user.locked_until.getTime() > Date.now()) {
+    await auditAuthEvent(req, "login_locked", false, username, user.id, { source: "database" });
+    res.status(429).json({ error: "Too many failed attempts. Try again later." });
+    return;
+  }
 
   if (!user || user.status !== "Active" || !verifyPassword(parsed.data.password, user.password_hash)) {
+    await recordLoginFailure(req, username, user ?? null);
     res.status(401).json({ error: "Invalid username or password" });
     return;
   }
 
-  await pool.query("update dealer_users set last_login_at = now(), updated_at = now() where id = $1", [user.id]);
+  await pool.query(
+    "update dealer_users set last_login_at = now(), failed_login_count = 0, locked_until = null, updated_at = now() where id = $1",
+    [user.id],
+  );
+  loginFailures.delete(failureKey(req, username));
 
   const token = crypto.randomBytes(32).toString("hex");
+  const issuedAt = Date.now();
   const expiresAt = Date.now() + SESSION_TTL_MS;
-  sessions.set(token, { userId: user.id, expiresAt });
+  sessions.set(token, { userId: user.id, expiresAt, issuedAt });
+  await auditAuthEvent(req, "login_success", true, username, user.id);
 
   res.json({ token, expiresAt: new Date(expiresAt).toISOString(), user: safeUser(user) });
 });
 
 router.get("/auth/me", async (req, res) => {
-  await ensureAlphaUser();
+  const authContext = await authenticatedUser(req);
+  if (!authContext) {
+    res.status(401).json({ user: null });
+    return;
+  }
+
+  res.json({
+    user: safeUser(authContext.user),
+    expiresAt: new Date(authContext.session.expiresAt).toISOString(),
+  });
+});
+
+router.post("/auth/change-password", async (req, res) => {
+  const authContext = await authenticatedUser(req);
+  if (!authContext) {
+    res.status(401).json({ error: "Session expired" });
+    return;
+  }
+
+  const parsed = ChangePasswordBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "currentPassword and newPassword are required" });
+    return;
+  }
+
+  const { user } = authContext;
+  if (!verifyPassword(parsed.data.currentPassword, user.password_hash)) {
+    await auditAuthEvent(req, "password_change_failed", false, user.username, user.id, { reason: "invalid_current" });
+    res.status(401).json({ error: "Current password is incorrect" });
+    return;
+  }
+
+  if (verifyPassword(parsed.data.newPassword, user.password_hash)) {
+    res.status(400).json({ error: "New password must be different from the current password" });
+    return;
+  }
+
+  const policyErrors = passwordPolicyErrors(parsed.data.newPassword, user.username);
+  if (policyErrors.length > 0) {
+    res.status(400).json({ error: "Password is not strong enough", details: policyErrors });
+    return;
+  }
+
+  await pool.query(
+    `update dealer_users
+     set password_hash = $1,
+         password_changed_at = now(),
+         failed_login_count = 0,
+         locked_until = null,
+         updated_at = now()
+     where id = $2`,
+    [hashPassword(parsed.data.newPassword), user.id],
+  );
+  removeUserSessions(user.id);
+  await auditAuthEvent(req, "password_changed", true, user.username, user.id);
+
+  res.json({ ok: true, message: "Password changed. Please sign in again." });
+});
+
+router.post("/auth/logout", async (req, res) => {
   const auth = req.get("authorization") ?? "";
   const token = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : "";
   const session = token ? sessions.get(token) : null;
-  if (!session || session.expiresAt <= Date.now()) {
-    if (token) sessions.delete(token);
-    res.status(401).json({ user: null });
-    return;
-  }
-
-  const userResult = await pool.query<DealerUserRow>(
-    "select * from dealer_users where id = $1 limit 1",
-    [session.userId],
-  );
-  const user = userResult.rows[0];
-
-  if (!user || user.status !== "Active") {
+  if (token) {
     sessions.delete(token);
-    res.status(401).json({ user: null });
-    return;
+    if (session) await auditAuthEvent(req, "logout", true, "", session.userId);
   }
-
-  res.json({ user: safeUser(user), expiresAt: new Date(session.expiresAt).toISOString() });
-});
-
-router.post("/auth/logout", (req, res) => {
-  const auth = req.get("authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : "";
-  if (token) sessions.delete(token);
   res.json({ ok: true });
 });
 

@@ -237,10 +237,19 @@ test("cancelled and dismissed batches do not block the auto-publish frequency ga
 
 test("Alpha auth seeds the requested login and logout removes the access token in the UI", () => {
   assert.match(authSource, /const ALPHA_USERNAME = "alpha\.manassas"/);
-  assert.match(authSource, /const ALPHA_PASSWORD = "Alpha2026"/);
+  assert.match(authSource, /const ALPHA_INITIAL_PASSWORD = process\.env\.ALPHA_INITIAL_PASSWORD/);
   assert.match(authSource, /create table if not exists dealer_users/);
+  assert.match(authSource, /create table if not exists auth_events/);
   assert.match(authSource, /dealer_id integer not null references dealers\(id\)/);
+  assert.match(authSource, /router\.post\("\/auth\/change-password"/);
+  assert.match(authSource, /passwordPolicyErrors/);
+  assert.match(authSource, /removeUserSessions\(user\.id\)/);
+  assert.match(authSource, /MAX_LOGIN_FAILURES = 5/);
+  assert.match(authSource, /login_failed/);
+  assert.doesNotMatch(authSource, /verifyPassword\(ALPHA_INITIAL_PASSWORD, existing\.password_hash\)/);
   assert.match(authGateSource, /const TOKEN_KEY = "dealerpilot\.sessionToken"/);
+  assert.match(authGateSource, /ChangePasswordPanel/);
+  assert.match(authGateSource, /\/auth\/change-password/);
   assert.match(authGateSource, /authFetch\("\/auth\/logout", token/);
   assert.match(authGateSource, /localStorage\.removeItem\(TOKEN_KEY\)/);
   assert.match(authGateSource, /Log out/);
