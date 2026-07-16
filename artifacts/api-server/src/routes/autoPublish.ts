@@ -41,6 +41,10 @@ import { getInitialBatchTiming } from "../publishing/batchProgress";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 import { publishingWorker } from "../workers/publishing.worker";
 import { runWorkerOnce } from "../workers/scheduler";
+import {
+  ensurePhotoDirectorReadyForPublish,
+  photoDirectorPublishBlockReason,
+} from "../photo/publishReadiness";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
 // Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
@@ -511,6 +515,12 @@ router.post("/auto-publish/batches", async (req, res) => {
     // Market Agent duplicate-listing conflict — blocked unless explicitly overridden.
     if (validation.eligible && duplicateConflictIds.has(v.id) && !gmOverrideSet.has(v.id)) {
       validation = { eligible: false, reason: "Market Agent flagged a duplicate-listing conflict" };
+    }
+    if (validation.eligible) {
+      const photoReadiness = await ensurePhotoDirectorReadyForPublish(v, req.log);
+      if (!photoReadiness.ready) {
+        validation = { eligible: false, reason: photoReadiness.reason };
+      }
     }
 
     const neverPublished = !listing || listing.status !== "Published";
@@ -1248,6 +1258,12 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     }
     if (validation.eligible && duplicateConflictIds.has(v.id)) {
       validation = { eligible: false, reason: "Market Agent flagged a duplicate-listing conflict" };
+    }
+    if (validation.eligible) {
+      const photoBlockReason = photoDirectorPublishBlockReason(v);
+      if (photoBlockReason) {
+        validation = { eligible: false, reason: photoBlockReason };
+      }
     }
 
     const neverPublished = !listing || listing.status !== "Published";

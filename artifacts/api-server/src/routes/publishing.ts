@@ -31,12 +31,32 @@ import {
   moveJobToNeedsReviewWithoutListingUrl,
   reconcileBatchProgress,
 } from "../features/publishing/infrastructure/publishingRepository";
+import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
 // Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
 const DEALER_ID = 1;
 
 const router: IRouter = Router();
+
+async function deferPublishingJobForPhotoDirector(
+  jobId: number,
+  reason: string,
+): Promise<void> {
+  await db
+    .update(publishingJobsTable)
+    .set({
+      status: "Scheduled",
+      scheduledAt: new Date(Date.now() + 10 * 60_000),
+      currentStep: "Waiting for Photo Director",
+      progressPercent: 0,
+      failedReason: reason,
+      assignedExtensionId: null,
+      assignedAt: null,
+      claimedByExtension: null,
+    })
+    .where(eq(publishingJobsTable.id, jobId));
+}
 
 // GET /publishing/jobs — full queue for the UI.
 router.get("/publishing/jobs", async (req, res) => {
@@ -162,6 +182,21 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
     res.json({ job: null });
     return;
   }
+  const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, row.vehicleId));
+  if (!vehicle) {
+    res.status(404).json({ error: "Vehicle not found for assigned job", code: "VEHICLE_NOT_FOUND" });
+    return;
+  }
+  const photoReadiness = await ensurePhotoDirectorReadyForPublish(vehicle, req.log);
+  if (!photoReadiness.ready) {
+    await deferPublishingJobForPhotoDirector(row.id, photoReadiness.reason);
+    req.log.info(
+      { jobId: row.id, vehicleId: row.vehicleId, code: photoReadiness.code, photoJobId: photoReadiness.photoJobId ?? null },
+      "Assigned publishing job deferred until Photo Director is ready",
+    );
+    res.json({ job: null, deferred: true, code: photoReadiness.code, reason: photoReadiness.reason });
+    return;
+  }
   const [enriched] = await enrich([row]);
   res.json({ job: enriched });
 });
@@ -196,6 +231,21 @@ router.get("/publishing/jobs/next", async (req, res) => {
     .limit(1);
   if (!row) {
     res.json({ job: null });
+    return;
+  }
+  const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, row.vehicleId));
+  if (!vehicle) {
+    res.status(404).json({ error: "Vehicle not found for job", code: "VEHICLE_NOT_FOUND" });
+    return;
+  }
+  const photoReadiness = await ensurePhotoDirectorReadyForPublish(vehicle, req.log);
+  if (!photoReadiness.ready) {
+    await deferPublishingJobForPhotoDirector(row.id, photoReadiness.reason);
+    req.log.info(
+      { jobId: row.id, vehicleId: row.vehicleId, code: photoReadiness.code, photoJobId: photoReadiness.photoJobId ?? null },
+      "Next publishing job deferred until Photo Director is ready",
+    );
+    res.json({ job: null, deferred: true, code: photoReadiness.code, reason: photoReadiness.reason });
     return;
   }
   const [enriched] = await enrich([row]);
@@ -278,6 +328,23 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     }
 
     // ── Lot location guard ────────────────────────────────────────────────────
+    const photoReadiness = await ensurePhotoDirectorReadyForPublish(vehicle, req.log);
+    if (!photoReadiness.ready) {
+      await deferPublishingJobForPhotoDirector(job.id, photoReadiness.reason);
+      req.log.info(
+        { jobId: job.id, vehicleId: vehicle.id, code: photoReadiness.code, photoJobId: photoReadiness.photoJobId ?? null },
+        "Publishing payload blocked until Photo Director is ready",
+      );
+      res.status(409).json({
+        error: photoReadiness.reason,
+        code: photoReadiness.code,
+        jobId: job.id,
+        vehicleId: vehicle.id,
+        photoJobId: photoReadiness.photoJobId ?? null,
+      });
+      return;
+    }
+
     const lotCity = vehicle.lotLocation ? LOT_CITY_MAP[vehicle.lotLocation] : undefined;
     if (!lotCity) {
       req.log.warn(
@@ -1046,7 +1113,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
   // before dispatching Controlled Mode jobs immediately.
   const gmBlocked: { vehicleId: number; recommendation: string; confidence: number }[] = [];
   const otherBlocked: { vehicleId: number; code: string; reason: string }[] = [];
-  const eligible = vehicles.filter((v) => {
+  let eligible = vehicles.filter((v) => {
     if (alreadyQueued.has(v.id)) return false;
 
     if (["Published", "Sold/Removed", "Sold", "Removed", "Archived"].includes(v.status)) {
@@ -1115,10 +1182,30 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
     req.log.warn({ otherBlocked }, "Bulk-schedule blocked vehicles due to lot/duplicate/extension guardrails");
   }
 
-  const skipped = vehicles.length - eligible.length - gmBlocked.length - otherBlocked.length;
+  const photoBlocked: { vehicleId: number; code: string; reason: string; photoJobId: number | null }[] = [];
+  const photoReady: typeof eligible = [];
+  for (const vehicle of eligible) {
+    const photoReadiness = await ensurePhotoDirectorReadyForPublish(vehicle, req.log);
+    if (photoReadiness.ready) {
+      photoReady.push(vehicle);
+      continue;
+    }
+    photoBlocked.push({
+      vehicleId: vehicle.id,
+      code: photoReadiness.code,
+      reason: photoReadiness.reason,
+      photoJobId: photoReadiness.photoJobId ?? null,
+    });
+  }
+  eligible = photoReady;
+  if (photoBlocked.length > 0) {
+    req.log.info({ photoBlocked }, "Bulk-schedule deferred vehicles until Photo Director is ready");
+  }
+
+  const skipped = vehicles.length - eligible.length - gmBlocked.length - otherBlocked.length - photoBlocked.length;
 
   if (eligible.length === 0) {
-    res.status(202).json({ enqueued: 0, skipped, gmBlocked, otherBlocked });
+    res.status(202).json({ enqueued: 0, skipped, gmBlocked, otherBlocked, photoBlocked });
     return;
   }
 
@@ -1180,7 +1267,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
     { vehicleIds: eligible.map((v) => v.id), enqueued: enqueued.length, skipped },
     "Bulk publishing jobs scheduled",
   );
-  res.status(202).json({ enqueued: enqueued.length, skipped });
+  res.status(202).json({ enqueued: enqueued.length, skipped, photoBlocked });
 });
 
 // ── Publish Now ────────────────────────────────────────────────────────────────
@@ -1262,6 +1349,24 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
   if (!guardrail.ok) {
     req.log.warn({ vehicleId, code: guardrail.code, reason: guardrail.reason }, "Publish Now blocked by guardrail");
     res.status(422).json({ error: guardrail.reason, code: guardrail.code });
+    return;
+  }
+
+  const photoReadiness = await ensurePhotoDirectorReadyForPublish(vehicle, req.log);
+  if (!photoReadiness.ready) {
+    req.log.info(
+      { vehicleId, code: photoReadiness.code, photoJobId: photoReadiness.photoJobId ?? null },
+      "Publish Now deferred until Photo Director is ready",
+    );
+    res.status(202).json({
+      jobId: null,
+      job: null,
+      deferred: true,
+      queuedPhotoDirector: photoReadiness.code === "PHOTO_DIRECTOR_QUEUED",
+      code: photoReadiness.code,
+      message: photoReadiness.reason,
+      photoJobId: photoReadiness.photoJobId ?? null,
+    });
     return;
   }
 

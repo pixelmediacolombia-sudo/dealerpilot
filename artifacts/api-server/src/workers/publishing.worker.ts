@@ -46,11 +46,28 @@ import {
   resolvePublishMode,
 } from "../publishing/controlledMode";
 import { getInitialBatchTiming } from "../publishing/batchProgress";
+import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 
 const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const DEALER_ID = 1;
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // heartbeat within last 5 minutes = online
 const MAX_ASSIGNMENTS_PER_RUN = 1;
+
+async function deferJobForPhotoDirector(jobId: number, reason: string) {
+  await db
+    .update(publishingJobsTable)
+    .set({
+      status: "Scheduled",
+      scheduledAt: new Date(Date.now() + 10 * 60_000),
+      currentStep: "Waiting for Photo Director",
+      progressPercent: 0,
+      failedReason: reason,
+      assignedExtensionId: null,
+      assignedAt: null,
+      claimedByExtension: null,
+    })
+    .where(eq(publishingJobsTable.id, jobId));
+}
 function newYorkDateKey(date: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/New_York",
@@ -258,7 +275,7 @@ async function maybeCreateAutomaticBatch(
     if (!versionByVehicle.has(version.vehicleId)) versionByVehicle.set(version.vehicleId, version);
   }
 
-  const selected = vehicles
+  const selectedCandidates = vehicles
     .map((vehicle) => {
       const images = imagesByVehicle.get(vehicle.id) ?? [];
       const listing = listingByVehicle.get(vehicle.id);
@@ -285,11 +302,24 @@ async function maybeCreateAutomaticBatch(
       };
     })
     .filter((entry) => entry != null)
-    .sort((a, b) => b.priorityScore - a.priorityScore)
-    .slice(0, Math.min(settings.vehiclesPerBatch, remainingToday));
+    .sort((a, b) => b.priorityScore - a.priorityScore);
+
+  const selected: typeof selectedCandidates = [];
+  for (const entry of selectedCandidates) {
+    if (selected.length >= Math.min(settings.vehiclesPerBatch, remainingToday)) break;
+    const photoReadiness = await ensurePhotoDirectorReadyForPublish(entry.vehicle, log);
+    if (!photoReadiness.ready) {
+      log.info(
+        { vehicleId: entry.vehicle.id, code: photoReadiness.code, photoJobId: photoReadiness.photoJobId ?? null },
+        "Publishing worker deferred auto-batch candidate until Photo Director is ready",
+      );
+      continue;
+    }
+    selected.push(entry);
+  }
 
   if (selected.length === 0) {
-    return { created: 0, summary: "No vehicles passed auto-publish guardrails" };
+    return { created: 0, summary: "No vehicles passed auto-publish guardrails or Photo Director readiness" };
   }
 
   const batchCountResult = await db
@@ -387,7 +417,7 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
   const candidates = await db
     .select({
       job: publishingJobsTable,
-      lotLocation: vehiclesTable.lotLocation,
+      vehicle: vehiclesTable,
     })
     .from(publishingJobsTable)
     .innerJoin(vehiclesTable, eq(vehiclesTable.id, publishingJobsTable.vehicleId))
@@ -413,11 +443,12 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
   let skippedUnknownLot = 0;
   let skippedDuplicate = 0;
   let skippedGm = 0;
+  let skippedPhotoDirector = 0;
 
-  for (const { job, lotLocation } of candidates) {
+  for (const { job, vehicle } of candidates) {
     if (assigned >= MAX_ASSIGNMENTS_PER_RUN) break;
 
-    if (!lotLocation) {
+    if (!vehicle.lotLocation) {
       skippedUnknownLot++;
       continue;
     }
@@ -435,6 +466,17 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
         skippedDuplicate++;
         continue;
       }
+    }
+
+    const photoReadiness = await ensurePhotoDirectorReadyForPublish(vehicle, log);
+    if (!photoReadiness.ready) {
+      skippedPhotoDirector++;
+      await deferJobForPhotoDirector(job.id, photoReadiness.reason);
+      log.info(
+        { jobId: job.id, vehicleId: vehicle.id, code: photoReadiness.code, photoJobId: photoReadiness.photoJobId ?? null },
+        "Publishing worker deferred job until Photo Director is ready",
+      );
+      continue;
     }
 
     const [updated] = await db
@@ -461,15 +503,15 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
   if (assigned === 0) {
     const autoSummary = autoBatch.summary ? `${autoBatch.summary}; ` : "";
     return {
-      summary: `${autoSummary}No jobs assigned - ${skippedUnknownLot} unknown lot, ${skippedDuplicate} duplicate conflicts, ${skippedGm} GM held`,
+      summary: `${autoSummary}No jobs assigned - ${skippedUnknownLot} unknown lot, ${skippedDuplicate} duplicate conflicts, ${skippedGm} GM held, ${skippedPhotoDirector} waiting for Photo Director`,
       skipped: true,
-      detail: { autoCreated: autoBatch.created, skippedUnknownLot, skippedDuplicate, skippedGm },
+      detail: { autoCreated: autoBatch.created, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
     };
   }
 
   return {
     summary: `${autoBatch.summary ? `${autoBatch.summary}; ` : ""}Assigned ${assigned} publishing job${assigned === 1 ? "" : "s"} to extension "${extension.id}"`,
-    detail: { autoCreated: autoBatch.created, assigned, skippedUnknownLot, skippedDuplicate, skippedGm },
+    detail: { autoCreated: autoBatch.created, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
   };
 }
 

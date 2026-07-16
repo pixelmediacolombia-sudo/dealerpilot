@@ -63,6 +63,10 @@ const photoAutoEnqueueSource = readFileSync(
   new URL("../photo/autoEnqueue.ts", import.meta.url),
   "utf8",
 );
+const photoPublishReadinessSource = readFileSync(
+  new URL("../photo/publishReadiness.ts", import.meta.url),
+  "utf8",
+);
 const photoQueueWorkerSource = readFileSync(
   new URL("../workers/photo.worker.ts", import.meta.url),
   "utf8",
@@ -301,6 +305,24 @@ test("publishing payload uses approved Photo Director handoff when available", (
   assert.match(routeSource, /const images = await getVehiclePhotos\(/);
   assert.match(publisherFlowSource, /const DEFAULT_MAX = 10/);
   assert.doesNotMatch(publisherFlowSource, /const DEFAULT_MAX = 20/);
+});
+
+test("publishing jobs wait for Photo Director before reaching Marketplace", () => {
+  assert.match(photoPublishReadinessSource, /export async function ensurePhotoDirectorReadyForPublish/);
+  assert.match(photoPublishReadinessSource, /isPhotoDirectorReadyForPublish/);
+  assert.match(photoPublishReadinessSource, /PHOTO_DIRECTOR_WAITING_REASON/);
+  assert.match(photoPublishReadinessSource, /presetVersionForMode\("balanced", \[\], \[\], \[\], "balanced"\)/);
+  assert.match(photoPublishReadinessSource, /\.insert\(aiPhotoJobsTable\)/);
+  assert.match(photoPublishReadinessSource, /priority: -5/);
+  assert.match(routeSource, /deferPublishingJobForPhotoDirector/);
+  assert.match(routeSource, /Publish Now deferred until Photo Director is ready/);
+  assert.match(routeSource, /Publishing payload blocked until Photo Director is ready/);
+  assert.match(routeSource, /Bulk-schedule deferred vehicles until Photo Director is ready/);
+  assert.match(autoPublishSource, /ensurePhotoDirectorReadyForPublish\(v, req\.log\)/);
+  assert.match(autoPublishSource, /photoDirectorPublishBlockReason\(v\)/);
+  assert.match(workerSource, /ensurePhotoDirectorReadyForPublish\(entry\.vehicle, log\)/);
+  assert.match(workerSource, /deferJobForPhotoDirector/);
+  assert.match(workerSource, /Publishing worker deferred job until Photo Director is ready/);
 });
 
 test("Marketplace live-list reconciliation can keep confirmed vehicles and demote missing live rows", () => {
