@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { PHOTO_CLASSIFICATIONS } from "./providers/types";
 
 export type PhotoProcessingMode = "fidelity-first" | "balanced" | "strong-restoration";
+export type PresetPhotoDirectorMode = "economy" | "balanced" | "premium";
 export type QualityImprovementClass =
   | "Strong Improvement"
   | "Moderate Improvement"
@@ -33,7 +34,7 @@ export interface ProviderTrace {
   processing_mode: PhotoProcessingMode;
 }
 
-export const ESTIMATED_PROVIDER_RESTORATION_COST_USD = 0.08;
+export const ESTIMATED_PROVIDER_RESTORATION_COST_USD = 0.055;
 
 export function normalizePhotoProcessingMode(value: unknown): PhotoProcessingMode {
   const raw = String(value ?? "").toLowerCase().trim();
@@ -47,11 +48,13 @@ export function presetVersionForMode(
   selectedPhotoIds: number[] = [],
   aiRestorationPhotoIds: number[] = selectedPhotoIds,
   localEnhancementPhotoIds: number[] = [],
+  photoDirectorMode?: PresetPhotoDirectorMode,
 ): string {
   const suffix = selectedPhotoIds.length > 0 ? `:ids=${selectedPhotoIds.join(",")}` : "";
   const aiSuffix = aiRestorationPhotoIds.length > 0 ? `:ai=${aiRestorationPhotoIds.join(",")}` : "";
   const localSuffix = localEnhancementPhotoIds.length > 0 ? `:local=${localEnhancementPhotoIds.join(",")}` : "";
-  return `v1:${mode}${suffix}${aiSuffix}${localSuffix}`;
+  const directorSuffix = photoDirectorMode ? `:director=${photoDirectorMode}` : "";
+  return `v1:${mode}${directorSuffix}${suffix}${aiSuffix}${localSuffix}`;
 }
 
 export function processingModeFromPresetVersion(value: string | null | undefined): PhotoProcessingMode {
@@ -69,6 +72,14 @@ export function aiRestorationPhotoIdsFromPresetVersion(value: string | null | un
 
 export function localEnhancementPhotoIdsFromPresetVersion(value: string | null | undefined): number[] {
   return photoIdsFromPresetPart(value, "local");
+}
+
+export function photoDirectorModeFromPresetVersion(value: string | null | undefined): PresetPhotoDirectorMode | null {
+  const parts = String(value ?? "").split(":");
+  const modePart = parts.find((part) => part.startsWith("director="));
+  const raw = modePart?.slice("director=".length).toLowerCase().trim();
+  if (raw === "economy" || raw === "balanced" || raw === "premium") return raw;
+  return null;
 }
 
 function photoIdsFromPresetPart(value: string | null | undefined, key: string): number[] {

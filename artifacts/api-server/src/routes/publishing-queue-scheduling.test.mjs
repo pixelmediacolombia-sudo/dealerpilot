@@ -55,6 +55,10 @@ const photoQueueWorkerSource = readFileSync(
   new URL("../workers/photo.worker.ts", import.meta.url),
   "utf8",
 );
+const photoPipelineSource = readFileSync(
+  new URL("../photo/pipeline.ts", import.meta.url),
+  "utf8",
+);
 const orchestratorSource = readFileSync(
   new URL("../workers/orchestrator.ts", import.meta.url),
   "utf8",
@@ -65,6 +69,10 @@ const enhanceStageSource = readFileSync(
 );
 const openAiRestorationSource = readFileSync(
   new URL("../photo/providers/openaiRestoration.ts", import.meta.url),
+  "utf8",
+);
+const openAiImageClientSource = readFileSync(
+  new URL("../../../../lib/integrations-openai-ai-server/src/image/client.ts", import.meta.url),
   "utf8",
 );
 const openAiClassifierSource = readFileSync(
@@ -277,23 +285,22 @@ test("Marketplace live-list reconciliation can keep confirmed vehicles and demot
 });
 
 test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity validation", () => {
-  assert.match(restorationSpecSource, /dealerpilot-photo-enhancement-v3-gpt-image/);
-  assert.match(restorationSpecSource, /Act as a professional automotive photo restoration AI/);
-  assert.match(restorationSpecSource, /Image restoration only/);
-  assert.match(restorationSpecSource, /No creative edits/);
-  assert.match(restorationSpecSource, /Preserve exact geometry/);
-  assert.match(restorationSpecSource, /Super Resolution/);
-  assert.match(restorationSpecSource, /Deblur/);
-  assert.match(restorationSpecSource, /Noise Reduction/);
-  assert.match(restorationSpecSource, /White Balance/);
-  assert.match(restorationSpecSource, /Dynamic Range Recovery/);
-  assert.match(restorationSpecSource, /Shadow Recovery/);
-  assert.match(restorationSpecSource, /Micro Detail Enhancement/);
+  assert.match(restorationSpecSource, /dealerpilot-photo-enhancement-v4-gpt-image-2-premium-marketplace/);
+  assert.match(restorationSpecSource, /professional automotive inventory photo retoucher/);
+  assert.match(restorationSpecSource, /Cars\.com, AutoTrader/);
+  assert.match(restorationSpecSource, /Preserve the exact vehicle geometry/);
+  assert.match(restorationSpecSource, /exact OEM paint color/);
+  assert.match(restorationSpecSource, /chrome brightness/);
+  assert.match(restorationSpecSource, /avoid over-brightening white walls/);
+  assert.match(restorationSpecSource, /not an AI-generated image/);
   assert.match(restorationSpecSource, /MIN_PHOTO_FIDELITY_SCORE = 9\.5/);
   assert.match(enhanceStageSource, /DealerPilot Vision Engine/);
   assert.match(enhanceStageSource, /VehicleGeometryFidelity|vehicleGeometryFidelity/);
   assert.match(enhanceStageSource, /restoreWithValidation/);
   assert.match(enhanceStageSource, /authorizedPhotoIds\.length > 0/);
+  assert.match(enhanceStageSource, /photo_director_paid_ai_selected/);
+  assert.match(enhanceStageSource, /photoDirectorMode === "balanced" \|\| photoDirectorMode === "premium"/);
+  assert.match(enhanceStageSource, /photoDirectorMode === "economy"/);
   assert.match(enhanceStageSource, /localEnhancementPhotoIdsFromPresetVersion/);
   assert.match(enhanceStageSource, /local_enhancement_too_subtle_original_preserved/);
   assert.match(enhanceStageSource, /paid_restoration_not_selected_for_this_photo/);
@@ -303,7 +310,12 @@ test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity v
   assert.match(enhanceStageSource, /localVisionNoImprovement/);
   assert.match(openAiRestorationSource, /PHOTO_RESTORATION_ALLOW_GENERATIVE/);
   assert.match(openAiRestorationSource, /PHOTO_RESTORATION_PROVIDER.*openai/s);
+  assert.match(openAiRestorationSource, /gpt-image-2/);
   assert.match(openAiRestorationSource, /disabled/);
+  assert.match(openAiImageClientSource, /PHOTO_RESTORATION_OPENAI_QUALITY/);
+  assert.match(openAiImageClientSource, /PHOTO_RESTORATION_OPENAI_MODEL/);
+  assert.match(openAiImageClientSource, /quality/);
+  assert.match(openAiImageClientSource, /output_format/);
   assert.match(openAiClassifierSource, /data:image\/jpeg;base64/);
   assert.match(openAiClassifierSource, /toOpenAiDataUrl/);
   assert.match(openAiClassifierSource, /response_format: \{ type: "json_object" \}/);
@@ -312,13 +324,19 @@ test("AI photo enhancement uses DealerPilot Vision Engine with strict fidelity v
   assert.match(photoSetViewerSource, /fallbackSrc/);
 });
 
-test("Photo Director limits paid AI and builds selected-photo handoff", () => {
+test("Photo Director improves the selected ten by plan and builds selected-photo handoff", () => {
   assert.match(photoDirectorSource, /PhotoDirectorMode = "economy" \| "balanced" \| "premium"/);
   assert.match(photoDirectorSource, /PHOTO_DIRECTOR_COST_CAPS_USD/);
-  assert.match(photoDirectorSource, /premium: 0\.35/);
-  assert.match(photoDirectorSource, /return 3/);
+  assert.match(photoDirectorSource, /balanced: 1\.5/);
+  assert.match(photoDirectorSource, /premium: 1\.5/);
+  assert.match(photoDirectorSource, /return 10/);
+  assert.match(photoDirectorSource, /input\.mode === "economy"[\s\S]*"LOCAL_ENHANCEMENT"[\s\S]*"PAID_AI_RESTORATION"/);
   assert.match(photoDirectorSource, /PAID_AI_RESTORATION/);
   assert.match(photoDirectorSource, /localEnhancementPhotoIds/);
+  assert.match(photoStudioRouteSource, /presetVersionForMode\([\s\S]*selectionMode/);
+  assert.match(photoPipelineSource, /photoDirectorModeFromPresetVersion/);
+  assert.match(photoPipelineSource, /applyPhotoDirectorSelection/);
+  assert.match(photoPipelineSource, /stage\.name === "Classify"[\s\S]*applyPhotoDirectorSelection/);
   assert.match(photoStudioRouteSource, /buildPhotoDirectorPlan/);
   assert.match(photoStudioRouteSource, /getPhotoDirectorSourceSet/);
   assert.match(photoStudioRouteSource, /desc\(aiPhotoSetsTable\.totalPhotos\)/);

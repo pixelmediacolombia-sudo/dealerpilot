@@ -29,6 +29,7 @@ import {
   ESTIMATED_PROVIDER_RESTORATION_COST_USD,
   isRestorableClassification,
   localEnhancementPhotoIdsFromPresetVersion,
+  photoDirectorModeFromPresetVersion,
   processingModeFromPresetVersion,
   type PhotoProcessingMode,
   type ProviderTrace,
@@ -526,17 +527,39 @@ async function restoreWithValidation(
   const originalStats = await measureImageStats(buf);
   const initialIntensity = chooseInitialIntensity(originalStats);
   const processingMode = processingModeFromPresetVersion(ctx.job.presetVersion);
-  const needAssessment = await assessRestorationNeed(buf, classification, processingMode);
   const authorizedPhotoIds = aiRestorationPhotoIdsFromPresetVersion(ctx.job.presetVersion);
   const localEnhancementPhotoIds = localEnhancementPhotoIdsFromPresetVersion(ctx.job.presetVersion);
+  const photoDirectorMode = photoDirectorModeFromPresetVersion(ctx.job.presetVersion);
   const providerAllowed =
-    authorizedPhotoIds.length > 0 &&
-    sourcePhotoId !== undefined &&
-    authorizedPhotoIds.includes(sourcePhotoId);
+    (
+      authorizedPhotoIds.length > 0 &&
+      sourcePhotoId !== undefined &&
+      authorizedPhotoIds.includes(sourcePhotoId)
+    ) ||
+    (
+      authorizedPhotoIds.length === 0 &&
+      sourcePhotoId === undefined &&
+      (photoDirectorMode === "balanced" || photoDirectorMode === "premium")
+    );
+  const measuredNeedAssessment = await assessRestorationNeed(buf, classification, processingMode);
+  const needAssessment = providerAllowed
+    ? {
+        needsRestoration: true,
+        reasons: Array.from(new Set([...measuredNeedAssessment.reasons, "photo_director_paid_ai_selected"])),
+        score: Math.max(measuredNeedAssessment.score, 10),
+      }
+    : measuredNeedAssessment;
   const localAllowed =
-    localEnhancementPhotoIds.length > 0 &&
-    sourcePhotoId !== undefined &&
-    localEnhancementPhotoIds.includes(sourcePhotoId);
+    (
+      localEnhancementPhotoIds.length > 0 &&
+      sourcePhotoId !== undefined &&
+      localEnhancementPhotoIds.includes(sourcePhotoId)
+    ) ||
+    (
+      localEnhancementPhotoIds.length === 0 &&
+      sourcePhotoId === undefined &&
+      photoDirectorMode === "economy"
+    );
   const providerAttempt = providerAllowed
     ? await maybeRunProviderRestoration(ctx, buf, classification, needAssessment)
     : {
@@ -578,7 +601,7 @@ async function restoreWithValidation(
         intensity: initialIntensity,
         usedProvider: true,
         finalProvider: providerAttempt.returnedProvider ?? "openai",
-        finalModel: providerAttempt.model ?? process.env["PHOTO_RESTORATION_OPENAI_MODEL"] ?? "gpt-image-1",
+        finalModel: providerAttempt.model ?? process.env["PHOTO_RESTORATION_OPENAI_MODEL"] ?? "gpt-image-2",
         providerTrace: {
           requested_provider: providerAttempt.requestedProvider,
           attempted_provider: providerAttempt.attemptedProvider,

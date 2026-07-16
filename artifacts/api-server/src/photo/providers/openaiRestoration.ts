@@ -3,7 +3,7 @@ import path from "path";
 import sharp from "sharp";
 import type { ImageRestorationInput, ImageRestorationResult, IImageRestorationProvider } from "./types";
 
-const MODEL = process.env["PHOTO_RESTORATION_OPENAI_MODEL"] ?? "gpt-image-1";
+const MODEL = process.env["PHOTO_RESTORATION_OPENAI_MODEL"] ?? "gpt-image-2";
 
 function getTmpDir(): string {
   const dir = path.join(process.cwd(), "artifacts/api-server/uploads/ai-photos/tmp");

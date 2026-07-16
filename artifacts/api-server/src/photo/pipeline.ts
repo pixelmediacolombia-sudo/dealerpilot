@@ -28,10 +28,12 @@ import { stageValidate } from "./stages/5_validate";
 import { stageOrder } from "./stages/6_order";
 import { stageExport } from "./stages/7_export";
 import {
+  photoDirectorModeFromPresetVersion,
   selectedPhotoIdsFromPresetVersion,
   type ProviderTrace,
   type QualityImprovementClass,
 } from "./restorationPolicy";
+import { buildPhotoDirectorPlan } from "./photoDirector";
 
 // Per-image working state threaded through stages
 export interface PipelineImage {
@@ -125,6 +127,53 @@ async function updateJobProgress(jobId: number, stage: string, percent: number) 
     .update(aiPhotoJobsTable)
     .set({ currentStage: stage, progressPercent: percent })
     .where(eq(aiPhotoJobsTable.id, jobId));
+}
+
+async function applyPhotoDirectorSelection(ctx: PipelineContext): Promise<void> {
+  if (ctx.job.sourceSetId) return;
+  const mode = photoDirectorModeFromPresetVersion(ctx.job.presetVersion);
+  if (!mode || ctx.images.length <= 10) return;
+
+  const plan = await buildPhotoDirectorPlan({
+    vehicleId: ctx.job.vehicleId,
+    sourceSetId: null,
+    images: ctx.images.map((image, index) => ({
+      id: index + 1,
+      originalUrl: image.originalUrl,
+      classification: image.classification ?? null,
+      classificationConfidence: image.classificationConfidence ?? null,
+      position: image.position,
+    })),
+    mode,
+    maxPhotos: 10,
+  });
+
+  const bySyntheticId = new Map(ctx.images.map((image, index) => [index + 1, image]));
+  ctx.images = plan.selectedPhotoIds
+    .map((id, index) => {
+      const image = bySyntheticId.get(id);
+      if (!image) return null;
+      image.position = index;
+      return image;
+    })
+    .filter((image): image is PipelineImage => image !== null);
+
+  await Promise.all([
+    db.update(aiPhotoSetsTable).set({ totalPhotos: ctx.images.length }).where(eq(aiPhotoSetsTable.id, ctx.setId)),
+    db.update(aiPhotoJobsTable).set({ totalPhotos: ctx.images.length }).where(eq(aiPhotoJobsTable.id, ctx.job.id)),
+  ]);
+
+  ctx.log.info(
+    {
+      jobId: ctx.job.id,
+      vehicleId: ctx.job.vehicleId,
+      mode,
+      totalPhotosAnalyzed: plan.totalPhotosAnalyzed,
+      selectedPhotoIds: plan.selectedPhotoIds,
+      selectedPhotos: ctx.images.length,
+    },
+    "photo:pipeline Photo Director selected final Marketplace set",
+  );
 }
 
 export async function runPhotoPipeline(job: AiPhotoJob, log: Logger): Promise<void> {
@@ -288,6 +337,9 @@ export async function runPhotoPipeline(job: AiPhotoJob, log: Logger): Promise<vo
 
     try {
       await stage.fn(ctx);
+      if (stage.name === "Classify") {
+        await applyPhotoDirectorSelection(ctx);
+      }
     } catch (err) {
       // If a whole stage throws (not per-image), mark all pending images as Failed
       log.error({ err, stage: stage.name, jobId: job.id }, "photo:stage threw");

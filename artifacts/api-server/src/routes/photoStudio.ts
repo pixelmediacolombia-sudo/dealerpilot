@@ -465,6 +465,7 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
       processingPhotos.selectedPhotoIds,
       processingPhotos.paidAiRestorationPhotoIds,
       processingPhotos.localEnhancementPhotoIds,
+      selectionMode,
     );
     const [vehicle] = await db
       .select()
@@ -1377,7 +1378,7 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
     const processingMode = defaultPack?.processingMode ?? "enhance_only";
     const isEnhanceOnly = processingMode !== "studio";
     const openAiRestorationEnabled = OpenAiImageRestorationProvider.isConfigured();
-    const restorationModel = process.env["PHOTO_RESTORATION_OPENAI_MODEL"] ?? "gpt-image-1";
+    const restorationModel = process.env["PHOTO_RESTORATION_OPENAI_MODEL"] ?? "gpt-image-2";
 
     res.json({
       jobs: statusCounts ?? { queued: 0, processing: 0, completed: 0, failed: 0, cancelled: 0 },
@@ -1412,7 +1413,7 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
         restoration: {
           provider: openAiRestorationEnabled ? "openai" : "dealerpilot-vision-engine",
           model: openAiRestorationEnabled ? restorationModel : "v4.0-vision-engine",
-          promptVersion: "dealerpilot-photo-enhancement-v3-gpt-image",
+          promptVersion: "dealerpilot-photo-enhancement-v4-gpt-image-2-premium-marketplace",
           enabled: openAiRestorationEnabled,
         },
       },

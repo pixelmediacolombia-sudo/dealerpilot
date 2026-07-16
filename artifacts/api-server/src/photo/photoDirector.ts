@@ -11,8 +11,8 @@ export type PhotoDirectorTreatment =
 
 export const PHOTO_DIRECTOR_COST_CAPS_USD: Record<PhotoDirectorMode, number> = {
   economy: 0,
-  balanced: 0.2,
-  premium: 0.35,
+  balanced: 1.5,
+  premium: 1.5,
 };
 
 export function normalizePhotoDirectorMode(value: unknown): PhotoDirectorMode {
@@ -23,9 +23,8 @@ export function normalizePhotoDirectorMode(value: unknown): PhotoDirectorMode {
 }
 
 export function paidRestorationLimitForDirectorMode(mode: PhotoDirectorMode): number {
-  if (mode === "premium") return 3;
   if (mode === "economy") return 0;
-  return 2;
+  return 10;
 }
 
 export interface PhotoDirectorInput {
@@ -472,17 +471,20 @@ export async function buildPhotoDirectorPlan(input: {
   const selected = selectBalancedPhotos(analyzed, maxPhotos);
   const selectedIds = selected.map((photo) => photo.id);
   const heroPhotoId = selected[0]?.id ?? null;
-  const paidLimit = paidRestorationLimitForDirectorMode(input.mode);
+  const paidLimit = Math.min(paidRestorationLimitForDirectorMode(input.mode), maxPhotos);
   const costCap = PHOTO_DIRECTOR_COST_CAPS_USD[input.mode];
   let paidCount = 0;
   let estimatedCost = 0;
 
   const treatmentById = new Map<number, { treatment: PhotoDirectorTreatment; estimatedCostUsd: number }>();
   for (const photo of selected) {
-    let treatment = decideBaseTreatment(photo);
+    let treatment: PhotoDirectorTreatment = input.mode === "economy"
+      ? "LOCAL_ENHANCEMENT"
+      : "PAID_AI_RESTORATION";
     let photoCost = 0;
     if (treatment === "PAID_AI_RESTORATION") {
       const canUsePaid =
+        isRestorableClassification(photo.classification) &&
         paidCount < paidLimit &&
         Number((estimatedCost + ESTIMATED_PROVIDER_RESTORATION_COST_USD).toFixed(3)) <= costCap;
       if (canUsePaid) {
@@ -515,7 +517,9 @@ export async function buildPhotoDirectorPlan(input: {
   const localEnhancementCount = localEnhancementPhotoIds.length;
   const paidAiRestorationCount = paidAiRestorationPhotoIds.length;
   const duplicateRejectedCount = analyzed.filter((photo) => photo.rejectionReason === "near_duplicate").length;
-  const potentialAllPaidCost = analyzed.filter((photo) => !photo.rejected && decideBaseTreatment(photo) === "PAID_AI_RESTORATION").length * ESTIMATED_PROVIDER_RESTORATION_COST_USD;
+  const potentialAllPaidCost = input.mode === "economy"
+    ? 0
+    : analyzed.filter((photo) => !photo.rejected).slice(0, maxPhotos).length * ESTIMATED_PROVIDER_RESTORATION_COST_USD;
   const estimatedCostAvoidedUsd = Number(Math.max(0, potentialAllPaidCost - estimatedCost).toFixed(3));
 
   return {
