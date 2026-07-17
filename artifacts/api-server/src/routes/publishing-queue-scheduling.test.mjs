@@ -5,6 +5,7 @@ import { test } from "node:test";
 const routeSource = readFileSync(new URL("./publishing.ts", import.meta.url), "utf8");
 const autoPublishSource = readFileSync(new URL("./autoPublish.ts", import.meta.url), "utf8");
 const workerSource = readFileSync(new URL("../workers/publishing.worker.ts", import.meta.url), "utf8");
+const staleCleanerSource = readFileSync(new URL("../publishing/staleCleaner.ts", import.meta.url), "utf8");
 const publishingRepositorySource = readFileSync(
   new URL("../features/publishing/infrastructure/publishingRepository.ts", import.meta.url),
   "utf8",
@@ -178,6 +179,33 @@ test("publishing worker also respects scheduledAt for queued jobs", () => {
   );
 });
 
+test("Publish Now cleanup cannot cancel scheduled or automatic batch jobs", () => {
+  assert.match(
+    routeSource,
+    /Cancel stale direct Publish Now jobs[\s\S]*eq\(publishingJobsTable\.source,\s*"publish_now"\)[\s\S]*lt\(publishingJobsTable\.createdAt,\s*STALE_THRESHOLD\)/,
+  );
+});
+
+test("publishing worker rebinds due unclaimed jobs after the Chrome extension id changes", () => {
+  assert.match(workerSource, /rebindDueAssignedJobsToOnlineExtension/);
+  assert.match(workerSource, /eq\(publishingJobsTable\.status,\s*"Assigned"\)/);
+  assert.match(workerSource, /ne\(publishingJobsTable\.assignedExtensionId,\s*extensionId\)/);
+  assert.match(workerSource, /Publishing worker rebound unclaimed jobs to the active extension/);
+});
+
+test("scheduled jobs expire relative to their scheduled slot instead of batch creation", () => {
+  assert.match(
+    staleCleanerSource,
+    /coalesce\(\$\{publishingJobsTable\.scheduledAt\},\s*\$\{publishingJobsTable\.createdAt\}\)/,
+  );
+});
+
+test("extension recreates its scheduled-job polling alarm after Chrome clears it", () => {
+  assert.match(queueClientSource, /async function ensurePollAssignedAlarm\(\)/);
+  assert.match(queueClientSource, /await chrome\.alarms\.get\("pollAssigned"\)/);
+  assert.match(queueClientSource, /ensurePollAssignedAlarm\(\)\.catch/);
+});
+
 test("cancelled and dismissed auto-publish batches are excluded from the operational list", () => {
   assert.match(
     autoPublishSource,
@@ -217,6 +245,8 @@ test("moving a published job to Needs Review clears contradictory published stat
 test("batch list derives terminal counters from jobs instead of stale batch columns", () => {
   assert.match(autoPublishSource, /terminalCountRows[\s\S]*from\(publishingJobsTable\)/);
   assert.match(autoPublishSource, /needsReviewCount:\s*sql<number>`count\(\*\) filter \(where \$\{publishingJobsTable\.status\} = 'Needs Review'\)`/);
+  assert.match(autoPublishSource, /skippedCount:\s*sql<number>`count\(\*\) filter \(where \$\{publishingJobsTable\.status\} in \('Skipped', 'Cancelled'\)\)`/);
+  assert.match(autoPublishSource, /status:\s*derivedProgress\?\.isDone \? derivedProgress\.status : row\.status/);
   assert.match(autoPublishSource, /completedCount:\s*terminalCounts\.completedCount/);
   assert.match(autoPublishSource, /needsReviewCount:\s*terminalCounts\.needsReviewCount/);
 });

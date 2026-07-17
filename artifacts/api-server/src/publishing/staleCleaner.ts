@@ -1,5 +1,5 @@
 import { db, publishingJobsTable } from "@workspace/db";
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import type { Logger } from "pino";
 import {
   IN_FLIGHT_PUBLISHING_JOB_STATUSES,
@@ -14,7 +14,7 @@ const MAX_ATTEMPTS = 3;
 const REVIEW_STALE_STATUSES = new Set<string>(["Auto Publishing"]);
 
 // ── Queued/Scheduled stale jobs (extension offline, never claimed) ────────────
-// Jobs sitting in Queued or Scheduled for > 4 hours without being claimed
+// Jobs sitting past their effective scheduled time for > 4 hours without being claimed
 // are cancelled automatically. The operator can re-queue when the extension
 // is back online. Threshold is intentionally long to survive overnight gaps.
 const QUEUED_STALE_MS = 4 * 60 * 60 * 1000; // 4 hours
@@ -90,7 +90,10 @@ export function startStaleJobCleaner(logger: Logger): void {
       .where(
         and(
           inArray(publishingJobsTable.status, [...QUEUED_PUBLISHING_JOB_STATUSES]),
-          lt(publishingJobsTable.createdAt, queuedCutoff),
+          lt(
+            sql`coalesce(${publishingJobsTable.scheduledAt}, ${publishingJobsTable.createdAt})`,
+            queuedCutoff,
+          ),
         ),
       );
 
@@ -108,7 +111,10 @@ export function startStaleJobCleaner(logger: Logger): void {
         .where(
           and(
             inArray(publishingJobsTable.status, [...QUEUED_PUBLISHING_JOB_STATUSES]),
-            lt(publishingJobsTable.createdAt, queuedCutoff),
+            lt(
+              sql`coalesce(${publishingJobsTable.scheduledAt}, ${publishingJobsTable.createdAt})`,
+              queuedCutoff,
+            ),
           ),
         );
       logger.warn({ jobIds: queuedStale.map((j) => j.id) }, "Stale queued jobs cancelled");

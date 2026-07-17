@@ -37,7 +37,7 @@ import {
   LOT_CITY_MAP,
   resolvePublishMode,
 } from "../publishing/controlledMode";
-import { getInitialBatchTiming } from "../publishing/batchProgress";
+import { deriveBatchProgress, getInitialBatchTiming } from "../publishing/batchProgress";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 import { publishingWorker } from "../workers/publishing.worker";
 import { runWorkerOnce } from "../workers/scheduler";
@@ -754,7 +754,7 @@ router.get("/auto-publish/batches", async (req, res) => {
           totalVehicles: sql<number>`count(*)`,
           completedCount: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Published')`,
           failedCount: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Failed')`,
-          skippedCount: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Skipped')`,
+          skippedCount: sql<number>`count(*) filter (where ${publishingJobsTable.status} in ('Skipped', 'Cancelled'))`,
           needsReviewCount: sql<number>`count(*) filter (where ${publishingJobsTable.status} = 'Needs Review')`,
         })
         .from(publishingJobsTable)
@@ -796,8 +796,18 @@ router.get("/auto-publish/batches", async (req, res) => {
   res.json({
     batches: rows.map((row) => {
       const terminalCounts = terminalCountsByBatch.get(row.id);
+      const derivedProgress = terminalCounts
+        ? deriveBatchProgress({
+            completed: terminalCounts.completedCount,
+            failed: terminalCounts.failedCount,
+            skipped: terminalCounts.skippedCount,
+            needsReview: terminalCounts.needsReviewCount,
+            totalVehicles: terminalCounts.totalVehicles || row.totalVehicles,
+          })
+        : null;
       return {
         ...row,
+        status: derivedProgress?.isDone ? derivedProgress.status : row.status,
         ...(terminalCounts
           ? {
               totalVehicles: terminalCounts.totalVehicles || row.totalVehicles,

@@ -1303,9 +1303,10 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
   // Controlled Mode) an online extension all must pass before a job is created.
   const mode = resolvePublishMode(true);
 
-  // Cancel stale active jobs (>10 min old) for this DEALER before creating a new one.
-  // Any stale job from any vehicle blocks the extension queue — clear them all.
-  // Failed jobs are intentionally excluded; they do not block the queue.
+  // Cancel stale direct Publish Now jobs (>10 min old) before creating a new
+  // one. Scheduled/batch jobs have their own lifecycle and may be intentionally
+  // older than ten minutes while waiting for their configured slot. A manual
+  // Publish Now action must never cancel the rest of a valid batch.
   const STALE_THRESHOLD = new Date(Date.now() - 10 * 60 * 1000);
   await db
     .update(publishingJobsTable)
@@ -1313,6 +1314,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     .where(
       and(
         eq(publishingJobsTable.dealerId, DEALER_ID),
+        eq(publishingJobsTable.source, "publish_now"),
         inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
         lt(publishingJobsTable.createdAt, STALE_THRESHOLD),
       ),

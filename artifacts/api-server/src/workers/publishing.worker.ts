@@ -390,7 +390,10 @@ async function maybeCreateAutomaticBatch(
 }
 
 async function findOnlineExtension(): Promise<{ id: string; name: string } | null> {
-  const rows = await db.select().from(extensionConnectionsTable);
+  const rows = await db
+    .select()
+    .from(extensionConnectionsTable)
+    .orderBy(desc(extensionConnectionsTable.lastHeartbeatAt));
   const cutoff = Date.now() - ONLINE_THRESHOLD_MS;
   const online = rows.find(
     (r) => r.lastHeartbeatAt && r.lastHeartbeatAt.getTime() >= cutoff && r.status === "online",
@@ -405,6 +408,25 @@ async function findOnlineExtension(): Promise<{ id: string; name: string } | nul
   return extensionId && online ? { id: extensionId, name: online.name } : null;
 }
 
+async function rebindDueAssignedJobsToOnlineExtension(extensionId: string): Promise<number> {
+  const rebound = await db
+    .update(publishingJobsTable)
+    .set({ assignedExtensionId: extensionId, assignedAt: new Date() })
+    .where(
+      and(
+        eq(publishingJobsTable.status, "Assigned"),
+        isNull(publishingJobsTable.claimedByExtension),
+        or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
+        or(
+          isNull(publishingJobsTable.assignedExtensionId),
+          ne(publishingJobsTable.assignedExtensionId, extensionId),
+        ),
+      ),
+    )
+    .returning({ id: publishingJobsTable.id });
+  return rebound.length;
+}
+
 async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOutcome> {
   const extension = await findOnlineExtension();
   if (!extension) {
@@ -413,6 +435,13 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
 
   const duplicateConflictIds = await getDuplicateConflictVehicleIds();
   const autoBatch = await maybeCreateAutomaticBatch(log, duplicateConflictIds);
+  const reboundAssignments = await rebindDueAssignedJobsToOnlineExtension(extension.id);
+  if (reboundAssignments > 0) {
+    log.info(
+      { extensionId: extension.id, reboundAssignments },
+      "Publishing worker rebound unclaimed jobs to the active extension",
+    );
+  }
 
   const candidates = await db
     .select({
@@ -505,13 +534,13 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
     return {
       summary: `${autoSummary}No jobs assigned - ${skippedUnknownLot} unknown lot, ${skippedDuplicate} duplicate conflicts, ${skippedGm} GM held, ${skippedPhotoDirector} waiting for Photo Director`,
       skipped: true,
-      detail: { autoCreated: autoBatch.created, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
+      detail: { autoCreated: autoBatch.created, reboundAssignments, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
     };
   }
 
   return {
     summary: `${autoBatch.summary ? `${autoBatch.summary}; ` : ""}Assigned ${assigned} publishing job${assigned === 1 ? "" : "s"} to extension "${extension.id}"`,
-    detail: { autoCreated: autoBatch.created, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
+    detail: { autoCreated: autoBatch.created, reboundAssignments, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
   };
 }
 

@@ -1149,13 +1149,27 @@ const STATE_KEYS_TO_CLEAR = [
 // The alarm persists across service worker restarts, but the first tick after
 // browser launch may be up to 60 s away.  Polling immediately on startup
 // ensures any pending publish_now job is claimed without the full alarm delay.
+// Chrome may clear extension alarms after a browser restart. Recreate the
+// polling alarm whenever the service worker starts so scheduled batch jobs do
+// not depend on the popup being opened again.
+async function ensurePollAssignedAlarm() {
+  const alarm = await chrome.alarms.get("pollAssigned");
+  if (!alarm) {
+    chrome.alarms.create("pollAssigned", { periodInMinutes: 0.25 });
+  }
+}
+
+ensurePollAssignedAlarm().catch((err) => saveLastError(err));
+
 chrome.runtime.onStartup.addListener(() => {
-  handlers.POLL_ASSIGNED_JOB().catch((err) => saveLastError(err));
+  ensurePollAssignedAlarm()
+    .then(() => handlers.POLL_ASSIGNED_JOB())
+    .catch((err) => saveLastError(err));
 });
 
 // ---- App-controlled polling alarm ----
 chrome.runtime.onInstalled.addListener(async (details) => {
-  chrome.alarms.create("pollAssigned", { periodInMinutes: 0.25 });
+  await ensurePollAssignedAlarm();
   // Clear all stale state on fresh install or update
   await chrome.storage.local.remove(STATE_KEYS_TO_CLEAR);
   const manifest = chrome.runtime.getManifest();

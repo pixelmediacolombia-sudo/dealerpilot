@@ -1,5 +1,14 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.63
+
+**Fixed**
+- Recreates the scheduled-job polling alarm when Chrome clears it, so the next vehicle in a batch is detected without reopening the popup.
+- Rebinds due, unclaimed batch jobs when the active Chrome extension ID changes.
+- Prevents manual Publish Now cleanup from cancelling valid scheduled batch jobs.
+
+---
+
 ## v1.3.62
 
 **Fixed**

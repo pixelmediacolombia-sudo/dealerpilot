@@ -11,6 +11,7 @@ function createHarness(payload, options = {}) {
     claims: [],
     createdTabs: [],
     heartbeats: [],
+    alarmCreates: [],
     removedTabs: [],
     updatedTabs: [],
   };
@@ -66,7 +67,12 @@ function createHarness(payload, options = {}) {
       onMessage: { addListener(listener) { this.listener = listener; } },
     },
     alarms: {
-      create() {},
+      async get() {
+        return options.pollAlarmExists === false ? null : { name: "pollAssigned" };
+      },
+      create(name, config) {
+        calls.alarmCreates.push({ name, config });
+      },
       onAlarm: { addListener() {} },
     },
   };
@@ -134,6 +140,14 @@ function createHarness(payload, options = {}) {
     storage,
   };
 }
+
+test("missing Chrome polling alarm is recreated when the service worker loads", async () => {
+  const { calls } = createHarness({}, { pollAlarmExists: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(calls.alarmCreates.length, 1);
+  assert.equal(calls.alarmCreates[0].name, "pollAssigned");
+  assert.equal(calls.alarmCreates[0].config.periodInMinutes, 0.25);
+});
 
 test("incomplete assigned vehicle moves to Needs Review and polls the next job without opening Facebook", async () => {
   const payload = {
