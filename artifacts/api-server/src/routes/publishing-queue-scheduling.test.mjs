@@ -506,6 +506,9 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(publisherFlowSource, /Conversaci\\u00f3n con el t\\u00edtulo/);
   assert.match(publisherFlowSource, /Mensajes de la conversaci\\u00f3n/);
   assert.match(publisherFlowSource, /\[role=\"log\"\] article/);
+  assert.match(publisherFlowSource, /semanticMessageEls/);
+  assert.match(publisherFlowSource, /querySelectorAll\('\[aria-label\]'\)/);
+  assert.match(publisherFlowSource, /\(\?:por\|by\)\\s\+\[\^:\]\{1,80\}:/);
   assert.match(publisherFlowSource, /por\\s\+\(\?:t\\u00fa\|ti\)/);
   assert.match(publisherFlowSource, /threadStartedByCurrentUser/);
   assert.match(publisherFlowSource, /canonicalMarketplaceListingUrl/);
@@ -555,6 +558,9 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(conversationsSource, /aiStartedAt/);
   assert.match(conversationsSource, /aiCompletedAt/);
   assert.match(conversationsSource, /totalResponseMs/);
+  assert.match(conversationsSource, /Promise\.allSettled/);
+  assert.match(conversationsSource, /Conversation intake secondary sync failed - response preserved/);
+  assert.match(conversationsSource, /marketplace_listing_metrics/);
   assert.match(conversationsSource, /messages\.filter\(isDisplayMessage\)/);
   assert.match(conversationsSource, /hasBuyerMessage/);
   assert.match(conversationsSource, /hasNewBuyerMessage/);

@@ -3952,9 +3952,17 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
       // Try structured message rows — Messenger renders each message in a [role="row"] or similar
       const messageLog = main?.querySelector('[role="log"]') || null;
-      const messageEls = messageLog
-        ? Array.from(messageLog.querySelectorAll('article, [role="row"]')).filter(visible)
+      const semanticMessageEls = messageLog
+        ? Array.from(messageLog.querySelectorAll('[aria-label]')).filter((el) => {
+            const descriptor = el.getAttribute("aria-label") || "";
+            return visible(el) && /(?:por|by)\s+[^:]{1,80}:\s*\S/i.test(descriptor);
+          })
         : [];
+      const messageEls = semanticMessageEls.length > 0
+        ? semanticMessageEls
+        : messageLog
+          ? Array.from(messageLog.querySelectorAll('article, [role="row"]')).filter(visible)
+          : [];
 
       const messages = [];
       let threadStartedByCurrentUser = null;

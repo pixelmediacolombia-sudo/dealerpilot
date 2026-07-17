@@ -810,23 +810,35 @@ router.post("/conversations/intake", async (req, res) => {
     leadId = newLead.id;
   }
 
-  await db
-    .insert(downPaymentIntelligenceTable)
-    .values({
-      dealerId: DEALER_ID,
-      conversationId,
-      vehicleId,
-      listingId,
-      vehicleType,
-      publishedDownPayment: parsedDownPayment,
-      outcome: "pending",
-    })
-    .onConflictDoNothing();
-
-  await syncMarketplaceListingMetrics({
-    vehicleId: vehicleId ?? conversation.vehicleId,
-    leadQuality: resolvedLeadQuality,
-  });
+  const secondarySyncs = await Promise.allSettled([
+    db
+      .insert(downPaymentIntelligenceTable)
+      .values({
+        dealerId: DEALER_ID,
+        conversationId,
+        vehicleId,
+        listingId,
+        vehicleType,
+        publishedDownPayment: parsedDownPayment,
+        outcome: "pending",
+      })
+      .onConflictDoNothing(),
+    syncMarketplaceListingMetrics({
+      vehicleId: vehicleId ?? conversation.vehicleId,
+      leadQuality: resolvedLeadQuality,
+    }),
+  ]);
+  for (const [index, result] of secondarySyncs.entries()) {
+    if (result.status !== "rejected") continue;
+    req.log.warn(
+      {
+        conversationId,
+        secondaryTask: index === 0 ? "down_payment_intelligence" : "marketplace_listing_metrics",
+        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+      },
+      "Conversation intake secondary sync failed - response preserved",
+    );
+  }
 
   const backendRespondedAt = new Date();
   const timings = {

@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.62
+
+**Fixed**
+- Reads real Marketplace messages directly from Facebook's semantic ARIA message descriptors instead of depending on wrapper tags that are absent from the live DOM.
+- Preserves the primary Sales AI response when optional Marketplace metrics or down-payment intelligence synchronization fails.
+
+---
+
 ## v1.3.61
 
 **Fixed**
