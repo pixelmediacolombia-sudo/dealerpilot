@@ -3,6 +3,7 @@ const LEGACY_RENDER_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
 const REPLIT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 
 const MARKETPLACE_CREATE_URL = "https://www.facebook.com/marketplace/create/vehicle";
+const MARKETPLACE_INBOX_URL = "https://www.facebook.com/marketplace/inbox";
 const FACEBOOK_LOGIN_URL =
   "https://www.facebook.com/login/?next=%2Fmarketplace%2Fcreate%2Fvehicle";
 
@@ -158,6 +159,72 @@ async function detectFacebookTabState() {
   }
 }
 
+function isSalesAiMonitorUrl(url) {
+  try {
+    const parsed = new URL(url || "");
+    const host = parsed.hostname.toLowerCase();
+    const isFacebook =
+      host === "facebook.com" ||
+      host.endsWith(".facebook.com") ||
+      host === "messenger.com" ||
+      host.endsWith(".messenger.com");
+    if (!isFacebook) return false;
+    return /\/marketplace\/inbox\b/i.test(parsed.pathname) || /\/messages\b/i.test(parsed.pathname);
+  } catch (_err) {
+    return false;
+  }
+}
+
+// Sales AI depends on Facebook's live DOM because Alpha uses a personal
+// Facebook profile instead of a Page webhook. Keep one inactive seller inbox
+// tab available so new Marketplace messages can reach the content script even
+// when the operator is working only in the DealerPilot dashboard.
+async function ensureSalesAiMonitorTab({ fbLoggedIn, marketplaceConnected } = {}) {
+  if (fbLoggedIn !== true || marketplaceConnected !== true) {
+    return { skipped: true, reason: "facebook_session_not_ready" };
+  }
+
+  const tabs = await chrome.tabs.query({
+    url: [
+      "https://www.facebook.com/marketplace/inbox*",
+      "https://web.facebook.com/marketplace/inbox*",
+      "https://facebook.com/marketplace/inbox*",
+      "https://www.facebook.com/messages*",
+      "https://web.facebook.com/messages*",
+      "https://facebook.com/messages*",
+      "https://www.messenger.com/*",
+      "https://messenger.com/*",
+    ],
+  });
+  const existing = tabs.find((tab) => isSalesAiMonitorUrl(tab.url));
+  const now = new Date().toISOString();
+
+  if (existing?.id) {
+    await chrome.storage.local.set({
+      salesAiMonitorTabId: existing.id,
+      salesAiMonitorLastCheckedAt: now,
+    });
+    return { ok: true, created: false, tabId: existing.id };
+  }
+
+  const tab = await chrome.tabs.create({
+    url: MARKETPLACE_INBOX_URL,
+    active: false,
+    pinned: true,
+  });
+  await chrome.storage.local.set({
+    salesAiMonitorTabId: tab.id,
+    salesAiMonitorOpenedAt: now,
+    salesAiMonitorLastCheckedAt: now,
+  });
+  await logAudit("SALES_AI_MONITOR_TAB_OPENED", {
+    reason: "seller_inbox_missing",
+    tabId: tab.id,
+    url: MARKETPLACE_INBOX_URL,
+  });
+  return { ok: true, created: true, tabId: tab.id };
+}
+
 function isCloseableMarketplaceUrl(url) {
   const state = detectFacebookTabStateFromUrl(url || "");
   if (!state?.marketplaceDetected) return false;
@@ -218,6 +285,21 @@ async function sendHeartbeatSnapshot() {
     detected.marketplaceConnected ?? marketplaceConnected ?? null;
   const now = new Date().toISOString();
   const heartbeatUrl = `${base}/api/extension/heartbeat`;
+
+  try {
+    await ensureSalesAiMonitorTab({
+      fbLoggedIn: resolvedFbLoggedIn,
+      marketplaceConnected: resolvedMarketplaceConnected,
+    });
+  } catch (monitorErr) {
+    console.warn("[DealerPilot AI] Sales AI monitor tab check failed", monitorErr);
+    await chrome.storage.local.set({
+      salesAiMonitorError: {
+        message: monitorErr instanceof Error ? monitorErr.message : String(monitorErr),
+        at: now,
+      },
+    }).catch(() => {});
+  }
 
   try {
     const data = await DealerPilotApiClient.sendHeartbeat({

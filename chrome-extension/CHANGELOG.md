@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.67
+
+**Fixed**
+- Keeps one inactive, pinned seller Marketplace inbox available while the personal Facebook session is connected, so Sales AI can detect new buyer messages even when the operator is working only in DealerPilot.
+- Reuses an existing Marketplace inbox or Messenger tab and records monitor startup/error diagnostics instead of opening duplicate tabs.
+
+---
+
 ## v1.3.66
 
 **Fixed**

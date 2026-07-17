@@ -301,6 +301,45 @@ test("assigned queue poll uses the Chrome runtime id while claiming with storage
   assert.deepEqual(calls.claims, [{ jobId: 202, extensionId: "ext-e2e" }]);
 });
 
+test("queue polling opens one inactive seller inbox when Sales AI has no Facebook monitor tab", async () => {
+  const payload = { fill: {}, images: [] };
+  const { handlers, calls, storage } = createHarness(payload, {
+    initialStorage: {
+      fbLoggedIn: true,
+      marketplaceConnected: true,
+    },
+  });
+
+  const result = await handlers.POLL_ASSIGNED_JOB();
+
+  assert.equal(result.job, null);
+  assert.equal(calls.createdTabs.length, 1);
+  assert.equal(calls.createdTabs[0].url, "https://www.facebook.com/marketplace/inbox");
+  assert.equal(calls.createdTabs[0].active, false);
+  assert.equal(calls.createdTabs[0].pinned, true);
+  assert.equal(storage.salesAiMonitorTabId, 1001);
+  assert.equal(storage.auditLog.some((entry) => entry.event === "SALES_AI_MONITOR_TAB_OPENED"), true);
+});
+
+test("queue polling reuses an existing seller inbox instead of opening duplicates", async () => {
+  const payload = { fill: {}, images: [] };
+  const { handlers, calls, storage } = createHarness(payload, {
+    initialStorage: {
+      fbLoggedIn: true,
+      marketplaceConnected: true,
+    },
+    facebookTabs: [{
+      id: 42,
+      url: "https://www.facebook.com/marketplace/inbox/?target_tab=selling",
+    }],
+  });
+
+  await handlers.POLL_ASSIGNED_JOB();
+
+  assert.equal(calls.createdTabs.length, 0);
+  assert.equal(storage.salesAiMonitorTabId, 42);
+});
+
 test("publish completion closes current and related Marketplace tabs", async () => {
   const payload = { fill: {}, images: [] };
   const { handlers, calls } = createHarness(payload, {
@@ -308,6 +347,7 @@ test("publish completion closes current and related Marketplace tabs", async () 
       { id: 77, url: "https://www.facebook.com/marketplace/you/selling" },
       { id: 78, url: "https://www.facebook.com/marketplace/create/vehicle" },
       { id: 79, url: "https://www.facebook.com/messages" },
+      { id: 80, url: "https://www.facebook.com/marketplace/inbox" },
     ],
   });
 

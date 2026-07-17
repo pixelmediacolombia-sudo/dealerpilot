@@ -520,6 +520,11 @@ test("automatic photo queueing is disabled unless explicitly enabled", () => {
 });
 
 test("Sales AI intake writes Messenger messages to the CRM and Marketplace metrics", () => {
+  assert.match(queueClientSource, /function ensureSalesAiMonitorTab/);
+  assert.match(queueClientSource, /MARKETPLACE_INBOX_URL/);
+  assert.match(queueClientSource, /SALES_AI_MONITOR_TAB_OPENED/);
+  assert.match(queueClientSource, /active:\s*false/);
+  assert.match(queueClientSource, /pinned:\s*true/);
   assert.match(publisherFlowSource, /type: "CONVERSATION_INTAKE"/);
   assert.match(publisherFlowSource, /externalThreadRef/);
   assert.match(publisherFlowSource, /function initMessengerAiControls/);
