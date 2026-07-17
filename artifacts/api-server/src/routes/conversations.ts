@@ -146,7 +146,9 @@ function isReliableBuyerName(name?: string | null): boolean {
   const normalized = cleaned.toLowerCase();
   if (!cleaned || cleaned.length < 2 || cleaned.length > 80) return false;
   if (normalized === "unknown buyer" || normalized === "buyer" || normalized === "facebook") return false;
-  if (isUiConversationText(cleaned)) return false;
+  if (UI_MESSAGE_TEXT.has(normalized)) return false;
+  if (/^(enter|escape|tab|shift|control|option|command|alt)\b/i.test(normalized)) return false;
+  if (/^(write to|saved|compose|mute|search|customize chat|chat members|mark as pending|more options)\b/i.test(normalized)) return false;
   if (/\b(19|20)\d{2}\b/.test(cleaned)) return false;
   if (/\b(honda|acura|toyota|marketplace|listing|vehicle|group|page|facebook)\b/i.test(cleaned)) return false;
   if (/[/$•·]/.test(cleaned)) return false;
