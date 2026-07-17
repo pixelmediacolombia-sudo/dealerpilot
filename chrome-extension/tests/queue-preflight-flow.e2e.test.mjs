@@ -15,7 +15,12 @@ function createHarness(payload, options = {}) {
     removedTabs: [],
     updatedTabs: [],
   };
-  const storage = { extensionId: "ext-e2e", fbLoggedIn: true };
+  const storage = {
+    extensionId: "ext-e2e",
+    fbLoggedIn: true,
+    storedVersion: "e2e",
+    ...(options.initialStorage ?? {}),
+  };
 
   const chrome = {
     storage: {
@@ -192,6 +197,42 @@ test("incomplete assigned vehicle moves to Needs Review and polls the next job w
   const audit = storage.auditLog ?? [];
   assert.equal(audit.some((entry) => entry.event === "MARKETPLACE_TAB_OPENED"), false);
   assert.equal(audit.some((entry) => entry.event === "AUTO_START_SKIPPED_INCOMPLETE"), true);
+});
+
+test("a retried job receives fresh queue ownership before Marketplace opens again", async () => {
+  const payload = {
+    fill: {
+      year: 2020,
+      make: "Mazda",
+      model: "CX-30",
+      mileage: 75000,
+      bodyStyle: "SUV",
+      exteriorColor: "White",
+      fuelType: "Gasoline",
+      transmission: "Automatic",
+      location: "Fredericksburg, VA",
+      description: "Clean unit ready for financing.",
+      price: 1000,
+    },
+    images: ["https://1987dealerpilot.com/photo.jpg"],
+  };
+  const { handlers, storage } = createHarness(payload, {
+    initialStorage: {
+      pendingRetry: { jobId: 401, retryCount: 1, at: new Date().toISOString() },
+    },
+  });
+
+  await handlers.AUTO_START_ASSIGNED({
+    jobId: 401,
+    createdAt: new Date().toISOString(),
+    mode: "Controlled",
+    source: "auto_publish_batch",
+    approvedByUser: true,
+  });
+
+  assert.equal(storage.activeJob.id, 401);
+  assert.equal(storage.activeJob._retryCount, 1);
+  assert.equal(storage.pendingRetry, undefined);
 });
 
 test("claimed active jobs can be restored when activeJob storage is lost", async () => {

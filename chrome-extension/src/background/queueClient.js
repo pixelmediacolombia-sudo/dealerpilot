@@ -516,7 +516,14 @@ const handlers = {
       extensionId,
     });
 
-    await chrome.storage.local.set({ activeJob: { ...job, _prefetchedPayload: payload } });
+    const { pendingRetry } = await chrome.storage.local.get("pendingRetry");
+    const retryCount = Number(pendingRetry?.jobId) === Number(job.id)
+      ? Number(pendingRetry.retryCount || 0)
+      : 0;
+    await chrome.storage.local.set({
+      activeJob: { ...job, _retryCount: retryCount, _prefetchedPayload: payload },
+    });
+    if (retryCount > 0) await chrome.storage.local.remove("pendingRetry");
 
     // ── AUDIT LOG: every tab open must be logged with a reason ────────────────
     await logAudit("MARKETPLACE_TAB_OPENED", {
@@ -879,7 +886,7 @@ const handlers = {
 
     // Wipe all local extension state (including audit log)
     await chrome.storage.local.remove([
-      "activeJob", "lastClaimedJob", "lastPublishedJob",
+      "activeJob", "pendingRetry", "lastClaimedJob", "lastPublishedJob",
       "lastError", "lastClaimAttempt", "lastClaimError",
       "lastNextResponse", "lastNextResponseAt", "connectTabId",
       "lastPollTime", "auditLog",
@@ -1100,7 +1107,7 @@ const handlers = {
 // current manifest version, all stale local state is wiped and installedAt
 // is reset so the popup never surfaces jobs from a previous install/session.
 const STATE_KEYS_TO_CLEAR = [
-  "activeJob", "lastClaimedJob", "lastPublishedJob",
+  "activeJob", "pendingRetry", "lastClaimedJob", "lastPublishedJob",
   "lastError", "lastClaimAttempt", "lastClaimError",
   "lastNextResponse", "lastNextResponseAt", "connectTabId",
   "lastPollTime", "auditLog",

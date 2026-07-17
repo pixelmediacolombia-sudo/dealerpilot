@@ -1897,17 +1897,56 @@
       const otherStateTokens = Object.entries(STATE_ALIASES)
         .filter(([abbr, name]) => abbr !== statePart && name !== stateAlias)
         .flatMap(([abbr, name]) => [abbr, name]);
+      const containsToken = (text, token) => {
+        if (!token) return false;
+        const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(text);
+      };
+      const readValidationState = () => {
+        const validationText = normalizeText(
+          Array.from(document.querySelectorAll('[role="alert"], [aria-live], div, span'))
+            .filter(isVisibleElement)
+            .map((node) => (node.innerText || node.textContent || "").trim())
+            .filter((text) => text && text.length <= 180)
+            .join(" "),
+        );
+        return {
+          explicitlyInvalid:
+            validationText.includes("ubicacion no es valid") ||
+            validationText.includes("location is not valid") ||
+            validationText.includes("invalid location") ||
+            el.getAttribute?.("aria-invalid") === "true",
+          explicitlyValid:
+            validationText.includes("ubicacion es valid") ||
+            validationText.includes("location is valid"),
+        };
+      };
       let pickedSuggestion = false;
-      const dealerFallbackLocation = "Manassas, VA";
-      const fallbackCityPart = "manassas";
-      const fallbackStatePart = "va";
-      const fallbackStateAlias = STATE_ALIASES[fallbackStatePart];
+
+      // Facebook often preloads the seller's current Marketplace city. Keep it
+      // when it already matches the payload and Facebook has not marked it
+      // invalid. Clearing a valid default can make the autocomplete return no
+      // options and must never trigger a different dealer/city fallback.
+      const currentLocation = normalizeText(fieldCurrentValue(el) || el.innerText || el.textContent || "");
+      const currentPopupClosed = el.getAttribute?.("aria-expanded") !== "true";
+      const currentValidation = readValidationState();
+      if (
+        cityPart &&
+        containsToken(currentLocation, cityPart) &&
+        currentPopupClosed &&
+        !currentValidation.explicitlyInvalid
+      ) {
+        dispatchCommitEvents(el);
+        stateLog(`location already valid -> "${currentLocation}"; preserving Facebook selection`);
+        filled.push("location");
+        log("existing Facebook location preserved");
+        return true;
+      }
+
       const locationQueries = [
-        { query: textValue, city: cityPart, state: statePart, stateAlias, allowFirstFallback: false },
-        { query: stateAlias && cityPart ? `${textValue.split(",")[0].trim()} ${stateAlias}` : "", city: cityPart, state: statePart, stateAlias, allowFirstFallback: false },
-        { query: textValue.split(",")[0].trim(), city: cityPart, state: statePart, stateAlias, allowFirstFallback: false },
-        { query: dealerFallbackLocation, city: fallbackCityPart, state: fallbackStatePart, stateAlias: fallbackStateAlias, allowFirstFallback: true },
-        { query: "Manassas Virginia", city: fallbackCityPart, state: fallbackStatePart, stateAlias: fallbackStateAlias, allowFirstFallback: true },
+        { query: textValue, city: cityPart, state: statePart, stateAlias },
+        { query: stateAlias && cityPart ? `${textValue.split(",")[0].trim()} ${stateAlias}` : "", city: cityPart, state: statePart, stateAlias },
+        { query: textValue.split(",")[0].trim(), city: cityPart, state: statePart, stateAlias },
       ].filter((entry, index, entries) => {
         if (!entry.query) return false;
         const normalizedQuery = normalizeText(entry.query);
@@ -1932,11 +1971,6 @@
         const locationOptions = leafOptions.length ? leafOptions : options;
 
         const optionText = (option) => normalizeText(option.innerText || option.textContent || "");
-        const containsToken = (text, token) => {
-          if (!token) return false;
-          const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(text);
-        };
         const optionScore = (option) => {
           const text = optionText(option);
           const firstLine = normalizeText((option.innerText || option.textContent || "").split(/\r?\n/)[0] || "");
@@ -1975,16 +2009,6 @@
             null;
         }
 
-        // If no suggestion matched our heuristics but suggestions exist, pick
-        // the first suggestion as a fallback. Facebook sometimes requires an
-        // explicit suggestion selection for the location to be considered
-        // valid; selecting the first visible suggestion is a pragmatic
-        // fallback that fixes the "invalid location" error in many cases.
-        if (!pick && locationOptions.length > 0 && locationQuery.allowFirstFallback) {
-          pick = locationOptions[0];
-          stateLog("location suggestion fallback -> selecting first suggestion");
-        }
-
         if (pick) {
           const pickedText = (pick.innerText || pick.textContent || "").trim();
           stateLog(`location suggestion -> "${pickedText}"`);
@@ -1996,20 +2020,7 @@
           await sleep(900);
           const committed = normalizeText(fieldCurrentValue(el) || el.innerText || el.textContent || "");
           const visibleLocationOptions = Array.from(document.querySelectorAll('[role="option"]')).filter(isVisibleElement);
-          const validationText = normalizeText(
-            Array.from(document.querySelectorAll('[role="alert"], [aria-live], div, span'))
-              .filter(isVisibleElement)
-              .map((node) => (node.innerText || node.textContent || "").trim())
-              .filter((text) => text && text.length <= 180)
-              .join(" "),
-          );
-          const explicitlyInvalid =
-            validationText.includes("ubicacion no es valid") ||
-            validationText.includes("location is not valid") ||
-            validationText.includes("invalid location");
-          const explicitlyValid =
-            validationText.includes("ubicacion es valid") ||
-            validationText.includes("location is valid");
+          const { explicitlyInvalid, explicitlyValid } = readValidationState();
           const cityCommitted = containsToken(committed, locationQuery.city);
           const popupClosed = el.getAttribute?.("aria-expanded") !== "true" && visibleLocationOptions.length === 0;
           const selectionCommitted =
@@ -2759,6 +2770,62 @@
     }, delayMs);
   }
 
+  const SIDE_EFFECT_JOB_STATUSES = new Set([
+    "Claimed",
+    "Publishing",
+    "Opening Facebook",
+    "Filling Form",
+    "Auto Publishing",
+    "Ready for Review",
+  ]);
+
+  async function validateJobBeforeMarketplaceSideEffect(job, checkpoint) {
+    const { activeJob } = await chrome.storage.local.get("activeJob");
+    if (!activeJob || Number(activeJob.id) !== Number(job.id)) {
+      return {
+        ok: false,
+        stale: true,
+        reason: `Stopped before ${checkpoint}: this tab no longer owns job #${job.id}.`,
+      };
+    }
+
+    const validation = await send({ type: "VALIDATE_JOB", jobId: job.id }).catch(() => null);
+    const progress = validation?.ok ? validation.data : null;
+    if (!progress || !progress.status) {
+      return {
+        ok: false,
+        stale: false,
+        reason: `Stopped before ${checkpoint}: DealerPilot could not confirm the current job state.`,
+      };
+    }
+
+    if (!SIDE_EFFECT_JOB_STATUSES.has(progress.status)) {
+      return {
+        ok: false,
+        stale: true,
+        reason: `Stopped before ${checkpoint}: job #${job.id} is ${progress.status}, not actively publishing.`,
+      };
+    }
+
+    return { ok: true, status: progress.status };
+  }
+
+  async function stopStaleMarketplaceFlow(job, gate) {
+    stateLog(gate.reason);
+    setStatus(gate.reason, "err");
+    send({
+      type: "SEND_JOB_EVENT",
+      jobId: job.id,
+      event: "side_effect_blocked",
+      details: gate.reason,
+    }).catch(() => { });
+
+    if (gate.stale) {
+      await chrome.storage.local.remove("activeJob");
+      await send({ type: "POLL_NOW" }).catch(() => { });
+    }
+  }
+
   async function handleAutoRetry(job, reason, extras) {
     const retryCount = job._retryCount ?? 0;
     if (retryCount >= 1) {
@@ -2786,14 +2853,17 @@
       const retryRes = await send({ type: "RETRY_JOB", jobId: job.id });
       if (!retryRes || !retryRes.ok) throw new Error(retryRes?.error ?? "Retry API call failed");
 
-      // Persist incremented retry count; clear prefetched payload so next run fetches fresh data
+      // The backend owns the retry transition. Clear this tab's ownership and
+      // let the queue claim the Queued job again before another form can start.
+      // Reusing activeJob here allowed an old tab to continue after the backend
+      // had cancelled or requeued the job.
+      await chrome.storage.local.remove("activeJob");
       await chrome.storage.local.set({
-        activeJob: { ...job, _retryCount: retryCount + 1, _prefetchedPayload: undefined },
+        pendingRetry: { jobId: job.id, retryCount: retryCount + 1, at: new Date().toISOString() },
       });
 
-      setStatus("Auto-retry: reopening Marketplace in 4 s…");
-      await sleep(4000);
-      window.location.href = "https://www.facebook.com/marketplace/create/vehicle";
+      setStatus("Auto-retry: waiting for DealerPilot to reclaim the job...");
+      await send({ type: "POLL_NOW" });
     } catch (e) {
       console.error("[AUTO-RETRY] Setup failed:", e);
       await chrome.storage.local.remove("activeJob");
@@ -2832,8 +2902,9 @@
     await send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "next_enabled" }).catch(() => { });
 
     setStatus("Auto-publishing — clicking Next…");
-    const nextClicked = await clickEnabledButtonByText(["next", "continue", "next step", "siguiente", "continuar"], 10000);
-    if (!nextClicked) {
+    const nextTexts = ["next", "continue", "next step", "siguiente", "continuar"];
+    const nextButton = await waitForEnabledButtonByText(nextTexts, 10000);
+    if (!nextButton) {
       const fbErrors = scrapeFacebookErrors();
       const reason = fbErrors
         ? `Next button blocked: ${fbErrors}`
@@ -2848,6 +2919,16 @@
       return;
     }
 
+    const nextGate = await validateJobBeforeMarketplaceSideEffect(job, "clicking Next");
+    if (!nextGate.ok) {
+      await stopStaleMarketplaceFlow(job, nextGate);
+      return;
+    }
+
+    const nextText = normalizeText(nextButton.innerText || nextButton.textContent || "");
+    log("Auto-publish clicking:", nextText);
+    nextButton.click();
+
     stateLog("Auto-publish: Next clicked, waiting for Publish button…");
     setStatus("Auto-publishing — waiting for Publish button…");
     send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "next_clicked" }).catch(() => { });
@@ -2857,6 +2938,9 @@
     const publishOutcome = await clickPublishUntilListingUrl(job);
     const listingUrl = publishOutcome.listingUrl;
     if (!listingUrl) {
+      if (publishOutcome.jobAborted) {
+        return;
+      }
       if (publishOutcome.publishedLanding) {
         const reason = "Facebook accepted the publish and opened Your Listings, but the individual listing URL was not available.";
         stateLog("Auto-publish: Facebook selling page confirmed; URL pending review");
@@ -2941,10 +3025,20 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       setStatus(attempt === 1
         ? "Auto-publishing - clicking Publish..."
         : "Auto-publishing - confirming final Publish...");
-      const clicked = await clickButtonByText(publishTexts, attempt === 1 ? 15000 : 7000);
-      if (!clicked) {
+      const publishButton = await waitForEnabledButtonByText(publishTexts, attempt === 1 ? 15000 : 7000);
+      if (!publishButton) {
         return { listingUrl: null, blockReason: "Publish button was not available.", publishedLanding: false };
       }
+
+      const publishGate = await validateJobBeforeMarketplaceSideEffect(job, `Publish click ${attempt}`);
+      if (!publishGate.ok) {
+        await stopStaleMarketplaceFlow(job, publishGate);
+        return { listingUrl: null, blockReason: publishGate.reason, publishedLanding: false, jobAborted: true };
+      }
+
+      const publishText = normalizeText(publishButton.innerText || publishButton.textContent || "");
+      log("Auto-publish clicking:", publishText);
+      publishButton.click();
 
       stateLog(`Auto-publish: Publish click ${attempt}, waiting for Marketplace confirmation...`);
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "publish_clicked" }).catch(() => { });
@@ -3666,16 +3760,12 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           if (valRes && valRes.ok && valRes.data) {
             jobStatus = valRes.data.status;
             const ACTIVE_STATUSES = [
-              "Queued",
-              "Scheduled",
-              "Assigned",
               "Claimed",
               "Publishing",
               "Opening Facebook",
               "Filling Form",
               "Auto Publishing",
               "Ready for Review",
-              "Retry",
             ];
             jobIsActive = ACTIVE_STATUSES.includes(jobStatus);
           }

@@ -180,11 +180,12 @@ test("Marketplace location selects autocomplete suggestions before validating Ne
   assert.match(content, /queryStatePart && containsToken\(text, queryStatePart\)\) score \+= 80/);
   assert.match(content, /queryStateAlias && text\.includes\(queryStateAlias\)\) score \+= 80/);
   assert.match(content, /otherStateTokens\.some/);
-  assert.match(content, /dealerFallbackLocation = "Manassas, VA"/);
-  assert.match(content, /Manassas Virginia/);
+  assert.match(content, /location already valid ->/);
+  assert.match(content, /existing Facebook location preserved/);
+  assert.doesNotMatch(content, /dealerFallbackLocation/);
+  assert.doesNotMatch(content, /Manassas Virginia/);
   assert.match(content, /downtown /);
   assert.match(content, /registraron una visita/);
-  assert.match(content, /allowFirstFallback/);
   assert.match(content, /leafOptions/);
   assert.match(content, /!option\.querySelector\?\.\('\[role="option"\]'\)/);
   assert.match(content, /containsToken\(text, "city"\).*containsToken\(text, "ciudad"\)/);
@@ -204,6 +205,31 @@ test("Marketplace location selects autocomplete suggestions before validating Ne
     "location must be committed before year/make/model because Facebook can revalidate the form after location changes",
   );
   assert.doesNotMatch(content, /document\.dispatchEvent\(new KeyboardEvent\("keydown", \{ key: "ArrowDown"/);
+});
+
+test("Marketplace side effects require a currently active backend job", () => {
+  assert.match(content, /const SIDE_EFFECT_JOB_STATUSES = new Set/);
+  assert.match(content, /async function validateJobBeforeMarketplaceSideEffect\(job, checkpoint\)/);
+  assert.match(content, /this tab no longer owns job/);
+  assert.match(content, /not actively publishing/);
+  assert.match(content, /validateJobBeforeMarketplaceSideEffect\(job, "clicking Next"\)/);
+  assert.match(content, /validateJobBeforeMarketplaceSideEffect\(job, `Publish click \$\{attempt\}`\)/);
+  assert.match(content, /jobAborted: true/);
+  assert.ok(
+    content.indexOf('validateJobBeforeMarketplaceSideEffect(job, "clicking Next")') < content.indexOf("nextButton.click()"),
+    "job status must be rechecked immediately before Next",
+  );
+  assert.ok(
+    content.indexOf('validateJobBeforeMarketplaceSideEffect(job, `Publish click ${attempt}`)') < content.indexOf("publishButton.click()"),
+    "job status must be rechecked immediately before Publish",
+  );
+});
+
+test("Marketplace retry is reclaimed by the queue instead of reusing stale tab ownership", () => {
+  assert.match(content, /pendingRetry: \{ jobId: job\.id, retryCount: retryCount \+ 1/);
+  assert.match(content, /await chrome\.storage\.local\.remove\("activeJob"\)/);
+  assert.match(content, /await send\(\{ type: "POLL_NOW" \}\)/);
+  assert.doesNotMatch(content, /activeJob: \{ \.\.\.job, _retryCount: retryCount \+ 1/);
 });
 
 test("Positive Facebook validation text is not treated as a blocking form error", () => {

@@ -1,5 +1,15 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.65
+
+**Fixed**
+- Preserves Facebook's existing Marketplace city when it already matches the publishing payload and is not marked invalid.
+- Removes the cross-city dealer fallback so a listing can never substitute a different lot location.
+- Revalidates backend job ownership immediately before clicking Next or Publish.
+- Reclaims retries through the queue instead of allowing an older Facebook tab to continue publishing.
+
+---
+
 ## v1.3.64
 
 **Fixed**
