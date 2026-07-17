@@ -122,6 +122,64 @@ function detectFacebookTabStateFromUrl(url) {
   }
 }
 
+const FACEBOOK_PAGE_STATE_TTL_MS = 2 * 60 * 1000;
+
+function aggregateFacebookPageStates(pageStates, nowMs = Date.now()) {
+  const freshEntries = Object.entries(pageStates || {}).filter(([, state]) => {
+    const reportedAtMs = Date.parse(state?.reportedAt || "");
+    return Number.isFinite(reportedAtMs) && nowMs - reportedAtMs <= FACEBOOK_PAGE_STATE_TTL_MS;
+  });
+  const freshStates = freshEntries.map(([, state]) => state);
+  const marketplaceState = freshStates.find((state) => state.marketplaceDetected === true) || null;
+
+  return {
+    pageStates: Object.fromEntries(freshEntries),
+    patch: {
+      fbLoggedIn: freshStates.length > 0 ? freshStates.some((state) => state.fbLoggedIn === true) : null,
+      marketplaceConnected: freshStates.some((state) => state.marketplaceConnected === true),
+      marketplaceDetected: freshStates.some((state) => state.marketplaceDetected === true),
+      marketplacePath: marketplaceState?.marketplacePath || null,
+      marketplaceUrl: marketplaceState?.marketplaceUrl || null,
+      marketplaceDetectedAt: marketplaceState?.marketplaceDetectedAt || null,
+      messengerDetected: freshStates.some((state) => state.messengerDetected === true),
+    },
+  };
+}
+
+async function saveFacebookPageState(tabId, state, tabUrl) {
+  if (!Number.isInteger(tabId) || tabId <= 0) {
+    return { ok: false, reason: "sender_tab_missing" };
+  }
+  const { facebookPageStates = {} } = await chrome.storage.local.get("facebookPageStates");
+  const reportedAt = new Date().toISOString();
+  facebookPageStates[String(tabId)] = {
+    fbLoggedIn: state?.fbLoggedIn === true,
+    marketplaceConnected: state?.marketplaceConnected === true,
+    marketplaceDetected: state?.marketplaceDetected === true,
+    marketplacePath: state?.marketplacePath || null,
+    marketplaceUrl: state?.marketplaceUrl || tabUrl || null,
+    marketplaceDetectedAt: state?.marketplaceDetectedAt || null,
+    messengerDetected: state?.messengerDetected === true,
+    reportedAt,
+  };
+  const aggregate = aggregateFacebookPageStates(facebookPageStates);
+  await chrome.storage.local.set({
+    facebookPageStates: aggregate.pageStates,
+    ...aggregate.patch,
+  });
+  return { ok: true, ...aggregate.patch };
+}
+
+async function removeFacebookPageState(tabId) {
+  const { facebookPageStates = {} } = await chrome.storage.local.get("facebookPageStates");
+  delete facebookPageStates[String(tabId)];
+  const aggregate = aggregateFacebookPageStates(facebookPageStates);
+  await chrome.storage.local.set({
+    facebookPageStates: aggregate.pageStates,
+    ...aggregate.patch,
+  });
+}
+
 async function detectFacebookTabState() {
   try {
     const tabs = await chrome.tabs.query({
@@ -339,6 +397,10 @@ const handlers = {
     await apiGet("/api/healthz");
     const heartbeat = await sendHeartbeatSnapshot();
     return { backendUrl: heartbeat.backendUrl, environment: heartbeat.environment };
+  },
+
+  async PAGE_STATE_REPORT(message, sender) {
+    return saveFacebookPageState(sender?.tab?.id, message?.state, sender?.tab?.url);
   },
 
   // ---- Backend URL switching (no rebuild required) ----
@@ -1192,7 +1254,9 @@ const STATE_KEYS_TO_CLEAR = [
   "activeJob", "pendingRetry", "lastClaimedJob", "lastPublishedJob",
   "lastError", "lastClaimAttempt", "lastClaimError",
   "lastNextResponse", "lastNextResponseAt", "connectTabId",
-  "lastPollTime", "auditLog",
+  "lastPollTime", "auditLog", "facebookPageStates",
+  "marketplaceDetected", "marketplacePath", "marketplaceUrl",
+  "marketplaceDetectedAt", "messengerDetected",
 ];
 
 (async () => {
@@ -1272,6 +1336,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== "pollAssigned") return;
   handlers.POLL_ASSIGNED_JOB().catch((err) => saveLastError(err));
+});
+
+chrome.tabs.onRemoved?.addListener((tabId) => {
+  removeFacebookPageState(tabId).catch((err) =>
+    console.warn("[DealerPilot AI] Failed to remove closed Facebook tab state", err),
+  );
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

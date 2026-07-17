@@ -717,6 +717,24 @@
     return rect.width > 0 && rect.height > 0;
   }
 
+  function hasMarketplaceThreadEvidence(root) {
+    if (!root || !visible(root)) return false;
+    const hasMessageLog = !!root.querySelector(
+      '[role="log"], [aria-live="polite"][aria-label*="message" i], [aria-live="polite"][aria-label*="mensaje" i]',
+    );
+    const hasComposer = !!root.querySelector(
+      '[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label*="message" i], [contenteditable="true"][aria-label*="mensaje" i], textarea[aria-label*="message" i], textarea[aria-label*="mensaje" i]',
+    );
+    const hasHeading = !!root.querySelector('[role="heading"]');
+    const hasMarketplaceLink = !!root.querySelector('a[href*="/marketplace/item/"]');
+
+    // Facebook's current Marketplace inbox can render the listing title as
+    // plain text instead of an item anchor. On an explicitly Marketplace
+    // conversation route, the message log + composer + heading are the stable
+    // signals that this is the active seller thread.
+    return hasMessageLog && hasHeading && (hasMarketplaceLink || (isMarketplaceConversationUrl() && hasComposer));
+  }
+
   function findMarketplaceThreadRoot() {
     const semanticSelectors = [
       '[role="region"][aria-label*="Conversaci\u00f3n con el t\u00edtulo" i]',
@@ -733,19 +751,14 @@
           candidate.matches('[role="region"]')
             ? candidate
             : candidate.closest('[role="region"]') || candidate.closest('[role="main"]');
-        if (root && visible(root) && root.querySelector('a[href*="/marketplace/item/"]')) {
+        if (hasMarketplaceThreadEvidence(root)) {
           return root;
         }
       }
     }
 
     const contextualRoots = Array.from(document.querySelectorAll('[role="dialog"], [role="main"]'));
-    return contextualRoots.find((root) =>
-      visible(root) &&
-      root.querySelector('[role="log"]') &&
-      root.querySelector('a[href*="/marketplace/item/"]') &&
-      root.querySelector('[role="heading"]'),
-    ) || null;
+    return contextualRoots.find(hasMarketplaceThreadEvidence) || null;
   }
 
   function findMessengerRoot() {
@@ -764,19 +777,14 @@
         box.closest('[aria-label*="Messenger" i]') ||
         box.closest('[aria-label*="Chat" i]') ||
         box.closest('[role="main"]');
-      if (
-        root &&
-        visible(root) &&
-        root.querySelector('[role="log"]') &&
-        root.querySelector('a[href*="/marketplace/item/"]')
-      ) return root;
+      if (hasMarketplaceThreadEvidence(root)) return root;
     }
 
     return null;
   }
 
   function isMessengerUiVisible() {
-    return (isMessengerUrl() || isMarketplaceConversationUrl()) && !!findMarketplaceThreadRoot();
+    return (isMessengerUrl() || isMarketplaceConversationUrl()) && !!findMessengerRoot();
   }
 
   function detectPageState() {
@@ -798,8 +806,9 @@
       (hostname.includes("facebook.com") || hostname.includes("messenger.com")) && !isLoginPage;
     const marketplaceConnected = isMarketplaceNow && fbLoggedIn;
 
-    chrome.storage.local
-      .set({
+    send({
+      type: "PAGE_STATE_REPORT",
+      state: {
         marketplaceDetected: isMarketplaceNow,
         marketplacePath: isMarketplaceNow ? pathname : null,
         marketplaceUrl: isMarketplaceNow ? href : null,
@@ -807,8 +816,8 @@
         messengerDetected: isMessengerNow,
         fbLoggedIn,
         marketplaceConnected,
-      })
-      .catch(() => { });
+      },
+    }).catch(() => { });
 
     if (hostname.includes("facebook.com")) {
       try {
@@ -839,6 +848,7 @@
     history.replaceState = wrap(history.replaceState);
   })();
   window.addEventListener("popstate", detectPageState);
+  setInterval(detectPageState, 5000);
 
   let _lastUrl = location.href;
   new MutationObserver(() => {
@@ -4044,7 +4054,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         sellerIsCurrentUser: evidence.threadStartedByCurrentUser === true
           ? "current Facebook user started the Marketplace thread"
           : "message direction did not prove seller context",
-        marketplaceContextDetected: "Marketplace listing link was not found inside the thread",
+        marketplaceContextDetected: "Marketplace listing id or vehicle title was not found in the seller thread",
       };
       for (const [gate, passed] of Object.entries(gates)) {
         if (passed) continue;
@@ -4071,7 +4081,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         buyerNameDetected: isReliableBuyerName(buyerName),
         sellerIsCurrentUser:
           !!lastMessage && lastMessage.speaker !== "Dealer" && evidence.threadStartedByCurrentUser !== true,
-        marketplaceContextDetected: !!context.listingUrl && !!context.marketplaceItemId,
+        marketplaceContextDetected:
+          !!context.marketplaceItemId ||
+          (isMarketplaceConversationUrl() && !!context.vehicleTitle),
       };
       const missingReasonByGate = {
         routeAllowed: "route_not_allowed",
@@ -4273,8 +4285,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     function detectListingContext() {
       const root = findMarketplaceThreadRoot();
       const bodyText = (root?.innerText || "").toLowerCase();
-      const listingLink = root?.querySelector('a[href*="/marketplace/item/"]') || null;
-      const listingUrl = canonicalMarketplaceListingUrl(listingLink?.href);
+      const listingLink =
+        root?.querySelector('a[href*="/marketplace/item/"]') ||
+        document.querySelector('a[href*="/marketplace/item/"]') ||
+        null;
+      const listingUrl =
+        canonicalMarketplaceListingUrl(listingLink?.href) ||
+        canonicalMarketplaceListingUrl(location.href);
       const marketplaceItemId = listingUrl?.match(/\/item\/(\d+)\//)?.[1] || null;
 
       // Look for price patterns like $12,500 or $12500

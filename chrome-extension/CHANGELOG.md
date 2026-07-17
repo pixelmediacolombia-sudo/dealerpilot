@@ -1,5 +1,15 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.68
+
+**Fixed**
+- Detects the active Marketplace seller thread when Facebook renders the vehicle title as plain text instead of an item link, so the extension reaches conversation intake and automatic reply delivery.
+- Accepts the vehicle title as safe Marketplace context on Marketplace inbox routes while continuing to exclude generic Messenger chats.
+- Aggregates page detection per Facebook tab so another open tab can no longer overwrite an active Marketplace/Messenger state with `No`.
+- Refreshes DOM-based page detection every five seconds to follow Facebook's delayed single-page rendering.
+
+---
+
 ## v1.3.67
 
 **Fixed**

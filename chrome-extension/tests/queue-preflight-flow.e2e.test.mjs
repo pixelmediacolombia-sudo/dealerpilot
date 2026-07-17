@@ -58,6 +58,7 @@ function createHarness(payload, options = {}) {
         calls.updatedTabs.push({ id, patch });
         return { id, ...patch };
       },
+      onRemoved: { addListener(listener) { this.listener = listener; } },
     },
     windows: {
       async update() {},
@@ -338,6 +339,57 @@ test("queue polling reuses an existing seller inbox instead of opening duplicate
 
   assert.equal(calls.createdTabs.length, 0);
   assert.equal(storage.salesAiMonitorTabId, 42);
+});
+
+test("page detection remains true when another Facebook tab reports a non-Marketplace page", async () => {
+  const payload = { fill: {}, images: [] };
+  const { handlers, storage } = createHarness(payload);
+
+  await handlers.PAGE_STATE_REPORT(
+    {
+      state: {
+        fbLoggedIn: true,
+        marketplaceConnected: true,
+        marketplaceDetected: true,
+        marketplacePath: "/marketplace/inbox",
+        marketplaceUrl: "https://www.facebook.com/marketplace/inbox",
+        marketplaceDetectedAt: new Date().toISOString(),
+        messengerDetected: true,
+      },
+    },
+    { tab: { id: 41, url: "https://www.facebook.com/marketplace/inbox" } },
+  );
+  await handlers.PAGE_STATE_REPORT(
+    {
+      state: {
+        fbLoggedIn: true,
+        marketplaceConnected: false,
+        marketplaceDetected: false,
+        messengerDetected: false,
+      },
+    },
+    { tab: { id: 42, url: "https://www.facebook.com/" } },
+  );
+
+  assert.equal(storage.marketplaceDetected, true);
+  assert.equal(storage.marketplaceConnected, true);
+  assert.equal(storage.messengerDetected, true);
+  assert.equal(storage.marketplacePath, "/marketplace/inbox");
+
+  await handlers.PAGE_STATE_REPORT(
+    {
+      state: {
+        fbLoggedIn: true,
+        marketplaceConnected: false,
+        marketplaceDetected: false,
+        messengerDetected: false,
+      },
+    },
+    { tab: { id: 41, url: "https://www.facebook.com/" } },
+  );
+
+  assert.equal(storage.marketplaceDetected, false);
+  assert.equal(storage.messengerDetected, false);
 });
 
 test("publish completion closes current and related Marketplace tabs", async () => {
