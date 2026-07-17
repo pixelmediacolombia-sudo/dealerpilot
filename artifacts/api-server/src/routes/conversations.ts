@@ -157,7 +157,11 @@ function isBlockedFacebookSurface(sourceUrl?: string | null): boolean {
   if (!sourceUrl) return false;
   try {
     const url = new URL(sourceUrl);
-    return /\/(groups|pages|profile\.php|watch|reel|events)\b/i.test(url.pathname);
+    return (
+      url.pathname === "/" ||
+      /^\/(home\.php|feed)\b/i.test(url.pathname) ||
+      /^\/(groups|pages|profile\.php|watch|reel|events)\b/i.test(url.pathname)
+    );
   } catch {
     return false;
   }
@@ -168,6 +172,10 @@ function normalizeVehicleTitle(value?: string | null): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function extractMarketplaceItemId(value?: string | null): string | null {
+  return value?.match(/\/marketplace\/item\/(\d+)/i)?.[1] ?? null;
 }
 
 function parseTimestamp(value: unknown): Date | null {
@@ -412,6 +420,7 @@ router.post("/conversations/intake", async (req, res) => {
     messageDetectedAt: rawMessageDetectedAt,
     messageHash,
     idempotencyKey,
+    routeAllowed,
     conversationThreadDetected,
     buyerMessageDetected,
     buyerNameDetected,
@@ -434,6 +443,7 @@ router.post("/conversations/intake", async (req, res) => {
     messageDetectedAt?: string;
     messageHash?: string;
     idempotencyKey?: string;
+    routeAllowed?: boolean;
     conversationThreadDetected?: boolean;
     buyerMessageDetected?: boolean;
     buyerNameDetected?: boolean;
@@ -450,6 +460,7 @@ router.post("/conversations/intake", async (req, res) => {
   }
 
   const missingContext = [
+    routeAllowed === true ? null : "route_not_allowed",
     conversationThreadDetected === true ? null : "conversation_thread_missing",
     buyerMessageDetected === true ? null : "buyer_message_missing",
     buyerNameDetected === true ? null : "buyer_name_missing",
@@ -514,11 +525,22 @@ router.post("/conversations/intake", async (req, res) => {
   let vehicleTitleFromDb: string | undefined;
 
   if (detectedMarketplaceListingUrl) {
-    const [marketplaceListing] = await db
-      .select()
+    const detectedMarketplaceItemId = extractMarketplaceItemId(detectedMarketplaceListingUrl);
+    const marketplaceListings = await db
+      .select({
+        vehicleId: marketplaceListingsTable.vehicleId,
+        listingUrl: marketplaceListingsTable.listingUrl,
+        facebookListingId: marketplaceListingsTable.facebookListingId,
+      })
       .from(marketplaceListingsTable)
-      .where(eq(marketplaceListingsTable.listingUrl, detectedMarketplaceListingUrl))
-      .limit(1);
+      .where(eq(marketplaceListingsTable.dealerId, DEALER_ID));
+    const marketplaceListing = marketplaceListings.find((listing) => {
+      if (!detectedMarketplaceItemId) return listing.listingUrl === detectedMarketplaceListingUrl;
+      return (
+        listing.facebookListingId === detectedMarketplaceItemId ||
+        extractMarketplaceItemId(listing.listingUrl) === detectedMarketplaceItemId
+      );
+    });
     if (marketplaceListing) {
       vehicleId = marketplaceListing.vehicleId;
     }
@@ -529,14 +551,15 @@ router.post("/conversations/intake", async (req, res) => {
     const vRow = await db
       .select()
       .from(vehiclesTable)
-      .where(eq(vehiclesTable.dealerId, DEALER_ID))
-      .limit(20);
+      .where(eq(vehiclesTable.dealerId, DEALER_ID));
 
     const match = vRow.find((v) => {
       if (!detectedVehicleTitle) return false;
-      const vTitle = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ");
-      const normalizedVehicleTitle = normalizeVehicleTitle(vTitle);
-      return normalizedVehicleTitle === normalizedDetectedTitle;
+      const exactTitles = [
+        [v.year, v.make, v.model].filter(Boolean).join(" "),
+        [v.year, v.make, v.model, v.trim].filter(Boolean).join(" "),
+      ].map(normalizeVehicleTitle);
+      return exactTitles.includes(normalizedDetectedTitle);
     });
     if (match) {
       vehicleId = match.id;

@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.61
+
+**Fixed**
+- Detects real Marketplace Messenger threads from their semantic conversation region and message log even when Facebook does not render a composer.
+- Uses inbound/outbound message direction instead of a visible-label heuristic, logs every Sales AI validation gate safely, and resolves vehicles by the canonical Marketplace item ID before exact title matching.
+
+---
+
 ## v1.3.60
 
 **Fixed**

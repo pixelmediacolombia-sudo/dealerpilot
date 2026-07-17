@@ -708,7 +708,7 @@
   function isMarketplaceConversationUrl() {
     const hostname = location.hostname;
     const pathname = location.pathname;
-    return hostname.includes("facebook.com") && /\/marketplace\/(inbox|you\/selling|you\/buying)\b/.test(pathname);
+    return hostname.includes("facebook.com") && /\/marketplace\/(inbox|you\/selling|you\/buying|item\/\d+)\b/.test(pathname);
   }
 
   function visible(el) {
@@ -717,7 +717,41 @@
     return rect.width > 0 && rect.height > 0;
   }
 
+  function findMarketplaceThreadRoot() {
+    const semanticSelectors = [
+      '[role="region"][aria-label*="Conversaci\u00f3n con el t\u00edtulo" i]',
+      '[role="region"][aria-label*="Conversation titled" i]',
+      '[role="region"][aria-label*="Conversation with the title" i]',
+      '[role="log"][aria-label*="Mensajes de la conversaci\u00f3n" i]',
+      '[role="log"][aria-label*="Messages in the conversation" i]',
+      '[role="log"][aria-label*="Conversation messages" i]',
+    ];
+
+    for (const selector of semanticSelectors) {
+      for (const candidate of document.querySelectorAll(selector)) {
+        const root =
+          candidate.matches('[role="region"]')
+            ? candidate
+            : candidate.closest('[role="region"]') || candidate.closest('[role="main"]');
+        if (root && visible(root) && root.querySelector('a[href*="/marketplace/item/"]')) {
+          return root;
+        }
+      }
+    }
+
+    const contextualRoots = Array.from(document.querySelectorAll('[role="dialog"], [role="main"]'));
+    return contextualRoots.find((root) =>
+      visible(root) &&
+      root.querySelector('[role="log"]') &&
+      root.querySelector('a[href*="/marketplace/item/"]') &&
+      root.querySelector('[role="heading"]'),
+    ) || null;
+  }
+
   function findMessengerRoot() {
+    const marketplaceThreadRoot = findMarketplaceThreadRoot();
+    if (marketplaceThreadRoot) return marketplaceThreadRoot;
+
     const textboxes = Array.from(
       document.querySelectorAll(
         '[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label*="message" i], textarea[aria-label*="message" i]',
@@ -730,15 +764,19 @@
         box.closest('[aria-label*="Messenger" i]') ||
         box.closest('[aria-label*="Chat" i]') ||
         box.closest('[role="main"]');
-      if (root && visible(root)) return root;
+      if (
+        root &&
+        visible(root) &&
+        root.querySelector('[role="log"]') &&
+        root.querySelector('a[href*="/marketplace/item/"]')
+      ) return root;
     }
 
     return null;
   }
 
   function isMessengerUiVisible() {
-    if (isMessengerUrl()) return true;
-    return isMarketplaceConversationUrl() && !!findMessengerRoot();
+    return (isMessengerUrl() || isMarketplaceConversationUrl()) && !!findMarketplaceThreadRoot();
   }
 
   function detectPageState() {
@@ -3786,90 +3824,216 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return true;
     }
 
-    function validateMessengerSalesContext({ buyerName, messages, context }) {
-      const root = findMessengerRoot();
-      const lastMessage = messages[messages.length - 1] || null;
-      const conversationThreadDetected = !!root && (isMessengerUrl() || isMarketplaceConversationUrl());
-      const buyerMessageDetected = !!lastMessage && lastMessage.speaker !== "Dealer" && !isMessengerUiText(lastMessage.text);
-      const buyerNameDetected = isReliableBuyerName(buyerName);
-      const sellerIsCurrentUser = !!getMessengerMessageBox();
-      const marketplaceContextDetected = !!context.listingUrl || isMessengerUrl() || isMarketplaceConversationUrl();
-      const missing = [];
-      if (!conversationThreadDetected) missing.push("conversation_thread_missing");
-      if (!buyerMessageDetected) missing.push("buyer_message_missing");
-      if (!buyerNameDetected) missing.push("buyer_name_missing");
-      if (!sellerIsCurrentUser) missing.push("seller_current_user_missing");
-      if (!marketplaceContextDetected) missing.push("marketplace_context_missing");
-      return {
-        ok: missing.length === 0,
-        missing,
-        conversationThreadDetected,
-        buyerMessageDetected,
-        buyerNameDetected,
-        sellerIsCurrentUser,
-        marketplaceContextDetected,
+    function isBlockedSalesAiRoute() {
+      const pathname = location.pathname || "/";
+      return (
+        pathname === "/" ||
+        /^\/(home\.php|feed)\b/i.test(pathname) ||
+        /^\/(groups|pages|profile\.php|watch|reel|events)\b/i.test(pathname)
+      );
+    }
+
+    function safeSalesAiUrl() {
+      return `${location.origin}${location.pathname}`;
+    }
+
+    function getThreadHeadingText(root) {
+      if (!root) return "";
+      const headings = Array.from(root.querySelectorAll('[role="heading"], h1, h2, h3'));
+      const heading = headings.find((el) => /\b(19|20)\d{2}\b/.test(el.textContent || "")) || headings[0];
+      if (heading) return cleanMessengerText(heading.textContent || "").slice(0, 160);
+      return cleanMessengerText(root.getAttribute("aria-label") || "")
+        .replace(/^(?:Conversaci\u00f3n con el t\u00edtulo|Conversation titled|Conversation with the title)\s*/i, "")
+        .slice(0, 160);
+    }
+
+    function extractBuyerNameFromThreadHeader(headerText) {
+      const candidate = cleanMessengerText(headerText).split(/\s+[\u00b7\u2022|]\s+/)[0] || "";
+      return candidate.slice(0, 80);
+    }
+
+    function collectMatchedThreadSelectors(root) {
+      const selectors = [
+        '[role="region"][aria-label*="Conversaci\u00f3n con el t\u00edtulo" i]',
+        '[role="region"][aria-label*="Conversation titled" i]',
+        '[role="log"][aria-label*="Mensajes de la conversaci\u00f3n" i]',
+        '[role="log"][aria-label*="Messages in the conversation" i]',
+        'a[href*="/marketplace/item/"]',
+        '[role="log"] article',
+      ];
+      return selectors.filter((selector) =>
+        root?.matches?.(selector) || (root || document).querySelector(selector),
+      ).slice(0, 12);
+    }
+
+    function getMessageDescriptor(el) {
+      const labels = [
+        el.getAttribute("aria-label") || "",
+        ...Array.from(el.querySelectorAll('[aria-label]')).map((node) => node.getAttribute("aria-label") || ""),
+      ].filter(Boolean);
+      return labels.find((label) => /(?:por|by)\s+[^:]{1,80}:\s*\S/i.test(label)) || labels[0] || "";
+    }
+
+    function parseSemanticMessengerMessage(el) {
+      const descriptor = cleanMessengerText(getMessageDescriptor(el));
+      const visibleText = cleanMessengerText(el.innerText || el.textContent || "");
+      const directed = descriptor.match(/(?:por|by)\s+([^:]{1,80}):\s*(.+)$/i);
+      const timestamped = descriptor.match(/,\s*([^,:]{1,80}):\s*(.+)$/i);
+      const parsed = directed || timestamped;
+      const text = cleanMessengerText(parsed?.[2] || visibleText);
+      const sentByCurrentUser =
+        /(?:por\s+(?:t\u00fa|ti)|by\s+you)\s*:/i.test(descriptor) ||
+        /\b(?:sent by you|you sent|enviaste|enviado por ti)\b/i.test(descriptor) ||
+        /^t\u00fa\s*:/i.test(descriptor);
+      const isThreadStarter = /\b(?:iniciaste este chat|you started this chat|inici\u00f3 este chat|started this chat)\b/i.test(text);
+      return { descriptor, text, sentByCurrentUser, isThreadStarter };
+    }
+
+    function logSalesAiGateDiagnostics(gates, evidence) {
+      console.log("[DealerPilot AI] Sales AI validation gates", gates);
+      const reasons = {
+        routeAllowed: isBlockedSalesAiRoute() ? "blocked Facebook surface" : "route is not a supported Marketplace thread",
+        conversationThreadDetected: "Marketplace conversation region or message log not found",
+        buyerMessageDetected: "latest substantive message is not an inbound buyer message",
+        buyerNameDetected: "thread header did not provide a reliable buyer name",
+        sellerIsCurrentUser: evidence.threadStartedByCurrentUser === true
+          ? "current Facebook user started the Marketplace thread"
+          : "message direction did not prove seller context",
+        marketplaceContextDetected: "Marketplace listing link was not found inside the thread",
       };
+      for (const [gate, passed] of Object.entries(gates)) {
+        if (passed) continue;
+        console.log("[DealerPilot AI] Sales AI gate failed", {
+          gate,
+          reason: reasons[gate],
+          currentUrl: safeSalesAiUrl(),
+          matchedSelectors: evidence.matchedSelectors || [],
+          threadHeaderText: (evidence.threadHeaderText || "").slice(0, 160),
+          latestInboundMessageText: (evidence.latestInboundMessageText || "").slice(0, 500),
+          buyerNameCandidate: (evidence.buyerNameCandidate || "").slice(0, 80),
+          listingTitleCandidate: (evidence.listingTitleCandidate || "").slice(0, 160),
+        });
+      }
+    }
+
+    function validateMessengerSalesContext({ buyerName, messages, context, evidence }) {
+      const root = findMarketplaceThreadRoot();
+      const lastMessage = messages[messages.length - 1] || null;
+      const gates = {
+        routeAllowed: !isBlockedSalesAiRoute() && (isMessengerUrl() || isMarketplaceConversationUrl()),
+        conversationThreadDetected: !!root,
+        buyerMessageDetected: !!lastMessage && lastMessage.speaker !== "Dealer" && !isMessengerUiText(lastMessage.text),
+        buyerNameDetected: isReliableBuyerName(buyerName),
+        sellerIsCurrentUser:
+          !!lastMessage && lastMessage.speaker !== "Dealer" && evidence.threadStartedByCurrentUser !== true,
+        marketplaceContextDetected: !!context.listingUrl && !!context.marketplaceItemId,
+      };
+      const missingReasonByGate = {
+        routeAllowed: "route_not_allowed",
+        conversationThreadDetected: "conversation_thread_missing",
+        buyerMessageDetected: "buyer_message_missing",
+        buyerNameDetected: "buyer_name_missing",
+        sellerIsCurrentUser: "seller_current_user_missing",
+        marketplaceContextDetected: "marketplace_context_missing",
+      };
+      const missing = Object.entries(gates)
+        .filter(([, passed]) => !passed)
+        .map(([gate]) => missingReasonByGate[gate]);
+      logSalesAiGateDiagnostics(gates, evidence);
+      return { ok: missing.length === 0, missing, ...gates };
     }
 
     function scrapeConversation() {
-      const main = findMessengerRoot() || document.querySelector('[role="main"]') || document.body;
+      const main = findMarketplaceThreadRoot();
+      const threadHeaderText = getThreadHeadingText(main);
 
       // Try to detect buyer name from page heading
-      let buyerName = "";
-      const heading = main.querySelector('h1, [role="heading"]');
-      if (heading) buyerName = (heading.textContent || "").trim().slice(0, 120);
+      const buyerName = extractBuyerNameFromThreadHeader(threadHeaderText);
 
       // Try structured message rows — Messenger renders each message in a [role="row"] or similar
-      const messageEls = Array.from(
-        main.querySelectorAll('[data-testid="message-container"], [class*="message"], [role="row"]')
-      ).filter((el) => el.offsetParent !== null);
+      const messageLog = main?.querySelector('[role="log"]') || null;
+      const messageEls = messageLog
+        ? Array.from(messageLog.querySelectorAll('article, [role="row"]')).filter(visible)
+        : [];
 
-      let messages = [];
+      const messages = [];
+      let threadStartedByCurrentUser = null;
 
       if (messageEls.length > 0) {
         // Structured extraction: detect sent (you) vs received (buyer)
-        for (const el of messageEls.slice(-40)) {
-          const text = cleanMessengerText(el.innerText || el.textContent || "");
-          if (!text || text.length < 2 || isMessengerUiText(text)) continue;
-
-          // Heuristic: elements with aria-label containing "you" or sent indicators
-          const ariaLabel = (el.getAttribute("aria-label") || "").toLowerCase();
-          if (isMessengerUiText(ariaLabel)) continue;
-          const isSent =
-            ariaLabel.includes("you") ||
-            ariaLabel.includes("sent by you") ||
-            ariaLabel.includes("enviaste") ||
-            ariaLabel.includes("enviado por ti") ||
-            el.matches?.('[data-testid*="outgoing" i], [aria-label*="You sent" i]') ||
-            el.closest?.('[data-testid*="outgoing" i], [aria-label*="You sent" i]') ||
-            el.querySelector('[data-testid*="outgoing" i], [aria-label*="You sent" i]');
-
+        for (const el of messageEls.slice(-60)) {
+          const parsed = parseSemanticMessengerMessage(el);
+          if (parsed.isThreadStarter) {
+            threadStartedByCurrentUser = parsed.sentByCurrentUser;
+            continue;
+          }
+          if (!parsed.text || parsed.text.length < 2 || isMessengerUiText(parsed.text)) continue;
           messages.push({
-            speaker: isSent ? "Dealer" : (buyerName || "Buyer"),
-            text: text.slice(0, 500),
+            speaker: parsed.sentByCurrentUser ? "Dealer" : (buyerName || "Buyer"),
+            text: parsed.text.slice(0, 500),
           });
         }
       }
 
       // Fallback: raw text from [role="main"]
       if (messages.length < 1) {
-        return { buyerName, rawText: "", messages: [] };
+        return {
+          buyerName,
+          rawText: "",
+          messages: [],
+          evidence: {
+            threadHeaderText,
+            buyerNameCandidate: buyerName,
+            latestInboundMessageText: "",
+            threadStartedByCurrentUser,
+            matchedSelectors: collectMatchedThreadSelectors(main),
+          },
+        };
       }
 
       // Deduplicate consecutive identical messages
-      const deduped = messages.filter((m, i) =>
-        i === 0 || m.text !== messages[i - 1].text
-      );
+      const deduped = messages.filter((message, index) => {
+        const previous = messages[index - 1];
+        return !previous || message.speaker !== previous.speaker || message.text !== previous.text;
+      }).slice(-30);
+      const latestInboundMessage = [...deduped].reverse().find((message) => message.speaker !== "Dealer");
 
-      return { buyerName, messages: deduped.slice(-30), rawText: "" };
+      return {
+        buyerName,
+        messages: deduped,
+        rawText: "",
+        evidence: {
+          threadHeaderText,
+          buyerNameCandidate: buyerName,
+          latestInboundMessageText: latestInboundMessage?.text || "",
+          threadStartedByCurrentUser,
+          matchedSelectors: collectMatchedThreadSelectors(main),
+        },
+      };
     }
 
     // Detect listing context from the page (vehicle title, price, etc.)
+    function canonicalMarketplaceListingUrl(value) {
+      const match = String(value || "").match(/\/marketplace\/item\/(\d+)/i);
+      return match ? `https://www.facebook.com/marketplace/item/${match[1]}/` : null;
+    }
+
+    function extractVehicleTitleCandidate(value) {
+      const cleaned = cleanMessengerText(value)
+        .replace(/^.*?\$[\d,.]+\s*[-\u2013\u2014]\s*/i, "")
+        .replace(/^.*?[\u00b7\u2022|]\s+(?=(?:19|20)\d{2}\b)/, "")
+        .replace(/\s+(?:See details|Ver detalles|More options|M\u00e1s opciones).*$/i, "")
+        .trim();
+      const match = cleaned.match(/\b(?:19|20)\d{2}\s+[A-Za-z0-9][A-Za-z0-9 .+'\/-]{2,80}/);
+      return match ? match[0].trim() : null;
+    }
+
     function detectListingContext() {
-      const root = findMessengerRoot() || document;
-      const bodyText = (root.innerText || "").toLowerCase();
-      const urlMatch = document.querySelectorAll('a[href*="/marketplace/item/"]');
-      const listingUrl = urlMatch.length > 0 ? urlMatch[0].href : null;
+      const root = findMarketplaceThreadRoot();
+      const bodyText = (root?.innerText || "").toLowerCase();
+      const listingLink = root?.querySelector('a[href*="/marketplace/item/"]') || null;
+      const listingUrl = canonicalMarketplaceListingUrl(listingLink?.href);
+      const marketplaceItemId = listingUrl?.match(/\/item\/(\d+)\//)?.[1] || null;
 
       // Look for price patterns like $12,500 or $12500
       const priceMatch = bodyText.match(/\$[\d,]+/);
@@ -3880,24 +4044,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const downPayment = downMatch ? downMatch[0] : null;
 
       // Vehicle title — look for pattern like "2020 Toyota Camry" in headings or links
-      let vehicleTitle = null;
-      if (listingUrl) {
-        const headings = Array.from(root.querySelectorAll('h1, h2, [role="heading"], a[href*="/marketplace/item/"]'));
-        for (const h of headings) {
-          const t = cleanMessengerText(h.textContent || "");
-          if (
-            /\b(19|20)\d{2}\b/.test(t) &&
-            t.length > 8 &&
-            t.length < 120 &&
-            !/\b(group|page|older listings|recent media|visible)\b/i.test(t)
-          ) {
-            vehicleTitle = t;
-            break;
-          }
-        }
-      }
+      const titleSources = [
+        listingLink?.textContent || "",
+        getThreadHeadingText(root),
+        ...Array.from(root?.querySelectorAll('[role="heading"]') || []).map((node) => node.textContent || ""),
+      ];
+      const vehicleTitle = titleSources.map(extractVehicleTitleCandidate).find(Boolean) || null;
 
-      return { listingUrl, vehicleTitle, price, downPayment };
+      return { listingUrl, marketplaceItemId, vehicleTitle, price, downPayment };
     }
 
     function normalizeThreadToken(value) {
@@ -3999,9 +4153,10 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const messageDetectedAtMs = Date.now();
       setStatus("Reading conversation…");
 
-      const { buyerName, messages, rawText } = scrapeConversation();
+      const { buyerName, messages, rawText, evidence } = scrapeConversation();
       const context = detectListingContext();
-      const salesContext = validateMessengerSalesContext({ buyerName, messages, context });
+      evidence.listingTitleCandidate = context.vehicleTitle || "";
+      const salesContext = validateMessengerSalesContext({ buyerName, messages, context, evidence });
 
       if (!messages.length && !rawText) {
         setStatus("No conversation text found.", "err");
@@ -4040,6 +4195,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         buyerName: buyerName || undefined,
         dealerId: 1,
         messageDetectedAt: new Date(messageDetectedAtMs).toISOString(),
+        routeAllowed: salesContext.routeAllowed,
         conversationThreadDetected: salesContext.conversationThreadDetected,
         buyerMessageDetected: salesContext.buyerMessageDetected,
         buyerNameDetected: salesContext.buyerNameDetected,

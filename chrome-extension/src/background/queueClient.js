@@ -1004,6 +1004,7 @@ const handlers = {
       messageDetectedAt: message.messageDetectedAt,
       messageHash: message.messageHash,
       idempotencyKey: message.idempotencyKey,
+      routeAllowed: message.routeAllowed,
       conversationThreadDetected: message.conversationThreadDetected,
       buyerMessageDetected: message.buyerMessageDetected,
       buyerNameDetected: message.buyerNameDetected,
