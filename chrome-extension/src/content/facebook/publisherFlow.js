@@ -1924,6 +1924,13 @@
         const options = await scanForAnyOptions(4500, "location-suggestions");
         if (!options.length) continue;
 
+        // Facebook currently nests a second role=option inside every outer
+        // suggestion row. The outer <li> is visible but does not reliably
+        // commit the location when clicked; use the innermost option that owns
+        // the actual interaction handler whenever that duplicated DOM exists.
+        const leafOptions = options.filter((option) => !option.querySelector?.('[role="option"]'));
+        const locationOptions = leafOptions.length ? leafOptions : options;
+
         const optionText = (option) => normalizeText(option.innerText || option.textContent || "");
         const containsToken = (text, token) => {
           if (!token) return false;
@@ -1938,6 +1945,7 @@
           const queryStateAlias = locationQuery.stateAlias;
           let score = 0;
           if (firstLine === queryCityPart) score += 45;
+          if (containsToken(text, "city") || containsToken(text, "ciudad")) score += 120;
           if (text.includes(`${queryCityPart}, ${queryStatePart}`)) score += 60;
           if (queryStateAlias && text.includes(`${queryCityPart}, ${queryStateAlias}`)) score += 55;
           if (queryCityPart && text.includes(queryCityPart)) score += 25;
@@ -1951,7 +1959,7 @@
         let pick = null;
 
         if (cityPart) {
-          const scored = options
+          const scored = locationOptions
             .map((option) => ({ option, score: optionScore(option) }))
             .filter((entry) => entry.score > 0)
             .sort((a, b) => b.score - a.score);
@@ -1961,9 +1969,9 @@
         if (!pick) {
           const normalizedQueryTarget = normalizeText(query);
           pick =
-            options.find((option) => optionText(option).includes(normalizedQueryTarget)) ||
-            options.find((option) => locationQuery.city && optionText(option).includes(locationQuery.city) && (!locationQuery.stateAlias || optionText(option).includes(locationQuery.stateAlias))) ||
-            (!locationQuery.state && options.find((option) => locationQuery.city && optionText(option).includes(locationQuery.city))) ||
+            locationOptions.find((option) => optionText(option).includes(normalizedQueryTarget)) ||
+            locationOptions.find((option) => locationQuery.city && optionText(option).includes(locationQuery.city) && (!locationQuery.stateAlias || optionText(option).includes(locationQuery.stateAlias))) ||
+            (!locationQuery.state && locationOptions.find((option) => locationQuery.city && optionText(option).includes(locationQuery.city))) ||
             null;
         }
 
@@ -1972,8 +1980,8 @@
         // explicit suggestion selection for the location to be considered
         // valid; selecting the first visible suggestion is a pragmatic
         // fallback that fixes the "invalid location" error in many cases.
-        if (!pick && options.length > 0 && locationQuery.allowFirstFallback) {
-          pick = options[0];
+        if (!pick && locationOptions.length > 0 && locationQuery.allowFirstFallback) {
+          pick = locationOptions[0];
           stateLog("location suggestion fallback -> selecting first suggestion");
         }
 
@@ -1985,27 +1993,52 @@
             try { pick.dispatchEvent(new MouseEvent(eventName, { bubbles: true, cancelable: true, view: window })); } catch (_) { /* noop */ }
           }
           try { pick.click(); } catch (_) { /* noop */ }
-          pickedSuggestion = true;
           await sleep(900);
           const committed = normalizeText(fieldCurrentValue(el) || el.innerText || el.textContent || "");
-          if (!committed || committed === normalizeText(query)) {
-            el.focus?.();
-            document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
-            await sleep(150);
-            document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
-            await sleep(700);
+          const visibleLocationOptions = Array.from(document.querySelectorAll('[role="option"]')).filter(isVisibleElement);
+          const validationText = normalizeText(
+            Array.from(document.querySelectorAll('[role="alert"], [aria-live], div, span'))
+              .filter(isVisibleElement)
+              .map((node) => (node.innerText || node.textContent || "").trim())
+              .filter((text) => text && text.length <= 180)
+              .join(" "),
+          );
+          const explicitlyInvalid =
+            validationText.includes("ubicacion no es valid") ||
+            validationText.includes("location is not valid") ||
+            validationText.includes("invalid location");
+          const explicitlyValid =
+            validationText.includes("ubicacion es valid") ||
+            validationText.includes("location is valid");
+          const cityCommitted = containsToken(committed, locationQuery.city);
+          const popupClosed = el.getAttribute?.("aria-expanded") !== "true" && visibleLocationOptions.length === 0;
+          const selectionCommitted =
+            cityCommitted &&
+            popupClosed &&
+            !explicitlyInvalid &&
+            (explicitlyValid || committed !== normalizeText(query));
+
+          if (selectionCommitted) {
+            pickedSuggestion = true;
+            dispatchCommitEvents(el);
+            stateLog(`location committed -> "${committed}"`);
+            await sleep(250);
+            break;
           }
-          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
-          await sleep(250);
-          break;
+
+          stateLog(`location suggestion did not commit -> "${committed || "empty"}"; retrying`);
         }
       }
 
-      if (pickedSuggestion) dispatchCommitEvents(el);
-      else warnings.push(`location: no autocomplete suggestion matched "${textValue}"`);
+      if (!pickedSuggestion) {
+        warnings.push(`location: no autocomplete suggestion committed for "${textValue}"`);
+        missed.push("location");
+        stateError(`Could not commit a valid location for "${textValue}"`);
+        return false;
+      }
       await sleep(300);
       filled.push("location");
-      log(pickedSuggestion ? "location suggestion selected" : "location filled");
+      log("location suggestion selected and committed");
       return true;
     }
 

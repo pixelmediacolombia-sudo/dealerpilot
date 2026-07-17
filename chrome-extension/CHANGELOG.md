@@ -1,5 +1,14 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.64
+
+**Fixed**
+- Selects Facebook's innermost city autocomplete option instead of the duplicated wrapper option.
+- Verifies that Marketplace committed a valid location and closed its suggestion popup before continuing the vehicle form.
+- Retries location queries and moves the job to Needs Review without filling the remaining form when Facebook does not accept a city.
+
+---
+
 ## v1.3.63
 
 **Fixed**

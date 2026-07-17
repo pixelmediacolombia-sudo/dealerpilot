@@ -185,22 +185,25 @@ test("Marketplace location selects autocomplete suggestions before validating Ne
   assert.match(content, /downtown /);
   assert.match(content, /registraron una visita/);
   assert.match(content, /allowFirstFallback/);
+  assert.match(content, /leafOptions/);
+  assert.match(content, /!option\.querySelector\?\.\('\[role="option"\]'\)/);
+  assert.match(content, /containsToken\(text, "city"\).*containsToken\(text, "ciudad"\)/);
   assert.match(content, /const optionScore = \(option\) =>/);
   assert.match(content, /firstLine === queryCityPart/);
   assert.match(content, /text\.includes\("lake "\)/);
   assert.match(content, /location autocomplete suggestions are still open/);
-  assert.match(content, /location suggestion selected/);
-  assert.match(content, /no autocomplete suggestion matched/);
+  assert.match(content, /location suggestion selected and committed/);
+  assert.match(content, /location suggestion did not commit/);
+  assert.match(content, /selectionCommitted/);
+  assert.match(content, /popupClosed/);
+  assert.match(content, /explicitlyInvalid/);
+  assert.match(content, /no autocomplete suggestion committed/);
   assert.match(content, /await fillLocationStep\(fill\.location\)/);
   assert.ok(
     content.indexOf("await fillLocationStep(fill.location)") < content.indexOf('setStatus("Selecting year'),
     "location must be committed before year/make/model because Facebook can revalidate the form after location changes",
   );
-  assert.doesNotMatch(
-    content,
-    /key: "ArrowDown"[\s\S]{0,300}key: "Enter"[\s\S]{0,300}location filled/,
-    "location must not force Enter when no autocomplete suggestion was selected",
-  );
+  assert.doesNotMatch(content, /document\.dispatchEvent\(new KeyboardEvent\("keydown", \{ key: "ArrowDown"/);
 });
 
 test("Positive Facebook validation text is not treated as a blocking form error", () => {
