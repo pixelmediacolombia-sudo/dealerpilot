@@ -692,6 +692,30 @@ router.post("/conversations/intake", async (req, res) => {
   }
 
   if (!hasNewBuyerMessage) {
+    const retryableReply =
+      latestParsed?.role === "user"
+        ? existingMsgs.find((message) => message.role === "assistant" && isDisplayMessage(message))?.content ?? null
+        : null;
+    if (retryableReply) {
+      req.log.info(
+        { conversationId, externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
+        "Conversation intake returning existing reply for Messenger delivery retry",
+      );
+      res.json({
+        conversationId,
+        suggestedReply: retryableReply,
+        deliveryRetry: true,
+        language,
+        fallbackUsed: false,
+        fallbackReason: null,
+        timings: {
+          messageDetectedAt: messageDetectedAt.toISOString(),
+          backendReceivedAt: backendReceivedAt.toISOString(),
+          totalResponseMs: Date.now() - messageDetectedAt.getTime(),
+        },
+      });
+      return;
+    }
     req.log.info(
       { conversationId, externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
       "Conversation intake skipped - duplicate buyer message",

@@ -537,6 +537,12 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(publisherFlowSource, /Mensajes de la conversaci\\u00f3n/);
   assert.match(publisherFlowSource, /\[role=\"log\"\] article/);
   assert.match(publisherFlowSource, /semanticMessageEls/);
+  assert.match(publisherFlowSource, /scrapeConversationSnapshot/);
+  assert.match(publisherFlowSource, /findConversationScrollContainer/);
+  assert.match(publisherFlowSource, /mergeConversationWindows/);
+  assert.match(publisherFlowSource, /lastMessengerHistoryHydrationKey/);
+  assert.doesNotMatch(publisherFlowSource, /messageEls\.slice\(-60\)/);
+  assert.doesNotMatch(publisherFlowSource, /\}\)\.slice\(-30\)/);
   assert.match(publisherFlowSource, /querySelectorAll\('\[aria-label\]'\)/);
   assert.match(publisherFlowSource, /\(\?:por\|by\)\\s\+\[\^:\]\{1,80\}:/);
   assert.match(publisherFlowSource, /por\\s\+\(\?:t\\u00fa\|ti\)/);
@@ -559,7 +565,9 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.doesNotMatch(publisherFlowSource, /parseInboxThreadText/);
   assert.match(publisherFlowSource, /marketplace-thread::/);
   assert.match(publisherFlowSource, /async function autoSendReply/);
+  assert.match(publisherFlowSource, /messengerCaptureInFlight/);
   assert.match(publisherFlowSource, /function findMessengerSendButton/);
+  assert.match(publisherFlowSource, /const box = getMessengerMessageBox\(\)/);
   assert.match(publisherFlowSource, /AI reply sent automatically/);
   assert.match(publisherFlowSource, /Read Chat & Send AI Reply/);
   assert.match(conversationsSource, /parseConversationMessage/);
@@ -583,6 +591,8 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(conversationsSource, /generateAiReplyWithFallback/);
   assert.match(conversationsSource, /buildSafeFallbackReply/);
   assert.match(conversationsSource, /duplicate_buyer_message/);
+  assert.match(conversationsSource, /deliveryRetry: true/);
+  assert.match(conversationsSource, /returning existing reply for Messenger delivery retry/);
   assert.match(conversationsSource, /messageDetectedAt/);
   assert.match(conversationsSource, /backendReceivedAt/);
   assert.match(conversationsSource, /aiStartedAt/);

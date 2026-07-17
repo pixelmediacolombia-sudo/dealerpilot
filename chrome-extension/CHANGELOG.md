@@ -1,5 +1,15 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.66
+
+**Fixed**
+- Loads older Marketplace messages before intake and preserves the complete loaded thread instead of truncating it to the newest 30 messages.
+- Targets the active Messenger composer instead of Facebook's first global editable field.
+- Retries a generated Sales AI reply when the buyer message was saved but the first Facebook send attempt was not delivered.
+- Serializes automatic conversation captures so history loading and AI delivery cannot overlap.
+
+---
+
 ## v1.3.65
 
 **Fixed**

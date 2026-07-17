@@ -3862,7 +3862,29 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   let messengerControlsStarted = false;
   let lastMessengerCaptureHash = "";
   let lastMessengerAutoSendHash = "";
+  let lastMessengerHistoryHydrationKey = "";
+  let messengerCaptureInFlight = false;
   let lastReply = "";
+
+  function getMessengerMessageBox() {
+    const threadRoot = findMessengerRoot();
+    const candidates = Array.from(
+      document.querySelectorAll(
+        '[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label], textarea[aria-label]',
+      ),
+    ).filter((box) => {
+      if (!visible(box)) return false;
+      const label = `${box.getAttribute("aria-label") || ""} ${box.getAttribute("data-lexical-editor") || ""}`;
+      if (/search|buscar|comment|comentario|post|publicaci\u00f3n/i.test(label)) return false;
+      return /message|mensaje|lexical/i.test(label) || !!threadRoot?.contains(box);
+    });
+
+    const insideThread = candidates.find((box) => threadRoot?.contains(box));
+    if (insideThread) return insideThread;
+    return candidates.sort((left, right) =>
+      right.getBoundingClientRect().bottom - left.getBoundingClientRect().bottom,
+    )[0] || null;
+  }
 
   function initMessengerAiControls() {
     if (messengerControlsStarted || !isMessengerUiVisible()) return;
@@ -4066,7 +4088,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return { ok: missing.length === 0, missing, ...gates };
     }
 
-    function scrapeConversation() {
+    function scrapeConversationSnapshot() {
       const main = findMarketplaceThreadRoot();
       const threadHeaderText = getThreadHeadingText(main);
 
@@ -4092,7 +4114,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
       if (messageEls.length > 0) {
         // Structured extraction: detect sent (you) vs received (buyer)
-        for (const el of messageEls.slice(-60)) {
+        for (const el of messageEls) {
           const parsed = parseSemanticMessengerMessage(el);
           if (parsed.isThreadStarter) {
             threadStartedByCurrentUser = parsed.sentByCurrentUser;
@@ -4126,7 +4148,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const deduped = messages.filter((message, index) => {
         const previous = messages[index - 1];
         return !previous || message.speaker !== previous.speaker || message.text !== previous.text;
-      }).slice(-30);
+      });
       const latestInboundMessage = [...deduped].reverse().find((message) => message.speaker !== "Dealer");
 
       return {
@@ -4141,6 +4163,95 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           matchedSelectors: collectMatchedThreadSelectors(main),
         },
       };
+    }
+
+    function findConversationScrollContainer(messageLog) {
+      let candidate = messageLog;
+      while (candidate && candidate !== document.body) {
+        const style = window.getComputedStyle(candidate);
+        const canScroll = /auto|scroll/i.test(style.overflowY || "");
+        if (canScroll && candidate.scrollHeight > candidate.clientHeight + 8) return candidate;
+        candidate = candidate.parentElement;
+      }
+      return null;
+    }
+
+    function sameConversationMessage(left, right) {
+      return left?.speaker === right?.speaker && left?.text === right?.text;
+    }
+
+    function mergeConversationWindows(olderWindow, currentHistory) {
+      if (!olderWindow.length) return currentHistory;
+      if (!currentHistory.length) return olderWindow;
+
+      const maxOverlap = Math.min(olderWindow.length, currentHistory.length);
+      for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
+        const olderSuffix = olderWindow.slice(-overlap);
+        const currentPrefix = currentHistory.slice(0, overlap);
+        if (olderSuffix.every((message, index) => sameConversationMessage(message, currentPrefix[index]))) {
+          return [...olderWindow, ...currentHistory.slice(overlap)];
+        }
+      }
+
+      return [...olderWindow, ...currentHistory];
+    }
+
+    async function scrapeConversation() {
+      let snapshot = scrapeConversationSnapshot();
+      let messages = snapshot.messages;
+      const hydrationKey = safeSalesAiUrl();
+      const messageLog = findMarketplaceThreadRoot()?.querySelector('[role="log"]') || null;
+      let scrollContainer = findConversationScrollContainer(messageLog);
+
+      if (!scrollContainer || lastMessengerHistoryHydrationKey === hydrationKey) return snapshot;
+      lastMessengerHistoryHydrationKey = hydrationKey;
+
+      const shouldRestoreBottom =
+        scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 80;
+      let stablePasses = 0;
+      let previousHeight = scrollContainer.scrollHeight;
+
+      for (let pass = 0; pass < 8 && stablePasses < 2; pass += 1) {
+        scrollContainer.scrollTop = 0;
+        scrollContainer.dispatchEvent(new Event("scroll", { bubbles: true }));
+        await sleep(350);
+
+        const olderSnapshot = scrapeConversationSnapshot();
+        const merged = mergeConversationWindows(olderSnapshot.messages, messages);
+        const addedMessages = merged.length - messages.length;
+        messages = merged;
+        snapshot = {
+          ...snapshot,
+          buyerName: snapshot.buyerName || olderSnapshot.buyerName,
+          evidence: {
+            ...olderSnapshot.evidence,
+            ...snapshot.evidence,
+          },
+        };
+
+        const refreshedLog = findMarketplaceThreadRoot()?.querySelector('[role="log"]') || null;
+        scrollContainer = findConversationScrollContainer(refreshedLog) || scrollContainer;
+        const heightChanged = scrollContainer.scrollHeight > previousHeight + 8;
+        stablePasses = addedMessages > 0 || heightChanged ? 0 : stablePasses + 1;
+        previousHeight = scrollContainer.scrollHeight;
+      }
+
+      if (shouldRestoreBottom) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        scrollContainer.dispatchEvent(new Event("scroll", { bubbles: true }));
+        await sleep(100);
+        const newestSnapshot = scrapeConversationSnapshot();
+        messages = mergeConversationWindows(messages, newestSnapshot.messages);
+        snapshot = {
+          ...snapshot,
+          evidence: {
+            ...snapshot.evidence,
+            ...newestSnapshot.evidence,
+          },
+        };
+      }
+
+      return { ...snapshot, messages };
     }
 
     // Detect listing context from the page (vehicle title, price, etc.)
@@ -4202,22 +4313,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return `${fallbackUrl.split("?")[0]}::${buyer || "unknown-buyer"}`;
     }
 
-    function getMessengerMessageBox() {
-      const root = findMessengerRoot() || document;
-      return (
-        root.querySelector('[contenteditable="true"][role="textbox"]') ||
-        root.querySelector('[contenteditable="true"][aria-label*="message" i]') ||
-        root.querySelector('textarea[aria-label*="message" i]') ||
-        document.querySelector('[contenteditable="true"][role="textbox"]') ||
-        document.querySelector('[contenteditable="true"][aria-label*="message" i]') ||
-        document.querySelector('[contenteditable="true"]') ||
-        document.querySelector('textarea[aria-label*="message" i]') ||
-        document.querySelector('textarea')
-      );
-    }
-
     function findMessengerSendButton() {
-      const root = findMessengerRoot() || document;
+      const box = getMessengerMessageBox();
+      const root =
+        box?.closest('[role="dialog"]') ||
+        box?.closest('[role="main"]') ||
+        findMessengerRoot() ||
+        document;
       const candidates = Array.from(
         root.querySelectorAll(
           [
@@ -4239,7 +4341,15 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         const rect = el.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0 && !el.disabled && el.getAttribute("aria-disabled") !== "true";
       });
-      return candidates[0] || null;
+      if (!box) return candidates[0] || null;
+      const boxRect = box.getBoundingClientRect();
+      return candidates.sort((left, right) => {
+        const leftRect = left.getBoundingClientRect();
+        const rightRect = right.getBoundingClientRect();
+        const leftDistance = Math.abs(leftRect.left - boxRect.right) + Math.abs(leftRect.top - boxRect.top);
+        const rightDistance = Math.abs(rightRect.left - boxRect.right) + Math.abs(rightRect.top - boxRect.top);
+        return leftDistance - rightDistance;
+      })[0] || null;
     }
 
     async function clickMessengerSend() {
@@ -4278,13 +4388,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return true;
     }
 
-    async function captureConversation(options = {}) {
+    async function captureConversationOnce(options = {}) {
       const silent = !!options.silent;
       const automatic = !!options.automatic;
       const messageDetectedAtMs = Date.now();
       setStatus("Reading conversation…");
 
-      const { buyerName, messages, rawText, evidence } = scrapeConversation();
+      const { buyerName, messages, rawText, evidence } = await scrapeConversation();
       const context = detectListingContext();
       evidence.listingTitleCandidate = context.vehicleTitle || "";
       const salesContext = validateMessengerSalesContext({ buyerName, messages, context, evidence });
@@ -4412,6 +4522,16 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       });
     }
 
+    async function captureConversation(options = {}) {
+      if (messengerCaptureInFlight) return;
+      messengerCaptureInFlight = true;
+      try {
+        return await captureConversationOnce(options);
+      } finally {
+        messengerCaptureInFlight = false;
+      }
+    }
+
     const readBtn = button("Read Chat & Send AI Reply", () => captureConversation({ silent: true }));
     actionsEl.appendChild(readBtn);
 
@@ -4432,13 +4552,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   setInterval(initMessengerAiControls, 1500);
 
   function insertReply(text) {
-    // Try contenteditable first (Messenger's message box)
-    const box =
-      document.querySelector('[contenteditable="true"][role="textbox"]') ||
-      document.querySelector('[contenteditable="true"][aria-label*="Message" i]') ||
-      document.querySelector('[contenteditable="true"]') ||
-      document.querySelector('textarea[aria-label*="Message" i]') ||
-      document.querySelector('textarea');
+    // Use the composer resolved inside the active Marketplace thread. A global
+    // contenteditable selector can target Facebook search instead of Messenger.
+    const box = getMessengerMessageBox();
 
     if (!box) {
       setStatus("Could not find the message box.", "err");
