@@ -584,6 +584,10 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(buyerNameGuardSource, /UI_MESSAGE_TEXT\.has\(normalized\)/);
   assert.doesNotMatch(buyerNameGuardSource, /isUiConversationText\(cleaned\)/);
   assert.match(conversationsSource, /isBlockedFacebookSurface/);
+  assert.match(conversationsSource, /resolveMarketplaceIntakeSourceUrl/);
+  assert.match(conversationsSource, /https:\/\/www\.facebook\.com\/marketplace\/inbox/);
+  assert.match(conversationsSource, /isBlockedFacebookSurface\(resolvedSourceUrl\)/);
+  assert.match(conversationsSource, /sourceUrl:\s*resolvedSourceUrl \?\? existingConv\.sourceUrl/);
   assert.match(conversationsSource, /invalid Marketplace Sales AI context/);
   assert.match(conversationsSource, /blocked_facebook_surface/);
   assert.match(conversationsSource, /buyer_name_missing/);

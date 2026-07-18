@@ -169,6 +169,27 @@ function isBlockedFacebookSurface(sourceUrl?: string | null): boolean {
   }
 }
 
+function resolveMarketplaceIntakeSourceUrl(params: {
+  sourceUrl?: string | null;
+  detectedMarketplaceListingUrl?: string | null;
+  detectedVehicleTitle?: string | null;
+  marketplaceContextDetected?: boolean;
+}): string | undefined {
+  const sourceUrl = params.sourceUrl ?? undefined;
+  if (!isBlockedFacebookSurface(sourceUrl)) return sourceUrl;
+
+  const detectedTitle = cleanConversationText(params.detectedVehicleTitle);
+  const hasExplicitMarketplaceEvidence =
+    params.marketplaceContextDetected === true &&
+    (
+      !!extractMarketplaceItemId(params.detectedMarketplaceListingUrl) ||
+      /\b(?:19|20)\d{2}\s+\S+/.test(detectedTitle)
+    );
+  if (!hasExplicitMarketplaceEvidence) return sourceUrl;
+
+  return params.detectedMarketplaceListingUrl || "https://www.facebook.com/marketplace/inbox";
+}
+
 function normalizeVehicleTitle(value?: string | null): string {
   return cleanConversationText(value)
     .toLowerCase()
@@ -455,6 +476,12 @@ router.post("/conversations/intake", async (req, res) => {
   };
   const backendReceivedAt = new Date();
   const messageDetectedAt = parseTimestamp(rawMessageDetectedAt) ?? parseTimestamp(_ts) ?? backendReceivedAt;
+  const resolvedSourceUrl = resolveMarketplaceIntakeSourceUrl({
+    sourceUrl,
+    detectedMarketplaceListingUrl,
+    detectedVehicleTitle,
+    marketplaceContextDetected,
+  });
 
   if (!externalThreadRef) {
     res.status(400).json({ error: "externalThreadRef required" });
@@ -469,14 +496,22 @@ router.post("/conversations/intake", async (req, res) => {
     sellerIsCurrentUser === true ? null : "seller_current_user_missing",
     marketplaceContextDetected === true ? null : "marketplace_context_missing",
   ].filter((reason): reason is string => !!reason);
-  if (missingContext.length > 0 || !isReliableBuyerName(buyerName) || isBlockedFacebookSurface(sourceUrl)) {
-    const reason = isBlockedFacebookSurface(sourceUrl)
+  if (missingContext.length > 0 || !isReliableBuyerName(buyerName) || isBlockedFacebookSurface(resolvedSourceUrl)) {
+    const reason = isBlockedFacebookSurface(resolvedSourceUrl)
       ? "blocked_facebook_surface"
       : !isReliableBuyerName(buyerName)
         ? "buyer_name_missing"
         : missingContext[0];
     req.log.info(
-      { externalThreadRef, sourceUrl, buyerName, reason, missingContext, extensionId: extensionId ?? null },
+      {
+        externalThreadRef,
+        sourceUrl,
+        resolvedSourceUrl,
+        buyerName,
+        reason,
+        missingContext,
+        extensionId: extensionId ?? null,
+      },
       "Conversation intake skipped - invalid Marketplace Sales AI context",
     );
     res.json({
@@ -627,6 +662,7 @@ router.post("/conversations/intake", async (req, res) => {
           detectedMarketplaceListingUrl ?? existingConv.detectedListingUrl,
         detectedVehicleTitle:
           resolvedVehicleTitle ?? existingConv.detectedVehicleTitle,
+        sourceUrl: resolvedSourceUrl ?? existingConv.sourceUrl,
         language,
       })
       .where(eq(conversationsTable.id, existingConv.id))
@@ -640,7 +676,7 @@ router.post("/conversations/intake", async (req, res) => {
         externalThreadRef,
         buyerName,
         language,
-        sourceUrl,
+        sourceUrl: resolvedSourceUrl,
         detectedListingUrl: detectedMarketplaceListingUrl,
         detectedVehicleTitle: resolvedVehicleTitle,
         vehicleId,
@@ -795,7 +831,7 @@ router.post("/conversations/intake", async (req, res) => {
         language,
         vehicleId: vehicleId ?? existingLead.vehicleId,
         listingId: listingId ?? existingLead.listingId,
-        sourceUrl: sourceUrl ?? existingLead.sourceUrl,
+        sourceUrl: resolvedSourceUrl ?? existingLead.sourceUrl,
         publishedDownPayment:
           parsedDownPayment ?? existingLead.publishedDownPayment,
         suggestedReply: suggestedReply ?? existingLead.suggestedReply,
@@ -822,7 +858,7 @@ router.post("/conversations/intake", async (req, res) => {
         language,
         vehicleId,
         listingId,
-        sourceUrl,
+        sourceUrl: resolvedSourceUrl,
         publishedDownPayment: parsedDownPayment,
         suggestedReply,
         phone: extractedPhone,
