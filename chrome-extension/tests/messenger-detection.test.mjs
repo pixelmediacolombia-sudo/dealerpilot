@@ -425,6 +425,27 @@ test("Messenger auto-send excludes generic and quick-response buttons", () => {
   assert.match(resolverSource, /\[aria-label\*=\"send\" i\]/);
 });
 
+test("Messenger automatic capture yields to hidden Facebook tabs", () => {
+  assert.match(publisherFlowSource, /document\.visibilityState !== "visible"/);
+  assert.match(publisherFlowSource, /captureOnlyWhenTabVisible/);
+});
+
+test("Messenger diagnostics retain per-tab provenance and classify duplicate intake", () => {
+  const queueClientSource = readFileSync(
+    new URL("../src/background/queueClient.js", import.meta.url),
+    "utf8",
+  );
+  const popupSource = readFileSync(
+    new URL("../popup/modules/uiActions.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(queueClientSource, /lastMessengerCaptureDebugByTab/);
+  assert.match(queueClientSource, /sourceTabId/);
+  assert.match(popupSource, /duplicate_extension_intake/);
+  assert.match(popupSource, /tabId: activeTabId/);
+  assert.match(popupSource, /warn-text/);
+});
+
 test("Messenger intake sends canonical Buyer and Dealer role labels", () => {
   assert.match(
     publisherFlowSource,

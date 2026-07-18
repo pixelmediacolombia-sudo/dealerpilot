@@ -5297,16 +5297,20 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     const readBtn = button("Read Chat & Send AI Reply", () => captureConversation({ silent: true }));
     actionsEl.appendChild(readBtn);
 
-    setTimeout(() => {
+    const captureOnlyWhenTabVisible = () => {
+      // Facebook Marketplace can be open in several tabs at once. Hidden tabs
+      // must not compete for the same conversation or overwrite the active
+      // tab's Sales AI diagnostics while their DOM is stale or incomplete.
+      if (document.visibilityState !== "visible") return;
       captureConversation({ silent: true, automatic: true }).catch((err) => {
         console.warn("[DealerPilot AI] Messenger auto-capture failed", err);
       });
-    }, 1200);
+    };
+
+    setTimeout(captureOnlyWhenTabVisible, 1200);
     setInterval(() => {
-      if (!isMessengerUiVisible()) return;
-      captureConversation({ silent: true, automatic: true }).catch((err) => {
-        console.warn("[DealerPilot AI] Messenger auto-capture failed", err);
-      });
+      if (!isMessengerUiVisible() || document.visibilityState !== "visible") return;
+      captureOnlyWhenTabVisible();
     }, MESSENGER_CAPTURE_INTERVAL_MS);
   }
 

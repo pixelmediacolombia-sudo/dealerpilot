@@ -1,5 +1,10 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.78
+
+- Ignore hidden Facebook tabs during automatic Messenger capture so duplicate tabs cannot compete for one thread.
+- Keep Sales AI diagnostics scoped to the active tab and treat backend deduplication as a warning instead of a red failure.
+
 ## v1.3.77
 
 **Fixed**

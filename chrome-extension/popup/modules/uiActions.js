@@ -235,7 +235,14 @@ async function loadDebugState() {
   dbg.chromeId.textContent = truncate(chrome.runtime.id || "—", 24);
   dbg.chromeId.title = chrome.runtime.id || "";
 
-  const res = await send({ type: "GET_DEBUG_STATE" });
+  let activeTabId = null;
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    activeTabId = Number.isInteger(activeTab?.id) ? activeTab.id : null;
+  } catch (_) {
+    // Fall back to the global debug snapshot if tab lookup is unavailable.
+  }
+  const res = await send({ type: "GET_DEBUG_STATE", tabId: activeTabId });
   if (!res || !res.ok) {
     dbg.connStatus.textContent = "Error reading state";
     dbg.connStatus.className = "value err";
@@ -422,10 +429,14 @@ async function loadDebugState() {
   const aiCapture = d.lastMessengerCaptureDebug;
   if (aiCapture) {
     const aiConfirmed = aiCapture.stage === "intake_ok" && aiCapture.aiReplyReceived === true;
+    const duplicateIntake = aiCapture.stage === "intake_skipped" &&
+      aiCapture.reason === "duplicate_extension_intake";
     dbg.aiConfirmed.textContent = aiConfirmed ? "Yes ✓" : "No — see stage";
-    dbg.aiConfirmed.className = "value " + (aiConfirmed ? "ok" : "err");
+    dbg.aiConfirmed.className = "value " + (aiConfirmed ? "ok" : duplicateIntake ? "warn-text" : "err");
     dbg.aiCaptureStage.textContent = aiCapture.stage || "Unknown";
-    dbg.aiCaptureStage.className = "value " + (aiCapture.stage === "intake_ok" ? "ok" : "");
+    dbg.aiCaptureStage.className = "value " + (
+      aiCapture.stage === "intake_ok" ? "ok" : duplicateIntake ? "warn-text" : ""
+    );
     dbg.aiQuickReply.textContent = aiCapture.quickReplyVisible
       ? `Yes ✓${aiCapture.quickReplyLabel ? ` (${truncate(aiCapture.quickReplyLabel, 24)})` : ""}`
       : "No";
@@ -447,7 +458,9 @@ async function loadDebugState() {
         : "Not reached";
     dbg.aiSendContract.className = "value " + (aiCapture.autoSent ? "ok" : aiCapture.stage === "auto_send_blocked" ? "err" : "");
     dbg.aiCaptureReason.textContent = aiCapture.reason || "None";
-    dbg.aiCaptureReason.className = "value " + (aiCapture.reason ? "err" : "ok");
+    dbg.aiCaptureReason.className = "value " + (
+      !aiCapture.reason ? "ok" : duplicateIntake ? "warn-text" : "err"
+    );
     dbg.aiCaptureAt.textContent = fmtTime(aiCapture.at || aiCapture.receivedAt);
     dbg.aiCaptureAt.className = "value";
     dbg.aiCaptureStage.title = JSON.stringify(aiCapture);

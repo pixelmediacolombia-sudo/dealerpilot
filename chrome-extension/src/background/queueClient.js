@@ -186,11 +186,16 @@ async function saveFacebookPageState(tabId, state, tabUrl) {
 }
 
 async function removeFacebookPageState(tabId) {
-  const { facebookPageStates = {} } = await chrome.storage.local.get("facebookPageStates");
+  const { facebookPageStates = {}, lastMessengerCaptureDebugByTab = {} } = await chrome.storage.local.get([
+    "facebookPageStates",
+    "lastMessengerCaptureDebugByTab",
+  ]);
   delete facebookPageStates[String(tabId)];
+  delete lastMessengerCaptureDebugByTab[String(tabId)];
   const aggregate = aggregateFacebookPageStates(facebookPageStates);
   await chrome.storage.local.set({
     facebookPageStates: aggregate.pageStates,
+    lastMessengerCaptureDebugByTab,
     ...aggregate.patch,
   });
 }
@@ -1079,7 +1084,7 @@ const handlers = {
     return { ok: true };
   },
 
-  async GET_DEBUG_STATE() {
+  async GET_DEBUG_STATE(message) {
     const keys = [
       "backendUrl",
       "extensionId",
@@ -1093,6 +1098,7 @@ const handlers = {
       "messengerDetected",
       "lastMessengerDetectionDebug",
       "lastMessengerCaptureDebug",
+      "lastMessengerCaptureDebugByTab",
       "workflowStep",
       "workflowStepAt",
       "fbLoggedIn",
@@ -1129,7 +1135,11 @@ const handlers = {
       marketplaceDetected: stored.marketplaceDetected || false,
       messengerDetected: stored.messengerDetected || false,
       lastMessengerDetectionDebug: stored.lastMessengerDetectionDebug || null,
-      lastMessengerCaptureDebug: stored.lastMessengerCaptureDebug || null,
+      lastMessengerCaptureDebug: stored.lastMessengerCaptureDebugByTab?.[String(
+        Number.isInteger(message?.tabId)
+          ? message.tabId
+          : (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0]?.id,
+      )] || stored.lastMessengerCaptureDebug || null,
       workflowStep: stored.workflowStep || null,
       workflowStepAt: stored.workflowStepAt || null,
       fbLoggedIn: stored.fbLoggedIn ?? null,
@@ -1155,12 +1165,23 @@ const handlers = {
     return { ok: true };
   },
 
-  async MESSENGER_CAPTURE_DEBUG(message) {
+  async MESSENGER_CAPTURE_DEBUG(message, sender) {
     const debug = {
       ...(message.debug || {}),
+      sourceTabId: Number.isInteger(sender?.tab?.id) ? sender.tab.id : null,
+      sourceTabUrl: sender?.tab?.url || null,
       receivedAt: new Date().toISOString(),
     };
-    await chrome.storage.local.set({ lastMessengerCaptureDebug: debug });
+    const { lastMessengerCaptureDebugByTab = {} } = await chrome.storage.local.get(
+      "lastMessengerCaptureDebugByTab",
+    );
+    if (Number.isInteger(sender?.tab?.id)) {
+      lastMessengerCaptureDebugByTab[String(sender.tab.id)] = debug;
+    }
+    await chrome.storage.local.set({
+      lastMessengerCaptureDebug: debug,
+      lastMessengerCaptureDebugByTab,
+    });
     return { saved: true };
   },
 
@@ -1326,7 +1347,7 @@ const STATE_KEYS_TO_CLEAR = [
   "lastPollTime", "auditLog", "facebookPageStates",
   "marketplaceDetected", "marketplacePath", "marketplaceUrl",
   "marketplaceDetectedAt", "messengerDetected", "lastMessengerDetectionDebug",
-  "lastMessengerCaptureDebug",
+  "lastMessengerCaptureDebug", "lastMessengerCaptureDebugByTab",
   "messengerAvailabilityClaims",
 ];
 
