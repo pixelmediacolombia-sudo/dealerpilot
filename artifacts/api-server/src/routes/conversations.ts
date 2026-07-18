@@ -23,7 +23,8 @@ const STORE_PHONES: Record<string, string> = {
 };
 
 const DEFAULT_STORE_PHONE = "+1 703-763-4675";
-const SALES_AI_REPLY_TIMEOUT_MS = 3500;
+const SALES_AI_REPLY_TIMEOUT_MS = 12000;
+const MESSENGER_DELIVERY_RETRY_DELAY_MS = 120000;
 
 function resolveStorePhone(lotLocation?: string | null): string {
   if (!lotLocation) return DEFAULT_STORE_PHONE;
@@ -252,12 +253,81 @@ function parseTimestamp(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function buildSafeFallbackReply(language: string, vehicleTitle?: string, storePhone: string = DEFAULT_STORE_PHONE): string {
-  const vehicle = vehicleTitle ?? (language === "es" ? "el vehiculo" : "the vehicle");
-  if (language === "es") {
-    return `Gracias por escribirnos sobre el ${vehicle}. Para confirmar disponibilidad y opciones, llama ahora al ${storePhone}. ¿Puedes llamar en este momento?`;
+type SalesReplyStage = "availability" | "request_phone" | "phone_received" | "general";
+
+function extractPhoneNumber(text: string): string | null {
+  const match = text.match(/(?:^|\D)((?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})(?=$|\D)/);
+  const digits = match?.[1]?.replace(/\D/g, "") ?? "";
+  const localDigits = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  if (localDigits.length !== 10) return null;
+  return `${localDigits.slice(0, 3)}-${localDigits.slice(3, 6)}-${localDigits.slice(6)}`;
+}
+
+function hasPhoneNumber(text: string): boolean {
+  return extractPhoneNumber(text) !== null;
+}
+
+function resolveSalesReplyStage(visibleMessages: string[], currentMessage: string): SalesReplyStage {
+  const latest = cleanConversationText(currentMessage).toLowerCase();
+  const history = visibleMessages.map(cleanConversationText).join(" ").toLowerCase();
+  if (hasPhoneNumber(latest)) return "phone_received";
+  if (/\b(link|application|apply|financ(?:e|ing)|loan|monthly payment|payment plan|solicitud|aplicar|financiamiento|financiar|credito|crédito|cuota mensual)\b/i.test(latest)) {
+    return "request_phone";
   }
-  return `Thanks for asking about the ${vehicle}. To confirm availability and options, call us now at ${storePhone}. Are you able to call now?`;
+  if (/\b(is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|esta disponible|está disponible|lo tiene disponible)\b/i.test(latest)) {
+    return "availability";
+  }
+  if (!/\b(?:Dealer|DealerPilot AI|Assistant):/i.test(history)) return "availability";
+  return "general";
+}
+
+function buildSafeFallbackReply(
+  language: string,
+  vehicleTitle?: string,
+  storePhone: string = DEFAULT_STORE_PHONE,
+  visibleMessages: string[] = [],
+  currentMessage: string = "",
+  availabilityQuickReplyAccepted: boolean = false,
+): string {
+  const vehicle = vehicleTitle ?? (language === "es" ? "el vehículo" : "the vehicle");
+  const stage = resolveSalesReplyStage(visibleMessages, currentMessage);
+  if (language === "es") {
+    if (stage === "phone_received") {
+      return `Gracias. Nuestro equipo se comunicará contigo pronto sobre el ${vehicle}. Si prefieres llamar ahora: ${storePhone}.`;
+    }
+    if (stage === "request_phone") {
+      return `Perfecto. ¿Cuál es el mejor número de teléfono para ayudarte con el financiamiento del ${vehicle}?`;
+    }
+    if (stage === "availability") {
+      return `${availabilityQuickReplyAccepted ? "" : "Sí, sigue disponible. "}¿Te interesa financiar el ${vehicle}?`;
+    }
+    return `Con gusto te ayudo con el ${vehicle}. ¿Te interesa financiarlo?`;
+  }
+  if (stage === "phone_received") {
+    return `Thank you. Our team will contact you shortly about the ${vehicle}. If you prefer to call now: ${storePhone}.`;
+  }
+  if (stage === "request_phone") {
+    return `Great. What's the best phone number to help you with financing for the ${vehicle}?`;
+  }
+  if (stage === "availability") {
+    return `${availabilityQuickReplyAccepted ? "" : "Yes, it is still available. "}Are you interested in financing the ${vehicle}?`;
+  }
+  return `I'd be happy to help with the ${vehicle}. Are you interested in financing it?`;
+}
+
+function isAiReplyAligned(reply: string, stage: SalesReplyStage, storePhone: string): boolean {
+  const normalized = cleanConversationText(reply).toLowerCase();
+  if (!normalized) return false;
+  if (stage === "availability") {
+    return /financ|financiar|financiamiento/.test(normalized) && !normalized.includes(storePhone.toLowerCase());
+  }
+  if (stage === "request_phone") {
+    return /phone|number|tel[eé]fono|n[uú]mero/.test(normalized) && !normalized.includes(storePhone.toLowerCase());
+  }
+  if (stage === "phone_received") {
+    return /call|contact|llam|comunicar/.test(normalized);
+  }
+  return true;
 }
 
 type AiReplyResult = {
@@ -272,26 +342,27 @@ type AiReplyResult = {
 const ALPHA_RULES = `
 You are a professional car sales representative for Alpha Motorsport, a used car dealership.
 
-PHONE-FIRST STRATEGY:
-Your goal is to get the buyer to call the store. Every reply must:
-1. Answer the buyer's question directly without inventing availability, price, approval, or financing details
-2. Mention the specific vehicle by year, make, and model
-3. Direct them to call the store phone number provided
-4. Optionally ask if they want help scheduling a visit TODAY
+CONVERSATION FUNNEL:
+1. For the initial Marketplace availability inquiry, the affirmative Marketplace quick reply is handled by the extension. Ask whether the buyer is interested in financing.
+2. When the buyer is interested in financing or asks for an application/link, ask for the best phone number.
+3. Once the buyer provides a phone number, acknowledge it and say the team will call shortly. Only at this stage may you also offer the store phone as an immediate option.
+4. Send exactly one short reply for the latest buyer turn. Never repeat a previous reply.
+5. Answer safe vehicle questions directly when the supplied context contains the answer; never invent availability, price, approval, history, or financing details.
 
 Language rules:
 - Match the buyer's language EXACTLY (English or Spanish — do not mix)
 - Use "easy financing options" / "opciones de financiamiento fáciles"
 - Use "approval based on qualification" / "aprobación basada en calificación"
-- If asked about financing details: say they can confirm all options by calling
+- Do not push a call or include the store phone in the first reply
+- If asked about financing or an application link, ask for the buyer's phone number first
 - NEVER say: guaranteed approval, everyone approved, bad credit, denied, rejected, disqualified
 - NEVER promise a loan or specific rate
-- NEVER invent price, down payment, availability, or financing terms; if missing, tell the buyer to call the store to confirm
+- NEVER invent price, down payment, vehicle history, or financing terms
 
 Reply format:
-- Keep it SHORT — 3–5 lines max including the phone number line
-- Include the phone number with 📞 emoji on its own line
-- End with one soft question (appointment or purchase timeline)
+- Keep it SHORT — one or two sentences
+- Ask only one question at a time
+- Follow the current funnel stage exactly
 `;
 
 export function detectLanguage(text: string): "en" | "es" {
@@ -341,6 +412,7 @@ export async function generateAiReply(
   vehicleType?: string,
   publishedDownPayment?: number,
   storePhone: string = DEFAULT_STORE_PHONE,
+  availabilityQuickReplyAccepted: boolean = false,
 ): Promise<string> {
   const langNote =
     language === "es"
@@ -353,12 +425,21 @@ export async function generateAiReply(
 
   const history = visibleMessages.slice(-8).join("\n");
 
-  const phoneInstruction = `Store phone for this listing: ${storePhone} — ALWAYS include this number in your reply with a 📞 emoji.`;
+  const stage = resolveSalesReplyStage(visibleMessages, currentMessage);
+  const stageInstruction = {
+    availability: availabilityQuickReplyAccepted
+      ? "The affirmative Marketplace availability quick reply was already sent. Ask only whether the buyer is interested in financing."
+      : "Confirm availability briefly, then ask whether the buyer is interested in financing.",
+    request_phone: "Ask for the buyer's best phone number so the finance team can help. Do not provide the store phone yet.",
+    phone_received: `A phone number was provided. Thank the buyer, say the team will call shortly, and optionally offer ${storePhone} as an immediate call option.`,
+    general: "Answer safely using only supplied facts, then move the conversation forward with one short question.",
+  }[stage];
 
   const prompt = `${ALPHA_RULES}
 
 ${vehicleContext}
-${phoneInstruction}
+Current funnel stage: ${stage}
+Stage instruction: ${stageInstruction}
 
 Recent conversation:
 ${history}
@@ -366,7 +447,7 @@ ${history}
 Latest buyer message: "${currentMessage}"
 
 ${langNote}
-Write a short phone-first reply. Must include 📞 ${storePhone} on its own line. Mention the vehicle. Keep it under 5 lines.`;
+Write one short reply that follows the stage instruction exactly. Mention the vehicle naturally.`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-5-mini",
@@ -376,17 +457,18 @@ Write a short phone-first reply. Must include 📞 ${storePhone} on its own line
 
   const raw = response.choices[0]?.message?.content?.trim();
 
-  // Verify phone number is present; if AI omitted it, inject fallback template
-  if (raw && raw.length > 0 && raw.includes(storePhone)) {
+  if (raw && isAiReplyAligned(raw, stage, storePhone)) {
     return raw;
   }
 
-  // Fallback phone-first template
-  const vehicle = vehicleTitle ?? "the vehicle";
-  if (language === "es") {
-    return `Sí, está disponible ✅\n\nPara info rápida y opciones de financiamiento, llama directo a nuestra tienda:\n\n📞 ${storePhone}\n\nDiles que preguntas por el ${vehicle} que viste en Marketplace. ¿Quieres apartar una cita para verlo hoy?`;
-  }
-  return `Yes, it's available ✅\n\nFor the fastest details and financing options, call our store directly:\n\n📞 ${storePhone}\n\nMention you're asking about the ${vehicle} from Marketplace. Would you like to set up a time to see it today?`;
+  return buildSafeFallbackReply(
+    language,
+    vehicleTitle,
+    storePhone,
+    visibleMessages,
+    currentMessage,
+    availabilityQuickReplyAccepted,
+  );
 }
 
 async function generateAiReplyWithFallback(
@@ -397,6 +479,7 @@ async function generateAiReplyWithFallback(
   vehicleType?: string,
   publishedDownPayment?: number,
   storePhone: string = DEFAULT_STORE_PHONE,
+  availabilityQuickReplyAccepted: boolean = false,
 ): Promise<AiReplyResult> {
   const aiStartedAt = new Date();
   let fallbackReason: string | null = null;
@@ -411,6 +494,7 @@ async function generateAiReplyWithFallback(
         vehicleType,
         publishedDownPayment,
         storePhone,
+        availabilityQuickReplyAccepted,
       ),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("sales_ai_reply_timeout")), SALES_AI_REPLY_TIMEOUT_MS),
@@ -433,7 +517,14 @@ async function generateAiReplyWithFallback(
 
   const aiCompletedAt = new Date();
   return {
-    reply: buildSafeFallbackReply(language, vehicleTitle, storePhone),
+    reply: buildSafeFallbackReply(
+      language,
+      vehicleTitle,
+      storePhone,
+      visibleMessages,
+      currentMessage,
+      availabilityQuickReplyAccepted,
+    ),
     fallbackUsed: true,
     fallbackReason,
     aiStartedAt,
@@ -494,6 +585,7 @@ router.post("/conversations/intake", async (req, res) => {
     buyerNameDetected,
     sellerIsCurrentUser,
     marketplaceContextDetected,
+    availabilityQuickReplyAccepted,
     timestamp: _ts,
   } = req.body as {
     extensionId?: string;
@@ -517,6 +609,7 @@ router.post("/conversations/intake", async (req, res) => {
     buyerNameDetected?: boolean;
     sellerIsCurrentUser?: boolean;
     marketplaceContextDetected?: boolean;
+    availabilityQuickReplyAccepted?: boolean;
     timestamp?: string;
   };
   const backendReceivedAt = new Date();
@@ -764,10 +857,16 @@ router.post("/conversations/intake", async (req, res) => {
   }
 
   if (!hasNewBuyerMessage) {
-    const retryableReply =
+    const latestAssistantMessage =
       latestParsed?.role === "user"
-        ? existingMsgs.find((message) => message.role === "assistant" && isDisplayMessage(message))?.content ?? null
+        ? existingMsgs.find((message) => message.role === "assistant" && isDisplayMessage(message)) ?? null
         : null;
+    const assistantAgeMs = latestAssistantMessage?.createdAt
+      ? Date.now() - new Date(latestAssistantMessage.createdAt).getTime()
+      : Number.POSITIVE_INFINITY;
+    const retryableReply = assistantAgeMs >= MESSENGER_DELIVERY_RETRY_DELAY_MS
+      ? latestAssistantMessage?.content ?? null
+      : null;
     if (retryableReply) {
       req.log.info(
         { conversationId, externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
@@ -806,8 +905,7 @@ router.post("/conversations/intake", async (req, res) => {
   }
 
   // Extract phone number if buyer included one in their message
-  const phoneMatch = inbound.match(/\b(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})\b/);
-  const extractedPhone = phoneMatch ? phoneMatch[1].replace(/[-.\s]/g, "-") : null;
+  const extractedPhone = extractPhoneNumber(inbound);
 
   let suggestedReply: string | null = null;
   let aiReplyResult: AiReplyResult | null = null;
@@ -827,6 +925,7 @@ router.post("/conversations/intake", async (req, res) => {
       vehicleType,
       parsedDownPayment,
       storePhone,
+      availabilityQuickReplyAccepted === true,
     );
     suggestedReply = aiReplyResult.reply;
 

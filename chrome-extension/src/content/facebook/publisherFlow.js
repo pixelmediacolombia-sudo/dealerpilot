@@ -4177,6 +4177,113 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return { descriptor, text, sentByCurrentUser, isThreadStarter };
     }
 
+    function findPlainMessengerBubble(textEl, messageScope) {
+      let candidate = textEl;
+      for (let depth = 0; candidate && candidate !== messageScope && depth < 6; depth += 1) {
+        if (candidate.closest('button, [role="button"], a, [contenteditable="true"], textarea')) return null;
+        const rect = candidate.getBoundingClientRect();
+        const style = window.getComputedStyle(candidate);
+        const background = style.backgroundColor || "";
+        const radius = Number.parseFloat(style.borderRadius || "0");
+        const hasBubbleBackground = background && !/rgba?\(0,\s*0,\s*0(?:,\s*0)?\)|transparent/i.test(background);
+        if (
+          hasBubbleBackground &&
+          radius >= 6 &&
+          rect.width >= 18 &&
+          rect.height >= 16 &&
+          rect.height <= 320
+        ) return candidate;
+        candidate = candidate.parentElement;
+      }
+      return null;
+    }
+
+    function parsePlainMessengerMessages(messageScope, buyerName, threadHeaderText) {
+      if (!messageScope) return [];
+      const scopeRect = messageScope.getBoundingClientRect();
+      if (!scopeRect.width || !scopeRect.height) return [];
+      const seenBubbles = new Set();
+      const headerParts = cleanMessengerText(threadHeaderText).split(/\s+[·•|]\s+/).filter(Boolean);
+      const candidates = Array.from(messageScope.querySelectorAll('div[dir="auto"], span[dir="auto"]'))
+        .filter(visible)
+        .map((textEl) => findPlainMessengerBubble(textEl, messageScope))
+        .filter((bubble) => {
+          if (!bubble || seenBubbles.has(bubble)) return false;
+          seenBubbles.add(bubble);
+          return true;
+        })
+        .map((bubble) => {
+          const text = cleanMessengerText(bubble.innerText || bubble.textContent || "");
+          const rect = bubble.getBoundingClientRect();
+          const leftGap = Math.max(0, rect.left - scopeRect.left);
+          const rightGap = Math.max(0, scopeRect.right - rect.right);
+          return {
+            bubble,
+            text,
+            top: rect.top,
+            sentByCurrentUser: rightGap + 16 < leftGap,
+          };
+        })
+        .filter(({ text, bubble }) => {
+          if (!text || text.length < 2 || text.length > 500 || isMessengerUiText(text)) return false;
+          if (text === buyerName || headerParts.includes(text)) return false;
+          if (/^Marketplace\b/i.test(text) || /^\$[\d,.]+\b/.test(text)) return false;
+          return !bubble.querySelector('a[href*="/marketplace/item/"]');
+        })
+        .sort((left, right) => left.top - right.top);
+
+      return candidates.map(({ text, sentByCurrentUser }) => ({
+        speaker: sentByCurrentUser ? "Dealer" : (buyerName || "Buyer"),
+        text,
+      }));
+    }
+
+    function isMarketplaceAvailabilityInquiry(text) {
+      const normalized = cleanMessengerText(text).toLowerCase();
+      return /\b(?:is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|est[aá] disponible|lo tiene disponible)\b/i.test(normalized);
+    }
+
+    function findMarketplaceAvailabilityAcceptButton() {
+      const root = findMessengerRoot();
+      if (!root) return null;
+      const affirmativeLabels = new Set([
+        "yes its available",
+        "yes it is available",
+        "yes this is available",
+        "yes still available",
+        "yes are you interested",
+        "si esta disponible",
+        "si sigue disponible",
+        "si aun esta disponible",
+        "si te interesa",
+      ]);
+      return Array.from(root.querySelectorAll('button, [role="button"]')).find((buttonEl) => {
+        if (!visible(buttonEl) || buttonEl.disabled || buttonEl.getAttribute("aria-disabled") === "true") return false;
+        const label = cleanMessengerText(
+          buttonEl.getAttribute("aria-label") || buttonEl.innerText || buttonEl.textContent || "",
+        ).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/['’]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+        return affirmativeLabels.has(label);
+      }) || null;
+    }
+
+    async function acceptMarketplaceAvailabilityQuickReply(captureHash, messages) {
+      const lastMessage = messages[messages.length - 1] || null;
+      if (!lastMessage || lastMessage.speaker === "Dealer" || !isMarketplaceAvailabilityInquiry(lastMessage.text)) {
+        return false;
+      }
+      const acceptButton = findMarketplaceAvailabilityAcceptButton();
+      if (!acceptButton) return false;
+      const claim = await send({
+        type: "MESSENGER_CLAIM_AVAILABILITY_ACTION",
+        claimKey: captureHash,
+      });
+      if (!claim?.ok || claim.data?.claimed !== true) return false;
+      acceptButton.click();
+      await sleep(900);
+      setStatus("Marketplace availability confirmed. Preparing financing question...", "muted");
+      return true;
+    }
+
     function logSalesAiGateDiagnostics(gates, evidence) {
       console.log("[DealerPilot AI] Sales AI validation gates", gates);
       const reasons = {
@@ -4275,7 +4382,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         }
       }
 
-      // Fallback: raw text from [role="main"]
+      // Facebook also renders Marketplace chats as unlabeled rounded bubbles.
+      // When semantic rows are absent, use bubble styling plus left/right
+      // alignment inside the already validated active thread.
+      if (messages.length < 1 && messageScope) {
+        messages.push(...parsePlainMessengerMessages(messageScope, buyerName, threadHeaderText));
+      }
+
       if (messages.length < 1) {
         return {
           buyerName,
@@ -4659,6 +4772,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       });
       payload.messageHash = captureHash;
       payload.idempotencyKey = captureHash;
+      let availabilityQuickReplyAccepted = false;
 
       if (automatic) {
         if (captureHash === lastMessengerAutoSendHash) {
@@ -4683,7 +4797,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         payload.messageDetectedAt = new Date(
           pendingMessengerMessageDetectedAt || messageDetectedAtMs,
         ).toISOString();
+
+        availabilityQuickReplyAccepted = await acceptMarketplaceAvailabilityQuickReply(
+          captureHash,
+          messages,
+        );
       }
+
+      payload.availabilityQuickReplyAccepted = availabilityQuickReplyAccepted;
 
       const buyerReplyPending =
         silent &&

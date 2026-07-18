@@ -1,5 +1,16 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.73
+
+**Fixed**
+- Accepts Facebook Marketplace's affirmative availability quick reply inside the active seller chat.
+- Follows the sales funnel requested by Alpha Motorsport: financing interest, phone capture, then call handoff.
+- Lets the AI finish within a realistic response window and uses the same funnel-aware text if a fallback is required.
+- Deduplicates intake across every open Facebook tab and delays delivery retries so one buyer turn cannot send twice.
+- Reads current Facebook chat variants that expose visible rounded bubbles without semantic message labels.
+
+---
+
 ## v1.3.72
 
 **Fixed**

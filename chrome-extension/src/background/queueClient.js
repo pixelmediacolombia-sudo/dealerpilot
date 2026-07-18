@@ -7,6 +7,12 @@ const MARKETPLACE_INBOX_URL = "https://www.facebook.com/marketplace/inbox";
 const FACEBOOK_LOGIN_URL =
   "https://www.facebook.com/login/?next=%2Fmarketplace%2Fcreate%2Fvehicle";
 
+const CONVERSATION_INTAKE_DEDUPE_MS = 120000;
+const MESSENGER_AVAILABILITY_CLAIM_TTL_MS = 5 * 60 * 1000;
+const conversationIntakeInFlight = new Set();
+const recentConversationIntakes = new Map();
+const availabilityClaimsInFlight = new Set();
+
 async function getBackendUrl() {
   return DealerPilotApiClient.getBackendUrl();
 }
@@ -1149,31 +1155,72 @@ const handlers = {
 
   // ---- Sales AI: Conversation Intake ----
   async CONVERSATION_INTAKE(message) {
-    const extensionId = await getExtensionId();
-    return apiPost("/api/conversations/intake", {
-      extensionId,
-      externalThreadRef: message.externalThreadRef,
-      sourceUrl: message.sourceUrl,
-      buyerName: message.buyerName,
-      visibleMessages: message.visibleMessages || [],
-      currentMessage: message.currentMessage,
-      detectedMarketplaceListingUrl: message.detectedMarketplaceListingUrl,
-      detectedVehicleTitle: message.detectedVehicleTitle,
-      marketplaceDownPayment: message.marketplaceDownPayment,
-      marketplaceAskingPrice: message.marketplaceAskingPrice,
-      vehicleType: message.vehicleType,
-      dealerId: message.dealerId || 1,
-      messageDetectedAt: message.messageDetectedAt,
-      messageHash: message.messageHash,
-      idempotencyKey: message.idempotencyKey,
-      routeAllowed: message.routeAllowed,
-      conversationThreadDetected: message.conversationThreadDetected,
-      buyerMessageDetected: message.buyerMessageDetected,
-      buyerNameDetected: message.buyerNameDetected,
-      sellerIsCurrentUser: message.sellerIsCurrentUser,
-      marketplaceContextDetected: message.marketplaceContextDetected,
-      timestamp: new Date().toISOString(),
-    });
+    const dedupeKey = message.idempotencyKey || message.messageHash || "";
+    const now = Date.now();
+    for (const [key, completedAt] of recentConversationIntakes.entries()) {
+      if (now - completedAt > CONVERSATION_INTAKE_DEDUPE_MS) recentConversationIntakes.delete(key);
+    }
+    if (
+      dedupeKey &&
+      (conversationIntakeInFlight.has(dedupeKey) || recentConversationIntakes.has(dedupeKey))
+    ) {
+      return { skipped: true, reason: "duplicate_extension_intake" };
+    }
+
+    if (dedupeKey) conversationIntakeInFlight.add(dedupeKey);
+    try {
+      const extensionId = await getExtensionId();
+      const response = await apiPost("/api/conversations/intake", {
+        extensionId,
+        externalThreadRef: message.externalThreadRef,
+        sourceUrl: message.sourceUrl,
+        buyerName: message.buyerName,
+        visibleMessages: message.visibleMessages || [],
+        currentMessage: message.currentMessage,
+        detectedMarketplaceListingUrl: message.detectedMarketplaceListingUrl,
+        detectedVehicleTitle: message.detectedVehicleTitle,
+        marketplaceDownPayment: message.marketplaceDownPayment,
+        marketplaceAskingPrice: message.marketplaceAskingPrice,
+        vehicleType: message.vehicleType,
+        dealerId: message.dealerId || 1,
+        messageDetectedAt: message.messageDetectedAt,
+        messageHash: message.messageHash,
+        idempotencyKey: message.idempotencyKey,
+        routeAllowed: message.routeAllowed,
+        conversationThreadDetected: message.conversationThreadDetected,
+        buyerMessageDetected: message.buyerMessageDetected,
+        buyerNameDetected: message.buyerNameDetected,
+        sellerIsCurrentUser: message.sellerIsCurrentUser,
+        marketplaceContextDetected: message.marketplaceContextDetected,
+        availabilityQuickReplyAccepted: message.availabilityQuickReplyAccepted === true,
+        timestamp: new Date().toISOString(),
+      });
+      if (dedupeKey) recentConversationIntakes.set(dedupeKey, Date.now());
+      return response;
+    } finally {
+      if (dedupeKey) conversationIntakeInFlight.delete(dedupeKey);
+    }
+  },
+
+  async MESSENGER_CLAIM_AVAILABILITY_ACTION(message) {
+    const claimKey = String(message.claimKey || "");
+    if (!claimKey || availabilityClaimsInFlight.has(claimKey)) return { claimed: false };
+    availabilityClaimsInFlight.add(claimKey);
+    try {
+      const now = Date.now();
+      const { messengerAvailabilityClaims = {} } = await chrome.storage.local.get("messengerAvailabilityClaims");
+      const activeClaims = Object.fromEntries(
+        Object.entries(messengerAvailabilityClaims).filter(([, claimedAt]) =>
+          Number.isFinite(Number(claimedAt)) && now - Number(claimedAt) < MESSENGER_AVAILABILITY_CLAIM_TTL_MS,
+        ),
+      );
+      if (activeClaims[claimKey]) return { claimed: false };
+      activeClaims[claimKey] = now;
+      await chrome.storage.local.set({ messengerAvailabilityClaims: activeClaims });
+      return { claimed: true };
+    } finally {
+      availabilityClaimsInFlight.delete(claimKey);
+    }
   },
 
   async GET_CONVERSATION_LEAD(message) {
@@ -1268,6 +1315,7 @@ const STATE_KEYS_TO_CLEAR = [
   "lastPollTime", "auditLog", "facebookPageStates",
   "marketplaceDetected", "marketplacePath", "marketplaceUrl",
   "marketplaceDetectedAt", "messengerDetected", "lastMessengerDetectionDebug",
+  "messengerAvailabilityClaims",
 ];
 
 (async () => {

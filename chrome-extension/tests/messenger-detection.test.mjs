@@ -252,6 +252,22 @@ test("Messenger capture falls back to the validated active thread when role=log 
   );
 });
 
+test("Messenger capture reads unlabeled rounded chat bubbles inside the active thread", () => {
+  assert.match(publisherFlowSource, /function findPlainMessengerBubble/);
+  assert.match(publisherFlowSource, /function parsePlainMessengerMessages/);
+  assert.match(publisherFlowSource, /backgroundColor/);
+  assert.match(publisherFlowSource, /rightGap \+ 16 < leftGap/);
+  assert.match(publisherFlowSource, /messages\.push\(\.\.\.parsePlainMessengerMessages/);
+});
+
+test("Marketplace availability quick reply is accepted once before the financing question", () => {
+  assert.match(publisherFlowSource, /function findMarketplaceAvailabilityAcceptButton/);
+  assert.match(publisherFlowSource, /yes its available/);
+  assert.match(publisherFlowSource, /si esta disponible/);
+  assert.match(publisherFlowSource, /MESSENGER_CLAIM_AVAILABILITY_ACTION/);
+  assert.match(publisherFlowSource, /availabilityQuickReplyAccepted/);
+});
+
 test("Messenger auto-send excludes generic and quick-response buttons", () => {
   const start = publisherFlowSource.indexOf("    function findMessengerSendButton()");
   const end = publisherFlowSource.indexOf("    function readMessengerComposerText", start);

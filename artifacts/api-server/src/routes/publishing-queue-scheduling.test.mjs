@@ -596,7 +596,13 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(conversationsSource, /marketplaceListingsTable\.facebookListingId/);
   assert.match(conversationsSource, /exactTitles\.includes\(normalizedDetectedTitle\)/);
   assert.match(conversationsSource, /Conversation intake skipped - no buyer message/);
-  assert.match(conversationsSource, /SALES_AI_REPLY_TIMEOUT_MS = 3500/);
+  assert.match(conversationsSource, /SALES_AI_REPLY_TIMEOUT_MS = 12000/);
+  assert.match(conversationsSource, /MESSENGER_DELIVERY_RETRY_DELAY_MS = 120000/);
+  assert.match(conversationsSource, /resolveSalesReplyStage/);
+  assert.match(conversationsSource, /extractPhoneNumber/);
+  assert.match(conversationsSource, /isAiReplyAligned/);
+  assert.match(conversationsSource, /Are you interested in financing/);
+  assert.match(conversationsSource, /best phone number/);
   assert.match(conversationsSource, /generateAiReplyWithFallback/);
   assert.match(conversationsSource, /buildSafeFallbackReply/);
   assert.match(conversationsSource, /duplicate_buyer_message/);
@@ -628,6 +634,10 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(conversationsSource, /unreadMessages/);
   assert.match(queueClientSource, /messageDetectedAt/);
   assert.match(queueClientSource, /idempotencyKey/);
+  assert.match(queueClientSource, /CONVERSATION_INTAKE_DEDUPE_MS = 120000/);
+  assert.match(queueClientSource, /duplicate_extension_intake/);
+  assert.match(queueClientSource, /MESSENGER_CLAIM_AVAILABILITY_ACTION/);
+  assert.match(queueClientSource, /availabilityQuickReplyAccepted/);
   assert.match(queueClientSource, /conversationThreadDetected/);
   assert.match(queueClientSource, /routeAllowed/);
   assert.match(publisherFlowSource, /Sales AI response timing/);
