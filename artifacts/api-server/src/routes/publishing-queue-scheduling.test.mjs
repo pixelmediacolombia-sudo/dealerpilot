@@ -157,6 +157,15 @@ test("assigned endpoint can map the extension storage id to the online Chrome co
   assert.match(routeSource, /if \(online\?\.chrome_extension_id\) aliases\.add\(online\.chrome_extension_id\);/);
 });
 
+test("assigned polling repairs due jobs after the extension identifier changes", () => {
+  assert.match(routeSource, /if \(online\?\.chrome_extension_id === extensionId\)/);
+  assert.match(routeSource, /set\(\{ assignedExtensionId: extensionId, assignedAt: new Date\(\) \}\)/);
+  assert.match(
+    routeSource,
+    /eq\(publishingJobsTable\.status,\s*"Assigned"\)[\s\S]*isNull\(publishingJobsTable\.claimedByExtension\)[\s\S]*lte\(publishingJobsTable\.scheduledAt,\s*new Date\(\)\)/,
+  );
+});
+
 test("bulk schedule keeps future vehicles scheduled and assigns only due jobs", () => {
   assert.match(routeSource, /const claimableNow: number\[\] = \[\];/);
   assert.match(routeSource, /status:\s*jobDueNow\s*\?\s*"Queued"\s*:\s*"Scheduled"/);

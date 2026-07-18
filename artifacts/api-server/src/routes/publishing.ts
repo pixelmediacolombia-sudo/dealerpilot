@@ -13,7 +13,7 @@ import {
   autoPublishSettingsTable,
   pool,
 } from "@workspace/db";
-import { and, asc, desc, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { getMarketplacePricing } from "../listings/pricing";
 import {
   checkPublishGuardrails,
@@ -155,13 +155,30 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
     [extensionId],
   );
   if (connection.rows[0]?.name) aliases.add(connection.rows[0].name);
-  if (!connection.rows[0]?.name) {
-    const onlineConnection = await pool.query<{ name: string | null; chrome_extension_id: string | null }>(
-      "select name, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
-    );
-    const online = onlineConnection.rows[0];
-    if (online?.name) aliases.add(online.name);
-    if (online?.chrome_extension_id) aliases.add(online.chrome_extension_id);
+  const onlineConnection = await pool.query<{ name: string | null; chrome_extension_id: string | null }>(
+    "select name, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+  );
+  const online = onlineConnection.rows[0];
+  if (online?.name) aliases.add(online.name);
+  if (online?.chrome_extension_id) aliases.add(online.chrome_extension_id);
+
+  // A Chrome extension reload/update can change the ID stored on an already
+  // assigned job. Repair due, unclaimed assignments as soon as the current
+  // online extension polls instead of waiting for the background worker's
+  // next interval. This is limited to the current heartbeat ID so an arbitrary
+  // caller cannot steal another extension's queue.
+  if (online?.chrome_extension_id === extensionId) {
+    await db
+      .update(publishingJobsTable)
+      .set({ assignedExtensionId: extensionId, assignedAt: new Date() })
+      .where(
+        and(
+          eq(publishingJobsTable.status, "Assigned"),
+          isNull(publishingJobsTable.claimedByExtension),
+          or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
+          or(isNull(publishingJobsTable.assignedExtensionId), ne(publishingJobsTable.assignedExtensionId, extensionId)),
+        ),
+      );
   }
 
   const [row] = await db
