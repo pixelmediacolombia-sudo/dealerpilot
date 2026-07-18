@@ -1,5 +1,16 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.72
+
+**Fixed**
+- Waits seven quiet seconds after the latest buyer message before requesting one AI reply for the complete burst.
+- Restarts that quiet window whenever another buyer message arrives, preventing repeated replies and unnecessary token usage.
+- Ignores the extension's own recently sent reply even if Facebook temporarily renders it with the wrong direction.
+- Preserves repeated messages by their ordered position instead of globally deleting equal text from Sales history.
+- Refreshes the open Sales conversation every two seconds and its conversation list every three seconds.
+
+---
+
 ## v1.3.70
 
 **Fixed**

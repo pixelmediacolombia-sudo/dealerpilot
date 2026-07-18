@@ -613,6 +613,10 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(conversationsSource, /messages\.filter\(isDisplayMessage\)/);
   assert.match(conversationsSource, /hasBuyerMessage/);
   assert.match(conversationsSource, /hasNewBuyerMessage/);
+  assert.match(conversationsSource, /findNewConversationMessages/);
+  assert.match(conversationsSource, /existingChronological\.slice\(-overlap\)/);
+  assert.match(conversationsSource, /incomingChronological\.slice\(0, overlap\)/);
+  assert.doesNotMatch(conversationsSource, /const existingContents = new Set/);
   assert.match(conversationsSource, /shouldGenerateReply/);
   assert.match(conversationsSource, /latestParsed\?\.role === "user"/);
   assert.doesNotMatch(publisherFlowSource, /Send was NOT clicked/);

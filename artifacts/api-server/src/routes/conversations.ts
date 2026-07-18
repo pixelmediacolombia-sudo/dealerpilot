@@ -133,6 +133,51 @@ function parseConversationMessage(value: unknown): ParsedConversationMessage | n
   return { role, content: text.slice(0, 1000) };
 }
 
+function sameParsedConversationMessage(
+  left: ParsedConversationMessage | null | undefined,
+  right: ParsedConversationMessage | null | undefined,
+): boolean {
+  return !!left && !!right && left.role === right.role && left.content.trim() === right.content.trim();
+}
+
+function mergeCurrentConversationMessage(
+  messages: ParsedConversationMessage[],
+  current: ParsedConversationMessage | null,
+): ParsedConversationMessage[] {
+  if (!current || sameParsedConversationMessage(messages[messages.length - 1], current)) return messages;
+  return [...messages, current];
+}
+
+function findNewConversationMessages(
+  existingChronological: ParsedConversationMessage[],
+  incomingChronological: ParsedConversationMessage[],
+): ParsedConversationMessage[] {
+  const maxOverlap = Math.min(existingChronological.length, incomingChronological.length);
+  for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
+    const existingSuffix = existingChronological.slice(-overlap);
+    const incomingPrefix = incomingChronological.slice(0, overlap);
+    if (existingSuffix.every((message, index) => sameParsedConversationMessage(message, incomingPrefix[index]))) {
+      return incomingChronological.slice(overlap);
+    }
+  }
+
+  // Facebook can briefly omit the dealer's latest outgoing row while the DOM
+  // rerenders. In that case the incoming prefix still matches an older DB
+  // segment even though it is not the DB suffix. Continue after that segment
+  // instead of charging for the same buyer text again.
+  for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
+    const incomingPrefix = incomingChronological.slice(0, overlap);
+    const lastStart = existingChronological.length - overlap;
+    for (let start = lastStart; start >= 0; start -= 1) {
+      const existingSegment = existingChronological.slice(start, start + overlap);
+      if (existingSegment.every((message, index) => sameParsedConversationMessage(message, incomingPrefix[index]))) {
+        return incomingChronological.slice(overlap);
+      }
+    }
+  }
+  return incomingChronological;
+}
+
 function isDisplayMessage(message: { content?: string | null } | null | undefined): boolean {
   return !!message?.content && !isUiConversationText(message.content);
 }
@@ -530,11 +575,12 @@ router.post("/conversations/intake", async (req, res) => {
   const rawMsgs = Array.isArray(visibleMessages) ? visibleMessages : [];
   const parsedMsgs = rawMsgs.map(parseConversationMessage).filter((msg): msg is ParsedConversationMessage => !!msg);
   const currentParsed = parseConversationMessage(currentMessage);
-  const latestParsed = currentParsed ?? parsedMsgs[parsedMsgs.length - 1] ?? null;
+  const incomingMsgs = mergeCurrentConversationMessage(parsedMsgs, currentParsed);
+  const latestParsed = incomingMsgs[incomingMsgs.length - 1] ?? null;
   const latestBuyerMessage =
     latestParsed?.role === "user"
       ? latestParsed.content
-      : [...parsedMsgs].reverse().find((msg) => msg.role === "user")?.content ?? "";
+      : [...incomingMsgs].reverse().find((msg) => msg.role === "user")?.content ?? "";
   if (!latestBuyerMessage) {
     req.log.info(
       { externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
@@ -698,33 +744,23 @@ router.post("/conversations/intake", async (req, res) => {
     .where(eq(conversationMessagesTable.conversationId, conversationId))
     .orderBy(desc(conversationMessagesTable.createdAt));
 
-  const existingContents = new Set(existingMsgs.map((m) => `${m.role}:${m.content.trim()}`));
+  const existingChronological = [...existingMsgs]
+    .reverse()
+    .filter(isDisplayMessage)
+    .map((message) => ({
+      role: message.role === "assistant" ? "assistant" as const : "user" as const,
+      content: message.content.trim(),
+    }));
+  const newMessages = findNewConversationMessages(existingChronological, incomingMsgs);
   let hasNewBuyerMessage = false;
 
-  for (const msg of parsedMsgs) {
-    const key = `${msg.role}:${msg.content.trim()}`;
-    if (!existingContents.has(key)) {
-      await db.insert(conversationMessagesTable).values({
-        conversationId,
-        role: msg.role,
-        content: msg.content,
-      });
-      existingContents.add(key);
-      if (msg.role === "user") hasNewBuyerMessage = true;
-    }
-  }
-
-  if (currentParsed) {
-    const key = `${currentParsed.role}:${currentParsed.content.trim()}`;
-    if (!existingContents.has(key)) {
-      await db.insert(conversationMessagesTable).values({
-        conversationId,
-        role: currentParsed.role,
-        content: currentParsed.content,
-      });
-      existingContents.add(key);
-      if (currentParsed.role === "user") hasNewBuyerMessage = true;
-    }
+  for (const msg of newMessages) {
+    await db.insert(conversationMessagesTable).values({
+      conversationId,
+      role: msg.role,
+      content: msg.content,
+    });
+    if (msg.role === "user") hasNewBuyerMessage = true;
   }
 
   if (!hasNewBuyerMessage) {
@@ -784,7 +820,7 @@ router.post("/conversations/intake", async (req, res) => {
 
   if (shouldGenerateReply) {
     aiReplyResult = await generateAiReplyWithFallback(
-      parsedMsgs.map((msg) => `${msg.role === "assistant" ? "Dealer" : "Buyer"}: ${msg.content}`),
+      incomingMsgs.map((msg) => `${msg.role === "assistant" ? "Dealer" : "Buyer"}: ${msg.content}`),
       inbound,
       language,
       resolvedVehicleTitle,

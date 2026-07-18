@@ -268,3 +268,13 @@ test("Messenger intake sends canonical Buyer and Dealer role labels", () => {
     /m\.speaker === "Dealer" \? "Dealer" : "Buyer"/,
   );
 });
+
+test("Messenger automatic replies wait for a quiet buyer window and guard their own reply", () => {
+  assert.match(publisherFlowSource, /MESSENGER_REPLY_QUIET_MS = 7000/);
+  assert.match(publisherFlowSource, /MESSENGER_CAPTURE_INTERVAL_MS = 2000/);
+  assert.match(publisherFlowSource, /captureHash !== pendingMessengerBuyerHash/);
+  assert.match(publisherFlowSource, /now - pendingMessengerBuyerSince < MESSENGER_REPLY_QUIET_MS/);
+  assert.match(publisherFlowSource, /Waiting for the buyer to finish typing/);
+  assert.match(publisherFlowSource, /latestText === lastMessengerAutoReplyText/);
+  assert.match(publisherFlowSource, /captureHash === lastMessengerAutoSendHash/);
+});

@@ -3969,6 +3969,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   let lastMessengerHistoryHydrationKey = "";
   let messengerCaptureInFlight = false;
   let lastReply = "";
+  const MESSENGER_REPLY_QUIET_MS = 7000;
+  const MESSENGER_CAPTURE_INTERVAL_MS = 2000;
+  const MESSENGER_OWN_REPLY_GUARD_MS = 120000;
+  let pendingMessengerBuyerHash = "";
+  let pendingMessengerBuyerSince = 0;
+  let pendingMessengerMessageDetectedAt = 0;
+  let lastMessengerAutoReplyText = "";
+  let lastMessengerAutoReplyAt = 0;
 
   function getMessengerMessageBox() {
     const threadRoot = findMessengerRoot();
@@ -4548,6 +4556,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         return false;
       }
       lastMessengerAutoSendHash = captureHash;
+      lastMessengerAutoReplyText = cleanMessengerText(reply);
+      lastMessengerAutoReplyAt = Date.now();
       setStatus("AI reply sent automatically. Lead saved to CRM.", "ok");
       return true;
     }
@@ -4581,6 +4591,22 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       if (automatic) {
         const lastMessage = messages[messages.length - 1] || null;
         if (!lastMessage || lastMessage.speaker === "Dealer") {
+          pendingMessengerBuyerHash = "";
+          pendingMessengerBuyerSince = 0;
+          pendingMessengerMessageDetectedAt = 0;
+          setStatus("No new buyer message detected.", "muted");
+          return;
+        }
+
+        const latestText = cleanMessengerText(lastMessage.text);
+        const recentlySentOwnReply =
+          !!latestText &&
+          latestText === lastMessengerAutoReplyText &&
+          Date.now() - lastMessengerAutoReplyAt < MESSENGER_OWN_REPLY_GUARD_MS;
+        if (recentlySentOwnReply) {
+          pendingMessengerBuyerHash = "";
+          pendingMessengerBuyerSince = 0;
+          pendingMessengerMessageDetectedAt = 0;
           setStatus("No new buyer message detected.", "muted");
           return;
         }
@@ -4633,6 +4659,32 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       });
       payload.messageHash = captureHash;
       payload.idempotencyKey = captureHash;
+
+      if (automatic) {
+        if (captureHash === lastMessengerAutoSendHash) {
+          setStatus("No new buyer message detected.", "muted");
+          return;
+        }
+
+        const now = Date.now();
+        if (captureHash !== pendingMessengerBuyerHash) {
+          pendingMessengerBuyerHash = captureHash;
+          pendingMessengerBuyerSince = now;
+          pendingMessengerMessageDetectedAt = messageDetectedAtMs;
+          setStatus("Waiting for the buyer to finish typing...", "muted");
+          return;
+        }
+
+        if (now - pendingMessengerBuyerSince < MESSENGER_REPLY_QUIET_MS) {
+          setStatus("Waiting for the buyer to finish typing...", "muted");
+          return;
+        }
+
+        payload.messageDetectedAt = new Date(
+          pendingMessengerMessageDetectedAt || messageDetectedAtMs,
+        ).toISOString();
+      }
+
       const buyerReplyPending =
         silent &&
         messages.length > 0 &&
@@ -4651,11 +4703,17 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       }
       if (res.data?.skipped) {
         lastMessengerCaptureHash = captureHash;
+        pendingMessengerBuyerHash = "";
+        pendingMessengerBuyerSince = 0;
+        pendingMessengerMessageDetectedAt = 0;
         setStatus("No new buyer message to answer.", "muted");
         return;
       }
 
       lastMessengerCaptureHash = captureHash;
+      pendingMessengerBuyerHash = "";
+      pendingMessengerBuyerSince = 0;
+      pendingMessengerMessageDetectedAt = 0;
       lastReply = res.data.suggestedReply;
       const msgCount = messages.length || "?";
       const autoSent = silent ? await autoSendReply(lastReply, captureHash, messages) : false;
@@ -4713,7 +4771,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       captureConversation({ silent: true, automatic: true }).catch((err) => {
         console.warn("[DealerPilot AI] Messenger auto-capture failed", err);
       });
-    }, 8000);
+    }, MESSENGER_CAPTURE_INTERVAL_MS);
   }
 
   initMessengerAiControls();

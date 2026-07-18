@@ -25,6 +25,8 @@ import { useToast } from "@/hooks/use-toast";
 
 const API_BASE = "/api";
 const DEALER_ID = 1;
+const SALES_THREAD_REFRESH_MS = 2_000;
+const SALES_LIST_REFRESH_MS = 3_000;
 const STORE_PHONE = "+1 703-763-4675";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -294,7 +296,8 @@ function ThreadPanel({ convId }: { convId: number }) {
   const { data, isLoading } = useQuery({
     queryKey: ["conversation", convId],
     queryFn: () => fetchConversation(convId),
-    refetchInterval: 10_000,
+    refetchInterval: SALES_THREAD_REFRESH_MS,
+    refetchIntervalInBackground: true,
   });
 
   const { mutateAsync: updateStatus } = useUpdateConversationStatus();
@@ -726,7 +729,8 @@ export function SalesAIWorkspace() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["conversations", DEALER_ID],
     queryFn: fetchConversations,
-    refetchInterval: 20_000,
+    refetchInterval: SALES_LIST_REFRESH_MS,
+    refetchIntervalInBackground: true,
   });
 
   const conversations = data?.conversations ?? [];
