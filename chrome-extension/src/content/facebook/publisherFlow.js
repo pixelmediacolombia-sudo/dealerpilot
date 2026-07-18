@@ -4631,9 +4631,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         conversationThreadDetected: "Marketplace conversation region or message log not found",
         buyerMessageDetected: "latest substantive message is not an inbound buyer message",
         buyerNameDetected: "thread header did not provide a reliable buyer name",
-        sellerIsCurrentUser: evidence.threadStartedByCurrentUser === true
-          ? "current Facebook user started the Marketplace thread"
-          : "message direction did not prove seller context",
+        sellerIsCurrentUser: "DealerPilot is installed in the seller-side browser context",
         marketplaceContextDetected: "Marketplace listing id or vehicle title was not found in the seller thread",
       };
       for (const [gate, passed] of Object.entries(gates)) {
@@ -4661,8 +4659,12 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         conversationThreadDetected: !!root,
         buyerMessageDetected: !!lastMessage && lastMessage.speaker !== "Dealer" && !isMessengerUiText(lastMessage.text),
         buyerNameDetected: isReliableBuyerName(buyerName),
-        sellerIsCurrentUser:
-          !!lastMessage && lastMessage.speaker !== "Dealer" && evidence.threadStartedByCurrentUser !== true,
+        // The extension is intentionally installed and run only in the
+        // seller's browser. Do not infer seller identity from who started the
+        // Facebook thread: Marketplace can render seller-authored messages
+        // with the seller's display name and can mark a buyer-started thread
+        // as started by the current user in the opposite browser.
+        sellerIsCurrentUser: true,
         marketplaceContextDetected:
           !!context.marketplaceItemId ||
           (!!root && !!context.vehicleTitle),
@@ -4780,6 +4782,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
             matchedSelectors: collectMatchedThreadSelectors(main),
             threadIdentity: stableThreadIdentity || inboundMessageDescriptors[0] || "",
             sellerNameCandidates,
+            sellerContext: "extension_installed_seller_browser",
           },
         };
       }
@@ -4814,6 +4817,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           matchedSelectors: collectMatchedThreadSelectors(main),
           threadIdentity: stableThreadIdentity || inboundMessageDescriptors[0] || "",
           sellerNameCandidates,
+          sellerContext: "extension_installed_seller_browser",
         },
       };
     }
@@ -5181,6 +5185,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         messageExtractionMode: evidence.extractionMode || "none",
         threadIdentityDetected: !!evidence.threadIdentity,
         latestMessageDirection: evidence.latestMessageDirection || "none",
+        sellerContext: evidence.sellerContext || "extension_installed_seller_browser",
         composerDetected: !!getMessengerMessageBox(),
       };
 

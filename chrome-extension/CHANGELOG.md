@@ -1,5 +1,11 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.81
+
+- Treats the browser running DealerPilot as the seller context by contract.
+- Removes the `threadStartedByCurrentUser` check from Sales AI seller validation.
+- Keeps message-direction parsing only for identifying the latest buyer message and preventing replies to the seller's own message.
+
 ## v1.3.80
 
 - Classifies seller messages labeled with the seller's Facebook name as Dealer messages.
