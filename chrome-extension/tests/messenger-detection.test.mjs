@@ -35,6 +35,7 @@ function loadDetectionHarness({ hostname, pathname, rootSignals }) {
       if (selector.includes('[role="log"]') && this.signals.messageLog) return new FakeElement();
       if (selector.includes('[contenteditable="true"]') && this.signals.composer) return new FakeElement();
       if (selector.includes('[role="heading"]') && this.signals.heading) return new FakeElement();
+      if (selector.includes("h2") && this.signals.nativeHeading) return new FakeElement();
       if (selector.includes('/marketplace/item/') && this.signals.marketplaceLink) return new FakeElement();
       return null;
     }
@@ -73,6 +74,24 @@ test("Marketplace inbox detects the active seller thread when Facebook renders n
       messageLog: true,
       composer: true,
       heading: true,
+      marketplaceLink: false,
+    },
+  });
+
+  assert.ok(detection.findMarketplaceThreadRoot());
+  assert.ok(detection.findMessengerRoot());
+  assert.equal(detection.isMessengerUiVisible(), true);
+});
+
+test("Marketplace inbox detects Facebook's native h2 thread heading", () => {
+  const detection = loadDetectionHarness({
+    hostname: "www.facebook.com",
+    pathname: "/marketplace/inbox",
+    rootSignals: {
+      messageLog: true,
+      composer: true,
+      heading: false,
+      nativeHeading: true,
       marketplaceLink: false,
     },
   });

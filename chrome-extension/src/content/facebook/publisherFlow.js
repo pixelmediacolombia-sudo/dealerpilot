@@ -725,7 +725,7 @@
     const hasComposer = !!root.querySelector(
       '[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label*="message" i], [contenteditable="true"][aria-label*="mensaje" i], textarea[aria-label*="message" i], textarea[aria-label*="mensaje" i]',
     );
-    const hasHeading = !!root.querySelector('[role="heading"]');
+    const hasHeading = !!root.querySelector('[role="heading"], h1, h2, h3, [aria-level]');
     const hasMarketplaceLink = !!root.querySelector('a[href*="/marketplace/item/"]');
 
     // Facebook's current Marketplace inbox can render the listing title as

@@ -1,5 +1,13 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.69
+
+**Fixed**
+- Detects the active Marketplace seller thread when Facebook renders its title as a native `h2` instead of an element with `role="heading"`.
+- Adds a regression fixture matching the production thread heading observed during live VPS QA.
+
+---
+
 ## v1.3.68
 
 **Fixed**
