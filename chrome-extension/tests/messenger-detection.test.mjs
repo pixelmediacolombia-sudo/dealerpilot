@@ -106,20 +106,30 @@ function loadDetectionHarness({ hostname, pathname, rootSignals }) {
   return context.__detection;
 }
 
-function loadAvailabilityQuickReplyHarness(label) {
+function loadAvailabilityQuickReplyHarness(label, { plainSpan = false } = {}) {
   const start = publisherFlowSource.indexOf("    function normalizeMarketplaceAvailabilityLabel");
   const end = publisherFlowSource.indexOf("    async function acceptMarketplaceAvailabilityQuickReply", start);
   assert.ok(start >= 0 && end > start, "Availability quick-reply functions must remain extractable");
 
+  const quickResponseCard = {
+    innerText: "Send a quick response Tap a response to send it to the buyer. Yes, are you interested? In talks, I'll let you know",
+    textContent: "Send a quick response Tap a response to send it to the buyer. Yes, are you interested? In talks, I'll let you know",
+    parentElement: null,
+  };
   const button = {
     disabled: false,
     innerText: label,
     textContent: label,
     getAttribute: () => null,
+    parentElement: plainSpan ? quickResponseCard : null,
   };
   const root = {
-    querySelectorAll: () => [button],
+    querySelectorAll: (selector) => {
+      if (selector === "span") return plainSpan ? [button] : [];
+      return plainSpan ? [] : [button];
+    },
   };
+  quickResponseCard.parentElement = root;
   const context = vm.createContext({
     cleanMessengerText: (text) => String(text || "").trim(),
     findMessengerRoot: () => root,
@@ -308,7 +318,8 @@ test("Messenger capture reads unlabeled rounded chat bubbles inside the active t
   assert.match(publisherFlowSource, /function parsePlainMessengerMessages/);
   assert.match(publisherFlowSource, /backgroundColor/);
   assert.match(publisherFlowSource, /rightGap \+ 16 < leftGap/);
-  assert.match(publisherFlowSource, /messages\.push\(\.\.\.parsePlainMessengerMessages/);
+  assert.match(publisherFlowSource, /const plainMessages = parsePlainMessengerMessages/);
+  assert.match(publisherFlowSource, /extractionMode = "visual_bubbles"/);
 });
 
 test("Marketplace availability quick reply is accepted once before the financing question", () => {
@@ -325,6 +336,22 @@ test("Marketplace availability quick reply is accepted once before the financing
     "Is it still available?",
   );
 
+  const realFacebookDom = loadAvailabilityQuickReplyHarness("Yes, are you interested?", { plainSpan: true });
+  assert.equal(
+    realFacebookDom.findMarketplaceAvailabilityAcceptButton(),
+    realFacebookDom.button,
+    "plain response-label spans inside Facebook's quick-response card must be actionable",
+  );
+
+  const unrelatedChatBubble = loadAvailabilityQuickReplyHarness("Yes, are you interested?", { plainSpan: true });
+  unrelatedChatBubble.button.parentElement.innerText = "Yes, are you interested?";
+  unrelatedChatBubble.button.parentElement.textContent = "Yes, are you interested?";
+  assert.equal(
+    unrelatedChatBubble.findMarketplaceAvailabilityAcceptButton(),
+    null,
+    "matching text in a normal chat bubble must never be clicked",
+  );
+
   const spanish = loadAvailabilityQuickReplyHarness("Sí, está disponible");
   const spanishFallback = spanish.createMarketplaceAvailabilityFallbackMessage("Juan");
   assert.equal(spanishFallback.text, "¿Sigue disponible?");
@@ -334,10 +361,16 @@ test("Marketplace availability quick reply is accepted once before the financing
   assert.equal(snapshot.messages[0].speaker, "Juan");
   assert.equal(snapshot.messages[0].text, "Is it still available?");
   assert.equal(snapshot.evidence.availabilityQuickReplyVisible, true);
+  assert.equal(snapshot.evidence.extractionMode, "quick_reply_card");
+  assert.equal(snapshot.evidence.threadRootDetected, true);
+  assert.equal(snapshot.evidence.messageScopeDetected, false);
 
   assert.match(publisherFlowSource, /MESSENGER_CLAIM_AVAILABILITY_ACTION/);
   assert.match(publisherFlowSource, /availabilityQuickReplyAccepted/);
   assert.match(publisherFlowSource, /if \(messages\.length >= 1\)/);
+  assert.match(publisherFlowSource, /composer_insert_unconfirmed/);
+  assert.match(publisherFlowSource, /delivery_unconfirmed/);
+  assert.match(publisherFlowSource, /messageExtractionMode/);
 });
 
 test("Messenger auto-send excludes generic and quick-response buttons", () => {
@@ -371,6 +404,6 @@ test("Messenger capture reports the Sales AI pipeline stage for extension diagno
   assert.match(publisherFlowSource, /type: "MESSENGER_CAPTURE_DEBUG"/);
   assert.match(publisherFlowSource, /reportMessengerCaptureDebug\("blocked"/);
   assert.match(publisherFlowSource, /reportMessengerCaptureDebug\("intake_sending"/);
-  assert.match(publisherFlowSource, /reportMessengerCaptureDebug\("intake_ok"/);
+  assert.match(publisherFlowSource, /autoSent \|\| !silent \? "intake_ok" : "auto_send_blocked"/);
   assert.match(publisherFlowSource, /aiReplyReceived: !!lastReply/);
 });

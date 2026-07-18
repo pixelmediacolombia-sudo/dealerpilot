@@ -1,5 +1,16 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.76
+
+**Fixed**
+- Detects Facebook Marketplace availability replies when Facebook renders the affirmative option as a plain `span` instead of a semantic button.
+- Restricts the non-semantic fallback to the dedicated quick-response card so matching text in chat history cannot be clicked accidentally.
+
+**Improved**
+- Adds visible DOM-contract diagnostics for thread root, message extraction, composer insertion, send dispatch, and delivery confirmation.
+
+---
+
 ## v1.3.75
 
 **Fixed**

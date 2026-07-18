@@ -72,6 +72,8 @@ const dbg = {
   aiConfirmed:       document.getElementById("d-ai-confirmed"),
   aiCaptureStage:    document.getElementById("d-ai-capture-stage"),
   aiQuickReply:      document.getElementById("d-ai-quick-reply"),
+  aiDomContract:     document.getElementById("d-ai-dom-contract"),
+  aiSendContract:    document.getElementById("d-ai-send-contract"),
   aiCaptureReason:   document.getElementById("d-ai-capture-reason"),
   aiCaptureAt:       document.getElementById("d-ai-capture-at"),
 };
@@ -428,6 +430,22 @@ async function loadDebugState() {
       ? `Yes ✓${aiCapture.quickReplyLabel ? ` (${truncate(aiCapture.quickReplyLabel, 24)})` : ""}`
       : "No";
     dbg.aiQuickReply.className = "value " + (aiCapture.quickReplyVisible ? "ok" : "");
+    dbg.aiDomContract.textContent = [
+      `Root ${aiCapture.threadRootDetected ? "Y" : "N"}`,
+      `Msg ${aiCapture.messageExtractionMode || "none"}`,
+      `Box ${aiCapture.composerDetected ? "Y" : "N"}`,
+    ].join(" | ");
+    dbg.aiDomContract.className = "value " + (
+      aiCapture.threadRootDetected && aiCapture.messageExtractionMode !== "none" && aiCapture.composerDetected
+        ? "ok"
+        : "err"
+    );
+    dbg.aiSendContract.textContent = aiCapture.autoSent
+      ? `Sent OK (${aiCapture.sendMethod || "confirmed"})`
+      : aiCapture.stage === "auto_send_blocked"
+        ? `Blocked: ${aiCapture.reason || "unknown"}`
+        : "Not reached";
+    dbg.aiSendContract.className = "value " + (aiCapture.autoSent ? "ok" : aiCapture.stage === "auto_send_blocked" ? "err" : "");
     dbg.aiCaptureReason.textContent = aiCapture.reason || "None";
     dbg.aiCaptureReason.className = "value " + (aiCapture.reason ? "err" : "ok");
     dbg.aiCaptureAt.textContent = fmtTime(aiCapture.at || aiCapture.receivedAt);
@@ -440,6 +458,10 @@ async function loadDebugState() {
     dbg.aiCaptureStage.className = "value";
     dbg.aiQuickReply.textContent = "Not detected";
     dbg.aiQuickReply.className = "value";
+    dbg.aiDomContract.textContent = "Not checked";
+    dbg.aiDomContract.className = "value";
+    dbg.aiSendContract.textContent = "Not reached";
+    dbg.aiSendContract.className = "value";
     dbg.aiCaptureReason.textContent = "—";
     dbg.aiCaptureReason.className = "value";
     dbg.aiCaptureAt.textContent = "Never";

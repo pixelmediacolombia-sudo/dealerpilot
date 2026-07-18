@@ -3977,6 +3977,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   let pendingMessengerMessageDetectedAt = 0;
   let lastMessengerAutoReplyText = "";
   let lastMessengerAutoReplyAt = 0;
+  let lastMessengerAutoSendFailureReason = "";
+  let lastMessengerAutoSendMethod = "";
 
   function getMessengerMessageBox() {
     const threadRoot = findMessengerRoot();
@@ -4253,6 +4255,21 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         .trim();
     }
 
+    function isMarketplaceQuickResponseCard(element, root) {
+      let current = element?.parentElement || null;
+      for (let depth = 0; current && depth < 8; depth += 1) {
+        const cardText = normalizeMarketplaceAvailabilityLabel(current.innerText || current.textContent || "");
+        const hasEnglishPrompt = cardText.includes("send a quick response") &&
+          cardText.includes("tap a response to send it to the buyer");
+        const hasSpanishPrompt = cardText.includes("enviar una respuesta rapida") &&
+          cardText.includes("respuesta para enviarla al comprador");
+        if (hasEnglishPrompt || hasSpanishPrompt) return true;
+        if (current === root) break;
+        current = current.parentElement;
+      }
+      return false;
+    }
+
     function findMarketplaceAvailabilityAcceptButton() {
       const root = findMessengerRoot();
       if (!root) return null;
@@ -4267,16 +4284,29 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         "si aun esta disponible",
         "si te interesa",
       ];
-      return Array.from(root.querySelectorAll('button, [role="button"]')).find((buttonEl) => {
-        if (!visible(buttonEl) || buttonEl.disabled || buttonEl.getAttribute("aria-disabled") === "true") return false;
+      const matchesAffirmativeLabel = (element) => {
+        if (!visible(element) || element.disabled || element.getAttribute("aria-disabled") === "true") return false;
         const label = normalizeMarketplaceAvailabilityLabel(
-          buttonEl.getAttribute("aria-label") || buttonEl.innerText || buttonEl.textContent || "",
+          element.getAttribute("aria-label") || element.innerText || element.textContent || "",
         );
         return affirmativeLabels.some((expectedLabel) =>
           label === expectedLabel ||
           (label.length >= 12 && expectedLabel.startsWith(label)),
         );
-      }) || null;
+      };
+
+      const semanticButton = Array.from(root.querySelectorAll('button, [role="button"]'))
+        .find(matchesAffirmativeLabel);
+      if (semanticButton) return semanticButton;
+
+      // Facebook currently renders Marketplace quick replies as plain spans.
+      // Clicking the label still bubbles to Facebook's React handler, but only
+      // accept such a span when its ancestors prove it belongs to the dedicated
+      // quick-response card (never an old chat bubble with the same text).
+      return Array.from(root.querySelectorAll("span")).find((labelElement) =>
+        matchesAffirmativeLabel(labelElement) &&
+        isMarketplaceQuickResponseCard(labelElement, root),
+      ) || null;
     }
 
     function createMarketplaceAvailabilityFallbackMessage(buyerName) {
@@ -4391,6 +4421,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
       const messages = [];
       let threadStartedByCurrentUser = null;
+      let extractionMode = "none";
 
       if (messageEls.length > 0) {
         // Structured extraction: detect sent (you) vs received (buyer)
@@ -4406,13 +4437,16 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
             text: parsed.text.slice(0, 500),
           });
         }
+        if (messages.length > 0) extractionMode = "semantic";
       }
 
       // Facebook also renders Marketplace chats as unlabeled rounded bubbles.
       // When semantic rows are absent, use bubble styling plus left/right
       // alignment inside the already validated active thread.
       if (messages.length < 1 && messageScope) {
-        messages.push(...parsePlainMessengerMessages(messageScope, buyerName, threadHeaderText));
+        const plainMessages = parsePlainMessengerMessages(messageScope, buyerName, threadHeaderText);
+        messages.push(...plainMessages);
+        if (plainMessages.length > 0) extractionMode = "visual_bubbles";
       }
 
       // On a first Marketplace contact, Facebook can replace the inbound
@@ -4422,7 +4456,10 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const availabilityFallbackMessage = messages.length < 1
         ? createMarketplaceAvailabilityFallbackMessage(buyerName)
         : null;
-      if (availabilityFallbackMessage) messages.push(availabilityFallbackMessage);
+      if (availabilityFallbackMessage) {
+        messages.push(availabilityFallbackMessage);
+        extractionMode = "quick_reply_card";
+      }
 
       if (messages.length < 1) {
         return {
@@ -4436,6 +4473,10 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
             threadStartedByCurrentUser,
             availabilityQuickReplyVisible: false,
             availabilityQuickReplyLabel: "",
+            threadRootDetected: !!main,
+            messageScopeDetected: !!messageScope,
+            extractionMode,
+            latestMessageDirection: "none",
             matchedSelectors: collectMatchedThreadSelectors(main),
           },
         };
@@ -4459,6 +4500,10 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           threadStartedByCurrentUser,
           availabilityQuickReplyVisible: !!availabilityFallbackMessage,
           availabilityQuickReplyLabel: availabilityFallbackMessage?.availabilityQuickReplyLabel || "",
+          threadRootDetected: !!main,
+          messageScopeDetected: !!messageScope,
+          extractionMode,
+          latestMessageDirection: deduped[deduped.length - 1]?.speaker === "Dealer" ? "dealer" : "buyer",
           matchedSelectors: collectMatchedThreadSelectors(main),
         },
       };
@@ -4676,40 +4721,72 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         sendBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
         sendBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
         sendBtn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
-        return true;
+        return { ok: true, method: "button" };
       }
 
-      if (!box) return false;
+      if (!box) return { ok: false, method: "none" };
       box.focus();
       box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
       box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-      return true;
+      return { ok: true, method: "enter" };
     }
 
-    async function autoSendReply(reply, captureHash, messages) {
-      if (!reply || !captureHash || captureHash === lastMessengerAutoSendHash) return false;
-      if (!messages.length) return false;
+    async function autoSendReply(reply, captureHash, messages, captureDebug = {}) {
+      lastMessengerAutoSendFailureReason = "";
+      lastMessengerAutoSendMethod = "";
+      if (!reply || !captureHash || captureHash === lastMessengerAutoSendHash) {
+        lastMessengerAutoSendFailureReason = "reply_or_capture_not_actionable";
+        return false;
+      }
+      if (!messages.length) {
+        lastMessengerAutoSendFailureReason = "message_history_missing";
+        return false;
+      }
       const lastMessage = messages[messages.length - 1];
-      if (lastMessage.speaker === "Dealer") return false;
+      if (lastMessage.speaker === "Dealer") {
+        lastMessengerAutoSendFailureReason = "latest_message_is_dealer";
+        return false;
+      }
 
       const box = getMessengerMessageBox();
-      if (!box) return false;
+      if (!box) {
+        lastMessengerAutoSendFailureReason = "composer_missing";
+        return false;
+      }
       const inserted = insertReply(reply);
-      if (!inserted) return false;
-      const sent = await clickMessengerSend(box);
-      if (!sent) {
+      const composerTextDetected = cleanMessengerText(readMessengerComposerText(box)) === cleanMessengerText(reply);
+      if (!inserted || !composerTextDetected) {
+        lastMessengerAutoSendFailureReason = "composer_insert_unconfirmed";
+        return false;
+      }
+      const sendControlDetected = !!findMessengerSendButton();
+      const sendResult = await clickMessengerSend(box);
+      if (!sendResult.ok) {
+        lastMessengerAutoSendFailureReason = "send_dispatch_failed";
         setStatus("Reply inserted, but DealerPilot could not find Messenger Send.", "err");
         return false;
       }
       await sleep(900);
       const deliveryConfirmed = !readMessengerComposerText(box) || messengerShowsSentReply(reply);
       if (!deliveryConfirmed) {
+        lastMessengerAutoSendFailureReason = "delivery_unconfirmed";
+        reportMessengerCaptureDebug("auto_send_blocked", {
+          ...captureDebug,
+          reason: lastMessengerAutoSendFailureReason,
+          composerDetected: true,
+          composerTextDetected: true,
+          sendControlDetected,
+          sendMethod: sendResult.method,
+          deliveryConfirmed: false,
+        });
         setStatus("AI reply was prepared, but Facebook did not confirm delivery.", "err");
         return false;
       }
       lastMessengerAutoSendHash = captureHash;
       lastMessengerAutoReplyText = cleanMessengerText(reply);
       lastMessengerAutoReplyAt = Date.now();
+      lastMessengerAutoSendFailureReason = "";
+      lastMessengerAutoSendMethod = sendResult.method;
       setStatus("AI reply sent automatically. Lead saved to CRM.", "ok");
       return true;
     }
@@ -4743,6 +4820,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         vehicleContextDetected: !!context.marketplaceItemId || !!context.vehicleTitle,
         quickReplyVisible: evidence.availabilityQuickReplyVisible === true,
         quickReplyLabel: evidence.availabilityQuickReplyLabel || "",
+        threadRootDetected: evidence.threadRootDetected === true,
+        messageScopeDetected: evidence.messageScopeDetected === true,
+        messageExtractionMode: evidence.extractionMode || "none",
+        latestMessageDirection: evidence.latestMessageDirection || "none",
+        composerDetected: !!getMessengerMessageBox(),
       };
 
       if (!messages.length && !rawText) {
@@ -4920,14 +5002,16 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       pendingMessengerMessageDetectedAt = 0;
       lastReply = res.data.suggestedReply;
       const msgCount = messages.length || "?";
-      const autoSent = silent ? await autoSendReply(lastReply, captureHash, messages) : false;
+      const autoSent = silent ? await autoSendReply(lastReply, captureHash, messages, captureDebug) : false;
       const replySentAt = autoSent ? new Date().toISOString() : null;
       const totalResponseMs = Date.now() - messageDetectedAtMs;
-      reportMessengerCaptureDebug("intake_ok", {
+      reportMessengerCaptureDebug(autoSent || !silent ? "intake_ok" : "auto_send_blocked", {
         ...captureDebug,
         availabilityQuickReplyAccepted,
         aiReplyReceived: !!lastReply,
         autoSent,
+        sendMethod: autoSent ? lastMessengerAutoSendMethod : undefined,
+        reason: autoSent || !silent ? undefined : (lastMessengerAutoSendFailureReason || "auto_send_unconfirmed"),
         totalResponseMs,
       });
       console.log("[DealerPilot AI] Sales AI response timing", {
