@@ -7,6 +7,10 @@ const publisherFlowSource = readFileSync(
   new URL("../src/content/facebook/publisherFlow.js", import.meta.url),
   "utf8",
 );
+const messengerQaFixture = readFileSync(
+  new URL("./fixtures/messenger-qa-dom.html", import.meta.url),
+  "utf8",
+);
 
 function loadDetectionHarness({ hostname, pathname, rootSignals }) {
   const start = publisherFlowSource.indexOf("  function isMessengerUrl()");
@@ -111,27 +115,52 @@ function loadAvailabilityQuickReplyHarness(label, { plainSpan = false } = {}) {
   const end = publisherFlowSource.indexOf("    async function acceptMarketplaceAvailabilityQuickReply", start);
   assert.ok(start >= 0 && end > start, "Availability quick-reply functions must remain extractable");
 
+  const cardRect = { left: 120, top: 120, right: 520, bottom: 360, width: 400, height: 240 };
+  const optionRect = { left: 160, top: 250, right: 360, bottom: 290, width: 200, height: 40 };
+  const promptRect = { left: 150, top: 150, right: 490, bottom: 220, width: 340, height: 70 };
   const quickResponseCard = {
     innerText: "Send a quick response Tap a response to send it to the buyer. Yes, are you interested? In talks, I'll let you know",
     textContent: "Send a quick response Tap a response to send it to the buyer. Yes, are you interested? In talks, I'll let you know",
     parentElement: null,
+    children: [],
+    getBoundingClientRect: () => cardRect,
+    getAttribute: () => null,
+  };
+  const promptMarker = {
+    innerText: "Send a quick response Tap a response to send it to the buyer",
+    textContent: "Send a quick response Tap a response to send it to the buyer",
+    parentElement: quickResponseCard,
+    children: [],
+    getBoundingClientRect: () => promptRect,
+    getAttribute: () => null,
   };
   const button = {
     disabled: false,
     innerText: label,
     textContent: label,
+    tagName: plainSpan ? "SPAN" : "BUTTON",
+    children: [],
     getAttribute: () => null,
     parentElement: plainSpan ? quickResponseCard : null,
+    getBoundingClientRect: () => optionRect,
   };
+  if (!plainSpan) button.parentElement = quickResponseCard;
   const root = {
+    getBoundingClientRect: () => ({ left: 0, top: 0, right: 640, bottom: 720, width: 640, height: 720 }),
     querySelectorAll: (selector) => {
-      if (selector === "span") return plainSpan ? [button] : [];
-      return plainSpan ? [] : [button];
+      if (selector === "span") return plainSpan ? [button, promptMarker] : [];
+      if (selector === "span, div, p") return [promptMarker];
+      if (selector.includes('button, [role="button"], span, div')) return [button];
+      return [];
     },
   };
   quickResponseCard.parentElement = root;
   const context = vm.createContext({
     cleanMessengerText: (text) => String(text || "").trim(),
+    elementArea: (element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width * rect.height;
+    },
     findMessengerRoot: () => root,
     visible: () => true,
   });
@@ -156,6 +185,7 @@ function loadAvailabilitySnapshotHarness() {
     extractBuyerNameFromThreadHeader: () => "Juan",
     findMessengerMessageScope: () => null,
     createMarketplaceAvailabilityFallbackMessage: () => fallbackMessage,
+    lastMarketplaceQuickReplyDiagnostics: null,
     collectMatchedThreadSelectors: () => [],
   });
   vm.runInContext(
@@ -320,6 +350,18 @@ test("Messenger capture reads unlabeled rounded chat bubbles inside the active t
   assert.match(publisherFlowSource, /rightGap \+ 16 < leftGap/);
   assert.match(publisherFlowSource, /const plainMessages = parsePlainMessengerMessages/);
   assert.match(publisherFlowSource, /extractionMode = "visual_bubbles"/);
+});
+
+test("sanitized VPS QA fixture preserves the live Messenger contracts", () => {
+  assert.match(messengerQaFixture, /role="region"[^>]+Conversation titled Buyer/);
+  assert.match(messengerQaFixture, /role="log"[^>]+aria-live="polite"/);
+  assert.match(messengerQaFixture, /Message sent [^"]+ by Buyer:/);
+  assert.match(messengerQaFixture, /Message sent [^"]+ by You:/);
+  assert.match(messengerQaFixture, /dir="auto"/);
+  assert.match(messengerQaFixture, /contenteditable="true" role="textbox"/);
+  assert.match(messengerQaFixture, /Send a quick response/);
+  assert.match(messengerQaFixture, /Tap a response to send it to the buyer/);
+  assert.match(messengerQaFixture, /Yes, are you inter\.\.\./);
 });
 
 test("Marketplace availability quick reply is accepted once before the financing question", () => {

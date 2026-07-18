@@ -1,5 +1,14 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.77
+
+**Fixed**
+- Relates affirmative quick-response candidates to the nearest validated Marketplace card by shared structure and geometry, including sibling title/option branches and plain spans.
+- Keeps message, composer, send, and delivery diagnostics explicit so a later send failure cannot be overwritten by a generic intake success state.
+- Adds a sanitized VPS QA DOM fixture covering the live semantic log, direction labels, composer, and quick-response card contracts.
+
+---
+
 ## v1.3.76
 
 **Fixed**

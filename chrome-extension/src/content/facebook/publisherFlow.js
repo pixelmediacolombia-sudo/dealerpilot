@@ -3979,6 +3979,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   let lastMessengerAutoReplyAt = 0;
   let lastMessengerAutoSendFailureReason = "";
   let lastMessengerAutoSendMethod = "";
+  let lastMessengerSendDiagnostics = {};
+  let lastMarketplaceQuickReplyDiagnostics = null;
 
   function getMessengerMessageBox() {
     const threadRoot = findMessengerRoot();
@@ -4101,6 +4103,27 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const headings = Array.from(root.querySelectorAll('[role="heading"], h1, h2, h3'));
       const heading = headings.find((el) => /\b(19|20)\d{2}\b/.test(el.textContent || "")) || headings[0];
       if (heading) return cleanMessengerText(heading.textContent || "").slice(0, 160);
+
+      // Marketplace floating chats currently expose the title as plain text
+      // (for example "Juan - 2012 Mazda MAZDA3") without a heading role. Keep
+      // this lookup inside the active thread and prefer compact nodes near its
+      // top edge so a vehicle year mentioned in message history is not treated
+      // as the conversation header.
+      const rootRect = root.getBoundingClientRect();
+      const visualHeading = Array.from(
+        root.querySelectorAll('span[dir="auto"], div[dir="auto"], span, div'),
+      )
+        .filter(visible)
+        .map((el) => ({ el, text: cleanMessengerText(el.innerText || el.textContent || "") }))
+        .filter(({ el, text }) => {
+          if (!text || text.length > 160 || !/\b(19|20)\d{2}\b/.test(text)) return false;
+          if (!/^.{2,80}\s*(?:[-|\u00b7\u2022])\s*(?:19|20)\d{2}\b/.test(text)) return false;
+          const rect = el.getBoundingClientRect();
+          return rect.top >= rootRect.top - 4 && rect.top <= rootRect.top + 140;
+        })
+        .sort((left, right) => elementArea(left.el) - elementArea(right.el))[0];
+      if (visualHeading) return visualHeading.text.slice(0, 160);
+
       return cleanMessengerText(root.getAttribute("aria-label") || "")
         .replace(/^(?:Conversaci\u00f3n con el t\u00edtulo|Conversation titled|Conversation with the title)\s*/i, "")
         .slice(0, 160);
@@ -4179,21 +4202,48 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return { descriptor, text, sentByCurrentUser, isThreadStarter };
     }
 
+    function isTransparentMessengerColor(color) {
+      return !color || /^(?:transparent|rgba?\(\s*0\s*,\s*0\s*,\s*0\s*(?:,\s*0\s*)?\))$/i.test(color);
+    }
+
+    function getMessengerBubbleVisualEvidence(element) {
+      const styles = [
+        window.getComputedStyle(element),
+        window.getComputedStyle(element, "::before"),
+        window.getComputedStyle(element, "::after"),
+      ];
+      return styles.reduce((evidence, style) => {
+        const radius = Math.max(
+          Number.parseFloat(style.borderRadius || "0") || 0,
+          Number.parseFloat(style.borderTopLeftRadius || "0") || 0,
+          Number.parseFloat(style.borderTopRightRadius || "0") || 0,
+          Number.parseFloat(style.borderBottomLeftRadius || "0") || 0,
+          Number.parseFloat(style.borderBottomRightRadius || "0") || 0,
+        );
+        const background = style.backgroundColor || "";
+        return {
+          hasBackground: evidence.hasBackground || !isTransparentMessengerColor(background),
+          radius: Math.max(evidence.radius, radius),
+        };
+      }, { hasBackground: false, radius: 0 });
+    }
+
     function findPlainMessengerBubble(textEl, messageScope) {
       let candidate = textEl;
-      for (let depth = 0; candidate && candidate !== messageScope && depth < 6; depth += 1) {
+      while (candidate && candidate !== messageScope) {
         if (candidate.closest('button, [role="button"], a, [contenteditable="true"], textarea')) return null;
         const rect = candidate.getBoundingClientRect();
-        const style = window.getComputedStyle(candidate);
-        const background = style.backgroundColor || "";
-        const radius = Number.parseFloat(style.borderRadius || "0");
-        const hasBubbleBackground = background && !/rgba?\(0,\s*0,\s*0(?:,\s*0)?\)|transparent/i.test(background);
+        const visualEvidence = getMessengerBubbleVisualEvidence(candidate);
+        const presentationBubble = candidate.getAttribute("role") === "presentation";
         if (
-          hasBubbleBackground &&
-          radius >= 6 &&
           rect.width >= 18 &&
           rect.height >= 16 &&
-          rect.height <= 320
+          rect.width <= Math.max(560, messageScope.getBoundingClientRect().width * 0.92) &&
+          rect.height <= 320 &&
+          (
+            (visualEvidence.hasBackground && visualEvidence.radius >= 6) ||
+            (presentationBubble && visualEvidence.radius >= 6)
+          )
         ) return candidate;
         candidate = candidate.parentElement;
       }
@@ -4255,24 +4305,152 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         .trim();
     }
 
-    function isMarketplaceQuickResponseCard(element, root) {
-      let current = element?.parentElement || null;
-      for (let depth = 0; current && depth < 8; depth += 1) {
-        const cardText = normalizeMarketplaceAvailabilityLabel(current.innerText || current.textContent || "");
-        const hasEnglishPrompt = cardText.includes("send a quick response") &&
-          cardText.includes("tap a response to send it to the buyer");
-        const hasSpanishPrompt = cardText.includes("enviar una respuesta rapida") &&
-          cardText.includes("respuesta para enviarla al comprador");
-        if (hasEnglishPrompt || hasSpanishPrompt) return true;
+    function hasMarketplaceQuickResponsePrompt(text) {
+      const normalized = normalizeMarketplaceAvailabilityLabel(text);
+      const hasEnglishPrompt = normalized.includes("send a quick response") &&
+        normalized.includes("tap a response to send it to the buyer");
+      const hasSpanishPrompt = normalized.includes("enviar una respuesta rapida") &&
+        normalized.includes("respuesta para enviarla al comprador");
+      return hasEnglishPrompt || hasSpanishPrompt;
+    }
+
+    function isMarketplaceQuickResponsePromptMarker(element) {
+      const normalized = normalizeMarketplaceAvailabilityLabel(
+        element.getAttribute?.("aria-label") || element.innerText || element.textContent || "",
+      );
+      return (
+        normalized.includes("send a quick response") ||
+        normalized.includes("tap a response to send it to the buyer") ||
+        normalized.includes("enviar una respuesta rapida") ||
+        normalized.includes("respuesta para enviarla al comprador")
+      );
+    }
+
+    function findMarketplaceQuickResponsePromptMarkers(root) {
+      return Array.from(root.querySelectorAll("span, div, p"))
+        .filter((element) => visible(element) && isMarketplaceQuickResponsePromptMarker(element))
+        .filter((element) => !Array.from(element.children || []).some(isMarketplaceQuickResponsePromptMarker));
+    }
+
+    function findLowestCommonMessengerAncestor(left, right, root) {
+      if (!left || !right || !root) return null;
+      const leftAncestors = new Set();
+      let current = left;
+      while (current) {
+        leftAncestors.add(current);
         if (current === root) break;
         current = current.parentElement;
       }
-      return false;
+      current = right;
+      while (current) {
+        if (leftAncestors.has(current)) return current;
+        if (current === root) break;
+        current = current.parentElement;
+      }
+      return null;
+    }
+
+    function rectDistance(left, right) {
+      const horizontal = Math.max(0, left.left - right.right, right.left - left.right);
+      const vertical = Math.max(0, left.top - right.bottom, right.top - left.bottom);
+      return Math.hypot(horizontal, vertical);
+    }
+
+    function serializeMessengerAncestorChain(element, root) {
+      const chain = [];
+      let current = element;
+      while (current) {
+        chain.push({
+          tag: current.tagName || "",
+          role: current.getAttribute?.("role") || "",
+          ariaLabel: current.getAttribute?.("aria-label") || "",
+          text: cleanMessengerText(current.innerText || current.textContent || "").slice(0, 180),
+        });
+        if (current === root) break;
+        current = current.parentElement;
+      }
+      return chain;
+    }
+
+    function inspectMarketplaceQuickResponseCandidate(candidate, root, promptMarkers) {
+      const candidateRect = candidate.getBoundingClientRect();
+      const rootRect = root.getBoundingClientRect();
+      const relationships = promptMarkers.map((prompt) => {
+        const commonAncestor = findLowestCommonMessengerAncestor(candidate, prompt, root);
+        const commonRect = commonAncestor?.getBoundingClientRect?.();
+        const promptRect = prompt.getBoundingClientRect();
+        const commonText = cleanMessengerText(
+          commonAncestor?.innerText || commonAncestor?.textContent || "",
+        );
+        const rootArea = Math.max(1, rootRect.width * rootRect.height);
+        const commonArea = commonRect ? commonRect.width * commonRect.height : Number.POSITIVE_INFINITY;
+        const accepted = !!commonAncestor &&
+          commonAncestor !== root &&
+          visible(commonAncestor) &&
+          hasMarketplaceQuickResponsePrompt(commonText) &&
+          commonArea < rootArea * 0.82 &&
+          commonRect.width <= rootRect.width + 8 &&
+          commonRect.height <= Math.min(680, rootRect.height + 8) &&
+          rectDistance(candidateRect, promptRect) <= 480;
+        return {
+          accepted,
+          commonAncestor,
+          commonArea,
+          distance: Math.round(rectDistance(candidateRect, promptRect)),
+          promptText: cleanMessengerText(prompt.innerText || prompt.textContent || "").slice(0, 180),
+          siblingBranches: candidate.parentElement !== prompt.parentElement,
+          reason: accepted
+            ? "quick_response_card_common_ancestor"
+            : !commonAncestor
+              ? "no_common_ancestor"
+              : commonAncestor === root
+                ? "common_ancestor_is_thread_root"
+                : !hasMarketplaceQuickResponsePrompt(commonText)
+                  ? "prompt_contract_missing"
+                  : commonArea >= rootArea * 0.82
+                    ? "common_ancestor_too_broad"
+                    : "candidate_too_far_from_prompt",
+        };
+      }).sort((left, right) => {
+        if (left.accepted !== right.accepted) return left.accepted ? -1 : 1;
+        return left.commonArea - right.commonArea;
+      });
+      const relationship = relationships[0] || {
+        accepted: false,
+        commonAncestor: null,
+        distance: null,
+        promptText: "",
+        siblingBranches: false,
+        reason: "quick_response_prompt_missing",
+      };
+      return {
+        accepted: relationship.accepted,
+        reason: relationship.reason,
+        distance: relationship.distance,
+        promptText: relationship.promptText,
+        siblingBranches: relationship.siblingBranches,
+        commonAncestorText: cleanMessengerText(
+          relationship.commonAncestor?.innerText || relationship.commonAncestor?.textContent || "",
+        ).slice(0, 360),
+        ancestorChain: serializeMessengerAncestorChain(candidate, root),
+      };
     }
 
     function findMarketplaceAvailabilityAcceptButton() {
       const root = findMessengerRoot();
-      if (!root) return null;
+      if (!root) {
+        lastMarketplaceQuickReplyDiagnostics = {
+          rootDetected: false,
+          spansExamined: 0,
+          matchingSpans: 0,
+          affirmativeMatches: 0,
+          promptMarkers: 0,
+          candidates: [],
+          accepted: false,
+          reason: "thread_root_missing",
+        };
+        return null;
+      }
       const affirmativeLabels = [
         "yes its available",
         "yes it is available",
@@ -4295,18 +4473,36 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         );
       };
 
-      const semanticButton = Array.from(root.querySelectorAll('button, [role="button"]'))
-        .find(matchesAffirmativeLabel);
-      if (semanticButton) return semanticButton;
-
-      // Facebook currently renders Marketplace quick replies as plain spans.
-      // Clicking the label still bubbles to Facebook's React handler, but only
-      // accept such a span when its ancestors prove it belongs to the dedicated
-      // quick-response card (never an old chat bubble with the same text).
-      return Array.from(root.querySelectorAll("span")).find((labelElement) =>
-        matchesAffirmativeLabel(labelElement) &&
-        isMarketplaceQuickResponseCard(labelElement, root),
-      ) || null;
+      const spans = Array.from(root.querySelectorAll("span"));
+      const promptMarkers = findMarketplaceQuickResponsePromptMarkers(root);
+      const candidates = Array.from(
+        root.querySelectorAll('button, [role="button"], span, div'),
+      )
+        .filter(matchesAffirmativeLabel)
+        .sort((left, right) => elementArea(left) - elementArea(right));
+      const inspectedCandidates = candidates.map((candidate) => ({
+        candidate,
+        label: cleanMessengerText(
+          candidate.getAttribute("aria-label") || candidate.innerText || candidate.textContent || "",
+        ),
+        tag: candidate.tagName || "",
+        role: candidate.getAttribute("role") || "",
+        visible: visible(candidate),
+        ...inspectMarketplaceQuickResponseCandidate(candidate, root, promptMarkers),
+      }));
+      const accepted = inspectedCandidates.find((candidate) => candidate.accepted) || null;
+      lastMarketplaceQuickReplyDiagnostics = {
+        rootDetected: true,
+        spansExamined: spans.length,
+        matchingSpans: spans.filter(matchesAffirmativeLabel).length,
+        affirmativeMatches: candidates.length,
+        promptMarkers: promptMarkers.length,
+        accepted: !!accepted,
+        acceptedLabel: accepted?.label || "",
+        reason: accepted?.reason || inspectedCandidates[0]?.reason || "affirmative_candidate_missing",
+        candidates: inspectedCandidates.map(({ candidate: _candidate, ...details }) => details),
+      };
+      return accepted?.candidate || null;
     }
 
     function createMarketplaceAvailabilityFallbackMessage(buyerName) {
@@ -4319,6 +4515,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         speaker: buyerName || "Buyer",
         text: label.startsWith("si ") ? "¿Sigue disponible?" : "Is it still available?",
         availabilityQuickReplyLabel: label,
+        quickReplyDiagnostics: lastMarketplaceQuickReplyDiagnostics,
       };
     }
 
@@ -4453,8 +4650,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       // buyer bubble with a "Send a quick response" availability card. Treat
       // that seller-only control as evidence of the buyer's availability turn
       // so validation, debounce, button acceptance and intake can still run.
+      const availabilityQuickReplyMessage = createMarketplaceAvailabilityFallbackMessage(buyerName);
       const availabilityFallbackMessage = messages.length < 1
-        ? createMarketplaceAvailabilityFallbackMessage(buyerName)
+        ? availabilityQuickReplyMessage
         : null;
       if (availabilityFallbackMessage) {
         messages.push(availabilityFallbackMessage);
@@ -4473,9 +4671,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
             threadStartedByCurrentUser,
             availabilityQuickReplyVisible: false,
             availabilityQuickReplyLabel: "",
+            quickReplyDiagnostics: lastMarketplaceQuickReplyDiagnostics,
             threadRootDetected: !!main,
             messageScopeDetected: !!messageScope,
             extractionMode,
+            messageCandidateCount: semanticMessageEls.length || (messageScope
+              ? messageScope.querySelectorAll('div[dir="auto"], span[dir="auto"]').length
+              : 0),
             latestMessageDirection: "none",
             matchedSelectors: collectMatchedThreadSelectors(main),
           },
@@ -4498,11 +4700,16 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           buyerNameCandidate: buyerName,
           latestInboundMessageText: latestInboundMessage?.text || "",
           threadStartedByCurrentUser,
-          availabilityQuickReplyVisible: !!availabilityFallbackMessage,
-          availabilityQuickReplyLabel: availabilityFallbackMessage?.availabilityQuickReplyLabel || "",
+          availabilityQuickReplyVisible: !!availabilityQuickReplyMessage,
+          availabilityQuickReplyLabel: availabilityQuickReplyMessage?.availabilityQuickReplyLabel || "",
+          quickReplyDiagnostics:
+            availabilityQuickReplyMessage?.quickReplyDiagnostics || lastMarketplaceQuickReplyDiagnostics,
           threadRootDetected: !!main,
           messageScopeDetected: !!messageScope,
           extractionMode,
+          messageCandidateCount: semanticMessageEls.length || (messageScope
+            ? messageScope.querySelectorAll('div[dir="auto"], span[dir="auto"]').length
+            : 0),
           latestMessageDirection: deduped[deduped.length - 1]?.speaker === "Dealer" ? "dealer" : "buyer",
           matchedSelectors: collectMatchedThreadSelectors(main),
         },
@@ -4708,10 +4915,16 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const root = findMessengerRoot();
       if (!root) return false;
       const expected = cleanMessengerText(reply);
-      return Array.from(root.querySelectorAll('[aria-label]')).some((el) => {
+      const semanticDelivery = Array.from(root.querySelectorAll('[aria-label]')).some((el) => {
         const parsed = parseSemanticMessengerMessage(el);
         return parsed.sentByCurrentUser && cleanMessengerText(parsed.text) === expected;
       });
+      if (semanticDelivery) return true;
+
+      const messageScope = findMessengerMessageScope(root);
+      const buyerName = extractBuyerNameFromThreadHeader(getThreadHeadingText(root));
+      return parsePlainMessengerMessages(messageScope, buyerName, getThreadHeadingText(root))
+        .some((message) => message.speaker === "Dealer" && cleanMessengerText(message.text) === expected);
     }
 
     async function clickMessengerSend(box = getMessengerMessageBox()) {
@@ -4734,6 +4947,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     async function autoSendReply(reply, captureHash, messages, captureDebug = {}) {
       lastMessengerAutoSendFailureReason = "";
       lastMessengerAutoSendMethod = "";
+      lastMessengerSendDiagnostics = {
+        composerDetected: false,
+        composerTextDetected: false,
+        sendControlDetected: false,
+        sendMethod: "none",
+        deliveryConfirmed: false,
+      };
       if (!reply || !captureHash || captureHash === lastMessengerAutoSendHash) {
         lastMessengerAutoSendFailureReason = "reply_or_capture_not_actionable";
         return false;
@@ -4753,14 +4973,18 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         lastMessengerAutoSendFailureReason = "composer_missing";
         return false;
       }
+      lastMessengerSendDiagnostics.composerDetected = true;
       const inserted = insertReply(reply);
       const composerTextDetected = cleanMessengerText(readMessengerComposerText(box)) === cleanMessengerText(reply);
+      lastMessengerSendDiagnostics.composerTextDetected = composerTextDetected;
       if (!inserted || !composerTextDetected) {
         lastMessengerAutoSendFailureReason = "composer_insert_unconfirmed";
         return false;
       }
       const sendControlDetected = !!findMessengerSendButton();
+      lastMessengerSendDiagnostics.sendControlDetected = sendControlDetected;
       const sendResult = await clickMessengerSend(box);
+      lastMessengerSendDiagnostics.sendMethod = sendResult.method;
       if (!sendResult.ok) {
         lastMessengerAutoSendFailureReason = "send_dispatch_failed";
         setStatus("Reply inserted, but DealerPilot could not find Messenger Send.", "err");
@@ -4768,6 +4992,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       }
       await sleep(900);
       const deliveryConfirmed = !readMessengerComposerText(box) || messengerShowsSentReply(reply);
+      lastMessengerSendDiagnostics.deliveryConfirmed = deliveryConfirmed;
       if (!deliveryConfirmed) {
         lastMessengerAutoSendFailureReason = "delivery_unconfirmed";
         reportMessengerCaptureDebug("auto_send_blocked", {
@@ -4814,12 +5039,19 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       evidence.listingTitleCandidate = context.vehicleTitle || "";
       const salesContext = validateMessengerSalesContext({ buyerName, messages, context, evidence });
       const captureDebug = {
+        pageRoute: safeSalesAiUrl(),
+        automatic,
         messageCount: messages.length,
+        messageCandidateCount: evidence.messageCandidateCount || 0,
         rawTextDetected: !!rawText,
         buyerNameDetected: isReliableBuyerName(buyerName),
+        buyerName: buyerName || "",
         vehicleContextDetected: !!context.marketplaceItemId || !!context.vehicleTitle,
+        vehicleTitle: context.vehicleTitle || "",
         quickReplyVisible: evidence.availabilityQuickReplyVisible === true,
         quickReplyLabel: evidence.availabilityQuickReplyLabel || "",
+        quickReplyDiagnostics: evidence.quickReplyDiagnostics || lastMarketplaceQuickReplyDiagnostics,
+        affirmativeActionDetected: evidence.quickReplyDiagnostics?.accepted === true,
         threadRootDetected: evidence.threadRootDetected === true,
         messageScopeDetected: evidence.messageScopeDetected === true,
         messageExtractionMode: evidence.extractionMode || "none",
@@ -4959,6 +5191,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       reportMessengerCaptureDebug("intake_sending", {
         ...captureDebug,
         availabilityQuickReplyAccepted,
+        backendIntakeSent: false,
+        backendIntakeReceived: false,
       });
 
       const buyerReplyPending =
@@ -4977,6 +5211,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         reportMessengerCaptureDebug("intake_failed", {
           ...captureDebug,
           availabilityQuickReplyAccepted,
+          backendIntakeSent: true,
+          backendIntakeReceived: false,
           reason: res?.error || "no_extension_response",
         });
         setStatus("Failed: " + (res && res.error), "err");
@@ -4990,6 +5226,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         reportMessengerCaptureDebug("intake_skipped", {
           ...captureDebug,
           availabilityQuickReplyAccepted,
+          backendIntakeSent: true,
+          backendIntakeReceived: true,
           reason: res.data.reason || "backend_skipped",
         });
         setStatus("No new buyer message to answer.", "muted");
@@ -5007,10 +5245,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const totalResponseMs = Date.now() - messageDetectedAtMs;
       reportMessengerCaptureDebug(autoSent || !silent ? "intake_ok" : "auto_send_blocked", {
         ...captureDebug,
+        ...lastMessengerSendDiagnostics,
         availabilityQuickReplyAccepted,
         aiReplyReceived: !!lastReply,
         autoSent,
         sendMethod: autoSent ? lastMessengerAutoSendMethod : undefined,
+        backendIntakeSent: true,
+        backendIntakeReceived: true,
         reason: autoSent || !silent ? undefined : (lastMessengerAutoSendFailureReason || "auto_send_unconfirmed"),
         totalResponseMs,
       });
