@@ -4243,6 +4243,16 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return /\b(?:is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|est[aá] disponible|lo tiene disponible)\b/i.test(normalized);
     }
 
+    function normalizeMarketplaceAvailabilityLabel(text) {
+      return cleanMessengerText(text)
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/['’]/g, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    }
+
     function findMarketplaceAvailabilityAcceptButton() {
       const root = findMessengerRoot();
       if (!root) return null;
@@ -4259,11 +4269,23 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       ]);
       return Array.from(root.querySelectorAll('button, [role="button"]')).find((buttonEl) => {
         if (!visible(buttonEl) || buttonEl.disabled || buttonEl.getAttribute("aria-disabled") === "true") return false;
-        const label = cleanMessengerText(
+        const label = normalizeMarketplaceAvailabilityLabel(
           buttonEl.getAttribute("aria-label") || buttonEl.innerText || buttonEl.textContent || "",
-        ).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/['’]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+        );
         return affirmativeLabels.has(label);
       }) || null;
+    }
+
+    function createMarketplaceAvailabilityFallbackMessage(buyerName) {
+      const acceptButton = findMarketplaceAvailabilityAcceptButton();
+      if (!acceptButton) return null;
+      const label = normalizeMarketplaceAvailabilityLabel(
+        acceptButton.getAttribute("aria-label") || acceptButton.innerText || acceptButton.textContent || "",
+      );
+      return {
+        speaker: buyerName || "Buyer",
+        text: label.startsWith("si ") ? "¿Sigue disponible?" : "Is it still available?",
+      };
     }
 
     async function acceptMarketplaceAvailabilityQuickReply(captureHash, messages) {
@@ -4389,6 +4411,15 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         messages.push(...parsePlainMessengerMessages(messageScope, buyerName, threadHeaderText));
       }
 
+      // On a first Marketplace contact, Facebook can replace the inbound
+      // buyer bubble with a "Send a quick response" availability card. Treat
+      // that seller-only control as evidence of the buyer's availability turn
+      // so validation, debounce, button acceptance and intake can still run.
+      const availabilityFallbackMessage = messages.length < 1
+        ? createMarketplaceAvailabilityFallbackMessage(buyerName)
+        : null;
+      if (availabilityFallbackMessage) messages.push(availabilityFallbackMessage);
+
       if (messages.length < 1) {
         return {
           buyerName,
@@ -4399,6 +4430,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
             buyerNameCandidate: buyerName,
             latestInboundMessageText: "",
             threadStartedByCurrentUser,
+            availabilityQuickReplyVisible: false,
             matchedSelectors: collectMatchedThreadSelectors(main),
           },
         };
@@ -4420,6 +4452,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           buyerNameCandidate: buyerName,
           latestInboundMessageText: latestInboundMessage?.text || "",
           threadStartedByCurrentUser,
+          availabilityQuickReplyVisible: !!availabilityFallbackMessage,
           matchedSelectors: collectMatchedThreadSelectors(main),
         },
       };
@@ -4752,7 +4785,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         marketplaceDownPayment: context.downPayment || undefined,
       };
 
-      if (messages.length >= 2) {
+      if (messages.length >= 1) {
         // Canonical role labels keep the backend parser stable even when the
         // buyer's display name changes or contains punctuation.
         const canonicalMessages = messages.map((m) =>

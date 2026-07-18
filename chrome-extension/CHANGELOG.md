@@ -1,5 +1,15 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.74
+
+**Fixed**
+- Detects Facebook Marketplace's first-contact quick-response card even when no normal inbound buyer bubble is rendered.
+- Treats that card as the buyer's availability question before the Sales AI validation gates run.
+- Preserves the quiet-window debounce, accepts the affirmative availability response once, and sends the resulting turn to intake.
+- Serializes a single validated buyer message with canonical Buyer/Dealer roles instead of falling back to empty raw text.
+
+---
+
 ## v1.3.73
 
 **Fixed**

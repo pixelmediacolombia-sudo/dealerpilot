@@ -106,6 +106,57 @@ function loadDetectionHarness({ hostname, pathname, rootSignals }) {
   return context.__detection;
 }
 
+function loadAvailabilityQuickReplyHarness(label) {
+  const start = publisherFlowSource.indexOf("    function normalizeMarketplaceAvailabilityLabel");
+  const end = publisherFlowSource.indexOf("    async function acceptMarketplaceAvailabilityQuickReply", start);
+  assert.ok(start >= 0 && end > start, "Availability quick-reply functions must remain extractable");
+
+  const button = {
+    disabled: false,
+    innerText: label,
+    textContent: label,
+    getAttribute: () => null,
+  };
+  const root = {
+    querySelectorAll: () => [button],
+  };
+  const context = vm.createContext({
+    cleanMessengerText: (text) => String(text || "").trim(),
+    findMessengerRoot: () => root,
+    visible: () => true,
+  });
+  vm.runInContext(
+    `${publisherFlowSource.slice(start, end)}\n` +
+      "globalThis.__availability = { findMarketplaceAvailabilityAcceptButton, createMarketplaceAvailabilityFallbackMessage };",
+    context,
+    { filename: "publisherFlow-availability.js" },
+  );
+  return { button, ...context.__availability };
+}
+
+function loadAvailabilitySnapshotHarness() {
+  const start = publisherFlowSource.indexOf("    function scrapeConversationSnapshot()");
+  const end = publisherFlowSource.indexOf("    function findConversationScrollContainer", start);
+  assert.ok(start >= 0 && end > start, "Messenger snapshot function must remain extractable");
+
+  const fallbackMessage = { speaker: "Juan", text: "Is it still available?" };
+  const context = vm.createContext({
+    findMarketplaceThreadRoot: () => ({}),
+    getThreadHeadingText: () => "Juan · 2012 Mazda Mazda3",
+    extractBuyerNameFromThreadHeader: () => "Juan",
+    findMessengerMessageScope: () => null,
+    createMarketplaceAvailabilityFallbackMessage: () => fallbackMessage,
+    collectMatchedThreadSelectors: () => [],
+  });
+  vm.runInContext(
+    `${publisherFlowSource.slice(start, end)}\n` +
+      "globalThis.__snapshot = { scrapeConversationSnapshot };",
+    context,
+    { filename: "publisherFlow-availability-snapshot.js" },
+  );
+  return context.__snapshot.scrapeConversationSnapshot();
+}
+
 test("Marketplace inbox detects the active seller thread when Facebook renders no item anchor", () => {
   const detection = loadDetectionHarness({
     hostname: "www.facebook.com",
@@ -261,11 +312,25 @@ test("Messenger capture reads unlabeled rounded chat bubbles inside the active t
 });
 
 test("Marketplace availability quick reply is accepted once before the financing question", () => {
-  assert.match(publisherFlowSource, /function findMarketplaceAvailabilityAcceptButton/);
-  assert.match(publisherFlowSource, /yes its available/);
-  assert.match(publisherFlowSource, /si esta disponible/);
+  const english = loadAvailabilityQuickReplyHarness("Yes, are you interested?");
+  assert.equal(english.findMarketplaceAvailabilityAcceptButton(), english.button);
+  const englishFallback = english.createMarketplaceAvailabilityFallbackMessage("Juan");
+  assert.equal(englishFallback.speaker, "Juan");
+  assert.equal(englishFallback.text, "Is it still available?");
+
+  const spanish = loadAvailabilityQuickReplyHarness("Sí, está disponible");
+  const spanishFallback = spanish.createMarketplaceAvailabilityFallbackMessage("Juan");
+  assert.equal(spanishFallback.text, "¿Sigue disponible?");
+
+  const snapshot = loadAvailabilitySnapshotHarness();
+  assert.equal(snapshot.messages.length, 1);
+  assert.equal(snapshot.messages[0].speaker, "Juan");
+  assert.equal(snapshot.messages[0].text, "Is it still available?");
+  assert.equal(snapshot.evidence.availabilityQuickReplyVisible, true);
+
   assert.match(publisherFlowSource, /MESSENGER_CLAIM_AVAILABILITY_ACTION/);
   assert.match(publisherFlowSource, /availabilityQuickReplyAccepted/);
+  assert.match(publisherFlowSource, /if \(messages\.length >= 1\)/);
 });
 
 test("Messenger auto-send excludes generic and quick-response buttons", () => {
