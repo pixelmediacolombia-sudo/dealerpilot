@@ -1092,6 +1092,7 @@ const handlers = {
       "marketplaceDetected",
       "messengerDetected",
       "lastMessengerDetectionDebug",
+      "lastMessengerCaptureDebug",
       "workflowStep",
       "workflowStepAt",
       "fbLoggedIn",
@@ -1128,6 +1129,7 @@ const handlers = {
       marketplaceDetected: stored.marketplaceDetected || false,
       messengerDetected: stored.messengerDetected || false,
       lastMessengerDetectionDebug: stored.lastMessengerDetectionDebug || null,
+      lastMessengerCaptureDebug: stored.lastMessengerCaptureDebug || null,
       workflowStep: stored.workflowStep || null,
       workflowStepAt: stored.workflowStepAt || null,
       fbLoggedIn: stored.fbLoggedIn ?? null,
@@ -1151,6 +1153,15 @@ const handlers = {
   async CLEAR_ACTIVE_JOB() {
     await chrome.storage.local.remove(["activeJob", "lastClaimedJob"]);
     return { ok: true };
+  },
+
+  async MESSENGER_CAPTURE_DEBUG(message) {
+    const debug = {
+      ...(message.debug || {}),
+      receivedAt: new Date().toISOString(),
+    };
+    await chrome.storage.local.set({ lastMessengerCaptureDebug: debug });
+    return { saved: true };
   },
 
   // ---- Sales AI: Conversation Intake ----
@@ -1315,6 +1326,7 @@ const STATE_KEYS_TO_CLEAR = [
   "lastPollTime", "auditLog", "facebookPageStates",
   "marketplaceDetected", "marketplacePath", "marketplaceUrl",
   "marketplaceDetectedAt", "messengerDetected", "lastMessengerDetectionDebug",
+  "lastMessengerCaptureDebug",
   "messengerAvailabilityClaims",
 ];
 

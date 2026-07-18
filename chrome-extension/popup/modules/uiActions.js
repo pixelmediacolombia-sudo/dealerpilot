@@ -69,6 +69,11 @@ const dbg = {
   lastClaim:         document.getElementById("d-last-claim"),
   lastClaimErr:      document.getElementById("d-last-claim-err"),
   activeJob:         document.getElementById("d-active-job"),
+  aiConfirmed:       document.getElementById("d-ai-confirmed"),
+  aiCaptureStage:    document.getElementById("d-ai-capture-stage"),
+  aiQuickReply:      document.getElementById("d-ai-quick-reply"),
+  aiCaptureReason:   document.getElementById("d-ai-capture-reason"),
+  aiCaptureAt:       document.getElementById("d-ai-capture-at"),
 };
 
 let nextJob   = null;
@@ -410,6 +415,35 @@ async function loadDebugState() {
       messengerDomEl.className = "value";
       messengerDomEl.title = "";
     }
+  }
+
+  const aiCapture = d.lastMessengerCaptureDebug;
+  if (aiCapture) {
+    const aiConfirmed = aiCapture.stage === "intake_ok" && aiCapture.aiReplyReceived === true;
+    dbg.aiConfirmed.textContent = aiConfirmed ? "Yes ✓" : "No — see stage";
+    dbg.aiConfirmed.className = "value " + (aiConfirmed ? "ok" : "err");
+    dbg.aiCaptureStage.textContent = aiCapture.stage || "Unknown";
+    dbg.aiCaptureStage.className = "value " + (aiCapture.stage === "intake_ok" ? "ok" : "");
+    dbg.aiQuickReply.textContent = aiCapture.quickReplyVisible
+      ? `Yes ✓${aiCapture.quickReplyLabel ? ` (${truncate(aiCapture.quickReplyLabel, 24)})` : ""}`
+      : "No";
+    dbg.aiQuickReply.className = "value " + (aiCapture.quickReplyVisible ? "ok" : "");
+    dbg.aiCaptureReason.textContent = aiCapture.reason || "None";
+    dbg.aiCaptureReason.className = "value " + (aiCapture.reason ? "err" : "ok");
+    dbg.aiCaptureAt.textContent = fmtTime(aiCapture.at || aiCapture.receivedAt);
+    dbg.aiCaptureAt.className = "value";
+    dbg.aiCaptureStage.title = JSON.stringify(aiCapture);
+  } else {
+    dbg.aiConfirmed.textContent = "Not proven yet";
+    dbg.aiConfirmed.className = "value";
+    dbg.aiCaptureStage.textContent = "Never";
+    dbg.aiCaptureStage.className = "value";
+    dbg.aiQuickReply.textContent = "Not detected";
+    dbg.aiQuickReply.className = "value";
+    dbg.aiCaptureReason.textContent = "—";
+    dbg.aiCaptureReason.className = "value";
+    dbg.aiCaptureAt.textContent = "Never";
+    dbg.aiCaptureAt.className = "value";
   }
 
   // Extra: load lastValidationDebug and poll skip reason from storage

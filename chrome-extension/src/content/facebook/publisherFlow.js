@@ -4256,7 +4256,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     function findMarketplaceAvailabilityAcceptButton() {
       const root = findMessengerRoot();
       if (!root) return null;
-      const affirmativeLabels = new Set([
+      const affirmativeLabels = [
         "yes its available",
         "yes it is available",
         "yes this is available",
@@ -4266,13 +4266,16 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         "si sigue disponible",
         "si aun esta disponible",
         "si te interesa",
-      ]);
+      ];
       return Array.from(root.querySelectorAll('button, [role="button"]')).find((buttonEl) => {
         if (!visible(buttonEl) || buttonEl.disabled || buttonEl.getAttribute("aria-disabled") === "true") return false;
         const label = normalizeMarketplaceAvailabilityLabel(
           buttonEl.getAttribute("aria-label") || buttonEl.innerText || buttonEl.textContent || "",
         );
-        return affirmativeLabels.has(label);
+        return affirmativeLabels.some((expectedLabel) =>
+          label === expectedLabel ||
+          (label.length >= 12 && expectedLabel.startsWith(label)),
+        );
       }) || null;
     }
 
@@ -4285,6 +4288,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return {
         speaker: buyerName || "Buyer",
         text: label.startsWith("si ") ? "¿Sigue disponible?" : "Is it still available?",
+        availabilityQuickReplyLabel: label,
       };
     }
 
@@ -4431,6 +4435,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
             latestInboundMessageText: "",
             threadStartedByCurrentUser,
             availabilityQuickReplyVisible: false,
+            availabilityQuickReplyLabel: "",
             matchedSelectors: collectMatchedThreadSelectors(main),
           },
         };
@@ -4453,6 +4458,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           latestInboundMessageText: latestInboundMessage?.text || "",
           threadStartedByCurrentUser,
           availabilityQuickReplyVisible: !!availabilityFallbackMessage,
+          availabilityQuickReplyLabel: availabilityFallbackMessage?.availabilityQuickReplyLabel || "",
           matchedSelectors: collectMatchedThreadSelectors(main),
         },
       };
@@ -4708,6 +4714,18 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return true;
     }
 
+    function reportMessengerCaptureDebug(stage, details = {}) {
+      void send({
+        type: "MESSENGER_CAPTURE_DEBUG",
+        debug: {
+          at: new Date().toISOString(),
+          stage,
+          sourceUrl: safeSalesAiUrl(),
+          ...details,
+        },
+      }).catch(() => {});
+    }
+
     async function captureConversationOnce(options = {}) {
       const silent = !!options.silent;
       const automatic = !!options.automatic;
@@ -4718,8 +4736,20 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const context = detectListingContext();
       evidence.listingTitleCandidate = context.vehicleTitle || "";
       const salesContext = validateMessengerSalesContext({ buyerName, messages, context, evidence });
+      const captureDebug = {
+        messageCount: messages.length,
+        rawTextDetected: !!rawText,
+        buyerNameDetected: isReliableBuyerName(buyerName),
+        vehicleContextDetected: !!context.marketplaceItemId || !!context.vehicleTitle,
+        quickReplyVisible: evidence.availabilityQuickReplyVisible === true,
+        quickReplyLabel: evidence.availabilityQuickReplyLabel || "",
+      };
 
       if (!messages.length && !rawText) {
+        reportMessengerCaptureDebug("blocked", {
+          ...captureDebug,
+          reason: "no_conversation_text",
+        });
         setStatus("No conversation text found.", "err");
         return;
       }
@@ -4729,6 +4759,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           reasons: salesContext.missing,
           buyerName,
           url: location.href,
+        });
+        reportMessengerCaptureDebug("blocked", {
+          ...captureDebug,
+          reason: salesContext.missing[0] || "invalid_sales_context",
+          validationGates: salesContext,
         });
         setStatus(`Sales AI skipped: ${salesContext.missing[0] || "invalid context"}.`, "muted");
         return;
@@ -4818,6 +4853,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           pendingMessengerBuyerHash = captureHash;
           pendingMessengerBuyerSince = now;
           pendingMessengerMessageDetectedAt = messageDetectedAtMs;
+          reportMessengerCaptureDebug("waiting_quiet_window", captureDebug);
           setStatus("Waiting for the buyer to finish typing...", "muted");
           return;
         }
@@ -4838,6 +4874,10 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       }
 
       payload.availabilityQuickReplyAccepted = availabilityQuickReplyAccepted;
+      reportMessengerCaptureDebug("intake_sending", {
+        ...captureDebug,
+        availabilityQuickReplyAccepted,
+      });
 
       const buyerReplyPending =
         silent &&
@@ -4852,6 +4892,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const res = await send({ type: "CONVERSATION_INTAKE", ...payload });
       if (!res || !res.ok) {
         if (res?.error === CTXI) return;
+        reportMessengerCaptureDebug("intake_failed", {
+          ...captureDebug,
+          availabilityQuickReplyAccepted,
+          reason: res?.error || "no_extension_response",
+        });
         setStatus("Failed: " + (res && res.error), "err");
         return;
       }
@@ -4860,6 +4905,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         pendingMessengerBuyerHash = "";
         pendingMessengerBuyerSince = 0;
         pendingMessengerMessageDetectedAt = 0;
+        reportMessengerCaptureDebug("intake_skipped", {
+          ...captureDebug,
+          availabilityQuickReplyAccepted,
+          reason: res.data.reason || "backend_skipped",
+        });
         setStatus("No new buyer message to answer.", "muted");
         return;
       }
@@ -4873,6 +4923,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const autoSent = silent ? await autoSendReply(lastReply, captureHash, messages) : false;
       const replySentAt = autoSent ? new Date().toISOString() : null;
       const totalResponseMs = Date.now() - messageDetectedAtMs;
+      reportMessengerCaptureDebug("intake_ok", {
+        ...captureDebug,
+        availabilityQuickReplyAccepted,
+        aiReplyReceived: !!lastReply,
+        autoSent,
+        totalResponseMs,
+      });
       console.log("[DealerPilot AI] Sales AI response timing", {
         ...(res.data.timings || {}),
         replySentAt,

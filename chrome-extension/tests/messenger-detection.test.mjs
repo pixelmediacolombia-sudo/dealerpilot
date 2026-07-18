@@ -318,6 +318,13 @@ test("Marketplace availability quick reply is accepted once before the financing
   assert.equal(englishFallback.speaker, "Juan");
   assert.equal(englishFallback.text, "Is it still available?");
 
+  const truncated = loadAvailabilityQuickReplyHarness("Yes, are you inter...");
+  assert.equal(truncated.findMarketplaceAvailabilityAcceptButton(), truncated.button);
+  assert.equal(
+    truncated.createMarketplaceAvailabilityFallbackMessage("Juan").text,
+    "Is it still available?",
+  );
+
   const spanish = loadAvailabilityQuickReplyHarness("Sí, está disponible");
   const spanishFallback = spanish.createMarketplaceAvailabilityFallbackMessage("Juan");
   assert.equal(spanishFallback.text, "¿Sigue disponible?");
@@ -358,4 +365,12 @@ test("Messenger automatic replies wait for a quiet buyer window and guard their 
   assert.match(publisherFlowSource, /Waiting for the buyer to finish typing/);
   assert.match(publisherFlowSource, /latestText === lastMessengerAutoReplyText/);
   assert.match(publisherFlowSource, /captureHash === lastMessengerAutoSendHash/);
+});
+
+test("Messenger capture reports the Sales AI pipeline stage for extension diagnostics", () => {
+  assert.match(publisherFlowSource, /type: "MESSENGER_CAPTURE_DEBUG"/);
+  assert.match(publisherFlowSource, /reportMessengerCaptureDebug\("blocked"/);
+  assert.match(publisherFlowSource, /reportMessengerCaptureDebug\("intake_sending"/);
+  assert.match(publisherFlowSource, /reportMessengerCaptureDebug\("intake_ok"/);
+  assert.match(publisherFlowSource, /aiReplyReceived: !!lastReply/);
 });

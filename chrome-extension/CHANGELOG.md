@@ -1,5 +1,14 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.75
+
+**Fixed**
+- Recognizes Facebook's visually truncated first-contact action, including `Yes, are you inter...`.
+- Requires a sufficiently long affirmative prefix so unrelated Marketplace controls cannot be accepted accidentally.
+- Adds visible Sales AI diagnostics for the latest capture stage, quick-response card, failure reason, and confirmed AI reply.
+
+---
+
 ## v1.3.74
 
 **Fixed**
