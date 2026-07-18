@@ -4134,6 +4134,83 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return candidate.slice(0, 80);
     }
 
+    function extractMessengerSenderName(descriptor) {
+      const cleaned = cleanMessengerText(descriptor);
+      const directed = cleaned.match(/(?:por|by)\s+([^:]{1,80}):\s*\S/i);
+      const timestamped = cleaned.match(/,\s*([^,:]{1,80}):\s*\S/i);
+      const match = directed || timestamped;
+      if (!match) return "";
+      const candidate = cleanMessengerText(match[1]);
+      if (/^(?:tú|tu|you)$/i.test(candidate)) return "";
+      return candidate.slice(0, 80);
+    }
+
+    function normalizeMessengerPersonName(value) {
+      return cleanMessengerText(value)
+        .replace(/^visto\s+por\s+/i, "")
+        .replace(/\s+a\s+las\s+\d{1,2}:\d{2}\s*(?:am|pm).*$/i, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+    }
+
+    function messengerNamesMatch(left, right) {
+      const leftTokens = normalizeMessengerPersonName(left).split(" ").filter(Boolean);
+      const rightTokens = normalizeMessengerPersonName(right).split(" ").filter(Boolean);
+      if (!leftTokens.length || !rightTokens.length) return false;
+      const shorter = leftTokens.length <= rightTokens.length ? leftTokens : rightTokens;
+      const longer = leftTokens.length <= rightTokens.length ? rightTokens : leftTokens;
+      return shorter.every((token, index) => token === longer[index]);
+    }
+
+    function extractMessengerPersonNameFromAlt(value) {
+      const normalized = normalizeMessengerPersonName(value);
+      if (!normalized || normalized.length < 2 || normalized.length > 80) return "";
+      if (/^(?:tÃº|tu|you|facebook|unknown|buyer|seller|dealer)$/i.test(normalized)) return "";
+      if (!/^[\p{L}\p{M}][\p{L}\p{M}' .-]*$/u.test(normalized)) return "";
+      if (isMessengerUiText(normalized) || /\b(?:sent|mensaje|message|active|online|seen|visto)\b/i.test(normalized)) return "";
+      return normalized;
+    }
+
+    function collectMessengerSellerNameCandidates(root, messageScope) {
+      const scope = messageScope || root;
+      if (!scope) return [];
+      return Array.from(scope.querySelectorAll('img[alt]'))
+        .map((img) => extractMessengerPersonNameFromAlt(img.getAttribute("alt") || ""))
+        .filter(Boolean)
+        .filter((name, index, names) => names.indexOf(name) === index);
+    }
+
+    function findStableMessengerThreadIdentity(root, messageScope) {
+      const nodes = [root, messageScope].filter(Boolean);
+      const isMeaningfulIdentity = (value) => {
+        const normalized = normalizeThreadToken(value);
+        return (
+          /(?:thread|conversation|message)/i.test(value) &&
+          normalized.length >= 8 &&
+          !/^(?:mwthread|messenger-thread|conversation|message)$/.test(normalized)
+        );
+      };
+      for (const node of nodes) {
+        const candidates = [
+          "data-thread-id",
+          "data-conversation-id",
+          "data-thread-key",
+          "data-fb-thread-id",
+          "data-testid",
+          "id",
+        ]
+          .map((attribute) => node.getAttribute?.(attribute) || "")
+          .filter(isMeaningfulIdentity);
+        const hrefs = Array.from(node.querySelectorAll?.('a[href], [href]') || [])
+          .map((element) => element.getAttribute?.("href") || "")
+          .filter((value) => /(?:\/messages\/t\/|thread_id=|conversation_id=)/i.test(value));
+        const candidate = [...candidates, ...hrefs].find((value) => value.length >= 6);
+        if (candidate) return candidate.slice(0, 180);
+      }
+      return "";
+    }
+
     function collectMatchedThreadSelectors(root) {
       const selectors = [
         '[role="region"][aria-label*="Conversaci\u00f3n con el t\u00edtulo" i]',
@@ -4167,7 +4244,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       // validated active thread is the narrowest safe fallback scope.
       const semanticMessages = Array.from(root.querySelectorAll('[aria-label]')).filter((el) => {
         const descriptor = el.getAttribute("aria-label") || "";
-        return visible(el) && /(?:por|by)\s+[^:]{1,80}:\s*\S/i.test(descriptor);
+        return visible(el) && /(?:por|by)\s+[^:]{1,80}:\s*\S|,\s*[^,:]{1,80}:\s*\S/i.test(descriptor);
       });
       if (!semanticMessages.length) return root;
 
@@ -4184,22 +4261,32 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         el.getAttribute("aria-label") || "",
         ...Array.from(el.querySelectorAll('[aria-label]')).map((node) => node.getAttribute("aria-label") || ""),
       ].filter(Boolean);
-      return labels.find((label) => /(?:por|by)\s+[^:]{1,80}:\s*\S/i.test(label)) || labels[0] || "";
+      return labels.find((label) => /(?:por|by)\s+[^:]{1,80}:\s*\S|,\s*[^,:]{1,80}:\s*\S/i.test(label)) || labels[0] || "";
     }
 
-    function parseSemanticMessengerMessage(el) {
+    function parseSemanticMessengerMessage(el, sellerNameCandidates = []) {
       const descriptor = cleanMessengerText(getMessageDescriptor(el));
       const visibleText = cleanMessengerText(el.innerText || el.textContent || "");
       const directed = descriptor.match(/(?:por|by)\s+([^:]{1,80}):\s*(.+)$/i);
       const timestamped = descriptor.match(/,\s*([^,:]{1,80}):\s*(.+)$/i);
       const parsed = directed || timestamped;
       const text = cleanMessengerText(parsed?.[2] || visibleText);
-      const sentByCurrentUser =
+      const explicitCurrentUser =
         /(?:por\s+(?:t\u00fa|ti)|by\s+you)\s*:/i.test(descriptor) ||
         /\b(?:sent by you|you sent|enviaste|enviado por ti)\b/i.test(descriptor) ||
         /^t\u00fa\s*:/i.test(descriptor);
+      const senderName = extractMessengerSenderName(descriptor);
+      const sellerNameMatch = !!senderName && sellerNameCandidates.some((candidate) => messengerNamesMatch(senderName, candidate));
+      const sentByCurrentUser = explicitCurrentUser || sellerNameMatch;
       const isThreadStarter = /\b(?:iniciaste este chat|you started this chat|inici\u00f3 este chat|started this chat)\b/i.test(text);
-      return { descriptor, text, sentByCurrentUser, isThreadStarter };
+      return {
+        descriptor,
+        text,
+        sentByCurrentUser,
+        isThreadStarter,
+        senderName: sentByCurrentUser ? "" : senderName,
+        sellerNameMatch,
+      };
     }
 
     function isTransparentMessengerColor(color) {
@@ -4600,14 +4687,15 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const threadHeaderText = getThreadHeadingText(main);
 
       // Try to detect buyer name from page heading
-      const buyerName = extractBuyerNameFromThreadHeader(threadHeaderText);
+      let buyerName = extractBuyerNameFromThreadHeader(threadHeaderText);
 
       // Try structured message rows — Messenger renders each message in a [role="row"] or similar
       const messageScope = findMessengerMessageScope(main);
+      const sellerNameCandidates = collectMessengerSellerNameCandidates(main, messageScope);
       const semanticMessageEls = messageScope
         ? Array.from(messageScope.querySelectorAll('[aria-label]')).filter((el) => {
             const descriptor = el.getAttribute("aria-label") || "";
-            return visible(el) && /(?:por|by)\s+[^:]{1,80}:\s*\S/i.test(descriptor);
+            return visible(el) && /(?:por|by)\s+[^:]{1,80}:\s*\S|,\s*[^,:]{1,80}:\s*\S/i.test(descriptor);
           })
         : [];
       const messageEls = semanticMessageEls.length > 0
@@ -4617,18 +4705,25 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           : [];
 
       const messages = [];
+      const inboundSenderNames = [];
+      const inboundMessageDescriptors = [];
       let threadStartedByCurrentUser = null;
       let extractionMode = "none";
+      const stableThreadIdentity = findStableMessengerThreadIdentity(main, messageScope);
 
       if (messageEls.length > 0) {
         // Structured extraction: detect sent (you) vs received (buyer)
         for (const el of messageEls) {
-          const parsed = parseSemanticMessengerMessage(el);
+          const parsed = parseSemanticMessengerMessage(el, sellerNameCandidates);
           if (parsed.isThreadStarter) {
             threadStartedByCurrentUser = parsed.sentByCurrentUser;
             continue;
           }
           if (!parsed.text || parsed.text.length < 2 || isMessengerUiText(parsed.text)) continue;
+          if (!parsed.sentByCurrentUser) {
+            if (parsed.senderName) inboundSenderNames.push(parsed.senderName);
+            if (parsed.descriptor) inboundMessageDescriptors.push(parsed.descriptor);
+          }
           messages.push({
             speaker: parsed.sentByCurrentUser ? "Dealer" : (buyerName || "Buyer"),
             text: parsed.text.slice(0, 500),
@@ -4636,6 +4731,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         }
         if (messages.length > 0) extractionMode = "semantic";
       }
+
+      const descriptorBuyerName = inboundSenderNames.find(isReliableBuyerName);
+      if (descriptorBuyerName) buyerName = descriptorBuyerName;
 
       // Facebook also renders Marketplace chats as unlabeled rounded bubbles.
       // When semantic rows are absent, use bubble styling plus left/right
@@ -4680,6 +4778,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
               : 0),
             latestMessageDirection: "none",
             matchedSelectors: collectMatchedThreadSelectors(main),
+            threadIdentity: stableThreadIdentity || inboundMessageDescriptors[0] || "",
+            sellerNameCandidates,
           },
         };
       }
@@ -4712,6 +4812,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
             : 0),
           latestMessageDirection: deduped[deduped.length - 1]?.speaker === "Dealer" ? "dealer" : "buyer",
           matchedSelectors: collectMatchedThreadSelectors(main),
+          threadIdentity: stableThreadIdentity || inboundMessageDescriptors[0] || "",
+          sellerNameCandidates,
         },
       };
     }
@@ -4777,6 +4879,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           evidence: {
             ...olderSnapshot.evidence,
             ...snapshot.evidence,
+            threadIdentity:
+              snapshot.evidence.threadIdentity || olderSnapshot.evidence.threadIdentity || "",
           },
         };
 
@@ -4798,6 +4902,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           evidence: {
             ...snapshot.evidence,
             ...newestSnapshot.evidence,
+            threadIdentity:
+              newestSnapshot.evidence.threadIdentity || snapshot.evidence.threadIdentity || "",
           },
         };
       }
@@ -4860,13 +4966,30 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         .slice(0, 120);
     }
 
-    function buildMessengerThreadRef(buyerName, vehicleTitle, fallbackUrl = location.href) {
+    function stableThreadFingerprint(value) {
+      let hash = 2166136261;
+      for (const character of String(value || "")) {
+        hash ^= character.charCodeAt(0);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0).toString(36);
+    }
+
+    function buildMessengerThreadRef(
+      buyerName,
+      vehicleTitle,
+      fallbackUrl = location.href,
+      messages = [],
+      threadIdentity = "",
+    ) {
       const buyer = normalizeThreadToken(buyerName || "unknown-buyer");
       const vehicle = normalizeThreadToken(vehicleTitle || "vehicle-inquiry");
-      if (buyer && vehicle && buyer !== "unknown-buyer") {
-        return `marketplace-thread::${buyer}::${vehicle}`;
-      }
-      return `${fallbackUrl.split("?")[0]}::${buyer || "unknown-buyer"}`;
+      const firstBuyerMessage = messages.find((message) => message?.speaker !== "Dealer")?.text || "";
+      const identitySeed = threadIdentity || firstBuyerMessage || fallbackUrl.split("?")[0];
+      const fingerprint = stableThreadFingerprint(
+        [buyer, vehicle, normalizeThreadToken(identitySeed)].join("::"),
+      );
+      return `marketplace-thread::${buyer || "unknown-buyer"}::${vehicle}::${fingerprint}`;
     }
 
     function findMessengerSendButton() {
@@ -4915,13 +5038,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const root = findMessengerRoot();
       if (!root) return false;
       const expected = cleanMessengerText(reply);
+      const messageScope = findMessengerMessageScope(root);
+      const sellerNameCandidates = collectMessengerSellerNameCandidates(root, messageScope);
       const semanticDelivery = Array.from(root.querySelectorAll('[aria-label]')).some((el) => {
-        const parsed = parseSemanticMessengerMessage(el);
+        const parsed = parseSemanticMessengerMessage(el, sellerNameCandidates);
         return parsed.sentByCurrentUser && cleanMessengerText(parsed.text) === expected;
       });
       if (semanticDelivery) return true;
 
-      const messageScope = findMessengerMessageScope(root);
       const buyerName = extractBuyerNameFromThreadHeader(getThreadHeadingText(root));
       return parsePlainMessengerMessages(messageScope, buyerName, getThreadHeadingText(root))
         .some((message) => message.speaker === "Dealer" && cleanMessengerText(message.text) === expected);
@@ -5055,6 +5179,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         threadRootDetected: evidence.threadRootDetected === true,
         messageScopeDetected: evidence.messageScopeDetected === true,
         messageExtractionMode: evidence.extractionMode || "none",
+        threadIdentityDetected: !!evidence.threadIdentity,
         latestMessageDirection: evidence.latestMessageDirection || "none",
         composerDetected: !!getMessengerMessageBox(),
       };
@@ -5113,7 +5238,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           ? messages[messages.length - 1].text
           : rawText.split("\n").map((line) => line.trim()).filter(Boolean).slice(-1)[0] || "";
       const externalThreadRef = [
-        buildMessengerThreadRef(buyerName, context.vehicleTitle, context.listingUrl || location.href),
+        buildMessengerThreadRef(
+          buyerName,
+          context.vehicleTitle,
+          context.listingUrl || location.href,
+          messages,
+          evidence.threadIdentity,
+        ),
       ].join("");
       const payload = {
         externalThreadRef,

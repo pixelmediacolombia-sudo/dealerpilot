@@ -24,7 +24,11 @@ const STORE_PHONES: Record<string, string> = {
 
 const DEFAULT_STORE_PHONE = "+1 703-763-4675";
 const SALES_AI_REPLY_TIMEOUT_MS = 12000;
-const MESSENGER_DELIVERY_RETRY_DELAY_MS = 120000;
+// Retry a prepared reply quickly when Facebook did not confirm the first
+// composer/send attempt. The extension still deduplicates by message hash, so
+// this does not create duplicate AI replies; it only removes the old 2-minute
+// dead time between delivery attempts.
+const MESSENGER_DELIVERY_RETRY_DELAY_MS = 15000;
 
 function resolveStorePhone(lotLocation?: string | null): string {
   if (!lotLocation) return DEFAULT_STORE_PHONE;

@@ -1,5 +1,17 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.80
+
+- Classifies seller messages labeled with the seller's Facebook name as Dealer messages.
+- Sends only buyer-authored messages into Sales AI intake and prevents replies to the seller's own text.
+- Adds a regression test for seller-name descriptors such as `Andres:`.
+
+## v1.3.79
+
+- Separates Messenger conversations for buyers with the same first name by using Facebook thread identity or a first-message fingerprint.
+- Extracts the full inbound sender name when Facebook exposes it in the message descriptor.
+- Reduces the wait before retrying an unconfirmed Messenger delivery from 120 seconds to 15 seconds.
+
 ## v1.3.78
 
 - Ignore hidden Facebook tabs during automatic Messenger capture so duplicate tabs cannot compete for one thread.

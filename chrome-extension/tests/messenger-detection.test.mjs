@@ -183,7 +183,10 @@ function loadAvailabilitySnapshotHarness() {
     findMarketplaceThreadRoot: () => ({}),
     getThreadHeadingText: () => "Juan · 2012 Mazda Mazda3",
     extractBuyerNameFromThreadHeader: () => "Juan",
+    findStableMessengerThreadIdentity: () => "",
+    isReliableBuyerName: (name) => Boolean(name),
     findMessengerMessageScope: () => null,
+    collectMessengerSellerNameCandidates: () => [],
     createMarketplaceAvailabilityFallbackMessage: () => fallbackMessage,
     lastMarketplaceQuickReplyDiagnostics: null,
     collectMatchedThreadSelectors: () => [],
@@ -425,6 +428,64 @@ test("Messenger auto-send excludes generic and quick-response buttons", () => {
   assert.match(resolverSource, /\[aria-label\*=\"send\" i\]/);
 });
 
+test("Messenger thread refs separate same-name buyers with stable identity or first message", () => {
+  const start = publisherFlowSource.indexOf("    function normalizeThreadToken");
+  const end = publisherFlowSource.indexOf("    function findMessengerSendButton", start);
+  assert.ok(start >= 0 && end > start, "Messenger thread identity helpers must remain extractable");
+  const context = vm.createContext({
+    cleanMessengerText: (text) => String(text || "").trim(),
+    location: { href: "https://www.facebook.com/marketplace/inbox" },
+  });
+  vm.runInContext(
+    `${publisherFlowSource.slice(start, end)}\n` +
+      "globalThis.__threadRefs = { buildMessengerThreadRef };",
+    context,
+    { filename: "publisherFlow-thread-ref.js" },
+  );
+
+  const refs = context.__threadRefs;
+  const first = refs.buildMessengerThreadRef(
+    "Juan",
+    "2021 Toyota RAV4",
+    "https://www.facebook.com/marketplace/item/1/",
+    [{ speaker: "Buyer", text: "Hola, ¿sigue disponible?" }],
+    "facebook-thread-juan-1",
+  );
+  const second = refs.buildMessengerThreadRef(
+    "Juan",
+    "2021 Toyota RAV4",
+    "https://www.facebook.com/marketplace/item/1/",
+    [{ speaker: "Buyer", text: "Hola, ¿sigue disponible?" }],
+    "facebook-thread-juan-2",
+  );
+  assert.notEqual(first, second, "stable Facebook thread identities must prevent same-name collisions");
+  assert.equal(
+    refs.buildMessengerThreadRef(
+      "Juan",
+      "2021 Toyota RAV4",
+      "https://www.facebook.com/marketplace/item/1/",
+      [{ speaker: "Buyer", text: "Hola, ¿sigue disponible?" }],
+      "facebook-thread-juan-1",
+    ),
+    first,
+  );
+  assert.notEqual(
+    refs.buildMessengerThreadRef(
+      "Juan",
+      "2021 Toyota RAV4",
+      "https://www.facebook.com/marketplace/item/1/",
+      [{ speaker: "Buyer", text: "¿Cuál es el precio?" }],
+    ),
+    refs.buildMessengerThreadRef(
+      "Juan",
+      "2021 Toyota RAV4",
+      "https://www.facebook.com/marketplace/item/1/",
+      [{ speaker: "Buyer", text: "Hola, ¿sigue disponible?" }],
+    ),
+    "the first buyer message must separate fallback thread identities",
+  );
+});
+
 test("Messenger automatic capture yields to hidden Facebook tabs", () => {
   assert.match(publisherFlowSource, /document\.visibilityState !== "visible"/);
   assert.match(publisherFlowSource, /captureOnlyWhenTabVisible/);
@@ -451,6 +512,41 @@ test("Messenger intake sends canonical Buyer and Dealer role labels", () => {
     publisherFlowSource,
     /m\.speaker === "Dealer" \? "Dealer" : "Buyer"/,
   );
+});
+
+test("Messenger treats seller-name descriptors as Dealer messages", () => {
+  const start = publisherFlowSource.indexOf("    function isMessengerUiText(text)");
+  const end = publisherFlowSource.indexOf("    function isTransparentMessengerColor", start);
+  assert.ok(start >= 0 && end > start, "Messenger semantic parser must remain extractable");
+  const context = vm.createContext({
+    cleanMessengerText: (text) => String(text || "").replace(/\s+/g, " ").trim(),
+    MESSENGER_UI_TEXT: new Set(),
+  });
+  vm.runInContext(
+    `${publisherFlowSource.slice(start, end)}\n` +
+      "globalThis.__semantic = { parseSemanticMessengerMessage };",
+    context,
+    { filename: "publisherFlow-semantic.js" },
+  );
+  const element = (label, text) => ({
+    innerText: text,
+    textContent: text,
+    getAttribute: (name) => name === "aria-label" ? label : null,
+    querySelectorAll: () => [],
+  });
+  const sellerMessage = context.__semantic.parseSemanticMessengerMessage(
+    element("Mensaje enviado por Andres: Sí, está disponible.", "Sí, está disponible."),
+    ["Andres Ibanez"],
+  );
+  const buyerMessage = context.__semantic.parseSemanticMessengerMessage(
+    element("Mensaje enviado por Juan: Me interesa.", "Me interesa."),
+    ["Andres Ibanez"],
+  );
+  assert.equal(sellerMessage.sentByCurrentUser, true);
+  assert.equal(sellerMessage.sellerNameMatch, true);
+  assert.equal(sellerMessage.senderName, "");
+  assert.equal(buyerMessage.sentByCurrentUser, false);
+  assert.equal(buyerMessage.senderName, "Juan");
 });
 
 test("Messenger automatic replies wait for a quiet buyer window and guard their own reply", () => {

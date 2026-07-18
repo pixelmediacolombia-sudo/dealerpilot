@@ -606,7 +606,7 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(conversationsSource, /exactTitles\.includes\(normalizedDetectedTitle\)/);
   assert.match(conversationsSource, /Conversation intake skipped - no buyer message/);
   assert.match(conversationsSource, /SALES_AI_REPLY_TIMEOUT_MS = 12000/);
-  assert.match(conversationsSource, /MESSENGER_DELIVERY_RETRY_DELAY_MS = 120000/);
+  assert.match(conversationsSource, /MESSENGER_DELIVERY_RETRY_DELAY_MS = 15000/);
   assert.match(conversationsSource, /resolveSalesReplyStage/);
   assert.match(conversationsSource, /extractPhoneNumber/);
   assert.match(conversationsSource, /isAiReplyAligned/);
