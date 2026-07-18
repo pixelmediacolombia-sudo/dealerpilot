@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.82
+
+- Fails closed when the active Facebook account is not the configured seller (`Andres Ibáñez`, `Alpha Manassas`, or `Alpha Motorsport`).
+- Keeps the seller identity check exact so a buyer named only `Andres` cannot pass by first-name coincidence.
+- Allows independent seller tabs to poll concurrently while preserving per-thread idempotency and duplicate-capture protection.
+- Adds strict E2E coverage for seller/buyer identity separation and simultaneous Messenger conversations.
+
 ## v1.3.81
 
 - Treats the browser running DealerPilot as the seller context by contract.

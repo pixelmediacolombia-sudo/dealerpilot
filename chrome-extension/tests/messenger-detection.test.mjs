@@ -188,6 +188,11 @@ function loadAvailabilitySnapshotHarness() {
     findMessengerMessageScope: () => null,
     collectMessengerSellerNameCandidates: () => [],
     createMarketplaceAvailabilityFallbackMessage: () => fallbackMessage,
+    validateFacebookSellerProfile: () => ({
+      currentProfileName: "Alpha Manassas",
+      matched: true,
+    }),
+    document: { querySelectorAll: () => [] },
     lastMarketplaceQuickReplyDiagnostics: null,
     collectMatchedThreadSelectors: () => [],
   });
@@ -486,9 +491,10 @@ test("Messenger thread refs separate same-name buyers with stable identity or fi
   );
 });
 
-test("Messenger automatic capture yields to hidden Facebook tabs", () => {
-  assert.match(publisherFlowSource, /document\.visibilityState !== "visible"/);
+test("Messenger automatic capture keeps independent seller tabs eligible", () => {
+  assert.doesNotMatch(publisherFlowSource, /document\.visibilityState !== "visible"/);
   assert.match(publisherFlowSource, /captureOnlyWhenTabVisible/);
+  assert.match(publisherFlowSource, /backend idempotency is the final guard/);
 });
 
 test("Messenger diagnostics retain per-tab provenance and classify duplicate intake", () => {
@@ -547,6 +553,44 @@ test("Messenger treats seller-name descriptors as Dealer messages", () => {
   assert.equal(sellerMessage.senderName, "");
   assert.equal(buyerMessage.sentByCurrentUser, false);
   assert.equal(buyerMessage.senderName, "Juan");
+});
+
+test("Sales AI fails closed for a buyer Facebook profile and accepts the seller profile", () => {
+  const start = publisherFlowSource.indexOf("const EXPECTED_FACEBOOK_SELLER_NAMES");
+  const end = publisherFlowSource.indexOf("function findStableMessengerThreadIdentity", start);
+  assert.ok(start >= 0 && end > start, "Facebook seller-profile validator must remain extractable");
+  const context = vm.createContext({
+    cleanMessengerText: (text) => String(text || "").replace(/\s+/g, " ").trim(),
+  });
+  vm.runInContext(
+    `${publisherFlowSource.slice(start, end)}\n` +
+      "globalThis.__profile = { validateFacebookSellerProfile };",
+    context,
+    { filename: "publisherFlow-seller-profile.js" },
+  );
+  const rootFor = (label) => ({
+    querySelectorAll: () => [{ getAttribute: (name) => name === "aria-label" ? label : null }],
+  });
+  const buyer = context.__profile.validateFacebookSellerProfile(
+    rootFor("Manage Test App notification settings"),
+  );
+  const sameFirstNameBuyer = context.__profile.validateFacebookSellerProfile(
+    rootFor("Manage Andres notification settings"),
+  );
+  const seller = context.__profile.validateFacebookSellerProfile(
+    rootFor("Manage Andrés Ibáñez notification settings"),
+  );
+  assert.equal(buyer.currentProfileName, "Test App");
+  assert.equal(buyer.matched, false);
+  assert.equal(sameFirstNameBuyer.currentProfileName, "Andres");
+  assert.equal(sameFirstNameBuyer.matched, false);
+  assert.equal(seller.currentProfileName, "Andrés Ibáñez");
+  assert.equal(seller.matched, true);
+  assert.match(
+    publisherFlowSource,
+    /sellerIsCurrentUser:\s*evidence\.sellerProfileMatched === true/,
+  );
+  assert.match(publisherFlowSource, /seller_profile_mismatch/);
 });
 
 test("Messenger automatic replies wait for a quiet buyer window and guard their own reply", () => {

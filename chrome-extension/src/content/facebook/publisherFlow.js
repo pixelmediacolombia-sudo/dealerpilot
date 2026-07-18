@@ -4073,6 +4073,58 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return false;
     }
 
+    // Sales AI is a seller-side capability. The extension may be present in a
+    // Chrome installation, but it must not process a Facebook account that is
+    // visibly the buyer account. Facebook exposes the active account in the
+    // account-settings aria label; fail closed when it is missing or does not
+    // match the configured Alpha seller identities.
+    const EXPECTED_FACEBOOK_SELLER_NAMES = [
+      "Alpha Manassas",
+      "Alpha Motorsport",
+      "Andres Ibanez",
+    ];
+
+    function normalizeFacebookProfileName(value) {
+      return cleanMessengerText(value)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+    }
+
+    function extractFacebookCurrentProfileName(root = document) {
+      const labels = Array.from(root?.querySelectorAll?.("[aria-label]") || [])
+        .map((element) => element.getAttribute("aria-label") || "")
+        .filter(Boolean);
+      const patterns = [
+        /(?:manage|administrar)\s+(.+?)\s+(?:notification settings|configuraci[oó]n(?:es)? de notificaciones)/i,
+        /(?:your profile|tu perfil)\s*[:\-]\s*(.+)$/i,
+      ];
+      for (const label of labels) {
+        for (const pattern of patterns) {
+          const match = label.match(pattern);
+          const candidate = cleanMessengerText(match?.[1] || "");
+          if (candidate && candidate.length <= 80) return candidate;
+        }
+      }
+      return "";
+    }
+
+    function validateFacebookSellerProfile(root = document) {
+      const currentProfileName = extractFacebookCurrentProfileName(root);
+      const normalizedCurrent = normalizeFacebookProfileName(currentProfileName);
+      const expected = EXPECTED_FACEBOOK_SELLER_NAMES
+        .map(normalizeFacebookProfileName)
+        .filter(Boolean);
+      const matched = !!normalizedCurrent && expected.includes(normalizedCurrent);
+      return {
+        currentProfileName,
+        expectedProfileNames: EXPECTED_FACEBOOK_SELLER_NAMES,
+        matched,
+      };
+    }
+
     function isReliableBuyerName(name) {
       const cleaned = cleanMessengerText(name);
       const normalized = cleaned.toLowerCase();
@@ -4631,7 +4683,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         conversationThreadDetected: "Marketplace conversation region or message log not found",
         buyerMessageDetected: "latest substantive message is not an inbound buyer message",
         buyerNameDetected: "thread header did not provide a reliable buyer name",
-        sellerIsCurrentUser: "DealerPilot is installed in the seller-side browser context",
+        sellerIsCurrentUser: evidence.sellerProfileMatched === true
+          ? "DealerPilot is installed in the seller-side browser context"
+          : "active Facebook profile is not the configured seller account",
         marketplaceContextDetected: "Marketplace listing id or vehicle title was not found in the seller thread",
       };
       for (const [gate, passed] of Object.entries(gates)) {
@@ -4664,7 +4718,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         // Facebook thread: Marketplace can render seller-authored messages
         // with the seller's display name and can mark a buyer-started thread
         // as started by the current user in the opposite browser.
-        sellerIsCurrentUser: true,
+        sellerIsCurrentUser: evidence.sellerProfileMatched === true,
         marketplaceContextDetected:
           !!context.marketplaceItemId ||
           (!!root && !!context.vehicleTitle),
@@ -4674,7 +4728,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         conversationThreadDetected: "conversation_thread_missing",
         buyerMessageDetected: "buyer_message_missing",
         buyerNameDetected: "buyer_name_missing",
-        sellerIsCurrentUser: "seller_current_user_missing",
+        sellerIsCurrentUser: "seller_profile_mismatch",
         marketplaceContextDetected: "marketplace_context_missing",
       };
       const missing = Object.entries(gates)
@@ -4687,6 +4741,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     function scrapeConversationSnapshot() {
       const main = findMarketplaceThreadRoot();
       const threadHeaderText = getThreadHeadingText(main);
+      const sellerProfile = validateFacebookSellerProfile(document);
 
       // Try to detect buyer name from page heading
       let buyerName = extractBuyerNameFromThreadHeader(threadHeaderText);
@@ -4783,6 +4838,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
             threadIdentity: stableThreadIdentity || inboundMessageDescriptors[0] || "",
             sellerNameCandidates,
             sellerContext: "extension_installed_seller_browser",
+            sellerProfileName: sellerProfile.currentProfileName,
+            sellerProfileMatched: sellerProfile.matched,
           },
         };
       }
@@ -4818,6 +4875,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           threadIdentity: stableThreadIdentity || inboundMessageDescriptors[0] || "",
           sellerNameCandidates,
           sellerContext: "extension_installed_seller_browser",
+          sellerProfileName: sellerProfile.currentProfileName,
+          sellerProfileMatched: sellerProfile.matched,
         },
       };
     }
@@ -5186,6 +5245,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         threadIdentityDetected: !!evidence.threadIdentity,
         latestMessageDirection: evidence.latestMessageDirection || "none",
         sellerContext: evidence.sellerContext || "extension_installed_seller_browser",
+        sellerProfileName: evidence.sellerProfileName || "",
+        sellerProfileMatched: evidence.sellerProfileMatched === true,
         composerDetected: !!getMessengerMessageBox(),
       };
 
@@ -5434,10 +5495,10 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     actionsEl.appendChild(readBtn);
 
     const captureOnlyWhenTabVisible = () => {
-      // Facebook Marketplace can be open in several tabs at once. Hidden tabs
-      // must not compete for the same conversation or overwrite the active
-      // tab's Sales AI diagnostics while their DOM is stale or incomplete.
-      if (document.visibilityState !== "visible") return;
+      // Each Facebook tab owns an independent conversation state. Allow a
+      // hidden seller tab to continue polling so two open Marketplace threads
+      // can be processed concurrently; backend idempotency is the final guard
+      // when duplicate tabs happen to show the same thread.
       captureConversation({ silent: true, automatic: true }).catch((err) => {
         console.warn("[DealerPilot AI] Messenger auto-capture failed", err);
       });
@@ -5445,7 +5506,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     setTimeout(captureOnlyWhenTabVisible, 1200);
     setInterval(() => {
-      if (!isMessengerUiVisible() || document.visibilityState !== "visible") return;
+      if (!isMessengerUiVisible()) return;
       captureOnlyWhenTabVisible();
     }, MESSENGER_CAPTURE_INTERVAL_MS);
   }
