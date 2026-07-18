@@ -487,6 +487,10 @@
             <span class="label">Messenger Detected</span>
             <span class="value" id="d-messenger">—</span>
           </div>
+          <div class="row">
+            <span class="label">Messenger DOM</span>
+            <span class="value" id="d-messenger-dom">—</span>
+          </div>
 
           <div class="divider"></div>
           <h2 style="margin-top:6px">Dev Controls</h2>
@@ -505,8 +509,9 @@
             <span class="label">Last Poll Skip</span>
             <span class="value" id="d-last-poll-skip">—</span>
           </div>
-          <div style="display:flex;gap:8px;margin-top:8px;">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
             <button id="btn-show-validation" class="ghost">Show Validation Debug</button>
+            <button id="btn-show-messenger-dom" class="ghost">Show Messenger DOM</button>
             <button id="btn-show-poll" class="ghost">Show Poll Diagnostics</button>
           </div>
         </div>

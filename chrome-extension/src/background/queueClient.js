@@ -131,6 +131,13 @@ function aggregateFacebookPageStates(pageStates, nowMs = Date.now()) {
   });
   const freshStates = freshEntries.map(([, state]) => state);
   const marketplaceState = freshStates.find((state) => state.marketplaceDetected === true) || null;
+  const messengerDebugStates = freshStates
+    .filter((state) => state.messengerDetectionDebug)
+    .sort((left, right) => Date.parse(right.reportedAt || "") - Date.parse(left.reportedAt || ""));
+  const messengerDebugState =
+    messengerDebugStates.find((state) => state.messengerDetected === true) ||
+    messengerDebugStates[0] ||
+    null;
 
   return {
     pageStates: Object.fromEntries(freshEntries),
@@ -142,6 +149,7 @@ function aggregateFacebookPageStates(pageStates, nowMs = Date.now()) {
       marketplaceUrl: marketplaceState?.marketplaceUrl || null,
       marketplaceDetectedAt: marketplaceState?.marketplaceDetectedAt || null,
       messengerDetected: freshStates.some((state) => state.messengerDetected === true),
+      lastMessengerDetectionDebug: messengerDebugState?.messengerDetectionDebug || null,
     },
   };
 }
@@ -160,6 +168,7 @@ async function saveFacebookPageState(tabId, state, tabUrl) {
     marketplaceUrl: state?.marketplaceUrl || tabUrl || null,
     marketplaceDetectedAt: state?.marketplaceDetectedAt || null,
     messengerDetected: state?.messengerDetected === true,
+    messengerDetectionDebug: state?.messengerDetectionDebug || null,
     reportedAt,
   };
   const aggregate = aggregateFacebookPageStates(facebookPageStates);
@@ -1076,6 +1085,7 @@ const handlers = {
       "lastError",
       "marketplaceDetected",
       "messengerDetected",
+      "lastMessengerDetectionDebug",
       "workflowStep",
       "workflowStepAt",
       "fbLoggedIn",
@@ -1111,6 +1121,7 @@ const handlers = {
       lastError: stored.lastError || null,
       marketplaceDetected: stored.marketplaceDetected || false,
       messengerDetected: stored.messengerDetected || false,
+      lastMessengerDetectionDebug: stored.lastMessengerDetectionDebug || null,
       workflowStep: stored.workflowStep || null,
       workflowStepAt: stored.workflowStepAt || null,
       fbLoggedIn: stored.fbLoggedIn ?? null,
@@ -1256,7 +1267,7 @@ const STATE_KEYS_TO_CLEAR = [
   "lastNextResponse", "lastNextResponseAt", "connectTabId",
   "lastPollTime", "auditLog", "facebookPageStates",
   "marketplaceDetected", "marketplacePath", "marketplaceUrl",
-  "marketplaceDetectedAt", "messengerDetected",
+  "marketplaceDetectedAt", "messengerDetected", "lastMessengerDetectionDebug",
 ];
 
 (async () => {

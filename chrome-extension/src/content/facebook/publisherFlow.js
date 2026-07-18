@@ -717,26 +717,80 @@
     return rect.width > 0 && rect.height > 0;
   }
 
+  const MESSENGER_COMPOSER_SELECTOR = [
+    '[contenteditable="true"]',
+    "textarea",
+  ].join(", ");
+
+  function isLikelyMessengerComposer(el) {
+    if (!el || !visible(el)) return false;
+    const isEditable =
+      el.tagName === "TEXTAREA" ||
+      el.getAttribute("contenteditable") === "true";
+    if (!isEditable) return false;
+
+    const descriptor = [
+      el.getAttribute("role"),
+      el.getAttribute("aria-label"),
+      el.getAttribute("aria-placeholder"),
+      el.getAttribute("placeholder"),
+      el.getAttribute("data-lexical-editor"),
+    ].filter(Boolean).join(" ");
+
+    // Facebook's current chat editor is often only identified by
+    // data-lexical-editor="true" or aria-placeholder="Aa". Keep the selector
+    // broad, then exclude the other common Facebook editors explicitly.
+    return !/search|buscar|comment|comentario|post|publicaci[o\u00f3]n|what(?:'s| is) on your mind|qu[e\u00e9] est[a\u00e1]s pensando|caption|descripci[o\u00f3]n/i.test(descriptor);
+  }
+
+  function hasExplicitMarketplaceEvidence(root) {
+    if (!root) return false;
+    if (root.matches?.('a[href*="/marketplace/item/"]')) return true;
+    if (root.querySelector('a[href*="/marketplace/item/"]')) return true;
+    const accessibleText = `${root.getAttribute?.("aria-label") || ""} ${root.innerText || ""}`;
+    return /\bmarketplace\b/i.test(accessibleText);
+  }
+
   function hasMarketplaceThreadEvidence(root) {
     if (!root || !visible(root)) return false;
-    const hasMessageLog = !!root.querySelector(
-      '[role="log"], [aria-live="polite"][aria-label*="message" i], [aria-live="polite"][aria-label*="mensaje" i]',
-    );
-    const hasComposer = !!root.querySelector(
-      '[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label*="message" i], [contenteditable="true"][aria-label*="mensaje" i], textarea[aria-label*="message" i], textarea[aria-label*="mensaje" i]',
-    );
-    const hasHeading = !!root.querySelector('[role="heading"], h1, h2, h3, [aria-level]');
-    const hasMarketplaceLink = !!root.querySelector('a[href*="/marketplace/item/"]');
+    const hasComposer = Array.from(root.querySelectorAll(MESSENGER_COMPOSER_SELECTOR))
+      .some(isLikelyMessengerComposer);
+    const hasExplicitMarketplace = hasExplicitMarketplaceEvidence(root);
 
     // Facebook's current Marketplace inbox can render the listing title as
-    // plain text instead of an item anchor. On an explicitly Marketplace
-    // conversation route, the visible composer + heading are the stable active
-    // thread signals. Facebook no longer consistently exposes the message list
-    // as role="log", so that semantic role is supporting evidence instead of a
-    // hard gate. Generic /messages chats remain excluded unless they contain a
-    // Marketplace item link.
-    const routeBackedActiveThread = isMarketplaceConversationUrl() && (hasMessageLog || hasComposer);
-    return hasComposer && hasHeading && (hasMarketplaceLink || routeBackedActiveThread);
+    // plain text instead of an item anchor, and its visible title is not always
+    // exposed as a semantic heading. The active composer is the stable signal;
+    // Marketplace route/text/link evidence scopes it to a seller thread. The
+    // downstream Sales AI gates still require buyer, message direction, and
+    // vehicle context before any reply can be sent.
+    return hasComposer && (hasExplicitMarketplace || isMarketplaceConversationUrl());
+  }
+
+  function elementArea(el) {
+    const rect = el?.getBoundingClientRect?.();
+    return rect ? rect.width * rect.height : Number.POSITIVE_INFINITY;
+  }
+
+  function findThreadRootFromComposers() {
+    const roots = [];
+    const composers = Array.from(document.querySelectorAll(MESSENGER_COMPOSER_SELECTOR))
+      .filter(isLikelyMessengerComposer);
+
+    for (const composer of composers) {
+      let candidate = composer.parentElement;
+      while (candidate && candidate !== document.documentElement) {
+        if (hasMarketplaceThreadEvidence(candidate)) {
+          roots.push(candidate);
+          break;
+        }
+        candidate = candidate.parentElement;
+      }
+    }
+
+    // A background post editor may only match at <body>, while the active chat
+    // composer matches inside its compact popover. Prefer the narrowest valid
+    // root so the selected conversation cannot leak into another page surface.
+    return roots.sort((left, right) => elementArea(left) - elementArea(right))[0] || null;
   }
 
   function findMarketplaceThreadRoot() {
@@ -761,8 +815,13 @@
       }
     }
 
-    const contextualRoots = Array.from(document.querySelectorAll('[role="dialog"], [role="main"]'));
-    return contextualRoots.find(hasMarketplaceThreadEvidence) || null;
+    const composerRoot = findThreadRootFromComposers();
+    if (composerRoot) return composerRoot;
+
+    const contextualRoots = Array.from(
+      document.querySelectorAll('[role="dialog"], [role="main"], [role="region"]'),
+    ).filter(hasMarketplaceThreadEvidence);
+    return contextualRoots.sort((left, right) => elementArea(left) - elementArea(right))[0] || null;
   }
 
   function findMessengerRoot() {
@@ -771,9 +830,9 @@
 
     const textboxes = Array.from(
       document.querySelectorAll(
-        '[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label*="message" i], textarea[aria-label*="message" i]',
+        MESSENGER_COMPOSER_SELECTOR,
       ),
-    ).filter(visible);
+    ).filter(isLikelyMessengerComposer);
 
     for (const box of textboxes) {
       const root =
@@ -787,8 +846,37 @@
     return null;
   }
 
+  function getMessengerDetectionDebug() {
+    const supportedHost =
+      location.hostname.includes("facebook.com") ||
+      location.hostname.includes("messenger.com");
+    const root = supportedHost ? findMessengerRoot() : null;
+    const composerDetected = !!root && Array.from(
+      root.querySelectorAll(MESSENGER_COMPOSER_SELECTOR),
+    ).some(isLikelyMessengerComposer);
+
+    return {
+      at: new Date().toISOString(),
+      hostname: location.hostname,
+      pathname: location.pathname,
+      messengerRoute: isMessengerUrl(),
+      marketplaceRoute: isMarketplaceConversationUrl(),
+      supportedHost,
+      rootDetected: !!root,
+      rootTag: root?.tagName || null,
+      rootRole: root?.getAttribute?.("role") || null,
+      composerDetected,
+      headingDetected: !!root?.querySelector('[role="heading"], h1, h2, h3, [aria-level]'),
+      marketplaceEvidence: hasExplicitMarketplaceEvidence(root),
+      messageLogDetected: !!root?.querySelector(
+        '[role="log"], [aria-live="polite"][aria-label*="message" i], [aria-live="polite"][aria-label*="mensaje" i]',
+      ),
+      messengerDetected: supportedHost && !!root,
+    };
+  }
+
   function isMessengerUiVisible() {
-    return (isMessengerUrl() || isMarketplaceConversationUrl()) && !!findMessengerRoot();
+    return getMessengerDetectionDebug().messengerDetected;
   }
 
   function detectPageState() {
@@ -800,7 +888,8 @@
     const isMarketplaceNow =
       hostname.includes("facebook.com") && pathname.includes("/marketplace");
 
-    const isMessengerNow = isMessengerUiVisible();
+    const messengerDetectionDebug = getMessengerDetectionDebug();
+    const isMessengerNow = messengerDetectionDebug.messengerDetected;
 
     const isLoginPage =
       /^\/(login(\.php)?|checkpoint|recover|two_step_verification|privacy\/consent)/.test(pathname) ||
@@ -818,6 +907,7 @@
         marketplaceUrl: isMarketplaceNow ? href : null,
         marketplaceDetectedAt: now,
         messengerDetected: isMessengerNow,
+        messengerDetectionDebug,
         fbLoggedIn,
         marketplaceConnected,
       },
@@ -4110,7 +4200,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const root = findMarketplaceThreadRoot();
       const lastMessage = messages[messages.length - 1] || null;
       const gates = {
-        routeAllowed: !isBlockedSalesAiRoute() && (isMessengerUrl() || isMarketplaceConversationUrl()),
+        routeAllowed:
+          !!root &&
+          (!isBlockedSalesAiRoute() || hasExplicitMarketplaceEvidence(root)),
         conversationThreadDetected: !!root,
         buyerMessageDetected: !!lastMessage && lastMessage.speaker !== "Dealer" && !isMessengerUiText(lastMessage.text),
         buyerNameDetected: isReliableBuyerName(buyerName),
@@ -4118,7 +4210,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           !!lastMessage && lastMessage.speaker !== "Dealer" && evidence.threadStartedByCurrentUser !== true,
         marketplaceContextDetected:
           !!context.marketplaceItemId ||
-          (isMarketplaceConversationUrl() && !!context.vehicleTitle),
+          (!!root && !!context.vehicleTitle),
       };
       const missingReasonByGate = {
         routeAllowed: "route_not_allowed",

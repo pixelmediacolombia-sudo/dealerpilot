@@ -355,6 +355,13 @@ test("page detection remains true when another Facebook tab reports a non-Market
         marketplaceUrl: "https://www.facebook.com/marketplace/inbox",
         marketplaceDetectedAt: new Date().toISOString(),
         messengerDetected: true,
+        messengerDetectionDebug: {
+          rootDetected: true,
+          composerDetected: true,
+          headingDetected: true,
+          marketplaceEvidence: true,
+          messengerDetected: true,
+        },
       },
     },
     { tab: { id: 41, url: "https://www.facebook.com/marketplace/inbox" } },
@@ -374,6 +381,8 @@ test("page detection remains true when another Facebook tab reports a non-Market
   assert.equal(storage.marketplaceDetected, true);
   assert.equal(storage.marketplaceConnected, true);
   assert.equal(storage.messengerDetected, true);
+  assert.equal(storage.lastMessengerDetectionDebug.rootDetected, true);
+  assert.equal(storage.lastMessengerDetectionDebug.composerDetected, true);
   assert.equal(storage.marketplacePath, "/marketplace/inbox");
 
   await handlers.PAGE_STATE_REPORT(

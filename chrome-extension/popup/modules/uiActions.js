@@ -394,6 +394,24 @@ async function loadDebugState() {
   dbg.messenger.textContent = msgYes ? "Yes ✓" : "No";
   dbg.messenger.className   = "value " + (msgYes ? "ok" : "");
 
+  const messengerDomEl = document.getElementById("d-messenger-dom");
+  const messengerDom = d.lastMessengerDetectionDebug;
+  if (messengerDomEl) {
+    if (messengerDom) {
+      messengerDomEl.textContent = [
+        `Root ${messengerDom.rootDetected ? "Y" : "N"}`,
+        `Box ${messengerDom.composerDetected ? "Y" : "N"}`,
+        `MP ${messengerDom.marketplaceEvidence || messengerDom.marketplaceRoute ? "Y" : "N"}`,
+      ].join(" · ");
+      messengerDomEl.className = "value " + (messengerDom.messengerDetected ? "ok" : "");
+      messengerDomEl.title = JSON.stringify(messengerDom);
+    } else {
+      messengerDomEl.textContent = "—";
+      messengerDomEl.className = "value";
+      messengerDomEl.title = "";
+    }
+  }
+
   // Extra: load lastValidationDebug and poll skip reason from storage
   try {
     const extra = await chrome.storage.local.get([
@@ -696,6 +714,12 @@ document.getElementById("btn-show-validation")?.addEventListener("click", async 
   const obj = await chrome.storage.local.get("lastValidationDebug");
   console.log("[DealerPilot AI] lastValidationDebug:", obj.lastValidationDebug);
   setStatus("Validation debug dumped to console.", "ok");
+});
+
+document.getElementById("btn-show-messenger-dom")?.addEventListener("click", async () => {
+  const obj = await chrome.storage.local.get("lastMessengerDetectionDebug");
+  console.log("[DealerPilot AI] Messenger DOM detection:", obj.lastMessengerDetectionDebug);
+  setStatus("Messenger DOM diagnostics dumped to console.", "ok");
 });
 
 document.getElementById("btn-show-poll")?.addEventListener("click", async () => {
