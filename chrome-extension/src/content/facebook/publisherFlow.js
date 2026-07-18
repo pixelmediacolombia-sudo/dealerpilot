@@ -730,9 +730,13 @@
 
     // Facebook's current Marketplace inbox can render the listing title as
     // plain text instead of an item anchor. On an explicitly Marketplace
-    // conversation route, the message log + composer + heading are the stable
-    // signals that this is the active seller thread.
-    return hasMessageLog && hasHeading && (hasMarketplaceLink || (isMarketplaceConversationUrl() && hasComposer));
+    // conversation route, the visible composer + heading are the stable active
+    // thread signals. Facebook no longer consistently exposes the message list
+    // as role="log", so that semantic role is supporting evidence instead of a
+    // hard gate. Generic /messages chats remain excluded unless they contain a
+    // Marketplace item link.
+    const routeBackedActiveThread = isMarketplaceConversationUrl() && (hasMessageLog || hasComposer);
+    return hasComposer && hasHeading && (hasMarketplaceLink || routeBackedActiveThread);
   }
 
   function findMarketplaceThreadRoot() {
@@ -4021,6 +4025,37 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       ).slice(0, 12);
     }
 
+    function findMessengerMessageScope(root) {
+      if (!root) return null;
+      const semanticLog = root.querySelector(
+        [
+          '[role="log"]',
+          '[aria-live="polite"][aria-label*="message" i]',
+          '[aria-live="polite"][aria-label*="mensaje" i]',
+          '[aria-live="polite"][aria-label*="conversation" i]',
+          '[aria-live="polite"][aria-label*="conversaci\u00f3n" i]',
+        ].join(", "),
+      );
+      if (semanticLog) return semanticLog;
+
+      // Current Marketplace chat popovers can omit role="log" entirely while
+      // retaining accessible labels on individual messages. Use their closest
+      // shared container; if Facebook also removes that wrapper, the already
+      // validated active thread is the narrowest safe fallback scope.
+      const semanticMessages = Array.from(root.querySelectorAll('[aria-label]')).filter((el) => {
+        const descriptor = el.getAttribute("aria-label") || "";
+        return visible(el) && /(?:por|by)\s+[^:]{1,80}:\s*\S/i.test(descriptor);
+      });
+      if (!semanticMessages.length) return root;
+
+      let candidate = semanticMessages[0].parentElement;
+      while (candidate && candidate !== root) {
+        if (semanticMessages.every((message) => candidate.contains(message))) return candidate;
+        candidate = candidate.parentElement;
+      }
+      return root;
+    }
+
     function getMessageDescriptor(el) {
       const labels = [
         el.getAttribute("aria-label") || "",
@@ -4108,17 +4143,17 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const buyerName = extractBuyerNameFromThreadHeader(threadHeaderText);
 
       // Try structured message rows — Messenger renders each message in a [role="row"] or similar
-      const messageLog = main?.querySelector('[role="log"]') || null;
-      const semanticMessageEls = messageLog
-        ? Array.from(messageLog.querySelectorAll('[aria-label]')).filter((el) => {
+      const messageScope = findMessengerMessageScope(main);
+      const semanticMessageEls = messageScope
+        ? Array.from(messageScope.querySelectorAll('[aria-label]')).filter((el) => {
             const descriptor = el.getAttribute("aria-label") || "";
             return visible(el) && /(?:por|by)\s+[^:]{1,80}:\s*\S/i.test(descriptor);
           })
         : [];
       const messageEls = semanticMessageEls.length > 0
         ? semanticMessageEls
-        : messageLog
-          ? Array.from(messageLog.querySelectorAll('article, [role="row"]')).filter(visible)
+        : messageScope
+          ? Array.from(messageScope.querySelectorAll('article, [role="row"]')).filter(visible)
           : [];
 
       const messages = [];
@@ -4212,8 +4247,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       let snapshot = scrapeConversationSnapshot();
       let messages = snapshot.messages;
       const hydrationKey = safeSalesAiUrl();
-      const messageLog = findMarketplaceThreadRoot()?.querySelector('[role="log"]') || null;
-      let scrollContainer = findConversationScrollContainer(messageLog);
+      const messageScope = findMessengerMessageScope(findMarketplaceThreadRoot());
+      let scrollContainer = findConversationScrollContainer(messageScope);
 
       if (!scrollContainer || lastMessengerHistoryHydrationKey === hydrationKey) return snapshot;
       lastMessengerHistoryHydrationKey = hydrationKey;
@@ -4241,8 +4276,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           },
         };
 
-        const refreshedLog = findMarketplaceThreadRoot()?.querySelector('[role="log"]') || null;
-        scrollContainer = findConversationScrollContainer(refreshedLog) || scrollContainer;
+        const refreshedScope = findMessengerMessageScope(findMarketplaceThreadRoot());
+        scrollContainer = findConversationScrollContainer(refreshedScope) || scrollContainer;
         const heightChanged = scrollContainer.scrollHeight > previousHeight + 8;
         stablePasses = addedMessages > 0 || heightChanged ? 0 : stablePasses + 1;
         previousHeight = scrollContainer.scrollHeight;
@@ -4345,8 +4380,6 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
             '[aria-label*="send" i]',
             '[aria-label*="enviar" i]',
             '[data-testid*="send" i]',
-            '[role="button"]',
-            'button',
           ].join(", "),
         ),
       ).filter((el) => {
@@ -4369,7 +4402,22 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       })[0] || null;
     }
 
-    async function clickMessengerSend() {
+    function readMessengerComposerText(box) {
+      if (!box) return "";
+      return cleanMessengerText(box.tagName === "TEXTAREA" ? box.value : box.textContent || "");
+    }
+
+    function messengerShowsSentReply(reply) {
+      const root = findMessengerRoot();
+      if (!root) return false;
+      const expected = cleanMessengerText(reply);
+      return Array.from(root.querySelectorAll('[aria-label]')).some((el) => {
+        const parsed = parseSemanticMessengerMessage(el);
+        return parsed.sentByCurrentUser && cleanMessengerText(parsed.text) === expected;
+      });
+    }
+
+    async function clickMessengerSend(box = getMessengerMessageBox()) {
       await sleep(250);
       const sendBtn = findMessengerSendButton();
       if (sendBtn) {
@@ -4379,7 +4427,6 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         return true;
       }
 
-      const box = getMessengerMessageBox();
       if (!box) return false;
       box.focus();
       box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
@@ -4393,11 +4440,19 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.speaker === "Dealer") return false;
 
+      const box = getMessengerMessageBox();
+      if (!box) return false;
       const inserted = insertReply(reply);
       if (!inserted) return false;
-      const sent = await clickMessengerSend();
+      const sent = await clickMessengerSend(box);
       if (!sent) {
         setStatus("Reply inserted, but DealerPilot could not find Messenger Send.", "err");
+        return false;
+      }
+      await sleep(900);
+      const deliveryConfirmed = !readMessengerComposerText(box) || messengerShowsSentReply(reply);
+      if (!deliveryConfirmed) {
+        setStatus("AI reply was prepared, but Facebook did not confirm delivery.", "err");
         return false;
       }
       lastMessengerAutoSendHash = captureHash;
@@ -4467,9 +4522,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       };
 
       if (messages.length >= 2) {
-        // Send structured messages
-        payload.visibleMessages = messages.map((m) => `${m.speaker}: ${m.text}`);
-        payload.chatText = messages.map((m) => `${m.speaker}: ${m.text}`).join("\n").slice(-4000);
+        // Canonical role labels keep the backend parser stable even when the
+        // buyer's display name changes or contains punctuation.
+        const canonicalMessages = messages.map((m) =>
+          `${m.speaker === "Dealer" ? "Dealer" : "Buyer"}: ${m.text}`,
+        );
+        payload.visibleMessages = canonicalMessages;
+        payload.chatText = canonicalMessages.join("\n").slice(-4000);
       } else {
         payload.visibleMessages = rawText.split("\n").map((line) => line.trim()).filter(Boolean).slice(-12);
         payload.chatText = rawText;

@@ -1,5 +1,17 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.70
+
+**Fixed**
+- Detects an active Marketplace seller chat even when Facebook omits the legacy `role="log"` message container.
+- Reads accessible message rows from the validated chat popover instead of requiring a semantic log wrapper.
+- Keeps the Inbox list excluded until a real chat composer and heading are visible.
+- Restricts automatic sending to explicit Messenger send controls or the active composer, avoiding Facebook quick-response controls.
+- Confirms that Facebook cleared the composer or rendered the outgoing reply before marking delivery complete.
+- Sends canonical `Buyer` and `Dealer` roles to the backend so names do not create duplicate history entries.
+
+---
+
 ## v1.3.69
 
 **Fixed**

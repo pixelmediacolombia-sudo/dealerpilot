@@ -101,6 +101,41 @@ test("Marketplace inbox detects Facebook's native h2 thread heading", () => {
   assert.equal(detection.isMessengerUiVisible(), true);
 });
 
+test("Marketplace inbox detects an active chat when Facebook omits role=log", () => {
+  const detection = loadDetectionHarness({
+    hostname: "www.facebook.com",
+    pathname: "/marketplace/inbox",
+    rootSignals: {
+      messageLog: false,
+      composer: true,
+      heading: false,
+      nativeHeading: true,
+      marketplaceLink: false,
+    },
+  });
+
+  assert.ok(detection.findMarketplaceThreadRoot());
+  assert.ok(detection.findMessengerRoot());
+  assert.equal(detection.isMessengerUiVisible(), true);
+});
+
+test("Marketplace inbox list without an active composer stays excluded", () => {
+  const detection = loadDetectionHarness({
+    hostname: "www.facebook.com",
+    pathname: "/marketplace/inbox",
+    rootSignals: {
+      messageLog: false,
+      composer: false,
+      heading: false,
+      nativeHeading: true,
+      marketplaceLink: false,
+    },
+  });
+
+  assert.equal(detection.findMarketplaceThreadRoot(), null);
+  assert.equal(detection.isMessengerUiVisible(), false);
+});
+
 test("generic Messenger UI without Marketplace evidence stays excluded from Sales AI", () => {
   const detection = loadDetectionHarness({
     hostname: "www.facebook.com",
@@ -115,4 +150,32 @@ test("generic Messenger UI without Marketplace evidence stays excluded from Sale
 
   assert.equal(detection.findMarketplaceThreadRoot(), null);
   assert.equal(detection.isMessengerUiVisible(), false);
+});
+
+test("Messenger capture falls back to the validated active thread when role=log is absent", () => {
+  assert.match(
+    publisherFlowSource,
+    /function findMessengerMessageScope\(root\)[\s\S]*if \(!semanticMessages\.length\) return root;/,
+  );
+  assert.match(
+    publisherFlowSource,
+    /const messageScope = findMessengerMessageScope\(main\);[\s\S]*messageScope\.querySelectorAll\('\[aria-label\]'\)/,
+  );
+});
+
+test("Messenger auto-send excludes generic and quick-response buttons", () => {
+  const start = publisherFlowSource.indexOf("    function findMessengerSendButton()");
+  const end = publisherFlowSource.indexOf("    function readMessengerComposerText", start);
+  assert.ok(start >= 0 && end > start, "Messenger send-button resolver must remain extractable");
+  const resolverSource = publisherFlowSource.slice(start, end);
+  assert.doesNotMatch(resolverSource, /'\[role="button"\]'/);
+  assert.doesNotMatch(resolverSource, /'button'/);
+  assert.match(resolverSource, /\[aria-label\*=\"send\" i\]/);
+});
+
+test("Messenger intake sends canonical Buyer and Dealer role labels", () => {
+  assert.match(
+    publisherFlowSource,
+    /m\.speaker === "Dealer" \? "Dealer" : "Buyer"/,
+  );
 });
