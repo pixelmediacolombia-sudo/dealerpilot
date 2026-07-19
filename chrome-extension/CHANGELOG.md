@@ -1,5 +1,26 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.86
+
+- Prevents Marketplace's empty photo placeholder from being mistaken for an uploaded vehicle thumbnail.
+- Requires new, stable post-injection photo evidence before Full Auto can continue to Next and Publish.
+- Adds regression coverage for the zero-photo publication observed in production jobs 115, 117, and 118.
+
+## v1.3.85
+
+- Allows seller-inbox discovery to open first-contact rows when Facebook omits the vehicle title or unread accessibility label.
+- Recognizes previews such as "Attachment Unavailable" as conversation rows, then keeps the existing strict seller/message gates after the thread opens.
+- Adds regression coverage for title-less and metadata-less inbox rows.
+- Scopes Messenger capture to the focused thread, trusts seller-only `View buyer` / `Mark as pending` evidence, and rejects `View seller` surfaces.
+- Cleans buyer and vehicle headers, preserves per-tab diagnostics, and prevents buyer avatars from becoming seller identity evidence.
+- Adds deterministic automatic-publishing QA for complete, scheduled, and incomplete vehicle batches.
+
+## v1.3.84
+
+- Discovers Marketplace conversation rows from the seller inbox before a chat composer exists.
+- Opens only a Marketplace candidate after the seller profile is validated, then hands off to the existing strict DOM capture and reply gates.
+- Records inbox discovery stages and adds regression coverage for first-contact rows and sidebar-route exclusions.
+
 ## v1.3.83
 
 - Isolates Marketplace Messenger capture from the publisher DOM automation.

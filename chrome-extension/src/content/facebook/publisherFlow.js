@@ -794,6 +794,11 @@
   }
 
   function findMarketplaceThreadRoot() {
+    const isolatedCapture = globalThis.DealerPilotMessengerCapture;
+    if (isolatedCapture?.findThreadRoot) {
+      const isolatedRoot = isolatedCapture.findThreadRoot({ document, location });
+      if (isolatedRoot) return isolatedRoot;
+    }
     const semanticSelectors = [
       '[role="region"][aria-label*="Conversaci\u00f3n con el t\u00edtulo" i]',
       '[role="region"][aria-label*="Conversation titled" i]',
@@ -2743,6 +2748,11 @@
       details: `Uploading ${files.length} photos`
     }).catch(() => { });
 
+    // Record the empty/upload-placeholder state before assigning files. Facebook
+    // always renders photo-related icons in this area, so a post-change check
+    // must prove that NEW evidence appeared instead of accepting those icons.
+    const photoEvidenceBaseline = collectFacebookPhotoEvidence();
+
     const dt = new DataTransfer();
     for (const file of files) dt.items.add(file);
     input.files = dt.files;
@@ -2766,15 +2776,21 @@
     stateLog("Photo upload: waiting for Facebook thumbnail rendering…");
     setStatus(`Waiting for Facebook to process ${files.length} photo(s)…`);
     send({ type: "SEND_JOB_EVENT", jobId, event: "thumbnail_wait_started" }).catch(() => { });
-    const confirmed = await waitForPhotoThumbnails(files.length, BUDGET.THUMBNAIL_WAIT_MS);
-    if (confirmed && !_photosConfirmed) {
-      stateLog(`Photo upload: Facebook thumbnails visible`);
+    const confirmation = await waitForPhotoThumbnails(
+      files.length,
+      BUDGET.THUMBNAIL_WAIT_MS,
+      photoEvidenceBaseline,
+    );
+    if (confirmation.confirmed && !_photosConfirmed) {
+      stateLog(
+        `Photo upload: Facebook confirmed ${confirmation.count} photo(s) via ${confirmation.source}`,
+      );
       _photosConfirmed = true;
       send({
         type: "SEND_JOB_EVENT", jobId, event: "thumbnail_detected",
-        details: `${files.length} photos confirmed via DOM`
+        details: `${confirmation.count} photo(s) confirmed via ${confirmation.source}`
       }).catch(() => { });
-    } else if (!confirmed) {
+    } else if (!confirmation.confirmed) {
       const reason = `Photo upload failed: Facebook did not confirm ${files.length} uploaded photo(s)`;
       stateError(reason);
       warnings.push(reason);
@@ -2789,60 +2805,107 @@
     return { uploaded: files.length, failed: false };
   }
 
-  async function waitForPhotoThumbnails(expectedCount, timeoutMs) {
+  function readFacebookPhotoCounter(root = document) {
+    const text = root?.body?.innerText || root?.innerText || "";
+    const slashMatch = text.match(/(?:photos?|fotos?)\s*[·:\-]?\s*(\d+)\s*\/\s*\d+/i);
+    if (slashMatch) return Number.parseInt(slashMatch[1], 10) || 0;
+    const wordMatch = text.match(/(\d+)\s*(?:photos?|fotos?)\b/i);
+    return wordMatch ? Number.parseInt(wordMatch[1], 10) || 0 : 0;
+  }
+
+  function photoEvidenceSignature(element, kind) {
+    const src = element?.currentSrc || element?.src || element?.getAttribute?.("src") || "";
+    const style = element?.getAttribute?.("style") || "";
+    const label = element?.getAttribute?.("aria-label") || "";
+    const testId = element?.getAttribute?.("data-testid") || "";
+    return `${kind}|${src}|${style}|${label}|${testId}`;
+  }
+
+  function collectFacebookPhotoEvidence(root = document) {
+    const nodes = new Set();
+    const signatures = new Set();
+    const strongSelectors = [
+      ["delete-control", '[data-testid="media-attachment-delete-button"]'],
+      ["preview", '[data-testid="media-attachment-preview"]'],
+      ["blob-image", 'img[src^="blob:"]'],
+      ["data-image", 'img[src^="data:image/"]'],
+      ["remove-photo", '[aria-label*="remove photo" i]'],
+      ["remove-image", '[aria-label*="remove image" i]'],
+      ["remove-photo-es", '[aria-label*="eliminar foto" i]'],
+      ["remove-image-es", '[aria-label*="eliminar imagen" i]'],
+      ["remove-photo-es", '[aria-label*="quitar foto" i]'],
+      ["remove-image-es", '[aria-label*="quitar imagen" i]'],
+    ];
+
+    for (const [kind, selector] of strongSelectors) {
+      for (const element of root?.querySelectorAll?.(selector) || []) {
+        nodes.add(element);
+        signatures.add(photoEvidenceSignature(element, kind));
+      }
+    }
+
+    return {
+      counter: readFacebookPhotoCounter(root),
+      nodes,
+      signatures,
+    };
+  }
+
+  function compareFacebookPhotoEvidence(current, baseline) {
+    const before = baseline || { counter: 0, nodes: new Set(), signatures: new Set() };
+    if (current.counter > 0 && current.counter > (before.counter || 0)) {
+      return { confirmed: true, count: current.counter, source: "photo_counter" };
+    }
+
+    const newNodes = [...current.nodes].filter((node) => !before.nodes?.has(node));
+    const newSignatures = [...current.signatures].filter(
+      (signature) => !before.signatures?.has(signature),
+    );
+    const count = Math.max(newNodes.length, newSignatures.length);
+    return count > 0
+      ? { confirmed: true, count, source: "new_thumbnail_dom" }
+      : { confirmed: false, count: 0, source: "none" };
+  }
+
+  function readExistingFacebookPhotoEvidence(root = document) {
+    const snapshot = collectFacebookPhotoEvidence(root);
+    if (snapshot.counter > 0) {
+      return { confirmed: true, count: snapshot.counter, source: "photo_counter" };
+    }
+    if (snapshot.nodes.size > 0) {
+      return { confirmed: true, count: snapshot.nodes.size, source: "thumbnail_dom" };
+    }
+    return { confirmed: false, count: 0, source: "none" };
+  }
+
+  async function waitForPhotoThumbnails(expectedCount, timeoutMs, baseline) {
     const start = Date.now();
     let lastMsg = 0;
-    const getPhotoCounter = () => {
-      const text = document.body?.innerText || "";
-      const slashMatch = text.match(/(?:photos?|fotos?)\s*[·:\-]?\s*(\d+)\s*\/\s*\d+/i);
-      if (slashMatch) return Number.parseInt(slashMatch[1], 10) || 0;
-      const wordMatch = text.match(/(\d+)\s*(?:photos?|fotos?)\b/i);
-      return wordMatch ? Number.parseInt(wordMatch[1], 10) || 0 : 0;
-    };
+    let stableKey = "";
+    let stableSince = 0;
+    const PHOTO_CONFIRMATION_STABLE_MS = 750;
 
     while (Date.now() - start < timeoutMs) {
-      const photoCount = getPhotoCounter();
-      if (photoCount > 0) {
-        stateLog(`Photo counter found: ${photoCount} / ${expectedCount}`);
-        return true;
+      const evidence = compareFacebookPhotoEvidence(
+        collectFacebookPhotoEvidence(),
+        baseline,
+      );
+      if (evidence.confirmed) {
+        const nextStableKey = `${evidence.source}:${evidence.count}`;
+        if (nextStableKey !== stableKey) {
+          stableKey = nextStableKey;
+          stableSince = Date.now();
+        } else if (Date.now() - stableSince >= PHOTO_CONFIRMATION_STABLE_MS) {
+          stateLog(
+            `Photo evidence stable: ${evidence.count} / ${expectedCount} via ${evidence.source}`,
+          );
+          return evidence;
+        }
+      } else {
+        stableKey = "";
+        stableSince = 0;
       }
 
-      // Facebook renders uploaded photo thumbnails in a few different ways
-      const thumbs = [
-        ...document.querySelectorAll('[data-testid="media-attachment-delete-button"]'),
-        ...document.querySelectorAll('img[src^="blob:"]'),
-        ...document.querySelectorAll('[aria-label*="photo" i] img'),
-        ...document.querySelectorAll('[aria-label*="foto" i] img'),
-        ...document.querySelectorAll('[aria-label*="image" i] img'),
-        ...document.querySelectorAll('[aria-label*="imagen" i] img'),
-        ...document.querySelectorAll('[aria-label*="upload" i] img'),
-        ...document.querySelectorAll('[aria-label*="subir" i] img'),
-        ...document.querySelectorAll('[aria-label*="agregar" i] img'),
-        ...document.querySelectorAll('[aria-label*="eliminar" i]'),
-        ...document.querySelectorAll('[aria-label*="remove" i]'),
-      ];
-      // Deduplicate by filtering to unique elements
-      const unique = [...new Set(thumbs)];
-      if (unique.length >= 1) {
-        stateLog(`Photo thumbnails found: ${unique.length} / ${expectedCount}`);
-        return true;
-      }
-      // Also accept: any visible image that appeared inside the upload area
-      const uploadArea = document.querySelector(
-        [
-          '[aria-label*="photo" i]',
-          '[aria-label*="foto" i]',
-          '[aria-label*="image" i]',
-          '[aria-label*="imagen" i]',
-          '[aria-label*="upload" i]',
-          '[aria-label*="subir" i]',
-          '[aria-label*="agregar" i]',
-        ].join(", ")
-      );
-      if (uploadArea) {
-        const imgs = uploadArea.querySelectorAll("img");
-        if (imgs.length >= 1) return true;
-      }
       // Emit progress messages — thresholds tuned for the 20 s budget
       const elapsed = Date.now() - start;
       if (elapsed > 5000 && lastMsg < 5000) {
@@ -2854,7 +2917,7 @@
       }
       await sleep(500);
     }
-    return false;
+    return { confirmed: false, count: 0, source: "timeout" };
   }
 
   // ── Auto-retry helper ────────────────────────────────────────────────────────
@@ -3247,50 +3310,12 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     if (!hasPhoto) {
       const PHOTO_POLL_MS = 15000;
       const photoStart = Date.now();
-      // Expanded selector list — Facebook uses many different DOM patterns for
-      // uploaded photo thumbnails and preview tiles.
-      const THUMB_SELECTORS = [
-        'img[src^="blob:"]',
-        '[data-testid="media-attachment-delete-button"]',
-        '[data-testid="media-attachment-preview"]',
-        '[data-imagelocation]',
-        '[data-visualcompletion*="media"]',
-        '[aria-label*="photo" i] img',
-        '[aria-label*="image" i] img',
-        '[aria-label*="upload" i] img',
-        'img[style*="object-fit"]',
-        '[role="presentation"] img[src^="blob:"]',
-      ];
       while (Date.now() - photoStart < PHOTO_POLL_MS) {
-        // Collect all matching DOM thumbnail elements, deduped
-        const thumbs = [
-          ...new Set(THUMB_SELECTORS.flatMap((sel) => [...document.querySelectorAll(sel)])),
-        ];
-        if (thumbs.length > 0) { hasPhoto = true; break; }
-        // Also accept Facebook's text counter ("1 photo", "3 photos", "Fotos · 7/20")
-        const pageText = document.body.innerText || "";
-        const countText =
-          pageText.match(/(?:photos?|fotos?)\s*[·:\-]?\s*(\d+)\s*\/\s*\d+/i) ||
-          pageText.match(/(\d+)\s*(?:photos?|fotos?)\b/i);
-        if (countText && parseInt(countText[1], 10) > 0) { hasPhoto = true; break; }
-        // Accept any naturally loaded image inside a photo container
-        const uploadZone = document.querySelector(
-          [
-            '[aria-label*="photo" i]',
-            '[aria-label*="foto" i]',
-            '[aria-label*="image" i]',
-            '[aria-label*="imagen" i]',
-            '[aria-label*="upload" i]',
-            '[aria-label*="subir" i]',
-            '[aria-label*="agregar" i]',
-          ].join(", "),
-        );
-        if (uploadZone) {
-          const loaded = [...uploadZone.querySelectorAll("img")].filter(
-            (img) => img.naturalWidth > 0 || img.src,
-          );
-          if (loaded.length > 0) { hasPhoto = true; break; }
-        }
+        // Only accept a Facebook counter or controls that represent an actual
+        // uploaded preview. Generic "Add photos" icons are intentionally not
+        // evidence because they exist before any file is selected.
+        const evidence = readExistingFacebookPhotoEvidence();
+        if (evidence.confirmed) { hasPhoto = true; break; }
         await sleep(600);
       }
     }
@@ -3981,6 +4006,44 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   let lastMessengerAutoSendMethod = "";
   let lastMessengerSendDiagnostics = {};
   let lastMarketplaceQuickReplyDiagnostics = null;
+  let messengerInboxDiscoveryInFlight = false;
+  let lastMessengerInboxCandidateKey = "";
+  let lastMessengerInboxCandidateOpenedAt = 0;
+  const MESSENGER_INBOX_DISCOVERY_RETRY_MS = 5000;
+
+  function safeSalesAiUrl() {
+    return `${location.origin}${location.pathname}`;
+  }
+
+  function validateFacebookSellerProfile(root = document) {
+    const expected = ["alpha manassas", "alpha motorsport", "andres ibanez"];
+    const labels = Array.from(root?.querySelectorAll?.("[aria-label]") || [])
+      .map((element) => element.getAttribute("aria-label") || "")
+      .filter(Boolean);
+    const match = labels.map((label) => {
+      const result = label.match(/(?:manage|administrar)\s+(.+?)\s+(?:notification settings|configuraci[oÃ³]n(?:es)? de notificaciones)/i) ||
+        label.match(/(?:your profile|tu perfil)\s*[:\-]\s*(.+)$/i);
+      return String(result?.[1] || "").replace(/\s+/g, " ").trim();
+    }).find(Boolean) || "";
+    const normalized = match.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return {
+      currentProfileName: match,
+      expectedProfileNames: ["Alpha Manassas", "Alpha Motorsport", "Andres Ibanez"],
+      matched: expected.includes(normalized),
+    };
+  }
+
+  function reportMessengerCaptureDebug(stage, details = {}) {
+    void send({
+      type: "MESSENGER_CAPTURE_DEBUG",
+      debug: {
+        at: new Date().toISOString(),
+        stage,
+        sourceUrl: safeSalesAiUrl(),
+        ...details,
+      },
+    }).catch(() => {});
+  }
 
   function getMessengerMessageBox() {
     const threadRoot = findMessengerRoot();
@@ -4002,7 +4065,85 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     )[0] || null;
   }
 
+  function clickMarketplaceInboxCandidate(candidate) {
+    const element = candidate?.element;
+    if (!element) return false;
+    try {
+      element.focus?.();
+      const eventInit = { bubbles: true, cancelable: true, view: window };
+      element.dispatchEvent?.(new MouseEvent("mousedown", eventInit));
+      element.dispatchEvent?.(new MouseEvent("mouseup", eventInit));
+      if (typeof element.click === "function") element.click();
+      else element.dispatchEvent?.(new MouseEvent("click", eventInit));
+      return true;
+    } catch (error) {
+      console.warn("[DealerPilot AI] Marketplace inbox row could not be opened", error);
+      return false;
+    }
+  }
+
+  function discoverMarketplaceInboxConversation() {
+    const capture = globalThis.DealerPilotMessengerCapture;
+    if (!capture?.findInboxConversationCandidate || !/\/marketplace\/inbox\b/i.test(location.pathname || "")) return;
+
+    // An active thread is the only surface allowed to reach the scraper. The
+    // discovery phase is finished as soon as Facebook renders its composer.
+    if (isMessengerUiVisible()) {
+      messengerInboxDiscoveryInFlight = false;
+      lastMessengerInboxCandidateKey = "";
+      return;
+    }
+    if (messengerInboxDiscoveryInFlight) return;
+
+    const sellerProfile = validateFacebookSellerProfile(document);
+    if (!sellerProfile.matched) {
+      reportMessengerCaptureDebug("inbox_discovery_blocked", {
+        reason: "seller_profile_unmatched",
+        sellerProfileName: sellerProfile.currentProfileName || "",
+        sellerProfileMatched: false,
+        discoveryRoute: safeSalesAiUrl(),
+      });
+      return;
+    }
+
+    const candidate = capture.findInboxConversationCandidate({ document, location });
+    if (!candidate) {
+      reportMessengerCaptureDebug("inbox_discovery_waiting", {
+        reason: "marketplace_inbox_candidate_missing",
+        sellerProfileName: sellerProfile.currentProfileName || "",
+        sellerProfileMatched: true,
+        discoveryRoute: safeSalesAiUrl(),
+      });
+      return;
+    }
+
+    const now = Date.now();
+    if (
+      candidate.key === lastMessengerInboxCandidateKey &&
+      now - lastMessengerInboxCandidateOpenedAt < MESSENGER_INBOX_DISCOVERY_RETRY_MS
+    ) return;
+
+    messengerInboxDiscoveryInFlight = true;
+    lastMessengerInboxCandidateKey = candidate.key;
+    lastMessengerInboxCandidateOpenedAt = now;
+    const opened = clickMarketplaceInboxCandidate(candidate);
+    reportMessengerCaptureDebug(opened ? "inbox_thread_open_requested" : "inbox_thread_open_failed", {
+      reason: opened ? undefined : "dom_click_failed",
+      candidateKey: candidate.key,
+      candidateText: candidate.text,
+      candidateScore: candidate.score,
+      sellerProfileName: sellerProfile.currentProfileName || "",
+      sellerProfileMatched: true,
+      discoveryRoute: safeSalesAiUrl(),
+    });
+    if (!opened) messengerInboxDiscoveryInFlight = false;
+    setTimeout(() => {
+      if (!isMessengerUiVisible()) messengerInboxDiscoveryInFlight = false;
+    }, MESSENGER_INBOX_DISCOVERY_RETRY_MS);
+  }
+
   function initMessengerAiControls() {
+    if (!messengerControlsStarted) discoverMarketplaceInboxConversation();
     if (messengerControlsStarted || !isMessengerUiVisible()) return;
     messengerControlsStarted = true;
 
@@ -4073,11 +4214,10 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return false;
     }
 
-    // Sales AI is a seller-side capability. The extension may be present in a
-    // Chrome installation, but it must not process a Facebook account that is
-    // visibly the buyer account. Facebook exposes the active account in the
-    // account-settings aria label; fail closed when it is missing or does not
-    // match the configured Alpha seller identities.
+    // Profile labels are useful corroboration, but Facebook does not render
+    // them consistently. The active thread's seller-only controls are the
+    // primary evidence; an explicit "View seller" surface always rejects the
+    // capture even if a profile label happens to match.
     const EXPECTED_FACEBOOK_SELLER_NAMES = [
       "Alpha Manassas",
       "Alpha Motorsport",
@@ -4152,6 +4292,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     function getThreadHeadingText(root) {
       if (!root) return "";
+      const inspected = globalThis.DealerPilotMessengerCapture?.inspectThread?.(root);
+      if (inspected?.cleanedThreadHeader) return inspected.cleanedThreadHeader.slice(0, 160);
       const headings = Array.from(root.querySelectorAll('[role="heading"], h1, h2, h3'));
       const heading = headings.find((el) => /\b(19|20)\d{2}\b/.test(el.textContent || "")) || headings[0];
       if (heading) return cleanMessengerText(heading.textContent || "").slice(0, 160);
@@ -4224,11 +4366,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return normalized;
     }
 
-    function collectMessengerSellerNameCandidates(root, messageScope) {
-      const scope = messageScope || root;
-      if (!scope) return [];
-      return Array.from(scope.querySelectorAll('img[alt]'))
-        .map((img) => extractMessengerPersonNameFromAlt(img.getAttribute("alt") || ""))
+    function collectMessengerSellerNameCandidates(currentProfileName = "", profileMatched = false) {
+      const configured = EXPECTED_FACEBOOK_SELLER_NAMES
+        .map(extractMessengerPersonNameFromAlt)
+        .filter(Boolean);
+      const validatedCurrent = profileMatched
+        ? extractMessengerPersonNameFromAlt(currentProfileName)
+        : "";
+      return [...configured, validatedCurrent]
         .filter(Boolean)
         .filter((name, index, names) => names.indexOf(name) === index);
     }
@@ -4693,9 +4838,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         conversationThreadDetected: "Marketplace conversation region or message log not found",
         buyerMessageDetected: "latest substantive message is not an inbound buyer message",
         buyerNameDetected: "thread header did not provide a reliable buyer name",
-        sellerIsCurrentUser: evidence.sellerProfileMatched === true
-          ? "DealerPilot is installed in the seller-side browser context"
-          : "active Facebook profile is not the configured seller account",
+        sellerIsCurrentUser: evidence.sellerSurfaceRejected === true
+          ? "active Marketplace thread exposes buyer-side View seller controls"
+          : "seller-side controls and configured seller profile evidence are both missing",
         marketplaceContextDetected: "Marketplace listing id or vehicle title was not found in the seller thread",
       };
       for (const [gate, passed] of Object.entries(gates)) {
@@ -4723,12 +4868,10 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         conversationThreadDetected: !!root,
         buyerMessageDetected: !!lastMessage && lastMessage.speaker !== "Dealer" && !isMessengerUiText(lastMessage.text),
         buyerNameDetected: isReliableBuyerName(buyerName),
-        // The extension is intentionally installed and run only in the
-        // seller's browser. Do not infer seller identity from who started the
-        // Facebook thread: Marketplace can render seller-authored messages
-        // with the seller's display name and can mark a buyer-started thread
-        // as started by the current user in the opposite browser.
-        sellerIsCurrentUser: evidence.sellerProfileMatched === true,
+        // Seller-only controls are the primary evidence because Facebook can
+        // omit the account aria-label. A matching profile is an allowed
+        // fallback only when the thread does not explicitly expose View seller.
+        sellerIsCurrentUser: evidence.sellerContextTrusted === true,
         marketplaceContextDetected:
           !!context.marketplaceItemId ||
           (!!root && !!context.vehicleTitle),
@@ -4738,7 +4881,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         conversationThreadDetected: "conversation_thread_missing",
         buyerMessageDetected: "buyer_message_missing",
         buyerNameDetected: "buyer_name_missing",
-        sellerIsCurrentUser: "seller_profile_mismatch",
+        sellerIsCurrentUser: evidence.sellerSurfaceRejected
+          ? "seller_surface_rejected"
+          : "seller_context_untrusted",
         marketplaceContextDetected: "marketplace_context_missing",
       };
       const missing = Object.entries(gates)
@@ -4750,15 +4895,24 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     function scrapeConversationSnapshot() {
       const main = findMarketplaceThreadRoot();
-      const threadHeaderText = getThreadHeadingText(main);
+      const isolatedCapture = globalThis.DealerPilotMessengerCapture;
+      const threadInspection = isolatedCapture?.inspectThread?.(main) || {};
+      const threadHeaderText = threadInspection.cleanedThreadHeader || getThreadHeadingText(main);
       const sellerProfile = validateFacebookSellerProfile(document);
+      const sellerContextTrusted = isolatedCapture?.sellerContextIsTrusted
+        ? isolatedCapture.sellerContextIsTrusted(threadInspection, sellerProfile.matched)
+        : threadInspection.sellerSurfaceRejected !== true &&
+          (threadInspection.sellerSurfaceDetected === true || sellerProfile.matched === true);
 
       // Try to detect buyer name from page heading
-      let buyerName = extractBuyerNameFromThreadHeader(threadHeaderText);
+      let buyerName = threadInspection.buyerName || extractBuyerNameFromThreadHeader(threadHeaderText);
 
       // Try structured message rows — Messenger renders each message in a [role="row"] or similar
       const messageScope = findMessengerMessageScope(main);
-      const sellerNameCandidates = collectMessengerSellerNameCandidates(main, messageScope);
+      const sellerNameCandidates = collectMessengerSellerNameCandidates(
+        sellerProfile.currentProfileName,
+        sellerProfile.matched,
+      );
       const semanticMessageEls = messageScope
         ? Array.from(messageScope.querySelectorAll('[aria-label]')).filter((el) => {
             const descriptor = el.getAttribute("aria-label") || "";
@@ -4776,7 +4930,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const inboundMessageDescriptors = [];
       let threadStartedByCurrentUser = null;
       let extractionMode = "none";
-      const stableThreadIdentity = findStableMessengerThreadIdentity(main, messageScope);
+      const stableThreadIdentity =
+        isolatedCapture?.findThreadIdentity?.(main, messageScope) ||
+        findStableMessengerThreadIdentity(main, messageScope);
 
       if (messageEls.length > 0) {
         // Structured extraction: detect sent (you) vs received (buyer)
@@ -4831,8 +4987,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
           messages: [],
           evidence: {
             threadHeaderText,
+            cleanedThreadHeader: threadInspection.cleanedThreadHeader || threadHeaderText,
+            cleanedVehicleTitle: threadInspection.cleanedVehicleTitle || "",
             buyerNameCandidate: buyerName,
             latestInboundMessageText: "",
+            inboundMessageText: "",
             threadStartedByCurrentUser,
             availabilityQuickReplyVisible: false,
             availabilityQuickReplyLabel: "",
@@ -4844,10 +5003,15 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
               ? messageScope.querySelectorAll('div[dir="auto"], span[dir="auto"]').length
               : 0),
             latestMessageDirection: "none",
+            activeThreadRootSelector: isolatedCapture?.selectorFor?.(main) || "",
             matchedSelectors: collectMatchedThreadSelectors(main),
             threadIdentity: stableThreadIdentity || inboundMessageDescriptors[0] || "",
             sellerNameCandidates,
             sellerContext: "extension_installed_seller_browser",
+            sellerSurfaceDetected: threadInspection.sellerSurfaceDetected === true,
+            sellerSurfaceRejected: threadInspection.sellerSurfaceRejected === true,
+            sellerSurfaceEvidence: threadInspection.sellerSurfaceEvidence || [],
+            sellerContextTrusted,
             sellerProfileName: sellerProfile.currentProfileName,
             sellerProfileMatched: sellerProfile.matched,
           },
@@ -4867,8 +5031,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         rawText: "",
         evidence: {
           threadHeaderText,
+          cleanedThreadHeader: threadInspection.cleanedThreadHeader || threadHeaderText,
+          cleanedVehicleTitle: threadInspection.cleanedVehicleTitle || "",
           buyerNameCandidate: buyerName,
           latestInboundMessageText: latestInboundMessage?.text || "",
+          inboundMessageText: latestInboundMessage?.text || "",
           threadStartedByCurrentUser,
           availabilityQuickReplyVisible: !!availabilityQuickReplyMessage,
           availabilityQuickReplyLabel: availabilityQuickReplyMessage?.availabilityQuickReplyLabel || "",
@@ -4881,10 +5048,15 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
             ? messageScope.querySelectorAll('div[dir="auto"], span[dir="auto"]').length
             : 0),
           latestMessageDirection: deduped[deduped.length - 1]?.speaker === "Dealer" ? "dealer" : "buyer",
+          activeThreadRootSelector: isolatedCapture?.selectorFor?.(main) || "",
           matchedSelectors: collectMatchedThreadSelectors(main),
           threadIdentity: stableThreadIdentity || inboundMessageDescriptors[0] || "",
           sellerNameCandidates,
           sellerContext: "extension_installed_seller_browser",
+          sellerSurfaceDetected: threadInspection.sellerSurfaceDetected === true,
+          sellerSurfaceRejected: threadInspection.sellerSurfaceRejected === true,
+          sellerSurfaceEvidence: threadInspection.sellerSurfaceEvidence || [],
+          sellerContextTrusted,
           sellerProfileName: sellerProfile.currentProfileName,
           sellerProfileMatched: sellerProfile.matched,
         },
@@ -4991,6 +5163,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     }
 
     function extractVehicleTitleCandidate(value) {
+      const isolatedCleaned = globalThis.DealerPilotMessengerCapture?.cleanVehicleTitle?.(value);
+      if (isolatedCleaned) return isolatedCleaned;
       const cleaned = cleanMessengerText(value)
         .replace(/^.*?\$[\d,.]+\s*[-\u2013\u2014]\s*/i, "")
         .replace(/^.*?[\u00b7\u2022|]\s+(?=(?:19|20)\d{2}\b)/, "")
@@ -5002,6 +5176,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     function detectListingContext() {
       const root = findMarketplaceThreadRoot();
+      const threadInspection = globalThis.DealerPilotMessengerCapture?.inspectThread?.(root) || {};
       const bodyText = (root?.innerText || "").toLowerCase();
       const listingLink =
         root?.querySelector('a[href*="/marketplace/item/"]') ||
@@ -5022,6 +5197,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
       // Vehicle title — look for pattern like "2020 Toyota Camry" in headings or links
       const titleSources = [
+        threadInspection.cleanedVehicleTitle || "",
         listingLink?.textContent || "",
         getThreadHeadingText(root),
         ...Array.from(root?.querySelectorAll('[role="heading"]') || []).map((node) => node.textContent || ""),
@@ -5112,7 +5288,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       if (!root) return false;
       const expected = cleanMessengerText(reply);
       const messageScope = findMessengerMessageScope(root);
-      const sellerNameCandidates = collectMessengerSellerNameCandidates(root, messageScope);
+      const sellerProfile = validateFacebookSellerProfile(document);
+      const sellerNameCandidates = collectMessengerSellerNameCandidates(
+        sellerProfile.currentProfileName,
+        sellerProfile.matched,
+      );
       const semanticDelivery = Array.from(root.querySelectorAll('[aria-label]')).some((el) => {
         const parsed = parseSemanticMessengerMessage(el, sellerNameCandidates);
         return parsed.sentByCurrentUser && cleanMessengerText(parsed.text) === expected;
@@ -5213,18 +5393,6 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return true;
     }
 
-    function reportMessengerCaptureDebug(stage, details = {}) {
-      void send({
-        type: "MESSENGER_CAPTURE_DEBUG",
-        debug: {
-          at: new Date().toISOString(),
-          stage,
-          sourceUrl: safeSalesAiUrl(),
-          ...details,
-        },
-      }).catch(() => {});
-    }
-
     async function captureConversationOnce(options = {}) {
       const silent = !!options.silent;
       const automatic = !!options.automatic;
@@ -5234,6 +5402,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       const { buyerName, messages, rawText, evidence } = await scrapeConversation();
       const context = detectListingContext();
       evidence.listingTitleCandidate = context.vehicleTitle || "";
+      if (!evidence.threadIdentity && buyerName && messages.some((message) => message.speaker !== "Dealer")) {
+        evidence.threadIdentity = buildMessengerThreadRef(
+          buyerName,
+          context.vehicleTitle,
+          context.listingUrl || location.href,
+          messages,
+        );
+      }
       const salesContext = validateMessengerSalesContext({ buyerName, messages, context, evidence });
       const captureDebug = {
         pageRoute: safeSalesAiUrl(),
@@ -5253,8 +5429,17 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         messageScopeDetected: evidence.messageScopeDetected === true,
         messageExtractionMode: evidence.extractionMode || "none",
         threadIdentityDetected: !!evidence.threadIdentity,
+        threadIdentity: evidence.threadIdentity || "",
         latestMessageDirection: evidence.latestMessageDirection || "none",
+        activeThreadRootSelector: evidence.activeThreadRootSelector || "",
+        sellerSurfaceDetected: evidence.sellerSurfaceDetected === true,
+        sellerSurfaceRejected: evidence.sellerSurfaceRejected === true,
+        sellerSurfaceEvidence: evidence.sellerSurfaceEvidence || [],
+        cleanedThreadHeader: evidence.cleanedThreadHeader || evidence.threadHeaderText || "",
+        cleanedVehicleTitle: context.vehicleTitle || evidence.cleanedVehicleTitle || "",
+        inboundMessageText: evidence.inboundMessageText || evidence.latestInboundMessageText || "",
         sellerContext: evidence.sellerContext || "extension_installed_seller_browser",
+        sellerContextTrusted: evidence.sellerContextTrusted === true,
         sellerProfileName: evidence.sellerProfileName || "",
         sellerProfileMatched: evidence.sellerProfileMatched === true,
         composerDetected: !!getMessengerMessageBox(),

@@ -507,6 +507,7 @@ test("Messenger diagnostics retain per-tab provenance and classify duplicate int
     "utf8",
   );
   assert.match(queueClientSource, /lastMessengerCaptureDebugByTab/);
+  assert.match(queueClientSource, /const tabId = Number\.isInteger\(sender\?\.tab\?\.id\)/);
   assert.match(queueClientSource, /sourceTabId/);
   assert.match(popupSource, /duplicate_extension_intake/);
   assert.match(popupSource, /tabId: activeTabId/);
@@ -521,6 +522,11 @@ test("Messenger intake sends canonical Buyer and Dealer role labels", () => {
 });
 
 test("Messenger treats seller-name descriptors as Dealer messages", () => {
+  assert.doesNotMatch(
+    publisherFlowSource,
+    /collectMessengerSellerNameCandidates[\s\S]{0,500}querySelectorAll\('img\[alt\]'\)/,
+    "buyer avatars must never become seller-name evidence",
+  );
   const start = publisherFlowSource.indexOf("    function isMessengerUiText(text)");
   const end = publisherFlowSource.indexOf("    function isTransparentMessengerColor", start);
   assert.ok(start >= 0 && end > start, "Messenger semantic parser must remain extractable");
@@ -555,7 +561,7 @@ test("Messenger treats seller-name descriptors as Dealer messages", () => {
   assert.equal(buyerMessage.senderName, "Juan");
 });
 
-test("Sales AI fails closed for a buyer Facebook profile and accepts the seller profile", () => {
+test("Sales AI keeps profile evidence as fallback and gates on trusted seller context", () => {
   const start = publisherFlowSource.indexOf("const EXPECTED_FACEBOOK_SELLER_NAMES");
   const end = publisherFlowSource.indexOf("function findStableMessengerThreadIdentity", start);
   assert.ok(start >= 0 && end > start, "Facebook seller-profile validator must remain extractable");
@@ -588,9 +594,12 @@ test("Sales AI fails closed for a buyer Facebook profile and accepts the seller 
   assert.equal(seller.matched, true);
   assert.match(
     publisherFlowSource,
-    /sellerIsCurrentUser:\s*evidence\.sellerProfileMatched === true/,
+    /sellerIsCurrentUser:\s*evidence\.sellerContextTrusted === true/,
   );
-  assert.match(publisherFlowSource, /seller_profile_mismatch/);
+  assert.match(publisherFlowSource, /threadInspection\.sellerSurfaceRejected !== true/);
+  assert.match(publisherFlowSource, /threadInspection\.sellerSurfaceDetected === true \|\| sellerProfile\.matched === true/);
+  assert.match(publisherFlowSource, /seller_surface_rejected/);
+  assert.match(publisherFlowSource, /seller_context_untrusted/);
 });
 
 test("Messenger automatic replies wait for a quiet buyer window and guard their own reply", () => {
@@ -609,4 +618,22 @@ test("Messenger capture reports the Sales AI pipeline stage for extension diagno
   assert.match(publisherFlowSource, /reportMessengerCaptureDebug\("intake_sending"/);
   assert.match(publisherFlowSource, /autoSent \|\| !silent \? "intake_ok" : "auto_send_blocked"/);
   assert.match(publisherFlowSource, /aiReplyReceived: !!lastReply/);
+  for (const field of [
+    "activeThreadRootSelector",
+    "sellerSurfaceDetected",
+    "sellerSurfaceEvidence",
+    "cleanedThreadHeader",
+    "cleanedVehicleTitle",
+    "inboundMessageText",
+    "threadIdentity",
+  ]) {
+    assert.match(publisherFlowSource, new RegExp(`${field}:`));
+  }
+});
+
+test("seller inbox discovery opens a row before strict thread capture", () => {
+  assert.match(publisherFlowSource, /findInboxConversationCandidate/);
+  assert.match(publisherFlowSource, /inbox_thread_open_requested/);
+  assert.match(publisherFlowSource, /seller_profile_unmatched/);
+  assert.match(publisherFlowSource, /if \(!messengerControlsStarted\) discoverMarketplaceInboxConversation\(\)/);
 });

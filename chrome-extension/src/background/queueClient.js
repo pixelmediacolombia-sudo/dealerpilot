@@ -12,6 +12,7 @@ const MESSENGER_AVAILABILITY_CLAIM_TTL_MS = 5 * 60 * 1000;
 const conversationIntakeInFlight = new Set();
 const recentConversationIntakes = new Map();
 const availabilityClaimsInFlight = new Set();
+let messengerDebugWriteQueue = Promise.resolve();
 
 async function getBackendUrl() {
   return DealerPilotApiClient.getBackendUrl();
@@ -1166,22 +1167,27 @@ const handlers = {
   },
 
   async MESSENGER_CAPTURE_DEBUG(message, sender) {
+    const tabId = Number.isInteger(sender?.tab?.id) ? sender.tab.id : null;
     const debug = {
       ...(message.debug || {}),
-      sourceTabId: Number.isInteger(sender?.tab?.id) ? sender.tab.id : null,
+      tabId,
+      sourceTabId: tabId,
       sourceTabUrl: sender?.tab?.url || null,
       receivedAt: new Date().toISOString(),
     };
-    const { lastMessengerCaptureDebugByTab = {} } = await chrome.storage.local.get(
-      "lastMessengerCaptureDebugByTab",
-    );
-    if (Number.isInteger(sender?.tab?.id)) {
-      lastMessengerCaptureDebugByTab[String(sender.tab.id)] = debug;
-    }
-    await chrome.storage.local.set({
-      lastMessengerCaptureDebug: debug,
-      lastMessengerCaptureDebugByTab,
-    });
+    const write = async () => {
+      const { lastMessengerCaptureDebugByTab = {} } = await chrome.storage.local.get(
+        "lastMessengerCaptureDebugByTab",
+      );
+      if (tabId !== null) lastMessengerCaptureDebugByTab[String(tabId)] = debug;
+      await chrome.storage.local.set({
+        lastMessengerCaptureDebug: debug,
+        lastMessengerCaptureDebugByTab,
+      });
+    };
+    const pendingWrite = messengerDebugWriteQueue.then(write, write);
+    messengerDebugWriteQueue = pendingWrite.catch(() => {});
+    await pendingWrite;
     return { saved: true };
   },
 

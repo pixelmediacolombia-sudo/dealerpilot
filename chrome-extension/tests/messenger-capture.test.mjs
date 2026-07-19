@@ -8,7 +8,16 @@ const captureSource = readFileSync(
   "utf8",
 );
 
-function loadCaptureDom({ semantic = false, includeSecondThread = false } = {}) {
+function loadCaptureDom({
+  semantic = false,
+  includeSecondThread = false,
+  sellerSurface = "none",
+  buyerHeader = "",
+  vehicleHeader = "",
+  onlyDealer = false,
+  threadId = "thread-buyer-a",
+  focusSecondThread = false,
+} = {}) {
   class FakeElement {
     constructor({ tagName = "div", role = "", attributes = {}, text = "", rect, children = [] } = {}) {
       this.tagName = tagName.toUpperCase();
@@ -32,12 +41,20 @@ function loadCaptureDom({ semantic = false, includeSecondThread = false } = {}) 
       if (selector === '[role="region"]') return this.role === "region";
       if (selector === '[role="main"]') return this.role === "main";
       if (selector === '[role="log"]') return this.role === "log";
+      if (selector === '[role="heading"]') return this.role === "heading";
+      if (selector === '[role="button"]') return this.role === "button";
       if (selector === '[contenteditable="true"]') return this.attributes.contenteditable === "true";
       if (selector === 'textarea') return this.tagName === "TEXTAREA";
       if (selector === 'div[dir="auto"]') return this.tagName === "DIV" && this.attributes.dir === "auto";
       if (selector === 'span[dir="auto"]') return this.tagName === "SPAN" && this.attributes.dir === "auto";
       if (selector === '[data-lexical-text]') return this.attributes["data-lexical-text"] !== undefined;
       if (selector === '[aria-label]') return this.attributes["aria-label"] !== undefined;
+      if (selector === '[title]') return this.attributes.title !== undefined;
+      if (selector === '[aria-level]') return this.attributes["aria-level"] !== undefined;
+      if (selector === "button") return this.tagName === "BUTTON";
+      if (selector === "a") return this.tagName === "A";
+      if (selector === "h1" || selector === "h2" || selector === "h3") return this.tagName === selector.toUpperCase();
+      if (selector === 'a[href]' || selector === '[href]') return this.attributes.href !== undefined;
       if (selector.includes('[aria-label*="message"')) {
         return (!selector.includes('[aria-live="polite"]') || this.attributes["aria-live"] === "polite") && /message/i.test(this.attributes["aria-label"] || "");
       }
@@ -93,10 +110,34 @@ function loadCaptureDom({ semantic = false, includeSecondThread = false } = {}) 
     text: "Yes, it is available.",
     rect: { left: 280, right: 500, top: 240, width: 220, height: 50 },
   });
-  const children = [composer, ...(semantic ? [semanticBuyer, semanticDealer] : [buyerBubble, dealerBubble])];
+  const surfaceLabel = sellerSurface === "seller"
+    ? "View buyer"
+    : sellerSurface === "pending"
+      ? "Mark as pending"
+      : sellerSurface === "buyer"
+        ? "View seller"
+        : "";
+  const surfaceControl = surfaceLabel
+    ? new FakeElement({ role: "button", attributes: { "aria-label": surfaceLabel }, text: surfaceLabel })
+    : null;
+  const buyerHeading = buyerHeader
+    ? new FakeElement({ tagName: "h2", role: "heading", text: buyerHeader, rect: { left: 20, right: 240, top: 20, width: 220, height: 30 } })
+    : null;
+  const vehicleHeading = vehicleHeader
+    ? new FakeElement({ tagName: "h3", role: "heading", text: vehicleHeader, rect: { left: 20, right: 420, top: 60, width: 400, height: 30 } })
+    : null;
+  const visualMessages = onlyDealer ? [dealerBubble] : [buyerBubble, dealerBubble];
+  const semanticMessages = onlyDealer ? [semanticDealer] : [semanticBuyer, semanticDealer];
+  const children = [
+    composer,
+    surfaceControl,
+    buyerHeading,
+    vehicleHeading,
+    ...(semantic ? semanticMessages : visualMessages),
+  ].filter(Boolean);
   const root = new FakeElement({
     role: "dialog",
-    attributes: { "aria-label": "Marketplace conversation" },
+    attributes: { "aria-label": "Marketplace conversation", "data-thread-id": threadId },
     rect: { left: 0, right: 520, top: 0, width: 520, height: 700 },
     children,
   });
@@ -113,6 +154,7 @@ function loadCaptureDom({ semantic = false, includeSecondThread = false } = {}) 
     : null;
   const document = {
     documentElement: new FakeElement({ tagName: "html" }),
+    activeElement: focusSecondThread ? otherRoot?.children[0] : composer,
     querySelectorAll(selector) {
       return [root, ...(otherRoot ? [otherRoot] : [])].filter((candidate) => candidate.matches(selector.split(",")[0].trim()));
     },
@@ -125,6 +167,66 @@ function loadCaptureDom({ semantic = false, includeSecondThread = false } = {}) 
   });
   vm.runInContext(`${captureSource}\nglobalThis.__capture = DealerPilotMessengerCapture;`, context, { filename: "messengerCapture.js" });
   return { capture: context.__capture, document, root, otherRoot };
+}
+
+function loadInboxDiscoveryDom() {
+  class FakeElement {
+    constructor({ tagName = "div", role = "", attributes = {}, text = "", children = [] } = {}) {
+      this.tagName = tagName.toUpperCase();
+      this.role = role;
+      this.attributes = { ...attributes };
+      this.innerText = text;
+      this.textContent = text;
+      this.children = children;
+      this.parentElement = null;
+      this.clicked = 0;
+      this.rect = { left: 0, right: 500, top: 0, width: 500, height: 80 };
+      for (const child of children) child.parentElement = this;
+    }
+    getBoundingClientRect() { return this.rect; }
+    getAttribute(name) { return name === "role" ? this.role || null : this.attributes[name] ?? null; }
+    click() { this.clicked += 1; }
+    contains(node) { return node === this || this.children.some((child) => child.contains(node)); }
+    matches(selector) {
+      if (selector === '[role="link"]') return this.role === "link";
+      if (selector === '[role="button"]') return this.role === "button";
+      if (selector === "button") return this.tagName === "BUTTON";
+      if (selector.startsWith('a[href*=')) return this.tagName === "A" && /\/marketplace\//.test(this.attributes.href || "");
+      return false;
+    }
+    querySelectorAll(selector) {
+      const selectors = selector.split(",").map((part) => part.trim()).filter(Boolean);
+      const result = [];
+      const visit = (node) => {
+        for (const child of node.children) {
+          if (selectors.some((part) => child.matches(part))) result.push(child);
+          visit(child);
+        }
+      };
+      visit(this);
+      return result;
+    }
+    querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+  }
+
+  const valid = new FakeElement({
+    role: "link",
+    text: "Peter · 2021 Toyota RAV4 Hola. ¿Sigue disponible?",
+  });
+  const nav = new FakeElement({ role: "link", text: "Selling" });
+  const document = {
+    body: new FakeElement({ tagName: "body" }),
+    documentElement: new FakeElement({ tagName: "html" }),
+    querySelectorAll(selector) { return [valid, nav].filter((node) => selector.split(",").some((part) => node.matches(part.trim()))); },
+  };
+  const context = vm.createContext({
+    Element: FakeElement,
+    document,
+    location: { pathname: "/marketplace/inbox" },
+    window: { getComputedStyle: () => ({ overflowY: "visible" }) },
+  });
+  vm.runInContext(`${captureSource}\nglobalThis.__capture = DealerPilotMessengerCapture;`, context, { filename: "messengerCapture.js" });
+  return { capture: context.__capture, document, valid, nav };
 }
 
 test("captures unlabeled Marketplace popover bubbles without role=log", () => {
@@ -169,6 +271,64 @@ test("requires an active composer so an inbox list cannot become a conversation"
   assert.equal(result.evidence.extractionMode, "none");
 });
 
+test("discovers a new Marketplace inbox row before the conversation is open", () => {
+  const { capture, document, valid } = loadInboxDiscoveryDom();
+  const candidate = capture.findInboxConversationCandidate({
+    document,
+    location: { pathname: "/marketplace/inbox" },
+  });
+  assert.equal(candidate.element, valid);
+  assert.match(candidate.text, /2021 Toyota RAV4/);
+  assert.ok(candidate.score > 0);
+});
+
+test("discovers an unread inbox row when Facebook hides the vehicle title", () => {
+  const { capture, document } = loadInboxDiscoveryDom();
+  const unread = new document.body.constructor({
+    role: "link",
+    attributes: { "aria-label": "Unread" },
+    text: "Peter Â· Attachment Unavailable",
+  });
+  document.querySelectorAll = (selector) =>
+    [unread].filter((node) => selector.split(",").some((part) => node.matches(part.trim())));
+
+  const candidate = capture.findInboxConversationCandidate({
+    document,
+    location: { pathname: "/marketplace/inbox" },
+  });
+  assert.equal(candidate.element, unread);
+  assert.match(candidate.text, /Attachment Unavailable/);
+});
+
+test("discovers a plain inbox preview when Facebook omits unread metadata", () => {
+  const { capture, document } = loadInboxDiscoveryDom();
+  const row = new document.body.constructor({
+    role: "link",
+    text: "Peter Attachment Unavailable",
+  });
+  document.querySelectorAll = (selector) =>
+    [row].filter((node) => selector.split(",").some((part) => node.matches(part.trim())));
+
+  const candidate = capture.findInboxConversationCandidate({
+    document,
+    location: { pathname: "/marketplace/inbox" },
+  });
+  assert.equal(candidate.element, row);
+});
+
+test("does not discover sidebar links or non-inbox routes", () => {
+  const { capture, document } = loadInboxDiscoveryDom();
+  assert.equal(capture.findInboxConversationCandidates({
+    document,
+    location: { pathname: "/marketplace/item/123" },
+  }).length, 0);
+  const candidates = capture.findInboxConversationCandidates({
+    document,
+    location: { pathname: "/marketplace/inbox" },
+  });
+  assert.equal(candidates.some(({ text }) => /^Selling$/i.test(text)), false);
+});
+
 test("capture state is scoped to each thread root", () => {
   const { capture, root, otherRoot } = loadCaptureDom({ includeSecondThread: true });
   const first = capture.readVisualMessages(root, "Buyer A");
@@ -178,4 +338,73 @@ test("capture state is scoped to each thread root", () => {
     { speaker: "Dealer", text: "Yes, it is available." },
   ]);
   assert.deepEqual(JSON.parse(JSON.stringify(second)), [{ speaker: "Buyer B", text: "A different buyer" }]);
+});
+
+test("seller Marketplace surface works without a profile aria-label", () => {
+  const { capture, document } = loadCaptureDom({
+    sellerSurface: "seller",
+    buyerHeader: "Peter View buyer More options",
+    vehicleHeader: "2021 Toyota RAV4View buyerMore options",
+    threadId: "marketplace-thread-peter-rav4",
+  });
+  const result = capture.capture({ document, location: { pathname: "/marketplace/inbox" } });
+  assert.equal(result.buyerName, "Peter");
+  assert.equal(result.evidence.sellerSurfaceDetected, true);
+  assert.equal(result.evidence.sellerSurfaceRejected, false);
+  assert.equal(result.evidence.sellerContextTrusted, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.evidence.sellerSurfaceEvidence)), ["View buyer"]);
+  assert.equal(result.evidence.cleanedThreadHeader, "Peter");
+  assert.equal(result.evidence.cleanedVehicleTitle, "2021 Toyota RAV4");
+  assert.equal(result.evidence.inboundMessageText, "Is this still available?");
+  assert.equal(result.evidence.threadIdentity, "marketplace-thread-peter-rav4");
+  assert.match(result.evidence.activeThreadRootSelector, /role="dialog"/);
+});
+
+test("buyer Marketplace surface is explicitly rejected", () => {
+  const { capture, document } = loadCaptureDom({
+    sellerSurface: "buyer",
+    buyerHeader: "Peter",
+    vehicleHeader: "2021 Toyota RAV4",
+  });
+  const result = capture.capture({ document, location: { pathname: "/marketplace/inbox" } });
+  assert.equal(result.evidence.sellerSurfaceDetected, false);
+  assert.equal(result.evidence.sellerSurfaceRejected, true);
+  assert.equal(result.evidence.sellerContextTrusted, false);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.evidence.sellerSurfaceEvidence)), ["View seller"]);
+});
+
+test("Mark as pending is accepted as a seller-only surface", () => {
+  const { capture, document } = loadCaptureDom({ sellerSurface: "pending", buyerHeader: "Peter" });
+  const result = capture.capture({ document, location: { pathname: "/marketplace/inbox" } });
+  assert.equal(result.evidence.sellerSurfaceDetected, true);
+  assert.equal(result.evidence.sellerContextTrusted, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.evidence.sellerSurfaceEvidence)), ["Mark as pending"]);
+});
+
+test("a seller-only conversation remains dealer-directed and has no inbound message", () => {
+  const { capture, document } = loadCaptureDom({
+    sellerSurface: "seller",
+    buyerHeader: "Peter",
+    vehicleHeader: "2021 Toyota RAV4",
+    onlyDealer: true,
+  });
+  const result = capture.capture({ document, location: { pathname: "/marketplace/inbox" } });
+  assert.equal(result.messages.length, 1);
+  assert.equal(result.messages[0].speaker, "Dealer");
+  assert.equal(result.evidence.latestMessageDirection, "dealer");
+  assert.equal(result.evidence.inboundMessageText, "");
+});
+
+test("the focused conversation wins when two chat popovers are mounted", () => {
+  const { capture, document, otherRoot } = loadCaptureDom({
+    includeSecondThread: true,
+    focusSecondThread: true,
+    sellerSurface: "seller",
+    buyerHeader: "Buyer A",
+  });
+  const result = capture.capture({ document, location: { pathname: "/marketplace/inbox" } });
+  assert.equal(result.root, otherRoot);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.messages)), [
+    { speaker: "Buyer", text: "A different buyer" },
+  ]);
 });

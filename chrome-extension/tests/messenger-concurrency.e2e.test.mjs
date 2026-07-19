@@ -83,7 +83,7 @@ function createConversationIntakeHarness() {
     setImmediate,
   });
   vm.runInContext(source, context, { filename: "queueClient-concurrency.e2e.js" });
-  return { handlers: context.__DealerPilotQueueHandlers, calls };
+  return { handlers: context.__DealerPilotQueueHandlers, calls, storage };
 }
 
 function intakePayload(overrides = {}) {
@@ -165,8 +165,27 @@ test("seller identity is a hard gate and hidden tabs do not become buyer context
     new URL("../src/content/facebook/publisherFlow.js", import.meta.url),
     "utf8",
   );
-  assert.match(publisherFlowSource, /sellerIsCurrentUser:\s*evidence\.sellerProfileMatched === true/);
-  assert.match(publisherFlowSource, /seller_profile_mismatch/);
+  assert.match(publisherFlowSource, /sellerIsCurrentUser:\s*evidence\.sellerContextTrusted === true/);
+  assert.match(publisherFlowSource, /seller_surface_rejected/);
+  assert.match(publisherFlowSource, /seller_context_untrusted/);
   assert.doesNotMatch(publisherFlowSource, /document\.visibilityState !== "visible"/);
   assert.match(publisherFlowSource, /backend idempotency is the final guard/);
+});
+
+test("diagnostics from two seller tabs retain independent thread identities", async () => {
+  const { handlers, storage } = createConversationIntakeHarness();
+  await Promise.all([
+    handlers.MESSENGER_CAPTURE_DEBUG(
+      { debug: { threadIdentity: "thread-a", buyerName: "Buyer A" } },
+      { tab: { id: 41, url: "https://www.facebook.com/marketplace/inbox" } },
+    ),
+    handlers.MESSENGER_CAPTURE_DEBUG(
+      { debug: { threadIdentity: "thread-b", buyerName: "Buyer B" } },
+      { tab: { id: 42, url: "https://www.facebook.com/marketplace/inbox" } },
+    ),
+  ]);
+  assert.equal(storage.lastMessengerCaptureDebugByTab["41"].tabId, 41);
+  assert.equal(storage.lastMessengerCaptureDebugByTab["41"].threadIdentity, "thread-a");
+  assert.equal(storage.lastMessengerCaptureDebugByTab["42"].tabId, 42);
+  assert.equal(storage.lastMessengerCaptureDebugByTab["42"].threadIdentity, "thread-b");
 });
