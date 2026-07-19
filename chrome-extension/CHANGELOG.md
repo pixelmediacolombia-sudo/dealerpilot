@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.83
+
+- Isolates Marketplace Messenger capture from the publisher DOM automation.
+- Supports active popovers that omit `role=log` by using scoped semantic and visual message extraction.
+- Keeps Buyer/Dealer direction canonical and isolates simultaneous conversations by thread root.
+- Adds strict capture tests for unlabeled bubbles, semantic descriptors, inactive inbox lists, and concurrent roots.
+
 ## v1.3.82
 
 - Fails closed when the active Facebook account is not the configured seller (`Andres Ibáñez`, `Alpha Manassas`, or `Alpha Motorsport`).

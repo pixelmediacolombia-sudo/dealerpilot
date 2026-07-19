@@ -4279,6 +4279,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     function findMessengerMessageScope(root) {
       if (!root) return null;
+      const isolatedCapture = globalThis.DealerPilotMessengerCapture;
+      if (isolatedCapture?.findMessageScope) {
+        const isolatedScope = isolatedCapture.findMessageScope(root);
+        if (isolatedScope) return isolatedScope;
+      }
       const semanticLog = root.querySelector(
         [
           '[role="log"]',
@@ -4391,6 +4396,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     function parsePlainMessengerMessages(messageScope, buyerName, threadHeaderText) {
       if (!messageScope) return [];
+      const isolatedCapture = globalThis.DealerPilotMessengerCapture;
+      if (isolatedCapture?.readVisualMessages) {
+        const isolatedMessages = isolatedCapture.readVisualMessages(messageScope, buyerName);
+        if (isolatedMessages.length) return isolatedMessages;
+      }
       const scopeRect = messageScope.getBoundingClientRect();
       if (!scopeRect.width || !scopeRect.height) return [];
       const seenBubbles = new Set();
