@@ -222,7 +222,7 @@ test("latest Dealer message is blocked as buyer_message_missing", async () => {
   assert.equal(calls.debug.at(-1).stage, "blocked");
 });
 
-test("multiple open buyer chats keep separate quiet windows and intake payloads", async () => {
+test("multiple open buyer chats process one winner and keep the rest as diagnostics", async () => {
   const captureA = {
     root: new FakeElement({
       attributes: { "aria-label": "Marketplace conversation A" },
@@ -273,10 +273,67 @@ test("multiple open buyer chats keep separate quiet windows and intake payloads"
 
   assert.equal(result.conversationCount, 2);
   assert.deepEqual(result.buyersDetected.map((buyer) => buyer.buyerName), ["Buyer A", "Buyer B"]);
-  assert.equal(calls.intake.length, 2);
-  assert.deepEqual(
-    calls.intake.map((message) => message.currentMessage),
-    ["Is this available?", "What is the best number?"],
-  );
-  assert.notEqual(calls.intake[0].externalThreadRef, calls.intake[1].externalThreadRef);
+  assert.deepEqual(result.buyersDetected.map((buyer) => buyer.selectedForProcessing), [true, false]);
+  assert.equal(calls.intake.length, 1);
+  assert.equal(calls.intake[0].currentMessage, "Is this available?");
+});
+
+test("valid buyer chat beats later UI noise candidate", async () => {
+  const goodRoot = new FakeElement({
+    attributes: { "aria-label": "Marketplace conversation" },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Juan - 2021 Toyota RAV4" }),
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } }),
+      new FakeElement({ tagName: "button", attributes: { "aria-label": "Send" }, text: "Send" }),
+    ],
+  });
+  const noiseRoot = new FakeElement({
+    attributes: { "aria-label": "Marketplace conversation" },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Choose an emoji" }),
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" } }),
+    ],
+  });
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
+    captures: [
+      {
+        root: goodRoot,
+        scope: goodRoot,
+        buyerName: "Juan",
+        messages: [{ speaker: "Juan", text: "Hola. Sigue disponible?" }],
+        evidence: {
+          threadRootDetected: true,
+          messageScopeDetected: true,
+          extractionMode: "semantic",
+          selectedHeaderText: "Juan - 2021 Toyota RAV4",
+          latestMessageDirection: "buyer",
+          composerDetected: true,
+          threadIdentity: "thread-juan",
+        },
+      },
+      {
+        root: noiseRoot,
+        scope: noiseRoot,
+        buyerName: "Choose an emoji",
+        messages: [{ speaker: "Buyer", text: "Aa" }],
+        evidence: {
+          threadRootDetected: true,
+          messageScopeDetected: false,
+          extractionMode: "visual_bubbles",
+          selectedHeaderText: "Choose an emoji",
+          latestMessageDirection: "buyer",
+          composerDetected: true,
+        },
+      },
+    ],
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(calls.intake[0].buyerName, "Juan");
+  assert.equal(calls.intake[0].currentMessage, "Hola. Sigue disponible?");
+  assert.deepEqual(result.buyersDetected.map((buyer) => buyer.selectedForProcessing), [true, false]);
+  assert.equal(calls.debug.at(-1).buyerName, "Juan");
 });

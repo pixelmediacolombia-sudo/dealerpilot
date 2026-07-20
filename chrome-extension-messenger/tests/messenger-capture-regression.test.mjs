@@ -50,6 +50,10 @@ class FakeElement {
     if (selector.includes('[role="dialog"]')) return this.attributes.role === "dialog";
     if (selector.includes('[role="main"]')) return this.attributes.role === "main";
     if (selector.includes('[role="log"]')) return this.attributes.role === "log";
+    if (selector.includes('[aria-label*="message"')) return /message/i.test(this.attributes["aria-label"] || "");
+    if (selector.includes('[aria-label*="mensaje"')) return /mensaje/i.test(this.attributes["aria-label"] || "");
+    if (selector.includes('[data-testid*="message"')) return /message/i.test(this.attributes["data-testid"] || "");
+    if (selector.includes('[data-testid*="messenger"')) return /messenger/i.test(this.attributes["data-testid"] || "");
     if (selector.includes('[role="heading"]')) return this.attributes.role === "heading";
     if (selector.includes("[aria-level]")) return this.attributes["aria-level"] !== undefined;
     if (selector === "h1" || selector === "h2" || selector === "h3") return this.tagName === selector.toUpperCase();
@@ -181,6 +185,47 @@ test("AI reply text is not accepted as buyer name or buyer message", () => {
 
   assert.equal(capture.buyerName, "");
   assert.deepEqual(JSON.parse(JSON.stringify(capture.messages)), []);
+});
+
+test("semantic descriptors strip Facebook timestamp metadata from buyer message", () => {
+  const message = new FakeElement({
+    attributes: { "aria-label": "Message sent 12 PM by Juan: Hola. Sigue disponible?" },
+    text: "12 PM by Juan",
+    rect: { left: 40, right: 260, top: 520, width: 220, height: 60 },
+  });
+  const metadataOnly = new FakeElement({
+    attributes: { "aria-label": "12 PM by Juan" },
+    text: "12 PM by Juan",
+    rect: { left: 40, right: 260, top: 590, width: 220, height: 40 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [message, metadataOnly],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Juan | 2021 Toyota RAV4",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $23,999 - 2021 Toyota RAV4" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const messages = JSON.parse(JSON.stringify(capture.messages));
+
+  assert.equal(capture.buyerName, "Juan");
+  assert.deepEqual(messages, [{ speaker: "Juan", text: "Hola. Sigue disponible?" }]);
 });
 
 test("capture prefers full floating chat panel over tiny composer ancestor", () => {

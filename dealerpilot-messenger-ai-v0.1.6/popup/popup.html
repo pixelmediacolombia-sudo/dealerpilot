@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>DealerPilot Messenger AI</title>
+    <style>
+      body {
+        width: 360px;
+        margin: 0;
+        font: 13px/1.45 Arial, sans-serif;
+        color: #172033;
+        background: #f7f8fb;
+      }
+      main {
+        padding: 14px;
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 16px;
+      }
+      label {
+        display: block;
+        margin: 10px 0 4px;
+        font-weight: 700;
+      }
+      input[type="text"],
+      textarea {
+        box-sizing: border-box;
+        width: 100%;
+        border: 1px solid #c9ced8;
+        border-radius: 6px;
+        padding: 8px;
+        font: inherit;
+      }
+      textarea {
+        min-height: 64px;
+        resize: vertical;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 0;
+        border-top: 1px solid #e1e4ea;
+      }
+      .row span {
+        font-weight: 700;
+      }
+      button {
+        margin-top: 12px;
+        width: 100%;
+        border: 0;
+        border-radius: 6px;
+        padding: 9px 10px;
+        font-weight: 700;
+        color: white;
+        background: #1c6dd0;
+        cursor: pointer;
+      }
+      pre {
+        max-height: 160px;
+        overflow: auto;
+        margin: 12px 0 0;
+        padding: 9px;
+        border-radius: 6px;
+        background: #111827;
+        color: #e5e7eb;
+        white-space: pre-wrap;
+      }
+      .muted {
+        color: #5d687a;
+        font-size: 12px;
+      }
+      .debug-card {
+        margin-top: 12px;
+        padding: 10px;
+        border: 1px solid #d5d9e2;
+        border-radius: 8px;
+        background: white;
+      }
+      .debug-card h2 {
+        margin: 0 0 8px;
+        font-size: 12px;
+        text-transform: uppercase;
+        color: #5d687a;
+      }
+      .debug-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 4px 0;
+        border-top: 1px solid #edf0f5;
+      }
+      .debug-row:first-of-type {
+        border-top: 0;
+      }
+      .debug-label {
+        color: #5d687a;
+      }
+      .debug-value {
+        max-width: 190px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-align: right;
+        font-weight: 700;
+      }
+      .ok { color: #0f8f45; }
+      .warn { color: #a96500; }
+      .err { color: #b42318; }
+      button.secondary {
+        background: #44546a;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>DealerPilot Messenger AI</h1>
+      <div class="muted">Independent Marketplace conversation assistant.</div>
+
+      <label for="backendUrl">Backend URL</label>
+      <input id="backendUrl" type="text" autocomplete="off">
+
+      <label for="sellerProfileNames">Seller profile names</label>
+      <textarea id="sellerProfileNames" spellcheck="false"></textarea>
+
+      <div class="row">
+        <span>Dry run</span>
+        <input id="dryRun" type="checkbox">
+      </div>
+      <div class="row">
+        <span>Auto reply</span>
+        <input id="autoReplyEnabled" type="checkbox">
+      </div>
+
+      <button id="save">Save Settings</button>
+
+      <section class="debug-card">
+        <h2>AI Debugger</h2>
+        <div class="debug-row">
+          <span class="debug-label">Mode</span>
+          <span class="debug-value" id="dbg-mode">—</span>
+        </div>
+        <div class="debug-row">
+          <span class="debug-label">Stage</span>
+          <span class="debug-value" id="dbg-stage">Never</span>
+        </div>
+        <div class="debug-row">
+          <span class="debug-label">Seller</span>
+          <span class="debug-value" id="dbg-seller">—</span>
+        </div>
+        <div class="debug-row">
+          <span class="debug-label">Buyer</span>
+          <span class="debug-value" id="dbg-buyer">—</span>
+        </div>
+        <div class="debug-row">
+          <span class="debug-label">DOM</span>
+          <span class="debug-value" id="dbg-dom">—</span>
+        </div>
+        <div class="debug-row">
+          <span class="debug-label">Backend</span>
+          <span class="debug-value" id="dbg-backend">—</span>
+        </div>
+        <div class="debug-row">
+          <span class="debug-label">Auto Send</span>
+          <span class="debug-value" id="dbg-send">Blocked</span>
+        </div>
+        <div class="debug-row">
+          <span class="debug-label">Specific Error</span>
+          <span class="debug-value" id="dbg-error-specific">None</span>
+        </div>
+        <label for="raw-error">Raw Error</label>
+        <pre id="raw-error">None</pre>
+        <button id="reload-debug" class="secondary">Reload Debugger</button>
+        <button id="show-debug" class="secondary">Show Debug Object</button>
+      </section>
+
+      <pre id="diagnostics">Loading...</pre>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
