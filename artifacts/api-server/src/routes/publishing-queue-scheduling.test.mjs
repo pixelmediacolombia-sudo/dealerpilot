@@ -580,6 +580,9 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /resolveSalesReplyStage/);
   assert.match(conversationsSource, /extractPhoneNumber/);
   assert.match(conversationsSource, /isAiReplyAligned/);
+  assert.match(conversationsSource, /isReplyLanguageMirrored/);
+  assert.match(conversationsSource, /Mirror the latest buyer message language exactly/);
+  assert.match(conversationsSource, /Never write a bilingual reply/);
   assert.match(conversationsSource, /Are you interested in financing/);
   assert.match(conversationsSource, /best phone number/);
   assert.match(conversationsSource, /generateAiReplyWithFallback/);

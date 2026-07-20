@@ -334,6 +334,17 @@ function isAiReplyAligned(reply: string, stage: SalesReplyStage, storePhone: str
   return true;
 }
 
+function isReplyLanguageMirrored(reply: string, language: string): boolean {
+  const normalized = cleanConversationText(reply).toLowerCase();
+  if (!normalized) return false;
+  const englishSalesPhrases =
+    /\b(are you|is it|still available|easy financing|financing options|best phone number|team will call|thank you|great|vehicle is)\b/i;
+  const spanishSalesPhrases =
+    /[¿¡]|\b(gracias|sigue disponible|opciones de financiamiento|financiamiento|numero|número|telefono|teléfono|equipo se comunicar|vehiculo|vehículo)\b/i;
+  if (language === "es") return !englishSalesPhrases.test(normalized);
+  return !spanishSalesPhrases.test(normalized);
+}
+
 type AiReplyResult = {
   reply: string;
   fallbackUsed: boolean;
@@ -354,7 +365,10 @@ CONVERSATION FUNNEL:
 5. Answer safe vehicle questions directly when the supplied context contains the answer; never invent availability, price, approval, history, or financing details.
 
 Language rules:
-- Match the buyer's language EXACTLY (English or Spanish — do not mix)
+- Mirror the latest buyer message language exactly.
+- If the latest buyer message is Spanish, reply ONLY in Spanish.
+- If the latest buyer message is English, reply ONLY in English.
+- Never write a bilingual reply, translation, second version, or mixed-language sentence.
 - Use "easy financing options" / "opciones de financiamiento fáciles"
 - Use "approval based on qualification" / "aprobación basada en calificación"
 - Do not push a call or include the store phone in the first reply
@@ -420,8 +434,8 @@ export async function generateAiReply(
 ): Promise<string> {
   const langNote =
     language === "es"
-      ? "Respond ONLY in Spanish."
-      : "Respond ONLY in English.";
+      ? "The latest buyer message is Spanish. Respond ONLY in Spanish. Do not include English."
+      : "The latest buyer message is English. Respond ONLY in English. Do not include Spanish.";
 
   const vehicleContext = vehicleTitle
     ? `Vehicle: ${vehicleTitle}${vehicleType ? ` (${vehicleType})` : ""}${publishedDownPayment ? ` — Listed down payment: $${publishedDownPayment.toLocaleString()}` : ""}`
@@ -461,7 +475,7 @@ Write one short reply that follows the stage instruction exactly. Mention the ve
 
   const raw = response.choices[0]?.message?.content?.trim();
 
-  if (raw && isAiReplyAligned(raw, stage, storePhone)) {
+  if (raw && isAiReplyAligned(raw, stage, storePhone) && isReplyLanguageMirrored(raw, language)) {
     return raw;
   }
 
