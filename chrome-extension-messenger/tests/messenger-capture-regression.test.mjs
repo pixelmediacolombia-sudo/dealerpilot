@@ -182,3 +182,50 @@ test("AI reply text is not accepted as buyer name or buyer message", () => {
   assert.equal(capture.buyerName, "");
   assert.deepEqual(JSON.parse(JSON.stringify(capture.messages)), []);
 });
+
+test("capture prefers full floating chat panel over tiny composer ancestor", () => {
+  const incomingText = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "Todavia esta disponible para verlo hoy?",
+    rect: { left: 980, right: 1210, top: 700, width: 230, height: 60 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 940, right: 1320, top: 520, width: 380, height: 290 },
+    children: [incomingText],
+  });
+  const composer = new FakeElement({
+    attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+    rect: { left: 980, right: 1260, top: 850, width: 280, height: 44 },
+  });
+  const tinyComposerAncestor = new FakeElement({
+    text: "Marketplace",
+    rect: { left: 960, right: 1280, top: 830, width: 320, height: 80 },
+    children: [composer],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 920, right: 1340, top: 360, width: 420, height: 600 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Juan | 2021 Toyota RAV4",
+        rect: { left: 930, right: 1320, top: 380, width: 390, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $23,999 - 2021 Toyota RAV4" }),
+      scope,
+      tinyComposerAncestor,
+    ],
+  });
+
+  const capture = runCapture(root);
+
+  assert.equal(capture.root, root);
+  assert.equal(capture.buyerName, "Juan");
+  assert.equal(capture.evidence.selectedHeaderText, "Juan | 2021 Toyota RAV4");
+  assert.equal(capture.evidence.latestMessageDirection, "buyer");
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(capture.messages)),
+    [{ speaker: "Juan", text: "Todavia esta disponible para verlo hoy?" }],
+  );
+});
