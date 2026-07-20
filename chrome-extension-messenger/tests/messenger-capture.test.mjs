@@ -65,11 +65,15 @@ class FakeElement {
   }
 }
 
-function runCapture(root) {
+function runCapture(root, extraElements = []) {
   const document = {
     documentElement: new FakeElement(),
     querySelectorAll(selector) {
-      return root.matches(selector) ? [root, ...root.querySelectorAll(selector)] : root.querySelectorAll(selector);
+      const rootMatches = root.matches(selector) ? [root, ...root.querySelectorAll(selector)] : root.querySelectorAll(selector);
+      const extraMatches = extraElements.flatMap((element) =>
+        element.matches(selector) ? [element, ...element.querySelectorAll(selector)] : element.querySelectorAll(selector),
+      );
+      return [...rootMatches, ...extraMatches];
     },
   };
   const context = vm.createContext({
@@ -130,5 +134,50 @@ test("floating Marketplace chat extracts buyer header and incoming visual bubble
   assert.deepEqual(
     JSON.parse(JSON.stringify(capture.messages)),
     [{ speaker: "Peter", text: "Hola. ¿Sigue disponible?" }],
+  );
+});
+
+test("floating Marketplace chat cleans Write to buyer header and falls back to inbox preview", () => {
+  const quickReply = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "Sorry, it's not available",
+    rect: { left: 260, right: 410, top: 520, width: 150, height: 44 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [quickReply],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Write to Peter",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $23,999 - 2021 Toyota RAV4" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 },
+      }),
+    ],
+  });
+  const inboxPreview = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "Peter · 2024 Chevrolet equinox ev are you still interested?",
+    rect: { left: 320, right: 740, top: 420, width: 420, height: 64 },
+  });
+
+  const capture = runCapture(root, [inboxPreview]);
+
+  assert.equal(capture.buyerName, "Peter");
+  assert.equal(capture.evidence.inboxPreviewFallback, true);
+  assert.equal(capture.evidence.latestMessageDirection, "buyer");
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(capture.messages)),
+    [{ speaker: "Peter", text: "are you still interested?" }],
   );
 });
