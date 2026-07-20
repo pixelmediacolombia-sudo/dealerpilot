@@ -83,8 +83,8 @@ test("background deduplicates identical intakes inside the extension", async () 
   const second = await handlers.CONVERSATION_INTAKE({ ...intakePayload });
 
   assert.equal(first.suggestedReply, "reply for marketplace-thread::buyer-a::rav4");
-  assert.equal(second.skipped, true);
-  assert.equal(second.reason, "duplicate_extension_intake");
+  assert.equal(second.suggestedReply, "reply for marketplace-thread::buyer-a::rav4");
+  assert.equal(second.duplicateExtensionIntake, true);
   assert.equal(calls.apiPost.length, 1);
 });
 

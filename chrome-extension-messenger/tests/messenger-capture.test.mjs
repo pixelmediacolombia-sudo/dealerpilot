@@ -181,3 +181,54 @@ test("floating Marketplace chat cleans Write to buyer header and falls back to i
     [{ speaker: "Peter", text: "are you still interested?" }],
   );
 });
+
+test("floating Marketplace chat keeps multiple buyer messages and uses the latest last", () => {
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [
+      new FakeElement({
+        attributes: { dir: "auto" },
+        text: "Hola. Â¿Sigue disponible?",
+        rect: { left: 260, right: 410, top: 480, width: 150, height: 44 },
+      }),
+      new FakeElement({
+        attributes: { dir: "auto" },
+        text: "Me interesa, Â¿cuÃ¡l es el mejor nÃºmero?",
+        rect: { left: 250, right: 410, top: 540, width: 160, height: 58 },
+      }),
+      new FakeElement({
+        attributes: { dir: "auto" },
+        text: "Â¿TodavÃ­a estÃ¡ disponible para verlo hoy?",
+        rect: { left: 240, right: 410, top: 610, width: 170, height: 58 },
+      }),
+    ],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Peter Â· 2021 Toyota RAV4",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $23,999 - 2021 Toyota RAV4" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const messages = JSON.parse(JSON.stringify(capture.messages));
+
+  assert.equal(messages.at(-1).text, "Â¿TodavÃ­a estÃ¡ disponible para verlo hoy?");
+  assert.deepEqual(messages.map((message) => message.text), [
+    "Hola. Â¿Sigue disponible?",
+    "Me interesa, Â¿cuÃ¡l es el mejor nÃºmero?",
+    "Â¿TodavÃ­a estÃ¡ disponible para verlo hoy?",
+  ]);
+});
