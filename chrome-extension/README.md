@@ -20,9 +20,8 @@ security screen.
   (e.g. "Silver" → "Gray", "Maroon" → "Brown").
 - **Body style + color keywords** — Extended combobox keyword list for more robust
   matching (`exterior color`, `body type`).
-- **Messenger improvements** — Structured chat scraping with speaker attribution;
-  "Copy Reply" button added alongside "Insert Reply"; smarter message box detection
-  for contenteditable fields; vehicle title detected from conversation context.
+- **Messenger AI separated** — conversation capture, AI suggestion, composer insert,
+  auto-reply controls, and AI diagnostics now live in `chrome-extension-messenger/`.
 - **Permissions** — Added `tabs` permission (required for `chrome.tabs.create` in
   background service worker).
 - **Debug panel** — Removed redundant "Dev: Claim Next Queued Job" dev button; added
@@ -30,14 +29,13 @@ security screen.
 
 ## The extension provides
 
-- A floating **DealerPilot AI** panel on Facebook and Messenger pages.
+- A floating **DealerPilot AI** panel on Facebook Marketplace publishing pages.
 - A popup with **Extension Status** (Backend, Assigned job, Current job, Last sync)
   plus **Facebook** and **Marketplace** status pills, and a **Start Publishing Job** button.
 - On the Marketplace **create listing** page: automatic form fill from the claimed
   job plus an **operator review** panel (filled / missing / warnings, **Mark
   Published**, **Mark Failed**). **It never clicks Publish.**
-- On **Messenger**: a **"Read Chat & Suggest Reply"** button with structured message
-  scraping, an **Insert Reply** button, and a **Copy Reply** button. **It never clicks Send.**
+- Messenger AI is handled by the separate `DealerPilot Messenger AI` extension.
 
 ## Install (Load Unpacked)
 
@@ -48,7 +46,7 @@ security screen.
 5. The "DealerPilot AI Publisher" extension appears in your list.
 
 > After any code update: go to `chrome://extensions` and click the **refresh ↺** icon
-> on the DealerPilot card. Then **fully refresh any open Facebook/Messenger tabs**.
+> on the DealerPilot card. Then **fully refresh any open Facebook Marketplace tabs**.
 
 ## Configure the Backend URL
 
@@ -77,13 +75,11 @@ jobs — it contains no Facebook credentials.
 
 ## Messenger AI flow
 
-1. Open a Messenger conversation on `messenger.com` or `facebook.com/messages`.
-2. The DealerPilot panel appears bottom-right. Click **Read Chat & Suggest Reply**.
-3. The extension scrapes the conversation (with speaker attribution when possible),
-   detects vehicle context (title, price, down payment), and sends it to the backend.
-4. The suggested reply appears in the panel. Click **Insert Reply** to paste it
-   into the message box, or **Copy Reply** to copy it to clipboard.
-5. **Send is never clicked** — the operator reviews and sends manually.
+1. Load `chrome-extension-messenger/` as a separate unpacked extension.
+2. Open the `DealerPilot Messenger AI` popup.
+3. Keep **Dry run** enabled until a real read-only QA pass is authorized.
+4. Use the popup **AI Debugger** to see capture stage, seller/buyer gates,
+   backend intake status, specific error reason, and raw JSON error data.
 
 ## Test Checklist
 
@@ -110,15 +106,15 @@ jobs — it contains no Facebook credentials.
 - [ ] If Facebook shows a login/checkpoint/captcha, the panel stops with a "Stopped for safety" banner.
 
 ### Messenger
-- [ ] Open a Messenger conversation. Panel shows "Read Chat & Suggest Reply".
-- [ ] Click it → suggested reply appears. Both "Insert Reply" and "Copy Reply" work.
-- [ ] Send is never clicked.
+- [ ] Publisher popup does not show Messenger or Sales AI diagnostics.
+- [ ] `DealerPilot Messenger AI` popup shows Dry run and the AI Debugger.
+- [ ] Specific error and raw JSON error data are visible when intake or DOM capture fails.
 
 ## Files
 
 - `manifest.json` — MV3 manifest v1.2 (permissions: storage, scripting, activeTab, alarms, tabs).
 - `background.js` — service worker; all backend `fetch` calls + job lifecycle handlers.
-- `content/content.js` — injects the panel; Marketplace fill state machine + Messenger AI.
+- `content/content.js` — injects the panel; Marketplace fill state machine.
 - `content/panel.css` — panel styling.
 - `popup/popup.html` — popup UI with status pills, FB login button, debug section.
 - `popup/popup.js` — popup logic with `updateFbPills()` for live status display.

@@ -33,6 +33,14 @@
       .trim();
   }
 
+  function cleanDisplayName(value) {
+    return String(value || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/^(?:conversation with|conversaci[oó]n con)\s+/i, "")
+      .trim();
+  }
+
   function isVisible(element) {
     if (!element || !(element instanceof Element)) return false;
     const rect = element.getBoundingClientRect?.();
@@ -67,7 +75,7 @@
     return !!link || /\bmarketplace\b/i.test(text) || marketplaceRoute;
   }
 
-  function findThreadRoot({ document, location }) {
+  function findThreadRoots({ document, location }) {
     const marketplaceRoute = /\/marketplace\/(?:inbox|you\/selling|you\/buying|item\/\d+)/i.test(location?.pathname || "");
     const semantic = [
       '[role="region"][aria-label*="conversation" i]',
@@ -94,11 +102,21 @@
         parent = parent.parentElement;
       }
     }
+    const seen = new Set();
     return [...candidates, ...composerRoots]
+      .filter((candidate) => {
+        if (seen.has(candidate)) return false;
+        seen.add(candidate);
+        return true;
+      })
       .sort((left, right) => {
         const a = rectOf(left); const b = rectOf(right);
         return (a.width * a.height) - (b.width * b.height);
-      })[0] || null;
+      });
+  }
+
+  function findThreadRoot({ document, location }) {
+    return findThreadRoots({ document, location })[0] || null;
   }
 
   function scoreScope(scope, root) {
@@ -181,6 +199,7 @@
     const scopeRect = rectOf(scope);
     const seen = new Set();
     const rows = [];
+    const minDealerOffset = Math.max(48, scopeRect.width * 0.18);
     for (const textElement of bubbleTextCandidates(scope)) {
       let bubble = textElement;
       while (bubble.parentElement && bubble.parentElement !== scope && textOf(bubble.parentElement).length <= 520) {
@@ -196,20 +215,35 @@
       if (!text || text.length < 2 || UI_TEXT.test(text)) continue;
       const leftGap = Math.max(0, rect.left - scopeRect.left);
       const rightGap = Math.max(0, scopeRect.right - rect.right);
-      rows.push({ top: rect.top, speaker: rightGap + 12 < leftGap ? "Dealer" : (buyerName || "Buyer"), text });
+      const clearlyRightAligned =
+        leftGap > rightGap + minDealerOffset &&
+        rect.left > scopeRect.left + (scopeRect.width * 0.35);
+      rows.push({ top: rect.top, speaker: clearlyRightAligned ? "Dealer" : (buyerName || "Buyer"), text });
     }
     return rows.sort((a, b) => a.top - b.top).map(({ speaker, text }) => ({ speaker, text }));
   }
 
   function extractBuyerName(root) {
-    const heading = root?.querySelector?.('[role="heading"], h1, h2, h3, [aria-level]');
     const fallback = root?.getAttribute?.("aria-label") || "";
-    const value = textOf(heading) || (/marketplace|conversation|conversaci\u00f3n/i.test(fallback) ? "" : fallback);
-    return value.split(/\s+[\u00b7\u2022|]\s+/)[0].trim();
+    const candidates = [
+      root?.querySelector?.('[role="heading"], h1, h2, h3, [aria-level]'),
+      ...Array.from(root?.querySelectorAll?.('div[dir="auto"], span[dir="auto"], [aria-label]') || []),
+    ].filter(Boolean);
+    for (const candidate of candidates) {
+      const value = cleanDisplayName(textOf(candidate) || candidate.getAttribute?.("aria-label") || "");
+      if (!value || UI_TEXT.test(value) || value.length > 140) continue;
+      const startedMatch = value.match(/^(.{2,80}?)\s+(?:started|inici[oó])\s+(?:this|este)\s+chat\b/i);
+      if (startedMatch) return cleanDisplayName(startedMatch[1]);
+      const listingHeaderMatch = value.match(/^(.{2,80}?)\s*[\u00b7\u2022|]\s*(?:\$?\d|19\d{2}|20\d{2}|Marketplace\b)/i);
+      if (listingHeaderMatch && !/^marketplace$/i.test(listingHeaderMatch[1])) {
+        return cleanDisplayName(listingHeaderMatch[1]);
+      }
+    }
+    if (/marketplace|conversation|conversaci[oó]n/i.test(fallback)) return "";
+    return cleanDisplayName(fallback).split(/\s+[\u00b7\u2022|]\s+/)[0].trim();
   }
 
-  function capture({ document, location, sellerNameCandidates = [] }) {
-    const root = findThreadRoot({ document, location });
+  function captureFromRoot(root, sellerNameCandidates = []) {
     const scope = findMessageScope(root);
     const buyerName = extractBuyerName(root);
     const semantic = Array.from(scope?.querySelectorAll?.(STRUCTURED_MESSAGE_SELECTORS.join(", ")) || [])
@@ -232,9 +266,21 @@
     };
   }
 
+  function capture({ document, location, sellerNameCandidates = [] }) {
+    return captureFromRoot(findThreadRoot({ document, location }), sellerNameCandidates);
+  }
+
+  function captureAll({ document, location, sellerNameCandidates = [] }) {
+    const roots = findThreadRoots({ document, location });
+    if (!roots.length) return [captureFromRoot(null, sellerNameCandidates)];
+    return roots.map((root) => captureFromRoot(root, sellerNameCandidates));
+  }
+
   globalThis.DealerPilotMessengerCapture = Object.freeze({
     capture,
+    captureAll,
     findThreadRoot,
+    findThreadRoots,
     findMessageScope,
     readVisualMessages,
   });

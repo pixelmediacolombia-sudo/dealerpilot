@@ -28,6 +28,18 @@ const publisherFlowSource = readFileSync(
   new URL("../../../../chrome-extension/src/content/facebook/publisherFlow.js", import.meta.url),
   "utf8",
 );
+const messengerClientSource = readFileSync(
+  new URL("../../../../chrome-extension-messenger/src/background/messengerClient.js", import.meta.url),
+  "utf8",
+);
+const messengerAiSource = readFileSync(
+  new URL("../../../../chrome-extension-messenger/src/content/facebook/messengerAi.js", import.meta.url),
+  "utf8",
+);
+const messengerPopupSource = readFileSync(
+  new URL("../../../../chrome-extension-messenger/popup/popup.html", import.meta.url),
+  "utf8",
+);
 const batchProgressCardSource = readFileSync(
   new URL("../../../dashboard/src/features/listings/components/BatchProgressCard.tsx", import.meta.url),
   "utf8",
@@ -528,62 +540,20 @@ test("automatic photo queueing is disabled unless explicitly enabled", () => {
   assert.match(orchestratorSource, /automatic photo queue disabled - photos run per selected vehicle/);
 });
 
-test("Sales AI intake writes Messenger messages to the CRM and Marketplace metrics", () => {
-  assert.match(queueClientSource, /function ensureSalesAiMonitorTab/);
-  assert.match(queueClientSource, /MARKETPLACE_INBOX_URL/);
-  assert.match(queueClientSource, /SALES_AI_MONITOR_TAB_OPENED/);
-  assert.match(queueClientSource, /active:\s*false/);
-  assert.match(queueClientSource, /pinned:\s*true/);
-  assert.match(publisherFlowSource, /type: "CONVERSATION_INTAKE"/);
-  assert.match(publisherFlowSource, /externalThreadRef/);
-  assert.match(publisherFlowSource, /function initMessengerAiControls/);
-  assert.match(publisherFlowSource, /isMessengerUiVisible/);
-  assert.match(publisherFlowSource, /lastMessengerCaptureHash/);
-  assert.match(publisherFlowSource, /lastMessengerAutoSendHash/);
-  assert.match(publisherFlowSource, /MESSENGER_UI_TEXT/);
-  assert.match(publisherFlowSource, /write to saved/);
-  assert.match(publisherFlowSource, /customize chat/);
-  assert.match(publisherFlowSource, /automatic: true/);
-  assert.match(publisherFlowSource, /No new buyer message detected/);
-  assert.match(publisherFlowSource, /isMarketplaceConversationUrl/);
-  assert.match(publisherFlowSource, /function findMarketplaceThreadRoot/);
-  assert.match(publisherFlowSource, /Conversaci\\u00f3n con el t\\u00edtulo/);
-  assert.match(publisherFlowSource, /Mensajes de la conversaci\\u00f3n/);
-  assert.match(publisherFlowSource, /\[role=\"log\"\] article/);
-  assert.match(publisherFlowSource, /semanticMessageEls/);
-  assert.match(publisherFlowSource, /scrapeConversationSnapshot/);
-  assert.match(publisherFlowSource, /findConversationScrollContainer/);
-  assert.match(publisherFlowSource, /mergeConversationWindows/);
-  assert.match(publisherFlowSource, /lastMessengerHistoryHydrationKey/);
-  assert.doesNotMatch(publisherFlowSource, /messageEls\.slice\(-60\)/);
-  assert.doesNotMatch(publisherFlowSource, /\}\)\.slice\(-30\)/);
-  assert.match(publisherFlowSource, /querySelectorAll\('\[aria-label\]'\)/);
-  assert.match(publisherFlowSource, /\(\?:por\|by\)\\s\+\[\^:\]\{1,80\}:/);
-  assert.match(publisherFlowSource, /por\\s\+\(\?:t\\u00fa\|ti\)/);
-  assert.match(publisherFlowSource, /threadStartedByCurrentUser/);
-  assert.match(publisherFlowSource, /canonicalMarketplaceListingUrl/);
-  assert.match(publisherFlowSource, /marketplaceItemId/);
-  assert.match(publisherFlowSource, /validateMessengerSalesContext/);
-  assert.match(publisherFlowSource, /routeAllowed/);
-  assert.match(publisherFlowSource, /conversationThreadDetected/);
-  assert.match(publisherFlowSource, /buyerNameDetected/);
-  assert.match(publisherFlowSource, /sellerIsCurrentUser/);
-  assert.match(publisherFlowSource, /marketplaceContextDetected/);
-  assert.match(publisherFlowSource, /Sales AI capture skipped/);
-  assert.match(publisherFlowSource, /Sales AI validation gates/);
-  assert.match(publisherFlowSource, /Sales AI gate failed/);
-  assert.match(publisherFlowSource, /matchedSelectors/);
-  assert.match(publisherFlowSource, /latestInboundMessageText/);
-  assert.doesNotMatch(publisherFlowSource, /sellerIsCurrentUser\s*=\s*!!getMessengerMessageBox/);
-  assert.doesNotMatch(publisherFlowSource, /discoverMessengerInboxThreads/);
-  assert.doesNotMatch(publisherFlowSource, /parseInboxThreadText/);
-  assert.match(publisherFlowSource, /marketplace-thread::/);
-  assert.match(publisherFlowSource, /async function autoSendReply/);
-  assert.match(publisherFlowSource, /messengerCaptureInFlight/);
-  assert.match(publisherFlowSource, /function findMessengerSendButton/);
-  assert.match(publisherFlowSource, /const box = getMessengerMessageBox\(\)/);
-  assert.match(publisherFlowSource, /AI reply sent automatically/);
-  assert.match(publisherFlowSource, /Read Chat & Send AI Reply/);
+test("Sales AI intake is owned by the Messenger AI extension and backend contract", () => {
+  assert.doesNotMatch(queueClientSource, /ensureSalesAiMonitorTab|SALES_AI_MONITOR_TAB_OPENED|CONVERSATION_INTAKE/);
+  assert.doesNotMatch(publisherFlowSource, /initMessengerAiControls|Read Chat|lastMessengerCaptureHash|findMessengerSendButton/);
+  assert.match(messengerClientSource, /CONVERSATION_INTAKE/);
+  assert.match(messengerClientSource, /\/api\/conversations\/intake/);
+  assert.match(messengerClientSource, /lastConversationIntake/);
+  assert.match(messengerClientSource, /lastError/);
+  assert.match(messengerAiSource, /dry_run_capture/);
+  assert.match(messengerAiSource, /auto_reply_disabled/);
+  assert.match(messengerAiSource, /composer_missing/);
+  assert.match(messengerAiSource, /rawError/);
+  assert.match(messengerPopupSource, /AI Debugger/);
+  assert.match(messengerPopupSource, /Specific Error/);
+  assert.match(messengerPopupSource, /Raw Error/);
   assert.match(conversationsSource, /parseConversationMessage/);
   assert.match(conversationsSource, /UI_MESSAGE_TEXT/);
   assert.match(conversationsSource, /send in messenger/);
@@ -641,17 +611,15 @@ test("Sales AI intake writes Messenger messages to the CRM and Marketplace metri
   assert.match(conversationsSource, /syncMarketplaceListingMetrics/);
   assert.match(conversationsSource, /messagesReceived/);
   assert.match(conversationsSource, /unreadMessages/);
-  assert.match(queueClientSource, /messageDetectedAt/);
-  assert.match(queueClientSource, /idempotencyKey/);
-  assert.match(queueClientSource, /CONVERSATION_INTAKE_DEDUPE_MS = 120000/);
-  assert.match(queueClientSource, /duplicate_extension_intake/);
-  assert.match(queueClientSource, /MESSENGER_CLAIM_AVAILABILITY_ACTION/);
-  assert.match(queueClientSource, /availabilityQuickReplyAccepted/);
-  assert.match(queueClientSource, /conversationThreadDetected/);
-  assert.match(queueClientSource, /routeAllowed/);
-  assert.match(publisherFlowSource, /Sales AI response timing/);
-  assert.match(publisherFlowSource, /messageHash/);
-  assert.match(publisherFlowSource, /res\.data\?\.skipped/);
+  assert.match(messengerClientSource, /messageDetectedAt/);
+  assert.match(messengerClientSource, /idempotencyKey/);
+  assert.match(messengerClientSource, /CONVERSATION_INTAKE_DEDUPE_MS = 120000/);
+  assert.match(messengerClientSource, /duplicate_extension_intake/);
+  assert.match(messengerClientSource, /availabilityQuickReplyAccepted/);
+  assert.match(messengerClientSource, /conversationThreadDetected/);
+  assert.match(messengerClientSource, /routeAllowed/);
+  assert.match(messengerAiSource, /messageHash/);
+  assert.match(messengerAiSource, /response\.data\?\.skipped/);
   assert.match(salesAiSource, /Vehicle not resolved/);
 });
 

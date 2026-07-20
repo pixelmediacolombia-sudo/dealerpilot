@@ -302,27 +302,7 @@ test("assigned queue poll uses the Chrome runtime id while claiming with storage
   assert.deepEqual(calls.claims, [{ jobId: 202, extensionId: "ext-e2e" }]);
 });
 
-test("queue polling opens one inactive seller inbox when Sales AI has no Facebook monitor tab", async () => {
-  const payload = { fill: {}, images: [] };
-  const { handlers, calls, storage } = createHarness(payload, {
-    initialStorage: {
-      fbLoggedIn: true,
-      marketplaceConnected: true,
-    },
-  });
-
-  const result = await handlers.POLL_ASSIGNED_JOB();
-
-  assert.equal(result.job, null);
-  assert.equal(calls.createdTabs.length, 1);
-  assert.equal(calls.createdTabs[0].url, "https://www.facebook.com/marketplace/inbox");
-  assert.equal(calls.createdTabs[0].active, false);
-  assert.equal(calls.createdTabs[0].pinned, true);
-  assert.equal(storage.salesAiMonitorTabId, 1001);
-  assert.equal(storage.auditLog.some((entry) => entry.event === "SALES_AI_MONITOR_TAB_OPENED"), true);
-});
-
-test("queue polling reuses an existing seller inbox instead of opening duplicates", async () => {
+test("queue polling no longer opens seller inbox monitor tabs", async () => {
   const payload = { fill: {}, images: [] };
   const { handlers, calls, storage } = createHarness(payload, {
     initialStorage: {
@@ -335,10 +315,11 @@ test("queue polling reuses an existing seller inbox instead of opening duplicate
     }],
   });
 
-  await handlers.POLL_ASSIGNED_JOB();
+  const result = await handlers.POLL_ASSIGNED_JOB();
 
+  assert.equal(result.job, null);
   assert.equal(calls.createdTabs.length, 0);
-  assert.equal(storage.salesAiMonitorTabId, 42);
+  assert.equal((storage.auditLog || []).some((entry) => entry.event === "SALES_AI_MONITOR_TAB_OPENED"), false);
 });
 
 test("page detection remains true when another Facebook tab reports a non-Marketplace page", async () => {
@@ -354,14 +335,6 @@ test("page detection remains true when another Facebook tab reports a non-Market
         marketplacePath: "/marketplace/inbox",
         marketplaceUrl: "https://www.facebook.com/marketplace/inbox",
         marketplaceDetectedAt: new Date().toISOString(),
-        messengerDetected: true,
-        messengerDetectionDebug: {
-          rootDetected: true,
-          composerDetected: true,
-          headingDetected: true,
-          marketplaceEvidence: true,
-          messengerDetected: true,
-        },
       },
     },
     { tab: { id: 41, url: "https://www.facebook.com/marketplace/inbox" } },
@@ -372,7 +345,6 @@ test("page detection remains true when another Facebook tab reports a non-Market
         fbLoggedIn: true,
         marketplaceConnected: false,
         marketplaceDetected: false,
-        messengerDetected: false,
       },
     },
     { tab: { id: 42, url: "https://www.facebook.com/" } },
@@ -380,9 +352,6 @@ test("page detection remains true when another Facebook tab reports a non-Market
 
   assert.equal(storage.marketplaceDetected, true);
   assert.equal(storage.marketplaceConnected, true);
-  assert.equal(storage.messengerDetected, true);
-  assert.equal(storage.lastMessengerDetectionDebug.rootDetected, true);
-  assert.equal(storage.lastMessengerDetectionDebug.composerDetected, true);
   assert.equal(storage.marketplacePath, "/marketplace/inbox");
 
   await handlers.PAGE_STATE_REPORT(
@@ -391,14 +360,12 @@ test("page detection remains true when another Facebook tab reports a non-Market
         fbLoggedIn: true,
         marketplaceConnected: false,
         marketplaceDetected: false,
-        messengerDetected: false,
       },
     },
     { tab: { id: 41, url: "https://www.facebook.com/" } },
   );
 
   assert.equal(storage.marketplaceDetected, false);
-  assert.equal(storage.messengerDetected, false);
 });
 
 test("publish completion closes current and related Marketplace tabs", async () => {

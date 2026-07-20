@@ -103,23 +103,23 @@ Mark each item ✅ when verified. Note any failures or observations.
 
 ---
 
-## 6. Messenger Detected
+## 6. Messenger AI moved
 
 **Steps:**
-1. Navigate to `https://www.messenger.com` (or Facebook Messenger tab)
-2. Confirm the DealerPilot AI floating panel appears
-3. Confirm it shows the **"Read Chat & Suggest Reply"** button
-4. Open the popup → expand **🔧 Debug Mode**
-5. Check **Messenger Detected**
+1. Load `chrome-extension-messenger/` as the separate unpacked extension.
+2. Open the **DealerPilot Messenger AI** popup.
+3. Confirm **Dry run** is enabled by default.
+4. Confirm the **AI Debugger** shows the latest capture stage or a specific reason.
 
 **Expected:**
-- Floating panel: visible with "Read Chat & Suggest Reply" button
-- Debug Mode → Messenger Detected: Yes ✓
+- Publisher popup no longer shows Messenger/Sales AI status.
+- Messenger AI popup owns the IA debugger and specific error details.
 
 **Result:**
-- [ ] ✅ Panel visible on Messenger
-- [ ] ✅ "Read Chat & Suggest Reply" button appears
-- [ ] ✅ Debug Mode: Messenger Detected = Yes ✓
+- [ ] ✅ `chrome-extension-messenger/` loads separately
+- [ ] ✅ Dry run enabled
+- [ ] ✅ AI Debugger visible
+- [ ] ✅ Specific error/reason visible when blocked
 
 **Notes:** _______________________________________________
 
