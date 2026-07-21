@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DealerPilot AI</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        width: 340px;
+        margin: 0;
+        padding: 14px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        background: #0b1f3a;
+        color: #f2f5fa;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .header-logo {
+        width: 32px;
+        height: 32px;
+        background: #1c3a63;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+        color: #e10600;
+        flex-shrink: 0;
+        letter-spacing: -0.5px;
+      }
+      h1 { font-size: 15px; margin: 0 0 1px; }
+      .sub { font-size: 11px; color: #9fb3cc; margin: 0; }
+      .card {
+        background: #08182d;
+        border: 1px solid #1c3a63;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 10px;
+      }
+      .card h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #9fb3cc;
+        margin: 0 0 8px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        padding: 2.5px 0;
+      }
+      .row .label { color: #9fb3cc; }
+      .row .value {
+        font-weight: 600;
+        text-align: right;
+        max-width: 190px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .pill { display: inline-flex; align-items: center; gap: 5px; }
+      .dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: #5a6b82;
+        flex-shrink: 0;
+      }
+      .dot.on  { background: #6fe39f; box-shadow: 0 0 6px #6fe39f55; }
+      .dot.off { background: #ff8a7a; }
+      .dot.warn { background: #ffce6b; }
+
+      /* FB status pills in the main card */
+      .status-pills {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #1c3a63;
+        flex-wrap: wrap;
+      }
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 7px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 600;
+        background: #0f2540;
+        border: 1px solid #1c3a63;
+        white-space: nowrap;
+      }
+      .status-pill .dot { width: 6px; height: 6px; }
+      .status-pill.pill-ok { border-color: #1e5e30; background: #0e2d1a; color: #6fe39f; }
+      .status-pill.pill-err { border-color: #5e1e1e; background: #2d0e0e; color: #ff8a7a; }
+      .status-pill.pill-warn { border-color: #5e4e1e; background: #2d250e; color: #ffce6b; }
+      .status-pill.pill-off { border-color: #1c3a63; background: #0f2540; color: #9fb3cc; }
+
+      /* Action button row */
+      .action-row {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #1c3a63;
+      }
+      .action-row button {
+        margin-top: 0;
+        flex: 1;
+        padding: 8px 6px;
+        font-size: 12px;
+      }
+
+      label { display: block; font-size: 12px; margin-bottom: 4px; color: #cdd9ea; }
+      input {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid #1c3a63;
+        background: #08182d;
+        color: #f2f5fa;
+        font-size: 12px;
+      }
+      button {
+        margin-top: 10px;
+        width: 100%;
+        padding: 9px;
+        border: none;
+        border-radius: 8px;
+        background: #e10600;
+        color: #fff;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        transition: opacity 0.15s;
+      }
+      button.secondary { background: #1c3a63; font-weight: 600; }
+      button.ghost {
+        background: transparent;
+        border: 1px solid #1c3a63;
+        color: #9fb3cc;
+        font-weight: 500;
+        font-size: 11px;
+        padding: 5px;
+        margin-top: 6px;
+      }
+      button.danger {
+        background: #c0001a;
+        border: 2px solid #ff3b52;
+        color: #fff;
+        font-weight: 800;
+        font-size: 12px;
+        padding: 8px;
+        margin-top: 10px;
+        letter-spacing: 0.02em;
+      }
+      button.danger:not(:disabled):hover { opacity: 1; background: #e8001f; }
+      button.btn-fb-login {
+        background: #1877f2;
+        font-size: 12px;
+        padding: 8px;
+        margin-top: 0;
+      }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      button:not(:disabled):hover { opacity: 0.88; }
+      #status { margin-top: 8px; font-size: 12px; min-height: 14px; }
+      .ok  { color: #6fe39f; }
+      .err { color: #ff8a7a; }
+      .warn-text { color: #ffce6b; }
+      select {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid #1c3a63;
+        background: #08182d;
+        color: #f2f5fa;
+        font-size: 12px;
+      }
+      .env-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+      }
+      .env-badge.env-render  {
+        background: #0e2d1a;
+        color: #6fe39f;
+        border: 1px solid #2a7a46;
+        box-shadow: 0 0 6px #1e5e3055;
+        font-size: 12px;
+        padding: 3px 9px;
+      }
+      .env-badge.env-replit  { background: #2d250e; color: #ffce6b; border: 1px solid #5e4e1e; }
+      .env-badge.env-local   { background: #2d0e0e; color: #ff8a7a; border: 1px solid #5e1e1e; }
+      .env-badge.env-custom  { background: #2d0e0e; color: #ff8a7a; border: 1px solid #5e1e1e; }
+      details { margin-top: 8px; }
+      summary {
+        font-size: 12px;
+        color: #9fb3cc;
+        cursor: pointer;
+        user-select: none;
+        padding: 2px 0;
+      }
+      summary:hover { color: #cdd9ea; }
+      .details-inner { margin-top: 10px; }
+
+      /* ---- App-controlled mode info banner ---- */
+      #app-mode-banner {
+        background: #0e2d1a;
+        border: 1px solid #1e5e30;
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-bottom: 10px;
+        font-size: 11px;
+        color: #6fe39f;
+        line-height: 1.5;
+      }
+
+      /* ---- Debug panel ---- */
+      #debug-card {
+        background: #050f1e;
+        border: 1px solid #122544;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-top: 4px;
+      }
+      #debug-card h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6b87a8;
+        margin: 0 0 8px;
+      }
+      #debug-card .row .label { color: #6b87a8; font-size: 11px; }
+      #debug-card .row .value { font-size: 11px; font-weight: 500; }
+      .divider {
+        height: 1px;
+        background: #122544;
+        margin: 6px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="header-logo">DP</div>
+      <div>
+        <h1>DealerPilot AI</h1>
+        <p class="sub" id="header-version">v— · Alpha Motorsport</p>
+        <p class="sub" style="font-size:10px;opacity:.6;margin:0;" id="header-build">Build: —</p>
+      </div>
+    </div>
+
+    <!-- App-controlled mode info -->
+    <div id="app-mode-banner">
+      ✓ Publishing is controlled from the DealerPilot app.<br>
+      The extension polls for assigned jobs automatically.<br>
+      <strong id="v-publish-mode-banner">Mode: Full Auto — extension clicks Publish automatically.</strong>
+    </div>
+
+    <!-- Extension Status -->
+    <div class="card">
+      <h2>Extension Status</h2>
+      <div class="row">
+        <span class="label">Backend</span>
+        <span class="value pill">
+          <span id="dot-backend" class="dot"></span>
+          <span id="v-backend">Checking…</span>
+        </span>
+      </div>
+      <div class="row">
+        <span class="label">Environment</span>
+        <span class="value"><span id="v-env-badge" class="env-badge">—</span></span>
+      </div>
+      <div class="row">
+        <span class="label">Publish mode</span>
+        <span class="value ok" id="v-mode">Full Auto</span>
+      </div>
+      <div class="row">
+        <span class="label">Active job</span>
+        <span class="value" id="v-current">None</span>
+      </div>
+      <div class="row">
+        <span class="label">Queued job</span>
+        <span class="value" id="v-queued">—</span>
+      </div>
+      <div class="row">
+        <span class="label">Last poll</span>
+        <span class="value" id="v-last-poll">—</span>
+      </div>
+      <div class="row">
+        <span class="label">Last sync</span>
+        <span class="value" id="v-sync">—</span>
+      </div>
+
+      <!-- Facebook + Marketplace status pills -->
+      <div class="status-pills">
+        <span class="status-pill pill-off" id="pill-fb">
+          <span class="dot"></span>
+          <span id="pill-fb-text">FB: Unknown</span>
+        </span>
+        <span class="status-pill pill-off" id="pill-mkp">
+          <span class="dot"></span>
+          <span id="pill-mkp-text">Marketplace: Unknown</span>
+        </span>
+      </div>
+
+      <!-- FB Login button (shown only when not logged in) -->
+      <div id="fb-login-row" style="display:none; margin-top:8px;">
+        <button id="btn-fb-login" class="btn-fb-login">Open Facebook Login →</button>
+      </div>
+    </div>
+
+    <button id="dev-start" disabled>Resume Current Approved Job</button>
+    <button id="refresh" class="secondary" style="margin-top:6px;">Refresh Status</button>
+    <button id="reset-state" class="ghost" style="margin-top:6px;border-color:rgba(255,138,122,0.35);color:#ff8a7a;">⊘ Reset Extension State</button>
+    <div id="status"></div>
+
+    <!-- Backend Settings -->
+    <details>
+      <summary>⚙ Backend settings</summary>
+      <div class="details-inner">
+        <label for="url">Backend URL</label>
+        <input id="url" type="url" placeholder="https://your-app.replit.dev" />
+        <button id="save" class="secondary">Save &amp; Test Connection</button>
+      </div>
+    </details>
+
+    <!-- Debug Mode -->
+    <details id="debug-details">
+      <summary>🔧 Debug Mode</summary>
+      <div class="details-inner">
+        <div id="debug-card">
+          <h2>System Info</h2>
+          <div class="row">
+            <span class="label">Build</span>
+            <span class="value ok" id="d-build">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Extension Version</span>
+            <span class="value" id="d-version">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Chrome Extension ID</span>
+            <span class="value" id="d-chrome-id" title="">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Extension ID (backend)</span>
+            <span class="value" id="d-ext-id" title="">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Dealer</span>
+            <span class="value" id="d-dealer-id">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Backend URL</span>
+            <span class="value" id="d-backend-url" title="">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Environment</span>
+            <span class="value" id="d-environment">—</span>
+          </div>
+
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Switch Backend URL</h2>
+          <div class="details-inner" style="margin-top:4px;">
+            <label for="env-select">Environment</label>
+            <select id="env-select">
+              <option value="replit">Replit</option>
+              <option value="render">Render</option>
+              <option value="local">Local</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <label for="env-url-input" style="margin-top:8px;">URL</label>
+            <input id="env-url-input" type="url" placeholder="https://your-service.onrender.com" />
+            <button id="switch-backend" class="secondary" style="margin-top:8px;">Switch Backend URL</button>
+          </div>
+
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Connection</h2>
+          <div class="row">
+            <span class="label">Connection Status</span>
+            <span class="value" id="d-conn-status">—</span>
+          </div>
+          <div class="row">
+            <span class="label">FB Logged In</span>
+            <span class="value" id="d-fb-login">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Marketplace Access</span>
+            <span class="value" id="d-mkp-access">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Heartbeat</span>
+            <span class="value" id="d-heartbeat">Never</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Heartbeat URL</span>
+            <span class="value" id="d-heartbeat-url" title="">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Heartbeat Response</span>
+            <span class="value" id="d-heartbeat-response" title="">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Payload Publish Mode</span>
+            <span class="value" id="d-payload-mode">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Payload Controlled/Auto-Click</span>
+            <span class="value" id="d-payload-flags">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Payload Backend Env</span>
+            <span class="value" id="d-payload-env">—</span>
+          </div>
+
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Publisher</h2>
+          <div class="row">
+            <span class="label">Workflow Step</span>
+            <span class="value" id="d-workflow-step">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Step Updated</span>
+            <span class="value" id="d-workflow-step-at">—</span>
+          </div>
+
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Poll Diagnostics</h2>
+          <div class="row">
+            <span class="label">Last Poll</span>
+            <span class="value" id="d-last-poll">Never</span>
+          </div>
+          <div class="row">
+            <span class="label">Last /next Response</span>
+            <span class="value" id="d-last-next">—</span>
+          </div>
+          <div class="row">
+            <span class="label">/next At</span>
+            <span class="value" id="d-last-next-at">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Claim Attempt</span>
+            <span class="value" id="d-last-claim">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Claim Error</span>
+            <span class="value ok" id="d-last-claim-err">None</span>
+          </div>
+          <div class="row">
+            <span class="label">Active Job (storage)</span>
+            <span class="value" id="d-active-job">None</span>
+          </div>
+
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Job History</h2>
+          <div class="row">
+            <span class="label">Last Claimed Job</span>
+            <span class="value" id="d-claimed">None</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Published Job</span>
+            <span class="value" id="d-published">None</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Error</span>
+            <span class="value ok" id="d-error">None</span>
+          </div>
+
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Page Detection</h2>
+          <div class="row">
+            <span class="label">Marketplace Detected</span>
+            <span class="value" id="d-marketplace">—</span>
+          </div>
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Dev Controls</h2>
+          <button id="emergency-kill" class="danger">🚨 Emergency Kill / Reset All</button>
+          <button id="clear-queue-display" class="ghost" style="border-color:#4a3020;color:#c8915a;">Clear Cached Queue Display</button>
+          <button id="clear-error" class="ghost">Clear Last Error</button>
+          <button id="clear-active-job" class="ghost">Clear Stuck Active Job</button>
+          <button id="reload-debug" class="ghost">Reload Debug State</button>
+          <div class="divider"></div>
+          <h2 style="margin-top:6px">Validation & Poll Logs</h2>
+          <div class="row">
+            <span class="label">Last Validation</span>
+            <span class="value" id="d-last-validation">—</span>
+          </div>
+          <div class="row">
+            <span class="label">Last Poll Skip</span>
+            <span class="value" id="d-last-poll-skip">—</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+            <button id="btn-show-validation" class="ghost">Show Validation Debug</button>
+            <button id="btn-show-poll" class="ghost">Show Poll Diagnostics</button>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <script src="modules/settings.js"></script>
+    <script src="modules/diagnostics.js"></script>
+    <script src="modules/uiActions.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

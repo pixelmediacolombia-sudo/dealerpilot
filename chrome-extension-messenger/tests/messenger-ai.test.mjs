@@ -196,6 +196,41 @@ test("autoReply disabled requests a suggestion but never writes to Messenger", a
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
 });
 
+test("selected chat header vehicle beats unrelated listing card headings", async () => {
+  const root = new FakeElement({
+    attributes: { "aria-label": "Marketplace conversation" },
+    children: [
+      new FakeElement({ tagName: "h2", text: "2025 Toyota Tacoma" }),
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } }),
+      new FakeElement({ tagName: "button", attributes: { "aria-label": "Send" }, text: "Send" }),
+    ],
+  });
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
+    captures: [{
+      root,
+      scope: root,
+      buyerName: "Ali",
+      messages: [{ speaker: "Ali", text: "Is this available?" }],
+      evidence: {
+        threadRootDetected: true,
+        messageScopeDetected: true,
+        extractionMode: "semantic",
+        selectedHeaderText: "Ali · 2021 Tesla MODEL Y",
+        latestMessageDirection: "buyer",
+        composerDetected: true,
+        threadIdentity: "facebook-thread-ali-tesla-model-y",
+      },
+    }],
+  });
+
+  await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(calls.intake[0].buyerName, "Ali");
+  assert.equal(calls.intake[0].detectedVehicleTitle, "2021 Tesla MODEL Y");
+});
+
 test("autoReply enabled refuses to send when the composer is missing", async () => {
   const { ai, calls } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },

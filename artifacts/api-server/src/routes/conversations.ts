@@ -717,6 +717,13 @@ router.post("/conversations/intake", async (req, res) => {
   let listingId: number | undefined;
   let lotLocation: string | null = null;
   let vehicleTitleFromDb: string | undefined;
+  let vehicleMatchSource: "marketplace_listing_url" | "detected_vehicle_title" | null = null;
+
+  const [existingConv] = await db
+    .select()
+    .from(conversationsTable)
+    .where(eq(conversationsTable.externalThreadRef, externalThreadRef))
+    .limit(1);
 
   if (detectedMarketplaceListingUrl) {
     const detectedMarketplaceItemId = extractMarketplaceItemId(detectedMarketplaceListingUrl);
@@ -737,6 +744,7 @@ router.post("/conversations/intake", async (req, res) => {
     });
     if (marketplaceListing) {
       vehicleId = marketplaceListing.vehicleId;
+      vehicleMatchSource = "marketplace_listing_url";
     }
   }
 
@@ -758,7 +766,31 @@ router.post("/conversations/intake", async (req, res) => {
     if (match) {
       vehicleId = match.id;
       lotLocation = match.lotLocation ?? null;
+      vehicleMatchSource = "detected_vehicle_title";
     }
+  }
+
+  if (
+    existingConv?.vehicleId &&
+    vehicleId &&
+    vehicleId !== existingConv.vehicleId &&
+    vehicleMatchSource !== "marketplace_listing_url"
+  ) {
+    req.log.warn(
+      {
+        conversationId: existingConv.id,
+        externalThreadRef,
+        existingVehicleId: existingConv.vehicleId,
+        detectedVehicleId: vehicleId,
+        detectedVehicleTitle,
+        vehicleMatchSource,
+      },
+      "Conversation intake preserved existing vehicle binding over unverified DOM title match",
+    );
+    vehicleId = existingConv.vehicleId;
+    listingId = existingConv.listingId ?? undefined;
+    lotLocation = null;
+    vehicleTitleFromDb = undefined;
   }
 
   if (vehicleId && !lotLocation) {
@@ -790,12 +822,6 @@ router.post("/conversations/intake", async (req, res) => {
     if (lRow[0]) listingId = lRow[0].id;
   }
   const resolvedVehicleTitle = vehicleId ? vehicleTitleFromDb ?? detectedVehicleTitle : undefined;
-
-  const [existingConv] = await db
-    .select()
-    .from(conversationsTable)
-    .where(eq(conversationsTable.externalThreadRef, externalThreadRef))
-    .limit(1);
 
   let conversationId: number;
   let conversation: typeof existingConv;

@@ -574,6 +574,9 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /extractMarketplaceItemId/);
   assert.match(conversationsSource, /marketplaceListingsTable\.facebookListingId/);
   assert.match(conversationsSource, /exactTitles\.includes\(normalizedDetectedTitle\)/);
+  assert.match(conversationsSource, /vehicleMatchSource/);
+  assert.match(conversationsSource, /preserved existing vehicle binding over unverified DOM title match/);
+  assert.match(conversationsSource, /vehicleMatchSource !== "marketplace_listing_url"/);
   assert.match(conversationsSource, /Conversation intake skipped - no buyer message/);
   assert.match(conversationsSource, /SALES_AI_REPLY_TIMEOUT_MS = 12000/);
   assert.match(conversationsSource, /MESSENGER_DELIVERY_RETRY_DELAY_MS = 15000/);

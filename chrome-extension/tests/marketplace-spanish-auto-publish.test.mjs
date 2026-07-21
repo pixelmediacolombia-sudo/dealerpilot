@@ -61,6 +61,18 @@ test("Photo proxy 5xx responses are skipped without extension error noise", () =
   assert.doesNotMatch(content, /console\.error\(`\[PHOTO\] proxy FAILED idx/);
 });
 
+test("Photo upload confirmation ignores generic Facebook photo placeholders", () => {
+  assert.match(content, /const requiredThumbnailCount = expectedCount > 1 \? 2 : 1/);
+  assert.match(content, /\[data-testid="media-attachment-delete-button"\]/);
+  assert.match(content, /\[data-testid="media-attachment-preview"\]/);
+  assert.match(content, /img\[src\^="blob:"\]/);
+  assert.match(content, /filter\(isVisibleElement\)/);
+  assert.doesNotMatch(content, /\[aria-label\*="photo" i\] img/);
+  assert.doesNotMatch(content, /\[aria-label\*="upload" i\] img/);
+  assert.doesNotMatch(content, /wordMatch/);
+  assert.doesNotMatch(content, /querySelectorAll\("img"\)/);
+});
+
 test("Make can fall back to a text input instead of requiring a combobox", () => {
   assert.match(content, /fillTextOrSelectComboboxStep\s*\(/);
   assert.match(content, /"make"[\s\S]*\["make", "marca"\][\s\S]*\["make", "marca"\]/);
