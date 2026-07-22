@@ -76,12 +76,16 @@ class FakeElement {
   }
 }
 
-function createHarness({ settings, messages, composer = true, intakeResponse, captures } = {}) {
+function createHarness({ settings, messages, composer = true, composerText = "", intakeResponse, captures, liveCaptureFromRoot } = {}) {
   const calls = { messages: [], debug: [], intake: [] };
   const composerElement = composer
     ? new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } })
     : null;
   const sendButton = new FakeElement({ tagName: "button", attributes: { "aria-label": "Send" }, text: "Send" });
+  if (composerElement) {
+    composerElement.innerText = composerText;
+    composerElement.textContent = composerText;
+  }
   const heading = new FakeElement({ tagName: "h2", text: "Buyer A - 2021 Toyota RAV4" });
   const root = new FakeElement({
     attributes: { "aria-label": "Marketplace conversation" },
@@ -144,6 +148,10 @@ function createHarness({ settings, messages, composer = true, intakeResponse, ca
       },
       captureAll() {
         return captures || [this.capture()];
+      },
+      captureFromRoot(rootArg) {
+        if (liveCaptureFromRoot) return liveCaptureFromRoot(rootArg);
+        return (captures?.[0]) || this.capture();
       },
     },
     chrome,
@@ -241,6 +249,53 @@ test("autoReply enabled refuses to send when the composer is missing", async () 
   assert.equal(calls.intake.length, 1);
   assert.equal(result.autoSent, false);
   assert.equal(result.reason, "composer_missing");
+  assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
+});
+
+test("autoReply revalidates the same root before writing to Messenger", async () => {
+  const { ai, calls, composerElement } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [{ speaker: "Buyer A", text: "so how can we make this work" }],
+    intakeResponse: { ok: true, data: { suggestedReply: "Great. What's the best phone number?" } },
+    liveCaptureFromRoot(root) {
+      return {
+        root,
+        scope: root,
+        buyerName: "Buyer A",
+        messages: [
+          { speaker: "Buyer A", text: "so how can we make this work" },
+          { speaker: "Dealer", text: "Great. What's the best phone number?" },
+        ],
+        evidence: {
+          threadRootDetected: true,
+          messageScopeDetected: true,
+          extractionMode: "semantic",
+          latestMessageDirection: "dealer",
+        },
+      };
+    },
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, false);
+  assert.equal(result.reason, "latest_message_not_buyer");
+  assert.equal(composerElement.textContent, "");
+  assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
+});
+
+test("autoReply refuses to overwrite an operator draft in the composer", async () => {
+  const { ai, calls, composerElement } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    composerText: "Manual note already typed",
+    intakeResponse: { ok: true, data: { suggestedReply: "Great. What's the best phone number?" } },
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, false);
+  assert.equal(result.reason, "composer_not_empty");
+  assert.equal(composerElement.textContent, "Manual note already typed");
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
 });
 
