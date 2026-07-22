@@ -187,6 +187,64 @@ test("AI reply text is not accepted as buyer name or buyer message", () => {
   assert.deepEqual(JSON.parse(JSON.stringify(capture.messages)), []);
 });
 
+test("outgoing AI reply stays in history so later buyer turns keep context", () => {
+  const aiReply = "Yes - the 2017 Porsche Cayenne is still available. Are you interested in our easy financing options?";
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [
+      new FakeElement({
+        attributes: { "aria-label": `Message sent 5:20 AM by You: ${aiReply}` },
+        text: "5:20 AM by You",
+        rect: { left: 180, right: 410, top: 420, width: 230, height: 60 },
+      }),
+      new FakeElement({
+        attributes: { "aria-label": "Message sent 5:24 AM by Jamal: yes" },
+        text: "5:24 AM by Jamal",
+        rect: { left: 30, right: 130, top: 500, width: 100, height: 36 },
+      }),
+      new FakeElement({
+        attributes: { "aria-label": "Message sent 5:25 AM by Jamal: have a trade also" },
+        text: "5:25 AM by Jamal",
+        rect: { left: 30, right: 190, top: 545, width: 160, height: 36 },
+      }),
+      new FakeElement({
+        attributes: { "aria-label": "Message sent 6:00 AM by Jamal: so how can we make this work" },
+        text: "6:00 AM by Jamal",
+        rect: { left: 30, right: 250, top: 610, width: 220, height: 36 },
+      }),
+    ],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Jamal | 2017 Porsche Cayenne",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $15,000 - 2017 Porsche Cayenne" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+
+  assert.equal(capture.buyerName, "Jamal");
+  assert.equal(capture.evidence.latestMessageDirection, "buyer");
+  assert.deepEqual(JSON.parse(JSON.stringify(capture.messages)), [
+    { speaker: "Dealer", text: aiReply },
+    { speaker: "Jamal", text: "yes" },
+    { speaker: "Jamal", text: "have a trade also" },
+    { speaker: "Jamal", text: "so how can we make this work" },
+  ]);
+});
+
 test("semantic descriptors strip Facebook timestamp metadata from buyer message", () => {
   const message = new FakeElement({
     attributes: { "aria-label": "Message sent 12 PM by Juan: Hola. Sigue disponible?" },

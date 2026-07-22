@@ -271,10 +271,21 @@ function hasPhoneNumber(text: string): boolean {
   return extractPhoneNumber(text) !== null;
 }
 
+function historyAskedAboutFinancing(history: string): boolean {
+  return /\b(?:dealer|dealerpilot ai|assistant):[\s\S]{0,240}\b(?:financing|finance|financiamiento|financiar|opciones de financiamiento)\b/i.test(history);
+}
+
+function buyerAcceptedFinancingStep(latest: string): boolean {
+  return /\b(?:yes|yeah|yep|sure|ok|okay|interested|i am|i'm|trade|trade-in|trade in|make this work|how can we make this work|next step|what next|si|s[ií]|claro|me interesa|hagamos|como hacemos|c[oó]mo hacemos)\b/i.test(latest);
+}
+
 function resolveSalesReplyStage(visibleMessages: string[], currentMessage: string): SalesReplyStage {
   const latest = cleanConversationText(currentMessage).toLowerCase();
   const history = visibleMessages.map(cleanConversationText).join(" ").toLowerCase();
   if (hasPhoneNumber(latest)) return "phone_received";
+  if (historyAskedAboutFinancing(history) && buyerAcceptedFinancingStep(latest)) {
+    return "request_phone";
+  }
   if (/\b(link|application|apply|financ(?:e|ing)|loan|monthly payment|payment plan|solicitud|aplicar|financiamiento|financiar|credito|crédito|cuota mensual)\b/i.test(latest)) {
     return "request_phone";
   }

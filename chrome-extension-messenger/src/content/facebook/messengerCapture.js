@@ -216,10 +216,11 @@
     const match = descriptor.match(/(?:\bby\b|\bpor\b)\s+([^:]{1,100}):\s*(.+)$/i) ||
       descriptor.match(/(?:message sent|mensaje enviado)[^:]*:\s*(.+)$/i);
     if (!match && isMessageMetadataText(descriptor)) return null;
-    const text = cleanMessageText(match?.[2] || match?.[1] || textOf(element));
-    if (!text || UI_TEXT.test(text) || text.length > 500 || isMessageMetadataText(text) || isLikelyAutoReplyText(text)) return null;
     const sender = match?.[1] || "";
     const isDealer = senderIsDealer(sender, sellerNameCandidates) || /\b(?:by\s+you|por\s+t[iú])\b/i.test(descriptor);
+    const text = cleanMessageText(match?.[2] || match?.[1] || textOf(element));
+    if (!text || UI_TEXT.test(text) || text.length > 500 || isMessageMetadataText(text)) return null;
+    if (isLikelyAutoReplyText(text) && !isDealer) return null;
     return { speaker: isDealer ? "Dealer" : "Buyer", text };
   }
 
@@ -389,13 +390,13 @@
       seen.add(bubble);
       const text = cleanMessageText(textOf(bubble));
       const rect = rectOf(bubble);
-      if (!text || text.length < 2 || UI_TEXT.test(text)) continue;
-      if (isLikelyAutoReplyText(text)) continue;
       const leftGap = Math.max(0, rect.left - scopeRect.left);
       const rightGap = Math.max(0, scopeRect.right - rect.right);
       const clearlyRightAligned =
         leftGap > rightGap + minDealerOffset &&
         rect.left > scopeRect.left + (scopeRect.width * 0.35);
+      if (!text || text.length < 2 || UI_TEXT.test(text)) continue;
+      if (isLikelyAutoReplyText(text) && !clearlyRightAligned) continue;
       rows.push({ top: rect.top, speaker: clearlyRightAligned ? "Dealer" : (buyerName || "Buyer"), text });
     }
     return rows.sort((a, b) => a.top - b.top).map(({ speaker, text }) => ({ speaker, text }));

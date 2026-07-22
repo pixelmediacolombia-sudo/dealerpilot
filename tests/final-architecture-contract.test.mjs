@@ -91,6 +91,9 @@ test("sales-ai intake protects lead handoff and conversation continuity", () => 
   assert.match(conversations, /status: extractedPhone \? "BDC Assigned" : "New"/);
   assert.match(conversations, /router\.patch\("\/conversations\/:id\/auto-reply"/);
   assert.match(conversations, /router\.post\("\/sales-ai\/test-message"/);
+  assert.match(conversations, /historyAskedAboutFinancing/);
+  assert.match(conversations, /buyerAcceptedFinancingStep/);
+  assert.match(conversations, /historyAskedAboutFinancing\(history\) && buyerAcceptedFinancingStep\(latest\)[\s\S]*return "request_phone"/);
 });
 
 test("backend-extension sacred endpoints are centralized and shape-compatible", () => {
