@@ -9,7 +9,7 @@ const source = readFileSync(
 );
 
 class FakeElement {
-  constructor({ tagName = "div", attributes = {}, text = "", children = [] } = {}) {
+  constructor({ tagName = "div", attributes = {}, text = "", children = [], onClick = null, rect = null } = {}) {
     this.tagName = tagName.toUpperCase();
     this.attributes = { ...attributes };
     this.innerText = text;
@@ -17,6 +17,9 @@ class FakeElement {
     this.value = "";
     this.children = children;
     this.events = [];
+    this.onClick = onClick;
+    this.rect = rect;
+    this.isConnected = true;
     for (const child of children) child.parentElement = this;
   }
 
@@ -35,6 +38,15 @@ class FakeElement {
 
   focus() {
     this.focused = true;
+  }
+
+  click() {
+    this.events.push("native-click");
+    this.onClick?.();
+  }
+
+  getBoundingClientRect() {
+    return this.rect;
   }
 
   querySelectorAll(selector) {
@@ -76,12 +88,43 @@ class FakeElement {
   }
 }
 
-function createHarness({ settings, messages, composer = true, composerText = "", intakeResponse, captures, liveCaptureFromRoot } = {}) {
+function createHarness({
+  settings,
+  messages,
+  composer = true,
+  composerText = "",
+  intakeResponse,
+  captures,
+  liveCaptureFromRoot,
+  sendSucceeds = false,
+  includeDecoySendButton = false,
+  locationOverride = null,
+} = {}) {
   const calls = { messages: [], debug: [], intake: [] };
   const composerElement = composer
-    ? new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } })
+    ? new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" },
+        rect: { left: 100, top: 400, width: 360, height: 40 },
+      })
     : null;
-  const sendButton = new FakeElement({ tagName: "button", attributes: { "aria-label": "Send" }, text: "Send" });
+  const sendButton = new FakeElement({
+    tagName: "button",
+    attributes: { "aria-label": "Send" },
+    text: "Send",
+    rect: { left: 470, top: 400, width: 40, height: 40 },
+    onClick() {
+      if (!sendSucceeds || !composerElement) return;
+      composerElement.value = "";
+      composerElement.innerText = "";
+      composerElement.textContent = "";
+    },
+  });
+  const decoySendButton = new FakeElement({
+    tagName: "button",
+    attributes: { "aria-label": "Send" },
+    text: "Send",
+    rect: { left: 900, top: 100, width: 40, height: 40 },
+  });
   if (composerElement) {
     composerElement.innerText = composerText;
     composerElement.textContent = composerText;
@@ -89,7 +132,12 @@ function createHarness({ settings, messages, composer = true, composerText = "",
   const heading = new FakeElement({ tagName: "h2", text: "Buyer A - 2021 Toyota RAV4" });
   const root = new FakeElement({
     attributes: { "aria-label": "Marketplace conversation" },
-    children: [heading, ...(composerElement ? [composerElement, sendButton] : [])],
+    children: [
+      heading,
+      ...(composerElement
+        ? [composerElement, ...(includeDecoySendButton ? [decoySendButton] : []), sendButton]
+        : []),
+    ],
   });
   const profile = new FakeElement({ attributes: { "aria-label": "Manage Andres Ibanez notification settings" } });
   const document = {
@@ -131,6 +179,15 @@ function createHarness({ settings, messages, composer = true, composerText = "",
   };
   const context = vm.createContext({
     __DEALERPILOT_MESSENGER_AI_TEST__: true,
+    DealerPilotMessengerAutonomy: {
+      extractThreadId(value, origin = "https://www.facebook.com") {
+        const url = new URL(value, origin);
+        return url.pathname.match(/^\/messages\/t\/([^/?#]+)\/?$/i)?.[1] || "";
+      },
+      isMessagesThreadRoute(pathname) {
+        return /^\/messages\/t\/[^/?#]+\/?$/i.test(pathname || "");
+      },
+    },
     DealerPilotMessengerCapture: {
       capture() {
         return (captures?.[0]) || {
@@ -156,7 +213,7 @@ function createHarness({ settings, messages, composer = true, composerText = "",
     },
     chrome,
     document,
-    location: {
+    location: locationOverride || {
       href: "https://www.facebook.com/marketplace/inbox",
       origin: "https://www.facebook.com",
       pathname: "/marketplace/inbox",
@@ -173,7 +230,7 @@ function createHarness({ settings, messages, composer = true, composerText = "",
     URL,
   });
   vm.runInContext(source, context, { filename: "messengerAi.js" });
-  return { ai: context.DealerPilotMessengerAi, calls, composerElement };
+  return { ai: context.DealerPilotMessengerAi, calls, composerElement, sendButton, decoySendButton };
 }
 
 test("dryRun captures a valid buyer message without backend intake or composer writes", async () => {
@@ -187,6 +244,111 @@ test("dryRun captures a valid buyer message without backend intake or composer w
   assert.equal(composerElement.textContent, "");
   assert.equal(calls.debug.at(-1).stage, "dry_run_capture");
   assert.equal(calls.debug.at(-1).backendIntakeSent, false);
+});
+
+test("dynamic facebook messages routes use the route id as stable conversation identity", async () => {
+  const route = {
+    href: "https://www.facebook.com/messages/t/1060211123108393",
+    origin: "https://www.facebook.com",
+    pathname: "/messages/t/1060211123108393",
+    hostname: "www.facebook.com",
+  };
+  const root = new FakeElement({
+    attributes: { "aria-label": "Marketplace conversation" },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Erika · 2021 Toyota RAV4" }),
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } }),
+    ],
+  });
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
+    locationOverride: route,
+    captures: [{
+      root,
+      scope: root,
+      buyerName: "Erika",
+      messages: [{ speaker: "Erika", text: "Hola, sigue disponible?" }],
+      evidence: {
+        threadRootDetected: true,
+        messageScopeDetected: true,
+        extractionMode: "semantic",
+        selectedHeaderText: "Erika · 2021 Toyota RAV4",
+        latestMessageDirection: "buyer",
+        composerDetected: true,
+      },
+    }],
+  });
+
+  assert.equal(ai.isMarketplaceMessengerRoute(route.pathname, route.hostname), true);
+  await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.match(calls.intake[0].externalThreadRef, /facebook-messages-thread-1060211123108393/);
+  assert.equal(calls.intake[0].sourceUrl, route.href);
+});
+
+test("messages route rejects global Facebook chrome and selects the active buyer header", async () => {
+  const route = {
+    href: "https://www.facebook.com/messages/t/777",
+    origin: "https://www.facebook.com",
+    pathname: "/messages/t/777",
+    hostname: "www.facebook.com",
+  };
+  const goodRoot = new FakeElement({
+    attributes: { "aria-label": "Marketplace conversation" },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Erika · 2021 Toyota RAV4" }),
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } }),
+    ],
+  });
+  const globalRoot = new FakeElement({
+    attributes: { "aria-label": "Facebook" },
+    children: [
+      new FakeElement({ tagName: "h2", text: "· 10m" }),
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } }),
+    ],
+  });
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
+    locationOverride: route,
+    captures: [
+      {
+        root: globalRoot,
+        scope: globalRoot,
+        buyerName: "Settings, help and more",
+        messages: [{ speaker: "Buyer", text: "Hola, sigue disponible?" }],
+        evidence: {
+          threadRootDetected: true,
+          messageScopeDetected: true,
+          extractionMode: "semantic",
+          selectedHeaderText: "· 10m",
+          latestMessageDirection: "buyer",
+          composerDetected: true,
+        },
+      },
+      {
+        root: goodRoot,
+        scope: goodRoot,
+        buyerName: "Erika",
+        messages: [{ speaker: "Erika", text: "Hola, sigue disponible?" }],
+        evidence: {
+          threadRootDetected: true,
+          messageScopeDetected: true,
+          extractionMode: "semantic",
+          selectedHeaderText: "Erika · 2021 Toyota RAV4",
+          latestMessageDirection: "buyer",
+          composerDetected: true,
+        },
+      },
+    ],
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(result.buyersDetected[0].selectedForProcessing, false);
+  assert.equal(result.buyersDetected[1].selectedForProcessing, true);
+  assert.equal(calls.intake.length, 1);
+  assert.equal(calls.intake[0].buyerName, "Erika");
 });
 
 test("autoReply disabled requests a suggestion but never writes to Messenger", async () => {
@@ -249,6 +411,41 @@ test("autoReply enabled refuses to send when the composer is missing", async () 
   assert.equal(calls.intake.length, 1);
   assert.equal(result.autoSent, false);
   assert.equal(result.reason, "composer_missing");
+  assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
+});
+
+test("autoReply clicks the send control nearest the winning chat and confirms the composer cleared", async () => {
+  const { ai, calls, composerElement, sendButton, decoySendButton } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    sendSucceeds: true,
+    includeDecoySendButton: true,
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, true);
+  assert.equal(result.sendMethod, "button_click");
+  assert.equal(result.deliveryConfirmed, true);
+  assert.equal(composerElement.textContent, "");
+  assert.deepEqual(sendButton.events, ["native-click"]);
+  assert.deepEqual(decoySendButton.events, []);
+  assert.equal(calls.debug.at(-1).stage, "intake_ok");
+});
+
+test("autoReply reports delivery_unconfirmed when Facebook leaves the draft in the composer", async () => {
+  const { ai, calls, composerElement, sendButton } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    sendSucceeds: false,
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, false);
+  assert.equal(result.reason, "delivery_unconfirmed");
+  assert.equal(result.sendMethod, "button_click");
+  assert.equal(result.deliveryConfirmed, false);
+  assert.equal(composerElement.textContent, "Yes, it is available.");
+  assert.deepEqual(sendButton.events, ["native-click"]);
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
 });
 
