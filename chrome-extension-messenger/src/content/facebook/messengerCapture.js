@@ -58,6 +58,7 @@
       .replace(/^\s*[^.]{2,80}\s+(?:started|inici[oó])\s+(?:this|este)\s+chat\.?\s*/i, "")
       .replace(/\s+(?:Enter|Return)\s*,?\s*(?:message sent|mensaje enviado)[\s\S]*$/i, "")
       .replace(/\s*(?:view|ver)\s+(?:buyer|comprador)\s+(?:profile|perfil)\s*$/i, "")
+      .replace(/\s*(?:joined|se\s+uni[oó])\s+(?:facebook|fb)\s+in\s+\d{4}\s*/i, "")
       .trim();
   }
 
