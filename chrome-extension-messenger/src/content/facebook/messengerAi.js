@@ -4,7 +4,6 @@
     autoReplyEnabled: false,
     sellerProfileNames: ["Alpha Manassas", "Alpha Motorsport", "Andres Ibanez"],
   });
-  const CAPTURE_INTERVAL_MS = 2000;
   const REPLY_QUIET_MS = 7000;
   const OWN_REPLY_GUARD_MS = 120000;
 
@@ -36,24 +35,16 @@
     });
   }
 
-  function isFacebookOrMessengerHost(hostname = location.hostname) {
+  function isFacebookHost(hostname = location.hostname) {
     const host = String(hostname || "").toLowerCase();
     return host === "facebook.com" ||
-      host.endsWith(".facebook.com") ||
-      host === "messenger.com" ||
-      host.endsWith(".messenger.com");
+      host.endsWith(".facebook.com");
   }
 
-  function isBlockedRoute(pathname = location.pathname) {
-    return pathname === "/" ||
-      /^\/(?:home\.php|feed|groups|pages|profile\.php|watch|reel|events)\b/i.test(pathname || "");
-  }
-
-  function isMarketplaceMessengerRoute(pathname = location.pathname, hostname = location.hostname) {
+  function isFacebookMessagesThreadRoute(pathname = location.pathname, hostname = location.hostname) {
     const path = String(pathname || "");
-    return /\/marketplace\/(?:inbox|you\/selling|you\/buying|item\/\d+)/i.test(path) ||
-      /^\/messages\/t\/[^/?#]+\/?$/i.test(path) ||
-      String(hostname || "").toLowerCase().includes("messenger.com");
+    return isFacebookHost(hostname) &&
+      /^\/messages\/t\/[^/?#]+\/?$/i.test(path);
   }
 
   function getCurrentThreadId(pathname = location.pathname) {
@@ -137,6 +128,8 @@
       .toLowerCase();
     return /^yes\s+(?:-|--)?\s*the car is still available\b/.test(normalized) ||
       /\beasy financing options\b/.test(normalized) ||
+      /^i(?:'|’)d be happy to help\b[\s\S]{0,180}\b(?:are you interested|financing)\b/.test(normalized) ||
+      /^great\b[\s\S]{0,120}\bbest phone number\b/.test(normalized) ||
       /^perfect\b[\s\S]{0,80}\b(?:we will contact|contact you)\b/.test(normalized) ||
       /^good morning\b[\s\S]{0,120}\b(?:includes vin|all the info)\b/.test(normalized);
   }
@@ -222,8 +215,24 @@
   function insertReply(reply, root) {
     const box = findComposer(root);
     if (!box) return { ok: false, reason: "composer_missing", composerDetected: false };
-    if (cleanText(readComposerText(box))) {
+    const existingText = cleanText(readComposerText(box));
+    const replacingExistingAiDraft =
+      existingText &&
+      existingText !== cleanText(reply) &&
+      isLikelyOwnAiReply(existingText);
+    if (existingText && existingText !== cleanText(reply) && !replacingExistingAiDraft) {
       return { ok: false, reason: "composer_not_empty", composerDetected: true };
+    }
+    if (existingText && !replacingExistingAiDraft) {
+      return {
+        ok: true,
+        reason: "",
+        composerDetected: true,
+        composerTextDetected: true,
+        reusedExistingDraft: true,
+        replacedExistingAiDraft: false,
+        box,
+      };
     }
     box.focus?.();
     if (box.tagName === "TEXTAREA") {
@@ -241,6 +250,8 @@
       reason: composerTextDetected ? "" : "composer_insert_unconfirmed",
       composerDetected: true,
       composerTextDetected,
+      reusedExistingDraft: false,
+      replacedExistingAiDraft: replacingExistingAiDraft === true,
       box,
     };
   }
@@ -309,7 +320,7 @@
     return messages.some((message) => message.speaker === "Dealer" && cleanText(message.text) === expected);
   }
 
-  function snapshotStillActionable(snapshot, payload, settings = DEFAULT_SETTINGS) {
+  function snapshotStillActionable(snapshot, payload, settings = DEFAULT_SETTINGS, expectedReply = "") {
     if (!snapshot?.root) return { ok: false, reason: "thread_root_missing" };
     if (snapshot.root.isConnected === false) return { ok: false, reason: "thread_root_detached" };
     if (!isReliableBuyerName(snapshot.buyerName)) return { ok: false, reason: "buyer_name_untrusted" };
@@ -330,7 +341,14 @@
     }
     const composer = findComposer(snapshot.root);
     if (!composer) return { ok: false, reason: "composer_missing" };
-    if (cleanText(readComposerText(composer))) return { ok: false, reason: "composer_not_empty" };
+    const composerText = cleanText(readComposerText(composer));
+    if (
+      composerText &&
+      composerText !== cleanText(expectedReply) &&
+      !isLikelyOwnAiReply(composerText)
+    ) {
+      return { ok: false, reason: "composer_not_empty" };
+    }
     return { ok: true, reason: "" };
   }
 
@@ -430,10 +448,7 @@
   }
 
   function validateSnapshot(snapshot) {
-    const routeAllowed =
-      isFacebookOrMessengerHost() &&
-      !isBlockedRoute() &&
-      isMarketplaceMessengerRoute();
+    const routeAllowed = isFacebookMessagesThreadRoute();
     const conversationThreadDetected = snapshot.evidence.threadRootDetected === true;
     const buyerNameDetected = isReliableBuyerName(snapshot.buyerName);
     const activeHeaderDetected = activeThreadHeaderDetected(snapshot);
@@ -566,7 +581,7 @@
     if (!reply || payload.messageHash === lastAutoSendHashByThread.get(threadKey)) {
       return { autoSent: false, reason: "reply_or_capture_not_actionable" };
     }
-    const actionable = snapshotStillActionable(snapshot, payload, settings);
+    const actionable = snapshotStillActionable(snapshot, payload, settings, reply);
     if (!actionable.ok) {
       return { autoSent: false, reason: actionable.reason };
     }
@@ -593,6 +608,8 @@
         reason: "delivery_unconfirmed",
         composerDetected: true,
         composerTextDetected: true,
+        composerDraftReused: inserted.reusedExistingDraft === true,
+        composerDraftReplaced: inserted.replacedExistingAiDraft === true,
         sendMethod: sendResult.method,
         deliveryConfirmed: false,
       };
@@ -607,6 +624,8 @@
       reason: "",
       composerDetected: true,
       composerTextDetected: true,
+      composerDraftReused: inserted.reusedExistingDraft === true,
+      composerDraftReplaced: inserted.replacedExistingAiDraft === true,
       sendMethod: sendResult.method,
       deliveryConfirmed: true,
     };
@@ -835,22 +854,13 @@
   }
 
   function start() {
-    if (globalThis.DealerPilotMessengerAutonomy?.isMessagesThreadRoute?.(location.pathname)) {
-      getSettings().then((settings) => {
-        globalThis.DealerPilotMessengerAutonomy.start({
-          processThread: captureConversation,
-          sellerProfileNames: settings.sellerProfileNames,
-        });
-      }).catch(console.warn);
-      return;
-    }
-    setTimeout(() => captureConversation({ automatic: true }).catch(console.warn), 1200);
-    setInterval(() => {
-      if (!isFacebookOrMessengerHost() || isBlockedRoute()) return;
-      captureConversation({ automatic: true }).catch((err) => {
-        console.warn("[DealerPilot Messenger AI] capture failed", err);
+    if (!isFacebookMessagesThreadRoute()) return;
+    getSettings().then((settings) => {
+      globalThis.DealerPilotMessengerAutonomy.start({
+        processThread: captureConversation,
+        sellerProfileNames: settings.sellerProfileNames,
       });
-    }, CAPTURE_INTERVAL_MS);
+    }).catch(console.warn);
   }
 
   globalThis.DealerPilotMessengerAi = Object.freeze({
@@ -862,7 +872,7 @@
     getCurrentThreadId,
     getLastDiagnostics: () => lastDiagnostics,
     insertReply,
-    isMarketplaceMessengerRoute,
+    isFacebookMessagesThreadRoute,
     selectWinningSnapshot,
     validateSellerProfile,
     validateSnapshot,

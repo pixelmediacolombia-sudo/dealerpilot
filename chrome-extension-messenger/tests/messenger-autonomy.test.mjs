@@ -197,3 +197,103 @@ test("a persisted active thread stays ahead of later queued threads after naviga
 
   assert.deepEqual(order, ["101", "202"]);
 });
+
+test("buyer_message_missing is terminal so an idle active thread does not retry forever", async () => {
+  const api = loadApi();
+  const locationRef = {
+    origin: "https://www.facebook.com",
+    pathname: "/messages/t/101",
+    href: "https://www.facebook.com/messages/t/101",
+  };
+  const documentRef = {
+    body: {},
+    querySelectorAll() {
+      return [];
+    },
+  };
+  const sessionStorageRef = {
+    getItem() {
+      return null;
+    },
+    setItem() {},
+  };
+  let attempts = 0;
+  const controller = api.start({
+    documentRef,
+    locationRef,
+    sessionStorageRef,
+    sleepFn: async () => {},
+    async processThread() {
+      attempts += 1;
+      return { skipped: true, reason: "buyer_message_missing" };
+    },
+  });
+
+  await controller.whenIdle();
+
+  assert.equal(attempts, 1);
+  assert.equal(controller.getState().processing, false);
+  assert.deepEqual(Array.from(controller.getState().pendingThreadIds), []);
+});
+
+test("active conversation mutations do not requeue the current thread without a sidebar change", async () => {
+  let observerCallback;
+  class FakeMutationObserver {
+    constructor(callback) {
+      observerCallback = callback;
+    }
+
+    observe() {}
+
+    disconnect() {}
+  }
+  const api = loadApi();
+  const locationRef = {
+    origin: "https://www.facebook.com",
+    pathname: "/messages/t/101",
+    href: "https://www.facebook.com/messages/t/101",
+  };
+  const documentRef = {
+    body: {},
+    querySelectorAll() {
+      return [];
+    },
+  };
+  const sessionStorageRef = {
+    getItem() {
+      return null;
+    },
+    setItem() {},
+  };
+  let attempts = 0;
+  const controller = api.start({
+    documentRef,
+    locationRef,
+    sessionStorageRef,
+    MutationObserverCtor: FakeMutationObserver,
+    sleepFn: async () => {},
+    async processThread() {
+      attempts += 1;
+      return { skipped: true, reason: "buyer_message_missing" };
+    },
+  });
+
+  await controller.whenIdle();
+  observerCallback?.([
+    {
+      target: { nodeType: 1, closest() { return null; } },
+      addedNodes: [
+        {
+          nodeType: 1,
+          matches() { return false; },
+          closest() { return null; },
+          querySelectorAll() { return []; },
+        },
+      ],
+    },
+  ]);
+  await controller.whenIdle();
+
+  assert.equal(attempts, 1);
+  assert.equal(controller.getState().processing, false);
+});

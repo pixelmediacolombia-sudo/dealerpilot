@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import vm from "node:vm";
 
 const routeSource = readFileSync(new URL("./publishing.ts", import.meta.url), "utf8");
 const autoPublishSource = readFileSync(new URL("./autoPublish.ts", import.meta.url), "utf8");
@@ -586,6 +587,17 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /isReplyLanguageMirrored/);
   assert.match(conversationsSource, /Mirror the latest buyer message language exactly/);
   assert.match(conversationsSource, /Never write a bilingual reply/);
+  assert.match(conversationsSource, /estoy\|interesad\[oa\]s\?/);
+  assert.match(conversationsSource, /const language = detectLanguage\(inbound\);/);
+  assert.doesNotMatch(conversationsSource, /detectLanguage\(inbound \+ " " \+ \(buyerName/);
+  const spanishWordsLiteral = conversationsSource.match(
+    /const spanishWords\s*=\s*(\/[^\n]+\/i);/,
+  )?.[1];
+  assert.ok(spanishWordsLiteral);
+  const spanishWords = vm.runInNewContext(spanishWordsLiteral);
+  assert.equal(spanishWords.test("Estoy interesado"), true);
+  assert.equal(spanishWords.test("claro que sí, ¿cómo podemos ayudarte?"), true);
+  assert.equal(spanishWords.test("I am interested"), false);
   assert.match(conversationsSource, /Are you interested in financing/);
   assert.match(conversationsSource, /best phone number/);
   assert.match(conversationsSource, /generateAiReplyWithFallback/);
@@ -593,6 +605,8 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /duplicate_buyer_message/);
   assert.match(conversationsSource, /deliveryRetry: true/);
   assert.match(conversationsSource, /returning existing reply for Messenger delivery retry/);
+  assert.match(conversationsSource, /!isReplyLanguageMirrored\(retryableReply, language\)/);
+  assert.match(conversationsSource, /repaired stored reply language before Messenger delivery retry/);
   assert.match(conversationsSource, /messageDetectedAt/);
   assert.match(conversationsSource, /backendReceivedAt/);
   assert.match(conversationsSource, /aiStartedAt/);

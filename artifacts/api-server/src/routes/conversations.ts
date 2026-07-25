@@ -396,8 +396,8 @@ Reply format:
 
 export function detectLanguage(text: string): "en" | "es" {
   const spanishWords =
-    /\b(hola|gracias|disponible|tengo|quiero|inicial|comprar|semana|número|itin|ingresos|esta|carro|auto)\b/i;
-  return spanishWords.test(text) ? "es" : "en";
+    /[¿¡ñáéíóúü]|\b(hola|gracias|disponible|tengo|quiero|estoy|interesad[oa]s?|claro|podemos|ayuda(?:r|rte)?|inicial|comprar|semana|número|telefono|teléfono|itin|ingresos|esta|está|carro|auto|sí|como|cómo)\b/i;
+  return spanishWords.test(cleanConversationText(text)) ? "es" : "en";
 }
 
 export function computeLeadScore(params: {
@@ -720,7 +720,7 @@ router.post("/conversations/intake", async (req, res) => {
     return;
   }
   const inbound = latestBuyerMessage;
-  const language = detectLanguage(inbound + " " + (buyerName ?? ""));
+  const language = detectLanguage(inbound);
   const parsedDownPayment = parseMoney(marketplaceDownPayment);
   const parsedAskingPrice = parseMoney(marketplaceAskingPrice);
 
@@ -919,9 +919,36 @@ router.post("/conversations/intake", async (req, res) => {
     const assistantAgeMs = latestAssistantMessage?.createdAt
       ? Date.now() - new Date(latestAssistantMessage.createdAt).getTime()
       : Number.POSITIVE_INFINITY;
-    const retryableReply = assistantAgeMs >= MESSENGER_DELIVERY_RETRY_DELAY_MS
+    let retryableReply = assistantAgeMs >= MESSENGER_DELIVERY_RETRY_DELAY_MS
       ? latestAssistantMessage?.content ?? null
       : null;
+    let retryFallbackUsed = false;
+    let retryFallbackReason: string | null = null;
+    if (retryableReply && !isReplyLanguageMirrored(retryableReply, language)) {
+      const repairedReply = await generateAiReplyWithFallback(
+        incomingMsgs.map((msg) => `${msg.role === "assistant" ? "Dealer" : "Buyer"}: ${msg.content}`),
+        inbound,
+        language,
+        resolvedVehicleTitle,
+        vehicleType,
+        parsedDownPayment,
+        storePhone,
+        availabilityQuickReplyAccepted === true,
+      );
+      retryableReply = repairedReply.reply;
+      retryFallbackUsed = repairedReply.fallbackUsed;
+      retryFallbackReason = repairedReply.fallbackReason ?? "stored_reply_language_mismatch";
+      if (latestAssistantMessage) {
+        await db
+          .update(conversationMessagesTable)
+          .set({ content: retryableReply })
+          .where(eq(conversationMessagesTable.id, latestAssistantMessage.id));
+      }
+      req.log.info(
+        { conversationId, externalThreadRef, language },
+        "Conversation intake repaired stored reply language before Messenger delivery retry",
+      );
+    }
     if (retryableReply) {
       req.log.info(
         { conversationId, externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
@@ -932,8 +959,8 @@ router.post("/conversations/intake", async (req, res) => {
         suggestedReply: retryableReply,
         deliveryRetry: true,
         language,
-        fallbackUsed: false,
-        fallbackReason: null,
+        fallbackUsed: retryFallbackUsed,
+        fallbackReason: retryFallbackReason,
         timings: {
           messageDetectedAt: messageDetectedAt.toISOString(),
           backendReceivedAt: backendReceivedAt.toISOString(),

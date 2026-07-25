@@ -142,8 +142,14 @@ function createHarness({
   const profile = new FakeElement({ attributes: { "aria-label": "Manage Andres Ibanez notification settings" } });
   const document = {
     execCommand(command, _showUi, value) {
-      if (command === "insertText" && composerElement) composerElement.textContent = value;
-      if (command === "selectAll" && composerElement) composerElement.textContent = "";
+      if (command === "insertText" && composerElement) {
+        composerElement.innerText = value;
+        composerElement.textContent = value;
+      }
+      if (command === "selectAll" && composerElement) {
+        composerElement.innerText = "";
+        composerElement.textContent = "";
+      }
       return true;
     },
     querySelectorAll(selector) {
@@ -200,6 +206,9 @@ function createHarness({
             messageScopeDetected: true,
             extractionMode: "semantic",
             threadIdentity: "facebook-thread-buyer-a",
+            selectedHeaderText: "Buyer A - 2021 Toyota RAV4",
+            latestMessageDirection: "buyer",
+            composerDetected: !!composerElement,
           },
         };
       },
@@ -214,9 +223,9 @@ function createHarness({
     chrome,
     document,
     location: locationOverride || {
-      href: "https://www.facebook.com/marketplace/inbox",
+      href: "https://www.facebook.com/messages/t/999999",
       origin: "https://www.facebook.com",
-      pathname: "/marketplace/inbox",
+      pathname: "/messages/t/999999",
       hostname: "www.facebook.com",
     },
     console: { warn() {}, log() {}, error() {} },
@@ -279,12 +288,24 @@ test("dynamic facebook messages routes use the route id as stable conversation i
     }],
   });
 
-  assert.equal(ai.isMarketplaceMessengerRoute(route.pathname, route.hostname), true);
+  assert.equal(ai.isFacebookMessagesThreadRoute(route.pathname, route.hostname), true);
   await ai.captureConversation({ automatic: false });
 
   assert.equal(calls.intake.length, 1);
   assert.match(calls.intake[0].externalThreadRef, /facebook-messages-thread-1060211123108393/);
   assert.equal(calls.intake[0].sourceUrl, route.href);
+});
+
+test("only Facebook messages thread routes are authorized", () => {
+  const { ai } = createHarness();
+
+  assert.equal(ai.isFacebookMessagesThreadRoute("/messages/t/123", "www.facebook.com"), true);
+  assert.equal(ai.isFacebookMessagesThreadRoute("/messages/t/456", "web.facebook.com"), true);
+  assert.equal(ai.isFacebookMessagesThreadRoute("/messages/t/789", "facebook.com"), true);
+  assert.equal(ai.isFacebookMessagesThreadRoute("/marketplace/inbox", "www.facebook.com"), false);
+  assert.equal(ai.isFacebookMessagesThreadRoute("/marketplace/you/selling", "www.facebook.com"), false);
+  assert.equal(ai.isFacebookMessagesThreadRoute("/messages/t/123", "www.messenger.com"), false);
+  assert.equal(ai.isFacebookMessagesThreadRoute("/", "www.facebook.com"), false);
 });
 
 test("messages route rejects global Facebook chrome and selects the active buyer header", async () => {
@@ -449,6 +470,50 @@ test("autoReply reports delivery_unconfirmed when Facebook leaves the draft in t
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
 });
 
+test("autoReply retries sending when the composer already contains the exact AI suggestion", async () => {
+  const suggestedReply = "I'd be happy to help with the 2021 TOYOTA RAV4.";
+  const { ai, calls, composerElement, sendButton } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    composerText: suggestedReply,
+    intakeResponse: { ok: true, data: { suggestedReply } },
+    sendSucceeds: true,
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, true);
+  assert.equal(result.composerDraftReused, true);
+  assert.equal(result.sendMethod, "button_click");
+  assert.equal(result.deliveryConfirmed, true);
+  assert.equal(composerElement.textContent, "");
+  assert.deepEqual(sendButton.events, ["native-click"]);
+  assert.equal(calls.debug.at(-1).stage, "intake_ok");
+});
+
+test("autoReply replaces a stale DealerPilot draft when the repaired suggestion changes language", async () => {
+  const staleEnglishReply =
+    "I'd be happy to help with the 2021 TOYOTA RAV4. Are you interested in financing it?";
+  const repairedSpanishReply =
+    "Con gusto te ayudo con la 2021 TOYOTA RAV4. ¿Te interesa financiarla?";
+  const { ai, calls, composerElement, sendButton } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [{ speaker: "Buyer", text: "Estoy interesado" }],
+    composerText: staleEnglishReply,
+    intakeResponse: { ok: true, data: { suggestedReply: repairedSpanishReply, deliveryRetry: true } },
+    sendSucceeds: true,
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, true);
+  assert.equal(result.composerDraftReused, false);
+  assert.equal(result.composerDraftReplaced, true);
+  assert.equal(result.deliveryConfirmed, true);
+  assert.equal(composerElement.textContent, "");
+  assert.deepEqual(sendButton.events, ["native-click"]);
+  assert.equal(calls.debug.at(-1).stage, "intake_ok");
+});
+
 test("autoReply revalidates the same root before writing to Messenger", async () => {
   const { ai, calls, composerElement } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
@@ -467,6 +532,7 @@ test("autoReply revalidates the same root before writing to Messenger", async ()
           threadRootDetected: true,
           messageScopeDetected: true,
           extractionMode: "semantic",
+          selectedHeaderText: "Buyer A - 2021 Toyota RAV4",
           latestMessageDirection: "dealer",
         },
       };
@@ -527,6 +593,9 @@ test("multiple open buyer chats process one winner and keep the rest as diagnost
       messageScopeDetected: true,
       extractionMode: "semantic",
       threadIdentity: "thread-a",
+      selectedHeaderText: "Buyer A - 2021 Toyota RAV4",
+      latestMessageDirection: "buyer",
+      composerDetected: true,
     },
   };
   captureA.scope = captureA.root;
@@ -547,6 +616,9 @@ test("multiple open buyer chats process one winner and keep the rest as diagnost
       messageScopeDetected: true,
       extractionMode: "semantic",
       threadIdentity: "thread-b",
+      selectedHeaderText: "Buyer B - 2022 Honda Civic",
+      latestMessageDirection: "buyer",
+      composerDetected: true,
     },
   };
   captureB.scope = captureB.root;

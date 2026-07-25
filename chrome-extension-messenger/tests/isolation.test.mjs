@@ -51,6 +51,11 @@ test("manifest loads only Messenger AI runtime files", () => {
     "src/content/facebook/messengerAi.js",
     "content/content.js",
   ]);
+  assert.deepEqual(manifest.content_scripts[0].matches, [
+    "https://www.facebook.com/messages/t/*",
+    "https://web.facebook.com/messages/t/*",
+    "https://facebook.com/messages/t/*",
+  ]);
   assert.equal(manifest.background.service_worker, "background.js");
 });
 

@@ -1,16 +1,17 @@
 (function () {
   const THREAD_LINK_SELECTOR = 'a[href*="/messages/t/"]';
-  const ACTIVE_MESSAGE_SELECTOR = [
-    '[role="log"]',
-    '[aria-live="polite"][aria-label*="message" i]',
-    '[aria-live="polite"][aria-label*="mensaje" i]',
-    '[data-pagelet*="conversation" i]',
-    '[data-testid*="conversation" i]',
-  ].join(", ");
   const PERSIST_KEY = "dealerpilotMessengerAutonomyQueueV1";
   const THREAD_SETTLE_MS = 900;
   const PROCESS_RETRY_MS = 1200;
   const PROCESS_MAX_ATTEMPTS = 9;
+  const RETRYABLE_PROCESS_REASONS = new Set([
+    "waiting_quiet_window",
+    "capture_in_flight",
+    "conversation_snapshot_missing",
+    "conversation_thread_missing",
+    "buyer_name_missing",
+    "active_thread_header_missing",
+  ]);
 
   function cleanText(value) {
     return String(value || "")
@@ -278,6 +279,9 @@
 
     async function processQueuedThread(target) {
       lastDiscoveredThreadId = target.threadId;
+      if (!isMessagesThreadRoute(locationRef.pathname)) {
+        return { skipped: true, reason: "route_not_allowed" };
+      }
       if (!await switchToThread(target)) {
         return { skipped: true, reason: "thread_navigation_pending" };
       }
@@ -285,15 +289,7 @@
       let result = null;
       for (let attempt = 0; attempt < PROCESS_MAX_ATTEMPTS; attempt += 1) {
         result = await processThread({ automatic: true, expectedThreadId: target.threadId });
-        const retryable = [
-          "waiting_quiet_window",
-          "capture_in_flight",
-          "conversation_snapshot_missing",
-          "conversation_thread_missing",
-          "buyer_message_missing",
-          "buyer_name_missing",
-          "active_thread_header_missing",
-        ].includes(result?.reason);
+        const retryable = RETRYABLE_PROCESS_REASONS.has(result?.reason);
         if (!retryable) break;
         await sleepFn(PROCESS_RETRY_MS);
       }
@@ -304,6 +300,7 @@
     const queue = createFifoThreadQueue(processQueuedThread, persist);
 
     function observeTarget(target, reason) {
+      if (!isMessagesThreadRoute(locationRef.pathname)) return;
       if (!target) return;
       const previous = previewById.get(target.threadId);
       previewById.set(target.threadId, target.signature);
@@ -315,6 +312,7 @@
     }
 
     function scan(reason = "scan") {
+      if (!isMessagesThreadRoute(locationRef.pathname)) return [];
       const targets = collectThreadTargets(documentRef, {
         origin: locationRef.origin,
         sellerProfileNames: options.sellerProfileNames || [],
@@ -329,7 +327,7 @@
       queue.enqueue({
         threadId,
         url: new URL(`/messages/t/${encodeURIComponent(threadId)}`, locationRef.origin).href,
-        signature: `active:${threadId}:${Date.now()}`,
+        signature: `active:${threadId}`,
         incomingPreview: true,
         explicitUnread: false,
         reason,
@@ -379,19 +377,6 @@
                 origin: locationRef.origin,
                 sellerProfileNames: options.sellerProfileNames || [],
               }), "sidebar_mutation");
-            }
-            const targetElement = record.target?.nodeType === 1
-              ? record.target
-              : record.target?.parentElement;
-            const activeChanged =
-              targetElement?.closest?.(ACTIVE_MESSAGE_SELECTOR) ||
-              Array.from(record.addedNodes || []).some((node) => {
-                const element = node?.nodeType === 1 ? node : node?.parentElement;
-                return element &&
-                  (element.matches?.(ACTIVE_MESSAGE_SELECTOR) || element.closest?.(ACTIVE_MESSAGE_SELECTOR));
-              });
-            if (activeChanged && isMessagesThreadRoute(locationRef.pathname)) {
-              queueCurrentThread("active_thread_mutation");
             }
           }
         })
