@@ -55,8 +55,9 @@
     const cleaned = text
       .replace(/^\s*(?:message sent|mensaje enviado)\s+(?:at\s+)?(?:\d{1,2}:\d{2}|\d{1,2})\s*(?:am|pm)?\s+(?:by|por)\s+[^:]{1,80}:\s*/i, "")
       .replace(/^\s*(?:\d{1,2}:\d{2}|\d{1,2})\s*(?:am|pm)?\s+(?:by|por)\s+[^:]{1,80}:\s*/i, "")
-      .replace(/^\s*[^.]{2,80}\s+(?:started|inici[oó])\s+(?:this|este)\s+chat\.?\s*$/i, "")
+      .replace(/^\s*[^.]{2,80}\s+(?:started|inici[oó])\s+(?:this|este)\s+chat\.?\s*/i, "")
       .replace(/\s+(?:Enter|Return)\s*,?\s*(?:message sent|mensaje enviado)[\s\S]*$/i, "")
+      .replace(/\s*(?:view|ver)\s+(?:buyer|comprador)\s+(?:profile|perfil)\s*$/i, "")
       .trim();
     const dayPrefix = "(?:(?:mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday|today|tomorrow|ayer|hoy|mañana)\\s+)?";
     if (new RegExp("^" + dayPrefix + "\\d{1,2}:\\d{2}\\s*(?:am|pm)?$", "i").test(cleaned)) return "";
