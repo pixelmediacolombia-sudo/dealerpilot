@@ -52,6 +52,8 @@ const UI_MESSAGE_TEXT = new Set([
   "aa",
   "active",
   "about",
+  "message sent",
+  "mensaje enviado",
   "anyone can find this group",
   "anyone can see who's in the group and what they post",
   "archive",
@@ -102,6 +104,7 @@ function cleanConversationText(value: unknown): string {
     .replace(/^\w+day\s+\d{1,2}:\d{2}\s*(AM|PM)\s+by\s+You\s*:?\s*/i, "You sent: ")
     .replace(/^You sent\s*,\s*/i, "You sent: ")
     .replace(/^\s*[:.,;]\s*/, "")
+    .replace(/^(?:message sent|mensaje enviado)[\s.]*$/i, "")
     .trim();
 }
 
