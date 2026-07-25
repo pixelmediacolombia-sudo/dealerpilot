@@ -49,6 +49,7 @@
       .replace(/\s+/g, " ")
       .replace(/^\s*(?:Enter|Return)\s*,?\s*/i, "")
       .trim();
+    if (/^(?:message sent|mensaje enviado)[\s.]*$/i.test(text)) return "";
     const sentMatch = text.match(/(?:message sent|mensaje enviado)[^:]{0,180}:\s*([\s\S]+)$/i);
     if (sentMatch) text = sentMatch[1].trim();
     return text
