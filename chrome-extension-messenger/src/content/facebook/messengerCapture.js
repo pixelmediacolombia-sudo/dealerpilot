@@ -59,6 +59,7 @@
       .replace(/\s+(?:Enter|Return)\s*,?\s*(?:message sent|mensaje enviado)[\s\S]*$/i, "")
       .replace(/\s*(?:view|ver)\s+(?:buyer|comprador)\s+(?:profile|perfil)\s*$/i, "")
       .replace(/\s*(?:joined|se\s+uni[oó])\s+(?:facebook|fb)\s+in\s+\d{4}\s*/i, "")
+      .replace(/^\s*[A-Za-zÀ-ÿ'’ -]+\s*·\s*(?:19|20)\d{2}\s+[A-Za-z0-9 -]+\s*$/i, "")
       .trim();
   }
 
@@ -68,6 +69,37 @@
     if (/^[A-Za-zÀ-ÿ'’ -]+ · (?:Buyer|Seller|Participant|Miembro|Comprador|Vendedor)$/i.test(text)) return true;
     return /^(?:message sent|mensaje enviado)?\s*(?:at\s+)?(?:\d{1,2}:\d{2}|\d{1,2})\s*(?:am|pm)?\s+(?:by|por)\s+[^:]{1,80}\.?$/i.test(text) ||
       /^[^.]{2,80}\s+(?:started|inici[oó])\s+(?:this|este)\s+chat\.?$/i.test(text);
+  }
+
+  function scoreBubbleCandidate(element, scope) {
+    if (!element || !scope) return 0;
+    let score = 0;
+    const scopeRect = rectOf(scope);
+    const rect = rectOf(element);
+    const leftGap = Math.max(0, rect.left - scopeRect.left);
+    const rightGap = Math.max(0, scopeRect.right - rect.right);
+    const gapRatio = scopeRect.width > 0 ? (Math.min(leftGap, rightGap) / scopeRect.width) : 0;
+    if (gapRatio > 0.25) score += 30;
+    if (leftGap < scopeRect.width * 0.1 || rightGap < scopeRect.width * 0.1) score += 20;
+    let current = element;
+    let depth = 0;
+    while (current && current !== scope && current !== document.body && current !== document.documentElement && depth < 8) {
+      const cs = window.getComputedStyle(current);
+      const bg = cs.backgroundColor;
+      if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'rgba(0,0,0,0)') {
+        score += 40;
+        const pr = cs.borderRadius;
+        if (pr && pr !== '0px') score += 15;
+        const pd = cs.padding;
+        if (pd && pd !== '0px') score += 10;
+        break;
+      }
+      current = current.parentElement;
+      depth++;
+    }
+    if (element.closest?.('[role="log"]')) score += 25;
+    if (element.closest?.('[aria-live="polite"]')) score += 20;
+    return score;
   }
 
   function isVisible(element) {
@@ -247,7 +279,9 @@
       const text = cleanMessageText(textOf(element));
       if (!text || text.length < 2 || text.length > 500 || UI_TEXT.test(text) || isMessageMetadataText(text)) return false;
       if (/^(?:send a quick response|tap a response|yes, are you inter|in talks\. i'll let you|sorry, it'?s not av)/i.test(text)) return false;
-      return !element.querySelector?.('a[href*="/marketplace/item/"], button, [role="button"], [contenteditable="true"], textarea');
+      if (element.querySelector?.('a[href*="/marketplace/item/"], button, [role="button"], [contenteditable="true"], textarea')) return false;
+      if (scoreBubbleCandidate(element, scope) < 20) return false;
+      return true;
     });
   }
 
@@ -356,6 +390,7 @@
   function extractVisibleBuyerMessages(root, documentRef, buyerName, scope) {
     const buyer = cleanDisplayName(buyerName);
     if (!buyer) return [];
+    const scopeTop = scope ? rectOf(scope).top : 0;
     const rootSources = Array.from(root?.querySelectorAll?.('div[dir="auto"], span[dir="auto"], [aria-label]') || [])
       .filter(isVisible);
     const sources = rootSources.length ? rootSources : Array.from(documentRef?.querySelectorAll?.('div[dir="auto"], span[dir="auto"], [aria-label]') || [])
@@ -363,11 +398,19 @@
     const seen = new Set();
     return sources
       .map((element) => ({
+        element,
         text: extractMessageLikeText(textOf(element) || element.getAttribute?.("aria-label") || ""),
         top: rectOf(element).top || 0,
         ownSide: isClearlyOwnSide(element, scope),
+        bubbleScore: scope ? scoreBubbleCandidate(element, scope) : 0,
       }))
-      .filter((candidate) => candidate.text && !candidate.ownSide && candidate.text.length >= 4 && !UI_TEXT.test(candidate.text))
+      .filter((candidate) => {
+        if (candidate.ownSide) return false;
+        if (!candidate.text || candidate.text.length < 4) return false;
+        if (candidate.bubbleScore < 25 && candidate.top < scopeTop - 10) return false;
+        if (UI_TEXT.test(candidate.text)) return false;
+        return true;
+      })
       .sort((left, right) => left.top - right.top)
       .filter((candidate) => {
         const key = normalizeForMatch(candidate.text);
