@@ -389,19 +389,18 @@
           });
         }
         if (btn) {
+          try { btn.click(); } catch(e) {}
           ['mousedown', 'mouseup', 'click'].forEach(function(t) {
             btn.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true }));
           });
-          setResult('button_click');
-        } else {
-          document.execCommand('insertParagraph', false, null);
-          setTimeout(function() {
-            if (composer.textContent.trim() === '') { setResult('sent_insert_paragraph'); return; }
-            composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
-            composer.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
-            setResult('enter');
-          }, 100);
         }
+        document.execCommand('insertParagraph', false, null);
+        setTimeout(function() {
+          if (composer.textContent.trim() === '') { setResult('sent_insert_paragraph'); return; }
+          composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
+          composer.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
+          setResult('enter');
+        }, 100);
       } catch(e2) { setResult('error:' + e2.message); }
     }, 150);
   } catch(e) { setResult('error:' + e.message); }
