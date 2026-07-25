@@ -237,34 +237,12 @@
     box.focus?.();
     if (box.tagName === "TEXTAREA") {
       setNativeValue(box, reply);
-    } else if (document.execCommand) {
-      const escapedReply = escapeJs(reply);
-      const script = [
-        "(function(){",
-        "var c=document.querySelector('[contenteditable=\"true\"][role=\"textbox\"], [contenteditable=\"true\"][aria-label], [contenteditable=\"true\"][data-lexical-editor]');",
-        "if(!c){return;}",
-        "c.focus();",
-        "var s=window.getSelection();",
-        "if(s&&s.rangeCount){s.removeAllRanges();}",
-        "var r=document.createRange();",
-        "r.selectNodeContents(c);",
-        "s&&s.addRange(r);",
-        "document.execCommand('insertText',false," + escapedReply + ");",
-        "})();",
-      ].join("");
-      executeInMainWorld(script);
-      document.execCommand("selectAll", false, undefined);
-      document.execCommand("insertText", false, reply);
-    } else {
-      box.textContent = reply;
-      box.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: reply }));
     }
-    const composerTextDetected = cleanText(readComposerText(box)) === cleanText(reply);
     return {
-      ok: composerTextDetected,
-      reason: composerTextDetected ? "" : "composer_insert_unconfirmed",
+      ok: true,
+      reason: "",
       composerDetected: true,
-      composerTextDetected,
+      composerTextDetected: false,
       reusedExistingDraft: false,
       replacedExistingAiDraft: replacingExistingAiDraft === true,
       box,
@@ -377,10 +355,10 @@
     return path.join(" > ");
   }
 
-  async function clickSend(box, root) {
+  async function clickSend(box, root, replyText) {
     await sleep(250);
-    const replyText = box ? cleanText(readComposerText(box)) : "";
-    const escapedReply = escapeJs(replyText);
+    const text = replyText || (box ? cleanText(readComposerText(box)) : "");
+    const escapedReply = escapeJs(text);
     const sendButton = findSendButton(root, box);
     const btnSelector = sendButton ? escapeJs(generateSelector(sendButton)) : "null";
     const script = `
@@ -434,6 +412,16 @@
     const raw = globalThis.__DP_SEND_RESULT || "";
     delete globalThis.__DP_SEND_RESULT;
     if (!raw || raw === "composer_missing") {
+      if (box && box.tagName !== "TEXTAREA" && document.execCommand) {
+        box.focus?.();
+        document.execCommand("selectAll", false, undefined);
+        document.execCommand("insertText", false, text);
+      } else if (box && box.tagName === "TEXTAREA") {
+        setNativeValue(box, text);
+      } else if (box) {
+        box.textContent = text;
+        box.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+      }
       if (sendButton) {
         sendButton.focus?.();
         sendButton.click();
@@ -726,7 +714,7 @@
     if (!inserted.ok) {
       return { autoSent: false, reason: inserted.reason, ...inserted };
     }
-    const sendResult = await clickSend(inserted.box, snapshot.root);
+    const sendResult = await clickSend(inserted.box, snapshot.root, reply);
     if (!sendResult.ok) {
       return { autoSent: false, reason: "send_dispatch_failed", sendMethod: sendResult.method };
     }
