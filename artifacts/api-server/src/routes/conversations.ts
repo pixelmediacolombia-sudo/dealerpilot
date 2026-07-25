@@ -257,7 +257,7 @@ function parseTimestamp(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-type SalesReplyStage = "availability" | "request_phone" | "phone_received" | "general";
+type SalesReplyStage = "availability" | "request_phone" | "phone_received" | "address_request" | "general";
 
 function extractPhoneNumber(text: string): string | null {
   const match = text.match(/(?:^|\D)((?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})(?=$|\D)/);
@@ -292,8 +292,23 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   if (/\b(is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|esta disponible|está disponible|lo tiene disponible)\b/i.test(latest)) {
     return "availability";
   }
+  if (
+    /\b(direcci[oó]n|address|ubicaci[oó]n|location|d[oó]nde est[áa]n|where are you|c[oó]mo llegar|how (?:do )?i get|est[áa] en|store address|concesionario|lot location|physical address|visitar|visit the lot|come see|stop by|come by|directions|mapa|maps|google maps)\b/i.test(latest)
+  ) {
+    return "address_request";
+  }
   if (!/\b(?:Dealer|DealerPilot AI|Assistant):/i.test(history)) return "availability";
   return "general";
+}
+
+function resolveStoreAddress(lotLocation?: string | null): string {
+  const locations: Record<string, string> = {
+    manassas: "7610 Coppermine Dr, Manassas, VA 20109",
+    fredericksburg: "3613 Jefferson Davis Hwy, Fredericksburg, VA 22408",
+  };
+  if (!lotLocation) return locations.manassas;
+  const key = lotLocation.toLowerCase().trim();
+  return locations[key] ?? locations.manassas;
 }
 
 function buildSafeFallbackReply(
@@ -303,9 +318,11 @@ function buildSafeFallbackReply(
   visibleMessages: string[] = [],
   currentMessage: string = "",
   availabilityQuickReplyAccepted: boolean = false,
+  lotLocation?: string | null,
 ): string {
   const vehicle = vehicleTitle ?? (language === "es" ? "el vehículo" : "the vehicle");
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage);
+  const storeAddress = resolveStoreAddress(lotLocation);
   if (language === "es") {
     if (stage === "phone_received") {
       return `Gracias. Nuestro equipo se comunicará contigo pronto sobre el ${vehicle}. Si prefieres llamar ahora: ${storePhone}.`;
@@ -315,6 +332,9 @@ function buildSafeFallbackReply(
     }
     if (stage === "availability") {
       return `${availabilityQuickReplyAccepted ? "" : "Sí, sigue disponible. "}¿Te interesa financiar el ${vehicle}?`;
+    }
+    if (stage === "address_request") {
+      return `Nuestra dirección es: ${storeAddress}. ¿Te gustaría venir a ver el ${vehicle}?`;
     }
     return `Con gusto te ayudo con el ${vehicle}. ¿Te interesa financiarlo?`;
   }
@@ -326,6 +346,9 @@ function buildSafeFallbackReply(
   }
   if (stage === "availability") {
     return `${availabilityQuickReplyAccepted ? "" : "Yes, it is still available. "}Are you interested in financing the ${vehicle}?`;
+  }
+  if (stage === "address_request") {
+    return `Our address is: ${storeAddress}. Would you like to come see the ${vehicle}?`;
   }
   return `I'd be happy to help with the ${vehicle}. Are you interested in financing it?`;
 }
@@ -346,14 +369,9 @@ function isAiReplyAligned(reply: string, stage: SalesReplyStage, storePhone: str
 }
 
 function isReplyLanguageMirrored(reply: string, language: string): boolean {
-  const normalized = cleanConversationText(reply).toLowerCase();
-  if (!normalized) return false;
-  const englishSalesPhrases =
-    /\b(are you|is it|still available|easy financing|financing options|best phone number|team will call|thank you|great|vehicle is)\b/i;
-  const spanishSalesPhrases =
-    /[¿¡]|\b(gracias|sigue disponible|opciones de financiamiento|financiamiento|numero|número|telefono|teléfono|equipo se comunicar|vehiculo|vehículo)\b/i;
-  if (language === "es") return !englishSalesPhrases.test(normalized);
-  return !spanishSalesPhrases.test(normalized);
+  const text = cleanConversationText(reply);
+  if (!text) return false;
+  return detectLanguage(text) === language;
 }
 
 type AiReplyResult = {
@@ -374,6 +392,11 @@ CONVERSATION FUNNEL:
 3. Once the buyer provides a phone number, acknowledge it and say the team will call shortly. Only at this stage may you also offer the store phone as an immediate option.
 4. Send exactly one short reply for the latest buyer turn. Never repeat a previous reply.
 5. Answer safe vehicle questions directly when the supplied context contains the answer; never invent availability, price, approval, history, or financing details.
+
+ADDRESS / DIRECTIONS HANDLING:
+- If the buyer asks for the address, directions, or location, provide the store address directly and invite them to visit.
+- Never ask a clarifying question about which vehicle or location they mean.
+- Always provide the address from the supplied Dealership address field.
 
 Language rules:
 - Mirror the latest buyer message language exactly.
@@ -442,15 +465,18 @@ export async function generateAiReply(
   publishedDownPayment?: number,
   storePhone: string = DEFAULT_STORE_PHONE,
   availabilityQuickReplyAccepted: boolean = false,
+  lotLocation?: string | null,
 ): Promise<string> {
   const langNote =
     language === "es"
       ? "The latest buyer message is Spanish. Respond ONLY in Spanish. Do not include English."
       : "The latest buyer message is English. Respond ONLY in English. Do not include Spanish.";
 
+  const storeAddress = resolveStoreAddress(lotLocation);
   const vehicleContext = vehicleTitle
     ? `Vehicle: ${vehicleTitle}${vehicleType ? ` (${vehicleType})` : ""}${publishedDownPayment ? ` — Listed down payment: $${publishedDownPayment.toLocaleString()}` : ""}`
     : "";
+  const locationContext = `Dealership address: ${storeAddress}`;
 
   const history = visibleMessages.slice(-8).join("\n");
 
@@ -461,12 +487,14 @@ export async function generateAiReply(
       : "Confirm availability briefly, then ask whether the buyer is interested in financing.",
     request_phone: "Ask for the buyer's best phone number so the finance team can help. Do not provide the store phone yet.",
     phone_received: `A phone number was provided. Thank the buyer, say the team will call shortly, and optionally offer ${storePhone} as an immediate call option.`,
+    address_request: `The buyer is asking for the address or directions. Provide the dealership address and invite them to visit. Do NOT ask clarifying questions.`,
     general: "Answer safely using only supplied facts, then move the conversation forward with one short question.",
   }[stage];
 
   const prompt = `${ALPHA_RULES}
 
 ${vehicleContext}
+${locationContext}
 Current funnel stage: ${stage}
 Stage instruction: ${stageInstruction}
 
@@ -509,6 +537,7 @@ async function generateAiReplyWithFallback(
   publishedDownPayment?: number,
   storePhone: string = DEFAULT_STORE_PHONE,
   availabilityQuickReplyAccepted: boolean = false,
+  lotLocation?: string | null,
 ): Promise<AiReplyResult> {
   const aiStartedAt = new Date();
   let fallbackReason: string | null = null;
@@ -524,6 +553,7 @@ async function generateAiReplyWithFallback(
         publishedDownPayment,
         storePhone,
         availabilityQuickReplyAccepted,
+        lotLocation,
       ),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("sales_ai_reply_timeout")), SALES_AI_REPLY_TIMEOUT_MS),
@@ -553,6 +583,7 @@ async function generateAiReplyWithFallback(
       visibleMessages,
       currentMessage,
       availabilityQuickReplyAccepted,
+      lotLocation,
     ),
     fallbackUsed: true,
     fallbackReason,
@@ -934,6 +965,7 @@ router.post("/conversations/intake", async (req, res) => {
         parsedDownPayment,
         storePhone,
         availabilityQuickReplyAccepted === true,
+        lotLocation,
       );
       retryableReply = repairedReply.reply;
       retryFallbackUsed = repairedReply.fallbackUsed;
@@ -1008,6 +1040,7 @@ router.post("/conversations/intake", async (req, res) => {
       parsedDownPayment,
       storePhone,
       availabilityQuickReplyAccepted === true,
+      lotLocation,
     );
     suggestedReply = aiReplyResult.reply;
 

@@ -279,18 +279,84 @@
     return Math.abs(firstCenterX - secondCenterX) + Math.abs(firstCenterY - secondCenterY);
   }
 
+  function escapeJs(value) {
+    return JSON.stringify(value);
+  }
+
+  function generateSelector(element) {
+    if (!element || !element.parentElement) return "";
+    const cssEscape = typeof CSS !== "undefined" && CSS.escape ? CSS.escape.bind(CSS) : function(v) { return v.replace(/["\\]/g, "\\$&"); };
+    if (element.id) return "#" + cssEscape(element.id);
+    const label = element.getAttribute("aria-label");
+    if (label) return '[aria-label="' + cssEscape(label) + '"]';
+    let path = [];
+    let cur = element;
+    while (cur && cur !== document.body && cur !== document.documentElement) {
+      let tag = cur.tagName.toLowerCase();
+      const parent = cur.parentElement;
+      if (parent) {
+        const siblings = Array.from(parent.children).filter((s) => s.tagName === cur.tagName);
+        if (siblings.length > 1) {
+          const idx = Array.from(parent.children).indexOf(cur) + 1;
+          tag += ":nth-child(" + idx + ")";
+        }
+      }
+      path.unshift(tag);
+      cur = parent;
+    }
+    return path.join(" > ");
+  }
+
+  function executeInMainWorld(code) {
+    if (typeof document === "undefined" || !document.createElement) return;
+    const el = document.createElement("script");
+    el.textContent = code;
+    document.documentElement.appendChild(el);
+    el.remove();
+  }
+
   function findSendButton(root, box = null) {
+    const selectors = [
+      '[aria-label*="send" i]',
+      '[aria-label*="enviar" i]',
+      '[aria-label*="envoyer" i]',
+      '[data-testid*="send" i]',
+      '[data-visualcompletion*="ignore"] div[role="button"]',
+      'div[aria-label*="send" i]',
+      'div[aria-label*="enviar" i]',
+    ];
     const buttons = Array.from(
-      (root || document).querySelectorAll?.(
-        '[aria-label*="send" i], [aria-label*="enviar" i], [data-testid*="send" i]',
-      ) || [],
+      (root || document).querySelectorAll?.(selectors.join(", ")) || [],
     );
     const candidates = buttons.filter((button) => {
       const text = cleanText(button.innerText || button.textContent || button.getAttribute?.("aria-label") || "");
       return elementIsVisibleAndEnabled(button) &&
         !/quick response|respuesta rápida|tap a response|availability|disponible/i.test(text);
     });
-    if (!box || candidates.length < 2) return candidates[0] || null;
+    const allInteractive = Array.from(
+      (root || document).querySelectorAll?.('div[role="button"], button') || [],
+    ).filter((el) => elementIsVisibleAndEnabled(el) && !el.closest('[role="menu"], [role="listbox"], [role="navigation"]'));
+    const svgCandidate = allInteractive.find((el) => {
+      const html = el.innerHTML.toLowerCase();
+      return (html.includes("svg") || el.querySelector("svg")) &&
+        !/quick response|respuesta|availability|disponible/i.test(cleanText(el.innerText || el.textContent || ""));
+    });
+    const distanceSort = (a, b) => {
+      const da = distanceBetweenElements(a, box);
+      const db = distanceBetweenElements(b, box);
+      return da - db;
+    };
+    const labelBest = candidates.length > 0
+      ? (box ? [...candidates].sort(distanceSort)[0] : candidates[0])
+      : null;
+    if (labelBest) return labelBest;
+    if (svgCandidate && box) {
+      const distance = Math.abs(
+        (box.getBoundingClientRect?.().top || 0) - (svgCandidate.getBoundingClientRect?.().top || 0),
+      );
+      if (distance < 200) return svgCandidate;
+    }
+    if (svgCandidate) return svgCandidate;
     return candidates
       .map((button, index) => ({ button, index, distance: distanceBetweenElements(button, box) }))
       .sort((left, right) => left.distance - right.distance || left.index - right.index)[0]?.button || null;
@@ -298,21 +364,74 @@
 
   async function clickSend(box, root) {
     await sleep(250);
+    const replyText = box ? cleanText(readComposerText(box)) : "";
+    const escapedReply = escapeJs(replyText);
     const sendButton = findSendButton(root, box);
-    if (sendButton) {
-      sendButton.focus?.();
-      if (typeof sendButton.click === "function") {
+    const btnSelector = sendButton ? escapeJs(generateSelector(sendButton)) : "null";
+    const script = `
+(function() {
+  function setResult(r) { window.__DP_SEND_RESULT = r; }
+  try {
+    var composer = document.querySelector('[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label], [contenteditable="true"][data-lexical-editor]');
+    if (!composer) { setResult('composer_missing'); return; }
+    composer.focus();
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount) sel.removeAllRanges();
+    var range = document.createRange();
+    range.selectNodeContents(composer);
+    sel && sel.addRange(range);
+    document.execCommand('delete', false, null);
+    document.execCommand('insertText', false, ${escapedReply});
+    setTimeout(function() {
+      try {
+        var btn = ${btnSelector} ? document.querySelector(${btnSelector}) : null;
+        if (!btn || !btn.offsetParent || btn.style.pointerEvents === 'none') {
+          var allBtns = Array.from(document.querySelectorAll('[aria-label*="send" i], [aria-label*="enviar" i], [aria-label*="envoyer" i], [data-testid*="send" i], div[role="button"], button'));
+          btn = allBtns.find(function(b) {
+            if (!b.offsetParent || b.style.pointerEvents === 'none') return false;
+            var label = (b.getAttribute('aria-label')||'').toLowerCase();
+            if (/send|enviar|envoyer/.test(label) && !/(quick response|respuesta)/i.test(label)) return true;
+            var html = (b.innerHTML||'').toLowerCase();
+            return (html.indexOf('svg') !== -1 || b.querySelector('svg'));
+          });
+        }
+        if (btn) {
+          ['mousedown', 'mouseup', 'click'].forEach(function(t) {
+            btn.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true }));
+          });
+          setResult('button_click');
+        } else {
+          document.execCommand('insertParagraph', false, null);
+          setTimeout(function() {
+            if (composer.textContent.trim() === '') { setResult('sent_insert_paragraph'); return; }
+            composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
+            composer.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
+            setResult('enter');
+          }, 100);
+        }
+      } catch(e2) { setResult('error:' + e2.message); }
+    }, 150);
+  } catch(e) { setResult('error:' + e.message); }
+})();
+`;
+    executeInMainWorld(script);
+    await sleep(1000);
+    const raw = globalThis.__DP_SEND_RESULT || "";
+    delete globalThis.__DP_SEND_RESULT;
+    if (!raw || raw === "composer_missing") {
+      if (sendButton) {
+        sendButton.focus?.();
         sendButton.click();
         return { ok: true, method: "button_click" };
       }
-      sendButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
-      return { ok: true, method: "button_event" };
+      if (!box) return { ok: false, method: "none" };
+      box.focus?.();
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+      box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+      return { ok: true, method: "enter" };
     }
-    if (!box) return { ok: false, method: "none" };
-    box.focus?.();
-    box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-    box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-    return { ok: true, method: "enter" };
+    if (raw.startsWith("error:")) return { ok: false, method: "main_world_error", error: raw.slice(6) };
+    return { ok: true, method: raw === "button_click" ? "button_click" : raw === "sent_insert_paragraph" ? "insert_paragraph" : "enter" };
   }
 
   function deliveryIsVisible(reply, messages = []) {
@@ -342,12 +461,13 @@
     const composer = findComposer(snapshot.root);
     if (!composer) return { ok: false, reason: "composer_missing" };
     const composerText = cleanText(readComposerText(composer));
-    if (
-      composerText &&
-      composerText !== cleanText(expectedReply) &&
-      !isLikelyOwnAiReply(composerText)
-    ) {
-      return { ok: false, reason: "composer_not_empty" };
+    if (composerText) {
+      const threadKey = payload?.externalThreadRef || "";
+      const prevReply = cleanText(lastSuggestedReplyByThread.get(threadKey) || "");
+      const matchesExpected = composerText === cleanText(expectedReply) || (prevReply && composerText === prevReply);
+      if (!matchesExpected && !isLikelyOwnAiReply(composerText)) {
+        return { ok: false, reason: "composer_not_empty" };
+      }
     }
     return { ok: true, reason: "" };
   }
