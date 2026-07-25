@@ -417,7 +417,8 @@ Language rules:
 Reply format:
 - Keep it SHORT — one or two sentences
 - Ask only one question at a time
-- Follow the current funnel stage exactly
+- Follow the current funnel stage exactly and do not add extra steps
+- Never refer to the vehicle as "your vehicle", "your car", "tu vehículo", or "tu carro". Always say "the vehicle" / "el vehículo" or use the specific make/model.
 `;
 
 export function detectLanguage(text: string): "en" | "es" {
