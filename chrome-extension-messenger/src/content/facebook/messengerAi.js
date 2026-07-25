@@ -238,6 +238,21 @@
     if (box.tagName === "TEXTAREA") {
       setNativeValue(box, reply);
     } else if (document.execCommand) {
+      const escapedReply = escapeJs(reply);
+      const script = [
+        "(function(){",
+        "var c=document.querySelector('[contenteditable=\"true\"][role=\"textbox\"], [contenteditable=\"true\"][aria-label], [contenteditable=\"true\"][data-lexical-editor]');",
+        "if(!c){return;}",
+        "c.focus();",
+        "var s=window.getSelection();",
+        "if(s&&s.rangeCount){s.removeAllRanges();}",
+        "var r=document.createRange();",
+        "r.selectNodeContents(c);",
+        "s&&s.addRange(r);",
+        "document.execCommand('insertText',false," + escapedReply + ");",
+        "})();",
+      ].join("");
+      executeInMainWorld(script);
       document.execCommand("selectAll", false, undefined);
       document.execCommand("insertText", false, reply);
     } else {
