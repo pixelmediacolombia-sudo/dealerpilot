@@ -63,6 +63,7 @@
   function isMessageMetadataText(value) {
     const text = cleanMessageText(value);
     if (!text) return true;
+    if (/^[A-Za-zÀ-ÿ'’ -]+ · (?:Buyer|Seller|Participant|Miembro|Comprador|Vendedor)$/i.test(text)) return true;
     return /^(?:message sent|mensaje enviado)?\s*(?:at\s+)?(?:\d{1,2}:\d{2}|\d{1,2})\s*(?:am|pm)?\s+(?:by|por)\s+[^:]{1,80}\.?$/i.test(text) ||
       /^[^.]{2,80}\s+(?:started|inici[oó])\s+(?:this|este)\s+chat\.?$/i.test(text);
   }

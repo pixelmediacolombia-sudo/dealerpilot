@@ -68,6 +68,7 @@
     if (!text) return true;
     const dayPrefix = "(?:(?:mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday|today|tomorrow|ayer|hoy|mañana)\\s+)?";
     if (new RegExp("^" + dayPrefix + "\\d{1,2}:\\d{2}\\s*(?:am|pm)?$", "i").test(text)) return true;
+    if (/^[A-Za-zÀ-ÿ'’ -]+ · (?:Buyer|Seller|Participant|Miembro|Comprador|Vendedor)$/i.test(text)) return true;
     return /^(?:message sent|mensaje enviado)?\s*(?:at\s+)?(?:\d{1,2}:\d{2}|\d{1,2})\s*(?:am|pm)?\s+(?:by|por)\s+[^:]{1,80}\.?$/i.test(text) ||
       /^[^.]{2,80}\s+(?:started|inici[oó])\s+(?:this|este)\s+chat\.?$/i.test(text);
   }
