@@ -303,8 +303,8 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
 
 function resolveStoreAddress(lotLocation?: string | null): string {
   const locations: Record<string, string> = {
-    manassas: "7610 Coppermine Dr, Manassas, VA 20109",
-    fredericksburg: "3613 Jefferson Davis Hwy, Fredericksburg, VA 22408",
+    manassas: "9120 Euclid Ave, Manassas, VA 20110",
+    fredericksburg: "9120 Euclid Ave, Manassas, VA 20110",
   };
   if (!lotLocation) return locations.manassas;
   const key = lotLocation.toLowerCase().trim();
