@@ -6,7 +6,8 @@
   "permissions": [
     "storage",
     "activeTab",
-    "tabs"
+    "tabs",
+    "debugger"
   ],
   "host_permissions": [
     "https://*.replit.dev/*",

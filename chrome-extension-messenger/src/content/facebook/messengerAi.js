@@ -360,54 +360,24 @@
     const text = replyText || (box ? cleanText(readComposerText(box)) : "");
     const escapedReply = escapeJs(text);
     const sendButton = findSendButton(root, box);
-    const btnSelector = sendButton ? escapeJs(generateSelector(sendButton)) : "null";
     const script = `
 (function() {
-  function setResult(r) { window.__DP_SEND_RESULT = r; }
   try {
-    var composer = document.querySelector('[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label], [contenteditable="true"][data-lexical-editor]');
-    if (!composer) { setResult('composer_missing'); return; }
-    composer.focus();
-    var sel = window.getSelection();
-    if (sel && sel.rangeCount) sel.removeAllRanges();
-    var range = document.createRange();
-    range.selectNodeContents(composer);
-    sel && sel.addRange(range);
+    var c = document.querySelector('[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label], [contenteditable="true"][data-lexical-editor]');
+    if (!c) { window.__DP_SEND_RESULT = 'composer_missing'; return; }
+    c.focus();
+    var s = window.getSelection();
+    if (s && s.rangeCount) s.removeAllRanges();
+    var r = document.createRange();
+    r.selectNodeContents(c); s && s.addRange(r);
     document.execCommand('delete', false, null);
     document.execCommand('insertText', false, ${escapedReply});
-    setTimeout(function() {
-      try {
-        var btn = ${btnSelector} ? document.querySelector(${btnSelector}) : null;
-        if (!btn || !btn.offsetParent || btn.style.pointerEvents === 'none') {
-          var allBtns = Array.from(document.querySelectorAll('[aria-label*="send" i], [aria-label*="enviar" i], [aria-label*="envoyer" i], [data-testid*="send" i], div[role="button"], button'));
-          btn = allBtns.find(function(b) {
-            if (!b.offsetParent || b.style.pointerEvents === 'none') return false;
-            var label = (b.getAttribute('aria-label')||'').toLowerCase();
-            if (/send|enviar|envoyer/.test(label) && !/(quick response|respuesta)/i.test(label)) return true;
-            var html = (b.innerHTML||'').toLowerCase();
-            return (html.indexOf('svg') !== -1 || b.querySelector('svg'));
-          });
-        }
-        if (btn) {
-          try { btn.click(); } catch(e) {}
-          ['mousedown', 'mouseup', 'click'].forEach(function(t) {
-            btn.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true }));
-          });
-        }
-        document.execCommand('insertParagraph', false, null);
-        setTimeout(function() {
-          if (composer.textContent.trim() === '') { setResult('sent_insert_paragraph'); return; }
-          composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
-          composer.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
-          setResult('enter');
-        }, 100);
-      } catch(e2) { setResult('error:' + e2.message); }
-    }, 150);
-  } catch(e) { setResult('error:' + e.message); }
+    window.__DP_SEND_RESULT = 'text_inserted';
+  } catch(e) { window.__DP_SEND_RESULT = 'error:' + e.message; }
 })();
 `;
     executeInMainWorld(script);
-    await sleep(1000);
+    await sleep(400);
     const raw = globalThis.__DP_SEND_RESULT || "";
     delete globalThis.__DP_SEND_RESULT;
     if (!raw || raw === "composer_missing") {
@@ -433,7 +403,33 @@
       return { ok: true, method: "enter" };
     }
     if (raw.startsWith("error:")) return { ok: false, method: "main_world_error", error: raw.slice(6) };
-    return { ok: true, method: raw === "button_click" ? "button_click" : raw === "sent_insert_paragraph" ? "insert_paragraph" : "enter" };
+    if (sendButton) {
+      sendButton.scrollIntoView?.({ block: "center", behavior: "instant" });
+      await sleep(300);
+      const rect = sendButton.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const debugResp = await send({ type: "DEBUGGER_SEND", x: cx, y: cy }).catch(() => ({ ok: false }));
+      if (debugResp?.ok && debugResp?.data?.ok) {
+        await sleep(600);
+        return { ok: true, method: "debugger_click" };
+      }
+      sendButton.focus?.();
+      try { sendButton.click(); } catch(e) {}
+      ['mousedown', 'mouseup', 'click'].forEach(function(t) {
+        sendButton.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true }));
+      });
+      box?.focus?.();
+      document.execCommand('insertParagraph', false, null);
+      await sleep(200);
+      box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+      box?.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+      return { ok: true, method: "button_click" };
+    }
+    box?.focus?.();
+    box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+    box?.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+    return { ok: true, method: "enter" };
   }
 
   function deliveryIsVisible(reply, messages = []) {

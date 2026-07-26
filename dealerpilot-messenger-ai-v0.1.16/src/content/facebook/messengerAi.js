@@ -261,16 +261,51 @@
     return true;
   }
 
+  function distanceBetweenElements(first, second) {
+    const firstRect = first?.getBoundingClientRect?.();
+    const secondRect = second?.getBoundingClientRect?.();
+    if (!firstRect || !secondRect) return Number.POSITIVE_INFINITY;
+    const firstCenterX = Number(firstRect.left) + Number(firstRect.width) / 2;
+    const firstCenterY = Number(firstRect.top) + Number(firstRect.height) / 2;
+    const secondCenterX = Number(secondRect.left) + Number(secondRect.width) / 2;
+    const secondCenterY = Number(secondRect.top) + Number(secondRect.height) / 2;
+    return Math.abs(firstCenterX - secondCenterX) + Math.abs(firstCenterY - secondCenterY);
+  }
+
+  function escapeJs(value) {
+    return JSON.stringify(value);
+  }
+
+  function generateSelector(element) {
+    if (!element || !element.parentElement) return "";
+    const cssEscape = typeof CSS !== "undefined" && CSS.escape ? CSS.escape.bind(CSS) : function(v) { return v.replace(/["\\]/g, "\\$&"); };
+    if (element.id) return "#" + cssEscape(element.id);
+    const label = element.getAttribute("aria-label");
+    if (label) return '[aria-label="' + cssEscape(label) + '"]';
+    let path = [];
+    let cur = element;
+    while (cur && cur !== document.body && cur !== document.documentElement) {
+      let tag = cur.tagName.toLowerCase();
+      const parent = cur.parentElement;
+      if (parent) {
+        const siblings = Array.from(parent.children).filter((s) => s.tagName === cur.tagName);
+        if (siblings.length > 1) {
+          const idx = Array.from(parent.children).indexOf(cur) + 1;
+          tag += ":nth-child(" + idx + ")";
+        }
+      }
+      path.unshift(tag);
+      cur = parent;
+    }
+    return path.join(" > ");
+  }
+
   function executeInMainWorld(code) {
     if (typeof document === "undefined" || !document.createElement) return;
     const el = document.createElement("script");
     el.textContent = code;
     document.documentElement.appendChild(el);
     el.remove();
-  }
-
-  function escapeJs(value) {
-    return JSON.stringify(value);
   }
 
   function findSendButton(root, box = null) {
@@ -320,94 +355,29 @@
       .sort((left, right) => left.distance - right.distance || left.index - right.index)[0]?.button || null;
   }
 
-  function distanceBetweenElements(first, second) {
-    const firstRect = first?.getBoundingClientRect?.();
-    const secondRect = second?.getBoundingClientRect?.();
-    if (!firstRect || !secondRect) return Number.POSITIVE_INFINITY;
-    const firstCenterX = Number(firstRect.left) + Number(firstRect.width) / 2;
-    const firstCenterY = Number(firstRect.top) + Number(firstRect.height) / 2;
-    const secondCenterX = Number(secondRect.left) + Number(secondRect.width) / 2;
-    const secondCenterY = Number(secondRect.top) + Number(secondRect.height) / 2;
-    return Math.abs(firstCenterX - secondCenterX) + Math.abs(firstCenterY - secondCenterY);
-  }
-
-  function generateSelector(element) {
-    if (!element || !element.parentElement) return "";
-    const cssEscape = typeof CSS !== "undefined" && CSS.escape ? CSS.escape.bind(CSS) : function(v) { return v.replace(/["\\]/g, "\\$&"); };
-    if (element.id) return "#" + cssEscape(element.id);
-    const label = element.getAttribute("aria-label");
-    if (label) return '[aria-label="' + cssEscape(label) + '"]';
-    let path = [];
-    let cur = element;
-    while (cur && cur !== document.body && cur !== document.documentElement) {
-      let tag = cur.tagName.toLowerCase();
-      const parent = cur.parentElement;
-      if (parent) {
-        const siblings = Array.from(parent.children).filter((s) => s.tagName === cur.tagName);
-        if (siblings.length > 1) {
-          const idx = Array.from(parent.children).indexOf(cur) + 1;
-          tag += ":nth-child(" + idx + ")";
-        }
-      }
-      path.unshift(tag);
-      cur = parent;
-    }
-    return path.join(" > ");
-  }
-
   async function clickSend(box, root, replyText) {
     await sleep(250);
     const text = replyText || (box ? cleanText(readComposerText(box)) : "");
     const escapedReply = escapeJs(text);
     const sendButton = findSendButton(root, box);
-    const btnSelector = sendButton ? escapeJs(generateSelector(sendButton)) : "null";
     const script = `
 (function() {
-  function setResult(r) { window.__DP_SEND_RESULT = r; }
   try {
-    var composer = document.querySelector('[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label], [contenteditable="true"][data-lexical-editor]');
-    if (!composer) { setResult('composer_missing'); return; }
-    composer.focus();
-    var sel = window.getSelection();
-    if (sel && sel.rangeCount) sel.removeAllRanges();
-    var range = document.createRange();
-    range.selectNodeContents(composer);
-    sel && sel.addRange(range);
+    var c = document.querySelector('[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label], [contenteditable="true"][data-lexical-editor]');
+    if (!c) { window.__DP_SEND_RESULT = 'composer_missing'; return; }
+    c.focus();
+    var s = window.getSelection();
+    if (s && s.rangeCount) s.removeAllRanges();
+    var r = document.createRange();
+    r.selectNodeContents(c); s && s.addRange(r);
     document.execCommand('delete', false, null);
     document.execCommand('insertText', false, ${escapedReply});
-    setTimeout(function() {
-      try {
-        var btn = ${btnSelector} ? document.querySelector(${btnSelector}) : null;
-        if (!btn || !btn.offsetParent || btn.style.pointerEvents === 'none') {
-          var allBtns = Array.from(document.querySelectorAll('[aria-label*="send" i], [aria-label*="enviar" i], [aria-label*="envoyer" i], [data-testid*="send" i], div[role="button"], button'));
-          btn = allBtns.find(function(b) {
-            if (!b.offsetParent || b.style.pointerEvents === 'none') return false;
-            var label = (b.getAttribute('aria-label')||'').toLowerCase();
-            if (/send|enviar|envoyer/.test(label) && !/(quick response|respuesta)/i.test(label)) return true;
-            var html = (b.innerHTML||'').toLowerCase();
-            return (html.indexOf('svg') !== -1 || b.querySelector('svg'));
-          });
-        }
-        if (btn) {
-          try { btn.click(); } catch(e) {}
-          ['mousedown', 'mouseup', 'click'].forEach(function(t) {
-            btn.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true }));
-          });
-        }
-        document.execCommand('insertParagraph', false, null);
-        setTimeout(function() {
-          if (composer.textContent.trim() === '') { setResult('sent_insert_paragraph'); return; }
-          composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
-          composer.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
-          setResult('enter');
-        }, 100);
-      } catch(e2) { setResult('error:' + e2.message); }
-    }, 150);
-  } catch(e) { setResult('error:' + e.message); }
+    window.__DP_SEND_RESULT = 'text_inserted';
+  } catch(e) { window.__DP_SEND_RESULT = 'error:' + e.message; }
 })();
 `;
     executeInMainWorld(script);
-    await sleep(1000);
+    await sleep(400);
     const raw = globalThis.__DP_SEND_RESULT || "";
     delete globalThis.__DP_SEND_RESULT;
     if (!raw || raw === "composer_missing") {
@@ -433,7 +403,33 @@
       return { ok: true, method: "enter" };
     }
     if (raw.startsWith("error:")) return { ok: false, method: "main_world_error", error: raw.slice(6) };
-    return { ok: true, method: raw === "button_click" ? "button_click" : raw === "sent_insert_paragraph" ? "insert_paragraph" : "enter" };
+    if (sendButton) {
+      sendButton.scrollIntoView?.({ block: "center", behavior: "instant" });
+      await sleep(300);
+      const rect = sendButton.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const debugResp = await send({ type: "DEBUGGER_SEND", x: cx, y: cy }).catch(() => ({ ok: false }));
+      if (debugResp?.ok && debugResp?.data?.ok) {
+        await sleep(600);
+        return { ok: true, method: "debugger_click" };
+      }
+      sendButton.focus?.();
+      try { sendButton.click(); } catch(e) {}
+      ['mousedown', 'mouseup', 'click'].forEach(function(t) {
+        sendButton.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true }));
+      });
+      box?.focus?.();
+      document.execCommand('insertParagraph', false, null);
+      await sleep(200);
+      box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+      box?.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+      return { ok: true, method: "button_click" };
+    }
+    box?.focus?.();
+    box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+    box?.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+    return { ok: true, method: "enter" };
   }
 
   function deliveryIsVisible(reply, messages = []) {
@@ -451,14 +447,9 @@
       document,
     );
     const liveMessages = Array.isArray(liveCapture?.messages) ? liveCapture.messages : snapshot.messages;
-    const liveEvidence = liveCapture?.evidence || snapshot.evidence || {};
-    const latestBuyerText = cleanText(liveEvidence.latestBuyerMessage || "");
-    const buyerMessagesExist = liveMessages.some((m) => m.speaker !== "Dealer");
-    if (!buyerMessagesExist) return { ok: false, reason: "no_buyer_messages" };
-    const latestText = latestBuyerText || (() => {
-      const lastBuyer = [...liveMessages].reverse().find((m) => m.speaker !== "Dealer");
-      return cleanText(lastBuyer?.text || "");
-    })();
+    const liveLastMessage = liveMessages[liveMessages.length - 1] || snapshot.lastMessage;
+    if (liveLastMessage?.speaker === "Dealer") return { ok: false, reason: "latest_message_not_buyer" };
+    const latestText = cleanText(liveLastMessage?.text || "");
     if (!latestText || isUiText(latestText) || isLikelyOwnAiReply(latestText)) {
       return { ok: false, reason: "buyer_message_untrusted" };
     }
@@ -521,19 +512,21 @@
     const context = detectListingContext(capture.root || document, capture.evidence || {});
     const sellerProfile = validateSellerProfile(document, settings.sellerProfileNames);
     const messages = Array.isArray(capture.messages) ? capture.messages : [];
+    const lastMessage = messages[messages.length - 1] || null;
+    const buyerMessageDetected = !!lastMessage && lastMessage.speaker !== "Dealer";
     const evidence = {
       ...(capture.evidence || {}),
       sellerProfileName: sellerProfile.currentProfileName,
       sellerProfileMatched: sellerProfile.matched,
+      latestMessageDirection: lastMessage?.speaker === "Dealer" ? "dealer" : buyerMessageDetected ? "buyer" : "none",
       composerDetected: !!findComposer(capture.root),
     };
-    const buyerMessageDetected = evidence.latestMessageDirection === "buyer";
     return {
       ...capture,
       context,
       sellerProfile,
       messages,
-      lastMessage: messages[messages.length - 1] || null,
+      lastMessage,
       buyerMessageDetected,
       evidence,
     };
@@ -551,19 +544,21 @@
       const context = detectListingContext(capture.root || document, capture.evidence || {});
       const sellerProfile = validateSellerProfile(document, settings.sellerProfileNames);
       const messages = Array.isArray(capture.messages) ? capture.messages : [];
+      const lastMessage = messages[messages.length - 1] || null;
+      const buyerMessageDetected = !!lastMessage && lastMessage.speaker !== "Dealer";
       const evidence = {
         ...(capture.evidence || {}),
         sellerProfileName: sellerProfile.currentProfileName,
         sellerProfileMatched: sellerProfile.matched,
+        latestMessageDirection: lastMessage?.speaker === "Dealer" ? "dealer" : buyerMessageDetected ? "buyer" : "none",
         composerDetected: !!findComposer(capture.root),
       };
-      const buyerMessageDetected = evidence.latestMessageDirection === "buyer";
       return {
         ...capture,
         context,
         sellerProfile,
         messages,
-        lastMessage: messages[messages.length - 1] || null,
+        lastMessage,
         buyerMessageDetected,
         evidence,
       };
@@ -578,8 +573,7 @@
     const marketplaceContextDetected =
       !!snapshot.context.listingUrl ||
       /\/marketplace\//i.test(location.pathname || "") ||
-      /\bmarketplace\b/i.test(cleanText(snapshot.root?.getAttribute?.("aria-label") || "")) ||
-      (!!snapshot.context?.vehicleTitle && /\b(?:19|20)\d{2}\b/.test(cleanText(snapshot.evidence?.selectedHeaderText || "")));
+      /\bmarketplace\b/i.test(cleanText(snapshot.root?.getAttribute?.("aria-label") || ""));
     const sellerProfileDetected = !!cleanText(snapshot.sellerProfile.currentProfileName);
     const sellerIsCurrentUser = sellerProfileDetected ? snapshot.sellerProfile.matched === true : true;
     const missing = [
@@ -612,7 +606,7 @@
     const area = Math.max(0, Number(rect.width) || 0) * Math.max(0, Number(rect.height) || 0);
     const header = cleanText(evidence.selectedHeaderText || "");
     const buyerName = cleanText(snapshot.buyerName || "");
-    const currentMessage = cleanText(evidence.latestBuyerMessage || snapshot.lastMessage?.text || "");
+    const currentMessage = cleanText(snapshot.lastMessage?.text || "");
     let score = 0;
 
     if (validation.ok) score += 1000;
@@ -659,7 +653,7 @@
 
   function buildIntakePayload(snapshot, validation, detectedAtMs = Date.now()) {
     const messages = snapshot.messages;
-    const currentMessage = cleanText(snapshot.evidence?.latestBuyerMessage || snapshot.lastMessage?.text || "");
+    const currentMessage = cleanText(snapshot.lastMessage?.text || "");
     const externalThreadRef = buildThreadRef({
       buyerName: snapshot.buyerName,
       vehicleTitle: snapshot.context.vehicleTitle,

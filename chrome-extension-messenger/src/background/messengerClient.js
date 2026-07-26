@@ -113,6 +113,33 @@
       return { saved: true };
     },
 
+    async DEBUGGER_SEND(message, sender) {
+      const tabId = sender?.tab?.id;
+      if (!tabId) return { ok: false, error: "no_tab_id" };
+      const { x, y } = message;
+      if (x == null || y == null) return { ok: false, error: "no_coordinates" };
+      try {
+        await chrome.debugger.attach({ tabId }, "1.3");
+      } catch (err) {
+        return { ok: false, error: "debugger_attach_failed", details: err.message };
+      }
+      try {
+        await chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
+          type: "mousePressed",
+          x, y, button: "left", clickCount: 1,
+        });
+        await chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
+          type: "mouseReleased",
+          x, y, button: "left", clickCount: 1,
+        });
+        return { ok: true, method: "debugger_click" };
+      } catch (err) {
+        return { ok: false, error: "debugger_dispatch_failed", details: err.message };
+      } finally {
+        try { await chrome.debugger.detach({ tabId }); } catch (e) {}
+      }
+    },
+
     async CONVERSATION_INTAKE(message) {
       const dedupeKey = message.idempotencyKey || message.messageHash || "";
       pruneRecentConversationIntakes();
