@@ -607,6 +607,13 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /best phone number to help with the application/);
   assert.match(conversationsSource, /Solo necesitas tu ID y una cuenta bancaria activa/);
   assert.match(conversationsSource, /mejor número de teléfono/);
+  assert.match(conversationsSource, /warranty_info/);
+  assert.match(conversationsSource, /advisor_question/);
+  assert.match(conversationsSource, /buyerAskedWarrantyInfo/);
+  assert.match(conversationsSource, /buyerAskedAdvisorQuestion/);
+  assert.match(conversationsSource, /discuss that with an advisor/);
+  assert.match(conversationsSource, /confirm the exact details/);
+  assert.match(conversationsSource, /best phone number so we can help you/);
   assert.match(conversationsSource, /generateAiReplyWithFallback/);
   assert.match(conversationsSource, /buildSafeFallbackReply/);
   assert.match(conversationsSource, /duplicate_buyer_message/);
