@@ -186,6 +186,10 @@ function findNewConversationMessages(
   return incomingChronological;
 }
 
+function formatConversationHistoryForAi(messages: ParsedConversationMessage[]): string[] {
+  return messages.map((message) => `${message.role === "assistant" ? "Dealer" : "Buyer"}: ${message.content}`);
+}
+
 function isDisplayMessage(message: { content?: string | null } | null | undefined): boolean {
   return !!message?.content && !isUiConversationText(message.content);
 }
@@ -286,6 +290,10 @@ function historyAskedAboutFinancing(history: string): boolean {
   return /\b(?:dealer|dealerpilot ai|assistant):[\s\S]{0,240}\b(?:financing|finance|financiamiento|financiar|opciones de financiamiento)\b/i.test(history);
 }
 
+function historyRequestedPhone(history: string): boolean {
+  return /\b(?:dealer|dealerpilot ai|assistant):[\s\S]{0,280}\b(?:best phone number|phone number|n[uú]mero de tel[eé]fono|tel[eé]fono)\b/i.test(history);
+}
+
 function buyerAcceptedFinancingStep(latest: string): boolean {
   return /\b(?:yes|yeah|yep|sure|ok|okay|interested|i am|i'm|trade|trade-in|trade in|make this work|how can we make this work|next step|what next|si|s[ií]|claro|me interesa|hagamos|como hacemos|c[oó]mo hacemos)\b/i.test(latest);
 }
@@ -326,6 +334,7 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   }
   if (buyerAskedWarrantyInfo(latest)) return "warranty_info";
   if (buyerAskedAdvisorQuestion(latest)) return "advisor_question";
+  if (historyRequestedPhone(history)) return "request_phone";
   if (!/\b(?:Dealer|DealerPilot AI|Assistant):/i.test(history)) return "availability";
   return "general";
 }
@@ -453,9 +462,10 @@ CONVERSATION FUNNEL:
 2. When the buyer is interested in financing or asks for an application/link, ask for the best phone number.
 3. If the buyer asks what requirements/documents are needed to apply, answer the requirements first: ID and active bank account; passport or Tax ID works. Then continue the flow by asking for the best phone number to help with the application.
 4. If the buyer asks any vehicle, payment, warranty, coverage, deductible, inspection, third-party/dealership, or other detailed question that is not answered by the supplied context, do not invent details. Say they can discuss it with an advisor and continue by asking for the best phone number.
-5. Once the buyer provides a phone number, acknowledge it and say the team will call shortly. Only at this stage may you also offer the store phone as an immediate option.
-6. Send exactly one short reply for the latest buyer turn. Never repeat a previous reply.
-7. Answer safe vehicle questions directly only when the supplied context contains the answer; otherwise route the buyer to an advisor and ask for the best phone number. Never invent availability, price, approval, history, warranty, or financing details.
+5. If the conversation already asked for the buyer's phone number and the buyer replies without a number, do not restart the financing question. Continue by asking for the best phone number.
+6. Once the buyer provides a phone number, acknowledge it and say the team will call shortly. Only at this stage may you also offer the store phone as an immediate option.
+7. Send exactly one short reply for the latest buyer turn. Never repeat a previous reply.
+8. Answer safe vehicle questions directly only when the supplied context contains the answer; otherwise route the buyer to an advisor and ask for the best phone number. Never invent availability, price, approval, history, warranty, or financing details.
 
 ADDRESS / DIRECTIONS HANDLING:
 - If the buyer asks for the address, directions, or location, provide the store address directly and invite them to visit.
@@ -999,6 +1009,7 @@ router.post("/conversations/intake", async (req, res) => {
       content: message.content.trim(),
     }));
   const newMessages = findNewConversationMessages(existingChronological, incomingMsgs);
+  const conversationHistoryForAi = [...existingChronological, ...newMessages];
   let hasNewBuyerMessage = false;
 
   for (const msg of newMessages) {
@@ -1025,7 +1036,7 @@ router.post("/conversations/intake", async (req, res) => {
     let retryFallbackReason: string | null = null;
     if (retryableReply && !isReplyLanguageMirrored(retryableReply, language)) {
       const repairedReply = await generateAiReplyWithFallback(
-        incomingMsgs.map((msg) => `${msg.role === "assistant" ? "Dealer" : "Buyer"}: ${msg.content}`),
+        formatConversationHistoryForAi(conversationHistoryForAi.length ? conversationHistoryForAi : incomingMsgs),
         inbound,
         language,
         resolvedVehicleTitle,
@@ -1100,7 +1111,7 @@ router.post("/conversations/intake", async (req, res) => {
 
   if (shouldGenerateReply) {
     aiReplyResult = await generateAiReplyWithFallback(
-      incomingMsgs.map((msg) => `${msg.role === "assistant" ? "Dealer" : "Buyer"}: ${msg.content}`),
+      formatConversationHistoryForAi(conversationHistoryForAi.length ? conversationHistoryForAi : incomingMsgs),
       inbound,
       language,
       resolvedVehicleTitle,

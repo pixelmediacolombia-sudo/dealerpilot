@@ -600,6 +600,11 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.equal(spanishWords.test("I am interested"), false);
   assert.match(conversationsSource, /Are you interested in financing/);
   assert.match(conversationsSource, /best phone number/);
+  assert.match(conversationsSource, /historyRequestedPhone/);
+  assert.match(conversationsSource, /do not restart the financing question/);
+  assert.match(conversationsSource, /formatConversationHistoryForAi/);
+  assert.match(conversationsSource, /const conversationHistoryForAi = \[\.\.\.existingChronological, \.\.\.newMessages\]/);
+  assert.match(conversationsSource, /formatConversationHistoryForAi\(conversationHistoryForAi\.length \? conversationHistoryForAi : incomingMsgs\)/);
   assert.match(conversationsSource, /document_requirements/);
   assert.match(conversationsSource, /buyerAskedDocumentRequirements/);
   assert.match(conversationsSource, /ID and active bank account/);
