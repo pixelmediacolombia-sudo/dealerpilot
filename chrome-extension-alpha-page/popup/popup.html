@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alpha Page Publisher</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <div class="logo">A</div>
+      <div>
+        <h1>Alpha Page Publisher</h1>
+        <p>Human-reviewed Facebook Page drafts</p>
+      </div>
+    </header>
+
+    <section>
+      <label for="backendUrl">DealerPilot backend</label>
+      <input id="backendUrl" type="url" />
+      <button id="saveBackend" class="secondary">Save backend</button>
+    </section>
+
+    <section>
+      <label for="search">Find vehicle</label>
+      <input id="search" type="search" placeholder="VIN, stock, make, model, id" />
+      <button id="loadVehicles" class="secondary">Load vehicles</button>
+      <select id="vehicleSelect"></select>
+      <button id="prepareDraft">Prepare Business Suite draft</button>
+    </section>
+
+    <section class="note">
+      This extension never clicks Publish. Review the Business Suite draft manually.
+    </section>
+
+    <div id="status"></div>
+    <script src="../src/shared/apiClient.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

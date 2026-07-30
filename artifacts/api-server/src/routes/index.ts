@@ -21,6 +21,7 @@ import marketplaceListingsRouter from "./marketplaceListings";
 import gmRouter from "./gm";
 import workersRouter from "./workers";
 import orchestratorRouter from "./orchestrator";
+import alphaPagePublisherRouter from "./alphaPagePublisher";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use(marketplaceIntelligenceRouter);
 router.use(channelsRouter);
 router.use(photoStudioRouter);
 router.use(marketplaceListingsRouter);
+router.use(alphaPagePublisherRouter);
 
 export default router;

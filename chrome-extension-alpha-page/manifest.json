@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "DealerPilot Alpha Page Publisher",
+  "version": "0.1.0",
+  "description": "Prepares human-reviewed Alpha MotorSports Facebook Page posts from DealerPilot inventory without using Meta Developers.",
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://1987dealerpilot.com/*",
+    "https://www.1987dealerpilot.com/*",
+    "http://localhost/*",
+    "https://business.facebook.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://business.facebook.com/latest/composer*"
+      ],
+      "js": [
+        "src/shared/apiClient.js",
+        "content/content.js"
+      ],
+      "css": [
+        "content/panel.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Alpha Page Publisher"
+  }
+}
