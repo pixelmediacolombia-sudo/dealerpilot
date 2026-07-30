@@ -100,6 +100,7 @@ function createHarness({
   debuggerSendSucceeds = false,
   sendClearDelayMs = 0,
   includeDecoySendButton = false,
+  dynamicSendControl = false,
   locationOverride = null,
 } = {}) {
   const calls = { messages: [], debug: [], intake: [] };
@@ -111,8 +112,8 @@ function createHarness({
     : null;
   const sendButton = new FakeElement({
     tagName: "button",
-    attributes: { "aria-label": "Send" },
-    text: "Send",
+    attributes: { "aria-label": dynamicSendControl ? "Send a voice clip" : "Send" },
+    text: dynamicSendControl ? "" : "Send",
     rect: { left: 470, top: 400, width: 40, height: 40 },
     onClick() {
       if (!sendSucceeds || !composerElement) return;
@@ -151,6 +152,11 @@ function createHarness({
       if (command === "insertText" && composerElement) {
         composerElement.innerText = value;
         composerElement.textContent = value;
+        if (dynamicSendControl) {
+          sendButton.setAttribute("aria-label", "Send");
+          sendButton.innerText = "Send";
+          sendButton.textContent = "Send";
+        }
       }
       if (command === "selectAll" && composerElement) {
         composerElement.innerText = "";
@@ -515,6 +521,24 @@ test("autoReply clicks the send control nearest the winning chat and confirms th
   const expectedEvents = ["native-click"];
   assert.deepEqual(sendButton.events, expectedEvents);
   assert.deepEqual(decoySendButton.events, []);
+  assert.equal(calls.debug.at(-1).stage, "intake_ok");
+});
+
+test("autoReply re-queries Facebook send control after voice button changes to Send", async () => {
+  const { ai, calls, composerElement, sendButton } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    dynamicSendControl: true,
+    debuggerSendSucceeds: true,
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, true);
+  assert.equal(result.sendMethod, "debugger_click");
+  assert.equal(result.deliveryConfirmed, true);
+  assert.equal(composerElement.textContent, "");
+  assert.equal(sendButton.getAttribute("aria-label"), "Send");
+  assert.deepEqual(sendButton.events, []);
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
 

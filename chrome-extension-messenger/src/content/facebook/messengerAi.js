@@ -421,7 +421,7 @@
   async function clickSend(box, root, replyText) {
     await sleep(250);
     const text = replyText || (box ? cleanText(readComposerText(box)) : "");
-    const sendButton = findSendButton(root, box);
+    let sendButton = findSendButton(root, box);
     if (box && !cleanText(readComposerText(box))) {
       if (box.tagName !== "TEXTAREA" && document.execCommand) {
         box.focus?.();
@@ -432,6 +432,13 @@
       } else {
         box.textContent = text;
         box.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+      }
+    }
+    if (!sendButton && box && cleanText(readComposerText(box))) {
+      const started = Date.now();
+      while (!sendButton && Date.now() - started <= 1500) {
+        await sleep(100);
+        sendButton = findSendButton(root, box);
       }
     }
     if (sendButton) {
