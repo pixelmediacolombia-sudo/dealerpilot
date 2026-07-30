@@ -60,6 +60,55 @@
     }
   }
 
+  async function focusMessengerComposer(tabId, selectContents = false) {
+    const response = await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+      returnByValue: true,
+      expression: `(() => {
+        const editors = [...document.querySelectorAll(
+          '[contenteditable="true"][role="textbox"][data-lexical-editor="true"]'
+        )].filter((element) => {
+          const rect = element.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        });
+        const editor = editors.find((element) =>
+          /write to|message|mensaje|escribe/i.test(element.getAttribute('aria-label') || '')
+        ) || editors[0];
+        if (!editor) return { ok: false, reason: 'composer_missing' };
+        editor.scrollIntoView({ block: 'center' });
+        editor.focus();
+        if (${selectContents ? "true" : "false"}) {
+          const range = document.createRange();
+          range.selectNodeContents(editor);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        return {
+          ok: true,
+          aria: editor.getAttribute('aria-label') || '',
+          text: editor.innerText || ''
+        };
+      })()`,
+    });
+    return response?.result?.value || { ok: false, reason: "composer_focus_failed" };
+  }
+
+  async function readMessengerComposer(tabId) {
+    const response = await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+      returnByValue: true,
+      expression: `(() => {
+        const editor = [...document.querySelectorAll(
+          '[contenteditable="true"][role="textbox"][data-lexical-editor="true"]'
+        )].find((element) => {
+          const rect = element.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        });
+        return { found: Boolean(editor), text: editor?.innerText || '' };
+      })()`,
+    });
+    return response?.result?.value || { found: false, text: "" };
+  }
+
   const handlers = {
     async GET_SETTINGS() {
       return getSettings();
@@ -113,7 +162,38 @@
       return { saved: true };
     },
 
-    async DEBUGGER_SEND(message, sender) {
+    async DEBUGGER_COMPOSER_WRITE(message, sender) {
+      const tabId = sender?.tab?.id;
+      if (!tabId) return { ok: false, error: "no_tab_id" };
+      const { x, y, text } = message;
+      if (x == null || y == null) return { ok: false, error: "no_coordinates" };
+      if (typeof text !== "string" || !text.trim()) return { ok: false, error: "no_reply_text" };
+      try {
+        await chrome.debugger.attach({ tabId }, "1.3");
+      } catch (err) {
+        return { ok: false, error: "debugger_attach_failed", details: err.message };
+      }
+      try {
+        const focused = await focusMessengerComposer(tabId, true);
+        if (!focused.ok) return { ok: false, error: focused.reason || "composer_focus_failed" };
+        await chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text });
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        const verified = await readMessengerComposer(tabId);
+        return {
+          ok: verified.found && verified.text.trim() === text.trim(),
+          method: "debugger_main_world_write",
+          error: verified.found ? "composer_write_unconfirmed" : "composer_missing_after_write",
+          writtenText: verified.text,
+          composerAria: focused.aria,
+        };
+      } catch (err) {
+        return { ok: false, error: "debugger_dispatch_failed", details: err.message };
+      } finally {
+        try { await chrome.debugger.detach({ tabId }); } catch (e) {}
+      }
+    },
+
+    async DEBUGGER_COMPOSER_SUBMIT(message, sender) {
       const tabId = sender?.tab?.id;
       if (!tabId) return { ok: false, error: "no_tab_id" };
       const { x, y } = message;
@@ -124,15 +204,15 @@
         return { ok: false, error: "debugger_attach_failed", details: err.message };
       }
       try {
-        await chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
-          type: "mousePressed",
-          x, y, button: "left", clickCount: 1,
+        const focused = await focusMessengerComposer(tabId, false);
+        if (!focused.ok) return { ok: false, error: focused.reason || "composer_focus_failed" };
+        await chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", {
+          type: "rawKeyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13,
         });
-        await chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
-          type: "mouseReleased",
-          x, y, button: "left", clickCount: 1,
+        await chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", {
+          type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13,
         });
-        return { ok: true, method: "debugger_click" };
+        return { ok: true, method: "debugger_main_world_submit", composerAria: focused.aria };
       } catch (err) {
         return { ok: false, error: "debugger_dispatch_failed", details: err.message };
       } finally {

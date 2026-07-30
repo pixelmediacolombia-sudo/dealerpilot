@@ -577,6 +577,38 @@ function isReplyLanguageMirrored(reply: string, language: string): boolean {
   return detectLanguage(text) === language;
 }
 
+function replyRepeatsRecentDealerMessage(reply: string, visibleMessages: string[]): boolean {
+  const normalizedReply = cleanConversationText(reply).toLowerCase();
+  if (!normalizedReply) return false;
+  return visibleMessages.slice(-8).some((message) => {
+    const match = cleanConversationText(message).match(/^(?:Dealer|DealerPilot AI|Assistant):\s*(.+)$/i);
+    return cleanConversationText(match?.[1] || "").toLowerCase() === normalizedReply;
+  });
+}
+
+function avoidRepeatedFallback(
+  reply: string,
+  language: string,
+  visibleMessages: string[],
+  currentMessage: string,
+  vehicleTitle?: string,
+): string {
+  if (!replyRepeatsRecentDealerMessage(reply, visibleMessages)) return reply;
+  const stage = resolveSalesReplyStage(visibleMessages, currentMessage);
+  const vehicle = vehicleTitle ?? (language === "es" ? "el vehículo" : "the vehicle");
+  if (stage === "warranty_info" || stage === "advisor_question") {
+    return language === "es"
+      ? `Nuestro equipo puede verificar ese detalle por ti. ¿Te gustaría conocer las opciones de financiamiento para el ${vehicle}?`
+      : `Our team can verify that detail for you. Would you like to explore financing options for the ${vehicle}?`;
+  }
+  if (stage === "clean_title") {
+    return language === "es"
+      ? "Correcto, este vehículo tiene título limpio. ¿Te gustaría conocer las opciones de financiamiento?"
+      : "Correct, this vehicle has a clean title. Would you like to explore financing options?";
+  }
+  return reply;
+}
+
 type AiReplyResult = {
   reply: string;
   fallbackUsed: boolean;
@@ -599,6 +631,7 @@ CONVERSATION FUNNEL:
 6. If the conversation already asked for the buyer's phone number and the buyer replies without a number, do not restart the financing question. Continue by asking for the best phone number.
 7. Once the buyer provides a phone number, acknowledge it and say the team will call shortly. You may also offer the store phone as an immediate option.
 8. Send exactly one short reply for the latest buyer turn. Never repeat a previous reply.
+8a. Read the recent conversation before replying. Never reuse the exact wording of a recent Dealer message; vary the wording while remaining in the same funnel stage.
 9. Do not give price, mileage, approval, history, warranty, or financing details in Messenger, except that you must confirm a clean title when explicitly asked.
 
 ADDRESS / DIRECTIONS HANDLING:
@@ -742,18 +775,26 @@ Write one short reply that follows the stage instruction exactly. Mention the ve
     raw &&
     isAiReplyAligned(raw, stage, storePhone) &&
     isReplyLanguageMirrored(raw, language) &&
-    isReplyRelevantToCurrentMessage(raw, currentMessage)
+    isReplyRelevantToCurrentMessage(raw, currentMessage) &&
+    !replyRepeatsRecentDealerMessage(raw, visibleMessages)
   ) {
     return raw;
   }
 
-  return buildSafeFallbackReply(
+  return avoidRepeatedFallback(
+    buildSafeFallbackReply(
+      language,
+      vehicleTitle,
+      storePhone,
+      visibleMessages,
+      currentMessage,
+      availabilityQuickReplyAccepted,
+      lotLocation,
+    ),
     language,
-    vehicleTitle,
-    storePhone,
     visibleMessages,
     currentMessage,
-    availabilityQuickReplyAccepted,
+    vehicleTitle,
   );
 }
 
@@ -805,14 +846,20 @@ async function generateAiReplyWithFallback(
 
   const aiCompletedAt = new Date();
   return {
-    reply: buildSafeFallbackReply(
+    reply: avoidRepeatedFallback(
+      buildSafeFallbackReply(
+        language,
+        vehicleTitle,
+        storePhone,
+        visibleMessages,
+        currentMessage,
+        availabilityQuickReplyAccepted,
+        lotLocation,
+      ),
       language,
-      vehicleTitle,
-      storePhone,
       visibleMessages,
       currentMessage,
-      availabilityQuickReplyAccepted,
-      lotLocation,
+      vehicleTitle,
     ),
     fallbackUsed: true,
     fallbackReason,

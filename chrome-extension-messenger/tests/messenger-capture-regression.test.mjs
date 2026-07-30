@@ -69,7 +69,7 @@ class FakeElement {
   }
 }
 
-function runCapture(root, extraElements = []) {
+function runCapture(root, extraElements = [], pathname = "/marketplace/inbox") {
   const document = {
     documentElement: new FakeElement(),
     querySelectorAll(selector) {
@@ -82,7 +82,7 @@ function runCapture(root, extraElements = []) {
   };
   const context = vm.createContext({
     document,
-    location: { pathname: "/marketplace/inbox" },
+    location: { pathname },
     Element: FakeElement,
     window: {
       getComputedStyle() {
@@ -93,7 +93,7 @@ function runCapture(root, extraElements = []) {
   vm.runInContext(source, context, { filename: "messengerCapture.js" });
   return context.DealerPilotMessengerCapture.capture({
     document,
-    location: { pathname: "/marketplace/inbox" },
+    location: { pathname },
     sellerNameCandidates: ["Alpha Motorsport"],
   });
 }
@@ -103,6 +103,11 @@ test("open chat visible buyer messages win over stale inbox preview", () => {
     attributes: { role: "log" },
     rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
     children: [
+      new FakeElement({
+        attributes: { dir: "auto" },
+        text: "Barış · Buyer",
+        rect: { left: 400, right: 520, top: 450, width: 120, height: 24 },
+      }),
       new FakeElement({
         attributes: { dir: "auto" },
         text: "Hola. Sigue disponible?",
@@ -331,4 +336,98 @@ test("capture prefers full floating chat panel over tiny composer ancestor", () 
     JSON.parse(JSON.stringify(capture.messages)),
     [{ speaker: "Juan", text: "Todavia esta disponible para verlo hoy?" }],
   );
+});
+
+test("messages thread selects buyer vehicle panel without a Marketplace link", () => {
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 376, right: 1505, top: 233, width: 1129, height: 420 },
+    children: [
+      new FakeElement({
+        attributes: { "aria-label": "Message sent 2:20 PM by Barış: Hii" },
+        text: "2:20 PM by Barış",
+        rect: { left: 594, right: 650, top: 500, width: 56, height: 42 },
+      }),
+      new FakeElement({
+        attributes: { "aria-label": "Message sent 2:21 PM by Barış: Is this vehicle a hybrid" },
+        text: "2:21 PM by Barış",
+        rect: { left: 594, right: 810, top: 610, width: 216, height: 42 },
+      }),
+    ],
+  });
+  const activePanel = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Conversation" },
+    rect: { left: 376, right: 1505, top: 71, width: 1129, height: 642 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Barış · 2023 Kia SPORTAGE" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 740, right: 1420, top: 665, width: 680, height: 44 },
+      }),
+    ],
+  });
+  const globalRoot = new FakeElement({
+    attributes: { role: "main", "aria-label": "Messenger" },
+    text: "Marketplace",
+    rect: { left: 0, right: 1521, top: 56, width: 1521, height: 674 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "· 11m" }),
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 740, right: 1420, top: 665, width: 680, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(activePanel, [globalRoot], "/messages/t/1036903578892236");
+
+  assert.equal(capture.root, activePanel);
+  assert.equal(capture.buyerName, "Barış");
+  assert.equal(capture.evidence.selectedHeaderText, "Barış · 2023 Kia SPORTAGE");
+  assert.equal(capture.evidence.selectedRootRect.left, 376);
+  assert.equal(capture.evidence.latestMessageDirection, "buyer");
+  assert.deepEqual(JSON.parse(JSON.stringify(capture.messages)), [
+    { speaker: "Barış", text: "Hii" },
+    { speaker: "Barış", text: "Is this vehicle a hybrid" },
+  ]);
+});
+
+test("visual buyer bubble survives incomplete semantic Message sent metadata", () => {
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 376, right: 1505, top: 233, width: 1129, height: 420 },
+    children: [
+      new FakeElement({
+        attributes: { "aria-label": "Message sent 2:20 PM by You: Yes, are you interested?" },
+        text: "Message sent",
+        rect: { left: 1200, right: 1450, top: 500, width: 250, height: 44 },
+      }),
+      new FakeElement({
+        attributes: { dir: "auto" },
+        text: "Is this vehicle a hybrid",
+        rect: { left: 400, right: 616, top: 610, width: 216, height: 42 },
+      }),
+    ],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Conversation" },
+    rect: { left: 376, right: 1505, top: 71, width: 1129, height: 642 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Barış · 2023 Kia SPORTAGE" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 740, right: 1420, top: 665, width: 680, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root, [], "/messages/t/1036903578892236");
+
+  assert.equal(capture.buyerName, "Barış");
+  assert.equal(capture.evidence.latestMessageDirection, "buyer");
+  assert.equal(capture.messages.at(-1).speaker, "Barış");
+  assert.equal(capture.messages.at(-1).text, "Is this vehicle a hybrid");
+  assert.equal(capture.messages.some((message) => message.text === "Barış · Buyer"), false);
 });

@@ -297,3 +297,58 @@ test("active conversation mutations do not requeue the current thread without a 
   assert.equal(attempts, 1);
   assert.equal(controller.getState().processing, false);
 });
+
+test("a new incoming message mutation reruns the active thread once", async () => {
+  let observerCallback;
+  class FakeMutationObserver {
+    constructor(callback) {
+      observerCallback = callback;
+    }
+
+    observe() {}
+    disconnect() {}
+  }
+  const api = loadApi();
+  const locationRef = {
+    origin: "https://www.facebook.com",
+    pathname: "/messages/t/101",
+    href: "https://www.facebook.com/messages/t/101",
+  };
+  const documentRef = {
+    body: { querySelectorAll() { return []; } },
+    querySelectorAll() { return []; },
+  };
+  let attempts = 0;
+  const controller = api.start({
+    documentRef,
+    locationRef,
+    sessionStorageRef: { getItem() { return null; }, setItem() {} },
+    MutationObserverCtor: FakeMutationObserver,
+    sellerProfileNames: ["Andres Ibanez"],
+    sleepFn: async () => {},
+    async processThread() {
+      attempts += 1;
+      return { autoSent: true };
+    },
+  });
+  await controller.whenIdle();
+
+  const incoming = {
+    nodeType: 1,
+    getAttribute(name) {
+      return name === "aria-label"
+        ? "Enter, Message sent 1:38 PM by Barış: Is the vehicle a hybrid"
+        : null;
+    },
+    querySelectorAll() { return []; },
+    matches() { return false; },
+    closest() { return null; },
+  };
+  observerCallback?.([{ target: incoming, addedNodes: [incoming] }]);
+  await controller.whenIdle();
+  observerCallback?.([{ target: incoming, addedNodes: [incoming] }]);
+  await controller.whenIdle();
+
+  assert.equal(attempts, 2);
+  assert.equal(controller.getState().processing, false);
+});

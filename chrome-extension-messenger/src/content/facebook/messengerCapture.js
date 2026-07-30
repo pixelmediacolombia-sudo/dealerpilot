@@ -157,6 +157,17 @@
       /\b(?:view buyer|ver perfil del comprador)\b/i.test(text);
   }
 
+  function hasActiveBuyerVehicleHeader(root) {
+    const header = extractHeaderText(root);
+    return /^[\p{L}][\p{L}\s.'’\-]{1,80}\s*(?:[\u00b7\u2022|]|Â·|â€¢)\s*(?:19|20)\d{2}\s+\S/u.test(header);
+  }
+
+  function hasThreadEvidence(root, marketplaceRoute, messagesThreadRoute) {
+    return messagesThreadRoute
+      ? hasActiveBuyerVehicleHeader(root)
+      : hasMarketplaceEvidence(root, marketplaceRoute);
+  }
+
   function rootCandidateScore(root, marketplaceRoute) {
     if (!root || !isVisible(root)) return -Infinity;
     const rect = rectOf(root);
@@ -176,6 +187,7 @@
 
   function findThreadRoots({ document, location }) {
     const marketplaceRoute = /\/marketplace\/(?:inbox|you\/selling|you\/buying|item\/\d+)/i.test(location?.pathname || "");
+    const messagesThreadRoute = /^\/messages\/t\/[^/?#]+\/?$/i.test(location?.pathname || "");
     const semantic = [
       '[role="region"][aria-label*="conversation" i]',
       '[role="region"][aria-label*="conversación" i]',
@@ -185,7 +197,7 @@
     const candidates = [];
     for (const selector of semantic) {
       for (const candidate of Array.from(document?.querySelectorAll?.(selector) || [])) {
-        if (isVisible(candidate) && hasComposer(candidate) && hasMarketplaceEvidence(candidate, marketplaceRoute)) {
+        if (isVisible(candidate) && hasComposer(candidate) && hasThreadEvidence(candidate, marketplaceRoute, messagesThreadRoute)) {
           candidates.push(candidate);
         }
       }
@@ -194,7 +206,7 @@
     for (const composer of Array.from(document?.querySelectorAll?.(COMPOSER_SELECTORS.join(", ")) || []).filter(isComposer)) {
       let parent = composer.parentElement;
       while (parent && parent !== document.documentElement) {
-        if (isVisible(parent) && hasComposer(parent) && hasMarketplaceEvidence(parent, marketplaceRoute)) {
+        if (isVisible(parent) && hasComposer(parent) && hasThreadEvidence(parent, marketplaceRoute, messagesThreadRoute)) {
           composerRoots.push(parent);
         }
         parent = parent.parentElement;
@@ -472,6 +484,7 @@
       if (seen.has(bubble)) continue;
       seen.add(bubble);
       const text = cleanMessageText(textOf(bubble));
+      const normalizedText = normalizeForMatch(text);
       const rect = rectOf(bubble);
       const leftGap = Math.max(0, rect.left - scopeRect.left);
       const rightGap = Math.max(0, scopeRect.right - rect.right);
@@ -479,6 +492,7 @@
         leftGap > rightGap + minDealerOffset &&
         rect.left > scopeRect.left + (scopeRect.width * 0.35);
       if (!text || text.length < 2 || UI_TEXT.test(text)) continue;
+      if (/^[\p{L}][\p{L}\s.'’\-]{1,80}\s*(?:[\u00b7\u2022|]|Â·|â€¢)\s*buyer$/u.test(normalizedText)) continue;
       if (isLikelyAutoReplyText(text) && !clearlyRightAligned) continue;
       rows.push({ top: rect.top, speaker: clearlyRightAligned ? "Dealer" : (buyerName || "Buyer"), text });
     }
@@ -528,12 +542,12 @@
       .map((element) => parseDescriptor(element, sellerNameCandidates))
       .filter(Boolean);
     const visualMessages = scope ? readVisualMessages(scope, buyerName) : [];
-    const visualDealerMessages = semantic.length
+    const missingVisualMessages = semantic.length
       ? visualMessages.filter((message) =>
-        message.speaker === "Dealer" &&
-        !semantic.some((semanticMessage) => semanticMessage.text === message.text))
+        !semantic.some((semanticMessage) =>
+          normalizeForMatch(semanticMessage.text) === normalizeForMatch(message.text)))
       : [];
-    const rawMessages = semantic.length ? [...semantic, ...visualDealerMessages] : visualMessages;
+    const rawMessages = semantic.length ? [...semantic, ...missingVisualMessages] : visualMessages;
     const messages = rawMessages.map((message) =>
       message.speaker === "Buyer" && buyerName ? { ...message, speaker: buyerName } : message,
     );

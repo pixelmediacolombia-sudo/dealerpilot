@@ -10,7 +10,8 @@ const source = readFileSync(
 
 function createHarness({ apiPost } = {}) {
   const storage = { extensionId: "msg-ext-test" };
-  const calls = { apiPost: [] };
+  const calls = { apiPost: [], debugger: [] };
+  let runtimeComposerText = "";
   const chrome = {
     storage: {
       local: {
@@ -29,6 +30,33 @@ function createHarness({ apiPost } = {}) {
       onInstalled: { addListener() {} },
       onMessage: { addListener() {} },
     },
+    debugger: {
+      async attach(target, version) {
+        calls.debugger.push({ operation: "attach", target, version });
+      },
+      async sendCommand(target, method, params) {
+        calls.debugger.push({ operation: "command", target, method, params });
+        if (method === "Input.insertText") runtimeComposerText = params.text;
+        if (method === "Runtime.evaluate") {
+          if (params.expression.includes("found: Boolean(editor)")) {
+            return { result: { value: { found: true, text: runtimeComposerText } } };
+          }
+          return {
+            result: {
+              value: {
+                ok: true,
+                aria: "Write to Buyer A · 2021 Toyota RAV4",
+                text: runtimeComposerText,
+              },
+            },
+          };
+        }
+        return {};
+      },
+      async detach(target) {
+        calls.debugger.push({ operation: "detach", target });
+      },
+    },
   };
   const DealerPilotMessengerApiClient = {
     async apiPost(path, body) {
@@ -42,6 +70,7 @@ function createHarness({ apiPost } = {}) {
     DealerPilotMessengerApiClient,
     crypto: { randomUUID: () => "uuid" },
     Date,
+    setTimeout,
     console: { warn() {}, log() {}, error() {} },
   });
   vm.runInContext(source, context, { filename: "messengerClient.js" });
@@ -86,6 +115,33 @@ test("background deduplicates identical intakes inside the extension", async () 
   assert.equal(second.suggestedReply, "reply for marketplace-thread::buyer-a::rav4");
   assert.equal(second.duplicateExtensionIntake, true);
   assert.equal(calls.apiPost.length, 1);
+});
+
+test("background writes and submits the Messenger composer through separate CDP phases", async () => {
+  const { handlers, calls } = createHarness();
+  const writeResponse = await handlers.DEBUGGER_COMPOSER_WRITE({
+    x: 120,
+    y: 420,
+    text: "Yes, it is available.",
+  }, { tab: { id: 42 } });
+  const submitResponse = await handlers.DEBUGGER_COMPOSER_SUBMIT({
+    x: 120,
+    y: 420,
+  }, { tab: { id: 42 } });
+
+  assert.equal(writeResponse.ok, true);
+  assert.equal(writeResponse.method, "debugger_main_world_write");
+  assert.equal(writeResponse.writtenText, "Yes, it is available.");
+  assert.equal(submitResponse.ok, true);
+  assert.equal(submitResponse.method, "debugger_main_world_submit");
+  assert.equal(calls.debugger[0].operation, "attach");
+  assert.ok(calls.debugger.some((call) =>
+    call.method === "Input.insertText" && call.params.text === "Yes, it is available."));
+  assert.ok(calls.debugger.some((call) =>
+    call.method === "Runtime.evaluate" && call.params.expression.includes("data-lexical-editor")));
+  assert.ok(calls.debugger.some((call) =>
+    call.method === "Input.dispatchKeyEvent" && call.params.key === "Enter" && call.params.type === "rawKeyDown"));
+  assert.equal(calls.debugger.at(-1).operation, "detach");
 });
 
 test("settings start in safe mode", async () => {

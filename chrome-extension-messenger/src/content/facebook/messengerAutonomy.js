@@ -222,6 +222,39 @@
     return anchors;
   }
 
+  function incomingBuyerSignaturesFromMutationRecords(records = [], sellerProfileNames = []) {
+    const signatures = [];
+    const seen = new Set();
+    const sellerNames = sellerProfileNames.map((name) => cleanText(name).toLowerCase()).filter(Boolean);
+    const inspect = (node) => {
+      const element = node?.nodeType === 1 ? node : node?.parentElement;
+      if (!element) return;
+      const candidates = [
+        element.getAttribute?.("aria-label") ? element : null,
+        ...Array.from(element.querySelectorAll?.("[aria-label]") || []),
+      ].filter(Boolean);
+      for (const candidate of candidates) {
+        const label = cleanText(candidate.getAttribute?.("aria-label") || "");
+        const match = label.match(/(?:\bby\b|\bpor\b)\s+([^:]{1,100}):\s*(.+)$/i);
+        if (!match) continue;
+        const sender = cleanText(match[1]).toLowerCase();
+        const text = cleanText(match[2]);
+        const isSeller = /^(?:you|t[uú]|yo)$/.test(sender) || sellerNames.some((name) =>
+          sender === name || sender.startsWith(`${name} `) || name.startsWith(`${sender} `));
+        if (isSeller || !text) continue;
+        const signature = `${sender}:${normalizePreviewSignature(text)}`;
+        if (seen.has(signature)) continue;
+        seen.add(signature);
+        signatures.push(signature);
+      }
+    };
+    for (const record of records) {
+      inspect(record.target);
+      for (const node of Array.from(record.addedNodes || [])) inspect(node);
+    }
+    return signatures;
+  }
+
   function start(options = {}) {
     if (globalThis.__dealerPilotMessengerAutonomyController) {
       return globalThis.__dealerPilotMessengerAutonomyController;
@@ -234,6 +267,9 @@
     const MutationObserverCtor = options.MutationObserverCtor || globalThis.MutationObserver;
     const previewById = new Map();
     const handledSignatureById = new Map();
+    const seenActiveBuyerSignatures = new Set(incomingBuyerSignaturesFromMutationRecords([
+      { target: documentRef.body || documentRef.documentElement, addedNodes: [] },
+    ], options.sellerProfileNames || []));
     let queueState = {};
     let lastDiscoveredThreadId = null;
 
@@ -370,6 +406,16 @@
 
     const observer = MutationObserverCtor
       ? new MutationObserverCtor((records) => {
+          const incomingSignatures = incomingBuyerSignaturesFromMutationRecords(
+            records,
+            options.sellerProfileNames || [],
+          );
+          const hasNewBuyerMessage = incomingSignatures.some((signature) => {
+            if (seenActiveBuyerSignatures.has(signature)) return false;
+            seenActiveBuyerSignatures.add(signature);
+            return true;
+          });
+          if (hasNewBuyerMessage) queueCurrentThread("active_buyer_message_mutation");
           for (const record of records) {
             const anchors = anchorsFromMutationRecords([record]);
             for (const anchor of anchors) {
@@ -412,6 +458,7 @@
 
   globalThis.DealerPilotMessengerAutonomy = Object.freeze({
     anchorsFromMutationRecords,
+    incomingBuyerSignaturesFromMutationRecords,
     collectThreadTargets,
     createFifoThreadQueue,
     describeThreadAnchor,

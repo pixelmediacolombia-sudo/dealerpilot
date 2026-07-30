@@ -98,6 +98,7 @@ function createHarness({
   liveCaptureFromRoot,
   sendSucceeds = false,
   debuggerSendSucceeds = false,
+  composerWriteSucceeds = true,
   sendClearDelayMs = 0,
   includeDecoySendButton = false,
   dynamicSendControl = false,
@@ -202,8 +203,24 @@ function createHarness({
           callback(intakeResponse || { ok: true, data: { suggestedReply: "Yes, it is available." } });
           return;
         }
-        if (message.type === "DEBUGGER_SEND") {
-          if (debuggerSendSucceeds && composerElement) {
+        if (message.type === "DEBUGGER_COMPOSER_WRITE") {
+          if (composerElement && composerWriteSucceeds) {
+            composerElement.value = "";
+            composerElement.innerText = message.text;
+            composerElement.textContent = message.text;
+          }
+          callback({
+            ok: true,
+            data: {
+              ok: true,
+              method: "debugger_main_world_write",
+              writtenText: composerWriteSucceeds ? message.text : "",
+            },
+          });
+          return;
+        }
+        if (message.type === "DEBUGGER_COMPOSER_SUBMIT") {
+          if ((sendSucceeds || debuggerSendSucceeds) && composerElement) {
             const clearComposer = () => {
               composerElement.value = "";
               composerElement.innerText = "";
@@ -212,7 +229,7 @@ function createHarness({
             if (sendClearDelayMs > 0) setTimeout(clearComposer, sendClearDelayMs);
             else clearComposer();
           }
-          callback({ ok: true, data: { ok: debuggerSendSucceeds } });
+          callback({ ok: true, data: { ok: true, method: "debugger_main_world_submit" } });
           return;
         }
         callback({ ok: false, error: `Unexpected ${message.type}` });
@@ -525,7 +542,7 @@ test("autoReply enabled refuses to send when the composer is missing", async () 
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
 });
 
-test("autoReply clicks the send control nearest the winning chat and confirms the composer cleared", async () => {
+test("autoReply writes and sends through the composer with CDP", async () => {
   const { ai, calls, composerElement, sendButton, decoySendButton } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
     sendSucceeds: true,
@@ -535,16 +552,15 @@ test("autoReply clicks the send control nearest the winning chat and confirms th
 
   assert.equal(calls.intake.length, 1);
   assert.equal(result.autoSent, true);
-  assert.equal(result.sendMethod, "button_click");
+  assert.equal(result.sendMethod, "debugger_main_world_submit");
   assert.equal(result.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, "");
-  const expectedEvents = ["native-click"];
-  assert.deepEqual(sendButton.events, expectedEvents);
+  assert.deepEqual(sendButton.events, []);
   assert.deepEqual(decoySendButton.events, []);
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
 
-test("autoReply re-queries Facebook send control after voice button changes to Send", async () => {
+test("autoReply ignores the voice control and sends through the composer", async () => {
   const { ai, calls, composerElement, sendButton } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
     dynamicSendControl: true,
@@ -554,10 +570,10 @@ test("autoReply re-queries Facebook send control after voice button changes to S
 
   assert.equal(calls.intake.length, 1);
   assert.equal(result.autoSent, true);
-  assert.equal(result.sendMethod, "debugger_click");
+  assert.equal(result.sendMethod, "debugger_main_world_submit");
   assert.equal(result.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, "");
-  assert.equal(sendButton.getAttribute("aria-label"), "Send");
+  assert.equal(sendButton.getAttribute("aria-label"), "Send a voice clip");
   assert.deepEqual(sendButton.events, []);
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
@@ -572,7 +588,7 @@ test("autoReply waits for delayed Facebook send confirmation before blocking", a
 
   assert.equal(calls.intake.length, 1);
   assert.equal(result.autoSent, true);
-  assert.equal(result.sendMethod, "debugger_click");
+  assert.equal(result.sendMethod, "debugger_main_world_submit");
   assert.equal(result.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, "");
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
@@ -599,8 +615,7 @@ test("automatic quiet window uses a stable buyer-message key when DOM history ch
   assert.equal(second.autoSent, true);
   assert.equal(second.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, "");
-  const expectedEvents = ["native-click"];
-  assert.deepEqual(sendButton.events, expectedEvents);
+  assert.deepEqual(sendButton.events, []);
 });
 
 test("autoReply reports delivery_unconfirmed when Facebook leaves the draft in the composer", async () => {
@@ -613,11 +628,26 @@ test("autoReply reports delivery_unconfirmed when Facebook leaves the draft in t
   assert.equal(calls.intake.length, 1);
   assert.equal(result.autoSent, false);
   assert.equal(result.reason, "delivery_unconfirmed");
-  assert.equal(result.sendMethod, "button_click");
+  assert.equal(result.sendMethod, "debugger_main_world_submit");
   assert.equal(result.deliveryConfirmed, false);
   assert.equal(composerElement.textContent, "Yes, it is available.");
-  const expectedEvents = ["native-click"];
-  assert.deepEqual(sendButton.events, expectedEvents);
+  assert.deepEqual(sendButton.events, []);
+  assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
+});
+
+test("autoReply never marks an empty composer as delivered when CDP writing failed", async () => {
+  const { ai, calls, composerElement } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    composerWriteSucceeds: false,
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(result.autoSent, false);
+  assert.equal(result.reason, "composer_write_unconfirmed");
+  assert.equal(result.sendMethod, "debugger_composer_write");
+  assert.equal(composerElement.textContent, "");
+  assert.equal(calls.messages.some((message) => message.type === "DEBUGGER_COMPOSER_SUBMIT"), false);
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
 });
 
@@ -658,11 +688,10 @@ test("autoReply confirms delivery from visible Dealer bubble when composer does 
 
   assert.equal(calls.intake.length, 1);
   assert.equal(result.autoSent, true);
-  assert.equal(result.sendMethod, "button_click");
+  assert.equal(result.sendMethod, "debugger_main_world_submit");
   assert.equal(result.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, suggestedReply);
-  const expectedEvents = ["native-click"];
-  assert.deepEqual(sendButton.events, expectedEvents);
+  assert.deepEqual(sendButton.events, []);
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
 
@@ -679,11 +708,10 @@ test("autoReply retries sending when the composer already contains the exact AI 
   assert.equal(calls.intake.length, 1);
   assert.equal(result.autoSent, true);
   assert.equal(result.composerDraftReused, true);
-  assert.equal(result.sendMethod, "button_click");
+  assert.equal(result.sendMethod, "debugger_main_world_submit");
   assert.equal(result.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, "");
-  const expectedEvents = ["native-click"];
-  assert.deepEqual(sendButton.events, expectedEvents);
+  assert.deepEqual(sendButton.events, []);
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
 
@@ -707,8 +735,7 @@ test("autoReply replaces a stale DealerPilot draft when the repaired suggestion 
   assert.equal(result.composerDraftReplaced, true);
   assert.equal(result.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, "");
-  const expectedEvents = ["native-click"];
-  assert.deepEqual(sendButton.events, expectedEvents);
+  assert.deepEqual(sendButton.events, []);
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
 
@@ -776,8 +803,7 @@ test("autoReply replaces stale ratings draft with requirements answer and sends"
   assert.equal(result.composerDraftReplaced, true);
   assert.equal(result.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, "");
-  const expectedEvents = ["native-click"];
-  assert.deepEqual(sendButton.events, expectedEvents);
+  assert.deepEqual(sendButton.events, []);
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
 
@@ -799,11 +825,10 @@ test("autoReply sends a pending own phone draft instead of blocking composer_not
   assert.equal(result.autoSent, true);
   assert.equal(result.composerDraftReused, false);
   assert.equal(result.composerDraftReplaced, true);
-  assert.equal(result.sendMethod, "button_click");
+  assert.equal(result.sendMethod, "debugger_main_world_submit");
   assert.equal(result.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, "");
-  const expectedEvents = ["native-click"];
-  assert.deepEqual(sendButton.events, expectedEvents);
+  assert.deepEqual(sendButton.events, []);
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
 
@@ -928,6 +953,43 @@ test("multiple open buyer chats process one winner and keep the rest as diagnost
   assert.deepEqual(result.buyersDetected.map((buyer) => buyer.selectedForProcessing), [true, false]);
   assert.equal(calls.intake.length, 1);
   assert.equal(calls.intake[0].currentMessage, "Is this available?");
+});
+
+test("duplicate DOM roots for the same buyer message are reported and processed once", async () => {
+  const makeCapture = () => {
+    const root = new FakeElement({
+      attributes: { "aria-label": "Marketplace conversation" },
+      children: [
+        new FakeElement({ tagName: "h2", text: "Omar · 2018 Honda ODYSSEY" }),
+        new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } }),
+      ],
+    });
+    return {
+      root,
+      scope: root,
+      buyerName: "Omar",
+      messages: [{ speaker: "Omar", text: "Clean title?" }],
+      evidence: {
+        threadRootDetected: true,
+        messageScopeDetected: true,
+        extractionMode: "semantic",
+        selectedHeaderText: "Omar · 2018 Honda ODYSSEY",
+        latestMessageDirection: "buyer",
+        composerDetected: true,
+      },
+    };
+  };
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
+    captures: [makeCapture(), makeCapture(), makeCapture()],
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(result.conversationCount, 1);
+  assert.equal(result.buyersDetected.length, 1);
+  assert.equal(calls.intake.length, 1);
+  assert.equal(calls.intake[0].currentMessage, "Clean title?");
 });
 
 test("valid buyer chat beats later UI noise candidate", async () => {

@@ -286,32 +286,6 @@
     return cleanText(box?.value || box?.innerText || box?.textContent || "");
   }
 
-  function setNativeValue(element, value) {
-    const prototype = Object.getPrototypeOf(element);
-    const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-    if (descriptor?.set) descriptor.set.call(element, value);
-    else element.value = value;
-    element.dispatchEvent(new Event("input", { bubbles: true }));
-    element.dispatchEvent(new Event("change", { bubbles: true }));
-  }
-
-  function writeComposerText(box, value) {
-    box.focus?.();
-    if (box.tagName === "TEXTAREA") {
-      setNativeValue(box, value);
-      return;
-    }
-    if (document.execCommand) {
-      document.execCommand("selectAll", false, undefined);
-      document.execCommand("insertText", false, value);
-      box.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
-      return;
-    }
-    box.textContent = value;
-    box.innerText = value;
-    box.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
-  }
-
   function insertReply(reply, root) {
     const box = findComposer(root);
     if (!box) return { ok: false, reason: "composer_missing", composerDetected: false };
@@ -334,144 +308,69 @@
         box,
       };
     }
-    writeComposerText(box, reply);
-    const composerTextDetected = cleanText(readComposerText(box)) === cleanText(reply);
     return {
       ok: true,
       reason: "",
       composerDetected: true,
-      composerTextDetected,
+      composerTextDetected: false,
       reusedExistingDraft: false,
       replacedExistingAiDraft: replacingExistingAiDraft === true,
+      needsWrite: true,
       box,
     };
   }
 
-  function elementIsVisibleAndEnabled(element) {
-    if (!element || element.isConnected === false || element.disabled === true) return false;
-    if (String(element.getAttribute?.("aria-disabled") || "").toLowerCase() === "true") return false;
-    const rect = element.getBoundingClientRect?.();
-    if (rect && (Number(rect.width) <= 0 || Number(rect.height) <= 0)) return false;
-    const style = globalThis.getComputedStyle?.(element);
-    if (style && (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0)) {
-      return false;
+  async function sendThroughComposer(box, replyText, needsWrite) {
+    if (!box) return { ok: false, method: "none", reason: "composer_missing" };
+    box.scrollIntoView?.({ block: "center", behavior: "instant" });
+    await sleep(200);
+    const rect = box.getBoundingClientRect?.();
+    if (!rect || Number(rect.width) <= 0 || Number(rect.height) <= 0) {
+      return { ok: false, method: "none", reason: "composer_not_visible" };
     }
-    return true;
-  }
-
-  function distanceBetweenElements(first, second) {
-    const firstRect = first?.getBoundingClientRect?.();
-    const secondRect = second?.getBoundingClientRect?.();
-    if (!firstRect || !secondRect) return Number.POSITIVE_INFINITY;
-    const firstCenterX = Number(firstRect.left) + Number(firstRect.width) / 2;
-    const firstCenterY = Number(firstRect.top) + Number(firstRect.height) / 2;
-    const secondCenterX = Number(secondRect.left) + Number(secondRect.width) / 2;
-    const secondCenterY = Number(secondRect.top) + Number(secondRect.height) / 2;
-    return Math.abs(firstCenterX - secondCenterX) + Math.abs(firstCenterY - secondCenterY);
-  }
-
-  function findSendButton(root, box = null) {
-    const selectors = [
-      '[aria-label*="send" i]',
-      '[aria-label*="enviar" i]',
-      '[aria-label*="envoyer" i]',
-      '[data-testid*="send" i]',
-      '[data-visualcompletion*="ignore"] div[role="button"]',
-      'div[aria-label*="send" i]',
-      'div[aria-label*="enviar" i]',
-    ];
-    const buttons = Array.from(
-      (root || document).querySelectorAll?.(selectors.join(", ")) || [],
-    );
-    const candidates = buttons.filter((button) => {
-      const text = cleanText(button.innerText || button.textContent || button.getAttribute?.("aria-label") || "");
-      const label = cleanText(button.getAttribute?.("aria-label") || button.getAttribute?.("title") || "");
-      const descriptor = `${label} ${text}`;
-      return elementIsVisibleAndEnabled(button) &&
-        !/quick response|respuesta rápida|tap a response|availability|disponible|send a like|like|thumb|me gusta|emoji|sticker|gif|photo|image|mic|microphone|voice|attach|adjuntar/i.test(descriptor);
-    });
-    const allInteractive = Array.from(
-      (root || document).querySelectorAll?.('div[role="button"], button') || [],
-    ).filter((el) => elementIsVisibleAndEnabled(el) && !el.closest('[role="menu"], [role="listbox"], [role="navigation"]'));
-    const svgCandidate = allInteractive.find((el) => {
-      const html = String(el.innerHTML || "").toLowerCase();
-      const label = cleanText(el.getAttribute?.("aria-label") || el.getAttribute?.("title") || el.innerText || el.textContent || "");
-      const rect = el.getBoundingClientRect?.();
-      const boxRect = box?.getBoundingClientRect?.();
-      const nearComposer =
-        !boxRect || !rect ||
-        (Math.abs((boxRect.top || 0) - (rect.top || 0)) < 200 &&
-          Number(rect.left) >= Number(boxRect.left) - 20);
-      return (html.includes("svg") || el.querySelector("svg")) &&
-        nearComposer &&
-        !/quick response|respuesta|availability|disponible|send a like|like|thumb|me gusta|emoji|sticker|gif|photo|image|mic|microphone|voice|attach|adjuntar/i.test(label);
-    });
-    const distanceSort = (a, b) => {
-      const da = distanceBetweenElements(a, box);
-      const db = distanceBetweenElements(b, box);
-      return da - db;
+    const coordinates = {
+      x: Number(rect.left) + Number(rect.width) / 2,
+      y: Number(rect.top) + Number(rect.height) / 2,
     };
-    const labelBest = candidates.length > 0
-      ? (box ? [...candidates].sort(distanceSort)[0] : candidates[0])
-      : null;
-    if (labelBest) return labelBest;
-    if (svgCandidate && box) {
-      const distance = Math.abs(
-        (box.getBoundingClientRect?.().top || 0) - (svgCandidate.getBoundingClientRect?.().top || 0),
-      );
-      if (distance < 200) return svgCandidate;
-    }
-    if (svgCandidate) return svgCandidate;
-    return candidates
-      .map((button, index) => ({ button, index, distance: distanceBetweenElements(button, box) }))
-      .sort((left, right) => left.distance - right.distance || left.index - right.index)[0]?.button || null;
-  }
-
-  async function composerCleared(box, timeoutMs = SEND_EVIDENCE_TIMEOUT_MS) {
-    const started = Date.now();
-    while (Date.now() - started <= timeoutMs) {
-      if (!cleanText(readComposerText(box))) return true;
-      await sleep(SEND_EVIDENCE_INTERVAL_MS);
-    }
-    return !cleanText(readComposerText(box));
-  }
-
-  async function clickSend(box, root, replyText) {
-    await sleep(250);
-    const text = replyText || (box ? cleanText(readComposerText(box)) : "");
-    let sendButton = findSendButton(root, box);
-    if (box && !cleanText(readComposerText(box))) {
-      writeComposerText(box, text);
-      sendButton = findSendButton(root, box) || sendButton;
-    }
-    if (!sendButton && box && cleanText(readComposerText(box))) {
-      const started = Date.now();
-      while (!sendButton && Date.now() - started <= 1500) {
+    if (needsWrite) {
+      const writeResponse = await send({
+        type: "DEBUGGER_COMPOSER_WRITE",
+        ...coordinates,
+        text: replyText,
+      }).catch(() => ({ ok: false }));
+      if (!writeResponse?.ok || !writeResponse?.data?.ok) {
+        return {
+          ok: false,
+          method: "debugger_composer_write",
+          reason: writeResponse?.data?.error || writeResponse?.error || "debugger_write_failed",
+        };
+      }
+      const mainWorldConfirmed = cleanText(writeResponse.data.writtenText) === cleanText(replyText);
+      const writeStarted = Date.now();
+      while (Date.now() - writeStarted <= 2500) {
+        if (mainWorldConfirmed || cleanText(readComposerText(box)) === cleanText(replyText)) break;
         await sleep(100);
-        sendButton = findSendButton(root, box);
+      }
+      if (!mainWorldConfirmed && cleanText(readComposerText(box)) !== cleanText(replyText)) {
+        return { ok: false, method: "debugger_composer_write", reason: "composer_write_unconfirmed" };
       }
     }
-    if (sendButton) {
-      sendButton.scrollIntoView?.({ block: "center", behavior: "instant" });
-      await sleep(300);
-      const rect = sendButton.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const debugResp = await send({ type: "DEBUGGER_SEND", x: cx, y: cy }).catch(() => ({ ok: false }));
-      if (debugResp?.ok && debugResp?.data?.ok) {
-        await composerCleared(box, SEND_EVIDENCE_TIMEOUT_MS);
-        return { ok: true, method: "debugger_click" };
-      }
-      sendButton.focus?.();
-      try { sendButton.click(); } catch(e) {}
-      await composerCleared(box, SEND_EVIDENCE_TIMEOUT_MS);
-      return { ok: true, method: "button_click" };
+    const submitResponse = await send({
+      type: "DEBUGGER_COMPOSER_SUBMIT",
+      ...coordinates,
+    }).catch(() => ({ ok: false }));
+    if (!submitResponse?.ok || !submitResponse?.data?.ok) {
+      return {
+        ok: false,
+        method: "debugger_composer_submit",
+        reason: submitResponse?.data?.error || submitResponse?.error || "debugger_submit_failed",
+      };
     }
-    if (!box) return { ok: false, method: "none" };
-    box.focus?.();
-    box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-    box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-    return { ok: true, method: "enter" };
+    return {
+      ok: true,
+      method: submitResponse.data.method || "debugger_main_world_submit",
+      composerWriteConfirmed: needsWrite === true,
+    };
   }
 
   function deliveryIsVisible(reply, messages = []) {
@@ -609,6 +508,26 @@
         evidence,
       };
     });
+  }
+
+  function deduplicateSnapshots(snapshots = []) {
+    const unique = new Map();
+    const keys = new Map();
+    for (const snapshot of snapshots) {
+      const key = JSON.stringify({
+        buyerName: normalizeLanguageText(snapshot.buyerName || ""),
+        vehicleTitle: normalizeLanguageText(snapshot.context?.vehicleTitle || ""),
+        header: normalizeLanguageText(snapshot.evidence?.selectedHeaderText || ""),
+        latestSpeaker: snapshot.lastMessage?.speaker === "Dealer" ? "dealer" : "buyer",
+        latestMessage: normalizeLanguageText(snapshot.lastMessage?.text || ""),
+      });
+      keys.set(snapshot, key);
+      const existing = unique.get(key);
+      if (!existing || scoreSnapshot(snapshot).score > scoreSnapshot(existing).score) {
+        unique.set(key, snapshot);
+      }
+    }
+    return snapshots.filter((snapshot) => unique.get(keys.get(snapshot)) === snapshot);
   }
 
   function validateSnapshot(snapshot) {
@@ -760,9 +679,13 @@
     if (!inserted.ok) {
       return { autoSent: false, reason: inserted.reason, ...inserted };
     }
-    const sendResult = await clickSend(inserted.box, snapshot.root, reply);
+    const sendResult = await sendThroughComposer(inserted.box, reply, inserted.needsWrite === true);
     if (!sendResult.ok) {
-      return { autoSent: false, reason: "send_dispatch_failed", sendMethod: sendResult.method };
+      return {
+        autoSent: false,
+        reason: sendResult.reason || "send_dispatch_failed",
+        sendMethod: sendResult.method,
+      };
     }
     const started = Date.now();
     let delivered = false;
@@ -776,7 +699,9 @@
       );
       liveComposer = findComposer(snapshot.root) || inserted.box;
       liveMessages = Array.isArray(liveCapture?.messages) ? liveCapture.messages : snapshot.messages;
-      delivered = !readComposerText(liveComposer) || deliveryIsVisible(reply, liveMessages);
+      delivered = deliveryIsVisible(reply, liveMessages) ||
+        ((inserted.reusedExistingDraft === true || sendResult.composerWriteConfirmed === true) &&
+          !readComposerText(liveComposer));
       if (delivered) break;
       await sleep(SEND_EVIDENCE_INTERVAL_MS);
     }
@@ -1017,7 +942,7 @@
       };
     }
     const settings = await getSettings();
-    const snapshots = createCaptureSnapshots(settings);
+    const snapshots = deduplicateSnapshots(createCaptureSnapshots(settings));
     const winning = selectWinningSnapshot(snapshots);
     if (!winning) {
       return {
