@@ -42,6 +42,20 @@
     return panel;
   }
 
+  function sendDebug(stage, details = {}) {
+    return chrome.runtime.sendMessage({
+      type: "ALPHA_DRAFT_DEBUG",
+      debug: {
+        stage,
+        url: window.location.href,
+        pageVisible: normalizeText(document.body.innerText || document.body.textContent || "").includes(TARGET_PAGE_TEXT),
+        instagramVisible: normalizeText(document.body.innerText || document.body.textContent || "").includes(INSTAGRAM_TEXT),
+        ...details,
+        at: new Date().toISOString(),
+      },
+    }).catch(() => {});
+  }
+
   function setStatus(message, tone = "") {
     const panel = createPanel();
     const status = panel.querySelector("[data-alpha-status]");
@@ -188,11 +202,23 @@
       throw new Error(`Vehicle is not ready for Alpha page posting: ${payload.readiness.missing.join(", ")}`);
     }
 
+    await sendDebug("started", {
+      vehicleId: payload.vehicle?.id || null,
+      vehicleLabel: payload.vehicle?.label || null,
+      photoCount: payload.images?.length || 0,
+    });
     const targetState = verifyComposerTarget();
     setStatus(`Filling ${payload.vehicle.label} for Alpha MotorSports...`);
     const field = await waitForTextField();
-    if (!field) throw new Error("Business Suite text field was not found.");
+    if (!field) {
+      await sendDebug("blocked", { reason: "text_field_not_found" });
+      throw new Error("Business Suite text field was not found.");
+    }
     setFieldValue(field, payload.post.text);
+    await sendDebug("text_filled", {
+      vehicleId: payload.vehicle?.id || null,
+      textLength: payload.post.text.length,
+    });
     await uploadPhotos(payload, backendUrl);
 
     await chrome.storage.local.set({
@@ -206,6 +232,13 @@
       `Draft prepared. Review text, photos, and target, then manually click Publish when ready.${instagramWarning}`,
       targetState.instagramAlsoSelected ? "warn" : "ok",
     );
+    await sendDebug("draft_prepared", {
+      vehicleId: payload.vehicle?.id || null,
+      vehicleLabel: payload.vehicle?.label || null,
+      photoCount: payload.images?.length || 0,
+      instagramAlsoSelected: targetState.instagramAlsoSelected,
+      humanPublishRequired: true,
+    });
   }
 
   async function fillPendingDraft() {

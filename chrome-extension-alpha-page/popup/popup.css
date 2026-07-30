@@ -95,6 +95,66 @@ button:disabled {
   line-height: 1.4;
 }
 
+.debug-card h2 {
+  margin: 0 0 9px;
+  color: #aebed0;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.debug-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-top: 1px solid #1d3247;
+}
+
+.debug-row:first-of-type {
+  border-top: 0;
+}
+
+.debug-label {
+  color: #aebed0;
+  font-size: 12px;
+}
+
+.debug-value {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.debug-value.ok {
+  color: #86efac;
+}
+
+.debug-value.warn {
+  color: #fde68a;
+}
+
+.debug-value.err {
+  color: #fca5a5;
+}
+
+pre {
+  max-height: 180px;
+  overflow: auto;
+  margin: 10px 0 0;
+  padding: 9px;
+  border-radius: 7px;
+  background: #020617;
+  color: #dbeafe;
+  white-space: pre-wrap;
+  font-size: 11px;
+}
+
 #status {
   min-height: 18px;
   font-size: 12px;

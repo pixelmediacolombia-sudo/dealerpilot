@@ -6,10 +6,52 @@
   const searchInput = document.getElementById("search");
   const vehicleSelect = document.getElementById("vehicleSelect");
   const status = document.getElementById("status");
+  const reloadDebugButton = document.getElementById("reloadDebug");
+  const showJsonDebugButton = document.getElementById("showJsonDebug");
+  const jsonDebug = document.getElementById("jsonDebug");
+
+  function send(message) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        resolve(response || { ok: false, error: chrome.runtime.lastError?.message || "no_extension_response" });
+      });
+    });
+  }
 
   function setStatus(message, tone = "") {
     status.textContent = message;
     status.className = tone;
+  }
+
+  function setDebugValue(id, value, className = "") {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = value;
+    el.className = `debug-value ${className}`.trim();
+    el.title = value;
+  }
+
+  function formatVehicle(pendingPost) {
+    if (!pendingPost?.vehicleId) return "-";
+    return `#${pendingPost.vehicleId} ${pendingPost.vehicleLabel || ""}`.trim();
+  }
+
+  async function loadDebug(showRawOnly = false) {
+    const response = await send({ type: "GET_DEBUG_STATE" });
+    const state = response.ok ? response.data : { error: response.error || "debug_unavailable" };
+    if (!showRawOnly) {
+      const pending = state.pendingPost || null;
+      const draft = state.lastDraftDebug || null;
+      const error = state.lastError || null;
+      setDebugValue("dbg-backend", state.backendUrl || "-", state.backendUrl ? "ok" : "warn");
+      setDebugValue("dbg-target", state.target?.pageName || "-", state.target?.pageId ? "ok" : "warn");
+      setDebugValue("dbg-vehicle", formatVehicle(pending), pending?.vehicleId ? "ok" : "warn");
+      setDebugValue("dbg-photos", pending ? String(pending.photoCount || 0) : "-", pending?.photoCount > 0 ? "ok" : "warn");
+      setDebugValue("dbg-stage", draft?.stage || "Never", draft?.stage === "draft_prepared" ? "ok" : draft?.stage === "blocked" ? "err" : "");
+      setDebugValue("dbg-human", "Required", "ok");
+      setDebugValue("dbg-error", error?.message || "None", error?.message ? "err" : "ok");
+    }
+    jsonDebug.textContent = JSON.stringify(state, null, 2);
   }
 
   function optionLabel(vehicle) {
@@ -73,8 +115,16 @@
       });
       if (!response?.ok) throw new Error(response?.error || "Could not open Business Suite composer");
       setStatus("Business Suite composer opened. Draft fill will start there.", "ok");
+      await loadDebug();
     } catch (error) {
       setStatus(error.message || String(error), "err");
+      await chrome.storage.local.set({
+        lastAlphaPageError: {
+          message: error.message || String(error),
+          at: new Date().toISOString(),
+        },
+      });
+      await loadDebug();
     } finally {
       prepareDraftButton.disabled = false;
     }
@@ -83,6 +133,7 @@
   async function init() {
     backendInput.value = await globalThis.DealerPilotAlphaApiClient.getBackendUrl();
     await loadVehicles();
+    await loadDebug();
   }
 
   saveBackendButton.addEventListener("click", async () => {
@@ -96,6 +147,14 @@
   });
   loadVehiclesButton.addEventListener("click", loadVehicles);
   prepareDraftButton.addEventListener("click", prepareDraft);
+  reloadDebugButton.addEventListener("click", () => {
+    loadDebug().catch((error) => setStatus(error.message || String(error), "err"));
+  });
+  showJsonDebugButton.addEventListener("click", () => {
+    loadDebug(true).catch((error) => {
+      jsonDebug.textContent = error.message || String(error);
+    });
+  });
   searchInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") loadVehicles();
   });

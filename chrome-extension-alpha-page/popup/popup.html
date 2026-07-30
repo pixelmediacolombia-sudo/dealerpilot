@@ -33,6 +33,41 @@
       This extension never clicks Publish. Review the Business Suite draft manually.
     </section>
 
+    <section class="debug-card">
+      <h2>Alpha Debugger</h2>
+      <div class="debug-row">
+        <span class="debug-label">Backend</span>
+        <span class="debug-value" id="dbg-backend">-</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Target</span>
+        <span class="debug-value" id="dbg-target">-</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Vehicle</span>
+        <span class="debug-value" id="dbg-vehicle">-</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Photos</span>
+        <span class="debug-value" id="dbg-photos">-</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Stage</span>
+        <span class="debug-value" id="dbg-stage">Never</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Human Review</span>
+        <span class="debug-value ok" id="dbg-human">Required</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Last Error</span>
+        <span class="debug-value" id="dbg-error">None</span>
+      </div>
+      <button id="reloadDebug" class="secondary">Reload debugger</button>
+      <button id="showJsonDebug" class="secondary">Show JSON debugger</button>
+      <pre id="jsonDebug">Loading...</pre>
+    </section>
+
     <div id="status"></div>
     <script src="../src/shared/apiClient.js"></script>
     <script src="popup.js"></script>

@@ -29,3 +29,14 @@ test("popup uses Alpha page payload endpoints", () => {
   assert.match(popup, /\/api\/alpha-page-publisher\/vehicles\/\$\{vehicleId\}\/payload/);
   assert.match(popup, /OPEN_ALPHA_COMPOSER/);
 });
+
+test("popup exposes normal and JSON debuggers", () => {
+  const html = read("../popup/popup.html");
+  const popup = read("../popup/popup.js");
+  const background = read("../src/background/pagePublisher.js");
+  assert.match(html, /Alpha Debugger/);
+  assert.match(html, /id="jsonDebug"/);
+  assert.match(popup, /GET_DEBUG_STATE/);
+  assert.match(background, /lastAlphaPageDraftDebug/);
+  assert.match(background, /lastAlphaPageError/);
+});
