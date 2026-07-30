@@ -576,6 +576,51 @@ test("autoReply reports delivery_unconfirmed when Facebook leaves the draft in t
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
 });
 
+test("autoReply confirms delivery from visible Dealer bubble when composer does not clear", async () => {
+  const suggestedReply =
+    "Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuál es el mejor número de teléfono para ayudarte con la aplicación? También puedes llamarnos al +1 703-763-4675.";
+  let captureCount = 0;
+  const { ai, calls, composerElement, sendButton } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [{ speaker: "Alejandro", text: "Buenas tardes que precio,millas y documentos." }],
+    intakeResponse: { ok: true, data: { suggestedReply } },
+    sendSucceeds: false,
+    liveCaptureFromRoot(root) {
+      captureCount += 1;
+      const sent = captureCount > 1;
+      return {
+        root,
+        scope: root,
+        buyerName: "Alejandro",
+        messages: sent
+          ? [
+              { speaker: "Alejandro", text: "Buenas tardes que precio,millas y documentos." },
+              { speaker: "Dealer", text: suggestedReply.replace(/\s+/g, " ") },
+            ]
+          : [{ speaker: "Alejandro", text: "Buenas tardes que precio,millas y documentos." }],
+        evidence: {
+          threadRootDetected: true,
+          messageScopeDetected: true,
+          extractionMode: "semantic",
+          selectedHeaderText: "Alejandro - 2023 Toyota Camry SE",
+          latestMessageDirection: sent ? "dealer" : "buyer",
+          composerDetected: !!composerElement,
+        },
+      };
+    },
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, true);
+  assert.equal(result.sendMethod, "button_click");
+  assert.equal(result.deliveryConfirmed, true);
+  assert.equal(composerElement.textContent, suggestedReply);
+  const expectedEvents = ["native-click"];
+  assert.deepEqual(sendButton.events, expectedEvents);
+  assert.equal(calls.debug.at(-1).stage, "intake_ok");
+});
+
 test("autoReply retries sending when the composer already contains the exact AI suggestion", async () => {
   const suggestedReply = "I'd be happy to help with the 2021 TOYOTA RAV4.";
   const { ai, calls, composerElement, sendButton } = createHarness({
@@ -680,7 +725,7 @@ test("autoReply replaces stale ratings draft with requirements answer and sends"
   assert.equal(calls.intake[0].currentMessage, "Q se necesita para aplicar?");
   assert.equal(
     result.suggestedReply,
-    "Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuál es el mejor número de teléfono para ayudarte con la aplicación?",
+    "Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuál es el mejor número de teléfono para ayudarte con la aplicación? También puedes llamarnos al +1 703-763-4675.",
   );
   assert.equal(result.autoSent, true);
   assert.equal(result.composerDraftReplaced, true);

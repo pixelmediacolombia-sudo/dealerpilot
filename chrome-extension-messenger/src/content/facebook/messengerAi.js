@@ -6,8 +6,9 @@
   });
   const REPLY_QUIET_MS = 7000;
   const OWN_REPLY_GUARD_MS = 120000;
-  const SEND_EVIDENCE_TIMEOUT_MS = 4500;
+  const SEND_EVIDENCE_TIMEOUT_MS = 8000;
   const SEND_EVIDENCE_INTERVAL_MS = 300;
+  const DEFAULT_STORE_PHONE = "+1 703-763-4675";
 
   let captureInFlight = false;
   const lastCaptureHashByThread = new Map();
@@ -143,6 +144,8 @@
       /\ban advisor can confirm\b/.test(normalized) ||
       /\byou can discuss that with an advisor\b/.test(normalized) ||
       /\beso lo puedes discutir con un asesor\b/.test(normalized) ||
+      /\bnuestro equipo puede darte la informacion correspondiente\b/.test(normalized) ||
+      /\bour team can provide the corresponding information\b/.test(normalized) ||
       /^sorry to hear that\b[\s\S]{0,220}\bbest phone number\b/.test(normalized) ||
       /^sorry to hear that\b[\s\S]{0,220}\bfinance team can help\b/.test(normalized) ||
       /\bwhat'?s the best phone number\b[\s\S]{0,160}\b(?:finance team|advisor|contact|reach you|help)\b/.test(normalized) ||
@@ -203,8 +206,8 @@
       .toLowerCase();
     const spanish = /\b(?:q|que|necesit|aplicar|requisit|documentos?|pasaporte|cuenta bancaria|cuenta de banco)\b/.test(normalized);
     return spanish
-      ? "Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuál es el mejor número de teléfono para ayudarte con la aplicación?"
-      : "You only need your ID and an active bank account; a passport or Tax ID works. What's the best phone number to help with the application?";
+      ? `Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuál es el mejor número de teléfono para ayudarte con la aplicación? También puedes llamarnos al ${DEFAULT_STORE_PHONE}.`
+      : `You only need your ID and an active bank account; a passport or Tax ID works. What's the best phone number to help with the application? You can also call us at ${DEFAULT_STORE_PHONE}.`;
   }
 
   function repairSuggestedReplyForBuyerIntent(reply, payload) {
@@ -292,6 +295,23 @@
     element.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
+  function writeComposerText(box, value) {
+    box.focus?.();
+    if (box.tagName === "TEXTAREA") {
+      setNativeValue(box, value);
+      return;
+    }
+    if (document.execCommand) {
+      document.execCommand("selectAll", false, undefined);
+      document.execCommand("insertText", false, value);
+      box.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+      return;
+    }
+    box.textContent = value;
+    box.innerText = value;
+    box.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }
+
   function insertReply(reply, root) {
     const box = findComposer(root);
     if (!box) return { ok: false, reason: "composer_missing", composerDetected: false };
@@ -314,15 +334,13 @@
         box,
       };
     }
-    box.focus?.();
-    if (box.tagName === "TEXTAREA") {
-      setNativeValue(box, reply);
-    }
+    writeComposerText(box, reply);
+    const composerTextDetected = cleanText(readComposerText(box)) === cleanText(reply);
     return {
       ok: true,
       reason: "",
       composerDetected: true,
-      composerTextDetected: false,
+      composerTextDetected,
       reusedExistingDraft: false,
       replacedExistingAiDraft: replacingExistingAiDraft === true,
       box,
@@ -423,16 +441,8 @@
     const text = replyText || (box ? cleanText(readComposerText(box)) : "");
     let sendButton = findSendButton(root, box);
     if (box && !cleanText(readComposerText(box))) {
-      if (box.tagName !== "TEXTAREA" && document.execCommand) {
-        box.focus?.();
-        document.execCommand("selectAll", false, undefined);
-        document.execCommand("insertText", false, text);
-      } else if (box.tagName === "TEXTAREA") {
-        setNativeValue(box, text);
-      } else {
-        box.textContent = text;
-        box.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
-      }
+      writeComposerText(box, text);
+      sendButton = findSendButton(root, box) || sendButton;
     }
     if (!sendButton && box && cleanText(readComposerText(box))) {
       const started = Date.now();
@@ -465,8 +475,12 @@
   }
 
   function deliveryIsVisible(reply, messages = []) {
-    const expected = cleanText(reply);
-    return messages.some((message) => message.speaker === "Dealer" && cleanText(message.text) === expected);
+    const expected = normalizeLanguageText(reply);
+    return messages.some((message) => {
+      if (message.speaker !== "Dealer") return false;
+      const actual = normalizeLanguageText(message.text);
+      return actual === expected || actual.includes(expected) || expected.includes(actual);
+    });
   }
 
   function snapshotStillActionable(snapshot, payload, settings = DEFAULT_SETTINGS, expectedReply = "") {
