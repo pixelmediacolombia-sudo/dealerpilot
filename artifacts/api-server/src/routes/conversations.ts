@@ -425,8 +425,8 @@ function buildSafeFallbackReply(
     }
     if (stage === "availability") {
       return availabilityQuickReplyAccepted
-        ? "Hola, te saludamos de Alpha Motorsports. ¿Estás interesado en financiar este vehículo?"
-        : "Hola, te saludamos de Alpha Motorsports. Sí, sigue disponible. ¿Estás interesado en financiar este vehículo?";
+        ? `Hola, somos Alpha Motorsports. Tenemos el ${vehicle} disponible. ¿Estás interesado en financiarlo?`
+        : `Hola, somos Alpha Motorsports. Sí, el ${vehicle} está disponible. ¿Estás interesado en financiarlo?`;
     }
     if (stage === "financing_intro") {
       return "Perfecto. Para aplicar solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuentas con esos requisitos?";
@@ -459,8 +459,8 @@ function buildSafeFallbackReply(
   }
   if (stage === "availability") {
     return availabilityQuickReplyAccepted
-      ? "Hello from Alpha Motorsports. Are you interested in financing this vehicle?"
-      : "Hello from Alpha Motorsports. Yes, it is still available. Are you interested in financing this vehicle?";
+      ? `Hello, this is Alpha Motorsports. We have the ${vehicle} available. Are you interested in financing it?`
+      : `Hello, this is Alpha Motorsports. Yes, the ${vehicle} is available. Are you interested in financing it?`;
   }
   if (stage === "financing_intro") {
     return "Perfect. To apply, you only need your ID and an active bank account; a passport or Tax ID works. Do you have those requirements?";
@@ -622,7 +622,7 @@ const ALPHA_RULES = `
 You are a professional car sales representative for Alpha Motorsport, a used car dealership.
 
 CONVERSATION FUNNEL:
-1. Initial availability inquiry: greet from Alpha Motorsports and ask whether the buyer is interested in financing the vehicle. Do not ask for a phone number.
+1. Initial availability inquiry: greet with "Hello, this is Alpha Motorsports" / "Hola, somos Alpha Motorsports", explicitly confirm that the specific vehicle from the Vehicle field is available, then ask whether the buyer is interested in financing it. Always name the year, make, and model. Do not ask for a phone number.
 2. If the buyer says they are interested in financing, do not ask for the phone number yet. Explain the basic requirements: ID and active bank account; passport or Tax ID works. Ask if they have those requirements.
 3. If the buyer asks what requirements/documents are needed to apply, answer the requirements first: ID and active bank account; passport or Tax ID works. Ask if they have those requirements. Do not ask for a phone number in this same reply.
 4. Only after the buyer confirms they have the requirements or explicitly wants to continue with the application, ask for the buyer's best phone number and include Alpha's dealership phone as an immediate call option.
@@ -734,8 +734,8 @@ export async function generateAiReply(
   const promptStage = stage === "advisor_question" ? "detailed_question" : stage;
   const stageInstruction = {
     availability: availabilityQuickReplyAccepted
-      ? "Greet from Alpha Motorsports and ask only whether the buyer is interested in financing this vehicle. Do not ask for a phone number."
-      : "Greet from Alpha Motorsports, confirm availability briefly, then ask whether the buyer is interested in financing this vehicle. Do not ask for a phone number.",
+      ? "Greet as Alpha Motorsports, state that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number."
+      : "Greet as Alpha Motorsports, explicitly confirm that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number.",
     financing_intro: "The buyer is interested in financing. Do not ask for a phone number yet. Explain the basic requirements: ID and an active bank account; passport or Tax ID works. Ask if they have those requirements.",
     request_phone: `Ask for the buyer's best phone number so the finance team can help. End with Alpha's dealership phone as an immediate call option: ${storePhone}.`,
     phone_received: `A phone number was provided. Thank the buyer, say the team will call shortly, and optionally offer ${storePhone} as an immediate call option.`,
