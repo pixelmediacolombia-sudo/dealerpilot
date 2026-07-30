@@ -598,7 +598,11 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.equal(spanishWords.test("Estoy interesado"), true);
   assert.equal(spanishWords.test("claro que sí, ¿cómo podemos ayudarte?"), true);
   assert.equal(spanishWords.test("I am interested"), false);
+  assert.match(conversationsSource, /Hello from Alpha Motorsports/);
   assert.match(conversationsSource, /Are you interested in financing/);
+  assert.match(conversationsSource, /financing_intro/);
+  assert.match(conversationsSource, /historyGaveFinancingRequirements/);
+  assert.match(conversationsSource, /buyerConfirmedRequirements/);
   assert.match(conversationsSource, /best phone number/);
   assert.match(conversationsSource, /historyRequestedPhone/);
   assert.match(conversationsSource, /do not restart the financing question/);
@@ -609,9 +613,10 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /buyerAskedDocumentRequirements/);
   assert.match(conversationsSource, /ID and active bank account/);
   assert.match(conversationsSource, /passport or Tax ID works/);
-  assert.match(conversationsSource, /best phone number to help with the application/);
+  assert.match(conversationsSource, /Do you have those requirements/);
+  assert.match(conversationsSource, /Do not ask for a phone number in this same reply/);
   assert.match(conversationsSource, /Solo necesitas tu ID y una cuenta bancaria activa/);
-  assert.match(conversationsSource, /mejor número de teléfono/);
+  assert.match(conversationsSource, /Cuentas con esos requisitos/);
   assert.match(conversationsSource, /warranty_info/);
   assert.match(conversationsSource, /advisor_question/);
   assert.match(conversationsSource, /buyerAskedWarrantyInfo/);
