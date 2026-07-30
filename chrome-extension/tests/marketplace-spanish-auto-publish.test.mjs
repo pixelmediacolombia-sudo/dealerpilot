@@ -61,16 +61,37 @@ test("Photo proxy 5xx responses are skipped without extension error noise", () =
   assert.doesNotMatch(content, /console\.error\(`\[PHOTO\] proxy FAILED idx/);
 });
 
-test("Photo upload confirmation ignores generic Facebook photo placeholders", () => {
-  assert.match(content, /const requiredThumbnailCount = expectedCount > 1 \? 2 : 1/);
-  assert.match(content, /\[data-testid="media-attachment-delete-button"\]/);
-  assert.match(content, /\[data-testid="media-attachment-preview"\]/);
-  assert.match(content, /img\[src\^="blob:"\]/);
-  assert.match(content, /filter\(isVisibleElement\)/);
-  assert.doesNotMatch(content, /\[aria-label\*="photo" i\] img/);
-  assert.doesNotMatch(content, /\[aria-label\*="upload" i\] img/);
-  assert.doesNotMatch(content, /wordMatch/);
-  assert.doesNotMatch(content, /querySelectorAll\("img"\)/);
+test("Photo upload confirmation uses only the exact image input and its own counter", () => {
+  const evidenceStart = content.indexOf("function isMarketplaceImageUploadInput");
+  const evidenceEnd = content.indexOf("function checkboxIsChecked", evidenceStart);
+  const evidenceBlock = content.slice(evidenceStart, evidenceEnd);
+
+  assert.match(evidenceBlock, /function findMarketplacePhotoSection\(photoInput = _activePhotoInput\)/);
+  assert.match(evidenceBlock, /current !== document\.body/);
+  assert.match(evidenceBlock, /function readMarketplacePhotoCounter\(photoInput = _activePhotoInput\)/);
+  assert.match(content, /function collectMarketplacePhotoEvidence\(expectedCount\)/);
+  assert.match(content, /counter\.current === requiredPhotoCount/);
+  assert.match(content, /injectedFileCount === requiredPhotoCount/);
+  assert.match(content, /confirmed: counterConfirmed && inputConfirmed/);
+  assert.match(content, /zeroCounter: Boolean\(counter && counter\.current === 0\)/);
+  assert.match(content, /function confirmMarketplacePhotosReady\(expectedCount, timeoutMs\)/);
+  assert.doesNotMatch(evidenceBlock, /document\.querySelectorAll/);
+  assert.doesNotMatch(evidenceBlock, /document\.body\?\.innerText/);
+  assert.doesNotMatch(evidenceBlock, /media-attachment-preview/);
+  assert.doesNotMatch(evidenceBlock, /img\[src/);
+  assert.doesNotMatch(evidenceBlock, /blob:/);
+});
+
+test("Photo upload anomalies move directly to Needs Review before Next or Publish", () => {
+  assert.match(content, /photoConfirmationFailureReason\(photoEvidence\)/);
+  assert.match(content, /needsReview: true/);
+  assert.match(content, /validation\.needsReview[\s\S]*MARK_NEEDS_REVIEW[\s\S]*POLL_NOW/);
+  assert.match(content, /Facebook shows \$\{evidence\.counter\.current\} of \$\{evidence\.requiredPhotoCount\} expected photos/);
+  assert.match(content, /!publishPhotoEvidence\.confirmed && !mayUsePreNextReceipt/);
+  assert.match(content, /!publishPhotoEvidence\.inputConnected[\s\S]*hasFreshExactPhotoReceipt\(expectedPhotoCount\)/);
+  assert.match(content, /Photo upload failed[\s\S]*MARK_NEEDS_REVIEW/);
+  assert.match(content, /job payload contains no photos[\s\S]*MARK_NEEDS_REVIEW/);
+  assert.match(content, /complete photo set required \(\$\{files\.length\} of \$\{totalPhotos\} images downloaded\)/);
 });
 
 test("Make can fall back to a text input instead of requiring a combobox", () => {

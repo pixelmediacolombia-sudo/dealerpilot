@@ -38,6 +38,9 @@
   // Survives multiple uploadPhotos calls within the same page load.
   const _photoCache = new Map();
   let _photosConfirmed = false;
+  let _expectedUploadedPhotoCount = 0;
+  let _activePhotoInput = null;
+  let _photoConfirmationReceipt = null;
 
   // Set to true once waitForPhotoThumbnails confirms at least one thumbnail.
   // validateBeforeNext skips its own photo re-scan when this is already true,
@@ -480,6 +483,121 @@
     if (!el) return false;
     const rect = el.getBoundingClientRect?.();
     return el.offsetParent !== null || Boolean(rect && rect.width > 0 && rect.height > 0);
+  }
+
+  function isMarketplaceImageUploadInput(input) {
+    if (!input || input.type !== "file") return false;
+    const accept = String(input.getAttribute?.("accept") || "").toLowerCase();
+    return accept.includes("image/")
+      || accept.includes(".jpg")
+      || accept.includes(".jpeg")
+      || accept.includes(".png")
+      || accept.includes(".webp");
+  }
+
+  function findMarketplacePhotoSection(photoInput = _activePhotoInput) {
+    if (!photoInput || !photoInput.isConnected || !isMarketplaceImageUploadInput(photoInput)) {
+      return null;
+    }
+
+    let current = photoInput.parentElement;
+    for (let depth = 0; current && current !== document.body && depth < 10; depth += 1) {
+      const text = current.innerText || current.textContent || "";
+      if (/(?:photos?|fotos?)\s*[·:\-]?\s*\d+\s*\/\s*\d+/i.test(text)) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  function readMarketplacePhotoCounter(photoInput = _activePhotoInput) {
+    const section = findMarketplacePhotoSection(photoInput);
+    if (!section) return null;
+    const text = section.innerText || section.textContent || "";
+    const matches = [...text.matchAll(/(?:photos?|fotos?)\s*[·:\-]?\s*(\d+)\s*\/\s*(\d+)/gi)]
+      .map((match) => ({
+        current: Number.parseInt(match[1], 10) || 0,
+        total: Number.parseInt(match[2], 10) || 0,
+        text: match[0],
+      }))
+      .filter((counter) => counter.total > 0);
+    if (!matches.length) return null;
+    return matches.find((counter) => counter.total >= 10) || matches[0];
+  }
+
+  function collectMarketplacePhotoEvidence(expectedCount) {
+    const requiredPhotoCount = Math.max(1, Number.parseInt(expectedCount, 10) || 0);
+    const photoInput = _activePhotoInput;
+    const inputConnected = Boolean(photoInput && photoInput.isConnected);
+    const imageInput = inputConnected && isMarketplaceImageUploadInput(photoInput);
+    const section = imageInput ? findMarketplacePhotoSection(photoInput) : null;
+    const counter = section ? readMarketplacePhotoCounter(photoInput) : null;
+    const injectedFileCount = imageInput ? Number(photoInput.files?.length || 0) : 0;
+    const counterConfirmed = Boolean(
+      counter
+      && counter.current === requiredPhotoCount
+      && counter.total >= requiredPhotoCount,
+    );
+    const inputConfirmed = injectedFileCount === requiredPhotoCount;
+
+    return {
+      confirmed: counterConfirmed && inputConfirmed,
+      counter,
+      requiredPhotoCount,
+      injectedFileCount,
+      inputConnected,
+      imageInput,
+      sectionFound: Boolean(section),
+      zeroCounter: Boolean(counter && counter.current === 0),
+    };
+  }
+
+  async function confirmMarketplacePhotosReady(expectedCount, timeoutMs) {
+    const start = Date.now();
+    let latest = collectMarketplacePhotoEvidence(expectedCount);
+    while (Date.now() - start < timeoutMs) {
+      latest = collectMarketplacePhotoEvidence(expectedCount);
+      if (latest.confirmed) {
+        _photoConfirmationReceipt = {
+          expectedCount: latest.requiredPhotoCount,
+          confirmedCount: latest.counter.current,
+          confirmedAt: Date.now(),
+        };
+        return latest;
+      }
+      await sleep(500);
+    }
+    return latest;
+  }
+
+  function hasFreshExactPhotoReceipt(expectedCount) {
+    const requiredPhotoCount = Math.max(1, Number.parseInt(expectedCount, 10) || 0);
+    return Boolean(
+      _photoConfirmationReceipt
+      && _photoConfirmationReceipt.expectedCount === requiredPhotoCount
+      && _photoConfirmationReceipt.confirmedCount === requiredPhotoCount
+      && Date.now() - _photoConfirmationReceipt.confirmedAt <= 2 * 60_000,
+    );
+  }
+
+  function photoConfirmationFailureReason(evidence) {
+    if (!evidence?.inputConnected) {
+      return "Facebook photo upload control is unavailable; moving this job to Needs Review instead of guessing from unrelated DOM elements.";
+    }
+    if (!evidence?.imageInput) {
+      return "Facebook image upload input could not be verified; moving this job to Needs Review.";
+    }
+    if (!evidence?.sectionFound || !evidence?.counter) {
+      return "Facebook photo counter is unavailable in the image upload section; moving this job to Needs Review.";
+    }
+    if (evidence.injectedFileCount !== evidence.requiredPhotoCount) {
+      return `Facebook image input contains ${evidence.injectedFileCount} of ${evidence.requiredPhotoCount} expected photos; moving this job to Needs Review.`;
+    }
+    if (evidence.counter.current !== evidence.requiredPhotoCount) {
+      return `Facebook shows ${evidence.counter.current} of ${evidence.requiredPhotoCount} expected photos; moving this job to Needs Review.`;
+    }
+    return "Exact photo upload confirmation is incomplete; moving this job to Needs Review.";
   }
 
   function checkboxIsChecked(el) {
@@ -957,6 +1075,11 @@
   // Publishing-queue flow on the Marketplace create page.
   // =====================================================================
   async function runPublishingFlow(job) {
+    _photosConfirmed = false;
+    _expectedUploadedPhotoCount = 0;
+    _activePhotoInput = null;
+    _photoConfirmationReceipt = null;
+
     const securityIssue = detectSecurityGate();
     if (securityIssue) {
       jobBoxEl.innerHTML = `<div class="mai-banner"><strong>Stopped for safety.</strong> ${escapeHtml(
@@ -2000,7 +2123,7 @@
             stateError("Photo upload failed — aborting", new Error(reason));
             setStatus(reason, "err");
             send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => { });
-            await send({ type: "FAIL_JOB", jobId: job.id, reason });
+            await send({ type: "MARK_NEEDS_REVIEW", jobId: job.id, reason });
             await chrome.storage.local.remove("activeJob");
             renderReview(job, { filled, missed, warnings });
             return;
@@ -2010,7 +2133,17 @@
           filled.push(`photos (${photoResult.uploaded} uploaded)`);
         }
       } else {
-        warnings.push("No photos in job payload — upload photos manually");
+        const reason = "Photo upload failed: job payload contains no photos";
+        warnings.push(reason);
+        if (job.mode === "Controlled" || job.autoClickPublish === true) {
+          stateError("Photo upload failed — aborting", new Error(reason));
+          setStatus(reason, "err");
+          send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: reason }).catch(() => { });
+          await send({ type: "MARK_NEEDS_REVIEW", jobId: job.id, reason });
+          await chrome.storage.local.remove("activeJob");
+          renderReview(job, { filled, missed, warnings });
+          return;
+        }
       }
 
       // ---- Phase 1: Vehicle type (required for Next button to activate) ----
@@ -2413,16 +2546,9 @@
 
     // Wait up to 10 s for Facebook to render the file input
     let input = null;
-    const FILE_SELECTORS = [
-      'input[type="file"][accept*="image"]',
-      'input[type="file"][multiple]',
-      'input[type="file"]',
-    ];
     for (let attempt = 0; attempt < 20; attempt++) {
-      for (const sel of FILE_SELECTORS) {
-        const found = document.querySelector(sel);
-        if (found) { input = found; break; }
-      }
+      input = Array.from(document.querySelectorAll('input[type="file"]'))
+        .find(isMarketplaceImageUploadInput) || null;
       if (input) break;
       await sleep(500);
     }
@@ -2432,6 +2558,7 @@
       stateError(reason);
       return { uploaded: 0, failed: true, reason };
     }
+    _activePhotoInput = input;
 
     // ── Parallel download (3 concurrent) with in-memory cache ────────────
     send({
@@ -2492,12 +2619,12 @@
             console.warn("[PHOTO]", reason);
             warnings.push(reason);
 
-            // If active job is Controlled or autoClickPublish, fail it immediately
+            // If active job is Controlled or autoClickPublish, move it to review immediately.
             try {
               const { activeJob } = await chrome.storage.local.get("activeJob");
               if (activeJob && (activeJob.mode === "Controlled" || activeJob.autoClickPublish === true) && activeJob.id === jobId) {
                 await send({ type: "SEND_JOB_EVENT", jobId, event: "auto_publish_failed", details: reason }).catch(() => { });
-                await send({ type: "FAIL_JOB", jobId, reason }).catch(() => { });
+                await send({ type: "MARK_NEEDS_REVIEW", jobId, reason }).catch(() => { });
                 await chrome.storage.local.remove("activeJob");
                 return { uploaded: 0, failed: true, reason };
               }
@@ -2533,6 +2660,12 @@
       stateError(reason);
       return { uploaded: 0, failed: true, reason };
     }
+    if (files.length !== totalPhotos) {
+      const reason = `Photo upload failed: complete photo set required (${files.length} of ${totalPhotos} images downloaded)`;
+      stateError(reason);
+      return { uploaded: files.length, failed: true, reason };
+    }
+    _expectedUploadedPhotoCount = files.length;
 
     send({
       type: "SEND_JOB_EVENT", jobId, event: "photo_download_complete",
@@ -2597,35 +2730,14 @@
   async function waitForPhotoThumbnails(expectedCount, timeoutMs) {
     const start = Date.now();
     let lastMsg = 0;
-    const requiredThumbnailCount = expectedCount > 1 ? 2 : 1;
-    const getPhotoCounter = () => {
-      const text = document.body?.innerText || "";
-      const slashMatch = text.match(/(?:photos?|fotos?)\s*[·:\-]?\s*(\d+)\s*\/\s*\d+/i);
-      if (slashMatch) return Number.parseInt(slashMatch[1], 10) || 0;
-      return 0;
-    };
 
     while (Date.now() - start < timeoutMs) {
-      const photoCount = getPhotoCounter();
-      if (photoCount > 0) {
-        stateLog(`Photo counter found: ${photoCount} / ${expectedCount}`);
-        return true;
+      const evidence = collectMarketplacePhotoEvidence(expectedCount);
+      if (evidence.counter && evidence.counter.current > 0) {
+        stateLog(`Photo counter found: ${evidence.counter.current} / ${expectedCount}`);
       }
-
-      // Facebook renders uploaded photo thumbnails in a few different ways
-      const thumbs = [
-        ...document.querySelectorAll('[data-testid="media-attachment-delete-button"]'),
-        ...document.querySelectorAll('[data-testid="media-attachment-preview"]'),
-        ...document.querySelectorAll('img[src^="blob:"]'),
-        ...document.querySelectorAll('[aria-label*="eliminar" i]'),
-        ...document.querySelectorAll('[aria-label*="quitar" i]'),
-        ...document.querySelectorAll('[aria-label*="remove" i]'),
-        ...document.querySelectorAll('[aria-label*="delete" i]'),
-      ].filter(isVisibleElement);
-      // Deduplicate by filtering to unique elements
-      const unique = [...new Set(thumbs)];
-      if (unique.length >= requiredThumbnailCount) {
-        stateLog(`Photo thumbnails found: ${unique.length} / ${expectedCount}`);
+      if (evidence.confirmed) {
+        stateLog(`Photo counter confirmed: ${evidence.counter.current} / ${expectedCount}`);
         return true;
       }
       // Emit progress messages — thresholds tuned for the 20 s budget
@@ -2780,6 +2892,16 @@
     if (!validation.ok) {
       stateError("Pre-Next validation failed", new Error(validation.reason));
       send({ type: "SEND_JOB_EVENT", jobId: job.id, event: "auto_publish_failed", details: validation.reason }).catch(() => { });
+      if (validation.needsReview) {
+        await send({ type: "MARK_NEEDS_REVIEW", jobId: job.id, reason: validation.reason });
+        await chrome.storage.local.remove("activeJob");
+        setStatus(`${validation.reason} Checking the next vehicle...`, "err");
+        setTimeout(() => {
+          window.location.replace("https://www.facebook.com/marketplace/create/vehicle");
+        }, 2000);
+        await send({ type: "POLL_NOW" }).catch(() => { });
+        return;
+      }
       const retried = await handleAutoRetry(job, validation.reason);
       if (!retried) {
         setStatus(validation.reason, "err");
@@ -2919,6 +3041,22 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         return { listingUrl: null, blockReason: "Publish button was not available.", publishedLanding: false };
       }
 
+      const expectedPhotoCount = Math.max(1, _expectedUploadedPhotoCount || 0);
+      const publishPhotoEvidence = collectMarketplacePhotoEvidence(expectedPhotoCount);
+      const mayUsePreNextReceipt =
+        !publishPhotoEvidence.inputConnected
+        && hasFreshExactPhotoReceipt(expectedPhotoCount);
+      if (!publishPhotoEvidence.confirmed && !mayUsePreNextReceipt) {
+        return {
+          listingUrl: null,
+          blockReason: photoConfirmationFailureReason(publishPhotoEvidence),
+          publishedLanding: false,
+        };
+      }
+      if (mayUsePreNextReceipt) {
+        stateLog(`Photo publish gate: using exact pre-Next receipt for ${expectedPhotoCount} photos`);
+      }
+
       const publishGate = await validateJobBeforeMarketplaceSideEffect(job, `Publish click ${attempt}`);
       if (!publishGate.ok) {
         await stopStaleMarketplaceFlow(job, publishGate);
@@ -3018,45 +3156,15 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   // validateBeforeNext — checks the form has the minimum required data before
   // we try to click Next. Returns { ok, reason }.
   async function validateBeforeNext(missed = [], warnings = []) {
-    // 1. Confirm at least one photo thumbnail is visible.
-    //
-    //    If uploadPhotos already confirmed thumbnails (via waitForPhotoThumbnails),
-    //    skip the re-scan entirely — we trust the earlier result.  This prevents
-    //    the false "0 photos" failure that fires when Facebook renders thumbnails
-    //    in a way that only the earlier, broader scan detects.
-    //
-    //    If _photosConfirmed is false (e.g. upload was skipped or thumbnails timed
-    //    out), run our own expanded scan with a short 15 s window.
-    let hasPhoto = _photosConfirmed;
-
-    if (!hasPhoto) {
-      const PHOTO_POLL_MS = 15000;
-      const photoStart = Date.now();
-      // Expanded selector list — Facebook uses many different DOM patterns for
-      // uploaded photo thumbnails and preview tiles.
-      const THUMB_SELECTORS = [
-        'img[src^="blob:"]',
-        '[data-testid="media-attachment-delete-button"]',
-        '[data-testid="media-attachment-preview"]',
-        '[aria-label*="eliminar" i]',
-        '[aria-label*="quitar" i]',
-        '[aria-label*="remove" i]',
-        '[aria-label*="delete" i]',
-        '[role="presentation"] img[src^="blob:"]',
-      ];
-      while (Date.now() - photoStart < PHOTO_POLL_MS) {
-        // Collect all matching DOM thumbnail elements, deduped
-        const thumbs = [
-          ...new Set(THUMB_SELECTORS.flatMap((sel) => [...document.querySelectorAll(sel)])),
-        ].filter(isVisibleElement);
-        if (thumbs.length > 0) { hasPhoto = true; break; }
-        // Also accept Facebook's text counter ("1 photo", "3 photos", "Fotos · 7/20")
-        const pageText = document.body.innerText || "";
-        const countText = pageText.match(/(?:photos?|fotos?)\s*[·:\-]?\s*(\d+)\s*\/\s*\d+/i);
-        if (countText && parseInt(countText[1], 10) > 0) { hasPhoto = true; break; }
-        await sleep(600);
-      }
-    }
+    // 1. Reconfirm real Facebook photo evidence immediately before Next.
+    //    Earlier upload confirmation can become stale if Facebook rejects the
+    //    files after briefly rendering controls. A visible "Photos 0 / 20"
+    //    counter is treated as authoritative and blocks all publish side effects.
+    const expectedPhotoCount = Math.max(1, _expectedUploadedPhotoCount || 0);
+    const photoEvidence = await confirmMarketplacePhotosReady(
+      expectedPhotoCount,
+      _photosConfirmed ? 5000 : 15000,
+    );
     // Some localized Marketplace forms omit certain optional fields
     // entirely (no combobox / input rendered). If a "missed" field
     // refers to a color field that does not exist in the current DOM,
@@ -3090,10 +3198,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       }
     } catch (e) { console.warn('[VALIDATION DEBUG] failed to write debug storage', e); }
 
-    if (!hasPhoto) {
+    if (!photoEvidence.confirmed) {
       return {
         ok: false,
-        reason: "Photo upload not confirmed by Facebook - refusing to continue to Next/Publish",
+        reason: photoConfirmationFailureReason(photoEvidence),
+        needsReview: true,
       };
     }
 
