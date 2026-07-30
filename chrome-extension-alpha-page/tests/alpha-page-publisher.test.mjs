@@ -20,6 +20,7 @@ test("content script refuses to click Publish automatically", () => {
   const content = read("../content/content.js");
   assert.match(content, /Human review is required before Publish/);
   assert.match(content, /manually click Publish/);
+  assert.match(content, /waitForComposerTarget/);
   assert.doesNotMatch(content, /\.click\(\)[\s\S]{0,120}(Publish|publish)/);
 });
 

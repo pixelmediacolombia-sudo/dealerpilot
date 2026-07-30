@@ -11,6 +11,7 @@
   border-radius: 10px;
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
   overflow: hidden;
+  max-height: calc(100vh - 36px);
 }
 
 #dealerpilot-alpha-panel header {
@@ -34,6 +35,8 @@
 
 #dealerpilot-alpha-panel .body {
   padding: 12px 14px 14px;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
 }
 
 #dealerpilot-alpha-panel .status {

@@ -80,6 +80,21 @@
     };
   }
 
+  async function waitForComposerTarget(timeoutMs = 20000) {
+    const started = Date.now();
+    let latestError = null;
+    while (Date.now() - started < timeoutMs) {
+      try {
+        return verifyComposerTarget();
+      } catch (error) {
+        latestError = error;
+        await sendDebug("waiting_for_target", { reason: error.message || String(error) });
+        await sleep(700);
+      }
+    }
+    throw latestError || new Error("Alpha MotorSports is not visible in this Business Suite composer.");
+  }
+
   function findByText(patterns) {
     const normalizedPatterns = patterns.map(normalizeText);
     const nodes = Array.from(document.querySelectorAll("button, div[role='button'], span, div"))
@@ -207,7 +222,7 @@
       vehicleLabel: payload.vehicle?.label || null,
       photoCount: payload.images?.length || 0,
     });
-    const targetState = verifyComposerTarget();
+    const targetState = await waitForComposerTarget();
     setStatus(`Filling ${payload.vehicle.label} for Alpha MotorSports...`);
     const field = await waitForTextField();
     if (!field) {
