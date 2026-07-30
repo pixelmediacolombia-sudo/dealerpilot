@@ -716,6 +716,10 @@
       currentMessage,
       visibleMessages,
     });
+    const autoActionKey = JSON.stringify({
+      thread: externalThreadRef,
+      currentMessage,
+    });
     return {
       externalThreadRef,
       sourceUrl: location.href,
@@ -734,6 +738,7 @@
       detectedVehicleTitle: snapshot.context.vehicleTitle || undefined,
       detectedMarketplaceListingUrl: snapshot.context.listingUrl || undefined,
       messageHash: captureHash,
+      autoActionKey,
       idempotencyKey: captureHash,
     };
   }
@@ -743,7 +748,8 @@
   }
 
   async function maybeSendReply(reply, payload, snapshot, threadKey, settings = DEFAULT_SETTINGS) {
-    if (!reply || payload.messageHash === lastAutoSendHashByThread.get(threadKey)) {
+    const autoActionKey = payload.autoActionKey || payload.messageHash;
+    if (!reply || autoActionKey === lastAutoSendHashByThread.get(threadKey)) {
       return { autoSent: false, reason: "reply_or_capture_not_actionable" };
     }
     const actionable = snapshotStillActionable(snapshot, payload, settings, reply);
@@ -786,7 +792,7 @@
         deliveryConfirmed: false,
       };
     }
-    lastAutoSendHashByThread.set(threadKey, payload.messageHash);
+    lastAutoSendHashByThread.set(threadKey, autoActionKey);
     lastAutoReplyByThread.set(threadKey, {
       text: cleanText(reply),
       at: Date.now(),
@@ -881,15 +887,16 @@
     }
 
     if (automatic) {
-      if (payload.messageHash === lastAutoSendHashByThread.get(threadKey)) {
+      const autoActionKey = payload.autoActionKey || payload.messageHash;
+      if (autoActionKey === lastAutoSendHashByThread.get(threadKey)) {
         await sendDebug("blocked", { ...debug, reason: "duplicate_auto_send_hash" });
         return { skipped: true, reason: "duplicate_auto_send_hash" };
       }
       const now = Date.now();
       const pending = pendingBuyerByThread.get(threadKey) || {};
-      if (payload.messageHash !== pending.hash) {
+      if (autoActionKey !== pending.hash) {
         pendingBuyerByThread.set(threadKey, {
-          hash: payload.messageHash,
+          hash: autoActionKey,
           since: now,
           detectedAt: detectedAtMs,
         });

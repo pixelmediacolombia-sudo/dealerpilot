@@ -102,8 +102,19 @@ function createHarness({
   includeDecoySendButton = false,
   dynamicSendControl = false,
   locationOverride = null,
+  nowMs = null,
 } = {}) {
   const calls = { messages: [], debug: [], intake: [] };
+  let currentNowMs = nowMs;
+  class FakeDate extends Date {
+    constructor(...args) {
+      super(args.length ? args[0] : currentNowMs ?? Date.now());
+    }
+
+    static now() {
+      return currentNowMs ?? Date.now();
+    }
+  }
   const composerElement = composer
     ? new FakeElement({
         attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" },
@@ -254,7 +265,7 @@ function createHarness({
       hostname: "www.facebook.com",
     },
     console: { warn() {}, log() {}, error() {} },
-    Date,
+    Date: FakeDate,
     Event,
     InputEvent: class InputEvent extends Event {},
     KeyboardEvent: class KeyboardEvent extends Event {},
@@ -264,7 +275,16 @@ function createHarness({
     URL,
   });
   vm.runInContext(source, context, { filename: "messengerAi.js" });
-  return { ai: context.DealerPilotMessengerAi, calls, composerElement, sendButton, decoySendButton };
+  return {
+    ai: context.DealerPilotMessengerAi,
+    calls,
+    composerElement,
+    sendButton,
+    decoySendButton,
+    setNow(ms) {
+      currentNowMs = ms;
+    },
+  };
 }
 
 test("dryRun captures a valid buyer message without backend intake or composer writes", async () => {
@@ -556,6 +576,31 @@ test("autoReply waits for delayed Facebook send confirmation before blocking", a
   assert.equal(result.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, "");
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
+});
+
+test("automatic quiet window uses a stable buyer-message key when DOM history changes", async () => {
+  const messages = [{ speaker: "Omar", text: "Good afternoon, is this still available?" }];
+  const { ai, calls, composerElement, sendButton, setNow } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages,
+    sendSucceeds: true,
+    nowMs: 100000,
+  });
+  const first = await ai.captureConversation({ automatic: true });
+
+  assert.equal(first.reason, "waiting_quiet_window");
+  assert.equal(calls.intake.length, 0);
+
+  messages.unshift({ speaker: "Dealer", text: "Send a quick response" });
+  setNow(108000);
+  const second = await ai.captureConversation({ automatic: true });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(second.autoSent, true);
+  assert.equal(second.deliveryConfirmed, true);
+  assert.equal(composerElement.textContent, "");
+  const expectedEvents = ["native-click"];
+  assert.deepEqual(sendButton.events, expectedEvents);
 });
 
 test("autoReply reports delivery_unconfirmed when Facebook leaves the draft in the composer", async () => {
