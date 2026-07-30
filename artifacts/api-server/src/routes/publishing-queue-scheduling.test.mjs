@@ -616,7 +616,15 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /advisor_question/);
   assert.match(conversationsSource, /buyerAskedWarrantyInfo/);
   assert.match(conversationsSource, /buyerAskedAdvisorQuestion/);
-  assert.match(conversationsSource, /discuss that with an advisor/);
+  assert.match(conversationsSource, /Do not use the words "advisor" or "asesor"/);
+  assert.match(conversationsSource, /Use "our team" \/ "nuestro equipo"/);
+  assert.match(conversationsSource, /do not provide those values/);
+  assert.match(conversationsSource, /stageRequiresStorePhone/);
+  assert.match(conversationsSource, /replyIncludesStorePhone/);
+  assert.match(conversationsSource, /replyGivesRestrictedVehicleDetails/);
+  assert.match(conversationsSource, /\$\\s\*\\d/);
+  assert.match(conversationsSource, /Dealership phone: \$\{storePhone\}/);
+  assert.match(conversationsSource, /detailed_question/);
   assert.match(conversationsSource, /confirm the exact details/);
   assert.match(conversationsSource, /best phone number so we can help you/);
   assert.match(conversationsSource, /generateAiReplyWithFallback/);
@@ -625,7 +633,7 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /deliveryRetry: true/);
   assert.match(conversationsSource, /returning existing reply for Messenger delivery retry/);
   assert.match(conversationsSource, /!isReplyLanguageMirrored\(retryableReply, language\)/);
-  assert.match(conversationsSource, /repaired stored reply language before Messenger delivery retry/);
+  assert.match(conversationsSource, /repaired stale reply before Messenger delivery retry/);
   assert.match(conversationsSource, /messageDetectedAt/);
   assert.match(conversationsSource, /backendReceivedAt/);
   assert.match(conversationsSource, /aiStartedAt/);

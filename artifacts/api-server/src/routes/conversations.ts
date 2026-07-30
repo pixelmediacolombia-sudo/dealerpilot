@@ -304,6 +304,10 @@ function buyerAskedDocumentRequirements(latest: string): boolean {
     /\b(?:pasaporte|passport|tax\s*id|itin|identificaci[oó]n|id|cuenta bancaria|bank account).{0,140}(?:aplicar|apply|application|financ|finance|financing|necesit|need|required)\b/i.test(latest);
 }
 
+function buyerAskedDetailedVehicleInfo(latest: string): boolean {
+  return /\b(?:price|precio|cash|efectivo|miles|millas|odometer|payment|pago|cuota|down payment|inicial|historial|history|accident|accidente|condition|condici[oó]n|warranty|garant[ií]a|deductible|deducible|coverage|cobertura)\b/i.test(latest);
+}
+
 function buyerAskedWarrantyInfo(latest: string): boolean {
   return /\b(?:warranty|garant[ií]a|deductible|deducible|engine|motor|transmission|transmisi[oó]n|mechanic|mec[aá]nico|repair|reparaci[oó]n|third-party|dealership|included|cover|days|miles|mill?as)\b/i.test(latest);
 }
@@ -323,6 +327,27 @@ function isTerminalBuyerAcknowledgement(value: string): boolean {
     .trim();
   return /^(?:(?:ok|okay|perfecto|listo|esta bien|todo bien)\s+)?(?:gracias|muchas gracias)$/.test(normalized) ||
     /^(?:(?:ok|okay|perfect|got it|all right)\s+)?(?:thanks|thank you)$/.test(normalized);
+}
+
+function normalizePhoneDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+function replyIncludesStorePhone(reply: string, storePhone: string): boolean {
+  const replyDigits = normalizePhoneDigits(reply);
+  const storeDigits = normalizePhoneDigits(storePhone);
+  return storeDigits.length > 0 && replyDigits.includes(storeDigits);
+}
+
+function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
+  return ["request_phone", "document_requirements", "warranty_info", "advisor_question"].includes(stage);
+}
+
+function replyGivesRestrictedVehicleDetails(reply: string): boolean {
+  const normalized = cleanConversationText(reply).toLowerCase();
+  return /\$\s*\d/.test(normalized) ||
+    /\b(?:price|precio|mileage|millaje|millas|miles|down payment|inicial)\b.{0,24}\b\d[\d,]*(?:\s*(?:mi|miles|millas))?\b/i.test(normalized) ||
+    /\b\d[\d,]*\s*(?:mi|miles|millas)\b/i.test(normalized);
 }
 
 function resolveSalesReplyStage(visibleMessages: string[], currentMessage: string): SalesReplyStage {
@@ -378,7 +403,7 @@ function buildSafeFallbackReply(
       return `Gracias. Nuestro equipo se comunicará contigo pronto sobre el ${vehicle}. Si prefieres llamar ahora: ${storePhone}.`;
     }
     if (stage === "request_phone") {
-      return `Perfecto. ¿Cuál es el mejor número de teléfono para ayudarte con el financiamiento del ${vehicle}?`;
+      return `Perfecto. ¿Cuál es el mejor número de teléfono para ayudarte con el financiamiento del ${vehicle}? También puedes llamarnos al ${storePhone}.`;
     }
     if (stage === "availability") {
       return `${availabilityQuickReplyAccepted ? "" : "Sí, sigue disponible. "}¿Te interesa financiar el ${vehicle}?`;
@@ -387,13 +412,16 @@ function buildSafeFallbackReply(
       return `Nuestra dirección es: ${storeAddress}. ¿Te gustaría venir a ver el ${vehicle}?`;
     }
     if (stage === "document_requirements") {
-      return "Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuál es el mejor número de teléfono para ayudarte con la aplicación?";
+      const detailBridge = buyerAskedDetailedVehicleInfo(currentMessage)
+        ? " Nuestro equipo puede darte la información correspondiente sobre esos detalles."
+        : "";
+      return `Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID.${detailBridge} ¿Cuál es el mejor número de teléfono para ayudarte con la aplicación? También puedes llamarnos al ${storePhone}.`;
     }
     if (stage === "warranty_info") {
-      return `Buena pregunta. Eso lo puedes discutir con un asesor para confirmar los detalles exactos de garantía y cobertura. ¿Cuál es el mejor número de teléfono para ayudarte con el ${vehicle}?`;
+      return `Buena pregunta. Nuestro equipo puede darte la información correspondiente y confirmar los detalles exactos de garantía y cobertura. ¿Cuál es el mejor número de teléfono para ayudarte con el ${vehicle}? También puedes llamarnos al ${storePhone}.`;
     }
     if (stage === "advisor_question") {
-      return `Buena pregunta. Eso lo puedes discutir con un asesor para confirmar los detalles exactos. ¿Cuál es el mejor número de teléfono para ayudarte con el ${vehicle}?`;
+      return `Buena pregunta. Nuestro equipo puede darte la información correspondiente y confirmar los detalles exactos. ¿Cuál es el mejor número de teléfono para ayudarte con el ${vehicle}? También puedes llamarnos al ${storePhone}.`;
     }
     return `Con gusto te ayudo con el ${vehicle}. ¿Te interesa financiarlo?`;
   }
@@ -401,7 +429,7 @@ function buildSafeFallbackReply(
     return `Thank you. Our team will contact you shortly about the ${vehicle}. If you prefer to call now: ${storePhone}.`;
   }
   if (stage === "request_phone") {
-    return `Great. What's the best phone number to help you with financing for the ${vehicle}?`;
+    return `Great. What's the best phone number to help you with financing for the ${vehicle}? You can also call us at ${storePhone}.`;
   }
   if (stage === "availability") {
     return `${availabilityQuickReplyAccepted ? "" : "Yes, it is still available. "}Are you interested in financing the ${vehicle}?`;
@@ -410,13 +438,16 @@ function buildSafeFallbackReply(
     return `Our address is: ${storeAddress}. Would you like to come see the ${vehicle}?`;
   }
   if (stage === "document_requirements") {
-    return "You only need your ID and an active bank account; a passport or Tax ID works. What's the best phone number to help with the application?";
+    const detailBridge = buyerAskedDetailedVehicleInfo(currentMessage)
+      ? " Our team can provide the corresponding information about those details."
+      : "";
+    return `You only need your ID and an active bank account; a passport or Tax ID works.${detailBridge} What's the best phone number to help with the application? You can also call us at ${storePhone}.`;
   }
   if (stage === "warranty_info") {
-    return `Great questions. You can discuss that with an advisor so they can confirm the exact warranty and coverage details. What's the best phone number so we can help you with the ${vehicle}?`;
+    return `Great question. Our team can provide the corresponding information and confirm the exact warranty and coverage details. What's the best phone number so we can help you with the ${vehicle}? You can also call us at ${storePhone}.`;
   }
   if (stage === "advisor_question") {
-    return `Great question. You can discuss that with an advisor so they can confirm the exact details. What's the best phone number so we can help you with the ${vehicle}?`;
+    return `Great question. Our team can provide the corresponding information and confirm the exact details. What's the best phone number so we can help you with the ${vehicle}? You can also call us at ${storePhone}.`;
   }
   return `I'd be happy to help with the ${vehicle}. Are you interested in financing it?`;
 }
@@ -424,11 +455,14 @@ function buildSafeFallbackReply(
 function isAiReplyAligned(reply: string, stage: SalesReplyStage, storePhone: string): boolean {
   const normalized = cleanConversationText(reply).toLowerCase();
   if (!normalized) return false;
+  if (stageRequiresStorePhone(stage) && !replyIncludesStorePhone(reply, storePhone)) return false;
+  if (/\badvisor\b|\basesor\b/i.test(normalized)) return false;
+  if (replyGivesRestrictedVehicleDetails(reply)) return false;
   if (stage === "availability") {
     return /financ|financiar|financiamiento/.test(normalized) && !normalized.includes(storePhone.toLowerCase());
   }
   if (stage === "request_phone") {
-    return /phone|number|tel[eé]fono|n[uú]mero/.test(normalized) && !normalized.includes(storePhone.toLowerCase());
+    return /phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
   }
   if (stage === "phone_received") {
     return /call|contact|llam|comunicar/.test(normalized);
@@ -439,13 +473,13 @@ function isAiReplyAligned(reply: string, stage: SalesReplyStage, storePhone: str
       /phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
   }
   if (stage === "warranty_info") {
-    return /advisor|asesor/.test(normalized) &&
-      /confirm|confirmar|discuss|discutir/.test(normalized) &&
+    return /team|equipo/.test(normalized) &&
+      /confirm|confirmar|information|informaci[oó]n/.test(normalized) &&
       /phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
   }
   if (stage === "advisor_question") {
-    return /advisor|asesor/.test(normalized) &&
-      /confirm|confirmar|discuss|discutir/.test(normalized) &&
+    return /team|equipo/.test(normalized) &&
+      /confirm|confirmar|information|informaci[oó]n/.test(normalized) &&
       /phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
   }
   return true;
@@ -503,11 +537,12 @@ CONVERSATION FUNNEL:
 1. For the initial Marketplace availability inquiry, the affirmative Marketplace quick reply is handled by the extension. Ask whether the buyer is interested in financing.
 2. When the buyer is interested in financing or asks for an application/link, ask for the best phone number.
 3. If the buyer asks what requirements/documents are needed to apply, answer the requirements first: ID and active bank account; passport or Tax ID works. Then continue the flow by asking for the best phone number to help with the application.
-4. If the buyer asks any vehicle, payment, warranty, coverage, deductible, inspection, third-party/dealership, or other detailed question that is not answered by the supplied context, do not invent details. Say they can discuss it with an advisor and continue by asking for the best phone number.
+4. If the buyer asks any vehicle, payment, warranty, coverage, deductible, inspection, third-party/dealership, or other detailed question that is not answered by the supplied context, do not invent details. Say our team can provide the corresponding information and continue by asking for the best phone number.
 5. If the conversation already asked for the buyer's phone number and the buyer replies without a number, do not restart the financing question. Continue by asking for the best phone number.
-6. Once the buyer provides a phone number, acknowledge it and say the team will call shortly. Only at this stage may you also offer the store phone as an immediate option.
+6. Once the buyer provides a phone number, acknowledge it and say the team will call shortly. You may also offer the store phone as an immediate option.
 7. Send exactly one short reply for the latest buyer turn. Never repeat a previous reply.
-8. Answer safe vehicle questions directly only when the supplied context contains the answer; otherwise route the buyer to an advisor and ask for the best phone number. Never invent availability, price, approval, history, warranty, or financing details.
+8. Do not give price, mileage, approval, history, warranty, or financing details in Messenger. If the buyer asks for those details, say our team can provide the corresponding information, then continue the funnel by asking for the best phone number.
+9. For the request_phone, document_requirements, warranty_info, and detailed-question stages, finish by asking for the buyer's best phone number and include Alpha's dealership phone as an immediate call option.
 
 ADDRESS / DIRECTIONS HANDLING:
 - If the buyer asks for the address, directions, or location, provide the store address directly and invite them to visit.
@@ -521,8 +556,9 @@ Language rules:
 - Never write a bilingual reply, translation, second version, or mixed-language sentence.
 - Use "easy financing options" / "opciones de financiamiento fáciles"
 - Use "approval based on qualification" / "aprobación basada en calificación"
+- Do not use the words "advisor" or "asesor". Use "our team" / "nuestro equipo".
 - Do not push a call or include the store phone in the first reply
-- If asked about financing or an application link, ask for the buyer's phone number first
+- If asked about financing, an application link, requirements, or detailed vehicle information after the first availability step, ask for the buyer's phone number and include Alpha's dealership phone as an immediate call option
 - NEVER say: guaranteed approval, everyone approved, bad credit, denied, rejected, disqualified
 - NEVER promise a loan or specific rate
 - NEVER invent price, down payment, vehicle history, or financing terms
@@ -598,20 +634,22 @@ export async function generateAiReply(
     ? `Vehicle: ${vehicleTitle}${vehicleType ? ` (${vehicleType})` : ""}${publishedDownPayment ? ` — Listed down payment: $${publishedDownPayment.toLocaleString()}` : ""}`
     : "";
   const locationContext = `Dealership address: ${storeAddress}`;
+  const phoneContext = `Dealership phone: ${storePhone}`;
 
   const history = visibleMessages.slice(-8).join("\n");
 
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage);
+  const promptStage = stage === "advisor_question" ? "detailed_question" : stage;
   const stageInstruction = {
     availability: availabilityQuickReplyAccepted
       ? "The affirmative Marketplace availability quick reply was already sent. Ask only whether the buyer is interested in financing."
       : "Confirm availability briefly, then ask whether the buyer is interested in financing.",
-    request_phone: "Ask for the buyer's best phone number so the finance team can help. Do not provide the store phone yet.",
+    request_phone: `Ask for the buyer's best phone number so the finance team can help. End with Alpha's dealership phone as an immediate call option: ${storePhone}.`,
     phone_received: `A phone number was provided. Thank the buyer, say the team will call shortly, and optionally offer ${storePhone} as an immediate call option.`,
     address_request: `The buyer is asking for the address or directions. Provide the dealership address and invite them to visit. Do NOT ask clarifying questions.`,
-    document_requirements: "The buyer is asking what is needed to apply. Reply with the requirements: ID and an active bank account; passport or Tax ID works. Then continue the flow by asking for the best phone number to help with the application.",
-    warranty_info: "The buyer is asking detailed warranty questions. Do not invent warranty terms. Say they can discuss it with an advisor who can confirm the exact warranty and coverage details; then ask for the best phone number.",
-    advisor_question: "The buyer is asking a detailed question. Do not invent details. Say they can discuss it with an advisor who can confirm the exact details; then ask for the best phone number.",
+    document_requirements: `The buyer is asking what is needed to apply. Reply with the requirements: ID and an active bank account; passport or Tax ID works. If they also ask price, miles, or other details, do not provide those values; say our team can provide the corresponding information. Then ask for the best phone number and include Alpha's dealership phone: ${storePhone}.`,
+    warranty_info: `The buyer is asking detailed warranty questions. Do not invent warranty terms. Say our team can provide the corresponding information and confirm exact warranty or coverage details; then ask for the best phone number and include Alpha's dealership phone: ${storePhone}.`,
+    advisor_question: `The buyer is asking a detailed question. Do not invent details. Say our team can provide the corresponding information and confirm exact details; then ask for the best phone number and include Alpha's dealership phone: ${storePhone}.`,
     general: "Answer safely using only supplied facts, then move the conversation forward with one short question.",
   }[stage];
 
@@ -619,7 +657,8 @@ export async function generateAiReply(
 
 ${vehicleContext}
 ${locationContext}
-Current funnel stage: ${stage}
+${phoneContext}
+Current funnel stage: ${promptStage}
 Stage instruction: ${stageInstruction}
 
 Recent conversation:
