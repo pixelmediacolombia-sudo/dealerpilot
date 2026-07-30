@@ -6,6 +6,8 @@
   });
   const REPLY_QUIET_MS = 7000;
   const OWN_REPLY_GUARD_MS = 120000;
+  const SEND_EVIDENCE_TIMEOUT_MS = 4500;
+  const SEND_EVIDENCE_INTERVAL_MS = 300;
 
   let captureInFlight = false;
   const lastCaptureHashByThread = new Map();
@@ -121,6 +123,14 @@
         /\b(?:started|inici[oó])\s+(?:this|este)\s+chat\b/i.test(header));
   }
 
+  function marketplaceHeaderContextDetected(snapshot) {
+    if (!globalThis.DealerPilotMessengerAutonomy?.isMessagesThreadRoute?.(location.pathname)) return false;
+    if (!activeThreadHeaderDetected(snapshot)) return false;
+    const header = cleanText(snapshot?.evidence?.selectedHeaderText || "");
+    const vehicleTitle = cleanText(snapshot?.context?.vehicleTitle || "");
+    return /\b(?:19|20)\d{2}\b/.test(header) && /\b(?:19|20)\d{2}\b/.test(vehicleTitle || header);
+  }
+
   function isLikelyOwnAiReply(value) {
     const normalized = cleanText(value)
       .normalize("NFD")
@@ -128,10 +138,80 @@
       .toLowerCase();
     return /^yes\s+(?:-|--)?\s*the car is still available\b/.test(normalized) ||
       /\beasy financing options\b/.test(normalized) ||
+      /^we don'?t handle ratings here\b/.test(normalized) ||
+      /\b(?:id|tax id|passport|pasaporte).{0,120}\b(?:bank account|cuenta bancaria|cuenta de banco)\b/.test(normalized) ||
+      /\ban advisor can confirm\b/.test(normalized) ||
+      /\byou can discuss that with an advisor\b/.test(normalized) ||
+      /\beso lo puedes discutir con un asesor\b/.test(normalized) ||
+      /^sorry to hear that\b[\s\S]{0,220}\bbest phone number\b/.test(normalized) ||
+      /^sorry to hear that\b[\s\S]{0,220}\bfinance team can help\b/.test(normalized) ||
+      /\bwhat'?s the best phone number\b[\s\S]{0,160}\b(?:finance team|advisor|contact|reach you|help)\b/.test(normalized) ||
       /^i(?:'|’)d be happy to help\b[\s\S]{0,180}\b(?:are you interested|financing)\b/.test(normalized) ||
       /^great\b[\s\S]{0,120}\bbest phone number\b/.test(normalized) ||
       /^perfect\b[\s\S]{0,80}\b(?:we will contact|contact you)\b/.test(normalized) ||
       /^good morning\b[\s\S]{0,120}\b(?:includes vin|all the info)\b/.test(normalized);
+  }
+
+  function isRequirementsInquiry(value) {
+    const normalized = cleanText(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    return /\b(?:q|que|what).{0,40}(?:necesit|need|required|requisit|document).{0,120}(?:aplicar|apply|application)?/.test(normalized) ||
+      /\b(?:requisitos?|requirements?|documentos?|documents?).{0,120}(?:aplicar|apply|application|financ)/.test(normalized);
+  }
+
+  function normalizeLanguageText(value) {
+    return cleanText(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  }
+
+  function detectLikelyLanguage(value) {
+    const raw = cleanText(value).toLowerCase();
+    const normalized = normalizeLanguageText(value);
+    if (!normalized) return "unknown";
+    if (/[¿¡ñáéíóúü]/i.test(raw)) return "es";
+
+    const spanishTokens = normalized.match(/\b(?:esa|ese|eso|esta|este|tiene|tienen|techo|panoramico|precio|cuanto|cual|donde|cuando|puedo|quisiera|busco|necesito|aplicar|requisitos|documentos|pasaporte|cuenta|bancaria|hola|buenas|gracias|financiar|financiamiento|carro|vehiculo|asesor|numero|telefono)\b/g) || [];
+    const englishTokens = normalized.match(/\b(?:this|that|does|have|has|roof|panoramic|price|cash|what|where|when|could|would|need|apply|requirements|documents|passport|bank|account|hello|thanks|financing|car|vehicle|advisor|number|phone|reach|you|your)\b/g) || [];
+    if (spanishTokens.length >= 2 && spanishTokens.length > englishTokens.length) return "es";
+    if (englishTokens.length >= 2 && englishTokens.length > spanishTokens.length) return "en";
+    return "unknown";
+  }
+
+  function isTerminalAcknowledgement(value) {
+    const normalized = normalizeLanguageText(value)
+      .replace(/[.,!?;:]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return /^(?:(?:ok|okay|perfecto|listo|esta bien|todo bien)\s+)?(?:gracias|muchas gracias)$/.test(normalized) ||
+      /^(?:(?:ok|okay|perfect|got it|all right)\s+)?(?:thanks|thank you)$/.test(normalized);
+  }
+
+  function replyMirrorsBuyerLanguage(reply, currentMessage) {
+    const buyerLanguage = detectLikelyLanguage(currentMessage);
+    const replyLanguage = detectLikelyLanguage(reply);
+    return buyerLanguage === "unknown" || replyLanguage === "unknown" || buyerLanguage === replyLanguage;
+  }
+
+  function requirementsReplyFor(value) {
+    const normalized = cleanText(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    const spanish = /\b(?:q|que|necesit|aplicar|requisit|documentos?|pasaporte|cuenta bancaria|cuenta de banco)\b/.test(normalized);
+    return spanish
+      ? "Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuál es el mejor número de teléfono para ayudarte con la aplicación?"
+      : "You only need your ID and an active bank account; a passport or Tax ID works. What's the best phone number to help with the application?";
+  }
+
+  function repairSuggestedReplyForBuyerIntent(reply, payload) {
+    if (isRequirementsInquiry(payload?.currentMessage || "")) {
+      return requirementsReplyFor(payload.currentMessage);
+    }
+    return reply;
   }
 
   function extractVehicleTitleFromHeader(value) {
@@ -272,42 +352,6 @@
     return Math.abs(firstCenterX - secondCenterX) + Math.abs(firstCenterY - secondCenterY);
   }
 
-  function escapeJs(value) {
-    return JSON.stringify(value);
-  }
-
-  function generateSelector(element) {
-    if (!element || !element.parentElement) return "";
-    const cssEscape = typeof CSS !== "undefined" && CSS.escape ? CSS.escape.bind(CSS) : function(v) { return v.replace(/["\\]/g, "\\$&"); };
-    if (element.id) return "#" + cssEscape(element.id);
-    const label = element.getAttribute("aria-label");
-    if (label) return '[aria-label="' + cssEscape(label) + '"]';
-    let path = [];
-    let cur = element;
-    while (cur && cur !== document.body && cur !== document.documentElement) {
-      let tag = cur.tagName.toLowerCase();
-      const parent = cur.parentElement;
-      if (parent) {
-        const siblings = Array.from(parent.children).filter((s) => s.tagName === cur.tagName);
-        if (siblings.length > 1) {
-          const idx = Array.from(parent.children).indexOf(cur) + 1;
-          tag += ":nth-child(" + idx + ")";
-        }
-      }
-      path.unshift(tag);
-      cur = parent;
-    }
-    return path.join(" > ");
-  }
-
-  function executeInMainWorld(code) {
-    if (typeof document === "undefined" || !document.createElement) return;
-    const el = document.createElement("script");
-    el.textContent = code;
-    document.documentElement.appendChild(el);
-    el.remove();
-  }
-
   function findSendButton(root, box = null) {
     const selectors = [
       '[aria-label*="send" i]',
@@ -323,16 +367,26 @@
     );
     const candidates = buttons.filter((button) => {
       const text = cleanText(button.innerText || button.textContent || button.getAttribute?.("aria-label") || "");
+      const label = cleanText(button.getAttribute?.("aria-label") || button.getAttribute?.("title") || "");
+      const descriptor = `${label} ${text}`;
       return elementIsVisibleAndEnabled(button) &&
-        !/quick response|respuesta rápida|tap a response|availability|disponible/i.test(text);
+        !/quick response|respuesta rápida|tap a response|availability|disponible|send a like|like|thumb|me gusta|emoji|sticker|gif|photo|image|mic|microphone|voice|attach|adjuntar/i.test(descriptor);
     });
     const allInteractive = Array.from(
       (root || document).querySelectorAll?.('div[role="button"], button') || [],
     ).filter((el) => elementIsVisibleAndEnabled(el) && !el.closest('[role="menu"], [role="listbox"], [role="navigation"]'));
     const svgCandidate = allInteractive.find((el) => {
-      const html = el.innerHTML.toLowerCase();
+      const html = String(el.innerHTML || "").toLowerCase();
+      const label = cleanText(el.getAttribute?.("aria-label") || el.getAttribute?.("title") || el.innerText || el.textContent || "");
+      const rect = el.getBoundingClientRect?.();
+      const boxRect = box?.getBoundingClientRect?.();
+      const nearComposer =
+        !boxRect || !rect ||
+        (Math.abs((boxRect.top || 0) - (rect.top || 0)) < 200 &&
+          Number(rect.left) >= Number(boxRect.left) - 20);
       return (html.includes("svg") || el.querySelector("svg")) &&
-        !/quick response|respuesta|availability|disponible/i.test(cleanText(el.innerText || el.textContent || ""));
+        nearComposer &&
+        !/quick response|respuesta|availability|disponible|send a like|like|thumb|me gusta|emoji|sticker|gif|photo|image|mic|microphone|voice|attach|adjuntar/i.test(label);
     });
     const distanceSort = (a, b) => {
       const da = distanceBetweenElements(a, box);
@@ -355,54 +409,31 @@
       .sort((left, right) => left.distance - right.distance || left.index - right.index)[0]?.button || null;
   }
 
+  async function composerCleared(box, timeoutMs = SEND_EVIDENCE_TIMEOUT_MS) {
+    const started = Date.now();
+    while (Date.now() - started <= timeoutMs) {
+      if (!cleanText(readComposerText(box))) return true;
+      await sleep(SEND_EVIDENCE_INTERVAL_MS);
+    }
+    return !cleanText(readComposerText(box));
+  }
+
   async function clickSend(box, root, replyText) {
     await sleep(250);
     const text = replyText || (box ? cleanText(readComposerText(box)) : "");
-    const escapedReply = escapeJs(text);
     const sendButton = findSendButton(root, box);
-    const script = `
-(function() {
-  try {
-    var c = document.querySelector('[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label], [contenteditable="true"][data-lexical-editor]');
-    if (!c) { window.__DP_SEND_RESULT = 'composer_missing'; return; }
-    c.focus();
-    var s = window.getSelection();
-    if (s && s.rangeCount) s.removeAllRanges();
-    var r = document.createRange();
-    r.selectNodeContents(c); s && s.addRange(r);
-    document.execCommand('delete', false, null);
-    document.execCommand('insertText', false, ${escapedReply});
-    window.__DP_SEND_RESULT = 'text_inserted';
-  } catch(e) { window.__DP_SEND_RESULT = 'error:' + e.message; }
-})();
-`;
-    executeInMainWorld(script);
-    await sleep(400);
-    const raw = globalThis.__DP_SEND_RESULT || "";
-    delete globalThis.__DP_SEND_RESULT;
-    if (!raw || raw === "composer_missing") {
-      if (box && box.tagName !== "TEXTAREA" && document.execCommand) {
+    if (box && !cleanText(readComposerText(box))) {
+      if (box.tagName !== "TEXTAREA" && document.execCommand) {
         box.focus?.();
         document.execCommand("selectAll", false, undefined);
         document.execCommand("insertText", false, text);
-      } else if (box && box.tagName === "TEXTAREA") {
+      } else if (box.tagName === "TEXTAREA") {
         setNativeValue(box, text);
-      } else if (box) {
+      } else {
         box.textContent = text;
         box.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
       }
-      if (sendButton) {
-        sendButton.focus?.();
-        sendButton.click();
-        return { ok: true, method: "button_click" };
-      }
-      if (!box) return { ok: false, method: "none" };
-      box.focus?.();
-      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-      box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-      return { ok: true, method: "enter" };
     }
-    if (raw.startsWith("error:")) return { ok: false, method: "main_world_error", error: raw.slice(6) };
     if (sendButton) {
       sendButton.scrollIntoView?.({ block: "center", behavior: "instant" });
       await sleep(300);
@@ -411,24 +442,18 @@
       const cy = rect.top + rect.height / 2;
       const debugResp = await send({ type: "DEBUGGER_SEND", x: cx, y: cy }).catch(() => ({ ok: false }));
       if (debugResp?.ok && debugResp?.data?.ok) {
-        await sleep(600);
+        await composerCleared(box, SEND_EVIDENCE_TIMEOUT_MS);
         return { ok: true, method: "debugger_click" };
       }
       sendButton.focus?.();
       try { sendButton.click(); } catch(e) {}
-      ['mousedown', 'mouseup', 'click'].forEach(function(t) {
-        sendButton.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true }));
-      });
-      box?.focus?.();
-      document.execCommand('insertParagraph', false, null);
-      await sleep(200);
-      box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-      box?.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+      await composerCleared(box, SEND_EVIDENCE_TIMEOUT_MS);
       return { ok: true, method: "button_click" };
     }
-    box?.focus?.();
-    box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-    box?.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+    if (!box) return { ok: false, method: "none" };
+    box.focus?.();
+    box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+    box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
     return { ok: true, method: "enter" };
   }
 
@@ -573,7 +598,8 @@
     const marketplaceContextDetected =
       !!snapshot.context.listingUrl ||
       /\/marketplace\//i.test(location.pathname || "") ||
-      /\bmarketplace\b/i.test(cleanText(snapshot.root?.getAttribute?.("aria-label") || ""));
+      /\bmarketplace\b/i.test(cleanText(snapshot.root?.getAttribute?.("aria-label") || "")) ||
+      marketplaceHeaderContextDetected(snapshot);
     const sellerProfileDetected = !!cleanText(snapshot.sellerProfile.currentProfileName);
     const sellerIsCurrentUser = sellerProfileDetected ? snapshot.sellerProfile.matched === true : true;
     const missing = [
@@ -711,15 +737,22 @@
     if (!sendResult.ok) {
       return { autoSent: false, reason: "send_dispatch_failed", sendMethod: sendResult.method };
     }
-    await sleep(900);
-    const liveCapture = globalThis.DealerPilotMessengerCapture?.captureFromRoot?.(
-      snapshot.root,
-      settings.sellerProfileNames,
-      document,
-    );
-    const liveComposer = findComposer(snapshot.root) || inserted.box;
-    const liveMessages = Array.isArray(liveCapture?.messages) ? liveCapture.messages : snapshot.messages;
-    const delivered = !readComposerText(liveComposer) || deliveryIsVisible(reply, liveMessages);
+    const started = Date.now();
+    let delivered = false;
+    let liveComposer = inserted.box;
+    let liveMessages = snapshot.messages;
+    while (Date.now() - started <= SEND_EVIDENCE_TIMEOUT_MS) {
+      const liveCapture = globalThis.DealerPilotMessengerCapture?.captureFromRoot?.(
+        snapshot.root,
+        settings.sellerProfileNames,
+        document,
+      );
+      liveComposer = findComposer(snapshot.root) || inserted.box;
+      liveMessages = Array.isArray(liveCapture?.messages) ? liveCapture.messages : snapshot.messages;
+      delivered = !readComposerText(liveComposer) || deliveryIsVisible(reply, liveMessages);
+      if (delivered) break;
+      await sleep(SEND_EVIDENCE_INTERVAL_MS);
+    }
     if (!delivered) {
       return {
         autoSent: false,
@@ -819,6 +852,13 @@
       return { skipped: true, reason: "own_reply_guard" };
     }
 
+    if (isTerminalAcknowledgement(payload.currentMessage)) {
+      lastCaptureHashByThread.set(threadKey, payload.messageHash);
+      pendingBuyerByThread.delete(threadKey);
+      await sendDebug("blocked", { ...debug, reason: "terminal_acknowledgement" });
+      return { skipped: true, reason: "terminal_acknowledgement" };
+    }
+
     if (automatic) {
       if (payload.messageHash === lastAutoSendHashByThread.get(threadKey)) {
         await sendDebug("blocked", { ...debug, reason: "duplicate_auto_send_hash" });
@@ -895,7 +935,23 @@
 
     lastCaptureHashByThread.set(threadKey, payload.messageHash);
     pendingBuyerByThread.delete(threadKey);
-    const lastSuggestedReply = extractSuggestedReply(response);
+    const lastSuggestedReply = repairSuggestedReplyForBuyerIntent(extractSuggestedReply(response), payload);
+    if (lastSuggestedReply && !replyMirrorsBuyerLanguage(lastSuggestedReply, payload.currentMessage)) {
+      await sendDebug("auto_send_blocked", {
+        ...debug,
+        aiReplyReceived: true,
+        backendIntakeSent: true,
+        backendIntakeReceived: true,
+        autoSent: false,
+        reason: "suggested_reply_language_mismatch",
+      });
+      return {
+        ok: false,
+        suggestedReply: "",
+        autoSent: false,
+        reason: "suggested_reply_language_mismatch",
+      };
+    }
     lastSuggestedReplyByThread.set(threadKey, lastSuggestedReply);
 
     if (!settings.autoReplyEnabled) {
@@ -991,6 +1047,8 @@
     getLastDiagnostics: () => lastDiagnostics,
     insertReply,
     isFacebookMessagesThreadRoute,
+    isTerminalAcknowledgement,
+    replyMirrorsBuyerLanguage,
     selectWinningSnapshot,
     validateSellerProfile,
     validateSnapshot,

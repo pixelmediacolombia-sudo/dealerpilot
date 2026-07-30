@@ -313,6 +313,18 @@ function buyerAskedAdvisorQuestion(latest: string): boolean {
     /^(?:what|how|when|where|why|can|could|do|does|did|is|are|will|would|cu[aá]l|c[oó]mo|cu[aá]ndo|d[oó]nde|por qu[eé]|puede|pueden|tiene|tienen|hay|es|est[aá])\b/i.test(latest);
 }
 
+function isTerminalBuyerAcknowledgement(value: string): boolean {
+  const normalized = cleanConversationText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[.,!?;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return /^(?:(?:ok|okay|perfecto|listo|esta bien|todo bien)\s+)?(?:gracias|muchas gracias)$/.test(normalized) ||
+    /^(?:(?:ok|okay|perfect|got it|all right)\s+)?(?:thanks|thank you)$/.test(normalized);
+}
+
 function resolveSalesReplyStage(visibleMessages: string[], currentMessage: string): SalesReplyStage {
   const latest = cleanConversationText(currentMessage).toLowerCase();
   const history = visibleMessages.map(cleanConversationText).join(" ").toLowerCase();
@@ -439,6 +451,36 @@ function isAiReplyAligned(reply: string, stage: SalesReplyStage, storePhone: str
   return true;
 }
 
+function isReplyRelevantToCurrentMessage(reply: string, currentMessage: string): boolean {
+  const normalizedReply = cleanConversationText(reply)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const normalizedBuyer = cleanConversationText(currentMessage)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const topicContracts = [
+    {
+      reply: /\b(?:cash price|asking price|precio(?: en efectivo)?|precio exacto)\b/,
+      buyer: /\b(?:cash|price|precio|cuanto|cuesta|valor)\b/,
+    },
+    {
+      reply: /\b(?:warranty|coverage|deductible|garantia|cobertura|deducible)\b/,
+      buyer: /\b(?:warranty|coverage|deductible|garantia|cobertura|deducible)\b/,
+    },
+    {
+      reply: /\b(?:address|location|directions|direccion|ubicacion|como llegar)\b/,
+      buyer: /\b(?:address|location|directions|direccion|ubicacion|donde|como llegar)\b/,
+    },
+    {
+      reply: /\b(?:passport|tax id|bank account|pasaporte|cuenta bancaria|requisitos|documentos)\b/,
+      buyer: /\b(?:passport|tax id|bank account|pasaporte|cuenta bancaria|requisitos|documentos|necesit|aplicar|apply)\b/,
+    },
+  ];
+  return topicContracts.every((topic) => !topic.reply.test(normalizedReply) || topic.buyer.test(normalizedBuyer));
+}
+
 function isReplyLanguageMirrored(reply: string, language: string): boolean {
   const text = cleanConversationText(reply);
   if (!text) return false;
@@ -493,9 +535,13 @@ Reply format:
 `;
 
 export function detectLanguage(text: string): "en" | "es" {
+  const normalized = cleanConversationText(text)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
   const spanishWords =
-    /[¿¡ñáéíóúü]|\b(hola|gracias|disponible|tengo|quiero|estoy|interesad[oa]s?|claro|podemos|ayuda(?:r|rte)?|inicial|comprar|semana|número|telefono|teléfono|itin|ingresos|esta|está|carro|auto|sí|como|cómo|necesit[ao]|aplicar|requisitos?|documentos?|pasaporte|cuenta|bancaria)\b/i;
-  return spanishWords.test(cleanConversationText(text)) ? "es" : "en";
+    /\b(hola|buenas|gracias|disponible|tengo|quiero|estoy|interesad[oa]s?|claro|podemos|ayuda(?:r|rte)?|inicial|comprar|semana|numero|telefono|itin|ingresos|esta|esa|ese|eso|esto|este|tiene|tienen|techo|panoramico|precio|cuanto|cual|donde|cuando|carro|auto|vehiculo|si|como|necesit[ao]|aplicar|requisitos?|documentos?|pasaporte|cuenta|bancaria|financiar|financiamiento|asesor)\b/i;
+  return /[¿¡ñáéíóúü]/i.test(cleanConversationText(text)) || spanishWords.test(normalized) ? "es" : "en";
 }
 
 export function computeLeadScore(params: {
@@ -592,7 +638,12 @@ Write one short reply that follows the stage instruction exactly. Mention the ve
 
   const raw = response.choices[0]?.message?.content?.trim();
 
-  if (raw && isAiReplyAligned(raw, stage, storePhone) && isReplyLanguageMirrored(raw, language)) {
+  if (
+    raw &&
+    isAiReplyAligned(raw, stage, storePhone) &&
+    isReplyLanguageMirrored(raw, language) &&
+    isReplyRelevantToCurrentMessage(raw, currentMessage)
+  ) {
     return raw;
   }
 
@@ -830,6 +881,23 @@ router.post("/conversations/intake", async (req, res) => {
   }
   const inbound = latestBuyerMessage;
   const language = detectLanguage(inbound);
+  if (isTerminalBuyerAcknowledgement(inbound)) {
+    req.log.info(
+      { externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
+      "Conversation intake skipped - terminal buyer acknowledgement",
+    );
+    res.json({
+      skipped: true,
+      reason: "terminal_acknowledgement",
+      language,
+      timings: {
+        messageDetectedAt: messageDetectedAt.toISOString(),
+        backendReceivedAt: backendReceivedAt.toISOString(),
+        totalResponseMs: Date.now() - messageDetectedAt.getTime(),
+      },
+    });
+    return;
+  }
   const parsedDownPayment = parseMoney(marketplaceDownPayment);
   const parsedAskingPrice = parseMoney(marketplaceAskingPrice);
 
@@ -1034,9 +1102,20 @@ router.post("/conversations/intake", async (req, res) => {
       : null;
     let retryFallbackUsed = false;
     let retryFallbackReason: string | null = null;
-    if (retryableReply && !isReplyLanguageMirrored(retryableReply, language)) {
+    const retryHistory = formatConversationHistoryForAi(
+      conversationHistoryForAi.length ? conversationHistoryForAi : incomingMsgs,
+    );
+    const retryStage = resolveSalesReplyStage(retryHistory, inbound);
+    if (
+      retryableReply &&
+      (
+        !isReplyLanguageMirrored(retryableReply, language) ||
+        !isAiReplyAligned(retryableReply, retryStage, storePhone) ||
+        !isReplyRelevantToCurrentMessage(retryableReply, inbound)
+      )
+    ) {
       const repairedReply = await generateAiReplyWithFallback(
-        formatConversationHistoryForAi(conversationHistoryForAi.length ? conversationHistoryForAi : incomingMsgs),
+        retryHistory,
         inbound,
         language,
         resolvedVehicleTitle,
@@ -1056,8 +1135,8 @@ router.post("/conversations/intake", async (req, res) => {
           .where(eq(conversationMessagesTable.id, latestAssistantMessage.id));
       }
       req.log.info(
-        { conversationId, externalThreadRef, language },
-        "Conversation intake repaired stored reply language before Messenger delivery retry",
+        { conversationId, externalThreadRef, language, retryStage },
+        "Conversation intake repaired stale reply before Messenger delivery retry",
       );
     }
     if (retryableReply) {

@@ -51,6 +51,12 @@ class FakeElement {
     if (selector.includes('[role="main"]')) return this.attributes.role === "main";
     if (selector.includes('[role="log"]')) return this.attributes.role === "log";
     if (selector.includes('[role="heading"]')) return this.attributes.role === "heading";
+    if (selector.includes('[aria-label*="message"')) {
+      return /message/i.test(this.attributes["aria-label"] || "");
+    }
+    if (selector.includes('[aria-label*="mensaje"')) {
+      return /mensaje/i.test(this.attributes["aria-label"] || "");
+    }
     if (selector.includes("[aria-level]")) return this.attributes["aria-level"] !== undefined;
     if (selector === "h1" || selector === "h2" || selector === "h3") return this.tagName === selector.toUpperCase();
     if (selector.includes('[contenteditable="true"]')) return this.attributes.contenteditable === "true";
@@ -135,6 +141,286 @@ test("floating Marketplace chat extracts buyer header and incoming visual bubble
     JSON.parse(JSON.stringify(capture.messages)),
     [{ speaker: "Peter", text: "Hola. ¿Sigue disponible?" }],
   );
+});
+
+test("floating Marketplace chat ignores Facebook rating cards and keeps requirements question latest", () => {
+  const ratingCard = new FakeElement({
+    attributes: {
+      "aria-label": "Message sent at 10:26 AM by Erika: You can now rate each other People may rate one another based on their interactions or transactions. Rate Erika",
+    },
+    text: "You can now rate each other People may rate one another based on their interactions or transactions. Rate Erika",
+    rect: { left: 40, right: 400, top: 500, width: 360, height: 80 },
+  });
+  const requirementsBubble = new FakeElement({
+    attributes: {
+      "aria-label": "Message sent at 10:27 AM by Erika: Q se necesita para aplicar?",
+    },
+    text: "Q se necesita para aplicar?",
+    rect: { left: 40, right: 250, top: 600, width: 210, height: 44 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [ratingCard, requirementsBubble],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Erika Â· 2021 Toyota RAV4",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $2,500 - 2021 Toyota RAV4" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const messages = JSON.parse(JSON.stringify(capture.messages));
+
+  assert.deepEqual(messages.map((message) => message.text), ["Q se necesita para aplicar?"]);
+  assert.equal(capture.evidence.latestMessageDirection, "buyer");
+});
+
+test("floating Marketplace chat keeps long buyer warranty question as latest message", () => {
+  const previousBuyer = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "Hello, is this still available?",
+    rect: { left: 40, right: 250, top: 420, width: 210, height: 44 },
+  });
+  const dealerReply = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "Yes, it is still available. Are you interested in financing the 2015 ACURA TLX?",
+    rect: { left: 230, right: 410, top: 500, width: 180, height: 70 },
+  });
+  const longQuestion = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "Yes, Is there a dealer warranty included? * How many days/miles? * Does it cover engine and transmission? * What's the deductible? * Can you take it to a mechanic in Richmond for warranty repairs? * Is it a third-party extended warranty or the dealership's own warranty?",
+    rect: { left: 40, right: 380, top: 600, width: 340, height: 150 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 620 },
+    children: [previousBuyer, dealerReply, longQuestion],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 850 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Bang · 2015 Acura TLX",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $11,000 - 2015 Acura TLX" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        text: "An advisor can confirm the exact warranty and coverage details for the 2015 Acura TLX -- what's the best phone number to reach you?",
+        rect: { left: 940, right: 1260, top: 820, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const messages = JSON.parse(JSON.stringify(capture.messages));
+
+  assert.equal(capture.buyerName, "Bang");
+  assert.equal(capture.evidence.latestMessageDirection, "buyer");
+  assert.equal(messages.at(-1).speaker, "Bang");
+  assert.match(messages.at(-1).text, /dealer warranty included/);
+  assert.match(messages.at(-1).text, /third-party extended warranty/);
+  assert.equal(messages.some((message) => /advisor can confirm/i.test(message.text)), false);
+});
+
+test("floating Marketplace chat keeps outgoing advisor reply as latest after buyer question", () => {
+  const longQuestion = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "Yes, Is there a dealer warranty included? * How many days/miles? * Does it cover engine and transmission?",
+    rect: { left: 40, right: 380, top: 420, width: 340, height: 110 },
+  });
+  const dealerReply = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "An advisor can confirm warranty and coverage details for the 2015 Acura TLX -- what's the best phone number to reach you?",
+    rect: { left: 230, right: 410, top: 620, width: 180, height: 90 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 620 },
+    children: [longQuestion, dealerReply],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 850 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Bang · 2015 Acura TLX",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $11,000 - 2015 Acura TLX" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        text: "Our advisor can confirm warranty and coverage for the 2015 Acura TLX; may I have the best phone number?",
+        rect: { left: 940, right: 1260, top: 820, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const messages = JSON.parse(JSON.stringify(capture.messages));
+
+  assert.equal(capture.evidence.latestMessageDirection, "dealer");
+  assert.equal(messages.at(-1).speaker, "Dealer");
+  assert.match(messages.at(-1).text, /advisor can confirm warranty/);
+  assert.equal(messages.some((message) => /^Our advisor can confirm/.test(message.text)), false);
+});
+
+test("floating Marketplace chat treats semantic DealerPilot financing reply as outgoing", () => {
+  const buyerMessage = new FakeElement({
+    attributes: {
+      "aria-label": "Message sent at 1:45 PM by Bang: I was up there earlier and they said it wasn't ready",
+    },
+    text: "I was up there earlier and they said it wasn't ready",
+    rect: { left: 40, right: 380, top: 420, width: 340, height: 70 },
+  });
+  const dealerReply = new FakeElement({
+    attributes: {
+      "aria-label": "Message sent: I'd be happy to help with the 2015 ACURA TLX. Are you interested in financing it?",
+    },
+    text: "I'd be happy to help with the 2015 ACURA TLX. Are you interested in financing it?",
+    rect: { left: 230, right: 410, top: 560, width: 180, height: 70 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 620 },
+    children: [buyerMessage, dealerReply],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 850 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Bang · 2015 Acura TLX",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $11,000 - 2015 Acura TLX" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 820, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const messages = JSON.parse(JSON.stringify(capture.messages));
+
+  assert.equal(capture.evidence.latestMessageDirection, "dealer");
+  assert.equal(messages.at(-1).speaker, "Dealer");
+  assert.match(messages.at(-1).text, /I'd be happy to help/);
+});
+
+test("floating Marketplace chat treats generic message-sent descriptors as outgoing", () => {
+  const buyerMessage = new FakeElement({
+    attributes: {
+      "aria-label": "Message sent at 10:26 AM by Erika: Q se necesita para aplicar",
+    },
+    text: "Q se necesita para aplicar",
+    rect: { left: 40, right: 300, top: 420, width: 260, height: 50 },
+  });
+  const manualDealerReply = new FakeElement({
+    attributes: {
+      "aria-label": "Message sent: cuales tienes?",
+    },
+    text: "cuales tienes?",
+    rect: { left: 300, right: 410, top: 700, width: 110, height: 42 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 620 },
+    children: [buyerMessage, manualDealerReply],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 850 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Erika · 2021 Toyota RAV4",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $2,500 - 2021 Toyota RAV4" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 820, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const messages = JSON.parse(JSON.stringify(capture.messages));
+
+  assert.equal(capture.evidence.latestMessageDirection, "dealer");
+  assert.equal(messages.at(-1).speaker, "Dealer");
+  assert.equal(messages.at(-1).text, "cuales tienes?");
+});
+
+test("floating Marketplace chat merges visual outgoing replies when semantic messages omit them", () => {
+  const semanticBuyerMessage = new FakeElement({
+    attributes: {
+      "aria-label": "Message sent at 10:26 AM by Erika: Q se necesita para aplicar",
+    },
+    text: "Q se necesita para aplicar",
+    rect: { left: 40, right: 300, top: 420, width: 260, height: 50 },
+  });
+  const manualDealerReply = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "cuales tienes?",
+    rect: { left: 300, right: 410, top: 700, width: 110, height: 42 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 620 },
+    children: [semanticBuyerMessage, manualDealerReply],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 850 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Erika · 2021 Toyota RAV4",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $2,500 - 2021 Toyota RAV4" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 820, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const messages = JSON.parse(JSON.stringify(capture.messages));
+
+  assert.equal(capture.evidence.latestMessageDirection, "dealer");
+  assert.equal(messages.at(-1).speaker, "Dealer");
+  assert.equal(messages.at(-1).text, "cuales tienes?");
+  assert.deepEqual(messages.map((message) => message.text), [
+    "Q se necesita para aplicar",
+    "cuales tienes?",
+  ]);
 });
 
 test("floating Marketplace chat cleans Write to buyer header and falls back to inbox preview", () => {

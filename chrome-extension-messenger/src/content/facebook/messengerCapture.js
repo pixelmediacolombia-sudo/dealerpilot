@@ -66,9 +66,19 @@
   function isMessageMetadataText(value) {
     const text = cleanMessageText(value);
     if (!text) return true;
+    if (isFacebookRatingCardText(text)) return true;
     if (/^[A-Za-zÀ-ÿ'’ -]+ · (?:Buyer|Seller|Participant|Miembro|Comprador|Vendedor)$/i.test(text)) return true;
     return /^(?:message sent|mensaje enviado)?\s*(?:at\s+)?(?:\d{1,2}:\d{2}|\d{1,2})\s*(?:am|pm)?\s+(?:by|por)\s+[^:]{1,80}\.?$/i.test(text) ||
       /^[^.]{2,80}\s+(?:started|inici[oó])\s+(?:this|este)\s+chat\.?$/i.test(text);
+  }
+
+  function isFacebookRatingCardText(value) {
+    const normalized = normalizeForMatch(cleanMessageText(value));
+    return /\byou can now rate each other\b/.test(normalized) ||
+      /\bpeople may rate one another\b/.test(normalized) ||
+      /\brate [a-z][a-z\s.'-]{1,80}$/.test(normalized) ||
+      /\b(?:pueden|puedes).{0,60}calific/.test(normalized) ||
+      /\bcalifica(?:r)?\s+[a-z][a-z\s.'-]{1,80}$/.test(normalized);
   }
 
   function scoreBubbleCandidate(element, scope) {
@@ -121,6 +131,11 @@
       element.getAttribute?.("data-lexical-editor"),
     ].filter(Boolean).join(" ");
     return !/search|buscar|comment|comentario|post|publicaci[oó]n|caption|descripci[oó]n/i.test(descriptor);
+  }
+
+  function isComposerNode(element) {
+    return !!element?.matches?.('[contenteditable="true"], textarea') ||
+      !!element?.closest?.('[contenteditable="true"], textarea');
   }
 
   function hasComposer(root) {
@@ -250,15 +265,17 @@
     ].filter(Boolean);
     const descriptor = labels.find((label) => /(?:\bby\b|\bpor\b|message sent|mensaje enviado)/i.test(label)) || "";
     if (!descriptor) return null;
-    const match = descriptor.match(/(?:\bby\b|\bpor\b)\s+([^:]{1,100}):\s*(.+)$/i) ||
-      descriptor.match(/(?:message sent|mensaje enviado)[^:]*:\s*(.+)$/i);
+    const senderMatch = descriptor.match(/(?:\bby\b|\bpor\b)\s+([^:]{1,100}):\s*(.+)$/i);
+    const sentMatch = senderMatch ? null : descriptor.match(/(?:message sent|mensaje enviado)[^:]*:\s*(.+)$/i);
+    const match = senderMatch || sentMatch;
     if (!match && isMessageMetadataText(descriptor)) return null;
-    const sender = match?.[1] || "";
+    const sender = senderMatch?.[1] || "";
+    const sentWithoutNamedSender = !!sentMatch;
     const isDealer = senderIsDealer(sender, sellerNameCandidates) || /\b(?:by\s+you|por\s+t[iú])\b/i.test(descriptor);
-    const text = cleanMessageText(match?.[2] || match?.[1] || textOf(element));
-    if (!text || UI_TEXT.test(text) || text.length > 500 || isMessageMetadataText(text)) return null;
-    if (isLikelyAutoReplyText(text) && !isDealer) return null;
-    return { speaker: isDealer ? "Dealer" : "Buyer", text };
+    const text = cleanMessageText(senderMatch?.[2] || sentMatch?.[1] || textOf(element));
+    if (!text || UI_TEXT.test(text) || text.length > 500 || isMessageMetadataText(text) || isFacebookRatingCardText(text)) return null;
+    const ownAutoReply = sentWithoutNamedSender || isLikelyAutoReplyText(text);
+    return { speaker: isDealer || ownAutoReply ? "Dealer" : "Buyer", text, __top: rectOf(element).top || 0 };
   }
 
   function bubbleTextCandidates(scope) {
@@ -276,8 +293,9 @@
       });
     }
     return elements.filter((element) => {
+      if (isComposerNode(element)) return false;
       const text = cleanMessageText(textOf(element));
-      if (!text || text.length < 2 || text.length > 500 || UI_TEXT.test(text) || isMessageMetadataText(text)) return false;
+      if (!text || text.length < 2 || text.length > 500 || UI_TEXT.test(text) || isMessageMetadataText(text) || isFacebookRatingCardText(text)) return false;
       if (/^(?:send a quick response|tap a response|yes, are you inter|in talks\. i'll let you|sorry, it'?s not av)/i.test(text)) return false;
       if (element.querySelector?.('a[href*="/marketplace/item/"], button, [role="button"], [contenteditable="true"], textarea')) return false;
       if (scoreBubbleCandidate(element, scope) < 20) return false;
@@ -298,6 +316,12 @@
     const normalized = normalizeForMatch(cleanMessageText(value));
     return /^yes\s+(?:-|--|—)?\s*the car is still available\b/.test(normalized) ||
       /\beasy financing options\b/.test(normalized) ||
+      /\ban advisor can confirm\b/.test(normalized) ||
+      /\byou can discuss that with an advisor\b/.test(normalized) ||
+      /\beso lo puedes discutir con un asesor\b/.test(normalized) ||
+      /^i(?:'|’)d be happy to help\b[\s\S]{0,180}\b(?:are you interested|financing)\b/.test(normalized) ||
+      /^great questions?\b[\s\S]{0,180}\b(?:advisor|best phone number|phone number)\b/.test(normalized) ||
+      /\b(?:id|tax id|passport|pasaporte).{0,120}\b(?:bank account|cuenta bancaria|cuenta de banco)\b/.test(normalized) ||
       /^perfect\b[\s\S]{0,80}\b(?:we will contact|contact you)\b/.test(normalized) ||
       /^good morning\b[\s\S]{0,120}\b(?:includes vin|all the info)\b/.test(normalized);
   }
@@ -369,6 +393,17 @@
     const text = cleanMessageText(value);
     if (isMessageMetadataText(text)) return "";
     if (isLikelyAutoReplyText(text)) return "";
+    if (isFacebookRatingCardText(text)) return "";
+    const requirementsMatch = text.match(
+      /((?:q|que|qu[eÃ©])\s+(?:se\s+)?necesit[ao][\s\S]{0,140}\?|requisitos?[\s\S]{0,140}\?|documentos?[\s\S]{0,140}\?|what (?:do|will) i need[\s\S]{0,140}\?|what documents[\s\S]{0,140}\?|requirements?[\s\S]{0,140}\?)/i,
+    );
+    if (requirementsMatch) return cleanMessageText(requirementsMatch[1]);
+    const normalized = normalizeForMatch(text);
+    const looksLikeBuyerQuestion =
+      text.length <= 700 &&
+      /[?¿]/.test(text) &&
+      !/\b(?:marketplace|messenger|view buyer|more options|customize chat|privacy|mute notifications|read receipts|thread composer|choose an emoji|choose a sticker|choose a gif|write a message)\b/i.test(normalized);
+    if (looksLikeBuyerQuestion) return text;
     const match = text.match(
       /(hola[\s\S]{0,160}\?|me interesa[\s\S]{0,180}\?|(?:Â¿|\?)?todav[iÃ­]a[\s\S]{0,180}\?|are you still interested\?|what(?:'s| is) the best number[\s\S]{0,140}\?|is this available\?)/i,
     );
@@ -392,9 +427,9 @@
     if (!buyer) return [];
     const scopeTop = scope ? rectOf(scope).top : 0;
     const rootSources = Array.from(root?.querySelectorAll?.('div[dir="auto"], span[dir="auto"], [aria-label]') || [])
-      .filter(isVisible);
+      .filter((element) => isVisible(element) && !isComposerNode(element));
     const sources = rootSources.length ? rootSources : Array.from(documentRef?.querySelectorAll?.('div[dir="auto"], span[dir="auto"], [aria-label]') || [])
-      .filter(isVisible);
+      .filter((element) => isVisible(element) && !isComposerNode(element));
     const seen = new Set();
     return sources
       .map((element) => ({
@@ -418,7 +453,7 @@
         seen.add(key);
         return true;
       })
-      .map((candidate) => ({ speaker: buyer, text: candidate.text }));
+      .map((candidate) => ({ speaker: buyer, text: candidate.text, __top: candidate.top }));
   }
 
   function readVisualMessages(scope, buyerName) {
@@ -447,7 +482,7 @@
       if (isLikelyAutoReplyText(text) && !clearlyRightAligned) continue;
       rows.push({ top: rect.top, speaker: clearlyRightAligned ? "Dealer" : (buyerName || "Buyer"), text });
     }
-    return rows.sort((a, b) => a.top - b.top).map(({ speaker, text }) => ({ speaker, text }));
+    return rows.sort((a, b) => a.top - b.top).map(({ speaker, text, top }) => ({ speaker, text, __top: top }));
   }
 
   function extractBuyerName(root) {
@@ -492,7 +527,13 @@
       .filter(isVisible)
       .map((element) => parseDescriptor(element, sellerNameCandidates))
       .filter(Boolean);
-    const rawMessages = semantic.length ? semantic : scope ? readVisualMessages(scope, buyerName) : [];
+    const visualMessages = scope ? readVisualMessages(scope, buyerName) : [];
+    const visualDealerMessages = semantic.length
+      ? visualMessages.filter((message) =>
+        message.speaker === "Dealer" &&
+        !semantic.some((semanticMessage) => semanticMessage.text === message.text))
+      : [];
+    const rawMessages = semantic.length ? [...semantic, ...visualDealerMessages] : visualMessages;
     const messages = rawMessages.map((message) =>
       message.speaker === "Buyer" && buyerName ? { ...message, speaker: buyerName } : message,
     );
@@ -512,11 +553,14 @@
         finalMessages.push(visibleBuyerMessage);
       }
     }
+    const orderedMessages = finalMessages
+      .sort((left, right) => (left.__top ?? Number.MAX_SAFE_INTEGER) - (right.__top ?? Number.MAX_SAFE_INTEGER))
+      .map((message) => ({ speaker: message.speaker, text: message.text }));
     return {
       root,
       scope,
       buyerName,
-      messages: finalMessages,
+      messages: orderedMessages,
       evidence: {
         threadRootDetected: !!root,
         messageScopeDetected: !!scope,
@@ -527,7 +571,7 @@
         messageCandidateCount: semantic.length || (scope ? bubbleTextCandidates(scope).length : 0),
         inboxPreviewFallback: !!inboxPreview,
         extractionMode: semantic.length ? "semantic" : finalMessages.length ? inboxPreview ? "visual_bubbles_inbox_preview" : "visual_bubbles" : "none",
-        latestMessageDirection: finalMessages.at(-1)?.speaker === "Dealer" ? "dealer" : finalMessages.length ? "buyer" : "none",
+        latestMessageDirection: orderedMessages.at(-1)?.speaker === "Dealer" ? "dealer" : orderedMessages.length ? "buyer" : "none",
       },
     };
   }
