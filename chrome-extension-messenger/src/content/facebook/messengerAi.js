@@ -193,10 +193,27 @@
       /^(?:(?:ok|okay|perfect|got it|all right)\s+)?(?:thanks|thank you)$/.test(normalized);
   }
 
+  function isFacebookRatingCard(value) {
+    const normalized = normalizeLanguageText(value);
+    return /\byou can now rate each other\b/.test(normalized) ||
+      /\bpeople may rate one another\b/.test(normalized) ||
+      /\brate [\p{L}][\p{L}\s.'’\-]{1,80}$/u.test(normalized);
+  }
+
   function replyMirrorsBuyerLanguage(reply, currentMessage) {
     const buyerLanguage = detectLikelyLanguage(currentMessage);
     const replyLanguage = detectLikelyLanguage(reply);
     return buyerLanguage === "unknown" || replyLanguage === "unknown" || buyerLanguage === replyLanguage;
+  }
+
+  function replyRepeatsConversation(reply, messages, currentMessage) {
+    const normalizedReply = normalizeLanguageText(reply);
+    if (!normalizedReply || normalizedReply.length < 4) return false;
+    if (messages.some((message) => normalizeLanguageText(message.text) === normalizedReply)) return true;
+    const normalizedCurrent = normalizeLanguageText(currentMessage);
+    return !!normalizedCurrent &&
+      normalizedCurrent.length >= 15 &&
+      normalizedReply.includes(normalizedCurrent);
   }
 
   function requirementsReplyFor(value) {
@@ -392,6 +409,11 @@
       document,
     );
     const liveMessages = Array.isArray(liveCapture?.messages) ? liveCapture.messages : snapshot.messages;
+    const snapshotDealerCount = snapshot.messages.filter((m) => m.speaker === "Dealer").length;
+    const liveDealerCount = liveMessages.filter((m) => m.speaker === "Dealer").length;
+    if (liveDealerCount > snapshotDealerCount) {
+      return { ok: false, reason: "new_dealer_message_in_history" };
+    }
     const liveLastMessage = liveMessages[liveMessages.length - 1] || snapshot.lastMessage;
     if (liveLastMessage?.speaker === "Dealer") return { ok: false, reason: "latest_message_not_buyer" };
     const latestText = cleanText(liveLastMessage?.text || "");
@@ -635,9 +657,11 @@
       currentMessage,
       visibleMessages,
     });
+    const buyerMessages = messages.filter((message) => message.speaker !== "Dealer");
     const autoActionKey = JSON.stringify({
       thread: externalThreadRef,
       currentMessage,
+      buyerMessages: canonicalMessages(buyerMessages).join("\n"),
     });
     return {
       externalThreadRef,
@@ -804,6 +828,13 @@
       return { skipped: true, reason: "own_reply_guard" };
     }
 
+    if (isFacebookRatingCard(payload.currentMessage)) {
+      lastCaptureHashByThread.set(threadKey, payload.messageHash);
+      pendingBuyerByThread.delete(threadKey);
+      await sendDebug("blocked", { ...debug, reason: "facebook_rating_card" });
+      return { skipped: true, reason: "facebook_rating_card" };
+    }
+
     if (isTerminalAcknowledgement(payload.currentMessage)) {
       lastCaptureHashByThread.set(threadKey, payload.messageHash);
       pendingBuyerByThread.delete(threadKey);
@@ -907,6 +938,22 @@
     }
     lastSuggestedReplyByThread.set(threadKey, lastSuggestedReply);
 
+    if (lastSuggestedReply && deliveryIsVisible(lastSuggestedReply, snapshot.messages)) {
+      const autoActionKey = payload.autoActionKey || payload.messageHash;
+      lastAutoSendHashByThread.set(threadKey, autoActionKey);
+      lastAutoReplyByThread.set(threadKey, { text: cleanText(lastSuggestedReply), at: Date.now() });
+      await sendDebug("intake_ok", {
+        ...debug,
+        aiReplyReceived: true,
+        backendIntakeSent: true,
+        backendIntakeReceived: true,
+        autoSent: true,
+        reason: "reply_already_delivered",
+        deliveryConfirmed: true,
+      });
+      return { ok: true, suggestedReply: lastSuggestedReply, autoSent: true, reason: "reply_already_delivered", deliveryConfirmed: true };
+    }
+
     if (!settings.autoReplyEnabled) {
       await sendDebug("auto_send_blocked", {
         ...debug,
@@ -917,6 +964,20 @@
         reason: "auto_reply_disabled",
       });
       return { ok: true, suggestedReply: lastSuggestedReply, autoSent: false, reason: "auto_reply_disabled" };
+    }
+
+    if (lastSuggestedReply && replyRepeatsConversation(lastSuggestedReply, snapshot.messages, payload.currentMessage)) {
+      lastAutoSendHashByThread.set(threadKey, payload.autoActionKey || payload.messageHash);
+      await sendDebug("auto_send_blocked", {
+        ...debug,
+        aiReplyReceived: true,
+        backendIntakeSent: true,
+        backendIntakeReceived: true,
+        autoSent: false,
+        reason: "reply_repeats_conversation",
+        suggestedReplyPreview: cleanText(lastSuggestedReply).slice(0, 200),
+      });
+      return { ok: false, suggestedReply: "", autoSent: false, reason: "reply_repeats_conversation" };
     }
 
     const sendResult = await maybeSendReply(lastSuggestedReply, payload, snapshot, threadKey, settings);
@@ -980,14 +1041,38 @@
     }
   }
 
+  async function restoreAutoSendState() {
+    const response = await send({ type: "LOAD_AUTO_SEND_STATE" }).catch(() => ({}));
+    if (response?.ok && response.data) {
+      const { sendHashes, replies } = response.data;
+      if (sendHashes) {
+        for (const [key, value] of Object.entries(sendHashes)) {
+          lastAutoSendHashByThread.set(key, value);
+        }
+      }
+      if (replies) {
+        for (const [key, value] of Object.entries(replies)) {
+          lastAutoReplyByThread.set(key, value);
+        }
+      }
+    }
+  }
+
   function start() {
     if (!isFacebookMessagesThreadRoute()) return;
-    getSettings().then((settings) => {
-      globalThis.DealerPilotMessengerAutonomy.start({
-        processThread: captureConversation,
-        sellerProfileNames: settings.sellerProfileNames,
-      });
+    restoreAutoSendState().then(() => {
+      getSettings().then((settings) => {
+        globalThis.DealerPilotMessengerAutonomy.start({
+          processThread: captureConversation,
+          sellerProfileNames: settings.sellerProfileNames,
+        });
+      }).catch(console.warn);
     }).catch(console.warn);
+    setInterval(() => {
+      const sendHashes = Object.fromEntries(lastAutoSendHashByThread);
+      const replies = Object.fromEntries(lastAutoReplyByThread);
+      send({ type: "SAVE_AUTO_SEND_STATE", sendHashes, replies }).catch(() => {});
+    }, 30000);
   }
 
   globalThis.DealerPilotMessengerAi = Object.freeze({
@@ -1000,8 +1085,10 @@
     getLastDiagnostics: () => lastDiagnostics,
     insertReply,
     isFacebookMessagesThreadRoute,
+    isFacebookRatingCard,
     isTerminalAcknowledgement,
     replyMirrorsBuyerLanguage,
+    replyRepeatsConversation,
     selectWinningSnapshot,
     validateSellerProfile,
     validateSnapshot,

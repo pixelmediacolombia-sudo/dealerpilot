@@ -231,6 +231,7 @@
       if (!element) return;
       const candidates = [
         element.getAttribute?.("aria-label") ? element : null,
+        element.closest?.("[aria-label]"),
         ...Array.from(element.querySelectorAll?.("[aria-label]") || []),
       ].filter(Boolean);
       for (const candidate of candidates) {

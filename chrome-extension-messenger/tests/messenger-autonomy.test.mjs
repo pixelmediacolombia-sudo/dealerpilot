@@ -344,9 +344,17 @@ test("a new incoming message mutation reruns the active thread once", async () =
     matches() { return false; },
     closest() { return null; },
   };
-  observerCallback?.([{ target: incoming, addedNodes: [incoming] }]);
+  const innerTextNode = {
+    nodeType: 3,
+    parentElement: {
+      getAttribute() { return null; },
+      querySelectorAll() { return []; },
+      closest(selector) { return selector === "[aria-label]" ? incoming : null; },
+    },
+  };
+  observerCallback?.([{ target: innerTextNode, addedNodes: [] }]);
   await controller.whenIdle();
-  observerCallback?.([{ target: incoming, addedNodes: [incoming] }]);
+  observerCallback?.([{ target: innerTextNode, addedNodes: [] }]);
   await controller.whenIdle();
 
   assert.equal(attempts, 2);

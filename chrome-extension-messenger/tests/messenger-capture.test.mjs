@@ -518,3 +518,44 @@ test("floating Marketplace chat keeps multiple buyer messages and uses the lates
     "Â¿TodavÃ­a estÃ¡ disponible para verlo hoy?",
   ]);
 });
+
+test("message rows that are only the buyer name label are dropped from history", () => {
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [
+      new FakeElement({
+        attributes: { "aria-label": "Message by Hector: Hector" },
+        text: "Hector",
+        rect: { left: 40, right: 250, top: 500, width: 210, height: 30 },
+      }),
+      new FakeElement({
+        attributes: { "aria-label": "Message by Hector: Cuál es el precio en cash?" },
+        text: "Cuál es el precio en cash?",
+        rect: { left: 40, right: 250, top: 600, width: 210, height: 44 },
+      }),
+    ],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Hector · 2022 Ford F150 Lightning",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const messages = JSON.parse(JSON.stringify(capture.messages));
+
+  assert.deepEqual(messages, [{ speaker: "Hector", text: "Cuál es el precio en cash?" }]);
+  assert.equal(capture.evidence.latestMessageDirection, "buyer");
+});

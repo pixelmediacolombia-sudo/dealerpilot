@@ -117,6 +117,21 @@ test("background deduplicates identical intakes inside the extension", async () 
   assert.equal(calls.apiPost.length, 1);
 });
 
+test("background keeps the latest 20 Messenger diagnostics", async () => {
+  const { handlers, storage } = createHarness();
+  for (let index = 0; index < 22; index += 1) {
+    await handlers.MESSENGER_CAPTURE_DEBUG({
+      debug: { stage: `stage-${index}`, at: `2026-07-30T20:00:${String(index).padStart(2, "0")}.000Z` },
+    }, { tab: { id: 42 } });
+  }
+
+  assert.equal(storage.messengerCaptureDebugHistory.length, 20);
+  assert.equal(storage.messengerCaptureDebugHistory[0].stage, "stage-21");
+  assert.equal(storage.messengerCaptureDebugHistory.at(-1).stage, "stage-2");
+  const debugState = await handlers.GET_DEBUG_STATE();
+  assert.equal(debugState.messengerCaptureDebugHistory.length, 20);
+});
+
 test("background writes and submits the Messenger composer through separate CDP phases", async () => {
   const { handlers, calls } = createHarness();
   const writeResponse = await handlers.DEBUGGER_COMPOSER_WRITE({

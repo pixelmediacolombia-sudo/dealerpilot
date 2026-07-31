@@ -304,6 +304,60 @@ function createHarness({
   };
 }
 
+test("autoReply never sends a backend reply that repeats an existing conversation message", async () => {
+  const { ai, calls, composerElement, sendButton } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [
+      { speaker: "Hector", text: "Hola, cuál es el precio en cash?" },
+      { speaker: "Dealer", text: "Hola buenas noches, alrededor de los $39.000." },
+      { speaker: "Hector", text: "Y tiene techo panorámico?" },
+    ],
+    intakeResponse: { ok: true, data: { suggestedReply: "Hola, cuál es el precio en cash?" } },
+    sendSucceeds: true,
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, false);
+  assert.equal(result.reason, "reply_repeats_conversation");
+  assert.equal(result.suggestedReply, "");
+  assert.equal(composerElement.textContent, "");
+  assert.deepEqual(sendButton.events, []);
+  assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
+  assert.equal(calls.debug.at(-1).reason, "reply_repeats_conversation");
+});
+
+test("autoReply never sends a backend reply that echoes the buyer question verbatim", async () => {
+  const question = "Cuál es el precio en cash?";
+  const { ai, calls, composerElement, sendButton } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [{ speaker: "Hector", text: question }],
+    intakeResponse: { ok: true, data: { suggestedReply: `Hola, ${question}` } },
+    sendSucceeds: true,
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(result.autoSent, false);
+  assert.equal(result.reason, "reply_repeats_conversation");
+  assert.equal(composerElement.textContent, "");
+  assert.deepEqual(sendButton.events, []);
+  assert.equal(calls.debug.at(-1).reason, "reply_repeats_conversation");
+});
+
+test("autoReply still sends a fresh backend reply that does not repeat the conversation", async () => {
+  const { ai, calls, composerElement } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [{ speaker: "Hector", text: "Cuál es el precio en cash?" }],
+    intakeResponse: { ok: true, data: { suggestedReply: "El precio es $39,000. ¿Te interesa financiar o cash?" } },
+    sendSucceeds: true,
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(result.autoSent, true);
+  assert.equal(result.deliveryConfirmed, true);
+  assert.equal(calls.debug.at(-1).stage, "intake_ok");
+});
+
 test("dryRun captures a valid buyer message without backend intake or composer writes", async () => {
   const { ai, calls, composerElement } = createHarness({
     settings: { dryRun: true, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
@@ -779,6 +833,24 @@ test("terminal Spanish acknowledgement is not sent to AI and receives no automat
   assert.equal(calls.debug.at(-1).stage, "blocked");
 });
 
+test("Facebook rating card is blocked before conversation intake", async () => {
+  const { ai, calls, composerElement } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [{
+      speaker: "Buyer",
+      text: "You can now rate each other People may rate one another based on their interactions or transactions. Rate Barış",
+    }],
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, "facebook_rating_card");
+  assert.equal(calls.intake.length, 0);
+  assert.equal(composerElement.textContent, "");
+  assert.equal(calls.debug.at(-1).stage, "blocked");
+});
+
 test("autoReply replaces stale ratings draft with requirements answer and sends", async () => {
   const staleRatingsReply =
     "We don't handle ratings here; are you still interested in the 2021 TOYOTA RAV4?";
@@ -860,7 +932,7 @@ test("autoReply revalidates the same root before writing to Messenger", async ()
 
   assert.equal(calls.intake.length, 1);
   assert.equal(result.autoSent, false);
-  assert.equal(result.reason, "latest_message_not_buyer");
+  assert.equal(result.reason, "new_dealer_message_in_history");
   assert.equal(composerElement.textContent, "");
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
 });
@@ -953,6 +1025,35 @@ test("multiple open buyer chats process one winner and keep the rest as diagnost
   assert.deepEqual(result.buyersDetected.map((buyer) => buyer.selectedForProcessing), [true, false]);
   assert.equal(calls.intake.length, 1);
   assert.equal(calls.intake[0].currentMessage, "Is this available?");
+});
+
+test("buyer repeating the same question is processed again instead of duplicate_auto_send_hash", async () => {
+  const question = "I am interested in this truck and would want to buy under my business.";
+  const messages = [{ speaker: "Nabeel", text: question }];
+  const { ai, calls, setNow } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages,
+    sendSucceeds: true,
+    nowMs: 100000,
+  });
+
+  const first = await ai.captureConversation({ automatic: true });
+  assert.equal(first.reason, "waiting_quiet_window");
+  setNow(108000);
+  const sent = await ai.captureConversation({ automatic: true });
+  assert.equal(sent.autoSent, true);
+  assert.equal(sent.deliveryConfirmed, true);
+  assert.equal(calls.intake.length, 1);
+
+  messages.push({ speaker: "Nabeel", text: question });
+  const second = await ai.captureConversation({ automatic: true });
+  assert.equal(second.reason, "waiting_quiet_window");
+  assert.equal(calls.debug.at(-1).stage, "waiting_quiet_window");
+  setNow(116000);
+  const resent = await ai.captureConversation({ automatic: true });
+  assert.equal(calls.intake.length, 2);
+  assert.equal(resent.autoSent, true);
+  assert.equal(resent.deliveryConfirmed, true);
 });
 
 test("duplicate DOM roots for the same buyer message are reported and processed once", async () => {

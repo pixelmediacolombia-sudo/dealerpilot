@@ -567,9 +567,17 @@
         finalMessages.push(visibleBuyerMessage);
       }
     }
+    const buyerToken = normalizeForMatch(buyerName);
+    const sellerTokens = (sellerNameCandidates || []).map(normalizeForMatch).filter(Boolean);
     const orderedMessages = finalMessages
       .sort((left, right) => (left.__top ?? Number.MAX_SAFE_INTEGER) - (right.__top ?? Number.MAX_SAFE_INTEGER))
-      .map((message) => ({ speaker: message.speaker, text: message.text }));
+      .map((message) => ({ speaker: message.speaker, text: message.text }))
+      .filter((message) => {
+        const token = normalizeForMatch(message.text);
+        return token &&
+          !(buyerToken && token === buyerToken) &&
+          !sellerTokens.includes(token);
+      });
     return {
       root,
       scope,

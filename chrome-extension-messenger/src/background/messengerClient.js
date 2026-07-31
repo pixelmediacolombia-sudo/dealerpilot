@@ -109,9 +109,30 @@
     return response?.result?.value || { found: false, text: "" };
   }
 
+  async function loadAutoSendState() {
+    const stored = await chrome.storage.local.get("messengerAutoSendState");
+    return stored.messengerAutoSendState || { sendHashes: {}, replies: {} };
+  }
+
+  async function saveAutoSendState(state) {
+    await chrome.storage.local.set({ messengerAutoSendState: state });
+  }
+
   const handlers = {
     async GET_SETTINGS() {
       return getSettings();
+    },
+
+    async LOAD_AUTO_SEND_STATE() {
+      return loadAutoSendState();
+    },
+
+    async SAVE_AUTO_SEND_STATE(message) {
+      const existing = await loadAutoSendState();
+      existing.sendHashes = { ...existing.sendHashes, ...(message.sendHashes || {}) };
+      existing.replies = { ...existing.replies, ...(message.replies || {}) };
+      await saveAutoSendState(existing);
+      return { saved: true };
     },
 
     async GET_DEBUG_STATE() {
@@ -119,6 +140,7 @@
       const stored = await chrome.storage.local.get([
         "lastMessengerCaptureDebug",
         "lastMessengerCaptureDebugByTab",
+        "messengerCaptureDebugHistory",
         "lastConversationIntake",
         "lastError",
         "extensionId",
@@ -129,6 +151,7 @@
         settings,
         lastMessengerCaptureDebug: stored.lastMessengerCaptureDebug || null,
         lastMessengerCaptureDebugByTab: stored.lastMessengerCaptureDebugByTab || {},
+        messengerCaptureDebugHistory: stored.messengerCaptureDebugHistory || [],
         lastConversationIntake: stored.lastConversationIntake || null,
         lastError: stored.lastError || null,
       };
@@ -153,11 +176,19 @@
         sourceTabId,
         at: message.debug?.at || new Date().toISOString(),
       };
-      const { lastMessengerCaptureDebugByTab = {} } = await chrome.storage.local.get("lastMessengerCaptureDebugByTab");
+      const {
+        lastMessengerCaptureDebugByTab = {},
+        messengerCaptureDebugHistory = [],
+      } = await chrome.storage.local.get([
+        "lastMessengerCaptureDebugByTab",
+        "messengerCaptureDebugHistory",
+      ]);
       if (sourceTabId) lastMessengerCaptureDebugByTab[String(sourceTabId)] = debug;
+      const history = [debug, ...messengerCaptureDebugHistory].slice(0, 20);
       await chrome.storage.local.set({
         lastMessengerCaptureDebug: debug,
         lastMessengerCaptureDebugByTab,
+        messengerCaptureDebugHistory: history,
       });
       return { saved: true };
     },
