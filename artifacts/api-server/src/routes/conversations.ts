@@ -375,18 +375,20 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   if (historyAskedAboutFinancing(history) && buyerAcceptedFinancingStep(latest)) {
     return "financing_intro";
   }
-  if (/\b(link|application|apply|financ(?:e|ing)|loan|monthly payment|payment plan|solicitud|aplicar|financiamiento|financiar|credito|crédito|cuota mensual)\b/i.test(latest)) {
-    return "request_phone";
+  if (/\b(application|apply|financ(?:e|ing)|loan|monthly payment|payment plan|solicitud|aplicar|financiamiento|financiar|credito|crédito|cuota mensual)\b/i.test(latest)) {
+    return historyGaveFinancingRequirements(history) || historyRequestedPhone(history)
+      ? "request_phone"
+      : "financing_intro";
   }
   if (/\b(is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|esta disponible|está disponible|lo tiene disponible)\b/i.test(latest)) {
     return "availability";
   }
+  if (buyerAskedCleanTitle(latest)) return "clean_title";
   if (
     /\b(direcci[oó]n|address|ubicaci[oó]n|location|d[oó]nde est[áa]n|where are you|c[oó]mo llegar|how (?:do )?i get|est[áa] en|store address|concesionario|lot location|physical address|visitar|visit the lot|come see|stop by|come by|directions|mapa|maps|google maps)\b/i.test(latest)
   ) {
     return "address_request";
   }
-  if (buyerAskedCleanTitle(latest)) return "clean_title";
   if (buyerAskedWarrantyInfo(latest)) return "warranty_info";
   if (buyerAskedAdvisorQuestion(latest)) return "advisor_question";
   if (historyRequestedPhone(history)) return "request_phone";
@@ -432,7 +434,7 @@ function buildSafeFallbackReply(
       return "Perfecto. Para aplicar solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuentas con esos requisitos?";
     }
     if (stage === "address_request") {
-      return `Nuestra dirección es: ${storeAddress}. ¿Te gustaría venir a ver el ${vehicle}?`;
+      return `Nuestra dirección es: ${storeAddress}. ¿Te gustaría venir a ver el ${vehicle} o te interesa financiarlo?`;
     }
     if (stage === "document_requirements") {
       const detailBridge = buyerAskedDetailedVehicleInfo(currentMessage)
@@ -466,7 +468,7 @@ function buildSafeFallbackReply(
     return "Perfect. To apply, you only need your ID and an active bank account; a passport or Tax ID works. Do you have those requirements?";
   }
   if (stage === "address_request") {
-    return `Our address is: ${storeAddress}. Would you like to come see the ${vehicle}?`;
+    return `Our address is: ${storeAddress}. Would you like to come see the ${vehicle} or are you interested in financing it?`;
   }
   if (stage === "document_requirements") {
     const detailBridge = buyerAskedDetailedVehicleInfo(currentMessage)
@@ -624,8 +626,8 @@ CONVERSATION FUNNEL:
 2. If the buyer says they are interested in financing, do not ask for the phone number yet. Explain the basic requirements: ID and active bank account; passport or Tax ID works. Ask if they have those requirements.
 3. If the buyer asks what requirements/documents are needed to apply, answer the requirements first: ID and active bank account; passport or Tax ID works. Ask if they have those requirements. Do not ask for a phone number in this same reply.
 4. Only after the buyer confirms they have the requirements or explicitly wants to continue with the application, ask for the buyer's best phone number and include Alpha's dealership phone as an immediate call option.
-5. If the buyer asks any vehicle, payment, warranty, coverage, deductible, inspection, third-party/dealership, or other detailed question that is not answered by the supplied context, do not invent details. Kindly say that Alpha Motorsports will be happy to confirm that detail, then continue the current funnel step without skipping ahead.
-5a. Clean-title exception: if the buyer asks whether the vehicle has a clean title, confirm that it does, then ask whether they are interested in financing. Do not ask for a phone number in this reply.
+5. If the buyer asks a detailed question about the vehicle, payment, warranty, coverage, deductible, inspection, or anything else not answered by the supplied context, do not invent details. Kindly say that Alpha Motorsports will be happy to confirm that detail, then ask whether they are interested in financing. Do not ask for a phone number or address in this reply.
+5a. Clean-title confirmation: if the buyer asks whether the vehicle has a clean title, confirm that it does (do not defer), then ask whether they are interested in financing. Do not ask for a phone number in this reply.
 6. If the conversation already asked for the buyer's phone number and the buyer replies without a number, do not restart the financing question. Continue by asking for the best phone number.
 7. Once the buyer provides a phone number, thank them warmly and say "we will contact you shortly." You may also offer the store phone as an immediate option.
 8. Send exactly one short reply for the latest buyer turn. Never repeat a previous reply.
@@ -633,7 +635,7 @@ CONVERSATION FUNNEL:
 9. Do not give price, mileage, approval, history, warranty, or financing details in Messenger, except that you must confirm a clean title when explicitly asked.
 
 ADDRESS / DIRECTIONS HANDLING:
-- If the buyer asks for the address, directions, or location, provide the store address directly and invite them to visit.
+- If the buyer asks for the address, directions, or location, provide the store address directly and invite them to visit, then ask whether they are interested in financing.
 - Never ask a clarifying question about which vehicle or location they mean.
 - Always provide the address from the supplied Dealership address field.
 
@@ -668,7 +670,7 @@ export function detectLanguage(text: string): "en" | "es" {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
   const spanishWords =
-    /\b(hola|buenas|gracias|disponible|tengo|quiero|estoy|interesad[oa]s?|claro|podemos|ayuda(?:r|rte)?|inicial|comprar|semana|numero|telefono|itin|ingresos|esta|esa|ese|eso|esto|este|tiene|tienen|techo|panoramico|precio|cuanto|cuánto|cual|donde|cuando|carro|auto|vehiculo|toyota|si|como|necesit[ao]|aplicar|requisitos?|documentos?|pasaporte|cuenta|bancaria|financiar|financiamiento|asesor)\b/i;
+    /\b(hola|buenas|gracias|disponible|tengo|quiero|estoy|interesad[oa]s?|claro|podemos|ayuda(?:r|rte)?|inicial|comprar|semana|numero|telefono|itin|ingresos|esta|esa|ese|eso|esto|este|tiene|tienen|techo|panoramico|precio|cuanto|cuánto|cual|donde|cuando|carro|auto|vehiculo|si|como|necesit[ao]|aplicar|requisitos?|documentos?|pasaporte|cuenta|bancaria|financiar|financiamiento|asesor)\b/i;
   return /[¿¡ñáéíóúü]/i.test(cleanConversationText(text)) || spanishWords.test(normalized) ? "es" : "en";
 }
 
@@ -737,9 +739,9 @@ export async function generateAiReply(
       ? "Greet as Alpha Motorsports, state that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number."
       : "Greet as Alpha Motorsports, explicitly confirm that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number.",
     financing_intro: "The buyer is interested in financing. Do not ask for a phone number yet. Explain the basic requirements: ID and an active bank account; passport or Tax ID works. Ask if they have those requirements.",
-    request_phone: `Ask for the buyer's best phone number so the finance team can help. End with Alpha's dealership phone as an immediate call option: ${storePhone}.`,
+    request_phone: `Ask for the buyer's best phone number so we can help them. End with Alpha's dealership phone as an immediate call option: ${storePhone}.`,
     phone_received: `A phone number was provided. Thank the buyer warmly, say "we will contact you shortly," and optionally offer ${storePhone} as an immediate call option. Do not transfer them to or mention a separate sales team.`,
-    address_request: `The buyer is asking for the address or directions. Provide the dealership address and invite them to visit. Do NOT ask clarifying questions.`,
+    address_request: `The buyer is asking for the address or directions. Provide the dealership address and invite them to visit, then ask whether they are interested in financing. Do NOT ask clarifying questions.`,
     document_requirements: "The buyer is asking what is needed to apply. Reply warmly with the requirements: ID and an active bank account; passport or Tax ID works. If they also ask price, miles, or other details, do not provide those values; kindly say we will be happy to confirm them. Ask if they have those requirements. Do not ask for a phone number yet.",
     clean_title: "Confirm that the vehicle has a clean title, then ask whether the buyer is interested in financing it. Do not ask for a phone number.",
     warranty_info: "The buyer is asking detailed warranty questions. Respond warmly and do not invent warranty terms. Say we will be happy to confirm the exact warranty or coverage details; then continue the funnel by asking whether they are interested in financing. Do not mention a separate team or ask for a phone number.",
