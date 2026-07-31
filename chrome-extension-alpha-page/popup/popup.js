@@ -8,6 +8,7 @@
   const status = document.getElementById("status");
   const reloadDebugButton = document.getElementById("reloadDebug");
   const showJsonDebugButton = document.getElementById("showJsonDebug");
+  const showScreenshotButton = document.getElementById("showScreenshot");
   const jsonDebug = document.getElementById("jsonDebug");
 
   function send(message) {
@@ -154,6 +155,14 @@
     loadDebug(true).catch((error) => {
       jsonDebug.textContent = error.message || String(error);
     });
+  });
+  showScreenshotButton.addEventListener("click", async () => {
+    const { lastAlphaPageScreenshot } = await chrome.storage.local.get("lastAlphaPageScreenshot");
+    if (!lastAlphaPageScreenshot) {
+      setStatus("No composer screenshot saved yet.", "warn");
+      return;
+    }
+    await chrome.tabs.create({ url: lastAlphaPageScreenshot });
   });
   searchInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") loadVehicles();

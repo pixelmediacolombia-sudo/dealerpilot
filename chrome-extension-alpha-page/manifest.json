@@ -1,11 +1,13 @@
 {
   "manifest_version": 3,
   "name": "DealerPilot Alpha Page Publisher",
-  "version": "0.1.0",
+  "version": "0.1.8",
   "description": "Prepares human-reviewed Alpha MotorSports Facebook Page posts from DealerPilot inventory without using Meta Developers.",
   "permissions": [
     "storage",
-    "tabs"
+    "tabs",
+    "downloads",
+    "debugger"
   ],
   "host_permissions": [
     "https://1987dealerpilot.com/*",
