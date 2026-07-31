@@ -735,10 +735,7 @@ export function SalesAIWorkspace() {
 
   const conversations = data?.conversations ?? [];
 
-  // Sort: needs_human → needs reply → active → closed, then by time
-  const urgencyScore = (c: ConvListItem) =>
-    c.status === "needs_human" ? 4 : c.lastMessage?.role === "user" && c.status === "active" ? 3 : c.status === "active" ? 2 : 1;
-
+  // Sort: most recently active first, oldest at the bottom
   const filtered = conversations
     .filter((c) => {
       const matchStatus = statusFilter === "all" || c.status === statusFilter;
@@ -749,17 +746,15 @@ export function SalesAIWorkspace() {
         || (c.vehicle ? [c.vehicle.make, c.vehicle.model].join(" ").toLowerCase().includes(q) : false);
       return matchStatus && matchSearch;
     })
-    .sort((a, b) => {
-      const diff = urgencyScore(b) - urgencyScore(a);
-      if (diff !== 0) return diff;
-      return new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
-    });
+    .sort((a, b) => new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime());
 
-  // Auto-open first conversation
+  // Auto-open most recent conversation
   useEffect(() => {
     if (!hasAutoOpened.current && conversations.length > 0) {
       hasAutoOpened.current = true;
-      const sorted = [...conversations].sort((a, b) => urgencyScore(b) - urgencyScore(a));
+      const sorted = [...conversations].sort(
+        (a, b) => new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime(),
+      );
       setSelectedId(sorted[0].id);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
