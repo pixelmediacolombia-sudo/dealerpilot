@@ -555,7 +555,15 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(messengerPopupSource, /AI Debugger/);
   assert.match(messengerPopupSource, /Specific Error/);
   assert.match(messengerPopupSource, /Raw Error/);
+  assert.match(messengerPopupSource, /Manual fallback reply/);
+  assert.match(messengerPopupSource, /Show Debug Object/);
+  assert.match(messengerAiSource, /manual_reply_after_buyer/);
+  assert.match(messengerAiSource, /freshSnapshotStillPendingBuyer/);
   assert.match(conversationsSource, /parseConversationMessage/);
+  assert.match(conversationsSource, /function normalizeIntentText/);
+  assert.match(conversationsSource, /ubicad\[oa\]s\?/);
+  assert.match(conversationsSource, /Nuestra dirección es: \$\{storeAddress\}/);
+  assert.match(conversationsSource, /9120 Euclid Ave, Manassas, VA 20110/);
   assert.match(conversationsSource, /UI_MESSAGE_TEXT/);
   assert.match(conversationsSource, /send in messenger/);
   assert.match(conversationsSource, /anyone can find this group/);
@@ -598,7 +606,7 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.equal(spanishWords.test("Estoy interesado"), true);
   assert.equal(spanishWords.test("claro que sí, ¿cómo podemos ayudarte?"), true);
   assert.equal(spanishWords.test("I am interested"), false);
-  assert.match(conversationsSource, /Hello from Alpha Motorsports/);
+  assert.match(conversationsSource, /Hello, this is Alpha Motorsports/);
   assert.match(conversationsSource, /Are you interested in financing/);
   assert.match(conversationsSource, /financing_intro/);
   assert.match(conversationsSource, /historyGaveFinancingRequirements/);
@@ -630,7 +638,7 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /\$\\s\*\\d/);
   assert.match(conversationsSource, /Dealership phone: \$\{storePhone\}/);
   assert.match(conversationsSource, /detailed_question/);
-  assert.match(conversationsSource, /confirm the exact details/);
+  assert.match(conversationsSource, /confirm that detail/);
   assert.match(conversationsSource, /best phone number so we can help you/);
   assert.match(conversationsSource, /generateAiReplyWithFallback/);
   assert.match(conversationsSource, /buildSafeFallbackReply/);

@@ -9,6 +9,7 @@
   const SEND_EVIDENCE_TIMEOUT_MS = 8000;
   const SEND_EVIDENCE_INTERVAL_MS = 300;
   const DEFAULT_STORE_PHONE = "+1 703-763-4675";
+  const PENDING_BUYER_STORE_KEY = "dealerpilotMessengerPendingBuyerByThreadV1";
 
   let captureInFlight = false;
   const lastCaptureHashByThread = new Map();
@@ -399,6 +400,23 @@
     });
   }
 
+  function dealerRespondedAfterBuyer(messages = [], currentMessage = "") {
+    const expected = cleanText(currentMessage);
+    if (!expected) return false;
+    let buyerIndex = -1;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message?.speaker !== "Dealer" && cleanText(message?.text || "") === expected) {
+        buyerIndex = index;
+        break;
+      }
+    }
+    if (buyerIndex < 0) {
+      return messages[messages.length - 1]?.speaker === "Dealer";
+    }
+    return messages.slice(buyerIndex + 1).some((message) => message?.speaker === "Dealer");
+  }
+
   function snapshotStillActionable(snapshot, payload, settings = DEFAULT_SETTINGS, expectedReply = "") {
     if (!snapshot?.root) return { ok: false, reason: "thread_root_missing" };
     if (snapshot.root.isConnected === false) return { ok: false, reason: "thread_root_detached" };
@@ -411,7 +429,7 @@
     const liveMessages = Array.isArray(liveCapture?.messages) ? liveCapture.messages : snapshot.messages;
     const snapshotDealerCount = snapshot.messages.filter((m) => m.speaker === "Dealer").length;
     const liveDealerCount = liveMessages.filter((m) => m.speaker === "Dealer").length;
-    if (liveDealerCount > snapshotDealerCount) {
+    if (liveDealerCount > snapshotDealerCount || dealerRespondedAfterBuyer(liveMessages, payload?.currentMessage || "")) {
       return { ok: false, reason: "new_dealer_message_in_history" };
     }
     const liveLastMessage = liveMessages[liveMessages.length - 1] || snapshot.lastMessage;
@@ -446,6 +464,91 @@
     };
     await send({ type: "MESSENGER_CAPTURE_DEBUG", debug: lastDiagnostics }).catch(() => {});
     return lastDiagnostics;
+  }
+
+  function readPendingBuyerStore() {
+    try {
+      return JSON.parse(globalThis.sessionStorage?.getItem?.(PENDING_BUYER_STORE_KEY) || "{}") || {};
+    } catch {
+      return {};
+    }
+  }
+
+  function writePendingBuyerStore(store) {
+    try {
+      globalThis.sessionStorage?.setItem?.(PENDING_BUYER_STORE_KEY, JSON.stringify(store || {}));
+    } catch {
+      // Quiet-window persistence is best-effort; the in-memory map still works.
+    }
+  }
+
+  function getPendingBuyer(threadKey) {
+    const pending = pendingBuyerByThread.get(threadKey);
+    if (pending?.hash) return pending;
+    const stored = readPendingBuyerStore()[threadKey];
+    if (stored?.hash) {
+      pendingBuyerByThread.set(threadKey, stored);
+      return stored;
+    }
+    return {};
+  }
+
+  function setPendingBuyer(threadKey, pending) {
+    pendingBuyerByThread.set(threadKey, pending);
+    const store = readPendingBuyerStore();
+    store[threadKey] = pending;
+    writePendingBuyerStore(store);
+  }
+
+  function clearPendingBuyer(threadKey) {
+    pendingBuyerByThread.delete(threadKey);
+    const store = readPendingBuyerStore();
+    if (Object.prototype.hasOwnProperty.call(store, threadKey)) {
+      delete store[threadKey];
+      writePendingBuyerStore(store);
+    }
+  }
+
+  function aggressiveImageDebug(snapshot) {
+    const evidence = snapshot?.evidence || {};
+    const candidates = Array.isArray(evidence.imageCandidates) ? evidence.imageCandidates : [];
+    if (!candidates.length && !evidence.imageMessageCount) return null;
+    const dump = {
+      at: new Date().toISOString(),
+      buyerName: snapshot?.buyerName || "",
+      vehicleTitle: snapshot?.context?.vehicleTitle || "",
+      imageCandidateCount: evidence.imageCandidateCount || 0,
+      imageMessageCount: evidence.imageMessageCount || 0,
+      latestIsImage: evidence.latestIsImage === true,
+      candidates: candidates.map((candidate) => ({
+        src: candidate.src,
+        dataSrc: candidate.dataSrc,
+        alt: candidate.alt,
+        ariaLabel: candidate.ariaLabel,
+        dataTestId: candidate.dataTestId,
+        role: candidate.role,
+        title: candidate.title,
+        naturalWidth: candidate.naturalWidth,
+        naturalHeight: candidate.naturalHeight,
+        width: candidate.width,
+        height: candidate.height,
+        top: candidate.top,
+        emojiLike: candidate.emojiLike,
+        profileLike: candidate.profileLike,
+        stickerLike: candidate.stickerLike,
+        inMessageBubble: candidate.inMessageBubble,
+        bubbleAriaLabel: candidate.bubbleAriaLabel,
+        bubbleTestId: candidate.bubbleTestId,
+        bubbleRole: candidate.bubbleRole,
+        bubbleTextPreview: candidate.bubbleTextPreview,
+        outerHtml: candidate.outerHtml,
+      })),
+    };
+    console.log(
+      "[DealerPilot IMAGE DEBUG]",
+      JSON.stringify(dump, null, 2).split("\n").slice(0, 240).join("\n"),
+    );
+    return dump;
   }
 
   function getSettingsFromResponse(response) {
@@ -652,10 +755,17 @@
         : snapshot.evidence.threadIdentity,
     });
     const visibleMessages = canonicalMessages(messages);
+    const visibleImages = Array.isArray(snapshot.imageMessages)
+      ? snapshot.imageMessages
+        .map((message) => message.image)
+        .filter(Boolean)
+        .slice(0, 12)
+      : [];
     const captureHash = JSON.stringify({
       thread: externalThreadRef,
       currentMessage,
       visibleMessages,
+      visibleImages: visibleImages.map((image) => image.src || image.dataSrc),
     });
     const buyerMessages = messages.filter((message) => message.speaker !== "Dealer");
     const autoActionKey = JSON.stringify({
@@ -677,6 +787,7 @@
       marketplaceContextDetected: validation.marketplaceContextDetected,
       currentMessage,
       visibleMessages,
+      visibleImages,
       chatText: visibleMessages.join("\n").slice(-4000),
       detectedVehicleTitle: snapshot.context.vehicleTitle || undefined,
       detectedMarketplaceListingUrl: snapshot.context.listingUrl || undefined,
@@ -690,10 +801,31 @@
     return response?.data?.suggestedReply || response?.data?.data?.suggestedReply || "";
   }
 
+  function freshSnapshotStillPendingBuyer(payload, settings = DEFAULT_SETTINGS) {
+    const freshWinner = selectWinningSnapshot(deduplicateSnapshots(createCaptureSnapshots(settings)));
+    const fresh = freshWinner?.snapshot;
+    if (!fresh) return { ok: false, reason: "fresh_snapshot_missing" };
+    const latest = fresh.messages[fresh.messages.length - 1] || null;
+    if (dealerRespondedAfterBuyer(fresh.messages, payload?.currentMessage || "")) {
+      return { ok: false, reason: "manual_reply_after_buyer" };
+    }
+    if (latest?.speaker === "Dealer") {
+      return { ok: false, reason: "latest_message_not_buyer" };
+    }
+    if (payload?.currentMessage && cleanText(latest?.text || "") !== cleanText(payload.currentMessage)) {
+      return { ok: false, reason: "buyer_message_changed" };
+    }
+    return { ok: true, snapshot: fresh };
+  }
+
   async function maybeSendReply(reply, payload, snapshot, threadKey, settings = DEFAULT_SETTINGS) {
     const autoActionKey = payload.autoActionKey || payload.messageHash;
     if (!reply || autoActionKey === lastAutoSendHashByThread.get(threadKey)) {
       return { autoSent: false, reason: "reply_or_capture_not_actionable" };
+    }
+    const fresh = freshSnapshotStillPendingBuyer(payload, settings);
+    if (!fresh.ok) {
+      return { autoSent: false, reason: fresh.reason };
     }
     const actionable = snapshotStillActionable(snapshot, payload, settings, reply);
     if (!actionable.ok) {
@@ -790,6 +922,12 @@
       messageScopeDetected: snapshot.evidence.messageScopeDetected === true,
       messageExtractionMode: snapshot.evidence.extractionMode || "none",
       latestMessageDirection: snapshot.evidence.latestMessageDirection || "none",
+      imageCandidateCount: snapshot.evidence.imageCandidateCount || 0,
+      imageMessageCount: snapshot.evidence.imageMessageCount || 0,
+      latestIsImage: snapshot.evidence.latestIsImage === true,
+      imageCandidates: Array.isArray(snapshot.evidence.imageCandidates)
+        ? snapshot.evidence.imageCandidates.slice(0, 12)
+        : [],
       selectedHeaderText: snapshot.evidence.selectedHeaderText || "",
       selectedRootTextPreview: snapshot.evidence.selectedRootTextPreview || "",
       selectedRootRect: snapshot.evidence.selectedRootRect || null,
@@ -830,14 +968,14 @@
 
     if (isFacebookRatingCard(payload.currentMessage)) {
       lastCaptureHashByThread.set(threadKey, payload.messageHash);
-      pendingBuyerByThread.delete(threadKey);
+      clearPendingBuyer(threadKey);
       await sendDebug("blocked", { ...debug, reason: "facebook_rating_card" });
       return { skipped: true, reason: "facebook_rating_card" };
     }
 
     if (isTerminalAcknowledgement(payload.currentMessage)) {
       lastCaptureHashByThread.set(threadKey, payload.messageHash);
-      pendingBuyerByThread.delete(threadKey);
+      clearPendingBuyer(threadKey);
       await sendDebug("blocked", { ...debug, reason: "terminal_acknowledgement" });
       return { skipped: true, reason: "terminal_acknowledgement" };
     }
@@ -849,9 +987,9 @@
         return { skipped: true, reason: "duplicate_auto_send_hash" };
       }
       const now = Date.now();
-      const pending = pendingBuyerByThread.get(threadKey) || {};
+      const pending = getPendingBuyer(threadKey);
       if (autoActionKey !== pending.hash) {
-        pendingBuyerByThread.set(threadKey, {
+        setPendingBuyer(threadKey, {
           hash: autoActionKey,
           since: now,
           detectedAt: detectedAtMs,
@@ -918,7 +1056,7 @@
     }
 
     lastCaptureHashByThread.set(threadKey, payload.messageHash);
-    pendingBuyerByThread.delete(threadKey);
+    clearPendingBuyer(threadKey);
     const lastSuggestedReply = repairSuggestedReplyForBuyerIntent(extractSuggestedReply(response), payload);
     if (lastSuggestedReply && !replyMirrorsBuyerLanguage(lastSuggestedReply, payload.currentMessage)) {
       await sendDebug("auto_send_blocked", {
@@ -1014,6 +1152,7 @@
         results: [],
       };
     }
+    const imageDump = aggressiveImageDebug(winning.snapshot);
     const result = await processSnapshot({
       automatic,
       detectedAtMs,
@@ -1024,6 +1163,7 @@
     });
     return {
       ...result,
+      imageDebug: imageDump,
       conversationCount: snapshots.length,
       buyersDetected: buildBuyersState(snapshots, winning.index),
       winnerScore: winning.score,

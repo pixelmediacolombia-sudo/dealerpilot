@@ -96,7 +96,7 @@ const intakePayload = {
 };
 
 test("background sends only the existing conversations intake contract", async () => {
-  const { handlers, calls } = createHarness();
+  const { handlers, calls, storage } = createHarness();
   const response = await handlers.CONVERSATION_INTAKE(intakePayload);
 
   assert.equal(response.suggestedReply, "reply for marketplace-thread::buyer-a::rav4");
@@ -104,6 +104,8 @@ test("background sends only the existing conversations intake contract", async (
   assert.equal(calls.apiPost[0].path, "/api/conversations/intake");
   assert.equal(calls.apiPost[0].body.extensionId, "msg-ext-test");
   assert.equal(calls.apiPost[0].body.availabilityQuickReplyAccepted, false);
+  assert.equal(storage.lastConversationIntake.suggestedReply, "reply for marketplace-thread::buyer-a::rav4");
+  assert.equal(storage.lastConversationIntake.suggestedReplyPreview, "reply for marketplace-thread::buyer-a::rav4");
 });
 
 test("background deduplicates identical intakes inside the extension", async () => {
@@ -130,6 +132,26 @@ test("background keeps the latest 20 Messenger diagnostics", async () => {
   assert.equal(storage.messengerCaptureDebugHistory.at(-1).stage, "stage-2");
   const debugState = await handlers.GET_DEBUG_STATE();
   assert.equal(debugState.messengerCaptureDebugHistory.length, 20);
+});
+
+test("background clears the manual fallback suggestion after confirmed auto-send", async () => {
+  const { handlers, storage } = createHarness();
+  await handlers.CONVERSATION_INTAKE(intakePayload);
+
+  assert.equal(storage.lastConversationIntake.suggestedReply, "reply for marketplace-thread::buyer-a::rav4");
+
+  await handlers.MESSENGER_CAPTURE_DEBUG({
+    debug: {
+      stage: "intake_ok",
+      at: "2026-08-01T14:00:00.000Z",
+      autoSent: true,
+      deliveryConfirmed: true,
+    },
+  }, { tab: { id: 42 } });
+
+  assert.equal(storage.lastConversationIntake.suggestedReply, null);
+  assert.equal(storage.lastConversationIntake.suggestedReplyPreview, "");
+  assert.equal(storage.lastConversationIntake.suggestedReplyClearReason, "auto_sent");
 });
 
 test("background writes and submits the Messenger composer through separate CDP phases", async () => {

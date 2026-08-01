@@ -108,6 +108,13 @@ function cleanConversationText(value: unknown): string {
     .trim();
 }
 
+function normalizeIntentText(value: unknown): string {
+  return cleanConversationText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 function isUiConversationText(value: string): boolean {
   const normalized = value.toLowerCase().replace(/[.。:;,\-–—]+$/g, "").trim();
   if (!normalized) return true;
@@ -366,6 +373,7 @@ function replyGivesRestrictedVehicleDetails(reply: string): boolean {
 
 function resolveSalesReplyStage(visibleMessages: string[], currentMessage: string): SalesReplyStage {
   const latest = cleanConversationText(currentMessage).toLowerCase();
+  const latestIntent = normalizeIntentText(currentMessage);
   const history = visibleMessages.map(cleanConversationText).join(" ").toLowerCase();
   if (hasPhoneNumber(latest)) return "phone_received";
   if (historyGaveFinancingRequirements(history) && buyerConfirmedRequirements(latest)) {
@@ -385,7 +393,7 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   }
   if (buyerAskedCleanTitle(latest)) return "clean_title";
   if (
-    /\b(direcci[oó]n|address|ubicaci[oó]n|location|d[oó]nde est[áa]n|where are you|c[oó]mo llegar|how (?:do )?i get|est[áa] en|store address|concesionario|lot location|physical address|visitar|visit the lot|come see|stop by|come by|directions|mapa|maps|google maps)\b/i.test(latest)
+    /\b(direccion|address|ubicacion|location|donde esta(?:n|s)?|donde queda|donde se encuentra|ubicad[oa]s?|where are you|where (?:is|are).{0,40}located|where is (?:the )?(?:dealer|dealership|lot)|como llegar|how (?:do )?i get|esta en|store address|concesionario|lot location|physical address|visitar|visit the lot|come see|stop by|come by|directions|mapa|maps|google maps)\b/i.test(latestIntent)
   ) {
     return "address_request";
   }
@@ -538,14 +546,8 @@ function isAiReplyAligned(reply: string, stage: SalesReplyStage, storePhone: str
 }
 
 function isReplyRelevantToCurrentMessage(reply: string, currentMessage: string): boolean {
-  const normalizedReply = cleanConversationText(reply)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-  const normalizedBuyer = cleanConversationText(currentMessage)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+  const normalizedReply = normalizeIntentText(reply);
+  const normalizedBuyer = normalizeIntentText(currentMessage);
   const topicContracts = [
     {
       reply: /\b(?:cash price|asking price|precio(?: en efectivo)?|precio exacto)\b/,
@@ -557,7 +559,7 @@ function isReplyRelevantToCurrentMessage(reply: string, currentMessage: string):
     },
     {
       reply: /\b(?:address|location|directions|direccion|ubicacion|como llegar)\b/,
-      buyer: /\b(?:address|location|directions|direccion|ubicacion|donde|como llegar)\b/,
+      buyer: /\b(?:address|location|directions|direccion|ubicacion|ubicad[oa]s?|donde|como llegar)\b/,
     },
     {
       reply: /\b(?:passport|tax id|bank account|pasaporte|cuenta bancaria|requisitos|documentos)\b/,
@@ -1644,11 +1646,11 @@ router.patch("/conversations/:id/auto-reply", async (req, res) => {
 // ── Intent / escalation / qualification helpers ──────────────────────────────
 
 function detectIntent(message: string): string {
-  const m = message.toLowerCase();
+  const m = normalizeIntentText(message);
   if (/disponible|still.*for sale|still.*available|is it available|está disponible/.test(m)) return "availability";
   if (/\bprecio\b|how much|what.*price|cuánto.*cuesta|cuanto.*cuesta/.test(m)) return "price_inquiry";
   if (/financiamiento|financing|finance|monthly|mensual|payment plan/.test(m)) return "financing";
-  if (/dónde|donde|location|address|dirección|where.*are.*you|where.*located/.test(m)) return "location";
+  if (/donde|ubicad[oa]s?|location|address|direccion|where.*are.*you|where.*located/.test(m)) return "location";
   if (/\binicial\b|down.?payment|enganche|cuánto.*inicial|cuanto.*inicial/.test(m)) return "down_payment";
   if (/\bitin\b|\bpasaporte\b|\bpassport\b|driver.*license|tax id|identificación/.test(m)) return "document_inquiry";
   if (/cita|appointment|come.*in|ver.*hoy|see.*today|schedule/.test(m)) return "appointment_request";

@@ -104,6 +104,8 @@ function createHarness({
   dynamicSendControl = false,
   locationOverride = null,
   nowMs = null,
+  sessionStorageRef = null,
+  onIntake = null,
 } = {}) {
   const calls = { messages: [], debug: [], intake: [] };
   let currentNowMs = nowMs;
@@ -200,6 +202,7 @@ function createHarness({
         }
         if (message.type === "CONVERSATION_INTAKE") {
           calls.intake.push(message);
+          onIntake?.(message);
           callback(intakeResponse || { ok: true, data: { suggestedReply: "Yes, it is available." } });
           return;
         }
@@ -280,6 +283,12 @@ function createHarness({
       origin: "https://www.facebook.com",
       pathname: "/messages/t/999999",
       hostname: "www.facebook.com",
+    },
+    sessionStorage: sessionStorageRef || {
+      getItem() {
+        return null;
+      },
+      setItem() {},
     },
     console: { warn() {}, log() {}, error() {} },
     Date: FakeDate,
@@ -937,6 +946,36 @@ test("autoReply revalidates the same root before writing to Messenger", async ()
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
 });
 
+test("autoReply blocks when an operator replies manually while backend intake is pending", async () => {
+  const messages = [{ speaker: "Luis", text: "Dónde está ubicado?" }];
+  const { ai, calls, composerElement } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages,
+    intakeResponse: {
+      ok: true,
+      data: {
+        suggestedReply:
+          "Estamos ubicados en 9120 Euclid Ave, Manassas, VA 20110. ¿Te gustaría venir a verlo o te interesa financiarlo?",
+      },
+    },
+    sendSucceeds: true,
+    onIntake() {
+      messages.push({
+        speaker: "Dealer",
+        text: "Estamos ubicados en 9120 Euclid Ave, Manassas, VA 20110. ¿Sigues interesado en el vehículo?",
+      });
+    },
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, false);
+  assert.equal(result.reason, "manual_reply_after_buyer");
+  assert.equal(composerElement.textContent, "");
+  assert.equal(calls.messages.some((message) => message.type === "DEBUGGER_COMPOSER_SUBMIT"), false);
+  assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
+});
+
 test("autoReply refuses to overwrite an operator draft in the composer", async () => {
   const { ai, calls, composerElement } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
@@ -1054,6 +1093,44 @@ test("buyer repeating the same question is processed again instead of duplicate_
   assert.equal(calls.intake.length, 2);
   assert.equal(resent.autoSent, true);
   assert.equal(resent.deliveryConfirmed, true);
+});
+
+test("quiet-window state survives a Messenger page reload before intake", async () => {
+  const sessionStore = {};
+  const sessionStorageRef = {
+    getItem(key) {
+      return sessionStore[key] || null;
+    },
+    setItem(key, value) {
+      sessionStore[key] = value;
+    },
+  };
+  const messages = [{ speaker: "Nio", text: "Hello, is this still available?" }];
+  const firstHarness = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
+    messages,
+    nowMs: 100000,
+    sessionStorageRef,
+  });
+
+  const first = await firstHarness.ai.captureConversation({ automatic: true });
+
+  assert.equal(first.reason, "waiting_quiet_window");
+  assert.equal(firstHarness.calls.intake.length, 0);
+
+  const secondHarness = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
+    messages,
+    nowMs: 108000,
+    sessionStorageRef,
+  });
+
+  const second = await secondHarness.ai.captureConversation({ automatic: true });
+
+  assert.equal(second.reason, "auto_reply_disabled");
+  assert.equal(secondHarness.calls.intake.length, 1);
+  assert.equal(secondHarness.calls.intake[0].currentMessage, "Hello, is this still available?");
+  assert.equal(secondHarness.calls.debug.at(-1).stage, "auto_send_blocked");
 });
 
 test("duplicate DOM roots for the same buyer message are reported and processed once", async () => {

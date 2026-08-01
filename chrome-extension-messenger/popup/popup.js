@@ -27,6 +27,33 @@
     el.className = `debug-value ${className}`.trim();
   }
 
+  function getSuggestedReply(state = {}) {
+    const debug = state.lastMessengerCaptureDebug || {};
+    const intake = state.lastConversationIntake || {};
+    return String(
+      intake.suggestedReply ||
+      intake.suggestedReplyPreview ||
+      debug.suggestedReply ||
+      debug.suggestedReplyPreview ||
+      "",
+    ).trim();
+  }
+
+  async function copySuggestedReply() {
+    const text = $("suggested-reply").value.trim();
+    if (!text) return;
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      $("suggested-reply").select();
+      document.execCommand("copy");
+    }
+    $("copy-suggested").textContent = "Copied";
+    setTimeout(() => {
+      $("copy-suggested").textContent = "Copy Suggested Reply";
+    }, 1200);
+  }
+
   async function loadDebug() {
     const response = await send({ type: "GET_DEBUG_STATE" });
     const state = response.ok ? response.data : {};
@@ -59,6 +86,15 @@
       ].join(" | "),
       debug.threadRootDetected && debug.messageExtractionMode !== "none" ? "ok" : "",
     );
+    const imageCount = debug.imageCandidateCount ?? 0;
+    const imageMessageCount = debug.imageMessageCount ?? 0;
+    setDebugValue(
+      "dbg-images",
+      imageCount
+        ? `Cand ${imageCount} | Msg ${imageMessageCount}${debug.latestIsImage ? " | latest" : ""}`
+        : "None",
+      imageMessageCount ? "warn" : imageCount ? "" : "ok",
+    );
     setDebugValue(
       "dbg-backend",
       debug.backendIntakeReceived ? "Intake OK" : debug.backendIntakeSent ? "Waiting/Error" : "Not sent",
@@ -83,7 +119,10 @@
     $("raw-error").textContent = specificError
       ? JSON.stringify(specificError, null, 2)
       : "None";
-    $("diagnostics").textContent = JSON.stringify(state, null, 2);
+    const suggestedReply = getSuggestedReply(state);
+    $("suggested-reply").value = suggestedReply;
+    $("copy-suggested").disabled = !suggestedReply;
+    $("diagnostics").textContent = "Debug loaded. Use Show Debug Object for full JSON.";
   }
 
   async function save() {
@@ -114,6 +153,12 @@
     const response = await send({ type: "GET_DEBUG_STATE" });
     console.log("[DealerPilot Messenger AI] Debug state:", response);
     $("diagnostics").textContent = JSON.stringify(response, null, 2);
+  });
+
+  $("copy-suggested").addEventListener("click", () => {
+    copySuggestedReply().catch((err) => {
+      $("diagnostics").textContent = String(err?.message || err);
+    });
   });
 
   load().catch((err) => {

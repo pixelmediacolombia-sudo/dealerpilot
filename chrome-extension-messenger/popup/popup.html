@@ -113,6 +113,10 @@
       button.secondary {
         background: #44546a;
       }
+      textarea.readonly {
+        min-height: 86px;
+        background: #f9fafc;
+      }
     </style>
   </head>
   <body>
@@ -160,6 +164,10 @@
           <span class="debug-value" id="dbg-dom">—</span>
         </div>
         <div class="debug-row">
+          <span class="debug-label">Images</span>
+          <span class="debug-value" id="dbg-images">—</span>
+        </div>
+        <div class="debug-row">
           <span class="debug-label">Backend</span>
           <span class="debug-value" id="dbg-backend">—</span>
         </div>
@@ -171,6 +179,9 @@
           <span class="debug-label">Specific Error</span>
           <span class="debug-value" id="dbg-error-specific">None</span>
         </div>
+        <label for="suggested-reply">Manual fallback reply</label>
+        <textarea id="suggested-reply" class="readonly" readonly placeholder="No AI suggestion yet."></textarea>
+        <button id="copy-suggested" class="secondary" type="button" disabled>Copy Suggested Reply</button>
         <label for="raw-error">Raw Error</label>
         <pre id="raw-error">None</pre>
         <button id="reload-debug" class="secondary">Reload Debugger</button>

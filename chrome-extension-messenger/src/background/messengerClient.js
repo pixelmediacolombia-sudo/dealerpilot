@@ -179,17 +179,29 @@
       const {
         lastMessengerCaptureDebugByTab = {},
         messengerCaptureDebugHistory = [],
+        lastConversationIntake = null,
       } = await chrome.storage.local.get([
         "lastMessengerCaptureDebugByTab",
         "messengerCaptureDebugHistory",
+        "lastConversationIntake",
       ]);
       if (sourceTabId) lastMessengerCaptureDebugByTab[String(sourceTabId)] = debug;
       const history = [debug, ...messengerCaptureDebugHistory].slice(0, 20);
-      await chrome.storage.local.set({
+      const patch = {
         lastMessengerCaptureDebug: debug,
         lastMessengerCaptureDebugByTab,
         messengerCaptureDebugHistory: history,
-      });
+      };
+      if (debug.autoSent === true && lastConversationIntake) {
+        patch.lastConversationIntake = {
+          ...lastConversationIntake,
+          suggestedReply: null,
+          suggestedReplyPreview: "",
+          suggestedReplyClearedAt: debug.at,
+          suggestedReplyClearReason: "auto_sent",
+        };
+      }
+      await chrome.storage.local.set(patch);
       return { saved: true };
     },
 
@@ -272,6 +284,7 @@
           buyerName: message.buyerName,
           visibleMessages: message.visibleMessages || [],
           currentMessage: message.currentMessage,
+          visibleImages: message.visibleImages || [],
           detectedMarketplaceListingUrl: message.detectedMarketplaceListingUrl,
           detectedVehicleTitle: message.detectedVehicleTitle,
           marketplaceDownPayment: message.marketplaceDownPayment,
@@ -290,13 +303,20 @@
           availabilityQuickReplyAccepted: false,
           timestamp: new Date().toISOString(),
         });
+        const suggestedReply =
+          response?.suggestedReply ||
+          response?.data?.suggestedReply ||
+          response?.data?.data?.suggestedReply ||
+          "";
         await chrome.storage.local.set({
           lastConversationIntake: {
             at: new Date().toISOString(),
             externalThreadRef: message.externalThreadRef || null,
             buyerName: message.buyerName || null,
             currentMessage: message.currentMessage || null,
-            suggestedReplyReceived: !!(response?.suggestedReply || response?.data?.suggestedReply),
+            suggestedReplyReceived: !!suggestedReply,
+            suggestedReply: suggestedReply || null,
+            suggestedReplyPreview: suggestedReply ? String(suggestedReply).slice(0, 240) : "",
             skipped: false,
           },
         });
