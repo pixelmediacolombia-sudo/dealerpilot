@@ -277,6 +277,7 @@ type SalesReplyStage =
   | "request_phone"
   | "phone_received"
   | "address_request"
+  | "inventory_options"
   | "document_requirements"
   | "clean_title"
   | "warranty_info"
@@ -319,6 +320,12 @@ function buyerAskedDocumentRequirements(latest: string): boolean {
   return /\b(?:q|que|qu[eé]|what).{0,50}(?:necesit|need|required|requisit|document).{0,140}(?:aplicar|apply|application|financ|finance|financing)?\b/i.test(latest) ||
     /\b(?:requisitos?|requirements?|documentos?|documents?).{0,140}(?:aplicar|apply|application|financ|finance|financing)\b/i.test(latest) ||
     /\b(?:pasaporte|passport|tax\s*id|itin|identificaci[oó]n|id|cuenta bancaria|bank account).{0,140}(?:aplicar|apply|application|financ|finance|financing|necesit|need|required)\b/i.test(latest);
+}
+
+function buyerAskedInventoryOptions(latest: string): boolean {
+  return /\b(?:tiene(?:n)?|hay|tendrian|manejan|ofrecen).{0,60}(?:mas|otros?|otras?|opciones?|disponibles?)\b/i.test(latest) ||
+    /\b(?:mas|otros?|otras?|opciones?|disponibles?).{0,60}(?:tiene(?:n)?|hay|manejan|ofrecen)\b/i.test(latest) ||
+    /\b(?:solo eso|solamente eso|nada mas|alguno mas|alguna mas|otro similar|otra opcion|otras opciones|more available|more options|other options|anything else|only that|only this|similar options)\b/i.test(latest);
 }
 
 function buyerAskedDetailedVehicleInfo(latest: string): boolean {
@@ -380,6 +387,7 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
     return "request_phone";
   }
   if (buyerAskedDocumentRequirements(latest)) return "document_requirements";
+  if (buyerAskedInventoryOptions(latestIntent)) return "inventory_options";
   if (historyAskedAboutFinancing(history) && buyerAcceptedFinancingStep(latest)) {
     return "financing_intro";
   }
@@ -444,6 +452,9 @@ function buildSafeFallbackReply(
     if (stage === "address_request") {
       return `Nuestra dirección es: ${storeAddress}. ¿Te gustaría venir a ver el ${vehicle} o te interesa financiarlo?`;
     }
+    if (stage === "inventory_options") {
+      return `Sí, tenemos más vehículos disponibles además del ${vehicle}. ¿Te interesa financiar este vehículo o quieres ver opciones similares?`;
+    }
     if (stage === "document_requirements") {
       const detailBridge = buyerAskedDetailedVehicleInfo(currentMessage)
         ? " Con gusto podemos confirmar esos detalles contigo."
@@ -477,6 +488,9 @@ function buildSafeFallbackReply(
   }
   if (stage === "address_request") {
     return `Our address is: ${storeAddress}. Would you like to come see the ${vehicle} or are you interested in financing it?`;
+  }
+  if (stage === "inventory_options") {
+    return `Yes, we have more vehicles available besides the ${vehicle}. Are you interested in financing this vehicle or would you like to see similar options?`;
   }
   if (stage === "document_requirements") {
     const detailBridge = buyerAskedDetailedVehicleInfo(currentMessage)
@@ -519,6 +533,12 @@ function isAiReplyAligned(reply: string, stage: SalesReplyStage, storePhone: str
   }
   if (stage === "phone_received") {
     return /call|contact|llam|comunicar/.test(normalized);
+  }
+  if (stage === "inventory_options") {
+    const normalizedIntent = normalizeIntentText(reply);
+    return /\b(?:more vehicles|more options|similar options|mas vehiculos|mas opciones|opciones similares)\b/.test(normalizedIntent) &&
+      /financ|financiar|financiamiento/.test(normalizedIntent) &&
+      !/id|tax id|passport|pasaporte|bank account|cuenta bancaria|requisitos|requirements|phone|number|telefono|numero/.test(normalizedIntent);
   }
   if (stage === "document_requirements") {
     return /\b(id|tax\s*id|passport|pasaporte)\b/.test(normalized) &&
@@ -625,6 +645,7 @@ You are a warm, helpful, and professional sales representative speaking directly
 
 CONVERSATION FUNNEL:
 1. Initial availability inquiry: greet with "Hello, this is Alpha Motorsports" / "Hola, somos Alpha Motorsports", explicitly confirm that the specific vehicle from the Vehicle field is available, then ask whether the buyer is interested in financing it. Always name the year, make, and model. Do not ask for a phone number.
+1a. If the buyer asks whether there are more vehicles, other options, similar vehicles, or "only that one", confirm that Alpha Motorsports has more vehicles available, then continue the flow by asking whether they are interested in financing this vehicle or seeing similar options. Do not ask for requirements yet.
 2. If the buyer says they are interested in financing, do not ask for the phone number yet. Explain the basic requirements: ID and active bank account; passport or Tax ID works. Ask if they have those requirements.
 3. If the buyer asks what requirements/documents are needed to apply, answer the requirements first: ID and active bank account; passport or Tax ID works. Ask if they have those requirements. Do not ask for a phone number in this same reply.
 4. Only after the buyer confirms they have the requirements or explicitly wants to continue with the application, ask for the buyer's best phone number and include Alpha's dealership phone as an immediate call option.
@@ -744,6 +765,7 @@ export async function generateAiReply(
     request_phone: `Ask for the buyer's best phone number so we can help them. End with Alpha's dealership phone as an immediate call option: ${storePhone}.`,
     phone_received: `A phone number was provided. Thank the buyer warmly, say "we will contact you shortly," and optionally offer ${storePhone} as an immediate call option. Do not transfer them to or mention a separate sales team.`,
     address_request: `The buyer is asking for the address or directions. Provide the dealership address and invite them to visit, then ask whether they are interested in financing. Do NOT ask clarifying questions.`,
+    inventory_options: "The buyer is asking whether more vehicles or similar options are available. Confirm that more vehicles are available, then ask whether they are interested in financing this vehicle or seeing similar options. Do not ask for requirements yet.",
     document_requirements: "The buyer is asking what is needed to apply. Reply warmly with the requirements: ID and an active bank account; passport or Tax ID works. If they also ask price, miles, or other details, do not provide those values; kindly say we will be happy to confirm them. Ask if they have those requirements. Do not ask for a phone number yet.",
     clean_title: "Confirm that the vehicle has a clean title, then ask whether the buyer is interested in financing it. Do not ask for a phone number.",
     warranty_info: "The buyer is asking detailed warranty questions. Respond warmly and do not invent warranty terms. Say we will be happy to confirm the exact warranty or coverage details; then continue the funnel by asking whether they are interested in financing. Do not mention a separate team or ask for a phone number.",
