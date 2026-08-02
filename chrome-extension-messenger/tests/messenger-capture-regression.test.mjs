@@ -155,6 +155,63 @@ test("open chat visible buyer messages win over stale inbox preview", () => {
   ]);
 });
 
+test("messages route accepts Marketplace thread when buyer name contains digits", () => {
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 620, top: 260, width: 620, height: 560 },
+    children: [
+      new FakeElement({
+        attributes: { dir: "auto" },
+        text: "Roberto Dj 503 \u00b7 Buyer",
+        rect: { left: 40, right: 235, top: 500, width: 195, height: 24 },
+      }),
+      new FakeElement({
+        attributes: { dir: "auto" },
+        text: "Buenos días. ¿Sigue disponible?",
+        rect: { left: 40, right: 290, top: 520, width: 250, height: 48 },
+      }),
+      new FakeElement({
+        attributes: { dir: "auto" },
+        text: "Sí, claro",
+        rect: { left: 40, right: 145, top: 760, width: 105, height: 40 },
+      }),
+    ],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 420, right: 1085, top: 180, width: 665, height: 800 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Roberto Dj 503 · 2020 Toyota SIENNA",
+        rect: { left: 460, right: 980, top: 200, width: 520, height: 32 },
+      }),
+      new FakeElement({ text: "Marketplace $21,999 - 2020 Toyota SIENNA" }),
+      new FakeElement({
+        tagName: "a",
+        attributes: { href: "/marketplace/item/1437407108214504/" },
+        text: "View listing",
+      }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 520, right: 1000, top: 910, width: 480, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root, [], "/messages/t/1526036699324530");
+
+  assert.equal(capture.evidence.threadRootDetected, true);
+  assert.equal(capture.buyerName, "Roberto Dj 503");
+  assert.equal(capture.evidence.selectedHeaderText, "Roberto Dj 503 · 2020 Toyota SIENNA");
+  assert.deepEqual(JSON.parse(JSON.stringify(capture.messages)), [
+    { speaker: "Roberto Dj 503", text: "Buenos días. ¿Sigue disponible?" },
+    { speaker: "Roberto Dj 503", text: "Sí, claro" },
+  ]);
+  assert.equal(capture.messages.some((message) => message.text === "Roberto Dj 503 \u00b7 Buyer"), false);
+});
+
 test("AI reply text is not accepted as buyer name or buyer message", () => {
   const aiReply = "Yes - the car is still available. Are you interested in our easy financing options?";
   const scope = new FakeElement({

@@ -55,6 +55,9 @@ test("manifest loads only Messenger AI runtime files", () => {
     "https://www.facebook.com/messages/t/*",
     "https://web.facebook.com/messages/t/*",
     "https://facebook.com/messages/t/*",
+    "https://www.facebook.com/marketplace/inbox*",
+    "https://web.facebook.com/marketplace/inbox*",
+    "https://facebook.com/marketplace/inbox*",
   ]);
   assert.equal(manifest.background.service_worker, "background.js");
 });

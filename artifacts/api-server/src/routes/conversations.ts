@@ -119,6 +119,7 @@ function isUiConversationText(value: string): boolean {
   const normalized = value.toLowerCase().replace(/[.。:;,\-–—]+$/g, "").trim();
   if (!normalized) return true;
   if (UI_MESSAGE_TEXT.has(normalized)) return true;
+  if (isParticipantLabelText(value)) return true;
   if (/^(enter|escape|tab|shift|control|option|command|alt)\b/i.test(normalized)) return true;
   if (/^(write to|saved|compose|mute|search|customize chat|chat members|mark as pending|more options|say something about this|anyone can|this group consist)\b/i.test(normalized)) return true;
   if (/^(older listings will be deleted|high net cars available|recent media|see all)\b/i.test(normalized)) return true;
@@ -127,6 +128,11 @@ function isUiConversationText(value: string): boolean {
   if (/^[a-z][\w .'-]{1,60}\s+-\s+(19|20)\d{2}\s+/i.test(normalized)) return true;
   if (/^[A-Z][A-Za-zÀ-ÿ'’-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'’-]+){1,2}$/.test(value.trim())) return true;
   return false;
+}
+
+function isParticipantLabelText(value: string): boolean {
+  const normalized = normalizeIntentText(value);
+  return /^[\p{L}\p{N}][\p{L}\p{N}\s.'’_-]{1,100}\s*(?:\u00b7|\u2022|\|)\s*(?:buyer|seller|participant|miembro|comprador|vendedor)$/u.test(normalized);
 }
 
 function parseConversationMessage(value: unknown): ParsedConversationMessage | null {

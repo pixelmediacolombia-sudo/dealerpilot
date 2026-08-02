@@ -67,6 +67,8 @@ test("extractThreadId accepts every dynamic Facebook messages thread id", () => 
   assert.equal(api.extractThreadId("/messages/t/9988776655/"), "9988776655");
   assert.equal(api.extractThreadId("/marketplace/inbox"), "");
   assert.equal(api.isMessagesThreadRoute("/messages/t/123456"), true);
+  assert.equal(api.isMarketplaceInboxRoute("/marketplace/inbox"), true);
+  assert.equal(api.isSupportedConversationRoute("/marketplace/inbox"), true);
 });
 
 test("thread discovery keeps DOM order and distinguishes incoming from outgoing previews", () => {
@@ -196,6 +198,39 @@ test("a persisted active thread stays ahead of later queued threads after naviga
   await controller.whenIdle();
 
   assert.deepEqual(order, ["101", "202"]);
+});
+
+test("Marketplace inbox queues the visible active conversation without a messages route id", async () => {
+  const api = loadApi();
+  const locationRef = {
+    origin: "https://www.facebook.com",
+    pathname: "/marketplace/inbox",
+    href: "https://www.facebook.com/marketplace/inbox",
+  };
+  const documentRef = {
+    body: {},
+    querySelectorAll() {
+      return [];
+    },
+  };
+  let receivedOptions = null;
+  const controller = api.start({
+    documentRef,
+    locationRef,
+    sessionStorageRef: { getItem() { return null; }, setItem() {} },
+    sleepFn: async () => {},
+    async processThread(options) {
+      receivedOptions = options;
+      return { autoSent: true };
+    },
+  });
+
+  await controller.whenIdle();
+
+  assert.equal(receivedOptions?.automatic, true);
+  assert.equal(receivedOptions?.expectedThreadId, "");
+  assert.equal(controller.getState().lastDiscoveredThreadId, "active-marketplace-inbox");
+  assert.equal(controller.getState().currentThreadId, null);
 });
 
 test("buyer_message_missing is terminal so an idle active thread does not retry forever", async () => {

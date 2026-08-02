@@ -48,7 +48,7 @@
   function isFacebookMessagesThreadRoute(pathname = location.pathname, hostname = location.hostname) {
     const path = String(pathname || "");
     return isFacebookHost(hostname) &&
-      /^\/messages\/t\/[^/?#]+\/?$/i.test(path);
+      (/^\/messages\/t\/[^/?#]+\/?$/i.test(path) || /^\/marketplace\/inbox\/?$/i.test(path));
   }
 
   function getCurrentThreadId(pathname = location.pathname) {

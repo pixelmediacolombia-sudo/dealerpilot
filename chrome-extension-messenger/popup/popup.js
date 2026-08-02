@@ -67,7 +67,11 @@
         : "Suggest only";
 
     setDebugValue("dbg-mode", mode, settings.autoReplyEnabled ? "warn" : "ok");
-    setDebugValue("dbg-stage", debug.stage || "Never", debug.stage === "intake_ok" ? "ok" : debug.reason ? "err" : "");
+    setDebugValue(
+      "dbg-stage",
+      debug.stage ? `${debug.stage}${debug.reason ? `: ${debug.reason}` : ""}` : "Never",
+      debug.stage === "intake_ok" ? "ok" : debug.reason ? "err" : "",
+    );
     setDebugValue(
       "dbg-seller",
       debug.sellerProfileMatched ? `${debug.sellerProfileName || "Matched"} ✓` : debug.sellerProfileName || "Not matched",

@@ -38,6 +38,14 @@
     return /^\/messages\/t\/[^/?#]+\/?$/i.test(String(pathname || ""));
   }
 
+  function isMarketplaceInboxRoute(pathname = globalThis.location?.pathname || "") {
+    return /^\/marketplace\/inbox\/?$/i.test(String(pathname || ""));
+  }
+
+  function isSupportedConversationRoute(pathname = globalThis.location?.pathname || "") {
+    return isMessagesThreadRoute(pathname) || isMarketplaceInboxRoute(pathname);
+  }
+
   function normalizePreviewSignature(value) {
     return cleanText(value)
       .replace(/\s*[·•|]\s*(?:\d+\s*(?:s|m|h|d|w)|yesterday|ayer)$/i, "")
@@ -295,6 +303,7 @@
 
     async function switchToThread(target) {
       const currentId = extractThreadId(locationRef.href || locationRef.pathname, locationRef.origin);
+      if (target.syntheticActiveThread && isMarketplaceInboxRoute(locationRef.pathname)) return true;
       if (currentId === target.threadId) return true;
       if (typeof options.navigate === "function") {
         await options.navigate(target);
@@ -316,7 +325,7 @@
 
     async function processQueuedThread(target) {
       lastDiscoveredThreadId = target.threadId;
-      if (!isMessagesThreadRoute(locationRef.pathname)) {
+      if (!isSupportedConversationRoute(locationRef.pathname)) {
         return { skipped: true, reason: "route_not_allowed" };
       }
       if (!await switchToThread(target)) {
@@ -325,7 +334,10 @@
       await sleepFn(THREAD_SETTLE_MS);
       let result = null;
       for (let attempt = 0; attempt < PROCESS_MAX_ATTEMPTS; attempt += 1) {
-        result = await processThread({ automatic: true, expectedThreadId: target.threadId });
+        result = await processThread({
+          automatic: true,
+          expectedThreadId: target.syntheticActiveThread ? "" : target.threadId,
+        });
         const retryable = RETRYABLE_PROCESS_REASONS.has(result?.reason);
         if (!retryable) break;
         await sleepFn(PROCESS_RETRY_MS);
@@ -337,7 +349,7 @@
     const queue = createFifoThreadQueue(processQueuedThread, persist);
 
     function observeTarget(target, reason) {
-      if (!isMessagesThreadRoute(locationRef.pathname)) return;
+      if (!isSupportedConversationRoute(locationRef.pathname)) return;
       if (!target) return;
       const previous = previewById.get(target.threadId);
       previewById.set(target.threadId, target.signature);
@@ -349,7 +361,7 @@
     }
 
     function scan(reason = "scan") {
-      if (!isMessagesThreadRoute(locationRef.pathname)) return [];
+      if (!isSupportedConversationRoute(locationRef.pathname)) return [];
       const targets = collectThreadTargets(documentRef, {
         origin: locationRef.origin,
         sellerProfileNames: options.sellerProfileNames || [],
@@ -360,13 +372,17 @@
 
     function queueCurrentThread(reason) {
       const threadId = extractThreadId(locationRef.href || locationRef.pathname, locationRef.origin);
-      if (!threadId) return;
+      const syntheticActiveThread = !threadId && isMarketplaceInboxRoute(locationRef.pathname);
+      if (!threadId && !syntheticActiveThread) return;
       queue.enqueue({
-        threadId,
-        url: new URL(`/messages/t/${encodeURIComponent(threadId)}`, locationRef.origin).href,
-        signature: `active:${threadId}`,
+        threadId: threadId || "active-marketplace-inbox",
+        url: threadId
+          ? new URL(`/messages/t/${encodeURIComponent(threadId)}`, locationRef.origin).href
+          : locationRef.href || new URL("/marketplace/inbox", locationRef.origin).href,
+        signature: threadId ? `active:${threadId}` : `active-marketplace-inbox:${reason}`,
         incomingPreview: true,
         explicitUnread: false,
+        syntheticActiveThread,
         reason,
         observedAt: Date.now(),
       });
@@ -400,7 +416,7 @@
     if (
       !initialQueueState.activeThreadId &&
       !initialQueueState.pendingThreadIds.length &&
-      isMessagesThreadRoute(locationRef.pathname)
+      isSupportedConversationRoute(locationRef.pathname)
     ) {
       queueCurrentThread("active_thread_start");
     }
@@ -465,6 +481,8 @@
     describeThreadAnchor,
     extractThreadId,
     isMessagesThreadRoute,
+    isMarketplaceInboxRoute,
+    isSupportedConversationRoute,
     isOutgoingPreview,
     normalizePreviewSignature,
     start,

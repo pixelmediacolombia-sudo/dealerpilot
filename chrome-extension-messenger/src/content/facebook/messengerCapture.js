@@ -67,9 +67,15 @@
     const text = cleanMessageText(value);
     if (!text) return true;
     if (isFacebookRatingCardText(text)) return true;
+    if (isParticipantLabelText(text)) return true;
     if (/^[A-Za-zÀ-ÿ'’ -]+ · (?:Buyer|Seller|Participant|Miembro|Comprador|Vendedor)$/i.test(text)) return true;
     return /^(?:message sent|mensaje enviado)?\s*(?:at\s+)?(?:\d{1,2}:\d{2}|\d{1,2})\s*(?:am|pm)?\s+(?:by|por)\s+[^:]{1,80}\.?$/i.test(text) ||
       /^[^.]{2,80}\s+(?:started|inici[oó])\s+(?:this|este)\s+chat\.?$/i.test(text);
+  }
+
+  function isParticipantLabelText(value) {
+    const normalized = normalizeForMatch(value);
+    return /^[\p{L}\p{N}][\p{L}\p{N}\s.'’_-]{1,100}\s*(?:\u00b7|\u2022|\|)\s*(?:buyer|seller|participant|miembro|comprador|vendedor)$/u.test(normalized);
   }
 
   function isFacebookRatingCardText(value) {
@@ -122,6 +128,107 @@
     return element?.getBoundingClientRect?.() || { left: 0, right: 0, top: 0, width: 0, height: 0 };
   }
 
+  function safeNumber(value) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  }
+
+  function imageBubbleDescriptor(img) {
+    let node = img?.parentElement || null;
+    for (let depth = 0; node && depth < 8; depth += 1, node = node.parentElement) {
+      const ariaLabel = node.getAttribute?.("aria-label") || "";
+      const testId = node.getAttribute?.("data-testid") || "";
+      if (
+        /(?:message|mensaje|photo|foto|imagen|image|sticker|pegatina)/i.test(ariaLabel) ||
+        /(?:message|attachment|image|photo|sticker)/i.test(testId)
+      ) {
+        return {
+          element: node,
+          ariaLabel,
+          testId,
+          role: node.getAttribute?.("role") || "",
+          textPreview: cleanMessageText(textOf(node)).slice(0, 120),
+        };
+      }
+    }
+    return null;
+  }
+
+  function collectImageCandidates(scope, root) {
+    const source = scope || root || null;
+    if (!source?.querySelectorAll) return [];
+    const elements = Array.from(source.querySelectorAll?.('img[src], img[data-src]') || []);
+    const candidates = [];
+    for (const img of elements) {
+      if (!isVisible(img)) continue;
+      const src = img.currentSrc || img.src || img.getAttribute?.("src") || "";
+      const dataSrc = img.getAttribute?.("data-src") || "";
+      const naturalWidth = safeNumber(img.naturalWidth);
+      const naturalHeight = safeNumber(img.naturalHeight);
+      const rect = rectOf(img);
+      const ariaLabel = img.getAttribute?.("aria-label") || "";
+      const alt = img.getAttribute?.("alt") || "";
+      const testId = img.getAttribute?.("data-testid") || "";
+      const role = img.getAttribute?.("role") || "";
+      const title = img.getAttribute?.("title") || "";
+      const descriptor = [ariaLabel, alt, testId, role, title].join(" ");
+      const bubble = imageBubbleDescriptor(img);
+      const ownDescriptorMatches = /(?:message|mensaje|photo|foto|imagen|image|sticker|pegatina)/i.test(descriptor);
+      const emojiLike = /emoji/i.test(descriptor) ||
+        (naturalWidth !== null && naturalWidth <= 40 && naturalHeight !== null && naturalHeight <= 40);
+      const profileLike = /(?:profile|avatar|perfil)/i.test(descriptor) ||
+        (naturalWidth !== null && naturalWidth <= 48 && !bubble && rect.width <= 48);
+      const stickerLike = /(?:sticker|pegatina)/i.test(descriptor);
+      const inMessageBubble = !!bubble || ownDescriptorMatches;
+      candidates.push({
+        src: String(src).slice(0, 300),
+        dataSrc: String(dataSrc).slice(0, 300),
+        alt,
+        ariaLabel,
+        dataTestId: testId,
+        role,
+        title,
+        naturalWidth,
+        naturalHeight,
+        width: rect.width,
+        height: rect.height,
+        top: rect.top || 0,
+        emojiLike,
+        profileLike,
+        stickerLike,
+        inMessageBubble,
+        bubbleAriaLabel: bubble?.ariaLabel || "",
+        bubbleTestId: bubble?.testId || "",
+        bubbleRole: bubble?.role || "",
+        bubbleTextPreview: bubble?.textPreview || "",
+        outerHtml: String(img.outerHTML || "").slice(0, 320),
+      });
+    }
+    return candidates.sort((left, right) => left.top - right.top);
+  }
+
+  function readImageMessages(scope, buyerName, candidates) {
+    const images = (candidates || collectImageCandidates(scope, scope))
+      .filter((img) => img.inMessageBubble && !img.emojiLike && !img.profileLike);
+    return images.map((img) => {
+      const caption = img.alt && !/^https?:/i.test(img.alt)
+        ? `: ${cleanDisplayName(img.alt).slice(0, 60)}`
+        : "";
+      return {
+        speaker: buyerName || "Buyer",
+        text: `[Imagen${caption}]`,
+        __top: img.top || 0,
+        image: {
+          src: img.src,
+          dataSrc: img.dataSrc,
+          alt: img.alt,
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        },
+      };
+    });
+  }
+
   function isComposer(element) {
     if (!element || !isVisible(element)) return false;
     const descriptor = [
@@ -164,7 +271,7 @@
 
   function hasThreadEvidence(root, marketplaceRoute, messagesThreadRoute) {
     return messagesThreadRoute
-      ? hasActiveBuyerVehicleHeader(root)
+      ? hasActiveBuyerVehicleHeader(root) || hasMarketplaceEvidence(root, marketplaceRoute)
       : hasMarketplaceEvidence(root, marketplaceRoute);
   }
 
@@ -492,6 +599,7 @@
         leftGap > rightGap + minDealerOffset &&
         rect.left > scopeRect.left + (scopeRect.width * 0.35);
       if (!text || text.length < 2 || UI_TEXT.test(text)) continue;
+      if (isParticipantLabelText(normalizedText)) continue;
       if (/^[\p{L}][\p{L}\s.'’\-]{1,80}\s*(?:[\u00b7\u2022|]|Â·|â€¢)\s*buyer$/u.test(normalizedText)) continue;
       if (isLikelyAutoReplyText(text) && !clearlyRightAligned) continue;
       rows.push({ top: rect.top, speaker: clearlyRightAligned ? "Dealer" : (buyerName || "Buyer"), text });
@@ -569,8 +677,13 @@
     }
     const buyerToken = normalizeForMatch(buyerName);
     const sellerTokens = (sellerNameCandidates || []).map(normalizeForMatch).filter(Boolean);
-    const orderedMessages = finalMessages
-      .sort((left, right) => (left.__top ?? Number.MAX_SAFE_INTEGER) - (right.__top ?? Number.MAX_SAFE_INTEGER))
+    const imageCandidates = collectImageCandidates(scope, root);
+    const imageMessages = scope ? readImageMessages(scope, buyerName, imageCandidates) : [];
+    const mergedMessages = [
+      ...finalMessages.map((message) => ({ ...message })),
+      ...imageMessages,
+    ].sort((left, right) => (left.__top ?? Number.MAX_SAFE_INTEGER) - (right.__top ?? Number.MAX_SAFE_INTEGER));
+    const orderedMessages = mergedMessages
       .map((message) => ({ speaker: message.speaker, text: message.text }))
       .filter((message) => {
         const token = normalizeForMatch(message.text);
@@ -578,11 +691,13 @@
           !(buyerToken && token === buyerToken) &&
           !sellerTokens.includes(token);
       });
+    const latest = orderedMessages.at(-1);
     return {
       root,
       scope,
       buyerName,
       messages: orderedMessages,
+      imageMessages,
       evidence: {
         threadRootDetected: !!root,
         messageScopeDetected: !!scope,
@@ -591,9 +706,13 @@
         selectedRootRect: rectOf(root),
         selectedScopeRect: rectOf(scope),
         messageCandidateCount: semantic.length || (scope ? bubbleTextCandidates(scope).length : 0),
+        imageCandidateCount: imageCandidates.length,
+        imageMessageCount: imageMessages.length,
+        imageCandidates: imageCandidates.slice(0, 12),
+        latestIsImage: !!latest && /^\[imagen/.test(normalizeForMatch(latest.text)),
         inboxPreviewFallback: !!inboxPreview,
         extractionMode: semantic.length ? "semantic" : finalMessages.length ? inboxPreview ? "visual_bubbles_inbox_preview" : "visual_bubbles" : "none",
-        latestMessageDirection: orderedMessages.at(-1)?.speaker === "Dealer" ? "dealer" : orderedMessages.length ? "buyer" : "none",
+        latestMessageDirection: latest?.speaker === "Dealer" ? "dealer" : orderedMessages.length ? "buyer" : "none",
       },
     };
   }
@@ -616,5 +735,8 @@
     findThreadRoots,
     findMessageScope,
     readVisualMessages,
+    collectImageCandidates,
+    readImageMessages,
+    imageBubbleDescriptor,
   });
 })();

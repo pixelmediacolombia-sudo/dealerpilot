@@ -565,6 +565,8 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /Nuestra dirección es: \$\{storeAddress\}/);
   assert.match(conversationsSource, /9120 Euclid Ave, Manassas, VA 20110/);
   assert.match(conversationsSource, /UI_MESSAGE_TEXT/);
+  assert.match(conversationsSource, /isParticipantLabelText/);
+  assert.match(conversationsSource, /buyer\|seller\|participant\|miembro\|comprador\|vendedor/);
   assert.match(conversationsSource, /send in messenger/);
   assert.match(conversationsSource, /anyone can find this group/);
   assert.match(conversationsSource, /isReliableBuyerName/);

@@ -247,7 +247,8 @@ function createHarness({
         return url.pathname.match(/^\/messages\/t\/([^/?#]+)\/?$/i)?.[1] || "";
       },
       isMessagesThreadRoute(pathname) {
-        return /^\/messages\/t\/[^/?#]+\/?$/i.test(pathname || "");
+        return /^\/messages\/t\/[^/?#]+\/?$/i.test(pathname || "") ||
+          /^\/marketplace\/inbox\/?$/i.test(pathname || "");
       },
     },
     DealerPilotMessengerCapture: {
@@ -427,7 +428,7 @@ test("only Facebook messages thread routes are authorized", () => {
   assert.equal(ai.isFacebookMessagesThreadRoute("/messages/t/123", "www.facebook.com"), true);
   assert.equal(ai.isFacebookMessagesThreadRoute("/messages/t/456", "web.facebook.com"), true);
   assert.equal(ai.isFacebookMessagesThreadRoute("/messages/t/789", "facebook.com"), true);
-  assert.equal(ai.isFacebookMessagesThreadRoute("/marketplace/inbox", "www.facebook.com"), false);
+  assert.equal(ai.isFacebookMessagesThreadRoute("/marketplace/inbox", "www.facebook.com"), true);
   assert.equal(ai.isFacebookMessagesThreadRoute("/marketplace/you/selling", "www.facebook.com"), false);
   assert.equal(ai.isFacebookMessagesThreadRoute("/messages/t/123", "www.messenger.com"), false);
   assert.equal(ai.isFacebookMessagesThreadRoute("/", "www.facebook.com"), false);

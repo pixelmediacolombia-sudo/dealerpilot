@@ -17,6 +17,10 @@ class FakeElement {
     this.children = children;
     this.parentElement = null;
     this.rect = rect || { left: 0, right: 100, top: 0, width: 100, height: 20 };
+    this.naturalWidth = rect?.width ?? null;
+    this.naturalHeight = rect?.height ?? null;
+    this.currentSrc = attributes.src ?? null;
+    this.outerHTML = this.tagName === "IMG" ? `<img src="${attributes.src || ""}" alt="${attributes.alt || ""}">` : `<${this.tagName}>`;
     for (const child of children) child.parentElement = this;
   }
 
@@ -66,6 +70,9 @@ class FakeElement {
     if (selector.includes("[data-lexical-text]")) return this.attributes["data-lexical-text"] !== undefined;
     if (selector.includes('a[href*="/marketplace/item/"]')) {
       return this.tagName === "A" && /\/marketplace\/item\//.test(this.attributes.href || "");
+    }
+    if (selector === "img[src]" || selector === "img[data-src]" || selector === "img[src], img[data-src]") {
+      return this.tagName === "IMG";
     }
     return false;
   }
@@ -558,4 +565,95 @@ test("message rows that are only the buyer name label are dropped from history",
 
   assert.deepEqual(messages, [{ speaker: "Hector", text: "Cuál es el precio en cash?" }]);
   assert.equal(capture.evidence.latestMessageDirection, "buyer");
+});
+
+test("captureFromRoot records buyer image messages from visible <img> bubbles", () => {
+  const imageBubble = new FakeElement({
+    tagName: "img",
+    attributes: {
+      src: "https://scontent.fnqz1-1.fna.fbcdn.net/v/t1.6435-9/photo.jpg",
+      alt: "Foto del VIN",
+    },
+    rect: { left: 60, right: 260, top: 560, width: 200, height: 150 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [imageBubble],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Hector · 2022 Ford F150 Lightning",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const messages = JSON.parse(JSON.stringify(capture.messages));
+
+  assert.equal(capture.evidence.imageCandidateCount, 1);
+  assert.equal(capture.evidence.imageMessageCount, 1);
+  assert.equal(capture.evidence.latestIsImage, true);
+  assert.deepEqual(messages, [{ speaker: "Hector", text: "[Imagen: Foto del VIN]" }]);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(capture.imageMessages.map((message) => message.image))),
+    [{
+      src: "https://scontent.fnqz1-1.fna.fbcdn.net/v/t1.6435-9/photo.jpg",
+      dataSrc: "",
+      alt: "Foto del VIN",
+      width: 200,
+      height: 150,
+    }],
+  );
+});
+
+test("collectImageCandidates flags emoji and profile images so they are excluded", () => {
+  const emoji = new FakeElement({
+    tagName: "img",
+    attributes: { src: "emoji.png", alt: "👍", role: "img" },
+    rect: { left: 70, right: 90, top: 400, width: 20, height: 20 },
+  });
+  const profile = new FakeElement({
+    tagName: "img",
+    attributes: { src: "profile.jpg", alt: "Hector" },
+    rect: { left: 10, right: 50, top: 200, width: 40, height: 40 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [emoji, profile],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Hector · 2022 Ford F150 Lightning",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const candidates = JSON.parse(JSON.stringify(capture.evidence.imageCandidates));
+
+  assert.equal(capture.evidence.imageMessageCount, 0);
+  assert.equal(candidates[0].emojiLike, true);
+  assert.equal(candidates[1].profileLike, true);
 });
