@@ -280,6 +280,8 @@ function parseTimestamp(value: unknown): Date | null {
 type SalesReplyStage =
   | "availability"
   | "financing_intro"
+  | "financing_declined"
+  | "cash_visit_request_phone"
   | "request_phone"
   | "phone_received"
   | "address_request"
@@ -312,6 +314,22 @@ function historyGaveFinancingRequirements(history: string): boolean {
 
 function historyRequestedPhone(history: string): boolean {
   return /\b(?:dealer|dealerpilot ai|assistant):[\s\S]{0,280}\b(?:best phone number|phone number|n[uú]mero de tel[eé]fono|tel[eé]fono)\b/i.test(history);
+}
+
+function historyAskedCashOrVisit(history: string): boolean {
+  return /\b(?:dealer|dealerpilot ai|assistant):[\s\S]{0,320}\b(?:purchase cash|pay cash|cash purchase|come see|visit|venir a ver|comprar de contado|pagar en efectivo)\b/i.test(history);
+}
+
+function buyerDeclinedFinancing(latest: string, history: string): boolean {
+  const normalized = normalizeIntentText(latest);
+  const financingContext = historyAskedAboutFinancing(history) ||
+    /\b(?:financ(?:e|ing)?|loan|payment plan|financiar|financiamiento|credito)\b/i.test(normalized);
+  if (!financingContext) return false;
+  return /\b(?:no|nope|nah|not interested|not looking|not needed|don'?t need|do not need|don'?t want|do not want|no financing|cash buyer|pay(?:ing)? cash|cash|efectivo|contado|no necesito|no quiero|no me interesa|no estoy interesad[oa])\b/i.test(normalized);
+}
+
+function buyerAcceptedCashOrVisitStep(latest: string): boolean {
+  return /\b(?:yes|yeah|yep|sure|ok|okay|cash|pay(?:ing)? cash|cash buyer|come see|visit|stop by|appointment|cita|si|claro|efectivo|contado|venir|verlo|visitar)\b/i.test(normalizeIntentText(latest));
 }
 
 function buyerAcceptedFinancingStep(latest: string): boolean {
@@ -374,7 +392,7 @@ function replyIncludesStorePhone(reply: string, storePhone: string): boolean {
 }
 
 function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
-  return stage === "request_phone";
+  return stage === "request_phone" || stage === "cash_visit_request_phone";
 }
 
 function replyGivesRestrictedVehicleDetails(reply: string): boolean {
@@ -389,6 +407,10 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   const latestIntent = normalizeIntentText(currentMessage);
   const history = visibleMessages.map(cleanConversationText).join(" ").toLowerCase();
   if (hasPhoneNumber(latest)) return "phone_received";
+  if (historyAskedCashOrVisit(history) && buyerAcceptedCashOrVisitStep(latest)) {
+    return "cash_visit_request_phone";
+  }
+  if (buyerDeclinedFinancing(latest, history)) return "financing_declined";
   if (historyGaveFinancingRequirements(history) && buyerConfirmedRequirements(latest)) {
     return "request_phone";
   }
@@ -413,6 +435,7 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   }
   if (buyerAskedWarrantyInfo(latest)) return "warranty_info";
   if (buyerAskedAdvisorQuestion(latest)) return "advisor_question";
+  if (historyAskedCashOrVisit(history)) return "cash_visit_request_phone";
   if (historyRequestedPhone(history)) return "request_phone";
   if (!/\b(?:Dealer|DealerPilot AI|Assistant):/i.test(history)) return "availability";
   return "general";
@@ -447,6 +470,9 @@ function buildSafeFallbackReply(
     if (stage === "request_phone") {
       return `Perfecto. ¿Cuál es el mejor número de teléfono para ayudarte con el financiamiento del ${vehicle}? También puedes llamarnos al ${storePhone}.`;
     }
+    if (stage === "cash_visit_request_phone") {
+      return `Perfecto. Cual es el mejor numero de telefono para coordinar la visita o la compra del ${vehicle}? Tambien puedes llamarnos al ${storePhone}.`;
+    }
     if (stage === "availability") {
       return availabilityQuickReplyAccepted
         ? `Hola, somos Alpha Motorsports. Tenemos el ${vehicle} disponible. ¿Estás interesado en financiarlo?`
@@ -454,6 +480,9 @@ function buildSafeFallbackReply(
     }
     if (stage === "financing_intro") {
       return "Perfecto. Para aplicar solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuentas con esos requisitos?";
+    }
+    if (stage === "financing_declined") {
+      return `No hay problema, gracias por avisarnos. Planeas comprar de contado o te gustaria venir a ver el ${vehicle}?`;
     }
     if (stage === "address_request") {
       return `Nuestra dirección es: ${storeAddress}. ¿Te gustaría venir a ver el ${vehicle} o te interesa financiarlo?`;
@@ -484,6 +513,9 @@ function buildSafeFallbackReply(
   if (stage === "request_phone") {
     return `Great. What's the best phone number to help you with financing for the ${vehicle}? You can also call us at ${storePhone}.`;
   }
+  if (stage === "cash_visit_request_phone") {
+    return `Great. What's the best phone number to coordinate a visit or cash purchase for the ${vehicle}? You can also call us at ${storePhone}.`;
+  }
   if (stage === "availability") {
     return availabilityQuickReplyAccepted
       ? `Hello, this is Alpha Motorsports. We have the ${vehicle} available. Are you interested in financing it?`
@@ -491,6 +523,9 @@ function buildSafeFallbackReply(
   }
   if (stage === "financing_intro") {
     return "Perfect. To apply, you only need your ID and an active bank account; a passport or Tax ID works. Do you have those requirements?";
+  }
+  if (stage === "financing_declined") {
+    return `No problem, thanks for letting us know. Are you planning to purchase cash or would you like to come see the ${vehicle}?`;
   }
   if (stage === "address_request") {
     return `Our address is: ${storeAddress}. Would you like to come see the ${vehicle} or are you interested in financing it?`;
@@ -534,8 +569,18 @@ function isAiReplyAligned(reply: string, stage: SalesReplyStage, storePhone: str
       /requirements|requisitos|cuentas|tienes|have/.test(normalized) &&
       !/phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
   }
+  if (stage === "financing_declined") {
+    return /no problem|no hay problema|thanks|gracias/.test(normalized) &&
+      !/id|tax\s*id|passport|pasaporte|bank account|cuenta bancaria|requirements|requisitos/.test(normalized) &&
+      !/are you interested in financing|te interesa financiar|do you have those requirements|cuentas con esos requisitos/.test(normalized);
+  }
   if (stage === "request_phone") {
     return /phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
+  }
+  if (stage === "cash_visit_request_phone") {
+    return /phone|number|telefono|numero/.test(normalized) &&
+      /visit|cash|compra|visita/.test(normalized) &&
+      !/financing|finance|financiar|financiamiento|requirements|requisitos/.test(normalized);
   }
   if (stage === "phone_received") {
     return /call|contact|llam|comunicar/.test(normalized);
@@ -653,6 +698,7 @@ CONVERSATION FUNNEL:
 1. Initial availability inquiry: greet with "Hello, this is Alpha Motorsports" / "Hola, somos Alpha Motorsports", explicitly confirm that the specific vehicle from the Vehicle field is available, then ask whether the buyer is interested in financing it. Always name the year, make, and model. Do not ask for a phone number.
 1a. If the buyer asks whether there are more vehicles, other options, similar vehicles, or "only that one", confirm that Alpha Motorsports has more vehicles available, then continue the flow by asking whether they are interested in financing this vehicle or seeing similar options. Do not ask for requirements yet.
 2. If the buyer says they are interested in financing, do not ask for the phone number yet. Explain the basic requirements: ID and active bank account; passport or Tax ID works. Ask if they have those requirements.
+2a. If the buyer declines financing or says they do not need financing, do not ask about financing again and do not explain requirements. Thank them, ask whether they plan to purchase cash or would like to come see the vehicle, then continue by collecting a phone number if they say yes.
 3. If the buyer asks what requirements/documents are needed to apply, answer the requirements first: ID and active bank account; passport or Tax ID works. Ask if they have those requirements. Do not ask for a phone number in this same reply.
 4. Only after the buyer confirms they have the requirements or explicitly wants to continue with the application, ask for the buyer's best phone number and include Alpha's dealership phone as an immediate call option.
 5. If the buyer asks a detailed question about the vehicle, payment, warranty, coverage, deductible, inspection, or anything else not answered by the supplied context, do not invent details. Kindly say that Alpha Motorsports will be happy to confirm that detail, then ask whether they are interested in financing. Do not ask for a phone number or address in this reply.
@@ -768,6 +814,8 @@ export async function generateAiReply(
       ? "Greet as Alpha Motorsports, state that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number."
       : "Greet as Alpha Motorsports, explicitly confirm that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number.",
     financing_intro: "The buyer is interested in financing. Do not ask for a phone number yet. Explain the basic requirements: ID and an active bank account; passport or Tax ID works. Ask if they have those requirements.",
+    financing_declined: "The buyer declined financing. Do not ask about financing again and do not explain financing requirements. Thank them, then ask whether they plan to purchase cash or would like to come see the vehicle.",
+    cash_visit_request_phone: `The buyer is continuing without financing. Ask for the buyer's best phone number to coordinate a visit or cash purchase. Include Alpha's dealership phone as an immediate call option: ${storePhone}. Do not mention financing.`,
     request_phone: `Ask for the buyer's best phone number so we can help them. End with Alpha's dealership phone as an immediate call option: ${storePhone}.`,
     phone_received: `A phone number was provided. Thank the buyer warmly, say "we will contact you shortly," and optionally offer ${storePhone} as an immediate call option. Do not transfer them to or mention a separate sales team.`,
     address_request: `The buyer is asking for the address or directions. Provide the dealership address and invite them to visit, then ask whether they are interested in financing. Do NOT ask clarifying questions.`,

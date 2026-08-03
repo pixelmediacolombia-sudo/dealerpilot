@@ -450,6 +450,51 @@ test("messages thread selects buyer vehicle panel without a Marketplace link", (
   ]);
 });
 
+test("messages thread keeps latest outgoing bubble when Facebook log scope is clipped", () => {
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 376, right: 1505, top: 233, width: 1129, height: 420, bottom: 653 },
+    children: [
+      new FakeElement({
+        attributes: { "aria-label": "Message sent at 8:24 AM by Roberto Dj: Si, claro" },
+        text: "Si, claro",
+        rect: { left: 580, right: 690, top: 390, width: 110, height: 42 },
+      }),
+      new FakeElement({
+        attributes: { "aria-label": "Message sent: hola roberto a que numero podemos contactarnos contigo" },
+        text: "hola roberto a que numero podemos contactarnos contigo",
+        rect: { left: 1190, right: 1490, top: 620, width: 300, height: 42 },
+      }),
+    ],
+  });
+  const latestOutgoingOutsideLog = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "Buena pregunta. Con gusto podemos confirmar ese detalle del 2020 TOYOTA SIENNA. Te interesa financiarlo?",
+    rect: { left: 1148, right: 1500, top: 728, width: 352, height: 70 },
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Conversation" },
+    rect: { left: 376, right: 1505, top: 72, width: 1129, height: 760, bottom: 832 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Roberto Dj Â· 2020 Toyota SIENNA" }),
+      new FakeElement({ text: "Marketplace $21,999 - 2020 Toyota SIENNA" }),
+      scope,
+      latestOutgoingOutsideLog,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 700, right: 1450, top: 840, width: 750, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root, [], "/messages/t/1526036699324530");
+
+  assert.equal(capture.buyerName, "Roberto Dj");
+  assert.equal(capture.evidence.latestMessageDirection, "dealer");
+  assert.equal(capture.messages.at(-1).speaker, "Dealer");
+  assert.match(capture.messages.at(-1).text, /Buena pregunta/);
+});
+
 test("visual buyer bubble survives incomplete semantic Message sent metadata", () => {
   const scope = new FakeElement({
     attributes: { role: "log" },

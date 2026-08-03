@@ -607,6 +607,18 @@
     return rows.sort((a, b) => a.top - b.top).map(({ speaker, text, top }) => ({ speaker, text, __top: top }));
   }
 
+  function mergeVisualMessageLists(primary = [], secondary = []) {
+    const seen = new Set();
+    return [...primary, ...secondary]
+      .sort((left, right) => (left.__top ?? 0) - (right.__top ?? 0))
+      .filter((message) => {
+        const key = `${message.speaker || ""}:${normalizeForMatch(message.text)}`;
+        if (!normalizeForMatch(message.text) || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+
   function extractBuyerName(root) {
     const fallback = root?.getAttribute?.("aria-label") || "";
     const headerText = extractHeaderText(root);
@@ -649,7 +661,15 @@
       .filter(isVisible)
       .map((element) => parseDescriptor(element, sellerNameCandidates))
       .filter(Boolean);
-    const visualMessages = scope ? readVisualMessages(scope, buyerName) : [];
+    const scopedVisualMessages = scope ? readVisualMessages(scope, buyerName) : [];
+    const rootVisualMessages = root && scope && root !== scope
+      ? readVisualMessages(root, buyerName).filter((message) => {
+        const messageTop = message.__top ?? 0;
+        const scopeRect = rectOf(scope);
+        return messageTop < scopeRect.top - 10 || messageTop > scopeRect.bottom + 10;
+      })
+      : [];
+    const visualMessages = mergeVisualMessageLists(scopedVisualMessages, rootVisualMessages);
     const missingVisualMessages = semantic.length
       ? visualMessages.filter((message) =>
         !semantic.some((semanticMessage) =>
