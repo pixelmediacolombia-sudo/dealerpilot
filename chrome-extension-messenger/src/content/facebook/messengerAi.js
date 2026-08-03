@@ -113,6 +113,10 @@
     return /^(?:messenger|messages|notifications|settings(?:, help and more)?|open more actions|back to previous page|thread composer|choose an emoji|choose a sticker|choose a gif|compose|chats|aa|unread message|write a message|marketplace|see details|more options|send a quick response|tap a response|message sent|mensaje enviado|joined facebook(?: in \d{4})?|se uni[oó] a facebook(?: en \d{4})?)$/i.test(cleanText(value));
   }
 
+  function isMessageSentMetadata(value) {
+    return /^(?:message sent|mensaje enviado)(?:\s|$)/i.test(cleanText(value));
+  }
+
   function activeThreadHeaderDetected(snapshot) {
     if (!globalThis.DealerPilotMessengerAutonomy?.isMessagesThreadRoute?.(location.pathname)) return true;
     const header = cleanText(snapshot?.evidence?.selectedHeaderText || "");
@@ -667,10 +671,11 @@
       marketplaceHeaderContextDetected(snapshot);
     const sellerProfileDetected = !!cleanText(snapshot.sellerProfile.currentProfileName);
     const sellerIsCurrentUser = sellerProfileDetected ? snapshot.sellerProfile.matched === true : true;
+    const latestMessageIsMetadata = isMessageSentMetadata(snapshot.lastMessage?.text || "");
     const missing = [
       routeAllowed ? null : "route_not_allowed",
       conversationThreadDetected ? null : "conversation_thread_missing",
-      snapshot.buyerMessageDetected ? null : "buyer_message_missing",
+      snapshot.buyerMessageDetected && !latestMessageIsMetadata ? null : "buyer_message_missing",
       buyerNameDetected ? null : "buyer_name_missing",
       activeHeaderDetected ? null : "active_thread_header_missing",
       sellerIsCurrentUser ? null : "seller_profile_mismatch",
@@ -687,6 +692,7 @@
       sellerProfileDetected,
       sellerIsCurrentUser,
       marketplaceContextDetected,
+      latestMessageIsMetadata,
     };
   }
 
@@ -717,6 +723,7 @@
     if (area > 0 && area < 60000) score -= 180;
     if (isUiText(buyerName)) score -= 700;
     if (isUiText(currentMessage)) score -= 500;
+    if (validation.latestMessageIsMetadata || isMessageSentMetadata(currentMessage)) score -= 2000;
     if (!validation.activeThreadHeaderDetected) score -= 900;
     if (/^(?:settings|messenger|messages|notifications|chats)\b/i.test(buyerName)) score -= 1000;
     if (!header) score -= 120;

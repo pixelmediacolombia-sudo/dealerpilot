@@ -279,6 +279,7 @@ function parseTimestamp(value: unknown): Date | null {
 
 type SalesReplyStage =
   | "availability"
+  | "price_inquiry"
   | "financing_intro"
   | "financing_declined"
   | "cash_visit_request_phone"
@@ -346,6 +347,10 @@ function buyerAskedDocumentRequirements(latest: string): boolean {
     /\b(?:pasaporte|passport|tax\s*id|itin|identificaci[oó]n|id|cuenta bancaria|bank account).{0,140}(?:aplicar|apply|application|financ|finance|financing|necesit|need|required)\b/i.test(latest);
 }
 
+function buyerAskedPriceInquiry(latest: string): boolean {
+  return /\b(?:price|precio|cash price|precio cash|cu[aá]nto cuesta|cuanto cuesta|how much|what(?:'s| is).{0,40}price|valor)\b/i.test(latest);
+}
+
 function buyerAskedInventoryOptions(latest: string): boolean {
   return /\b(?:tiene(?:n)?|hay|tendrian|manejan|ofrecen).{0,60}(?:mas|otros?|otras?|opciones?|disponibles?)\b/i.test(latest) ||
     /\b(?:mas|otros?|otras?|opciones?|disponibles?).{0,60}(?:tiene(?:n)?|hay|manejan|ofrecen)\b/i.test(latest) ||
@@ -395,6 +400,29 @@ function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
   return stage === "request_phone" || stage === "cash_visit_request_phone";
 }
 
+function historyHasDealerReply(visibleMessages: string[]): boolean {
+  return visibleMessages.some((message) =>
+    /^(?:Dealer|DealerPilot AI|Assistant):/i.test(cleanConversationText(message)),
+  );
+}
+
+function isFirstDealerReply(visibleMessages: string[]): boolean {
+  return !historyHasDealerReply(visibleMessages);
+}
+
+function replyHasFirstGreeting(reply: string): boolean {
+  const normalized = normalizeIntentText(reply);
+  return /\b(?:hello|hola)\b/.test(normalized) && /\balpha\b/.test(normalized);
+}
+
+function withFirstReplyGreeting(reply: string, language: string, firstDealerReply: boolean): string {
+  const cleaned = reply.trim();
+  if (!firstDealerReply || replyHasFirstGreeting(cleaned)) return cleaned;
+  return language === "es"
+    ? `Hola, somos Alpha Motorsports. ${cleaned}`
+    : `Hello, this is Alpha Motorsports. ${cleaned}`;
+}
+
 function replyGivesRestrictedVehicleDetails(reply: string): boolean {
   const normalized = cleanConversationText(reply).toLowerCase();
   return /\$\s*\d/.test(normalized) ||
@@ -415,6 +443,7 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
     return "request_phone";
   }
   if (buyerAskedDocumentRequirements(latest)) return "document_requirements";
+  if (buyerAskedPriceInquiry(latest)) return "price_inquiry";
   if (buyerAskedInventoryOptions(latestIntent)) return "inventory_options";
   if (historyAskedAboutFinancing(history) && buyerAcceptedFinancingStep(latest)) {
     return "financing_intro";
@@ -478,6 +507,9 @@ function buildSafeFallbackReply(
         ? `Hola, somos Alpha Motorsports. Tenemos el ${vehicle} disponible. ¿Estás interesado en financiarlo?`
         : `Hola, somos Alpha Motorsports. Sí, el ${vehicle} está disponible. ¿Estás interesado en financiarlo?`;
     }
+    if (stage === "price_inquiry") {
+      return `Con gusto podemos confirmar ese detalle del ${vehicle}. Te encuentras interesado?`;
+    }
     if (stage === "financing_intro") {
       return "Perfecto. Para aplicar solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuentas con esos requisitos?";
     }
@@ -521,6 +553,9 @@ function buildSafeFallbackReply(
       ? `Hello, this is Alpha Motorsports. We have the ${vehicle} available. Are you interested in financing it?`
       : `Hello, this is Alpha Motorsports. Yes, the ${vehicle} is available. Are you interested in financing it?`;
   }
+  if (stage === "price_inquiry") {
+    return `We will be happy to confirm that detail for the ${vehicle}. Are you still interested?`;
+  }
   if (stage === "financing_intro") {
     return "Perfect. To apply, you only need your ID and an active bank account; a passport or Tax ID works. Do you have those requirements?";
   }
@@ -551,9 +586,15 @@ function buildSafeFallbackReply(
   return `I'd be happy to help with the ${vehicle}. Are you interested in financing it?`;
 }
 
-function isAiReplyAligned(reply: string, stage: SalesReplyStage, storePhone: string): boolean {
+function isAiReplyAligned(
+  reply: string,
+  stage: SalesReplyStage,
+  storePhone: string,
+  firstDealerReply: boolean = false,
+): boolean {
   const normalized = cleanConversationText(reply).toLowerCase();
   if (!normalized) return false;
+  if (firstDealerReply && !replyHasFirstGreeting(reply)) return false;
   if (stageRequiresStorePhone(stage) && !replyIncludesStorePhone(reply, storePhone)) return false;
   if (/\badvisor\b|\basesor\b/i.test(normalized)) return false;
   if (replyGivesRestrictedVehicleDetails(reply)) return false;
@@ -562,6 +603,12 @@ function isAiReplyAligned(reply: string, stage: SalesReplyStage, storePhone: str
       /financ|financiar|financiamiento/.test(normalized) &&
       !/phone|number|tel[eé]fono|n[uú]mero/.test(normalized) &&
       !normalized.includes(storePhone.toLowerCase());
+  }
+  if (stage === "price_inquiry") {
+    return /confirm|confirmar/.test(normalized) &&
+      !/\$\s*\d/.test(normalized) &&
+      !/id|tax\s*id|passport|pasaporte|bank account|cuenta bancaria|requirements|requisitos/.test(normalized) &&
+      !/phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
   }
   if (stage === "financing_intro") {
     return /\b(id|tax\s*id|passport|pasaporte)\b/.test(normalized) &&
@@ -708,6 +755,7 @@ CONVERSATION FUNNEL:
 8. Send exactly one short reply for the latest buyer turn. Never repeat a previous reply.
 8a. Read the recent conversation before replying. Never reuse the exact wording of a recent Dealer message; vary the wording while remaining in the same funnel stage.
 9. Do not give price, mileage, approval, history, warranty, or financing details in Messenger, except that you must confirm a clean title when explicitly asked.
+9a. If the buyer asks for price, do not provide a number and do not jump to requirements. Say that Alpha Motorsports can confirm that detail, then ask whether they are still interested.
 
 ADDRESS / DIRECTIONS HANDLING:
 - If the buyer asks for the address, directions, or location, provide the store address directly and invite them to visit, then ask whether they are interested in financing.
@@ -719,7 +767,7 @@ Language rules:
 - If the latest buyer message is Spanish, reply ONLY in Spanish.
 - If the latest buyer message is English, reply ONLY in English.
 - Never write a bilingual reply, translation, second version, or mixed-language sentence.
-- Be friendly, conversational, and concise. Use a warm greeting on the first reply and thank the buyer naturally when appropriate.
+- Be friendly, conversational, and concise. The first Alpha Motorsports reply in any conversation must start with a warm greeting as Alpha Motorsports. Thank the buyer naturally when appropriate.
 - Speak directly as Alpha Motorsports using "we" / "nosotros". Never say "our sales team will take care of it", "our team will handle it", "nuestro equipo de ventas se encargará", or similar handoff language.
 - Use "easy financing options" / "opciones de financiamiento fáciles"
 - Use "approval based on qualification" / "aprobación basada en calificación"
@@ -808,11 +856,13 @@ export async function generateAiReply(
   const history = visibleMessages.slice(-8).join("\n");
 
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage);
+  const firstDealerReply = isFirstDealerReply(visibleMessages);
   const promptStage = stage === "advisor_question" ? "detailed_question" : stage;
   const stageInstruction = {
     availability: availabilityQuickReplyAccepted
       ? "Greet as Alpha Motorsports, state that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number."
       : "Greet as Alpha Motorsports, explicitly confirm that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number.",
+    price_inquiry: "The buyer is asking for price. Do not provide a number, do not ask for requirements, and do not ask for a phone number. Say Alpha Motorsports can confirm that detail, then ask whether they are still interested.",
     financing_intro: "The buyer is interested in financing. Do not ask for a phone number yet. Explain the basic requirements: ID and an active bank account; passport or Tax ID works. Ask if they have those requirements.",
     financing_declined: "The buyer declined financing. Do not ask about financing again and do not explain financing requirements. Thank them, then ask whether they plan to purchase cash or would like to come see the vehicle.",
     cash_visit_request_phone: `The buyer is continuing without financing. Ask for the buyer's best phone number to coordinate a visit or cash purchase. Include Alpha's dealership phone as an immediate call option: ${storePhone}. Do not mention financing.`,
@@ -834,6 +884,7 @@ ${locationContext}
 ${phoneContext}
 Current funnel stage: ${promptStage}
 Stage instruction: ${stageInstruction}
+First reply instruction: ${firstDealerReply ? "This is Alpha Motorsports' first reply in this conversation. Start with a warm greeting as Alpha Motorsports." : "This is not the first Alpha Motorsports reply; do not restart the greeting unless it sounds natural."}
 
 Recent conversation:
 ${history}
@@ -853,7 +904,7 @@ Write one short reply that follows the stage instruction exactly. Mention the ve
 
   if (
     raw &&
-    isAiReplyAligned(raw, stage, storePhone) &&
+    isAiReplyAligned(raw, stage, storePhone, firstDealerReply) &&
     isReplyLanguageMirrored(raw, language) &&
     isReplyRelevantToCurrentMessage(raw, currentMessage) &&
     !replyRepeatsRecentDealerMessage(raw, visibleMessages)
@@ -862,14 +913,18 @@ Write one short reply that follows the stage instruction exactly. Mention the ve
   }
 
   return avoidRepeatedFallback(
-    buildSafeFallbackReply(
+    withFirstReplyGreeting(
+      buildSafeFallbackReply(
+        language,
+        vehicleTitle,
+        storePhone,
+        visibleMessages,
+        currentMessage,
+        availabilityQuickReplyAccepted,
+        lotLocation,
+      ),
       language,
-      vehicleTitle,
-      storePhone,
-      visibleMessages,
-      currentMessage,
-      availabilityQuickReplyAccepted,
-      lotLocation,
+      firstDealerReply,
     ),
     language,
     visibleMessages,
@@ -925,16 +980,21 @@ async function generateAiReplyWithFallback(
   }
 
   const aiCompletedAt = new Date();
+  const firstDealerReply = isFirstDealerReply(visibleMessages);
   return {
     reply: avoidRepeatedFallback(
-      buildSafeFallbackReply(
+      withFirstReplyGreeting(
+        buildSafeFallbackReply(
+          language,
+          vehicleTitle,
+          storePhone,
+          visibleMessages,
+          currentMessage,
+          availabilityQuickReplyAccepted,
+          lotLocation,
+        ),
         language,
-        vehicleTitle,
-        storePhone,
-        visibleMessages,
-        currentMessage,
-        availabilityQuickReplyAccepted,
-        lotLocation,
+        firstDealerReply,
       ),
       language,
       visibleMessages,
@@ -1337,7 +1397,7 @@ router.post("/conversations/intake", async (req, res) => {
       retryableReply &&
       (
         !isReplyLanguageMirrored(retryableReply, language) ||
-        !isAiReplyAligned(retryableReply, retryStage, storePhone) ||
+        !isAiReplyAligned(retryableReply, retryStage, storePhone, isFirstDealerReply(retryHistory)) ||
         !isReplyRelevantToCurrentMessage(retryableReply, inbound)
       )
     ) {

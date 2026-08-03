@@ -1258,3 +1258,56 @@ test("valid buyer chat beats later UI noise candidate", async () => {
   assert.deepEqual(result.buyersDetected.map((buyer) => buyer.selectedForProcessing), [true, false]);
   assert.equal(calls.debug.at(-1).buyerName, "Juan");
 });
+
+test("Message sent metadata cannot beat the real buyer message", async () => {
+  const metadataRoot = new FakeElement({
+    attributes: { "aria-label": "Marketplace conversation" },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Marcela - 2023 Toyota Camry SE" }),
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } }),
+      new FakeElement({ tagName: "button", attributes: { "aria-label": "Send" }, text: "Send" }),
+    ],
+  });
+  const buyerRoot = new FakeElement({
+    attributes: { "aria-label": "Marketplace conversation" },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Marcela - 2023 Toyota Camry SE" }),
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } }),
+      new FakeElement({ tagName: "button", attributes: { "aria-label": "Send" }, text: "Send" }),
+    ],
+  });
+  const baseEvidence = {
+    threadRootDetected: true,
+    messageScopeDetected: true,
+    extractionMode: "visual_bubbles",
+    selectedHeaderText: "Marcela - 2023 Toyota Camry SE",
+    latestMessageDirection: "buyer",
+    composerDetected: true,
+    threadIdentity: "thread-marcela",
+  };
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
+    captures: [
+      {
+        root: metadataRoot,
+        scope: metadataRoot,
+        buyerName: "Marcela",
+        messages: [{ speaker: "Marcela", text: "Message sent" }],
+        evidence: baseEvidence,
+      },
+      {
+        root: buyerRoot,
+        scope: buyerRoot,
+        buyerName: "Marcela",
+        messages: [{ speaker: "Marcela", text: "Hola. Sigue disponible?" }],
+        evidence: baseEvidence,
+      },
+    ],
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(calls.intake[0].currentMessage, "Hola. Sigue disponible?");
+  assert.deepEqual(result.buyersDetected.map((buyer) => buyer.selectedForProcessing), [false, true]);
+});
