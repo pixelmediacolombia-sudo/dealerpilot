@@ -9,6 +9,9 @@
     "capture_in_flight",
     "conversation_snapshot_missing",
     "conversation_thread_missing",
+    "thread_changed_before_send",
+    "thread_navigation_pending",
+    "thread_route_mismatch",
     "buyer_name_missing",
     "active_thread_header_missing",
   ]);
@@ -78,6 +81,11 @@
       );
   }
 
+  function isWaitingForSellerResponse(text) {
+    return /\b(?:is\s+)?waiting for your response\b/i.test(cleanText(text)) ||
+      /\b(?:esperando|espera)\s+(?:tu|su)\s+respuesta\b/i.test(cleanText(text));
+  }
+
   function isOutgoingPreview(text, sellerProfileNames = []) {
     const value = cleanText(text);
     if (/(?:^|\s)(?:you|t[uú]|usted)\s*:/i.test(value)) return true;
@@ -101,6 +109,7 @@
       previewText,
       signature: normalizePreviewSignature(previewText),
       explicitUnread: hasUnreadIndicator(anchor),
+      needsSellerResponse: isWaitingForSellerResponse(previewText),
       incomingPreview: !isOutgoingPreview(previewText, options.sellerProfileNames || []),
     };
   }
@@ -342,7 +351,9 @@
         if (!retryable) break;
         await sleepFn(PROCESS_RETRY_MS);
       }
-      handledSignatureById.set(target.threadId, target.signature || "");
+      if (!RETRYABLE_PROCESS_REASONS.has(result?.reason)) {
+        handledSignatureById.set(target.threadId, target.signature || "");
+      }
       return result;
     }
 
@@ -355,7 +366,11 @@
       previewById.set(target.threadId, target.signature);
       const changed = previous !== undefined && previous !== target.signature;
       const alreadyHandled = handledSignatureById.get(target.threadId) === target.signature;
-      if (!alreadyHandled && target.incomingPreview && (target.explicitUnread || changed)) {
+      if (
+        !alreadyHandled &&
+        target.incomingPreview &&
+        (target.explicitUnread || target.needsSellerResponse || changed)
+      ) {
         queue.enqueue({ ...target, reason, observedAt: Date.now() });
       }
     }
@@ -480,6 +495,7 @@
     createFifoThreadQueue,
     describeThreadAnchor,
     extractThreadId,
+    isWaitingForSellerResponse,
     isMessagesThreadRoute,
     isMarketplaceInboxRoute,
     isSupportedConversationRoute,

@@ -768,10 +768,14 @@
       visibleImages: visibleImages.map((image) => image.src || image.dataSrc),
     });
     const buyerMessages = messages.filter((message) => message.speaker !== "Dealer");
+    const normalizedCurrentMessage = cleanText(currentMessage);
+    const currentBuyerMessageOccurrence = buyerMessages
+      .filter((message) => cleanText(message.text || "") === normalizedCurrentMessage)
+      .length || 1;
     const autoActionKey = JSON.stringify({
       thread: externalThreadRef,
       currentMessage,
-      buyerMessages: canonicalMessages(buyerMessages).join("\n"),
+      currentBuyerMessageOccurrence,
     });
     return {
       externalThreadRef,
@@ -802,6 +806,16 @@
   }
 
   function freshSnapshotStillPendingBuyer(payload, settings = DEFAULT_SETTINGS) {
+    const currentThreadId = getCurrentThreadId();
+    const externalThreadRef = String(payload?.externalThreadRef || "");
+    const currentThreadToken = currentThreadId ? `facebook-messages-thread-${currentThreadId}` : "";
+    if (
+      currentThreadToken &&
+      /\bfacebook-messages-thread-\d+\b/i.test(externalThreadRef) &&
+      !externalThreadRef.includes(currentThreadToken)
+    ) {
+      return { ok: false, reason: "thread_changed_before_send" };
+    }
     const freshWinner = selectWinningSnapshot(deduplicateSnapshots(createCaptureSnapshots(settings)));
     const fresh = freshWinner?.snapshot;
     if (!fresh) return { ok: false, reason: "fresh_snapshot_missing" };

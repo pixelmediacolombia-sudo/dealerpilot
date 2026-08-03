@@ -99,6 +99,45 @@ test("thread discovery keeps DOM order and distinguishes incoming from outgoing 
   assert.equal(targets[1].incomingPreview, false);
 });
 
+test("waiting-for-response Marketplace previews are queued without an unread badge", async () => {
+  const api = loadApi();
+  const locationRef = {
+    origin: "https://www.facebook.com",
+    pathname: "/messages/t/101",
+    href: "https://www.facebook.com/messages/t/101",
+  };
+  const waiting = new FakeAnchor(
+    "/messages/t/202",
+    "Aashiyan Â· 2023 Toyota camry se Aashiyan is waiting for your response Â· 1h",
+  );
+  const documentRef = {
+    body: {},
+    querySelectorAll() {
+      return [waiting];
+    },
+  };
+  const processed = [];
+  const controller = api.start({
+    documentRef,
+    locationRef,
+    sessionStorageRef: { getItem() { return null; }, setItem() {} },
+    sleepFn: async () => {},
+    async navigate(target) {
+      locationRef.pathname = `/messages/t/${target.threadId}`;
+      locationRef.href = `https://www.facebook.com${locationRef.pathname}`;
+    },
+    async processThread({ expectedThreadId }) {
+      processed.push(expectedThreadId);
+      return { autoSent: true };
+    },
+  });
+
+  await controller.whenIdle();
+
+  assert.deepEqual(processed, ["202"]);
+  assert.equal(api.isWaitingForSellerResponse(waiting.innerText), true);
+});
+
 test("mutation records preserve first-arrival order even when Facebook edits text nodes", () => {
   const api = loadApi();
   const first = new FakeAnchor("/messages/t/101", "First");
@@ -394,4 +433,56 @@ test("a new incoming message mutation reruns the active thread once", async () =
 
   assert.equal(attempts, 2);
   assert.equal(controller.getState().processing, false);
+});
+
+test("retryable failures are not marked handled and can be queued again by the same waiting preview", async () => {
+  let observerCallback;
+  class FakeMutationObserver {
+    constructor(callback) {
+      observerCallback = callback;
+    }
+
+    observe() {}
+    disconnect() {}
+  }
+  const api = loadApi();
+  const locationRef = {
+    origin: "https://www.facebook.com",
+    pathname: "/messages/t/101",
+    href: "https://www.facebook.com/messages/t/101",
+  };
+  const waiting = new FakeAnchor(
+    "/messages/t/202",
+    "Wais Â· 2023 Toyota camry se Wais is waiting for your response Â· 1h",
+  );
+  const documentRef = {
+    body: {},
+    querySelectorAll() {
+      return [waiting];
+    },
+  };
+  let attempts = 0;
+  const controller = api.start({
+    documentRef,
+    locationRef,
+    sessionStorageRef: { getItem() { return null; }, setItem() {} },
+    MutationObserverCtor: FakeMutationObserver,
+    sleepFn: async () => {},
+    async navigate(target) {
+      locationRef.pathname = `/messages/t/${target.threadId}`;
+      locationRef.href = `https://www.facebook.com${locationRef.pathname}`;
+    },
+    async processThread() {
+      attempts += 1;
+      return attempts === 1
+        ? { skipped: true, reason: "waiting_quiet_window" }
+        : { autoSent: true };
+    },
+  });
+  await controller.whenIdle();
+
+  observerCallback?.([{ target: waiting, addedNodes: [] }]);
+  await controller.whenIdle();
+
+  assert.equal(attempts, 2);
 });

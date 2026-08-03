@@ -672,6 +672,7 @@ test("automatic quiet window uses a stable buyer-message key when DOM history ch
   assert.equal(calls.intake.length, 0);
 
   messages.unshift({ speaker: "Dealer", text: "Send a quick response" });
+  messages.unshift({ speaker: "Omar", text: "Hi, I saw this on Marketplace earlier." });
   setNow(108000);
   const second = await ai.captureConversation({ automatic: true });
 
@@ -972,6 +973,33 @@ test("autoReply blocks when an operator replies manually while backend intake is
   assert.equal(calls.intake.length, 1);
   assert.equal(result.autoSent, false);
   assert.equal(result.reason, "manual_reply_after_buyer");
+  assert.equal(composerElement.textContent, "");
+  assert.equal(calls.messages.some((message) => message.type === "DEBUGGER_COMPOSER_SUBMIT"), false);
+  assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
+});
+
+test("autoReply requeues instead of sending when Facebook changes thread before send", async () => {
+  const locationRef = {
+    href: "https://www.facebook.com/messages/t/999999",
+    origin: "https://www.facebook.com",
+    pathname: "/messages/t/999999",
+    hostname: "www.facebook.com",
+  };
+  const { ai, calls, composerElement } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [{ speaker: "Luis", text: "Is this still available?" }],
+    sendSucceeds: true,
+    locationOverride: locationRef,
+    onIntake() {
+      locationRef.href = "https://www.facebook.com/messages/t/123123";
+      locationRef.pathname = "/messages/t/123123";
+    },
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, false);
+  assert.equal(result.reason, "thread_changed_before_send");
   assert.equal(composerElement.textContent, "");
   assert.equal(calls.messages.some((message) => message.type === "DEBUGGER_COMPOSER_SUBMIT"), false);
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
