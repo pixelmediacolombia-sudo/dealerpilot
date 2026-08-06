@@ -336,6 +336,7 @@ function historyAskedCashOrVisit(history: string): boolean {
 
 function buyerDeclinedFinancing(latest: string, history: string): boolean {
   const normalized = normalizeIntentText(latest);
+  if (historyAskedCashOrVisit(history)) return false;
   const financingContext = historyAskedAboutFinancing(history) ||
     /\b(?:financ(?:e|ing)?|loan|payment plan|financiar|financiamiento|credito)\b/i.test(normalized);
   if (!financingContext) return false;
@@ -343,7 +344,9 @@ function buyerDeclinedFinancing(latest: string, history: string): boolean {
 }
 
 function buyerAcceptedCashOrVisitStep(latest: string): boolean {
-  return /\b(?:yes|yeah|yep|sure|ok|okay|cash|pay(?:ing)? cash|cash buyer|come see|visit|stop by|appointment|cita|si|claro|efectivo|contado|venir|verlo|visitar)\b/i.test(normalizeIntentText(latest));
+  const normalized = normalizeIntentText(latest);
+  return /\b(?:cash|pay(?:ing)? cash|cash buyer|come see|visit|stop by|appointment|cita|efectivo|contado|venir (?:a |al |a ver|al lot|a la )(?:ver|comprar|contado)|visitar|verlo|ver el|dar una vuelta|pasar por|passe? por|show up)\b/i.test(normalized) ||
+    /\b(?:si|s[ií]|yes|yeah|yep|sure|ok|okay|claro|vamos|hagamos|adelante|dale)\b/i.test(normalized) && /\b(?:visita|visitar|venir|venir|comprar|contado|cash|efectivo|lot|dealer|cita)\b/i.test(normalized);
 }
 
 function buyerAcceptedFinancingStep(latest: string): boolean {
@@ -352,6 +355,10 @@ function buyerAcceptedFinancingStep(latest: string): boolean {
 
 function buyerConfirmedRequirements(latest: string): boolean {
   return /\b(?:yes|yeah|yep|sure|ok|okay|i have|i do|got it|ready|next step|what next|si|s[ií]|claro|tengo|cuento|listo|perfecto|lo tengo|los tengo|siguiente|aplicar)\b/i.test(latest);
+}
+
+function buyerLacksRequirements(latest: string): boolean {
+  return /\b(?:no tengo|no cuento|no poseo|me falta|me faltan|no tengo id|no tengo pasaporte|no tengo tax id|no tengo cuenta|i don'?t have|i do not have|don'?t have|dont have|not yet|todav[ií]a no|todavia no|no tengo los|aun no los tengo|a[uú]n no los tengo)\b/i.test(normalizeIntentText(latest));
 }
 
 function buyerAskedDocumentRequirements(latest: string): boolean {
@@ -446,10 +453,13 @@ function replyGivesRestrictedVehicleDetails(reply: string): boolean {
 function resolveSalesReplyStage(visibleMessages: string[], currentMessage: string): SalesReplyStage {
   const latest = cleanConversationText(currentMessage).toLowerCase();
   const latestIntent = normalizeIntentText(currentMessage);
-  const history = visibleMessages.map(cleanConversationText).join(" ").toLowerCase();
+  const history = visibleMessages.slice(-8).map(cleanConversationText).join(" ").toLowerCase();
   if (hasPhoneNumber(latest)) return "phone_received";
   if (historyAskedCashOrVisit(history) && buyerAcceptedCashOrVisitStep(latest)) {
     return "cash_visit_request_phone";
+  }
+  if (historyGaveFinancingRequirements(history) && buyerLacksRequirements(latest)) {
+    return "document_requirements";
   }
   if (buyerDeclinedFinancing(latest, history)) return "financing_declined";
   if (historyGaveFinancingRequirements(history) && buyerConfirmedRequirements(latest)) {
@@ -466,7 +476,7 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
       ? "request_phone"
       : "financing_intro";
   }
-  if (/\b(is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|esta disponible|está disponible|lo tiene disponible)\b/i.test(latest)) {
+  if (/\b(is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|esta disponible|está disponible|esta(?:n)? (?:a la venta|en venta)|lo tiene disponible|lo tienen disponible|lo tienes disponible|tienen este|tienen esa|tienen ese (?:vehiculo|carro|auto|car|suv|camioneta)|tienen este (?:vehiculo|carro|auto|car|suv|camioneta)|hay alguno disponible|lo venden aun|lo siguen vendiendo|aun lo tienen|a[uú]n lo tienen)\b/i.test(latest)) {
     return "availability";
   }
   if (buyerAskedCleanTitle(latest)) return "clean_title";
@@ -806,7 +816,7 @@ export function detectLanguage(text: string): "en" | "es" {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
   const spanishWords =
-    /\b(hola|buenas|gracias|disponible|tengo|quiero|estoy|interesad[oa]s?|claro|podemos|ayuda(?:r|rte)?|inicial|comprar|semana|numero|telefono|itin|ingresos|esta|esa|ese|eso|esto|este|tiene|tienen|techo|panoramico|precio|cuanto|cuánto|cual|donde|cuando|carro|auto|vehiculo|si|como|necesit[ao]|aplicar|requisitos?|documentos?|pasaporte|cuenta|bancaria|financiar|financiamiento|asesor)\b/i;
+    /\b(hola|buenas|gracias|disponible|tengo|quiero|estoy|interesad[oa]s?|claro|podemos|ayuda(?:r|rte)?|inicial|comprar|semana|numero|telefono|itin|ingresos|esta|esa|ese|eso|esto|este|tiene|tienen|techo|panoramico|precio|cuanto|cuánto|cual|donde|cuando|carro|auto|vehiculo|si|como|necesit[ao]|aplicar|requisitos?|documentos?|pasaporte|cuenta|bancaria|financiar|financiamiento|asesor|opciones?|disponibles?|tambien|puedo|puedes?|mira|dime|informa(?:ci[oó]n)?|diferencia|herramientas|paquete|alturas|precios?|millas|miles|kilometros?|garant[ií]a|motor|automatico|mecanico|manual|camioneta|sedan|historial|accidente|condici[oó]n|ped[oó]|ahora|listo|nuevo|viejo|gusta|encanta|necesitaria|estaria|alguno|alguna|otro|otra|mas|qu[eé]|talvez|tal ?vez|seguir)\b/i;
   return /[¿¡ñáéíóúü]/i.test(cleanConversationText(text)) || spanishWords.test(normalized) ? "es" : "en";
 }
 
