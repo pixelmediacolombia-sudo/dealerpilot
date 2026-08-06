@@ -115,9 +115,22 @@ function normalizeIntentText(value: unknown): string {
     .toLowerCase();
 }
 
+function isGroupSystemEventMessage(value: unknown): boolean {
+  const text = cleanConversationText(value);
+  if (!text || text.length > 160) return false;
+  const normalized = normalizeIntentText(text);
+  if (!/\b(?:group|chat|grupo|conversaci[oó]n)\b/.test(normalized)) return false;
+  const hasAction =
+    /(?:added|anadi[oó]|agreg[oó]|removed|elimin[oó]|left|sali[oó]|joined|se\s+uni[oó]|created|cre[oó]|started(?: a)?\s+(?:group|video|audio)|ended\s+(?:group|video|audio)|renamed|cambi[oó]\s+el\s+nombre|invited)\b/.test(normalized);
+  if (!hasAction) return false;
+  if (/\b(?:message|mensaje|photo|foto|photo\s+chat)\b/.test(normalized)) return false;
+  return /to\s+the\s+group\b|from\s+the\s+group\b|the\s+group\b|(?:group|video|audio)\s+call\b|\bal\s+grupo\b|\bdel\s+grupo\b|\bel\s+grupo\b/.test(normalized);
+}
+
 function isUiConversationText(value: string): boolean {
   const normalized = value.toLowerCase().replace(/[.。:;,\-–—]+$/g, "").trim();
   if (!normalized) return true;
+  if (isGroupSystemEventMessage(value)) return true;
   if (UI_MESSAGE_TEXT.has(normalized)) return true;
   if (isParticipantLabelText(value)) return true;
   if (/^(enter|escape|tab|shift|control|option|command|alt)\b/i.test(normalized)) return true;
