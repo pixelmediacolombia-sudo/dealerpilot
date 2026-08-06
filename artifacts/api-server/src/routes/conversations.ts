@@ -761,6 +761,55 @@ type AiReplyResult = {
   aiDurationMs: number;
 };
 
+const SALES_REPLY_STAGES: readonly SalesReplyStage[] = [
+  "availability",
+  "price_inquiry",
+  "financing_intro",
+  "financing_declined",
+  "cash_visit_request_phone",
+  "request_phone",
+  "phone_received",
+  "address_request",
+  "inventory_options",
+  "document_requirements",
+  "clean_title",
+  "warranty_info",
+  "advisor_question",
+  "general",
+];
+
+function isSalesReplyStage(value: unknown): value is SalesReplyStage {
+  return typeof value === "string" && (SALES_REPLY_STAGES as readonly string[]).includes(value);
+}
+
+function parseStructuredReply(content: unknown): { intent?: string; reply?: string } | null {
+  const text = typeof content === "string" ? content.trim() : "";
+  if (!text) return null;
+  const jsonText = text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\s*```$/i, "").trim();
+  if (!jsonText.startsWith("{") || !jsonText.endsWith("}")) {
+    const first = jsonText.indexOf("{");
+    const last = jsonText.lastIndexOf("}");
+    if (first < 0 || last <= first) return null;
+    return extractStructuredReply(jsonText.slice(first, last + 1));
+  }
+  return extractStructuredReply(jsonText);
+}
+
+function extractStructuredReply(jsonText: string): { intent?: string; reply?: string } | null {
+  try {
+    const parsed = JSON.parse(jsonText) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    const intent = (parsed as Record<string, unknown>).intent;
+    const reply = (parsed as Record<string, unknown>).reply;
+    return {
+      intent: typeof intent === "string" && intent.trim() ? intent.trim() : undefined,
+      reply: typeof reply === "string" && reply.trim() ? reply.trim() : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 const ALPHA_RULES = `
 You are a warm, helpful, and professional sales representative speaking directly as Alpha Motorsports, a used car dealership. Sound natural and welcoming, not robotic or transactional.
 
@@ -915,7 +964,10 @@ ${history}
 Latest buyer message: "${currentMessage}"
 
 ${langNote}
-Write one short reply that follows the stage instruction exactly. Mention the vehicle naturally.`;
+Respond with a single JSON object, no markdown, with exactly two keys:
+{"intent": "the sales funnel stage that best matches this buyer message", "reply": "your reply"}
+Valid intent values: availability, price_inquiry, financing_intro, financing_declined, cash_visit_request_phone, request_phone, phone_received, address_request, inventory_options, document_requirements, clean_title, warranty_info, advisor_question, general.
+The "reply" must be one short message that follows the stage instruction exactly, mentions the vehicle naturally, and mirrors the buyer's language.`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-5-mini",
@@ -925,14 +977,22 @@ Write one short reply that follows the stage instruction exactly. Mention the ve
 
   const raw = response.choices[0]?.message?.content?.trim();
 
+  const structured = parseStructuredReply(raw);
+  const candidateReply = (structured?.reply ?? raw ?? "").trim();
+  const ambiguousStage = stage === "general" || stage === "advisor_question";
+  const candidateStage =
+    structured?.intent && isSalesReplyStage(structured.intent) && ambiguousStage
+      ? structured.intent
+      : stage;
+
   if (
-    raw &&
-    isAiReplyAligned(raw, stage, storePhone, firstDealerReply) &&
-    isReplyLanguageMirrored(raw, language) &&
-    isReplyRelevantToCurrentMessage(raw, currentMessage) &&
-    !replyRepeatsRecentDealerMessage(raw, visibleMessages)
+    candidateReply &&
+    isAiReplyAligned(candidateReply, candidateStage, storePhone, firstDealerReply) &&
+    isReplyLanguageMirrored(candidateReply, language) &&
+    isReplyRelevantToCurrentMessage(candidateReply, currentMessage) &&
+    !replyRepeatsRecentDealerMessage(candidateReply, visibleMessages)
   ) {
-    return raw;
+    return candidateReply;
   }
 
   return avoidRepeatedFallback(
