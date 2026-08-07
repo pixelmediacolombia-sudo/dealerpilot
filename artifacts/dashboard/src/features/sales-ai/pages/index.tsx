@@ -766,7 +766,7 @@ export function SalesAIWorkspace() {
 
   return (
     <AppLayout>
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex h-full overflow-hidden">
 
         {/* ── LEFT: Conversation list ──────────────────────────────────── */}
         <div className="w-[280px] flex flex-col border-r border-white/[0.06] overflow-hidden shrink-0 bg-[#0a0812]">
