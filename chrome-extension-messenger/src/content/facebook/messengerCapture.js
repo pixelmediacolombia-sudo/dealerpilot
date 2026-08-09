@@ -81,6 +81,7 @@
     if (isGroupSystemEventMessage(text)) return true;
     if (isFacebookRatingCardText(text)) return true;
     if (isParticipantLabelText(text)) return true;
+    if (/^(?:(?:message sent|mensaje enviado)(?:\s+at)?\s+)?(?:(?:mon|monday|tue|tuesday|wed|wednesday|thu|thursday|fri|friday|sat|saturday|sun|sunday|today|yesterday|hoy|ayer|lun|lunes|mar|martes|mi[eÃ©]rcoles|mie|jue|jueves|vie|viernes|s[aÃ¡]bado|sab|dom|domingo)(?:,)?\s+)?(?:(?:at|a las)\s+)?\d{1,2}(?::\d{2})?\s*(?:a\.?\s*m\.?|p\.?\s*m\.?|am|pm)$/i.test(text)) return true;
     if (/^[A-Za-zÀ-ÿ'’ -]+ · (?:Buyer|Seller|Participant|Miembro|Comprador|Vendedor)$/i.test(text)) return true;
     return /^(?:message sent|mensaje enviado)?\s*(?:at\s+)?(?:\d{1,2}:\d{2}|\d{1,2})\s*(?:am|pm)?\s+(?:by|por)\s+[^:]{1,80}\.?$/i.test(text) ||
       /^[^.]{2,80}\s+(?:started|inici[oó])\s+(?:this|este)\s+chat\.?$/i.test(text);
@@ -689,9 +690,11 @@
           normalizeForMatch(semanticMessage.text) === normalizeForMatch(message.text)))
       : [];
     const rawMessages = semantic.length ? [...semantic, ...missingVisualMessages] : visualMessages;
-    const messages = rawMessages.map((message) =>
-      message.speaker === "Buyer" && buyerName ? { ...message, speaker: buyerName } : message,
-    );
+    const messages = rawMessages
+      .map((message) =>
+        message.speaker === "Buyer" && buyerName ? { ...message, speaker: buyerName } : message,
+      )
+      .filter((message) => !isMessageMetadataText(message.text));
     const visibleBuyerMessages = extractVisibleBuyerMessages(root, documentRef, buyerName, scope);
     const hasBuyerMessage = messages.some((message) => message.speaker !== "Dealer");
     const inboxPreview = !hasBuyerMessage && !visibleBuyerMessages.length
@@ -721,6 +724,7 @@
       .filter((message) => {
         const token = normalizeForMatch(message.text);
         return token &&
+          !isMessageMetadataText(message.text) &&
           !(buyerToken && token === buyerToken) &&
           !sellerTokens.includes(token);
       });

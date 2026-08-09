@@ -702,3 +702,39 @@ test("collectImageCandidates flags emoji and profile images so they are excluded
   assert.equal(candidates[0].emojiLike, true);
   assert.equal(candidates[1].profileLike, true);
 });
+
+test("standalone Message sent timestamps never become the final message", () => {
+  const timestamp = new FakeElement({
+    attributes: { "aria-label": "Message sent Fri 5:40 PM" },
+    text: "Message sent Fri 5:40 PM",
+    rect: { left: 400, right: 520, top: 500, width: 120, height: 24 },
+  });
+  const timestampOnly = new FakeElement({
+    text: "Thu 8:54 AM",
+    rect: { left: 400, right: 500, top: 530, width: 100, height: 24 },
+  });
+  const buyerBubble = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "Hola. Â¿Sigue estando disponible?",
+    rect: { left: 40, right: 260, top: 560, width: 220, height: 44 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [timestamp, timestampOnly, buyerBubble],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Franklin Â· 2009 Toyota RAV4" }),
+      scope,
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" } }),
+    ],
+  });
+
+  const capture = runCapture(root);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(capture.messages)), [{ speaker: "Franklin", text: "Hola. Â¿Sigue estando disponible?" }]);
+  assert.equal(capture.messages.at(-1).text, "Hola. Â¿Sigue estando disponible?");
+});
