@@ -6,9 +6,9 @@ function read(path) {
   return readFileSync(new URL(path, import.meta.url), "utf8");
 }
 
-test("Alpha Page Publisher is isolated from Marketplace URLs", () => {
+test("DealerPilot Page Publisher is isolated from Marketplace URLs", () => {
   const manifest = JSON.parse(read("../manifest.json"));
-  assert.equal(manifest.name, "DealerPilot Alpha Page Publisher");
+  assert.equal(manifest.name, "DealerPilot Page Publisher");
   assert.deepEqual(manifest.content_scripts[0].matches, ["https://business.facebook.com/latest/composer*"]);
 
   const background = read("../src/background/pagePublisher.js");

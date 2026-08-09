@@ -79,7 +79,7 @@ const assistants = [
   },
   {
     label: "BRAND",
-    title: "DealerPilot Alpha Page Publisher",
+    title: "DealerPilot Page Publisher",
     plainName: "Business page publisher",
     where: "Meta Business Suite",
     text: "Turns an inventory vehicle into a business-page draft with the caption and up to ten photos prepared.",

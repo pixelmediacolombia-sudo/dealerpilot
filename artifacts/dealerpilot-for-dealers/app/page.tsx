@@ -79,7 +79,7 @@ const assistants = [
   },
   {
     label: "MARCA",
-    title: "DealerPilot Alpha Page Publisher",
+    title: "DealerPilot Page Publisher",
     plainName: "Publicador de la página comercial",
     where: "Meta Business Suite",
     text: "Convierte un vehículo del inventario en un borrador para la página comercial, con texto y hasta diez fotos preparados.",

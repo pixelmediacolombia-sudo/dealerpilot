@@ -1,4 +1,4 @@
-# DealerPilot Alpha Page Publisher
+# DealerPilot Page Publisher
 
 This extension is intentionally separate from `DealerPilot AI Publisher`.
 

@@ -27,7 +27,7 @@
     panel.id = PANEL_ID;
     panel.innerHTML = `
       <header>
-        <h1>DealerPilot Alpha Page Publisher</h1>
+        <h1>DealerPilot Page Publisher</h1>
         <p>Prepares the Business Suite draft. Human review is required before Publish.</p>
       </header>
       <div class="body">
