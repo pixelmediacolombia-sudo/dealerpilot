@@ -21,6 +21,8 @@ import {
   CheckCircle2,
   RotateCcw,
   CalendarClock,
+  AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { Vehicle } from "@workspace/api-client-react";
@@ -35,10 +37,10 @@ type VehicleCardProps = {
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   Published: { label: "LIVE", className: "bg-success/80 text-success-foreground border-success/20" },
-  "Ready to Publish": { label: "READY", className: "bg-blue-500/80 text-white border-blue-500/20" },
+  "Ready to Publish": { label: "READY", className: "bg-primary/80 text-foreground border-primary/20" },
   "AI Generated": { label: "AI", className: "bg-accent/80 text-accent-foreground border-accent/20" },
   Active: { label: "ACTIVE", className: "bg-secondary/80 text-secondary-foreground border-secondary/20" },
-  "Price Changed": { label: "PRICE ↓", className: "bg-amber-500/80 text-white border-amber-500/20" },
+  "Price Changed": { label: "PRICE ↓", className: "bg-warning/80 text-foreground border-warning/20" },
   "New": { label: "NEW", className: "bg-primary/80 text-primary-foreground border-primary/20" },
   Archived: { label: "ARCHIVED", className: "bg-muted/80 text-muted-foreground border-muted/20" },
   "Sold/Removed": { label: "SOLD", className: "bg-destructive/80 text-destructive-foreground border-destructive/20" },
@@ -74,7 +76,7 @@ export function VehicleCard({ vehicle, selectionMode, isSelected, onToggle, onAc
     <div
       onClick={handleCardClick}
       className={cn(
-        "group relative overflow-hidden rounded-xl bg-card border transition-all duration-300 cursor-pointer flex flex-col h-full",
+        "group relative overflow-hidden rounded-xl bg-card border transition duration-300 cursor-pointer flex flex-col h-full",
         isSelected
           ? "border-primary ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
           : "border-border/40 hover:border-primary/30 hover-lift",
@@ -86,7 +88,7 @@ export function VehicleCard({ vehicle, selectionMode, isSelected, onToggle, onAc
           <img
             src={vehicle.primaryImageUrl}
             alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+            className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/50 to-background">
@@ -100,7 +102,7 @@ export function VehicleCard({ vehicle, selectionMode, isSelected, onToggle, onAc
         {/* Checkbox — hover on desktop, always when selection mode */}
         <div
           className={cn(
-            "absolute top-3 left-3 z-20 transition-all duration-200",
+            "absolute top-3 left-3 z-20 transition duration-200",
             selectionMode ? "opacity-100" : "opacity-0 group-hover:opacity-100",
           )}
           onClick={(e) => onToggle(vehicle.id, e)}
@@ -118,14 +120,14 @@ export function VehicleCard({ vehicle, selectionMode, isSelected, onToggle, onAc
         <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
           <Badge
             variant="outline"
-            className={cn("backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border", badge.className)}
+            className={cn("backdrop-blur-sm px-2.5 py-1 text-xs font-bold tracking-wide  border", badge.className)}
           >
             {badge.label}
           </Badge>
           <div onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="bg-black/50 backdrop-blur-sm rounded-md p-1 text-white/80 hover:text-white hover:bg-black/70 transition-colors border border-white/10">
+                <button className="bg-black/50 backdrop-blur-sm rounded-md p-1 text-white hover:text-white hover:bg-black/70 transition-colors border border-white/20">
                   <MoreVertical className="w-3.5 h-3.5" />
                 </button>
               </DropdownMenuTrigger>
@@ -161,7 +163,7 @@ export function VehicleCard({ vehicle, selectionMode, isSelected, onToggle, onAc
         {/* Price + mileage */}
         <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end text-white z-10">
           <div className="font-bold text-xl drop-shadow-md">{formatCurrency(vehicle.price)}</div>
-          <div className="text-xs font-medium bg-black/40 backdrop-blur-md px-2 py-1 rounded-md border border-white/10">
+          <div className="text-xs font-medium bg-black/40 backdrop-blur-md px-2 py-1 rounded-md border border-white/20">
             {formatMileage(vehicle.mileage)}
           </div>
         </div>
@@ -177,6 +179,26 @@ export function VehicleCard({ vehicle, selectionMode, isSelected, onToggle, onAc
           <span className="w-1 h-1 rounded-full bg-border flex-shrink-0" />
           <span className="font-mono">{vehicle.stockNumber ? `#${vehicle.stockNumber}` : "—"}</span>
         </div>
+
+        {vehicle.marketplaceRemovalRequired && (
+          <div className="mb-3 rounded-lg border border-destructive/25 bg-destructive/[0.06] p-3 text-xs">
+            <div className="flex items-start gap-2 text-destructive">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span className="font-semibold">Sold · remove from Marketplace</span>
+            </div>
+            {vehicle.marketplaceListingUrl && (
+              <a
+                href={vehicle.marketplaceListingUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(event) => event.stopPropagation()}
+                className="mt-2 inline-flex items-center gap-1 font-semibold text-foreground hover:text-primary"
+              >
+                Open listing <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="mt-auto pt-3 border-t border-border/50 flex items-center justify-between gap-2">

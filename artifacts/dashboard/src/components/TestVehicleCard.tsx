@@ -82,25 +82,25 @@ export function TestVehicleCard() {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-muted/50 p-3 rounded-md">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Down Payment</p>
+                <p className="text-xs text-muted-foreground  tracking-wider font-semibold">Down Payment</p>
                 <p className="text-sm font-medium">{formatCurrency(listing.downPayment)}</p>
               </div>
               <div className="bg-muted/50 p-3 rounded-md">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Mileage</p>
+                <p className="text-xs text-muted-foreground  tracking-wider font-semibold">Mileage</p>
                 <p className="text-sm font-medium">{formatNumber(listing.mileage)} mi</p>
               </div>
             </div>
             
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-2">Description</p>
+              <p className="text-xs text-muted-foreground  tracking-wider font-semibold mb-2">Description</p>
               <p className="text-sm text-foreground/80 line-clamp-3">{listing.description}</p>
             </div>
 
             {jsonResult && (
               <div className="mt-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-2 flex items-center justify-between">
+                <p className="text-xs text-muted-foreground  tracking-wider font-semibold mb-2 flex items-center justify-between">
                   Payload Preview
-                  {success && <span className="text-green-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Sent</span>}
+                  {success && <span className="text-success flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Sent</span>}
                 </p>
                 <div className="bg-slate-900 text-slate-50 p-3 rounded-md text-xs font-mono overflow-x-auto max-h-[150px] overflow-y-auto">
                   <pre>{jsonResult}</pre>

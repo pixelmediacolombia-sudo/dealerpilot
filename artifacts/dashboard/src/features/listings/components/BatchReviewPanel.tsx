@@ -211,23 +211,23 @@ function PhotoPerformanceCard({
         className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-secondary/30 transition-colors text-left"
       >
         <MessageSquare className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest flex-1">
+        <span className="text-[11px] font-bold text-muted-foreground  tracking-wide flex-1">
           Photo Performance Prediction
         </span>
 
         {/* Confidence pill */}
-        <span className="text-[10px] font-bold text-muted-foreground">
+        <span className="text-xs font-bold text-muted-foreground">
           {prediction.confidence}% confidence
         </span>
 
         {prediction.improvementPct !== null && (
-          <span className="px-2 py-0.5 rounded-full bg-success/15 border border-success/25 text-[10px] font-bold text-success">
+          <span className="px-2 py-0.5 rounded-full bg-success/15 border border-success/25 text-xs font-bold text-success">
             +{prediction.improvementPct}% with AI cover
           </span>
         )}
 
         {prediction.alreadyExcellent && (
-          <span className="px-2 py-0.5 rounded-full bg-success/15 border border-success/25 text-[10px] font-bold text-success">
+          <span className="px-2 py-0.5 rounded-full bg-success/15 border border-success/25 text-xs font-bold text-success">
             ✓ Already excellent
           </span>
         )}
@@ -243,10 +243,10 @@ function PhotoPerformanceCard({
       {!expanded && (
         <div className="px-4 pb-3 flex items-center gap-4">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-black text-foreground">
+            <span className="text-xl font-semibold text-foreground">
               {prediction.currentMessageRate}%
             </span>
-            <span className="text-[10px] text-muted-foreground font-medium">msg rate</span>
+            <span className="text-xs text-muted-foreground font-medium">msg rate</span>
           </div>
 
           {prediction.aiMessageRate !== null && (
@@ -255,10 +255,10 @@ function PhotoPerformanceCard({
                 <Zap className="w-3 h-3" />
               </div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-black text-success">
+                <span className="text-xl font-semibold text-success">
                   {prediction.aiMessageRate}%
                 </span>
-                <span className="text-[10px] text-muted-foreground font-medium">
+                <span className="text-xs text-muted-foreground font-medium">
                   with AI cover
                 </span>
               </div>
@@ -266,7 +266,7 @@ function PhotoPerformanceCard({
           )}
 
           <div className="flex-1" />
-          <span className="text-[10px] text-muted-foreground italic truncate max-w-[240px]">
+          <span className="text-xs text-muted-foreground italic truncate max-w-[240px]">
             {prediction.coverLabel}
           </span>
         </div>
@@ -284,14 +284,14 @@ function PhotoPerformanceCard({
           >
             {/* Current cover */}
             <div className="rounded-xl bg-secondary/40 border border-border/40 p-4 space-y-1">
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+              <p className="text-[11px] font-bold text-muted-foreground  tracking-wide">
                 Current Cover Photo
               </p>
-              <p className="text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">
+              <p className="text-[11px] text-muted-foreground  tracking-wide mt-0.5">
                 Expected Message Rate
               </p>
               <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-3xl font-black text-foreground">
+                <span className="text-3xl font-semibold text-foreground">
                   {prediction.currentMessageRate}%
                 </span>
               </div>
@@ -301,7 +301,7 @@ function PhotoPerformanceCard({
                   style={{ width: `${Math.min(100, prediction.currentMessageRate * 20)}%` }}
                 />
               </div>
-              <p className="text-[9px] text-muted-foreground mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 Photo score: {photoScore}
               </p>
             </div>
@@ -310,18 +310,18 @@ function PhotoPerformanceCard({
             {prediction.hasBetterAiOption && prediction.aiMessageRate !== null && (
               <div className="rounded-xl bg-success/5 border border-success/25 p-4 space-y-1 relative overflow-hidden">
                 <div className="absolute top-2 right-2">
-                  <span className="px-1.5 py-0.5 rounded bg-success/20 text-[8px] font-bold text-success uppercase tracking-widest">
+                  <span className="px-1.5 py-0.5 rounded bg-success/20 text-[11px] font-bold text-success  tracking-wide">
                     AI Rec
                   </span>
                 </div>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                <p className="text-[11px] font-bold text-muted-foreground  tracking-wide">
                   AI Recommended Cover
                 </p>
-                <p className="text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">
+                <p className="text-[11px] text-muted-foreground  tracking-wide mt-0.5">
                   Expected Message Rate
                 </p>
                 <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-3xl font-black text-success">
+                  <span className="text-3xl font-semibold text-success">
                     {prediction.aiMessageRate}%
                   </span>
                 </div>
@@ -332,7 +332,7 @@ function PhotoPerformanceCard({
                   />
                 </div>
                 {prediction.improvementPct !== null && (
-                  <p className="text-[9px] font-bold text-success mt-1">
+                  <p className="text-[11px] font-bold text-success mt-1">
                     +{prediction.improvementPct}% expected improvement
                   </p>
                 )}
@@ -353,7 +353,7 @@ function PhotoPerformanceCard({
           {/* Confidence bar */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+              <span className="text-xs font-bold text-muted-foreground  tracking-wide">
                 Prediction Confidence
               </span>
               <span className="text-[11px] font-bold text-foreground">
@@ -363,12 +363,12 @@ function PhotoPerformanceCard({
             <div className="h-1.5 rounded-full bg-border/50 overflow-hidden">
               <div
                 className={cn(
-                  "h-full rounded-full transition-all duration-700",
+                  "h-full rounded-full transition duration-700",
                   prediction.confidence >= 85
                     ? "bg-success/70"
                     : prediction.confidence >= 70
                       ? "bg-primary/60"
-                      : "bg-amber-500/60",
+                      : "bg-warning/60",
                 )}
                 style={{ width: `${prediction.confidence}%` }}
               />
@@ -379,7 +379,7 @@ function PhotoPerformanceCard({
           <div className="flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/15">
             <Info className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <p className="text-[9px] font-bold text-primary uppercase tracking-widest">
+              <p className="text-[11px] font-bold text-primary  tracking-wide">
                 Why DealerPilot selected this photo
               </p>
               <p className="text-xs text-muted-foreground leading-relaxed">
@@ -533,15 +533,15 @@ const STATUS_CONFIG: Record<
   },
   "Needs Better Photo": {
     label: "Needs Better Photo",
-    color: "text-amber-400",
+    color: "text-warning",
     icon: Camera,
-    bg: "bg-amber-500/10 border-amber-500/25",
+    bg: "bg-warning/10 border-warning/25",
   },
   "Needs Listing": {
     label: "Needs Listing",
-    color: "text-blue-400",
+    color: "text-primary",
     icon: PenTool,
-    bg: "bg-blue-500/10 border-blue-500/25",
+    bg: "bg-primary/10 border-primary/25",
   },
   "Needs Price Review": {
     label: "Needs Price Review",
@@ -568,8 +568,8 @@ const PRIORITY_CONFIG: Record<
   },
   Medium: {
     label: "Medium",
-    color: "text-amber-400",
-    bg: "bg-amber-500/10 border-amber-500/25",
+    color: "text-warning",
+    bg: "bg-warning/10 border-warning/25",
   },
   Low: {
     label: "Low",
@@ -684,14 +684,14 @@ export function BatchReviewPanel({
             <ArrowLeft className="w-4 h-4" />
             Back to Listings
           </button>
-          <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+          <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground  tracking-wide">
             <Sparkles className="w-3.5 h-3.5 text-primary" />
             DealerPilot AI · Batch Review · Strategy Engine v2
           </div>
         </div>
 
         {/* ── AI Summary ── */}
-        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 space-y-4">
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 space-y-4">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
               <Sparkles className="w-5 h-5 text-primary" />
@@ -729,8 +729,8 @@ export function BatchReviewPanel({
               {
                 label: "Medium Priority",
                 value: mediumCount,
-                color: "text-amber-400",
-                bg: "bg-amber-500/10",
+                color: "text-warning",
+                bg: "bg-warning/10",
               },
               {
                 label: "Need Review",
@@ -749,8 +749,8 @@ export function BatchReviewPanel({
                 key={s.label}
                 className={cn("rounded-xl px-4 py-3 flex flex-col gap-0.5", s.bg)}
               >
-                <span className={cn("text-2xl font-black", s.color)}>{s.value}</span>
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+                <span className={cn("text-2xl font-semibold", s.color)}>{s.value}</span>
+                <span className="text-xs font-semibold text-muted-foreground  tracking-wide">
                   {s.label}
                 </span>
               </div>
@@ -760,7 +760,7 @@ export function BatchReviewPanel({
 
         {/* ── Vehicle List ── */}
         <div className="space-y-3">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+          <p className="text-xs font-bold text-muted-foreground  tracking-wide">
             Vehicle Analysis — Publishing Order ({vehicles.length} selected)
           </p>
 
@@ -777,7 +777,7 @@ export function BatchReviewPanel({
               <div
                 key={v.vehicleId}
                 className={cn(
-                  "p-4 rounded-xl border transition-all",
+                  "p-4 rounded-xl border transition",
                   analysis.status === "Ready" && analysis.priority === "High"
                     ? "border-rose-500/20 bg-rose-500/5"
                     : analysis.status === "Ready"
@@ -815,7 +815,7 @@ export function BatchReviewPanel({
                       </div>
                     )}
                     {analysis.bestCoverIsAi && (
-                      <div className="absolute bottom-0 inset-x-0 bg-blue-500/80 text-white text-[8px] font-bold text-center py-0.5 flex items-center justify-center gap-0.5">
+                      <div className="absolute bottom-0 inset-x-0 bg-primary/80 text-foreground text-[11px] font-bold text-center py-0.5 flex items-center justify-center gap-0.5">
                         <Wand2 className="w-2 h-2" />
                         AI COVER
                       </div>
@@ -836,12 +836,12 @@ export function BatchReviewPanel({
                           </span>
                           {/* Marketplace price mode badge */}
                           {v.price >= 16000 ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[9px] font-bold text-amber-400 uppercase tracking-widest">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-warning/10 border border-warning/20 text-[11px] font-bold text-warning  tracking-wide">
                               <DollarSign className="w-2.5 h-2.5" />
                               Down payment
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 border border-success/20 text-[9px] font-bold text-success uppercase tracking-widest">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 border border-success/20 text-[11px] font-bold text-success  tracking-wide">
                               Full price
                             </span>
                           )}
@@ -850,7 +850,7 @@ export function BatchReviewPanel({
                       {analysis.status === "Ready" && (
                         <span
                           className={cn(
-                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-widest",
+                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-bold  tracking-wide",
                             pCfg.bg,
                             pCfg.color,
                           )}
@@ -861,7 +861,7 @@ export function BatchReviewPanel({
                         </span>
                       )}
                       {intel?.strategyName && (
-                        <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[9px] font-bold text-primary uppercase tracking-widest">
+                        <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[11px] font-bold text-primary  tracking-wide">
                           {intel.strategyName}
                         </span>
                       )}
@@ -870,29 +870,29 @@ export function BatchReviewPanel({
                     {/* Metrics row */}
                     <div className="flex items-center gap-3 flex-wrap">
                       {(v.imageCount ?? 0) > 0 && (
-                        <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
                           <ImageIcon className="w-3 h-3" />
                           {v.imageCount} photos
                         </span>
                       )}
                       {v.listingScore != null && (
-                        <span className="text-[10px] text-muted-foreground font-medium">
+                        <span className="text-xs text-muted-foreground font-medium">
                           Score {v.listingScore}
                         </span>
                       )}
                       {photoEntry?.photoScore != null && (
-                        <span className="text-[10px] text-muted-foreground font-medium">
+                        <span className="text-xs text-muted-foreground font-medium">
                           Photo {photoEntry.photoScore}
                         </span>
                       )}
                       {intel?.recommendedDownPayment != null && (v.price ?? 0) >= 16000 && (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-amber-400">
+                        <span className="flex items-center gap-1 text-xs font-bold text-warning">
                           <DollarSign className="w-3 h-3" />
                           Marketplace: {formatCurrency(intel.recommendedDownPayment)} down
                         </span>
                       )}
                       {intel?.recommendedDownPayment == null && (v.price ?? 0) >= 16000 && (
-                        <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                        <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                           <DollarSign className="w-3 h-3" />
                           Down payment pending
                         </span>
@@ -915,7 +915,7 @@ export function BatchReviewPanel({
                   <div className="flex-shrink-0 text-right space-y-1">
                     <div
                       className={cn(
-                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-widest",
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-bold  tracking-wide",
                         cfg.bg,
                         cfg.color,
                       )}
@@ -923,7 +923,7 @@ export function BatchReviewPanel({
                       <StatusIcon className="w-3 h-3" />
                       {cfg.label}
                     </div>
-                    <p className="text-[10px] text-muted-foreground max-w-[180px]">
+                    <p className="text-xs text-muted-foreground max-w-[180px]">
                       {analysis.reason}
                     </p>
                   </div>
@@ -943,18 +943,18 @@ export function BatchReviewPanel({
 
         {/* ── Scheduling ── */}
         {ready.length > 0 && (
-          <div className="rounded-2xl border border-border/50 bg-card/60 overflow-hidden">
+          <div className="rounded-xl border border-border/50 bg-card/60 overflow-hidden">
             <div className="px-6 py-4 border-b border-border/30 flex items-center gap-2">
               <CalendarClock className="w-4 h-4 text-primary" />
               <span className="font-bold text-sm">Batch Scheduling</span>
-              <Badge className="ml-auto bg-primary/15 text-primary border-0 text-[10px] font-bold uppercase tracking-widest">
+              <Badge className="ml-auto bg-primary/15 text-primary border-0 text-xs font-bold  tracking-wide">
                 AI Recommended
               </Badge>
             </div>
 
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-3">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                <p className="text-xs font-bold text-muted-foreground  tracking-wide">
                   When to Post
                 </p>
                 <div className="flex gap-2">
@@ -968,7 +968,7 @@ export function BatchReviewPanel({
                       key={value}
                       onClick={() => setScheduleMode(value)}
                       className={cn(
-                        "flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border text-xs font-bold transition-all",
+                        "flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border text-xs font-bold transition",
                         scheduleMode === value
                           ? "border-primary bg-primary/15 text-primary"
                           : "border-border/50 text-muted-foreground hover:border-border",
@@ -982,7 +982,7 @@ export function BatchReviewPanel({
               </div>
 
               <div className="space-y-3">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                <p className="text-xs font-bold text-muted-foreground  tracking-wide">
                   Posting Window{" "}
                   <span className="text-primary normal-case font-semibold">
                     (AI: Morning recommended)
@@ -1001,7 +1001,7 @@ export function BatchReviewPanel({
               </div>
 
               <div className="space-y-3">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                <p className="text-xs font-bold text-muted-foreground  tracking-wide">
                   Spacing Between Posts
                 </p>
                 <Select value={spacing} onValueChange={setSpacing}>
@@ -1017,7 +1017,7 @@ export function BatchReviewPanel({
               </div>
 
               <div className="space-y-3">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                <p className="text-xs font-bold text-muted-foreground  tracking-wide">
                   Vehicles per Session
                 </p>
                 <Select value={batchSize} onValueChange={setBatchSize}>
@@ -1089,7 +1089,7 @@ export function BatchReviewPanel({
             <Button
               onClick={() => onApprove(batchToPublish.map((v) => v.vehicleId))}
               disabled={isApproving}
-              className="gap-2 px-8 font-bold text-[11px] uppercase tracking-widest premium-gradient-btn"
+              className="gap-2 px-8 font-bold text-[11px]  tracking-wide premium-gradient-btn"
             >
               {isApproving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

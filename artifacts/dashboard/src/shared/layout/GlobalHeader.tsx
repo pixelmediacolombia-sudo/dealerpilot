@@ -1,4 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import {
   useGetConnectionStatus,
@@ -24,6 +26,8 @@ import {
   ShoppingBag,
   Loader2,
   WifiOff,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useDealerLocation, type DealerLocation } from "@/context/LocationContext";
@@ -32,24 +36,48 @@ import { useDealerLocation, type DealerLocation } from "@/context/LocationContex
 
 type PillState = "ok" | "warn" | "error" | "unknown";
 
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const isDark = mounted && resolvedTheme === "dark";
+  const label = isDark ? "Use light theme" : "Use dark theme";
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="h-10 w-10 shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+      aria-label={label}
+      title={label}
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+    >
+      {isDark ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
+    </Button>
+  );
+}
+
 // ── Telemetry segment ─────────────────────────────────────────────────────────
 
 function TelSeg({ label, value, state }: { label: string; value: string; state: PillState }) {
   const dot =
-    state === "ok" ? "bg-emerald-400" :
-    state === "warn" ? "bg-amber-400" :
-    state === "error" ? "bg-red-400/80" :
-    "bg-white/[0.12]";
+    state === "ok" ? "bg-success" :
+    state === "warn" ? "bg-warning" :
+    state === "error" ? "bg-destructive/80" :
+    "bg-muted-foreground/35";
   const val =
-    state === "ok" ? "text-emerald-400" :
-    state === "warn" ? "text-amber-400" :
-    state === "error" ? "text-red-400/80" :
-    "text-white/[0.18]";
+    state === "ok" ? "text-success" :
+    state === "warn" ? "text-warning" :
+    state === "error" ? "text-destructive/80" :
+    "text-muted-foreground";
   return (
-    <div className="flex items-center gap-[5px]">
-      <span className={cn("w-[5px] h-[5px] rounded-full shrink-0", dot)} />
-      <span className="text-[9px] text-white/[0.18] font-mono tracking-[0.12em] uppercase">{label}</span>
-      <span className={cn("text-[9px] font-mono font-bold tracking-[0.08em]", val)}>{value}</span>
+    <div className="flex items-center gap-1.5">
+      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
+      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+      <span className={cn("text-[11px] font-semibold tabular-nums", val)}>{value}</span>
     </div>
   );
 }
@@ -65,20 +93,20 @@ const LOCATIONS: LocationOption[] = [
 
 function LocationSelector() {
   const { selectedLocation, setSelectedLocation } = useDealerLocation();
-  const displayLabel = selectedLocation === "" ? "ALL" : selectedLocation.toUpperCase();
+  const displayLabel = selectedLocation === "" ? "All locations" : selectedLocation;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-1.5 outline-none group">
-          <MapPin className="w-2.5 h-2.5 text-blue-400/40 shrink-0" />
-          <span className="text-[10px] font-semibold text-white/30 group-hover:text-white/50 transition-colors">
+        <button className="group flex min-h-10 items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-muted">
+          <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="hidden text-sm font-medium text-foreground lg:inline">
             Alpha Motorsport
           </span>
-          <span className="text-[10px] font-bold text-blue-400/60 group-hover:text-blue-400/90 transition-colors uppercase tracking-widest">
+          <span className="text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
             {displayLabel}
           </span>
-          <ChevronDown className="w-2.5 h-2.5 text-white/15 shrink-0" />
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[220px]">
@@ -124,7 +152,7 @@ function deriveConn(data: ConnectionStatus | undefined) {
 export function GlobalHeader() {
   const queryClient = useQueryClient();
   const { data: dealersData } = useListDealers();
-  const dealerId = dealersData?.dealers[0]?.id;
+  const dealerId = dealersData?.dealers?.[0]?.id;
 
   const { data: connData } = useGetConnectionStatus({
     query: {
@@ -156,21 +184,21 @@ export function GlobalHeader() {
   const isBusy = isPending || conn.connectPending;
 
   const lastRun = feedRunsData?.feedRuns?.[0];
-  let syncDetail = "NEVER";
+  let syncDetail = "Never";
   if (lastRun?.finishedAt) {
     const mins = Math.round((Date.now() - new Date(lastRun.finishedAt).getTime()) / 60000);
-    syncDetail = mins < 1 ? "NOW" : mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
+    syncDetail = mins < 1 ? "Now" : mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
   }
 
   const jobs = jobsData?.jobs ?? [];
   const activeJobs = jobs.filter(j => j.status === "Queued" || j.status === "Generating").length;
-  const aiDetail = activeJobs > 0 ? `${activeJobs} ACTIVE` : "IDLE";
+  const aiDetail = activeJobs > 0 ? `${activeJobs} active` : "Idle";
 
-  const dot = (s: string) => <span className="text-white/[0.06] text-[9px] select-none">·</span>;
-  const div = () => <div className="h-3 w-px bg-white/[0.05] mx-3" />;
+  const dot = (s: string) => <span className="text-muted-foreground text-[11px] select-none">·</span>;
+  const div = () => <div className="mx-2 h-4 w-px bg-border" />;
 
   return (
-    <header className="h-9 border-b border-white/[0.04] bg-[#06040d]/90 backdrop-blur-md flex items-center gap-3 px-5 shrink-0 relative z-30">
+    <header className="relative z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur-md sm:gap-3 sm:px-5">
 
       {/* Location */}
       <LocationSelector />
@@ -178,7 +206,7 @@ export function GlobalHeader() {
       <div className="flex-1" />
 
       {/* ── Telemetry strip ─────────────────────────────────── */}
-      <div className="flex items-center gap-3">
+      <div className="hidden items-center gap-2 2xl:flex">
         <TelSeg label="EXT" value={conn.extState === "ok" ? "ONLINE" : "OFFLINE"} state={conn.extState} />
         {dot("·")}
         <TelSeg label="FB" value={conn.fbState === "ok" ? "ACTIVE" : conn.fbState === "error" ? "OFFLINE" : "—"} state={conn.fbState} />
@@ -195,12 +223,14 @@ export function GlobalHeader() {
       </div>
 
       {/* Connect button — only when not ready */}
+      <ThemeToggle />
+
       {conn.needsConnect && (
         <>
           {div()}
           <Button
             size="sm"
-            className="h-6 text-[10px] px-3 gap-1.5 bg-blue-600/80 hover:bg-blue-600 text-white font-bold border border-blue-500/25 shadow-none rounded-md"
+            className="h-9 gap-1.5 rounded-md border border-primary bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-none hover:bg-primary/90"
             onClick={() => connectMarketplace({ data: { action: "marketplace" } })}
             disabled={isBusy || !conn.extOnline}
             title={!conn.extOnline ? "Extension must be online to connect" : "Connect to Facebook Marketplace"}

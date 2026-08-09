@@ -23,15 +23,15 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 function temperatureBadge(temp: string | null | undefined) {
-  if (temp === "Hot") return "bg-red-500/10 text-red-400 border-red-500/20";
+  if (temp === "Hot") return "bg-destructive/10 text-destructive border-destructive/20";
   if (temp === "Warm") return "bg-orange-500/10 text-orange-400 border-orange-500/20";
-  return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+  return "bg-primary/10 text-primary border-primary/20";
 }
 
 function temperatureIcon(temp: string | null | undefined) {
-  if (temp === "Hot") return <Flame className="w-3.5 h-3.5 text-red-400" />;
+  if (temp === "Hot") return <Flame className="w-3.5 h-3.5 text-destructive" />;
   if (temp === "Warm") return <Thermometer className="w-3.5 h-3.5 text-orange-400" />;
-  return <Snowflake className="w-3.5 h-3.5 text-blue-400" />;
+  return <Snowflake className="w-3.5 h-3.5 text-primary" />;
 }
 
 const STATUS_FLOW = [
@@ -94,7 +94,7 @@ export function LeadDetail() {
                   variant="ghost"
                   size="sm"
                   onClick={() => navigate("/leads")}
-                  className="gap-2 -ml-2 h-8 text-muted-foreground hover:text-white"
+                  className="gap-2 -ml-2 h-8 text-muted-foreground hover:text-foreground"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   Back to Leads CRM
@@ -110,16 +110,16 @@ export function LeadDetail() {
                 <button
                   onClick={() => handleStatus(s)}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border",
+                    "px-3 py-1.5 rounded-lg text-xs font-bold  tracking-wide transition border",
                     i <= currentIdx
                       ? "bg-primary/10 text-primary border-primary/20"
-                      : "text-muted-foreground border-white/10 hover:border-white/20 hover:text-white/60",
+                      : "text-muted-foreground border-border hover:border-border hover:text-muted-foreground",
                   )}
                 >
                   {s}
                 </button>
                 {i < STATUS_FLOW.length - 1 && (
-                  <ArrowRight className="w-3 h-3 text-white/10 shrink-0" />
+                  <ArrowRight className="w-3 h-3 text-muted-foreground shrink-0" />
                 )}
               </div>
             ))}
@@ -129,14 +129,14 @@ export function LeadDetail() {
             <SectionCard title="Buyer Info" icon={Users}>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-lg text-white/90">
+                  <span className="font-bold text-lg text-foreground">
                     {lead.buyerName ?? "Unknown Buyer"}
                   </span>
                   {lead.temperature && (
                     <Badge
                       variant="outline"
                       className={cn(
-                        "flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest",
+                        "flex items-center gap-1 text-[11px] font-bold  tracking-wide",
                         temperatureBadge(lead.temperature),
                       )}
                     >
@@ -150,9 +150,9 @@ export function LeadDetail() {
                   <div>
                     <div className="flex justify-between text-[11px] mb-1">
                       <span className="text-muted-foreground">Lead Score</span>
-                      <span className="font-bold text-white/80">{lead.leadScore}/100</span>
+                      <span className="font-bold text-foreground">{lead.leadScore}/100</span>
                     </div>
-                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full bg-primary rounded-full"
                         style={{ width: `${Math.min(lead.leadScore, 100)}%` }}
@@ -161,9 +161,9 @@ export function LeadDetail() {
                   </div>
                 )}
 
-                <div className="pt-3 border-t border-white/5 space-y-2">
+                <div className="pt-3 border-t border-border space-y-2">
                   {[
-                    { label: "Phone", value: lead.phone, icon: Phone, accent: "text-emerald-400" },
+                    { label: "Phone", value: lead.phone, icon: Phone, accent: "text-success" },
                     { label: "Language", value: lead.language === "es" ? "Spanish" : "English", icon: MessageSquare },
                     { label: "Timeline", value: lead.buyerTimeline?.replace(/_/g, " "), icon: Calendar },
                     { label: "Source", value: lead.sourceUrl, icon: FileText },
@@ -173,7 +173,7 @@ export function LeadDetail() {
                         <Icon className="w-3 h-3" />
                         {label}
                       </span>
-                      <span className={cn("font-medium truncate max-w-[150px]", accent ?? "text-white/70")}>
+                      <span className={cn("font-medium truncate max-w-[150px]", accent ?? "text-foreground")}>
                         {value ?? "—"}
                       </span>
                     </div>
@@ -185,18 +185,18 @@ export function LeadDetail() {
             <SectionCard title="Down Payment" icon={DollarSign}>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-xl bg-card/60 border border-white/5 text-center">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+                  <div className="p-3 rounded-xl bg-card/60 border border-border text-center">
+                    <div className="text-xs font-bold  tracking-wide text-muted-foreground mb-1">
                       Published
                     </div>
-                    <div className="text-xl font-bold text-white/90">
+                    <div className="text-xl font-bold text-foreground">
                       {lead.publishedDownPayment
                         ? `$${lead.publishedDownPayment.toLocaleString()}`
                         : "—"}
                     </div>
                   </div>
                   <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 text-center">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">
+                    <div className="text-xs font-bold  tracking-wide text-primary mb-1">
                       Buyer Has
                     </div>
                     <div className="text-xl font-bold text-primary">
@@ -213,7 +213,7 @@ export function LeadDetail() {
                       className={cn(
                         "p-3 rounded-xl border text-[11px] font-medium",
                         lead.buyerAvailableDownPayment >= lead.publishedDownPayment
-                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                          ? "bg-success/10 border-success/20 text-success"
                           : "bg-orange-500/10 border-orange-500/20 text-orange-400",
                       )}
                     >
@@ -236,12 +236,12 @@ export function LeadDetail() {
                   <div key={label} className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">{label}</span>
                     {value === true ? (
-                      <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
+                      <div className="flex items-center gap-1.5 text-[11px] text-success font-medium">
                         <CheckCircle2 className="w-4 h-4" />
                         Yes
                       </div>
                     ) : value === false ? (
-                      <div className="flex items-center gap-1.5 text-[11px] text-red-400/60 font-medium">
+                      <div className="flex items-center gap-1.5 text-[11px] text-destructive/60 font-medium">
                         <XCircle className="w-4 h-4" />
                         No
                       </div>
@@ -260,7 +260,7 @@ export function LeadDetail() {
                     variant="outline"
                     size="sm"
                     onClick={() => navigate(`/conversations/${lead.conversationId}`)}
-                    className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/10 text-[10px] font-bold uppercase tracking-widest"
+                    className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/10 text-xs font-bold  tracking-wide"
                   >
                     <MessageSquare className="w-3.5 h-3.5" />
                     View conversation
@@ -268,12 +268,12 @@ export function LeadDetail() {
                   </Button>
                 )}
                 {[
-                  { label: "Mark Hot", status: "Contacted", color: "text-red-400 border-red-500/20 hover:bg-red-500/10" },
-                  { label: "Mark Qualified", status: "Qualified", color: "text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10" },
+                  { label: "Mark Hot", status: "Contacted", color: "text-destructive border-destructive/20 hover:bg-destructive/10" },
+                  { label: "Mark Qualified", status: "Qualified", color: "text-success border-success/20 hover:bg-success/10" },
                   { label: "Appointment Ready", status: "Appointment Ready", color: "text-yellow-400 border-yellow-500/20 hover:bg-yellow-500/10" },
-                  { label: "Appointment Set", status: "Appointment Set", color: "text-green-400 border-green-500/20 hover:bg-green-500/10" },
+                  { label: "Appointment Set", status: "Appointment Set", color: "text-success border-success/20 hover:bg-success/10" },
                   { label: "Mark Sold", status: "Sold", color: "text-primary border-primary/20 hover:bg-primary/10" },
-                  { label: "Mark Lost", status: "Lost", color: "text-muted-foreground border-white/10 hover:bg-white/5" },
+                  { label: "Mark Lost", status: "Lost", color: "text-muted-foreground border-border hover:bg-muted" },
                 ].map(({ label, status, color }) => (
                   <Button
                     key={status}
@@ -281,7 +281,7 @@ export function LeadDetail() {
                     size="sm"
                     onClick={() => handleStatus(status)}
                     className={cn(
-                      "w-full text-[10px] font-bold uppercase tracking-widest",
+                      "w-full text-xs font-bold  tracking-wide",
                       color,
                     )}
                   >
@@ -297,7 +297,7 @@ export function LeadDetail() {
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {convData.messages.slice(-6).map((m) => (
                   <div key={m.id} className={cn("text-sm", m.role === "assistant" ? "text-primary/90 pl-4 border-l border-primary/20" : "text-foreground/70")}>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 block mb-0.5">
+                    <span className="text-xs font-bold  tracking-wide text-muted-foreground/60 block mb-0.5">
                       {m.role === "assistant" ? "DealerPilot" : "Buyer"}
                     </span>
                     {m.content}

@@ -264,7 +264,7 @@ function VehicleStep({
       case "publishing":
         return <Loader2 className="w-5 h-5 text-primary animate-spin flex-shrink-0" />;
       case "cooldown":
-        return <Clock className="w-5 h-5 text-amber-400 flex-shrink-0" />;
+        return <Clock className="w-5 h-5 text-warning flex-shrink-0" />;
       default:
         return <Circle className="w-5 h-5 text-muted-foreground/30 flex-shrink-0" />;
     }
@@ -285,7 +285,7 @@ function VehicleStep({
               <span className="text-xs text-primary">
                 {result.step ?? "Publishing…"}
               </span>
-              <span className="text-[10px] text-muted-foreground">{result.pct}%</span>
+              <span className="text-xs text-muted-foreground">{result.pct}%</span>
             </div>
             <Progress value={result.pct} className="h-1.5" />
           </div>
@@ -312,7 +312,7 @@ function VehicleStep({
         );
       case "cooldown":
         return (
-          <span className="text-xs text-amber-400">
+          <span className="text-xs text-warning">
             Cooldown — next vehicle in {cooldownSecs}s
           </span>
         );
@@ -330,7 +330,7 @@ function VehicleStep({
             : result.status === "publishing" || result.status === "creating"
               ? "border-primary/20 bg-primary/5"
               : result.status === "cooldown"
-                ? "border-amber-500/20 bg-amber-500/5"
+                ? "border-warning/20 bg-warning/5"
                 : "border-border/30 bg-secondary/10",
       )}
     >

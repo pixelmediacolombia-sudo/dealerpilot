@@ -62,15 +62,15 @@ export interface GmCoachModalProps {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function recColor(rec: "PUBLISH" | "HOLD" | "RECONSIDER") {
-  if (rec === "PUBLISH") return "text-emerald-400";
-  if (rec === "HOLD") return "text-red-400";
-  return "text-amber-400";
+  if (rec === "PUBLISH") return "text-success";
+  if (rec === "HOLD") return "text-destructive";
+  return "text-warning";
 }
 
 function recBorderColor(rec: "PUBLISH" | "HOLD" | "RECONSIDER") {
-  if (rec === "PUBLISH") return "border-emerald-500/20 bg-emerald-500/[0.04]";
-  if (rec === "HOLD") return "border-red-500/20 bg-red-500/[0.04]";
-  return "border-amber-500/20 bg-amber-500/[0.04]";
+  if (rec === "PUBLISH") return "border-success/20 bg-success/[0.04]";
+  if (rec === "HOLD") return "border-destructive/20 bg-destructive/[0.04]";
+  return "border-warning/20 bg-warning/[0.04]";
 }
 
 function recLabel(rec: "PUBLISH" | "HOLD" | "RECONSIDER") {
@@ -80,16 +80,16 @@ function recLabel(rec: "PUBLISH" | "HOLD" | "RECONSIDER") {
 }
 
 function recIcon(rec: "PUBLISH" | "HOLD" | "RECONSIDER") {
-  if (rec === "PUBLISH") return <CheckCircle2 className="w-5 h-5 text-emerald-400" />;
-  if (rec === "HOLD") return <ShieldAlert className="w-5 h-5 text-red-400" />;
-  return <AlertTriangle className="w-5 h-5 text-amber-400" />;
+  if (rec === "PUBLISH") return <CheckCircle2 className="w-5 h-5 text-success" />;
+  if (rec === "HOLD") return <ShieldAlert className="w-5 h-5 text-destructive" />;
+  return <AlertTriangle className="w-5 h-5 text-warning" />;
 }
 
 function DeltaBadge({ pct }: { pct: number }) {
-  if (pct === 0) return <span className="text-white/30 text-[12px]">No change</span>;
+  if (pct === 0) return <span className="text-muted-foreground text-[12px]">No change</span>;
   const positive = pct > 0;
   return (
-    <span className={cn("flex items-center gap-0.5 text-[13px] font-bold", positive ? "text-emerald-400" : "text-red-400")}>
+    <span className={cn("flex items-center gap-0.5 text-[13px] font-bold", positive ? "text-success" : "text-destructive")}>
       {positive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
       {positive ? "+" : ""}{pct}%
     </span>
@@ -224,20 +224,20 @@ export function GmCoachModal({
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <SheetContent
         side="right"
-        className="w-[420px] sm:w-[460px] bg-[#080e18] border-white/[0.07] flex flex-col gap-0 p-0 overflow-hidden"
+        className="w-[420px] sm:w-[460px] bg-[#080e18] border-border flex flex-col gap-0 p-0 overflow-hidden"
       >
         {/* Header */}
-        <SheetHeader className="px-5 pt-5 pb-4 border-b border-white/[0.05] shrink-0">
+        <SheetHeader className="px-5 pt-5 pb-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2.5 mb-1">
-            <Brain className="w-4 h-4 text-blue-400/60 shrink-0" />
-            <p className="text-[9px] font-black text-blue-400/40 uppercase tracking-[0.28em]">
+            <Brain className="w-4 h-4 text-primary/60 shrink-0" />
+            <p className="text-[11px] font-semibold text-primary/40  tracking-wide">
               DealerPilot GM Review
             </p>
           </div>
-          <SheetTitle className="text-[15px] font-bold text-white/75 leading-snug">
+          <SheetTitle className="text-[15px] font-bold text-foreground leading-snug">
             {vehicleLabel ?? "Vehicle Review"}
           </SheetTitle>
-          <p className="text-[11px] text-white/22 mt-0.5">
+          <p className="text-[11px] text-muted-foreground mt-0.5">
             Review the GM analysis before publishing to Facebook Marketplace
           </p>
         </SheetHeader>
@@ -248,12 +248,12 @@ export function GmCoachModal({
           {isLoading && (
             <div className="flex flex-col items-center justify-center py-16 gap-4">
               <div className="relative">
-                <Brain className="w-10 h-10 text-blue-400/20" />
-                <Loader2 className="w-5 h-5 text-blue-400 animate-spin absolute -bottom-1 -right-1" />
+                <Brain className="w-10 h-10 text-primary/20" />
+                <Loader2 className="w-5 h-5 text-primary animate-spin absolute -bottom-1 -right-1" />
               </div>
               <div className="text-center">
-                <p className="text-[13px] font-semibold text-white/45">GM is reviewing this vehicle…</p>
-                <p className="text-[11px] text-white/20 mt-1">Analyzing inventory, pricing, audience fit, and conflicts</p>
+                <p className="text-[13px] font-semibold text-muted-foreground">GM is reviewing this vehicle…</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Analyzing inventory, pricing, audience fit, and conflicts</p>
               </div>
             </div>
           )}
@@ -261,16 +261,16 @@ export function GmCoachModal({
           {/* ── Error ───────────────────────────────────────────────────── */}
           {!isLoading && error && (
             <div className="p-5 space-y-4">
-              <div className="flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/[0.05] p-4">
-                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2.5 rounded-xl border border-destructive/20 bg-destructive/[0.05] p-4">
+                <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-[12px] font-semibold text-red-400/80">Analysis unavailable</p>
-                  <p className="text-[11px] text-white/28 mt-1">{error}</p>
+                  <p className="text-[12px] font-semibold text-destructive/80">Analysis unavailable</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">{error}</p>
                 </div>
               </div>
-              <p className="text-[11px] text-white/22">You can still publish — the GM review is advisory only.</p>
+              <p className="text-[11px] text-muted-foreground">You can still publish — the GM review is advisory only.</p>
               <Button
-                className="w-full h-9 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[12px]"
+                className="w-full h-9 bg-primary hover:bg-primary text-foreground font-bold text-[12px]"
                 onClick={handleConfirm}
               >
                 Publish Anyway
@@ -286,68 +286,68 @@ export function GmCoachModal({
               <div className={cn("rounded-xl border p-4", recBorderColor(analysis.recommendation))}>
                 <div className="flex items-center gap-2.5 mb-2">
                   {recIcon(analysis.recommendation)}
-                  <span className={cn("text-[15px] font-black", recColor(analysis.recommendation))}>
+                  <span className={cn("text-[15px] font-semibold", recColor(analysis.recommendation))}>
                     {recLabel(analysis.recommendation)}
                   </span>
-                  <span className="ml-auto text-[11px] font-bold text-white/22">
+                  <span className="ml-auto text-[11px] font-bold text-muted-foreground">
                     {analysis.confidence}% confidence
                   </span>
                 </div>
-                <p className="text-[12px] text-white/55 leading-relaxed">{analysis.whyPublish}</p>
+                <p className="text-[12px] text-muted-foreground leading-relaxed">{analysis.whyPublish}</p>
               </div>
 
               {/* Risk Warning */}
               {analysis.riskWarning && (
-                <div className="rounded-xl border border-amber-500/15 bg-amber-500/[0.04] p-3.5">
+                <div className="rounded-xl border border-warning/15 bg-warning/[0.04] p-3.5">
                   <div className="flex items-center gap-2 mb-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400/60 shrink-0" />
-                    <p className="text-[9px] font-black text-amber-400/40 uppercase tracking-[0.22em]">Risk Warning</p>
+                    <AlertTriangle className="w-3.5 h-3.5 text-warning/60 shrink-0" />
+                    <p className="text-[11px] font-semibold text-warning/40  tracking-wide">Risk Warning</p>
                   </div>
-                  <p className="text-[11px] text-white/45 leading-relaxed">{analysis.riskWarning}</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{analysis.riskWarning}</p>
                 </div>
               )}
 
               {/* Duplicate Conflict */}
               {analysis.duplicateConflictWarning && (
-                <div className="rounded-xl border border-red-500/15 bg-red-500/[0.04] p-3.5">
+                <div className="rounded-xl border border-destructive/15 bg-destructive/[0.04] p-3.5">
                   <div className="flex items-center gap-2 mb-1.5">
-                    <ShieldAlert className="w-3.5 h-3.5 text-red-400/60 shrink-0" />
-                    <p className="text-[9px] font-black text-red-400/35 uppercase tracking-[0.22em]">Self-Competition Warning</p>
+                    <ShieldAlert className="w-3.5 h-3.5 text-destructive/60 shrink-0" />
+                    <p className="text-[11px] font-semibold text-destructive/35  tracking-wide">Self-Competition Warning</p>
                   </div>
-                  <p className="text-[11px] text-white/45 leading-relaxed">{analysis.duplicateConflictWarning}</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{analysis.duplicateConflictWarning}</p>
                 </div>
               )}
 
               {/* Better Alternative */}
               {analysis.hasBetterAlternative && analysis.betterAlternative && (
-                <div className="rounded-xl border border-blue-500/15 bg-blue-500/[0.03] p-3.5">
+                <div className="rounded-xl border border-primary/15 bg-primary/[0.03] p-3.5">
                   <div className="flex items-center gap-2 mb-1.5">
-                    <ArrowRight className="w-3.5 h-3.5 text-blue-400/50 shrink-0" />
-                    <p className="text-[9px] font-black text-blue-400/40 uppercase tracking-[0.22em]">Better Alternative</p>
+                    <ArrowRight className="w-3.5 h-3.5 text-primary/50 shrink-0" />
+                    <p className="text-[11px] font-semibold text-primary/40  tracking-wide">Better Alternative</p>
                   </div>
-                  <p className="text-[11px] text-white/45 leading-relaxed">{analysis.betterAlternative}</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{analysis.betterAlternative}</p>
                 </div>
               )}
 
               {/* Creative Recommendation */}
-              <div className="rounded-xl border border-white/[0.04] bg-white/[0.015] p-3.5">
-                <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em] mb-2.5">
+              <div className="rounded-xl border border-border bg-muted p-3.5">
+                <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide mb-2.5">
                   Creative Recommendation
                 </p>
                 <div className="space-y-2">
                   <div>
-                    <p className="text-[9px] text-white/18 uppercase tracking-wider mb-0.5">Ad Hook</p>
-                    <p className="text-[12px] font-semibold text-white/60 italic">"{analysis.adAngle}"</p>
+                    <p className="text-[11px] text-muted-foreground  tracking-wider mb-0.5">Ad Hook</p>
+                    <p className="text-[12px] font-semibold text-muted-foreground italic">"{analysis.adAngle}"</p>
                   </div>
                   <div className="flex gap-4">
                     <div>
-                      <p className="text-[9px] text-white/18 uppercase tracking-wider mb-0.5">Language</p>
-                      <p className="text-[11px] font-bold text-white/45">{analysis.suggestedLanguage}</p>
+                      <p className="text-[11px] text-muted-foreground  tracking-wider mb-0.5">Language</p>
+                      <p className="text-[11px] font-bold text-muted-foreground">{analysis.suggestedLanguage}</p>
                     </div>
                     {analysis.timingRecommendation && (
                       <div>
-                        <p className="text-[9px] text-white/18 uppercase tracking-wider mb-0.5">Timing</p>
-                        <p className="text-[11px] text-white/40">{analysis.timingRecommendation}</p>
+                        <p className="text-[11px] text-muted-foreground  tracking-wider mb-0.5">Timing</p>
+                        <p className="text-[11px] text-muted-foreground">{analysis.timingRecommendation}</p>
                       </div>
                     )}
                   </div>
@@ -355,41 +355,41 @@ export function GmCoachModal({
               </div>
 
               {/* Expected Impact */}
-              <div className="rounded-xl border border-white/[0.04] bg-white/[0.015] p-3.5">
-                <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em] mb-2">
+              <div className="rounded-xl border border-border bg-muted p-3.5">
+                <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide mb-2">
                   Expected Impact
                 </p>
-                <p className="text-[12px] text-white/45 leading-relaxed">{analysis.expectedImpact}</p>
+                <p className="text-[12px] text-muted-foreground leading-relaxed">{analysis.expectedImpact}</p>
                 {analysis.audienceOverlapWarning && (
-                  <p className="text-[10px] text-amber-400/50 mt-2 italic">{analysis.audienceOverlapWarning}</p>
+                  <p className="text-xs text-warning/50 mt-2 italic">{analysis.audienceOverlapWarning}</p>
                 )}
               </div>
 
               {/* ── What-if Price Slider ───────────────────────────────── */}
-              <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] p-4">
+              <div className="rounded-xl border border-border bg-muted p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em]">
+                  <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">
                     AI What-if
                   </p>
-                  <p className="text-[9px] text-white/18">What if I change the price?</p>
+                  <p className="text-[11px] text-muted-foreground">What if I change the price?</p>
                 </div>
 
                 {/* Price display */}
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <p className="text-[9px] text-white/18 uppercase tracking-wider mb-0.5">Current</p>
-                    <p className="text-[15px] font-black text-white/50">
+                    <p className="text-[11px] text-muted-foreground  tracking-wider mb-0.5">Current</p>
+                    <p className="text-[15px] font-semibold text-muted-foreground">
                       ${vehiclePrice != null ? vehiclePrice.toLocaleString() : "—"}
                     </p>
                   </div>
                   {priceDelta !== 0 && hypoPrice != null && (
                     <>
-                      <ArrowRight className="w-3.5 h-3.5 text-white/15" />
+                      <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
                       <div className="text-right">
-                        <p className="text-[9px] text-white/18 uppercase tracking-wider mb-0.5">Hypothetical</p>
+                        <p className="text-[11px] text-muted-foreground  tracking-wider mb-0.5">Hypothetical</p>
                         <p className={cn(
-                          "text-[15px] font-black",
-                          priceDelta < 0 ? "text-emerald-400/70" : "text-red-400/70",
+                          "text-[15px] font-semibold",
+                          priceDelta < 0 ? "text-success/70" : "text-destructive/70",
                         )}>
                           ${hypoPrice.toLocaleString()}
                         </p>
@@ -403,7 +403,7 @@ export function GmCoachModal({
                   <button
                     disabled={priceDelta <= DELTA_MIN}
                     onClick={() => setPriceDelta(d => Math.max(DELTA_MIN, d - DELTA_STEP))}
-                    className="w-8 h-8 rounded-lg border border-white/[0.06] bg-white/[0.03] flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/[0.06] disabled:opacity-25 transition-colors"
+                    className="w-8 h-8 rounded-lg border border-border bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-25 transition-colors"
                   >
                     <Minus className="w-3 h-3" />
                   </button>
@@ -416,21 +416,21 @@ export function GmCoachModal({
                       step={DELTA_STEP}
                       value={priceDelta}
                       onChange={e => setPriceDelta(Number(e.target.value))}
-                      className="w-full h-1.5 appearance-none rounded-full cursor-pointer bg-white/[0.06] accent-blue-500"
+                      className="w-full h-1.5 appearance-none rounded-full cursor-pointer bg-muted accent-blue-500"
                     />
                   </div>
 
                   <button
                     disabled={priceDelta >= DELTA_MAX}
                     onClick={() => setPriceDelta(d => Math.min(DELTA_MAX, d + DELTA_STEP))}
-                    className="w-8 h-8 rounded-lg border border-white/[0.06] bg-white/[0.03] flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/[0.06] disabled:opacity-25 transition-colors"
+                    className="w-8 h-8 rounded-lg border border-border bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-25 transition-colors"
                   >
                     <Plus className="w-3 h-3" />
                   </button>
 
                   <div className={cn(
-                    "w-[52px] text-center text-[13px] font-black tabular-nums",
-                    priceDelta < 0 ? "text-emerald-400/70" : priceDelta > 0 ? "text-red-400/70" : "text-white/20",
+                    "w-[52px] text-center text-[13px] font-semibold tabular-nums",
+                    priceDelta < 0 ? "text-success/70" : priceDelta > 0 ? "text-destructive/70" : "text-muted-foreground",
                   )}>
                     {priceDelta > 0 ? "+" : ""}{priceDelta}%
                   </div>
@@ -438,15 +438,15 @@ export function GmCoachModal({
 
                 {/* What-if results */}
                 {priceDelta === 0 && (
-                  <p className="text-[11px] text-white/18 text-center py-1">
+                  <p className="text-[11px] text-muted-foreground text-center py-1">
                     Use the slider or +/− buttons to model a price change
                   </p>
                 )}
 
                 {priceDelta !== 0 && whatIfLoading && (
                   <div className="flex items-center justify-center gap-2 py-2">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400/50" />
-                    <p className="text-[11px] text-white/20">Calculating…</p>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary/50" />
+                    <p className="text-[11px] text-muted-foreground">Calculating…</p>
                   </div>
                 )}
 
@@ -458,14 +458,14 @@ export function GmCoachModal({
                         { label: "Appointments", value: whatIf.appointmentsDeltaPct },
                         { label: "Sale Prob.", value: whatIf.saleProbabilityDelta },
                       ].map(m => (
-                        <div key={m.label} className="text-center rounded-lg border border-white/[0.04] bg-white/[0.02] py-2 px-1">
+                        <div key={m.label} className="text-center rounded-lg border border-border bg-muted py-2 px-1">
                           <DeltaBadge pct={m.value} />
-                          <p className="text-[9px] text-white/18 mt-1">{m.label}</p>
+                          <p className="text-[11px] text-muted-foreground mt-1">{m.label}</p>
                         </div>
                       ))}
                     </div>
-                    <p className="text-[11px] text-white/32 leading-relaxed">{whatIf.explanation}</p>
-                    <p className="text-[9px] text-white/14">
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">{whatIf.explanation}</p>
+                    <p className="text-[11px] text-muted-foreground">
                       Confidence: {whatIf.confidence}% · Based on Opportunity Engine data
                     </p>
                   </div>
@@ -478,10 +478,10 @@ export function GmCoachModal({
 
         {/* ── Footer Actions ──────────────────────────────────────────────────── */}
         {!isLoading && (
-          <div className="shrink-0 px-5 py-4 border-t border-white/[0.05] flex gap-2.5">
+          <div className="shrink-0 px-5 py-4 border-t border-border flex gap-2.5">
             <Button
               variant="ghost"
-              className="flex-1 h-10 text-white/35 hover:text-white/60 hover:bg-white/[0.04] font-semibold text-[12px]"
+              className="flex-1 h-10 text-muted-foreground hover:text-muted-foreground hover:bg-muted font-semibold text-[12px]"
               onClick={handleClose}
             >
               {analysis?.recommendation === "HOLD" ? "Hold Vehicle" : "Cancel"}
@@ -490,8 +490,8 @@ export function GmCoachModal({
               className={cn(
                 "flex-[2] h-10 font-bold text-[13px] gap-2",
                 analysis?.recommendation === "HOLD"
-                  ? "bg-amber-600 hover:bg-amber-500 text-white"
-                  : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20",
+                  ? "bg-warning hover:bg-warning text-foreground"
+                  : "bg-primary hover:bg-primary text-foreground shadow-lg shadow-blue-500/20",
               )}
               onClick={handleConfirm}
             >

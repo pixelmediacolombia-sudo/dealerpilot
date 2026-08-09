@@ -122,9 +122,9 @@ function TriStateIcon({
   trueIcon: React.ComponentType<{ className?: string }>;
   falseIcon: React.ComponentType<{ className?: string }>;
 }) {
-  if (value === true) return <TrueIcon className="w-4 h-4 text-emerald-400" />;
-  if (value === false) return <FalseIcon className="w-4 h-4 text-red-400" />;
-  return <span className="w-4 h-4 rounded-full bg-white/10 inline-block" />;
+  if (value === true) return <TrueIcon className="w-4 h-4 text-success" />;
+  if (value === false) return <FalseIcon className="w-4 h-4 text-destructive" />;
+  return <span className="w-4 h-4 rounded-full bg-muted inline-block" />;
 }
 
 function StatusRow({
@@ -143,7 +143,7 @@ function StatusRow({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+    <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
       <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
         <Icon className="w-4 h-4 opacity-60" />
         <span>{label}</span>
@@ -151,17 +151,17 @@ function StatusRow({
       <div className="flex items-center gap-1.5">
         {ok === true ? (
           <>
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-xs font-medium text-emerald-400">{okLabel}</span>
+            <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+            <span className="text-xs font-medium text-success">{okLabel}</span>
           </>
         ) : ok === false ? (
           <>
-            <XCircle className="w-3.5 h-3.5 text-red-400" />
-            <span className="text-xs font-medium text-red-400">{nokLabel}</span>
+            <XCircle className="w-3.5 h-3.5 text-destructive" />
+            <span className="text-xs font-medium text-destructive">{nokLabel}</span>
           </>
         ) : (
           <>
-            <span className="w-3.5 h-3.5 rounded-full bg-white/15 inline-block" />
+            <span className="w-3.5 h-3.5 rounded-full bg-muted inline-block" />
             <span className="text-xs text-muted-foreground">{unknownLabel}</span>
           </>
         )}
@@ -180,16 +180,15 @@ function MarketplaceConnectionPanel({ status, isConnecting, onConnect }: Connect
   const showLoginBanner = extOnline && fbLoggedIn === false;
 
   const overallStatus = connected
-    ? { label: "Marketplace Connected", color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" }
+    ? { label: "Marketplace Connected", color: "text-success", bg: "bg-success/10 border-success/20" }
     : isConnectPending || isConnecting
-    ? { label: "Setting Up…", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" }
+    ? { label: "Setting Up…", color: "text-warning", bg: "bg-warning/10 border-warning/20" }
     : !extOnline
-    ? { label: "Extension Offline", color: "text-red-400", bg: "bg-red-500/10 border-red-500/20" }
-    : { label: "Not Connected", color: "text-muted-foreground", bg: "bg-white/5 border-white/10" };
+    ? { label: "Extension Offline", color: "text-destructive", bg: "bg-destructive/10 border-destructive/20" }
+    : { label: "Not Connected", color: "text-muted-foreground", bg: "bg-muted border-border" };
 
   return (
-    <Card className="glass-panel border-white/5 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.04] to-transparent pointer-events-none" />
+    <Card className="glass-panel border-border overflow-hidden">
 
       <CardHeader className="pb-4 relative z-10">
         <div className="flex items-start justify-between">
@@ -223,7 +222,7 @@ function MarketplaceConnectionPanel({ status, isConnecting, onConnect }: Connect
 
       <CardContent className="relative z-10 space-y-5">
         {/* Status rows */}
-        <div className="bg-black/30 rounded-lg border border-white/5 px-4 py-1">
+        <div className="rounded-lg border border-border bg-muted/60 px-4 py-1">
           <StatusRow
             label="Extension Agent"
             ok={extOnline}
@@ -260,17 +259,17 @@ function MarketplaceConnectionPanel({ status, isConnecting, onConnect }: Connect
 
         {/* Login required banner */}
         {showLoginBanner && (
-          <div className="flex items-center justify-between gap-3 px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 bg-warning/10 border border-warning/20 rounded-lg">
             <div className="flex items-center gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <span className="text-sm text-amber-300">
+              <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0" />
+              <span className="text-sm text-warning">
                 Facebook login required — the extension cannot access Marketplace.
               </span>
             </div>
             <Button
               size="sm"
               variant="outline"
-              className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 flex-shrink-0 gap-1.5"
+              className="border-warning/40 text-warning hover:bg-warning/10 flex-shrink-0 gap-1.5"
               onClick={() => onConnect("login")}
               disabled={isConnecting || isConnectPending}
             >
@@ -396,11 +395,11 @@ function AiWorkersPanel() {
   return (
     <div>
       <div className="flex items-center gap-3 mb-4">
-        <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">AI Workers</p>
-        <div className="flex-1 h-px bg-white/[0.04]" />
+        <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">AI Workers</p>
+        <div className="flex-1 h-px bg-muted" />
       </div>
 
-      <Card className="glass-panel border-white/5 overflow-hidden">
+      <Card className="glass-panel border-border overflow-hidden">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2.5">
             <Zap className="w-5 h-5 text-primary opacity-80" />
@@ -413,41 +412,41 @@ function AiWorkersPanel() {
         <CardContent className="space-y-4">
           {isLoading ? (
             <div className="py-8 flex justify-center">
-              <Loader2 className="w-5 h-5 animate-spin text-white/20" />
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
           ) : (
             <>
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-              <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Photo Worker Status</p>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted px-3.5 py-2.5">
+              <p className="text-xs font-bold text-muted-foreground  tracking-wider">Photo Worker Status</p>
               <StatusPulse status={photoWorkerStatusColor(photoWorkerStatus)} label={photoWorkerStatus} />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Today's FAL Spend</p>
-                <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+              <div className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
+                <p className="text-xs font-bold text-muted-foreground  tracking-wider">Today's FAL Spend</p>
+                <p className="text-[13px] font-semibold text-foreground mt-0.5">
                   ${todayFALSpendEstimate.toFixed(2)}
                 </p>
               </div>
-              <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Today's OpenAI Spend</p>
-                <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+              <div className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
+                <p className="text-xs font-bold text-muted-foreground  tracking-wider">Today's OpenAI Spend</p>
+                <p className="text-[13px] font-semibold text-foreground mt-0.5">
                   ${todayOpenAISpendEstimate.toFixed(3)}
                 </p>
               </div>
-              <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Remaining FAL Budget</p>
-                <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+              <div className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
+                <p className="text-xs font-bold text-muted-foreground  tracking-wider">Remaining FAL Budget</p>
+                <p className="text-[13px] font-semibold text-foreground mt-0.5">
                   ${falBudgetRemaining.toFixed(2)}
                 </p>
               </div>
-              <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Remaining OpenAI Budget</p>
-                <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+              <div className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
+                <p className="text-xs font-bold text-muted-foreground  tracking-wider">Remaining OpenAI Budget</p>
+                <p className="text-[13px] font-semibold text-foreground mt-0.5">
                   ${openAIBudgetRemaining.toFixed(3)}
                 </p>
               </div>
             </div>
-            <div className="border border-white/[0.05] bg-white/[0.01] rounded-xl overflow-hidden">
+            <div className="border border-border bg-muted rounded-xl overflow-hidden">
               {workers.map((w, idx) => {
                 const color = workerStatusColor(w.status);
                 const isRunning = runningId === w.id;
@@ -456,18 +455,18 @@ function AiWorkersPanel() {
                     key={w.id}
                     className={cn(
                       "flex items-center gap-4 px-5 py-3.5",
-                      idx < workers.length - 1 && "border-b border-white/[0.04]",
+                      idx < workers.length - 1 && "border-b border-border",
                     )}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-[13px] font-semibold text-white/70">{w.name}</p>
+                        <p className="text-[13px] font-semibold text-foreground">{w.name}</p>
                         <StatusPulse status={color} label={w.status} />
                       </div>
-                      <p className="text-[11px] text-white/22 mt-0.5 truncate">
+                      <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
                         {w.lastResult ?? w.lastError ?? w.description}
                       </p>
-                      <div className="flex items-center gap-3 mt-1 text-[10px] text-white/18 font-mono">
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground font-mono">
                         {w.lastRunAt && (
                           <span className="flex items-center gap-1">
                             <Clock className="w-2.5 h-2.5" /> Last {formatDate(w.lastRunAt)}
@@ -481,7 +480,7 @@ function AiWorkersPanel() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-white/10 text-white/70 hover:bg-white/5 gap-1.5 shrink-0"
+                      className="border-border text-foreground hover:bg-muted gap-1.5 shrink-0"
                       disabled={isRunning || !w.enabled}
                       onClick={() => runWorker({ id: w.id })}
                     >
@@ -502,21 +501,21 @@ function AiWorkersPanel() {
           {/* System timeline */}
           {events.length > 0 && (
             <div className="pt-1">
-              <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-white/22 uppercase tracking-wider">
+              <div className="flex items-center gap-2 mb-2 text-xs font-bold text-muted-foreground  tracking-wider">
                 <History className="w-3 h-3" />
                 Recent Activity
               </div>
-              <div className="border border-white/[0.04] bg-white/[0.01] rounded-lg overflow-hidden">
+              <div className="border border-border bg-muted rounded-lg overflow-hidden">
                 {events.map((e, ei) => (
                   <div
                     key={e.id}
                     className={cn(
                       "flex items-start justify-between gap-3 px-3.5 py-2",
-                      ei < events.length - 1 && "border-b border-white/[0.04]",
+                      ei < events.length - 1 && "border-b border-border",
                     )}
                   >
-                    <span className="text-[11px] text-white/50 min-w-0">{e.message}</span>
-                    <span className="text-[10px] text-white/18 font-mono shrink-0">{formatDate(e.createdAt)}</span>
+                    <span className="text-[11px] text-muted-foreground min-w-0">{e.message}</span>
+                    <span className="text-xs text-muted-foreground font-mono shrink-0">{formatDate(e.createdAt)}</span>
                   </div>
                 ))}
               </div>
@@ -549,11 +548,11 @@ function decisionActionMeta(action: WorkerDecision["action"]): {
 } {
   switch (action) {
     case "RUN":
-      return { icon: Play, color: "text-emerald-400" };
+      return { icon: Play, color: "text-success" };
     case "PAUSE":
-      return { icon: Pause, color: "text-amber-400" };
+      return { icon: Pause, color: "text-warning" };
     default:
-      return { icon: CircleSlash, color: "text-white/30" };
+      return { icon: CircleSlash, color: "text-muted-foreground" };
   }
 }
 
@@ -591,11 +590,11 @@ function AiOrchestratorPanel() {
   return (
     <div>
       <div className="flex items-center gap-3 mb-4">
-        <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">AI Orchestrator</p>
-        <div className="flex-1 h-px bg-white/[0.04]" />
+        <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">AI Orchestrator</p>
+        <div className="flex-1 h-px bg-muted" />
       </div>
 
-      <Card className="glass-panel border-white/5 overflow-hidden">
+      <Card className="glass-panel border-border overflow-hidden">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
@@ -611,7 +610,7 @@ function AiOrchestratorPanel() {
             <Button
               size="sm"
               variant="outline"
-              className="border-white/10 text-white/70 hover:bg-white/5 gap-1.5 shrink-0"
+              className="border-border text-foreground hover:bg-muted gap-1.5 shrink-0"
               disabled={isRunning}
               onClick={() => runCycle()}
             >
@@ -623,32 +622,32 @@ function AiOrchestratorPanel() {
         <CardContent className="space-y-4">
           {isLoading ? (
             <div className="py-8 flex justify-center">
-              <Loader2 className="w-5 h-5 animate-spin text-white/20" />
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
           ) : (
             <>
               {data?.lastDecisionAt && (
-                <p className="text-[11px] text-white/30 -mt-1">
+                <p className="text-[11px] text-muted-foreground -mt-1">
                   Last decision {formatDate(data.lastDecisionAt)}
                 </p>
               )}
 
               <div className="grid grid-cols-4 gap-3">
-                <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                  <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Running</p>
-                  <p className="text-[13px] font-semibold text-emerald-400 mt-0.5">{workersRunning.length}</p>
+                <div className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
+                  <p className="text-xs font-bold text-muted-foreground  tracking-wider">Running</p>
+                  <p className="text-[13px] font-semibold text-success mt-0.5">{workersRunning.length}</p>
                 </div>
-                <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                  <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Skipped</p>
-                  <p className="text-[13px] font-semibold text-white/50 mt-0.5">{workersSkipped.length}</p>
+                <div className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
+                  <p className="text-xs font-bold text-muted-foreground  tracking-wider">Skipped</p>
+                  <p className="text-[13px] font-semibold text-muted-foreground mt-0.5">{workersSkipped.length}</p>
                 </div>
-                <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                  <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Paused</p>
-                  <p className="text-[13px] font-semibold text-amber-400 mt-0.5">{workersPaused.length}</p>
+                <div className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
+                  <p className="text-xs font-bold text-muted-foreground  tracking-wider">Paused</p>
+                  <p className="text-[13px] font-semibold text-warning mt-0.5">{workersPaused.length}</p>
                 </div>
-                <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                  <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">Extension</p>
-                  <p className={cn("text-[13px] font-semibold mt-0.5", extensionOnline ? "text-emerald-400" : "text-red-400")}>
+                <div className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
+                  <p className="text-xs font-bold text-muted-foreground  tracking-wider">Extension</p>
+                  <p className={cn("text-[13px] font-semibold mt-0.5", extensionOnline ? "text-success" : "text-destructive")}>
                     {extensionOnline ? "Online" : "Offline"}
                   </p>
                 </div>
@@ -656,22 +655,22 @@ function AiOrchestratorPanel() {
 
               {budget && (
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                    <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">FAL Budget Remaining</p>
-                    <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+                  <div className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
+                    <p className="text-xs font-bold text-muted-foreground  tracking-wider">FAL Budget Remaining</p>
+                    <p className="text-[13px] font-semibold text-foreground mt-0.5">
                       ${budget.falBudgetRemaining.toFixed(2)} / ${budget.falDailyBudgetUsd.toFixed(2)}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] px-3.5 py-2.5">
-                    <p className="text-[10px] font-bold text-white/22 uppercase tracking-wider">OpenAI Budget Remaining</p>
-                    <p className="text-[13px] font-semibold text-white/70 mt-0.5">
+                  <div className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
+                    <p className="text-xs font-bold text-muted-foreground  tracking-wider">OpenAI Budget Remaining</p>
+                    <p className="text-[13px] font-semibold text-foreground mt-0.5">
                       ${budget.openAIBudgetRemaining.toFixed(3)} / ${budget.openAIDailyBudgetUsd.toFixed(2)}
                     </p>
                   </div>
                 </div>
               )}
 
-              <div className="border border-white/[0.05] bg-white/[0.01] rounded-xl overflow-hidden">
+              <div className="border border-border bg-muted rounded-xl overflow-hidden">
                 {decisions.map((d, idx) => {
                   const { icon: ActionIcon, color } = decisionActionMeta(d.action);
                   return (
@@ -679,16 +678,16 @@ function AiOrchestratorPanel() {
                       key={d.workerId}
                       className={cn(
                         "flex items-center gap-3 px-5 py-3",
-                        idx < decisions.length - 1 && "border-b border-white/[0.04]",
+                        idx < decisions.length - 1 && "border-b border-border",
                       )}
                     >
                       <ActionIcon className={cn("w-3.5 h-3.5 shrink-0", color)} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-[12px] font-semibold text-white/70 capitalize">{d.workerId}</p>
-                          <span className={cn("text-[10px] font-bold uppercase tracking-wider", color)}>{d.action}</span>
+                          <p className="text-[12px] font-semibold text-foreground capitalize">{d.workerId}</p>
+                          <span className={cn("text-xs font-bold  tracking-wider", color)}>{d.action}</span>
                         </div>
-                        <p className="text-[11px] text-white/30 mt-0.5 truncate">{d.reason}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{d.reason}</p>
                       </div>
                     </div>
                   );
@@ -765,7 +764,7 @@ export function ConnectionCenter() {
 
           {isLoading ? (
             <div className="py-20 flex justify-center">
-              <Loader2 className="w-5 h-5 animate-spin text-white/20" />
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
           ) : (
             <div className="space-y-8">
@@ -785,10 +784,10 @@ export function ConnectionCenter() {
               {/* Service health telemetry */}
               <div>
                 <div className="flex items-center gap-3 mb-4">
-                  <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Service Health</p>
-                  <div className="flex-1 h-px bg-white/[0.04]" />
+                  <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">Service Health</p>
+                  <div className="flex-1 h-px bg-muted" />
                 </div>
-                <div className="border border-white/[0.05] bg-white/[0.01] rounded-xl overflow-hidden">
+                <div className="border border-border bg-muted rounded-xl overflow-hidden">
                   {SERVICES.map(({ key, name, icon: Icon, description }, idx) => {
                     const svc = (status as unknown as Record<string, SvcStatus> | undefined)?.[key];
                     const color = svcColor(svc?.status);
@@ -799,22 +798,22 @@ export function ConnectionCenter() {
                       <div
                         key={key}
                         className={cn(
-                          "transition-colors hover:bg-white/[0.015]",
-                          idx < SERVICES.length - 1 && "border-b border-white/[0.04]",
+                          "transition-colors hover:bg-muted",
+                          idx < SERVICES.length - 1 && "border-b border-border",
                         )}
                       >
                         {/* Main row */}
                         <div className="flex items-center gap-5 px-5 py-4">
-                          <div className="w-8 h-8 rounded-lg border border-white/[0.06] bg-white/[0.02] flex items-center justify-center shrink-0">
-                            <Icon className="w-3.5 h-3.5 text-white/30" />
+                          <div className="w-8 h-8 rounded-lg border border-border bg-muted flex items-center justify-center shrink-0">
+                            <Icon className="w-3.5 h-3.5 text-muted-foreground" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-semibold text-white/70">{name}</p>
-                            <p className="text-[11px] text-white/22 mt-0.5">
+                            <p className="text-[13px] font-semibold text-foreground">{name}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
                               {svc?.detail ?? description}
                             </p>
                             {svc?.lastHeartbeatAt && (
-                              <p className="text-[10px] text-white/18 font-mono mt-1">{formatDate(svc.lastHeartbeatAt)}</p>
+                              <p className="text-xs text-muted-foreground font-mono mt-1">{formatDate(svc.lastHeartbeatAt)}</p>
                             )}
                           </div>
                           <StatusPulse status={color} label={label} />
@@ -823,7 +822,7 @@ export function ConnectionCenter() {
                         {/* Sub-components (AI Engine / Messaging details) */}
                         {hasComponents && (
                           <div className="px-5 pb-3 -mt-1">
-                            <div className="ml-[52px] border border-white/[0.04] bg-white/[0.015] rounded-lg overflow-hidden">
+                            <div className="ml-[52px] border border-border bg-muted rounded-lg overflow-hidden">
                               {svc!.components!.map((c, ci) => {
                                 const cColor = svcColor(c.status);
                                 return (
@@ -831,25 +830,25 @@ export function ConnectionCenter() {
                                     key={c.name}
                                     className={cn(
                                       "flex items-center justify-between px-3.5 py-2",
-                                      ci < svc!.components!.length - 1 && "border-b border-white/[0.04]",
+                                      ci < svc!.components!.length - 1 && "border-b border-border",
                                     )}
                                   >
                                     <div className="flex items-center gap-2 min-w-0">
                                       {cColor === "success" ? (
-                                        <CheckCircle2 className="w-3 h-3 text-emerald-400/70 shrink-0" />
+                                        <CheckCircle2 className="w-3 h-3 text-success/70 shrink-0" />
                                       ) : cColor === "warning" ? (
-                                        <AlertTriangle className="w-3 h-3 text-amber-400/70 shrink-0" />
+                                        <AlertTriangle className="w-3 h-3 text-warning/70 shrink-0" />
                                       ) : (
-                                        <XCircle className="w-3 h-3 text-red-400/60 shrink-0" />
+                                        <XCircle className="w-3 h-3 text-destructive/60 shrink-0" />
                                       )}
-                                      <span className="text-[11px] font-semibold text-white/55 shrink-0">{c.name}</span>
+                                      <span className="text-[11px] font-semibold text-muted-foreground shrink-0">{c.name}</span>
                                       {c.detail && (
-                                        <span className="text-[10px] text-white/22 truncate ml-1 hidden sm:block">— {c.detail}</span>
+                                        <span className="text-xs text-muted-foreground truncate ml-1 hidden sm:block">— {c.detail}</span>
                                       )}
                                     </div>
                                     <span className={cn(
-                                      "text-[10px] font-bold shrink-0 ml-3",
-                                      cColor === "success" ? "text-emerald-400/70" : cColor === "warning" ? "text-amber-400/70" : "text-red-400/60",
+                                      "text-xs font-bold shrink-0 ml-3",
+                                      cColor === "success" ? "text-success/70" : cColor === "warning" ? "text-warning/70" : "text-destructive/60",
                                     )}>
                                       {cColor === "success" ? "Live" : cColor === "warning" ? "Warning" : "Offline"}
                                     </span>

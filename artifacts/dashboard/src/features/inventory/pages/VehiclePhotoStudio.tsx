@@ -230,7 +230,7 @@ export function VehiclePhotoStudio({
   const progressPercent = activeJob?.progressPercent ??
     (progressTotal > 0 ? Math.round((progressDone / progressTotal) * 100) : 0);
   const modeSelector = (
-    <div className="grid grid-cols-3 gap-1 rounded-lg border border-white/[0.08] bg-white/[0.03] p-1">
+    <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-muted p-1">
       {([
         ["fidelity-first", "Fidelity"],
         ["balanced", "Balanced"],
@@ -241,10 +241,10 @@ export function VehiclePhotoStudio({
           type="button"
           onClick={() => setProcessingMode(mode)}
           className={cn(
-            "py-1.5 text-[10px] font-semibold rounded-md transition-colors",
+            "py-1.5 text-xs font-semibold rounded-md transition-colors",
             processingMode === mode
               ? "bg-primary/20 text-primary border border-primary/25"
-              : "text-muted-foreground hover:text-white/70",
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           {label}
@@ -253,7 +253,7 @@ export function VehiclePhotoStudio({
     </div>
   );
   const directorModeSelector = (
-    <div className="grid grid-cols-3 gap-1 rounded-lg border border-white/[0.08] bg-white/[0.03] p-1">
+    <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-muted p-1">
       {([
         ["economy", "Economy"],
         ["balanced", "Balanced"],
@@ -264,10 +264,10 @@ export function VehiclePhotoStudio({
           type="button"
           onClick={() => setPhotoDirectorMode(mode)}
           className={cn(
-            "py-1.5 text-[10px] font-semibold rounded-md transition-colors",
+            "py-1.5 text-xs font-semibold rounded-md transition-colors",
             photoDirectorMode === mode
-              ? "bg-emerald-500/15 text-emerald-300 border border-emerald-400/20"
-              : "text-muted-foreground hover:text-white/70",
+              ? "bg-success/15 text-success border border-success/20"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           {label}
@@ -276,14 +276,14 @@ export function VehiclePhotoStudio({
     </div>
   );
   const directorSummary = directorPlan ? (
-    <div className="rounded-lg border border-emerald-400/15 bg-emerald-500/[0.04] p-3 space-y-2">
+    <div className="rounded-lg border border-success/15 bg-success/[0.04] p-3 space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-emerald-300">Photo Director</span>
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-[11px] font-semibold text-success">Photo Director</span>
+        <span className="text-xs text-muted-foreground">
           ${directorPlan.estimatedCostUsd.toFixed(2)} est.
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
+      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
         <span>{directorPlan.totalPhotosAnalyzed} analyzed</span>
         <span>{directorPlan.selectedPhotoIds.length} selected</span>
         <span>{directorPlan.publishAsIsCount} as-is</span>
@@ -292,7 +292,7 @@ export function VehiclePhotoStudio({
         <span>{directorPlan.duplicateRejectedCount} duplicates</span>
       </div>
       {directorPlan.heroPhotoId && (
-        <div className="text-[10px] text-emerald-200/80">
+        <div className="text-xs text-success/80">
           Recommended Cover Photo #{directorPlan.heroPhotoId}
         </div>
       )}
@@ -348,9 +348,9 @@ export function VehiclePhotoStudio({
                     {progressDone} / {progressTotal} photos
                   </span>
                 </div>
-                <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-primary rounded-full transition-all duration-500"
+                    className="h-full bg-primary rounded-full transition duration-500"
                     style={{
                       width: `${progressPercent}%`,
                     }}
@@ -369,7 +369,7 @@ export function VehiclePhotoStudio({
               <div
                 className={cn(
                   "flex items-center gap-1.5 text-sm font-medium",
-                  isReady ? "text-green-400" : "text-amber-400",
+                  isReady ? "text-success" : "text-warning",
                 )}
               >
                 {isReady ? (
@@ -390,14 +390,14 @@ export function VehiclePhotoStudio({
             </div>
 
             {/* Original / AI Enhanced toggle */}
-            <div className="flex p-1 bg-white/[0.04] border border-white/[0.08] rounded-lg">
+            <div className="flex p-1 bg-muted border border-border rounded-lg">
               <button
                 onClick={() => onPhotoModeChange("original")}
                 className={cn(
-                  "flex-1 py-1.5 text-[11px] font-semibold rounded-md transition-all",
+                  "flex-1 py-1.5 text-[11px] font-semibold rounded-md transition",
                   photoMode === "original"
-                    ? "bg-white/10 text-white shadow-sm"
-                    : "text-muted-foreground hover:text-white/70",
+                    ? "bg-muted text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 Original
@@ -405,10 +405,10 @@ export function VehiclePhotoStudio({
               <button
                 onClick={() => onPhotoModeChange("ai")}
                 className={cn(
-                  "flex-1 py-1.5 text-[11px] font-semibold rounded-md transition-all flex items-center justify-center gap-1",
+                  "flex-1 py-1.5 text-[11px] font-semibold rounded-md transition flex items-center justify-center gap-1",
                   photoMode === "ai"
                     ? "bg-primary/20 text-primary shadow-sm border border-primary/20"
-                    : "text-muted-foreground hover:text-white/70",
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <Sparkles className="w-3 h-3" /> AI Enhanced
@@ -420,8 +420,8 @@ export function VehiclePhotoStudio({
               className={cn(
                 "flex items-center gap-2 p-3 rounded-lg border text-xs font-medium",
                 data?.isActiveForMarketplace
-                  ? "bg-green-500/[0.06] border-green-500/20 text-green-400"
-                  : "bg-white/[0.03] border-white/[0.06] text-muted-foreground",
+                  ? "bg-success/[0.06] border-success/20 text-success"
+                  : "bg-muted border-border text-muted-foreground",
               )}
             >
               <Store className="w-3.5 h-3.5 flex-shrink-0" />
@@ -437,11 +437,11 @@ export function VehiclePhotoStudio({
               <div>
                 <button
                   onClick={() => setShowBeforeAfter((v) => !v)}
-                  className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-white transition-colors w-full mb-2"
+                  className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors w-full mb-2"
                 >
                   <ArrowLeftRight className="w-3.5 h-3.5" />
                   <span className="font-medium">Before / After</span>
-                  <span className="ml-auto text-[10px] opacity-50">
+                  <span className="ml-auto text-xs opacity-50">
                     {showBeforeAfter ? "▲ hide" : "▼ show"}
                   </span>
                 </button>
@@ -451,30 +451,30 @@ export function VehiclePhotoStudio({
                     {exteriorImages.slice(0, 4).map((img) => (
                       <div
                         key={img.id}
-                        className="rounded-lg border border-white/[0.06] bg-card/40 p-2.5 space-y-2"
+                        className="rounded-lg border border-border bg-card/40 p-2.5 space-y-2"
                       >
                         <div className="flex items-center gap-1.5 flex-wrap min-h-[16px]">
                           {img.classification && (
-                            <span className="text-[10px] text-muted-foreground/60 flex items-center gap-0.5">
+                            <span className="text-xs text-muted-foreground/60 flex items-center gap-0.5">
                               <Tag className="w-2.5 h-2.5" />
                               {img.classification}
                             </span>
                           )}
                           {img.removalTimeMs != null && (
-                            <span className="text-[9px] text-muted-foreground/30 ml-auto flex items-center gap-0.5">
+                            <span className="text-[11px] text-muted-foreground/30 ml-auto flex items-center gap-0.5">
                               <Clock className="w-2.5 h-2.5" />
                               {(img.removalTimeMs / 1000).toFixed(1)}s
                             </span>
                           )}
                           {img.usedFallback === 1 && (
-                            <span className="text-[9px] px-1 py-0 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                            <span className="text-[11px] px-1 py-0 rounded bg-warning/15 text-warning border border-warning/20">
                               Fallback
                             </span>
                           )}
                         </div>
                         <div className="grid grid-cols-2 gap-1.5">
                           <div>
-                            <div className="aspect-[4/3] rounded-md overflow-hidden bg-white/[0.03] border border-white/[0.06]">
+                            <div className="aspect-[4/3] rounded-md overflow-hidden bg-muted border border-border">
                               <img
                                 src={img.originalUrl}
                                 alt="Original"
@@ -482,7 +482,7 @@ export function VehiclePhotoStudio({
                                 loading="lazy"
                               />
                             </div>
-                            <p className="text-[9px] text-muted-foreground/40 text-center mt-0.5">
+                            <p className="text-[11px] text-muted-foreground/40 text-center mt-0.5">
                               Original
                             </p>
                           </div>
@@ -491,7 +491,7 @@ export function VehiclePhotoStudio({
                               className={cn(
                                 "aspect-[4/3] rounded-md overflow-hidden border",
                                 img.usedFallback === 1
-                                  ? "border-amber-500/30"
+                                  ? "border-warning/30"
                                   : "border-primary/20 bg-primary/[0.03]",
                               )}
                             >
@@ -503,7 +503,7 @@ export function VehiclePhotoStudio({
                                 onError={(event) => fallBackToOriginal(event, img.originalUrl)}
                               />
                             </div>
-                            <p className="text-[9px] text-muted-foreground/40 text-center mt-0.5">
+                            <p className="text-[11px] text-muted-foreground/40 text-center mt-0.5">
                               AI Enhanced
                             </p>
                           </div>
@@ -511,7 +511,7 @@ export function VehiclePhotoStudio({
                       </div>
                     ))}
                     {exteriorImages.length > 4 && (
-                      <p className="text-[10px] text-muted-foreground/40 text-center py-1">
+                      <p className="text-xs text-muted-foreground/40 text-center py-1">
                         +{exteriorImages.length - 4} more exterior shots
                       </p>
                     )}
@@ -527,7 +527,7 @@ export function VehiclePhotoStudio({
             <Button
               variant="ghost"
               size="sm"
-              className="w-full gap-1.5 text-[11px] text-muted-foreground hover:text-white border border-white/[0.06] hover:border-white/[0.12]"
+              className="w-full gap-1.5 text-[11px] text-muted-foreground hover:text-foreground border border-border hover:border-border"
               onClick={() => processMutation.mutate()}
               disabled={processMutation.isPending}
             >

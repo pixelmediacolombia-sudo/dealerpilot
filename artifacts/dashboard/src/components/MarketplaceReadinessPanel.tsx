@@ -39,7 +39,7 @@ interface StatusRowProps {
 
 function StatusRow({ icon: Icon, label, status, okLabel, errLabel, unknownLabel = "Checking…" }: StatusRowProps) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-white/[0.05] last:border-0">
+    <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
       <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
         <Icon className="w-4 h-4 opacity-50 shrink-0" />
         <span>{label}</span>
@@ -47,17 +47,17 @@ function StatusRow({ icon: Icon, label, status, okLabel, errLabel, unknownLabel 
       <div className="flex items-center gap-1.5">
         {status === "ok" ? (
           <>
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span className="text-xs font-medium text-emerald-400">{okLabel}</span>
+            <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
+            <span className="text-xs font-medium text-success">{okLabel}</span>
           </>
         ) : status === "error" ? (
           <>
-            <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-            <span className="text-xs font-medium text-red-400">{errLabel}</span>
+            <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+            <span className="text-xs font-medium text-destructive">{errLabel}</span>
           </>
         ) : (
           <>
-            <span className="w-3.5 h-3.5 rounded-full bg-white/10 shrink-0 inline-block" />
+            <span className="w-3.5 h-3.5 rounded-full bg-muted shrink-0 inline-block" />
             <span className="text-xs text-muted-foreground">{unknownLabel}</span>
           </>
         )}
@@ -137,30 +137,30 @@ export function MarketplaceReadinessPanel() {
     <div className={cn(
       "rounded-xl border px-5 py-4 mb-6",
       state.publishingReady
-        ? "bg-emerald-500/[0.05] border-emerald-500/20"
-        : "bg-white/[0.02] border-white/[0.06]",
+        ? "bg-success/[0.05] border-success/20"
+        : "bg-muted border-border",
     )}>
       {/* Header row */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Wifi className={cn("w-4 h-4", state.publishingReady ? "text-emerald-400" : "text-muted-foreground")} />
-          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          <Wifi className={cn("w-4 h-4", state.publishingReady ? "text-success" : "text-muted-foreground")} />
+          <span className="text-xs font-bold  tracking-wide text-muted-foreground">
             Marketplace Publishing Readiness
           </span>
         </div>
 
         {state.publishingReady ? (
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-success">
             <CheckCircle2 className="w-3.5 h-3.5" />
             Ready to publish
           </span>
         ) : isBusy ? (
-          <span className="flex items-center gap-1.5 text-xs text-amber-400">
+          <span className="flex items-center gap-1.5 text-xs text-warning">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
             Setting up…
           </span>
         ) : state.missingStep ? (
-          <span className="flex items-center gap-1.5 text-xs text-amber-400">
+          <span className="flex items-center gap-1.5 text-xs text-warning">
             <AlertTriangle className="w-3.5 h-3.5" />
             {state.missingStep}
           </span>
@@ -168,7 +168,7 @@ export function MarketplaceReadinessPanel() {
       </div>
 
       {/* Status rows */}
-      <div className="bg-black/20 rounded-lg border border-white/[0.04] px-4 mb-4">
+      <div className="bg-black/20 rounded-lg border border-border px-4 mb-4">
         <StatusRow
           icon={Puzzle}
           label="Extension Agent"
@@ -210,7 +210,7 @@ export function MarketplaceReadinessPanel() {
               variant="outline"
               size="sm"
               disabled
-              className="gap-2 opacity-50 border-white/10"
+              className="gap-2 opacity-50 border-border"
             >
               <Puzzle className="w-3.5 h-3.5" />
               Extension Offline
@@ -229,7 +229,7 @@ export function MarketplaceReadinessPanel() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                className="gap-2 border-warning/40 text-warning hover:bg-warning/10"
                 onClick={() => handleConnect("login")}
                 disabled={isBusy}
               >
@@ -252,13 +252,13 @@ export function MarketplaceReadinessPanel() {
       )}
 
       {state.publishingReady && (
-        <p className="text-xs text-emerald-400/70">
+        <p className="text-xs text-success/70">
           DealerPilot is ready to publish. Publish Now is enabled for all vehicles.
         </p>
       )}
 
       {/* Advanced diagnostics link */}
-      <div className="mt-3 pt-3 border-t border-white/[0.05]">
+      <div className="mt-3 pt-3 border-t border-border">
         <Link
           href="/connection-center"
           className="text-[11px] text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"

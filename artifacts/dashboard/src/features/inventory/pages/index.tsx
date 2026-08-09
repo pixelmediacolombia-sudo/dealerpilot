@@ -16,7 +16,7 @@ import { Input } from "@/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
-import { Search, Car, Tag, Activity, Share, Filter, LayoutGrid, CheckSquare, MapPin, Image as ImageIcon, AlertTriangle } from "lucide-react";
+import { Search, Car, Tag, Activity, Share, Filter, LayoutGrid, CheckSquare, MapPin, Image as ImageIcon, AlertTriangle, ExternalLink } from "lucide-react";
 import { PageHeader, KpiCard, AnimatedCounter, EmptyState } from "@/shared/ui";
 import { VehicleCard } from "@/features/inventory/components/VehicleCard";
 import { FloatingBulkBar } from "@/features/inventory/components/FloatingBulkBar";
@@ -55,6 +55,9 @@ export function InventoryDashboard() {
   });
 
   const allVisibleIds = (vehiclesData?.vehicles ?? []).map((v) => v.id);
+  const marketplaceRemovalCount = (vehiclesData?.vehicles ?? []).filter(
+    (vehicle) => vehicle.marketplaceRemovalRequired,
+  ).length;
 
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: getListVehiclesQueryKey() });
@@ -174,12 +177,24 @@ export function InventoryDashboard() {
 
           {/* Unknown lot warning */}
           {!statsLoading && (stats?.noLot ?? 0) > 0 && (
-            <div className="flex items-start gap-3 mb-5 px-4 py-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] text-amber-300">
-              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-400" />
+            <div className="flex items-start gap-3 mb-5 px-4 py-3 rounded-lg border border-warning/30 bg-warning/[0.06] text-warning">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-warning" />
               <div className="text-[13px] leading-relaxed">
-                <span className="font-semibold text-amber-200">{stats!.noLot} vehicle{stats!.noLot !== 1 ? "s" : ""} with unknown lot location</span>
+                <span className="font-semibold text-warning">{stats!.noLot} vehicle{stats!.noLot !== 1 ? "s" : ""} with unknown lot location</span>
                 {" — "}these cannot be published to Marketplace until their lot is assigned to Manassas or Fredericksburg. Use the{" "}
-                <span className="font-medium text-amber-200">location filter</span> to find them (they appear in the "All" view only).
+                <span className="font-medium text-warning">location filter</span> to find them (they appear in the "All" view only).
+              </div>
+            </div>
+          )}
+
+          {marketplaceRemovalCount > 0 && (
+            <div className="flex items-start gap-3 mb-5 px-4 py-3 rounded-lg border border-destructive/25 bg-destructive/[0.06]">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-destructive" />
+              <div className="text-[13px] leading-relaxed">
+                <span className="font-semibold text-foreground">
+                  {marketplaceRemovalCount} sold vehicle{marketplaceRemovalCount !== 1 ? "s" : ""} still {marketplaceRemovalCount === 1 ? "needs" : "need"} Marketplace removal.
+                </span>{" "}
+                <span className="text-muted-foreground">Open the listing from the vehicle row and remove it from Facebook Marketplace.</span>
               </div>
             </div>
           )}
@@ -212,19 +227,19 @@ export function InventoryDashboard() {
           </div>
 
           {/* Filters toolbar */}
-          <div className="flex flex-col md:flex-row gap-3 items-center justify-between mb-6 py-3 border-y border-white/[0.04]">
+          <div className="flex flex-col md:flex-row gap-3 items-center justify-between mb-6 py-3 border-y border-border">
             <div className="relative flex-1 max-w-sm w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/22" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <Input
                 placeholder="VIN, stock, make, model…"
-                className="pl-9 h-8 text-[13px] bg-transparent border-white/[0.08] focus-visible:ring-0 focus-visible:border-cyan-500/40 text-white/70 placeholder:text-white/18"
+                className="pl-9 h-8 text-[13px] bg-transparent border-border focus-visible:ring-0 focus-visible:border-primary/40 text-foreground placeholder:text-muted-foreground"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
             <div className="flex gap-2 w-full md:w-auto items-center">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[148px] h-8 text-[12px] bg-transparent border-white/[0.08] text-white/55">
+                <SelectTrigger className="w-[148px] h-8 text-[12px] bg-transparent border-border text-muted-foreground">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -236,7 +251,7 @@ export function InventoryDashboard() {
                 </SelectContent>
               </Select>
               <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as ListVehiclesSort)}>
-                <SelectTrigger className="w-[148px] h-8 text-[12px] bg-transparent border-white/[0.08] text-white/55">
+                <SelectTrigger className="w-[148px] h-8 text-[12px] bg-transparent border-border text-muted-foreground">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
@@ -252,8 +267,8 @@ export function InventoryDashboard() {
                   size="sm"
                   onClick={() => isSelectAll ? selection.clear() : selection.selectAll(allVisibleIds)}
                   className={cn(
-                    "h-8 gap-1.5 text-[12px] text-white/35 hover:text-white/70",
-                    selection.selectionMode && "text-cyan-400 hover:text-cyan-400",
+                    "h-8 gap-1.5 text-[12px] text-muted-foreground hover:text-foreground",
+                    selection.selectionMode && "text-primary hover:text-primary",
                   )}
                 >
                   <CheckSquare className="w-3.5 h-3.5" />
@@ -265,31 +280,31 @@ export function InventoryDashboard() {
 
           {/* Vehicle catalog — flat telemetry list */}
           {vehiclesLoading ? (
-            <div className="border border-white/[0.05] rounded-xl overflow-hidden">
+            <div className="border border-border rounded-xl overflow-hidden">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="flex items-center gap-4 px-5 py-3.5 border-b border-white/[0.04] last:border-0 animate-pulse">
-                  <div className="w-5 h-5 rounded bg-white/[0.04] shrink-0" />
-                  <div className="w-[72px] h-[52px] rounded-lg bg-white/[0.04] shrink-0" />
+                <div key={i} className="flex items-center gap-4 px-5 py-3.5 border-b border-border last:border-0 animate-pulse">
+                  <div className="w-5 h-5 rounded bg-muted shrink-0" />
+                  <div className="w-[72px] h-[52px] rounded-lg bg-muted shrink-0" />
                   <div className="flex-1 space-y-1.5">
-                    <div className="h-4 bg-white/[0.04] rounded w-2/5" />
-                    <div className="h-3 bg-white/[0.03] rounded w-1/4" />
+                    <div className="h-4 bg-muted rounded w-2/5" />
+                    <div className="h-3 bg-muted rounded w-1/4" />
                   </div>
-                  <div className="w-20 h-5 bg-white/[0.04] rounded" />
-                  <div className="w-24 h-5 bg-white/[0.04] rounded" />
-                  <div className="w-20 h-7 bg-white/[0.04] rounded" />
+                  <div className="w-20 h-5 bg-muted rounded" />
+                  <div className="w-24 h-5 bg-muted rounded" />
+                  <div className="w-20 h-7 bg-muted rounded" />
                 </div>
               ))}
             </div>
-          ) : vehiclesData?.vehicles.length === 0 ? (
+          ) : vehiclesData?.vehicles?.length === 0 ? (
             <EmptyState
               icon={<Car className="w-8 h-8" />}
               title="No vehicles found"
               description="Try adjusting your search or filters."
             />
           ) : (
-            <div className="border border-white/[0.05] bg-white/[0.005] rounded-xl overflow-hidden pb-24">
+            <div className="border border-border bg-muted rounded-xl overflow-hidden pb-24">
               {/* List header */}
-              <div className="flex items-center gap-4 px-5 py-2.5 border-b border-white/[0.05] text-[9px] font-black uppercase tracking-[0.18em] text-white/18">
+              <div className="flex items-center gap-4 px-5 py-2.5 border-b border-border text-[11px] font-semibold  tracking-wide text-muted-foreground">
                 <div className="w-5 shrink-0" />
                 <div className="w-[72px] shrink-0">Photo</div>
                 <div className="flex-1 min-w-0">Vehicle</div>
@@ -298,15 +313,16 @@ export function InventoryDashboard() {
                 <div className="w-[90px] shrink-0 hidden xl:block">Mileage</div>
                 <div className="w-[120px] shrink-0 text-right">Actions</div>
               </div>
-              {vehiclesData?.vehicles.map((vehicle, idx) => {
+              {vehiclesData?.vehicles?.map((vehicle, idx) => {
                 const isSelected = selection.isSelected(vehicle.id);
                 return (
                   <div
                     key={vehicle.id}
                     onClick={() => selection.selectionMode && selection.toggle(vehicle.id)}
                     className={cn(
-                      "flex items-center gap-4 px-5 py-3 border-b border-white/[0.03] last:border-0 transition-colors hover:bg-white/[0.015] cursor-default",
-                      isSelected && "bg-cyan-500/[0.04] border-l-2 border-l-cyan-500/40",
+                      "flex items-center gap-4 px-5 py-3 border-b border-border last:border-0 transition-colors hover:bg-muted cursor-default",
+                      isSelected && "bg-primary/[0.04] border-l-2 border-l-cyan-500/40",
+                      vehicle.marketplaceRemovalRequired && "bg-destructive/[0.025] border-l-2 border-l-destructive/50",
                     )}
                   >
                     <div className="w-5 shrink-0">
@@ -318,55 +334,73 @@ export function InventoryDashboard() {
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
-                    <div className="w-[72px] h-[52px] shrink-0 rounded-lg overflow-hidden bg-white/[0.03] border border-white/[0.05]">
+                    <div className="w-[72px] h-[52px] shrink-0 rounded-lg overflow-hidden bg-muted border border-border">
                       {vehicle.primaryImageUrl ? (
                         <img src={vehicle.primaryImageUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Car className="w-4 h-4 text-white/10" />
+                          <Car className="w-4 h-4 text-muted-foreground" />
                         </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <a href={`/inventory/${vehicle.id}`} className="text-[13px] font-semibold text-white/75 hover:text-white transition-colors truncate block">
+                      <a href={`/inventory/${vehicle.id}`} className="text-[13px] font-semibold text-foreground hover:text-foreground transition-colors truncate block">
                         {vehicle.year} {vehicle.make} {vehicle.model}{vehicle.trim ? ` ${vehicle.trim}` : ""}
                       </a>
-                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-white/22">
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
                         {vehicle.vin && <span className="font-mono">{vehicle.vin.slice(-6)}</span>}
                         {vehicle.bodyStyle && <><span>·</span><span>{vehicle.bodyStyle}</span></>}
                         {(vehicle.imageCount ?? 0) > 0 && (
                           <span className="flex items-center gap-0.5"><ImageIcon className="w-3 h-3" />{vehicle.imageCount}</span>
                         )}
                       </div>
+                      {vehicle.marketplaceRemovalRequired && (
+                        <div className="flex items-center gap-1 mt-1 text-[11px] font-semibold text-destructive">
+                          <AlertTriangle className="w-3 h-3 shrink-0" />
+                          Sold · remove Marketplace listing
+                        </div>
+                      )}
                     </div>
                     <div className="w-[90px] shrink-0 hidden md:block">
                       <span className={cn(
-                        "text-[9px] font-black uppercase tracking-[0.14em] px-1.5 py-0.5 rounded",
-                        vehicle.status === "Active" ? "bg-cyan-500/10 text-cyan-400" :
-                        vehicle.status === "Published" ? "bg-green-500/10 text-green-400" :
-                        vehicle.status === "Sold/Removed" ? "bg-white/[0.04] text-white/22" :
-                        "bg-white/[0.04] text-white/35"
+                        "text-[11px] font-semibold  tracking-wide px-1.5 py-0.5 rounded",
+                        vehicle.status === "Active" ? "bg-primary/10 text-primary" :
+                        vehicle.status === "Published" ? "bg-success/10 text-success" :
+                        vehicle.status === "Sold/Removed" ? "bg-muted text-muted-foreground" :
+                        "bg-muted text-muted-foreground"
                       )}>
-                        {vehicle.status}
+                        {vehicle.marketplaceRemovalRequired ? "REMOVE LISTING" : vehicle.status}
                       </span>
                     </div>
                     <div className="w-[100px] shrink-0 hidden lg:block">
-                      <span className="text-[13px] font-bold text-white/65">
+                      <span className="text-[13px] font-bold text-muted-foreground">
                         {vehicle.price ? `$${vehicle.price.toLocaleString()}` : "—"}
                       </span>
                     </div>
                     <div className="w-[90px] shrink-0 hidden xl:block">
-                      <span className="text-[12px] text-white/35">
+                      <span className="text-[12px] text-muted-foreground">
                         {vehicle.mileage ? `${vehicle.mileage.toLocaleString()} mi` : "—"}
                       </span>
                     </div>
                     <div className="w-[120px] shrink-0 flex justify-end">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleCardAction("mark_ready", vehicle.id); }}
-                        className="h-7 px-3 text-[11px] font-semibold rounded-lg border border-white/[0.08] text-white/40 hover:text-cyan-400 hover:border-cyan-500/30 transition-colors"
-                      >
-                        Mark Ready
-                      </button>
+                      {vehicle.marketplaceRemovalRequired && vehicle.marketplaceListingUrl ? (
+                        <a
+                          href={vehicle.marketplaceListingUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex h-7 items-center gap-1 px-3 text-[11px] font-semibold rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          Open <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCardAction("mark_ready", vehicle.id); }}
+                          className="h-7 px-3 text-[11px] font-semibold rounded-lg border border-border text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+                        >
+                          Mark Ready
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

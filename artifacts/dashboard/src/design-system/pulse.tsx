@@ -20,7 +20,7 @@ function PulseDot({
         <span className={cn("relative inline-flex rounded-full", dotSize, colorClasses)} />
       </span>
       {label && (
-        <span className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+        <span className="text-[11px] font-semibold text-muted-foreground/70  tracking-wider">
           {label}
         </span>
       )}
@@ -29,21 +29,21 @@ function PulseDot({
 }
 
 export function LivePulse({ label = "Live", size, className }: PulseProps) {
-  return <PulseDot colorClasses="bg-emerald-400" label={label} size={size} className={className} />;
+  return <PulseDot colorClasses="bg-success" label={label} size={size} className={className} />;
 }
 
 export function AIProcessingPulse({ label = "Processing", size, className }: PulseProps) {
-  return <PulseDot colorClasses="bg-blue-400" label={label} size={size} className={className} />;
+  return <PulseDot colorClasses="bg-primary" label={label} size={size} className={className} />;
 }
 
 export function PublishingPulse({ label = "Publishing", size, className }: PulseProps) {
-  return <PulseDot colorClasses="bg-green-400" label={label} size={size} className={className} />;
+  return <PulseDot colorClasses="bg-success" label={label} size={size} className={className} />;
 }
 
 export function SyncPulse({ label = "Syncing", size, className }: PulseProps) {
-  return <PulseDot colorClasses="bg-cyan-400" label={label} size={size} className={className} />;
+  return <PulseDot colorClasses="bg-primary" label={label} size={size} className={className} />;
 }
 
 export function IdlePulse({ label, size, className }: PulseProps) {
-  return <PulseDot colorClasses="bg-white/20" label={label} size={size} className={className} />;
+  return <PulseDot colorClasses="bg-muted" label={label} size={size} className={className} />;
 }

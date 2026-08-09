@@ -86,13 +86,13 @@ export function CreativeStudio() {
                   {vehicles.length} vehicles · {vehicles.reduce((s, v) => s + (v.imageCount ?? 0), 0)} photos · pending AI review
                 </span>
                 <div className="flex flex-wrap gap-2 mt-1">
-                  <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] uppercase tracking-widest gap-1.5">
+                  <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-xs  tracking-wide gap-1.5">
                     <ScanSearch className="w-3 h-3" /> Photo Gallery
                   </Badge>
-                  <Badge variant="secondary" className="bg-secondary/50 text-muted-foreground border-white/5 text-[10px] uppercase tracking-widest gap-1.5">
+                  <Badge variant="secondary" className="bg-secondary/50 text-muted-foreground border-border text-xs  tracking-wide gap-1.5">
                     <Clock className="w-3 h-3" /> AI Review Pending
                   </Badge>
-                  <Badge variant="secondary" className="bg-secondary/50 text-muted-foreground border-white/5 text-[10px] uppercase tracking-widest gap-1.5">
+                  <Badge variant="secondary" className="bg-secondary/50 text-muted-foreground border-border text-xs  tracking-wide gap-1.5">
                     <Camera className="w-3 h-3" /> Marketplace Photo
                   </Badge>
                 </div>
@@ -120,7 +120,7 @@ export function CreativeStudio() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search VIN, make, model…"
-                className="pl-11 h-10 bg-card/60 backdrop-blur-xl border-border/50 focus-visible:ring-primary/50 text-sm"
+                className="pl-11 h-10 bg-card/60 backdrop-blur-md border-border/50 focus-visible:ring-primary/50 text-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -184,7 +184,7 @@ export function CreativeStudio() {
           {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="aspect-[4/3] rounded-2xl bg-secondary/50 animate-pulse" />
+                <div key={i} className="aspect-[4/3] rounded-xl bg-secondary/50 animate-pulse" />
               ))}
             </div>
           ) : sortedVehicles.length === 0 ? (
@@ -197,7 +197,7 @@ export function CreativeStudio() {
 
             /* ── List View ── */
             <div className="rounded-xl border border-border/40 overflow-hidden">
-              <div className="flex items-center gap-3 px-4 py-2.5 bg-muted/30 border-b border-border/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-muted/30 border-b border-border/30 text-xs font-bold  tracking-wide text-muted-foreground">
                 <div className="w-5 flex-shrink-0">
                   <Checkbox
                     checked={selectedIds.size === sortedVehicles.length && sortedVehicles.length > 0}
@@ -242,7 +242,7 @@ export function CreativeStudio() {
                       <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
                         <span className="font-mono">{v.vin.slice(-6)}</span>
                       </div>
-                      <Badge className="mt-1 text-[8px] font-bold uppercase tracking-widest bg-muted/40 text-muted-foreground border-border/30 gap-1">
+                      <Badge className="mt-1 text-[11px] font-bold  tracking-wide bg-muted/40 text-muted-foreground border-border/30 gap-1">
                         <Clock className="w-2 h-2" /> Pending AI Review
                       </Badge>
                     </div>
@@ -264,7 +264,7 @@ export function CreativeStudio() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 px-2.5 text-[10px] gap-1.5 border-primary/30 text-primary hover:bg-primary/10 whitespace-nowrap"
+                          className="h-7 px-2.5 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10 whitespace-nowrap"
                         >
                           <ScanSearch className="w-3 h-3" />
                           Review →
@@ -289,16 +289,16 @@ export function CreativeStudio() {
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSelected(v.vehicleId); }}
                     >
                       <div className={cn(
-                        "w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all duration-150 shadow-sm cursor-pointer",
-                        isSelected ? "bg-primary border-primary" : "bg-black/40 border-white/60 hover:border-white backdrop-blur-sm"
+                        "w-6 h-6 rounded-md border-2 flex items-center justify-center transition duration-150 shadow-sm cursor-pointer",
+                        isSelected ? "bg-primary border-primary" : "bg-black/40 border-border hover:border-border backdrop-blur-sm"
                       )}>
-                        {isSelected && <span className="text-white text-[10px] font-bold">✓</span>}
+                        {isSelected && <span className="text-foreground text-xs font-bold">✓</span>}
                       </div>
                     </div>
 
                     <Link href={`/creative-studio/${v.vehicleId}`}>
                       <div
-                        className="group glass-panel rounded-2xl overflow-hidden hover-lift cursor-pointer flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 shadow-sm hover:shadow-primary/5 border border-white/5 hover:border-primary/30 transition-all duration-500 relative"
+                        className="group glass-panel rounded-xl overflow-hidden hover-lift cursor-pointer flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 shadow-sm hover:shadow-primary/5 border border-border hover:border-primary/30 transition duration-500 relative"
                         style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}
                       >
                         {/* Image area */}
@@ -317,13 +317,13 @@ export function CreativeStudio() {
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/30" />
 
                           {/* Pending review badge */}
-                          <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md bg-black/50 text-white/70 border-white/10 uppercase text-[8px] font-bold tracking-widest gap-1">
+                          <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md bg-black/50 text-white border-white/20 text-[11px] font-bold tracking-wide gap-1">
                             <Clock className="w-2.5 h-2.5" /> Pending Review
                           </Badge>
 
                           {/* Photo count */}
                           {v.imageCount > 0 && (
-                            <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-lg backdrop-blur-sm">
+                            <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded-lg backdrop-blur-sm">
                               <ImageIcon className="w-3 h-3" />
                               {v.imageCount}
                             </div>
@@ -331,8 +331,8 @@ export function CreativeStudio() {
                         </div>
 
                         {/* Card body */}
-                        <div className="p-5 flex flex-col flex-1 bg-card/40 backdrop-blur-xl">
-                          <div className="text-primary text-[10px] font-bold uppercase tracking-widest mb-1.5">
+                        <div className="p-5 flex flex-col flex-1 bg-card/40 backdrop-blur-md">
+                          <div className="text-primary text-xs font-bold  tracking-wide mb-1.5">
                             {v.vin.slice(-6)}
                           </div>
                           <div className="font-bold tracking-tight text-xl truncate mb-1 text-foreground/90 group-hover:text-primary transition-colors">
@@ -342,11 +342,11 @@ export function CreativeStudio() {
                             {v.imageCount} photo{v.imageCount === 1 ? "" : "s"} · AI review pending
                           </div>
 
-                          <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between">
+                          <div className="mt-auto pt-4 border-t border-border flex items-center justify-between">
                             <div className="font-bold text-foreground/90 text-xl">
                               {formatCurrency(v.price)}
                             </div>
-                            <div className="text-xs font-semibold flex items-center gap-1 text-primary/80 group-hover:text-primary uppercase tracking-widest transition-colors">
+                            <div className="text-xs font-semibold flex items-center gap-1 text-primary/80 group-hover:text-primary  tracking-wide transition-colors">
                               <ScanSearch className="w-3 h-3" /> View Photos →
                             </div>
                           </div>

@@ -126,7 +126,7 @@ function StatCard({
   return (
     <div className={cn("rounded-xl border p-5 flex flex-col gap-2", colors[variant])}>
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-widest opacity-70">{label}</span>
+        <span className="text-xs font-medium  tracking-wide opacity-70">{label}</span>
         <Icon className={cn("w-4 h-4", iconColors[variant])} />
       </div>
       <div className="text-3xl font-bold tabular-nums">{value}</div>
@@ -136,11 +136,11 @@ function StatCard({
 }
 
 function FieldBadge({ value }: { value: boolean | null | undefined }) {
-  if (value === null || value === undefined) return <Badge variant="secondary" className="text-[10px]">No data</Badge>;
+  if (value === null || value === undefined) return <Badge variant="secondary" className="text-xs">No data</Badge>;
   return value ? (
-    <Badge className="bg-success/20 text-success border-success/20 border text-[10px]">Found</Badge>
+    <Badge className="bg-success/20 text-success border-success/20 border text-xs">Found</Badge>
   ) : (
-    <Badge className="bg-destructive/20 text-destructive border-destructive/20 border text-[10px]">Not found</Badge>
+    <Badge className="bg-destructive/20 text-destructive border-destructive/20 border text-xs">Not found</Badge>
   );
 }
 
@@ -156,8 +156,8 @@ function FeedQualitySection() {
     <SectionCard className="border-border/50">
       <div className="p-6 border-b border-border/30 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center">
-            <Database className="w-4 h-4 text-blue-400" />
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Database className="w-4 h-4 text-primary" />
           </div>
           <div>
             <div className="font-bold">XML Feed Quality</div>
@@ -253,7 +253,7 @@ function FeedQualitySection() {
                     <Badge
                       variant="outline"
                       className={cn(
-                        "text-[10px] ml-1",
+                        "text-xs ml-1",
                         q.lastFeedStatus === "success"
                           ? "bg-success/10 text-success border-success/20"
                           : "bg-destructive/10 text-destructive border-destructive/20",
@@ -401,8 +401,8 @@ function BatchDryRunSection() {
 
   const photoDecisionLabel: Record<string, { label: string; color: string }> = {
     use_original: { label: "Original", color: "bg-success/20 text-success border-success/20" },
-    use_original_recommend_ai_cover: { label: "AI Cover Rec", color: "bg-blue-500/20 text-blue-400 border-blue-500/20" },
-    generate_ai_creative: { label: "AI Creative", color: "bg-purple-500/20 text-purple-400 border-purple-500/20" },
+    use_original_recommend_ai_cover: { label: "AI Cover Rec", color: "bg-primary/20 text-primary border-primary/20" },
+    generate_ai_creative: { label: "AI Creative", color: "bg-primary/20 text-primary border-primary/20" },
     needs_review: { label: "Review", color: "bg-warning/20 text-warning border-warning/20" },
   };
 
@@ -437,7 +437,7 @@ function BatchDryRunSection() {
               step={1}
               className="w-full"
             />
-            <div className="flex justify-between text-[10px] text-muted-foreground">
+            <div className="flex justify-between text-xs text-muted-foreground">
               <span>1</span>
               <span className="text-primary font-medium">Alpha: max 4</span>
               <span>10</span>
@@ -484,7 +484,7 @@ function BatchDryRunSection() {
             {/* Selected vehicles */}
             {result.selected.length > 0 && (
               <div className="space-y-2">
-                <div className="text-xs font-bold uppercase tracking-widest text-success/80 px-1">
+                <div className="text-xs font-bold  tracking-wide text-success/80 px-1">
                   ✓ Would be queued
                 </div>
                 {result.selected.map((v, idx) => {
@@ -514,7 +514,7 @@ function BatchDryRunSection() {
                           </span>
                           <Badge
                             variant="outline"
-                            className={cn("text-[10px] border", pd.color)}
+                            className={cn("text-xs border", pd.color)}
                           >
                             {pd.label}
                           </Badge>
@@ -534,7 +534,7 @@ function BatchDryRunSection() {
             {result.skipped.length > 0 && (
               <div className="space-y-2">
                 <button
-                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-destructive/70 px-1 hover:text-destructive transition-colors"
+                  className="flex items-center gap-2 text-xs font-bold  tracking-wide text-destructive/70 px-1 hover:text-destructive transition-colors"
                   onClick={() => setShowSkipped((s) => !s)}
                 >
                   {showSkipped ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -673,7 +673,7 @@ function ExtensionDiagnosticsSection() {
             {/* Last activity */}
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-xl bg-secondary/30 border border-border/30 p-4">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                <div className="text-xs font-medium text-muted-foreground  tracking-wider mb-2">
                   Last Job Claim
                 </div>
                 {diag.lastJobClaimAt ? (
@@ -692,7 +692,7 @@ function ExtensionDiagnosticsSection() {
                 )}
               </div>
               <div className="rounded-xl bg-secondary/30 border border-border/30 p-4">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                <div className="text-xs font-medium text-muted-foreground  tracking-wider mb-2">
                   Last Event
                 </div>
                 {diag.lastEventAt ? (
@@ -701,7 +701,7 @@ function ExtensionDiagnosticsSection() {
                       {new Date(diag.lastEventAt).toLocaleString()}
                     </div>
                     {diag.lastEventType && (
-                      <Badge variant="secondary" className="text-[10px] mt-1">
+                      <Badge variant="secondary" className="text-xs mt-1">
                         {diag.lastEventType}
                       </Badge>
                     )}
@@ -715,7 +715,7 @@ function ExtensionDiagnosticsSection() {
             {/* Connections list */}
             {(diag.connections ?? []).length > 0 && (
               <div className="space-y-2">
-                <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">
+                <div className="text-xs font-bold  tracking-wide text-muted-foreground px-1">
                   Known Connections
                 </div>
                 {(diag.connections ?? []).map((c) => (
@@ -730,7 +730,7 @@ function ExtensionDiagnosticsSection() {
                     <Badge
                       variant="outline"
                       className={cn(
-                        "text-[10px]",
+                        "text-xs",
                         c.status === "online"
                           ? "bg-success/10 text-success border-success/20"
                           : "bg-secondary text-muted-foreground border-border",
@@ -777,8 +777,8 @@ function FieldValidationSection() {
     <SectionCard className="border-border/50">
       <div className="p-6 border-b border-border/30 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center">
-            <ShieldCheck className="w-4 h-4 text-purple-400" />
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+            <ShieldCheck className="w-4 h-4 text-primary" />
           </div>
           <div>
             <div className="font-bold">Facebook Field Validation</div>
@@ -811,7 +811,7 @@ function FieldValidationSection() {
           <div className="space-y-6">
             {agg && (
               <div className="space-y-3">
-                <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                <div className="text-xs font-bold  tracking-wide text-muted-foreground">
                   Latest validation ({agg.lastTestedAt ? new Date(agg.lastTestedAt).toLocaleString() : "—"})
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -833,7 +833,7 @@ function FieldValidationSection() {
 
             {reports.length > 1 && (
               <details className="group">
-                <summary className="text-xs font-bold uppercase tracking-widest text-muted-foreground cursor-pointer flex items-center gap-2">
+                <summary className="text-xs font-bold  tracking-wide text-muted-foreground cursor-pointer flex items-center gap-2">
                   <span>Recent Reports ({reports.length})</span>
                 </summary>
                 <div className="mt-3 space-y-2">
@@ -900,7 +900,7 @@ function AlphaLaunchModeSection() {
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-success" />
               <span className="font-bold text-success">Assisted Mode</span>
-              <Badge className="bg-success/20 text-success border-success/20 border text-[10px]">Default</Badge>
+              <Badge className="bg-success/20 text-success border-success/20 border text-xs">Default</Badge>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Extension opens Marketplace, fills all fields, pauses, and waits for the operator to review and manually click Publish. Safe for alpha.
@@ -910,7 +910,7 @@ function AlphaLaunchModeSection() {
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 text-muted-foreground" />
               <span className="font-bold text-muted-foreground">Controlled Auto Mode</span>
-              <Badge variant="secondary" className="text-[10px]">Locked</Badge>
+              <Badge variant="secondary" className="text-xs">Locked</Badge>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Extension clicks Publish automatically. Requires explicit confirmation and higher confidence threshold. Not recommended for alpha.
@@ -920,7 +920,7 @@ function AlphaLaunchModeSection() {
 
         {/* Default constraints */}
         <div className="space-y-3">
-          <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          <div className="text-xs font-bold  tracking-wide text-muted-foreground">
             Alpha Default Constraints
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -933,7 +933,7 @@ function AlphaLaunchModeSection() {
               <div key={label} className="rounded-xl bg-secondary/30 border border-border/30 p-4 space-y-1">
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <Icon className="w-3.5 h-3.5" />
-                  <span className="text-xs font-medium uppercase tracking-wider">{label}</span>
+                  <span className="text-xs font-medium  tracking-wider">{label}</span>
                 </div>
                 <div className="font-bold text-sm">{value}</div>
               </div>
@@ -944,25 +944,25 @@ function AlphaLaunchModeSection() {
         {/* Photo decision breakdown */}
         {scores.length > 0 && (
           <div className="space-y-3">
-            <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            <div className="text-xs font-bold  tracking-wide text-muted-foreground">
               Photo Quality Breakdown ({scores.length} vehicles analyzed)
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="rounded-xl bg-success/10 border border-success/20 p-4 text-center">
                 <div className="text-2xl font-bold text-success">{useOriginal}</div>
-                <div className="text-[10px] text-success/70 font-medium mt-1 uppercase tracking-wide">Use Original</div>
+                <div className="text-xs text-success/70 font-medium mt-1  tracking-wide">Use Original</div>
               </div>
-              <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-4 text-center">
-                <div className="text-2xl font-bold text-blue-400">{aiCoverRec}</div>
-                <div className="text-[10px] text-blue-400/70 font-medium mt-1 uppercase tracking-wide">AI Cover Rec</div>
+              <div className="rounded-xl bg-primary/10 border border-primary/20 p-4 text-center">
+                <div className="text-2xl font-bold text-primary">{aiCoverRec}</div>
+                <div className="text-xs text-primary/70 font-medium mt-1  tracking-wide">AI Cover Rec</div>
               </div>
-              <div className="rounded-xl bg-purple-500/10 border border-purple-500/20 p-4 text-center">
-                <div className="text-2xl font-bold text-purple-400">{aiCreative}</div>
-                <div className="text-[10px] text-purple-400/70 font-medium mt-1 uppercase tracking-wide">AI Creative</div>
+              <div className="rounded-xl bg-primary/10 border border-primary/20 p-4 text-center">
+                <div className="text-2xl font-bold text-primary">{aiCreative}</div>
+                <div className="text-xs text-primary/70 font-medium mt-1  tracking-wide">AI Creative</div>
               </div>
               <div className="rounded-xl bg-warning/10 border border-warning/20 p-4 text-center">
                 <div className="text-2xl font-bold text-warning">{needsReview}</div>
-                <div className="text-[10px] text-warning/70 font-medium mt-1 uppercase tracking-wide">Needs Review</div>
+                <div className="text-xs text-warning/70 font-medium mt-1  tracking-wide">Needs Review</div>
               </div>
             </div>
           </div>
@@ -1008,7 +1008,7 @@ export function ProductionReadiness() {
                     <div className="flex-1 max-w-xs h-2 bg-secondary/50 rounded-full overflow-hidden">
                       <div
                         className={cn(
-                          "h-full rounded-full transition-all duration-700",
+                          "h-full rounded-full transition duration-700",
                           pct === 100 ? "bg-success" : pct >= 50 ? "bg-primary" : "bg-warning",
                         )}
                         style={{ width: `${pct}%` }}

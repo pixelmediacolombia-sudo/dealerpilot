@@ -76,7 +76,7 @@ export function ScheduleModal({ open, onClose, vehicleCount, onConfirm, isLoadin
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setMode("now")}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all duration-150 text-sm font-medium ${
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition duration-150 text-sm font-medium ${
                 mode === "now"
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border/60 text-muted-foreground hover:border-border"
@@ -87,7 +87,7 @@ export function ScheduleModal({ open, onClose, vehicleCount, onConfirm, isLoadin
             </button>
             <button
               onClick={() => setMode("later")}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all duration-150 text-sm font-medium ${
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition duration-150 text-sm font-medium ${
                 mode === "later"
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border/60 text-muted-foreground hover:border-border"

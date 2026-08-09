@@ -34,6 +34,7 @@ import {
   Brain,
   Camera,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Collapsible,
@@ -122,7 +123,7 @@ export function VehicleDetail() {
     return (
       <AppLayout>
         <div className="flex-1 p-8 flex flex-col items-center justify-center h-full">
-          <div className="glass-panel p-12 rounded-2xl flex flex-col items-center text-center max-w-md">
+          <div className="glass-panel p-12 rounded-xl flex flex-col items-center text-center max-w-md">
             <Car className="w-16 h-16 text-muted-foreground/50 mb-6" />
             <h2 className="text-2xl font-bold tracking-tight mb-2">Vehicle Not Found</h2>
             <p className="text-muted-foreground mb-8">The vehicle you're looking for doesn't exist or has been removed.</p>
@@ -164,7 +165,7 @@ export function VehicleDetail() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "Published": return { label: "LIVE", className: "bg-success/80 text-success-foreground border-success/20" };
-      case "Ready to Publish": return { label: "READY", className: "bg-blue-500/80 text-white border-blue-500/20" };
+      case "Ready to Publish": return { label: "READY", className: "bg-primary/80 text-foreground border-primary/20" };
       case "AI Generated": return { label: "AI", className: "bg-accent/80 text-accent-foreground border-accent/20" };
       case "Active": return { label: "ACTIVE", className: "bg-secondary/80 text-secondary-foreground border-secondary/20" };
       case "Archived":
@@ -189,7 +190,7 @@ export function VehicleDetail() {
           
           {/* Header */}
           <div className="space-y-4">
-            <Link href="/inventory" className="inline-flex items-center text-sm text-cyan-400/60 hover:text-cyan-400 transition-colors font-medium">
+            <Link href="/inventory" className="inline-flex items-center text-sm text-primary/60 hover:text-primary transition-colors font-medium">
               <ChevronLeft className="w-4 h-4 mr-1" /> Back to Inventory
             </Link>
             
@@ -216,7 +217,7 @@ export function VehicleDetail() {
               <div className="flex flex-wrap gap-2 glass-panel p-2 rounded-xl">
                 {vehicle.status !== "Ready to Publish" && (
                   <Button 
-                    className="gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold"
+                    className="gap-2 bg-primary hover:bg-primary text-foreground font-semibold"
                     onClick={() => handleStatusUpdate("Ready to Publish")}
                     disabled={updateStatus.isPending}
                   >
@@ -226,7 +227,7 @@ export function VehicleDetail() {
                 <Button variant="ghost" className="gap-2 hover:bg-success/10 hover:text-success transition-colors" disabled>
                   <UploadCloud className="w-4 h-4" /> Queue Publish
                 </Button>
-                <Button variant="ghost" className="gap-2 hover:bg-cyan-500/10 hover:text-cyan-400 transition-colors" disabled>
+                <Button variant="ghost" className="gap-2 hover:bg-primary/10 hover:text-primary transition-colors" disabled>
                   <Wand2 className="w-4 h-4" /> Generate Photos
                 </Button>
                 <div className="w-px h-8 bg-border self-center" />
@@ -245,13 +246,32 @@ export function VehicleDetail() {
             </div>
           </div>
 
+          {vehicle.marketplaceRemovalRequired && (
+            <div className="flex flex-col gap-3 rounded-xl border border-destructive/25 bg-destructive/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                <div>
+                  <p className="font-semibold text-foreground">This vehicle is sold, but its Marketplace listing still needs removal.</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">Open the Facebook listing and remove it so buyers no longer see this vehicle as available.</p>
+                </div>
+              </div>
+              {vehicle.marketplaceListingUrl && (
+                <Button asChild variant="outline" className="shrink-0 gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                  <a href={vehicle.marketplaceListingUrl} target="_blank" rel="noreferrer">
+                    Open Marketplace <ExternalLink className="h-4 w-4" />
+                  </a>
+                </Button>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             {/* Left Column - Details */}
             <div className="lg:col-span-2 space-y-8">
               
               {/* Image Gallery */}
-              <div className="glass-panel p-2 rounded-2xl space-y-2">
+              <div className="glass-panel p-2 rounded-xl space-y-2">
                 {displayImages.length > 0 ? (
                   <>
                     {/* Header bar */}
@@ -260,12 +280,12 @@ export function VehicleDetail() {
                         <Camera className="w-4 h-4" />
                         <span>{displayImages.length} Photos</span>
                         {displayImages[selectedIdx]?.category && (
-                          <Badge variant="outline" className="text-[10px] uppercase tracking-wider capitalize px-2">
+                          <Badge variant="outline" className="text-xs  tracking-wider capitalize px-2">
                             {displayImages[selectedIdx].category}
                           </Badge>
                         )}
                         {photoMode === "ai" && (
-                          <span className="flex items-center gap-0.5 text-[10px] font-bold text-primary uppercase tracking-wide">
+                          <span className="flex items-center gap-0.5 text-xs font-bold text-primary  tracking-wide">
                             <Sparkles className="w-3 h-3" /> AI
                           </span>
                         )}
@@ -291,14 +311,14 @@ export function VehicleDetail() {
 
                     {/* Photo mode toggle — only visible when AI set is ready */}
                     {photoSetReady && (
-                      <div className="flex p-0.5 bg-white/[0.04] border border-white/[0.08] rounded-lg mx-1">
+                      <div className="flex p-0.5 bg-muted border border-border rounded-lg mx-1">
                         <button
                           onClick={() => { setPhotoMode("original"); setSelectedIdx(0); }}
                           className={cn(
-                            "flex-1 py-1 text-[10px] font-semibold rounded-md transition-all",
+                            "flex-1 py-1 text-xs font-semibold rounded-md transition",
                             photoMode === "original"
-                              ? "bg-white/10 text-white shadow-sm"
-                              : "text-muted-foreground hover:text-white/70",
+                              ? "bg-muted text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground",
                           )}
                         >
                           Original
@@ -306,10 +326,10 @@ export function VehicleDetail() {
                         <button
                           onClick={() => { setPhotoMode("ai"); setSelectedIdx(0); }}
                           className={cn(
-                            "flex-1 py-1 text-[10px] font-semibold rounded-md transition-all flex items-center justify-center gap-0.5",
+                            "flex-1 py-1 text-xs font-semibold rounded-md transition flex items-center justify-center gap-0.5",
                             photoMode === "ai"
                               ? "bg-primary/20 text-primary shadow-sm border border-primary/20"
-                              : "text-muted-foreground hover:text-white/70",
+                              : "text-muted-foreground hover:text-foreground",
                           )}
                         >
                           <Sparkles className="w-2.5 h-2.5" /> AI Enhanced
@@ -320,7 +340,7 @@ export function VehicleDetail() {
                     {/* Primary / selected image */}
                     <div className="aspect-video rounded-xl overflow-hidden bg-secondary relative group">
                       <div className="absolute top-3 right-3 z-10">
-                        <Badge variant="outline" className={cn("backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border", getStatusBadge(vehicle.status).className)}>
+                        <Badge variant="outline" className={cn("backdrop-blur-sm px-2.5 py-1 text-xs font-bold tracking-wide  border", getStatusBadge(vehicle.status).className)}>
                           {getStatusBadge(vehicle.status).label}
                         </Badge>
                       </div>
@@ -341,7 +361,7 @@ export function VehicleDetail() {
                             key={img.id}
                             onClick={() => setSelectedIdx(i)}
                             className={cn(
-                              "aspect-square rounded-lg overflow-hidden relative group transition-all duration-150 focus:outline-none",
+                              "aspect-square rounded-lg overflow-hidden relative group transition duration-150 focus:outline-none",
                               i === selectedIdx
                                 ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
                                 : "opacity-70 hover:opacity-100"
@@ -444,7 +464,7 @@ export function VehicleDetail() {
                   <div className="space-y-4">
                     {/* Opportunity Score — primary metric */}
                     {intel.opportunityScore != null && (
-                      <div className="flex items-center justify-between p-3 rounded-xl border bg-white/[0.02]"
+                      <div className="flex items-center justify-between p-3 rounded-xl border bg-muted"
                         style={{
                           borderColor: intel.opportunityScore >= 80
                             ? "rgba(34,197,94,0.2)"
@@ -454,23 +474,23 @@ export function VehicleDetail() {
                         }}
                       >
                         <div>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5">Opportunity Score</p>
+                          <p className="text-xs text-muted-foreground  tracking-wide mb-0.5">Opportunity Score</p>
                           <div className="flex items-center gap-2">
                             <span className={cn(
-                              "text-3xl font-black leading-none",
-                              intel.opportunityScore >= 80 ? "text-green-400"
-                              : intel.opportunityScore >= 70 ? "text-amber-400"
-                              : "text-white/40",
+                              "text-3xl font-semibold leading-none",
+                              intel.opportunityScore >= 80 ? "text-success"
+                              : intel.opportunityScore >= 70 ? "text-warning"
+                              : "text-muted-foreground",
                             )}>
                               {intel.opportunityScore}
                             </span>
                             <span className={cn(
-                              "text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest",
+                              "text-[11px] font-semibold px-2 py-0.5 rounded border  tracking-wide",
                               intel.opportunityScore >= 80
-                                ? "bg-green-500/15 border-green-500/25 text-green-400"
+                                ? "bg-success/15 border-success/25 text-success"
                                 : intel.opportunityScore >= 70
-                                ? "bg-amber-500/15 border-amber-500/25 text-amber-400"
-                                : "bg-white/[0.06] border-white/10 text-white/35",
+                                ? "bg-warning/15 border-warning/25 text-warning"
+                                : "bg-muted border-border text-muted-foreground",
                             )}>
                               {intel.opportunityScore >= 80 ? "HOT" : intel.opportunityScore >= 70 ? "WARM" : "WATCH"}
                             </span>
@@ -478,15 +498,15 @@ export function VehicleDetail() {
                         </div>
                         {intel.primarySegment && intel.primarySegment !== "General" && (
                           <div className="text-right">
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5">Buyer Segment</p>
-                            <p className="text-sm font-bold text-white/70">{intel.primarySegment}</p>
+                            <p className="text-xs text-muted-foreground  tracking-wide mb-0.5">Buyer Segment</p>
+                            <p className="text-sm font-bold text-foreground">{intel.primarySegment}</p>
                             <span className={cn(
-                              "text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide",
+                              "text-[11px] font-bold px-1.5 py-0.5 rounded border  tracking-wide",
                               intel.suggestedLanguage === "Spanish-first"
                                 ? "bg-orange-500/15 text-orange-400 border-orange-500/25"
                                 : intel.suggestedLanguage === "Bilingual"
                                 ? "bg-teal-500/15 text-teal-400 border-teal-500/25"
-                                : "bg-white/[0.05] text-white/30 border-white/10",
+                                : "bg-muted text-muted-foreground border-border",
                             )}>
                               {intel.suggestedLanguage}
                             </span>
@@ -497,9 +517,9 @@ export function VehicleDetail() {
 
                     {/* Ad Angle */}
                     {intel.adAngle && (
-                      <div className="px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05]">
-                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Suggested Ad Angle</p>
-                        <p className="text-sm text-white/65 font-medium italic">"{intel.adAngle}"</p>
+                      <div className="px-3 py-2 rounded-lg bg-muted border border-border">
+                        <p className="text-[11px] text-muted-foreground  tracking-wide mb-1">Suggested Ad Angle</p>
+                        <p className="text-sm text-muted-foreground font-medium italic">"{intel.adAngle}"</p>
                       </div>
                     )}
 
@@ -507,7 +527,7 @@ export function VehicleDetail() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Strategy Confidence</span>
                       <div className="flex items-center gap-2">
-                        <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
                           <div
                             className={cn(
                               "h-full rounded-full",
@@ -537,29 +557,29 @@ export function VehicleDetail() {
 
                     {/* Strategy rows */}
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Price Strategy</div>
-                        <div className="text-sm font-medium text-white capitalize">
+                      <div className="p-3 rounded-lg bg-muted border border-border">
+                        <div className="text-xs text-muted-foreground  tracking-wider mb-1">Price Strategy</div>
+                        <div className="text-sm font-medium text-foreground capitalize">
                           {intel.recommendedPriceStrategy.replace(/_/g, " ")}
                         </div>
                       </div>
                       {intel.recommendedDownPayment != null && (
                         <div className="p-3 rounded-lg bg-primary/5 border border-primary/15">
-                          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Rec. Down</div>
+                          <div className="text-xs text-muted-foreground  tracking-wider mb-1">Rec. Down</div>
                           <div className="text-sm font-medium text-primary">
                             {formatCurrency(intel.recommendedDownPayment)}
                           </div>
                         </div>
                       )}
-                      <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Photo Strategy</div>
-                        <div className="text-sm font-medium text-white capitalize">
+                      <div className="p-3 rounded-lg bg-muted border border-border">
+                        <div className="text-xs text-muted-foreground  tracking-wider mb-1">Photo Strategy</div>
+                        <div className="text-sm font-medium text-foreground capitalize">
                           {intel.recommendedPhotoStrategy.replace(/_/g, " ")}
                         </div>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Post When</div>
-                        <div className="text-sm font-medium text-white">
+                      <div className="p-3 rounded-lg bg-muted border border-border">
+                        <div className="text-xs text-muted-foreground  tracking-wider mb-1">Post When</div>
+                        <div className="text-sm font-medium text-foreground">
                           {intel.recommendedDayLabel} {intel.recommendedTimeLabel}
                         </div>
                       </div>
@@ -575,7 +595,7 @@ export function VehicleDetail() {
                             ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
                             : intel.expectedLeadQuality === "warm"
                               ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
-                              : "bg-white/5 text-muted-foreground border-white/10",
+                              : "bg-muted text-muted-foreground border-border",
                         )}
                       >
                         {intel.expectedLeadQuality === "hot"
@@ -588,7 +608,7 @@ export function VehicleDetail() {
 
                     {/* Explanation */}
                     {intel.explanation && (
-                      <div className="text-xs text-muted-foreground p-3 bg-white/[0.02] border border-white/[0.05] rounded-lg leading-relaxed">
+                      <div className="text-xs text-muted-foreground p-3 bg-muted border border-border rounded-lg leading-relaxed">
                         {intel.explanation}
                       </div>
                     )}
@@ -616,13 +636,13 @@ export function VehicleDetail() {
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 rounded-xl bg-secondary/30 border border-border/50">
-                      <p className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">Last Synced</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-1  tracking-wider">Last Synced</p>
                       <p className="text-sm font-medium flex items-center gap-2">
                         {formatDate(vehicle.lastSyncAt)}
                       </p>
                     </div>
                     <div className="p-4 rounded-xl bg-secondary/30 border border-border/50">
-                      <p className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">Added</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-1  tracking-wider">Added</p>
                       <p className="text-sm font-medium">{formatDate(vehicle.createdAt)}</p>
                     </div>
                   </div>
@@ -674,7 +694,7 @@ export function VehicleDetail() {
                           <div className="flex items-center justify-between mb-1.5">
                             <div className="font-semibold text-foreground text-sm capitalize flex items-center gap-2">
                               {change.changeType}
-                              {i === 0 && <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary border-primary/20">Latest</Badge>}
+                              {i === 0 && <Badge variant="outline" className="text-xs px-1.5 py-0 bg-primary/10 text-primary border-primary/20">Latest</Badge>}
                             </div>
                             <time className="text-xs font-medium text-muted-foreground">{formatDate(change.createdAt)}</time>
                           </div>

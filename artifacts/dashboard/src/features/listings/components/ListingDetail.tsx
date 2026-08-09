@@ -48,7 +48,7 @@ function ratingClass(rating: string | null | undefined) {
     case "Excellent":
       return "bg-success/10 text-success border-success/20";
     case "Good":
-      return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+      return "bg-primary/10 text-primary border-primary/20";
     case "Needs Improvement":
       return "bg-warning/10 text-warning border-warning/20";
     default:
@@ -66,8 +66,8 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
       <div className="h-2 rounded-full bg-secondary overflow-hidden shadow-inner">
         <div
           className={cn(
-            "h-full rounded-full transition-all duration-1000 ease-out",
-            value >= 80 ? "bg-success" : value >= 60 ? "bg-blue-500" : "bg-warning"
+            "h-full rounded-full transition duration-1000 ease-out",
+            value >= 80 ? "bg-success" : value >= 60 ? "bg-primary" : "bg-warning"
           )}
           style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
         />
@@ -83,7 +83,7 @@ function VersionView({ version }: { version: ListingVersion }) {
         <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2 col-span-2 md:col-span-1">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-xs font-medium uppercase tracking-wider">Copy Angle</span>
+            <span className="text-xs font-medium  tracking-wider">Copy Angle</span>
           </div>
           {version.copyAngle ? (
             <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 w-fit text-xs font-bold capitalize">
@@ -96,21 +96,21 @@ function VersionView({ version }: { version: ListingVersion }) {
         <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2 col-span-2 md:col-span-2">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Target className="w-4 h-4 text-primary" />
-            <span className="text-xs font-medium uppercase tracking-wider">Buyer Profile</span>
+            <span className="text-xs font-medium  tracking-wider">Buyer Profile</span>
           </div>
           <div className="font-semibold text-sm leading-snug">{version.buyerProfile || "N/A"}</div>
         </div>
         <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2">
           <div className="flex items-center gap-2 text-muted-foreground">
             <DollarSign className="w-4 h-4 text-success" />
-            <span className="text-xs font-medium uppercase tracking-wider">Down Payment</span>
+            <span className="text-xs font-medium  tracking-wider">Down Payment</span>
           </div>
           <div className="font-semibold">{formatCurrency(version.downPayment)}</div>
         </div>
         <div className="glass-panel p-4 rounded-xl border border-border/50 flex flex-col gap-2">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Flag className="w-4 h-4 text-warning" />
-            <span className="text-xs font-medium uppercase tracking-wider">Priority</span>
+            <span className="text-xs font-medium  tracking-wider">Priority</span>
           </div>
           <div className="font-semibold">{version.priority || "N/A"}</div>
         </div>
@@ -244,7 +244,7 @@ export function ListingDetail() {
     return (
       <AppLayout>
         <div className="flex-1 flex flex-col items-center justify-center bg-background/50 h-full p-8">
-          <div className="glass-panel p-12 rounded-2xl flex flex-col items-center text-center max-w-md">
+          <div className="glass-panel p-12 rounded-xl flex flex-col items-center text-center max-w-md">
             <FileText className="w-16 h-16 text-muted-foreground/50 mb-6" />
             <h2 className="text-2xl font-bold tracking-tight mb-2">Workspace Not Found</h2>
             <p className="text-muted-foreground mb-8">This listing workspace doesn't exist or you don't have access.</p>
@@ -277,7 +277,7 @@ export function ListingDetail() {
             </Link>
 
             {/* Header Card */}
-            <div className="glass-panel rounded-2xl overflow-hidden border border-border/50">
+            <div className="glass-panel rounded-xl overflow-hidden border border-border/50">
               <div className="flex flex-col md:flex-row">
                 <div className="w-full md:w-80 aspect-[4/3] md:aspect-auto bg-secondary relative overflow-hidden shrink-0">
                   {primaryImage ? (
@@ -322,11 +322,11 @@ export function ListingDetail() {
                   
                   <div className="grid grid-cols-2 md:flex md:flex-wrap gap-4 md:gap-8 mb-8">
                     <div>
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Asking Price</div>
+                      <div className="text-xs font-medium text-muted-foreground  tracking-wider mb-1">Asking Price</div>
                       <div className="text-2xl font-bold text-primary">{formatCurrency(vehicle.price)}</div>
                     </div>
                     <div>
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Mileage</div>
+                      <div className="text-xs font-medium text-muted-foreground  tracking-wider mb-1">Mileage</div>
                       <div className="text-xl font-semibold">{formatMileage(vehicle.mileage)}</div>
                     </div>
                   </div>
@@ -384,7 +384,7 @@ export function ListingDetail() {
 
           {/* Versions Area */}
           {sortedVersions.length === 0 ? (
-            <div className="glass-panel border-border/50 rounded-2xl p-12 text-center max-w-2xl mx-auto mt-12 animate-in fade-in duration-700 delay-200 fill-mode-both">
+            <div className="glass-panel border-border/50 rounded-xl p-12 text-center max-w-2xl mx-auto mt-12 animate-in fade-in duration-700 delay-200 fill-mode-both">
               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Sparkles className="w-8 h-8 text-primary" />
               </div>
@@ -434,11 +434,11 @@ export function ListingDetail() {
                       <TabsTrigger 
                         key={v.id} 
                         value={String(v.id)} 
-                        className="gap-2 px-4 py-2 rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all whitespace-nowrap"
+                        className="gap-2 px-4 py-2 rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm transition whitespace-nowrap"
                       >
                         <span className="font-semibold">v{v.version}</span>
                         {v.isCurrent && (
-                          <Badge variant="secondary" className="bg-primary/10 text-primary border-0 text-[10px] px-1.5 py-0 uppercase tracking-wider font-bold">
+                          <Badge variant="secondary" className="bg-primary/10 text-primary border-0 text-xs px-1.5 py-0  tracking-wider font-bold">
                             Active
                           </Badge>
                         )}
@@ -447,7 +447,7 @@ export function ListingDetail() {
                   </TabsList>
                 </div>
                 
-                <div className="mt-6 bg-card border border-border/40 rounded-2xl p-6 md:p-8 shadow-sm">
+                <div className="mt-6 bg-card border border-border/40 rounded-xl p-6 md:p-8 shadow-sm">
                   {sortedVersions.map((v) => (
                     <TabsContent key={v.id} value={String(v.id)} className="m-0 focus-visible:outline-none focus-visible:ring-0">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-border/50">

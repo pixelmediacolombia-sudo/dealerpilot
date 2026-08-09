@@ -37,37 +37,37 @@ function EngagementBadge({ status }: { status: string | null | undefined }) {
   switch (status) {
     case "Strong":
       return (
-        <Badge className="gap-1 bg-success/20 text-success border-success/30 text-[10px] font-bold uppercase tracking-widest">
+        <Badge className="gap-1 bg-success/20 text-success border-success/30 text-xs font-bold  tracking-wide">
           <TrendingUp className="w-3 h-3" /> Strong
         </Badge>
       );
     case "Normal":
       return (
-        <Badge className="gap-1 bg-blue-500/20 text-blue-400 border-blue-500/30 text-[10px] font-bold uppercase tracking-widest">
+        <Badge className="gap-1 bg-primary/20 text-primary border-primary/30 text-xs font-bold  tracking-wide">
           <Minus className="w-3 h-3" /> Normal
         </Badge>
       );
     case "Weak":
       return (
-        <Badge className="gap-1 bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px] font-bold uppercase tracking-widest">
+        <Badge className="gap-1 bg-warning/20 text-warning border-warning/30 text-xs font-bold  tracking-wide">
           <TrendingDown className="w-3 h-3" /> Weak
         </Badge>
       );
     case "No engagement yet":
       return (
-        <Badge className="gap-1 bg-muted/50 text-muted-foreground border-border text-[10px] font-bold uppercase tracking-widest">
+        <Badge className="gap-1 bg-muted/50 text-muted-foreground border-border text-xs font-bold  tracking-wide">
           No Engagement
         </Badge>
       );
     case "Needs Update":
       return (
-        <Badge className="gap-1 bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px] font-bold uppercase tracking-widest">
+        <Badge className="gap-1 bg-warning/20 text-warning border-warning/30 text-xs font-bold  tracking-wide">
           <AlertTriangle className="w-3 h-3" /> Needs Update
         </Badge>
       );
     case "Sold":
       return (
-        <Badge className="gap-1 bg-destructive/20 text-destructive border-destructive/30 text-[10px] font-bold uppercase tracking-widest">
+        <Badge className="gap-1 bg-destructive/20 text-destructive border-destructive/30 text-xs font-bold  tracking-wide">
           SOLD
         </Badge>
       );
@@ -77,10 +77,10 @@ function EngagementBadge({ status }: { status: string | null | undefined }) {
 }
 
 function liveBadgeClass(tab: string, engagementStatus: string | null | undefined): string {
-  if (tab === "sold") return "bg-destructive/90 text-white";
-  if (tab === "needs-update") return "bg-amber-500/90 text-white";
-  if (engagementStatus === "Weak") return "bg-amber-500/90 text-white";
-  return "bg-success/90 text-white";
+  if (tab === "sold") return "bg-destructive/90 text-foreground";
+  if (tab === "needs-update") return "bg-warning/90 text-foreground";
+  if (engagementStatus === "Weak") return "bg-warning/90 text-foreground";
+  return "bg-success/90 text-foreground";
 }
 
 function liveBadgeLabel(tab: string, engagementStatus: string | null | undefined): string {
@@ -93,14 +93,14 @@ function liveBadgeLabel(tab: string, engagementStatus: string | null | undefined
 export function PublishedCard({ workspace: w, tab, onMarkSold, onRenew, onUpdateListing, onRemoveFromMarketplace, onArchive }: PublishedCardProps) {
   const isInventoryRemoved = w.vehicleStatus === "Sold/Removed";
   return (
-    <div className="rounded-lg bg-card border border-border/40 hover:border-primary/30 transition-all duration-300 overflow-hidden hover-lift flex flex-col h-full">
+    <div className="rounded-lg bg-card border border-border/40 hover:border-primary/30 transition duration-300 overflow-hidden hover-lift flex flex-col h-full">
       {/* Image */}
       <div className="aspect-[16/9] bg-secondary/30 relative overflow-hidden flex-shrink-0 group">
         {w.primaryImageUrl ? (
           <img
             src={w.primaryImageUrl}
             alt={w.label}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+            className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/50 to-background">
@@ -112,8 +112,8 @@ export function PublishedCard({ workspace: w, tab, onMarkSold, onRenew, onUpdate
         {/* Status badge */}
         <Badge
           className={cn(
-            "absolute top-2 right-2 z-10 uppercase text-[9px] font-bold tracking-widest px-2 py-0.5 rounded-full border-0",
-            isInventoryRemoved ? "bg-amber-500/90 text-white" : liveBadgeClass(tab, w.engagementStatus),
+            "absolute top-2 right-2 z-10  text-[11px] font-bold tracking-wide px-2 py-0.5 rounded-full border-0",
+            isInventoryRemoved ? "bg-warning/90 text-foreground" : liveBadgeClass(tab, w.engagementStatus),
           )}
         >
           {isInventoryRemoved ? "INVENTORY REMOVED" : liveBadgeLabel(tab, w.engagementStatus)}
@@ -123,7 +123,7 @@ export function PublishedCard({ workspace: w, tab, onMarkSold, onRenew, onUpdate
         <div className="absolute bottom-2 left-2 right-2 flex justify-between items-end text-white z-10">
           <div className="font-bold text-lg drop-shadow-md">{formatCurrency(w.price)}</div>
           {w.downPayment && (
-            <div className="text-[11px] font-medium bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-md border border-white/10">
+            <div className="text-[11px] font-medium bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-md border border-white/20">
               ${(w.downPayment / 100).toFixed(0)}K down
             </div>
           )}
@@ -175,7 +175,7 @@ export function PublishedCard({ workspace: w, tab, onMarkSold, onRenew, onUpdate
             w.engagementStatus === "Strong"
               ? "bg-success/10 border-success/20 text-success"
               : w.engagementStatus === "Weak" || w.engagementStatus === "Needs Update"
-                ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                ? "bg-warning/10 border-warning/20 text-warning"
                 : w.engagementStatus === "Sold"
                   ? "bg-destructive/10 border-destructive/20 text-destructive"
                   : "bg-secondary/50 border-border text-muted-foreground",
@@ -186,7 +186,7 @@ export function PublishedCard({ workspace: w, tab, onMarkSold, onRenew, onUpdate
         )}
 
         {isInventoryRemoved && (
-          <div className="text-xs px-2 py-1.5 rounded-md border mb-2 flex items-start gap-2 bg-amber-500/10 border-amber-500/20 text-amber-300">
+          <div className="text-xs px-2 py-1.5 rounded-md border mb-2 flex items-start gap-2 bg-warning/10 border-warning/20 text-warning">
             <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
             Vehicle is Sold/Removed in inventory while Marketplace is still tracked.
           </div>
@@ -214,22 +214,22 @@ export function PublishedCard({ workspace: w, tab, onMarkSold, onRenew, onUpdate
                   <TrendingUp className="w-3 h-3" /> Performance
                 </Button>
               </Link>
-              <Button size="sm" variant="outline" onClick={() => onRenew(w.vehicleId)} className="h-7 text-xs px-2.5 gap-1.5 border-border/60 hover:border-blue-500/50 hover:text-blue-400">
+              <Button size="sm" variant="outline" onClick={() => onRenew(w.vehicleId)} className="h-7 text-xs px-2.5 gap-1.5 border-border/60 hover:border-primary/50 hover:text-primary">
                 <RotateCcw className="w-3 h-3" /> Renew
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => onMarkSold(w.vehicleId)} className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-amber-400">
+              <Button size="sm" variant="ghost" onClick={() => onMarkSold(w.vehicleId)} className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-warning">
                 <Tag className="w-3 h-3" /> Mark Sold
               </Button>
             </>
           )}
           {tab === "published" && isInventoryRemoved && (
-            <Button size="sm" variant="outline" onClick={() => onRemoveFromMarketplace(w.vehicleId)} className="h-7 text-xs px-2.5 gap-1.5 border-amber-500/40 text-amber-300 hover:bg-amber-500/10">
+            <Button size="sm" variant="outline" onClick={() => onRemoveFromMarketplace(w.vehicleId)} className="h-7 text-xs px-2.5 gap-1.5 border-warning/40 text-warning hover:bg-warning/10">
               <Trash2 className="w-3 h-3" /> Remove
             </Button>
           )}
           {tab === "needs-update" && (
             <>
-              <Button size="sm" variant="outline" onClick={() => onUpdateListing(w.vehicleId)} className="h-7 text-xs px-2.5 gap-1.5 border-amber-500/40 text-amber-400 hover:bg-amber-500/10">
+              <Button size="sm" variant="outline" onClick={() => onUpdateListing(w.vehicleId)} className="h-7 text-xs px-2.5 gap-1.5 border-warning/40 text-warning hover:bg-warning/10">
                 <RefreshCw className="w-3 h-3" /> Update Price
               </Button>
               <Button size="sm" variant="outline" onClick={() => onRenew(w.vehicleId)} className="h-7 text-xs px-2.5 gap-1.5 border-border/60 hover:border-primary/50 hover:text-primary">

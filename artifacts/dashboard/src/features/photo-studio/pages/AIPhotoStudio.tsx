@@ -191,11 +191,11 @@ function toCount(value: number | string | undefined): number {
 // ── AI Status badge ───────────────────────────────────────────────────────────
 
 const AI_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  Ready:      { label: "AI Enhanced",  color: "text-green-400 bg-green-400/10 border-green-400/20" },
-  Processing: { label: "Processing",   color: "text-blue-400 bg-blue-400/10 border-blue-400/20" },
+  Ready:      { label: "AI Enhanced",  color: "text-success bg-success/10 border-success/20" },
+  Processing: { label: "Processing",   color: "text-primary bg-primary/10 border-primary/20" },
   Queued:     { label: "In Queue",     color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
-  Failed:     { label: "Needs Attention",  color: "text-red-400 bg-red-400/10 border-red-400/20" },
-  Pending:    { label: "Ready to Enhance",  color: "text-white/30 bg-white/[0.04] border-white/[0.08]" },
+  Failed:     { label: "Needs Attention",  color: "text-destructive bg-destructive/10 border-destructive/20" },
+  Pending:    { label: "Ready to Enhance",  color: "text-muted-foreground bg-muted border-border" },
 };
 
 function AiStatusBadge({ status }: { status: string }) {
@@ -230,59 +230,59 @@ function VehicleCard({
 
   return (
     <div className={cn(
-      "flex items-center gap-5 px-5 py-3.5 border-b border-white/[0.04] last:border-0 transition-colors hover:bg-white/[0.015]",
+      "flex items-center gap-5 px-5 py-3.5 border-b border-border last:border-0 transition-colors hover:bg-muted",
       isFailed && "border-l-2 border-l-red-500/30",
       isProcessing && "border-l-2 border-l-blue-500/30",
       isDone && aiStatus === "Ready" && "border-l-2 border-l-amber-500/25",
     )}>
       {/* Thumbnail */}
-      <div className="w-[72px] h-[52px] shrink-0 rounded-lg overflow-hidden bg-white/[0.03] border border-white/[0.05] relative">
+      <div className="w-[72px] h-[52px] shrink-0 rounded-lg overflow-hidden bg-muted border border-border relative">
         {job.vehicleThumbnailUrl ? (
           <img src={job.vehicleThumbnailUrl} alt={name} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <ImageIcon className="w-4 h-4 text-white/10" />
+            <ImageIcon className="w-4 h-4 text-muted-foreground" />
           </div>
         )}
         {isProcessing && (
           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-            <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+            <Loader2 className="w-4 h-4 text-primary animate-spin" />
           </div>
         )}
       </div>
 
       {/* Vehicle info */}
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-semibold text-white/75 truncate">{name}</p>
+        <p className="text-[13px] font-semibold text-foreground truncate">{name}</p>
         <div className="flex items-center gap-3 mt-1">
-          <span className="text-[10px] text-white/30 font-mono">{job.totalPhotos} orig</span>
+          <span className="text-xs text-muted-foreground font-mono">{job.totalPhotos} orig</span>
           {enhancedCount > 0 && (
-            <span className="text-[10px] text-amber-400/70 font-mono">{enhancedCount} enhanced</span>
+            <span className="text-xs text-warning/70 font-mono">{enhancedCount} enhanced</span>
           )}
           {/* Improvement quality indicator — only shown for completed jobs with delta data */}
           {isDone && job.noImprovementCount > 0 && (
-            <span className="text-[9px] font-black uppercase tracking-[0.18em] text-orange-400/70 border border-orange-500/20 rounded px-1.5 py-0.5">
+            <span className="text-[11px] font-semibold  tracking-wide text-orange-400/70 border border-orange-500/20 rounded px-1.5 py-0.5">
               {job.noImprovementCount} no change
             </span>
           )}
           {isDone && job.noImprovementCount === 0 && job.lowImprovementCount > 0 && (
-            <span className="text-[9px] font-black uppercase tracking-[0.18em] text-yellow-400/50 border border-yellow-500/15 rounded px-1.5 py-0.5">
+            <span className="text-[11px] font-semibold  tracking-wide text-yellow-400/50 border border-yellow-500/15 rounded px-1.5 py-0.5">
               {job.lowImprovementCount} low
             </span>
           )}
           {job.completedAt && (
-            <span className="text-[10px] text-white/18 font-mono">{timeAgo(job.completedAt)}</span>
+            <span className="text-xs text-muted-foreground font-mono">{timeAgo(job.completedAt)}</span>
           )}
         </div>
         {/* Progress bar — amber = enhanced, orange = low/no improvement */}
         {job.totalPhotos > 0 && (
-          <div className="mt-1.5 h-[2px] w-32 bg-white/[0.06] rounded-full overflow-hidden">
+          <div className="mt-1.5 h-[2px] w-32 bg-muted rounded-full overflow-hidden">
             <div
               className={cn(
-                "h-full rounded-full transition-all",
+                "h-full rounded-full transition",
                 isDone && job.noImprovementCount > job.totalPhotos * 0.5 ? "bg-orange-400" :
-                isDone ? "bg-amber-400" :
-                isProcessing ? "bg-blue-400" : "bg-white/10",
+                isDone ? "bg-warning" :
+                isProcessing ? "bg-primary" : "bg-muted",
               )}
               style={{ width: isProcessing ? "60%" : `${pct}%` }}
             />
@@ -303,16 +303,16 @@ function VehicleCard({
             <Sparkles className="w-3 h-3 mr-1" />Open Studio
           </Button>
         ) : isFailed ? (
-          <Button variant="ghost" size="sm" className="h-7 text-[11px] px-3 text-red-400/70 hover:text-red-400"
+          <Button variant="ghost" size="sm" className="h-7 text-[11px] px-3 text-destructive/70 hover:text-destructive"
             onClick={() => onReprocess(job.vehicleId)}>
             <RotateCcw className="w-3 h-3 mr-1" />Retry
           </Button>
         ) : isProcessing ? (
-          <span className="text-[11px] text-blue-400/60 font-mono">
+          <span className="text-[11px] text-primary/60 font-mono">
             {job.status === "Queued" ? "In queue…" : "Processing…"}
           </span>
         ) : (
-          <Button variant="ghost" size="sm" className="h-7 text-[11px] px-3 text-white/30 hover:text-amber-400"
+          <Button variant="ghost" size="sm" className="h-7 text-[11px] px-3 text-muted-foreground hover:text-warning"
             onClick={() => onReprocess(job.vehicleId)}>
             <Sparkles className="w-3 h-3 mr-1" />Enhance
           </Button>
@@ -356,38 +356,38 @@ function InventoryBrowser({
   }, [data?.vehicles, search]);
 
   return (
-    <div className="border border-white/[0.06] rounded-2xl overflow-hidden">
+    <div className="border border-border rounded-xl overflow-hidden">
       {/* Section header */}
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted transition-colors"
       >
         <div className="flex items-center gap-3">
-          <Search className="w-4 h-4 text-white/40" />
-          <span className="text-sm font-semibold text-white/80">Select a Vehicle to Enhance</span>
+          <Search className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-semibold text-foreground">Select a Vehicle to Enhance</span>
           {data && (
-            <span className="text-xs text-white/30">{data.vehicles.length} vehicles in inventory</span>
+            <span className="text-xs text-muted-foreground">{data.vehicles.length} vehicles in inventory</span>
           )}
         </div>
         {expanded ? (
-          <ChevronUp className="w-4 h-4 text-white/30" />
+          <ChevronUp className="w-4 h-4 text-muted-foreground" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-white/30" />
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
         )}
       </button>
 
       {expanded && (
-        <div className="border-t border-white/[0.06]">
+        <div className="border-t border-border">
           {/* Search bar */}
-          <div className="px-5 py-3 border-b border-white/[0.04]">
+          <div className="px-5 py-3 border-b border-border">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search by year, make, model, VIN…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-primary/40 focus:bg-white/[0.06] transition-colors"
+                className="w-full bg-muted border border-border rounded-lg pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/40 focus:bg-muted transition-colors"
               />
             </div>
           </div>
@@ -396,12 +396,12 @@ function InventoryBrowser({
           <div className="max-h-[420px] overflow-y-auto divide-y divide-white/[0.04]">
             {isLoading && (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-white/30" />
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
               </div>
             )}
 
             {!isLoading && filtered.length === 0 && (
-              <div className="py-8 text-center text-sm text-white/30">No vehicles found</div>
+              <div className="py-8 text-center text-sm text-muted-foreground">No vehicles found</div>
             )}
 
             {filtered.map((vehicle) => {
@@ -414,10 +414,10 @@ function InventoryBrowser({
               return (
                 <div
                   key={vehicle.id}
-                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.02] transition-colors"
+                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted transition-colors"
                 >
                   {/* Thumbnail */}
-                  <div className="w-14 h-10 rounded-lg overflow-hidden bg-white/[0.04] border border-white/[0.06] shrink-0">
+                  <div className="w-14 h-10 rounded-lg overflow-hidden bg-muted border border-border shrink-0">
                     {vehicle.primaryImageUrl ? (
                       <img
                         src={vehicle.primaryImageUrl}
@@ -427,16 +427,16 @@ function InventoryBrowser({
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <ImageIcon className="w-4 h-4 text-white/15" />
+                        <ImageIcon className="w-4 h-4 text-muted-foreground" />
                       </div>
                     )}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white truncate">{name}</div>
+                    <div className="text-sm font-medium text-foreground truncate">{name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] text-white/30">{vehicle.imageCount} photo{vehicle.imageCount !== 1 ? "s" : ""}</span>
+                      <span className="text-[11px] text-muted-foreground">{vehicle.imageCount} photo{vehicle.imageCount !== 1 ? "s" : ""}</span>
                     </div>
                   </div>
 
@@ -444,7 +444,7 @@ function InventoryBrowser({
                   <div className="flex items-center gap-2 shrink-0">
                     {isEnhanced ? (
                       <>
-                        <span className="text-[11px] text-green-400 font-medium">✓ Enhanced</span>
+                        <span className="text-[11px] text-success font-medium">✓ Enhanced</span>
                         <Button
                           size="sm"
                           variant="outline"
@@ -455,7 +455,7 @@ function InventoryBrowser({
                         </Button>
                       </>
                     ) : isActive ? (
-                      <span className="flex items-center gap-1.5 text-[11px] text-blue-400">
+                      <span className="flex items-center gap-1.5 text-[11px] text-primary">
                         <Loader2 className="w-3 h-3 animate-spin" />
                         {job?.status === "Queued" ? "In queue…" : "Processing…"}
                       </span>
@@ -568,9 +568,9 @@ export function AIPhotoStudio() {
   const displayFailedCount = statsFailedCount || failedCount;
 
   const kpis = [
-    { label: "Enhanced", value: displayReadyCount, icon: Sparkles, color: "text-amber-400" },
-    { label: "In Progress", value: displayProcessingCount, icon: Loader2, color: displayProcessingCount > 0 ? "text-blue-400" : "text-white/30", spin: displayProcessingCount > 0 },
-    { label: "Needs Attention", value: displayFailedCount, icon: Clock, color: displayFailedCount > 0 ? "text-red-400" : "text-white/30" },
+    { label: "Enhanced", value: displayReadyCount, icon: Sparkles, color: "text-warning" },
+    { label: "In Progress", value: displayProcessingCount, icon: Loader2, color: displayProcessingCount > 0 ? "text-primary" : "text-muted-foreground", spin: displayProcessingCount > 0 },
+    { label: "Needs Attention", value: displayFailedCount, icon: Clock, color: displayFailedCount > 0 ? "text-destructive" : "text-muted-foreground" },
   ];
 
   if (openVehicleId !== null) {
@@ -614,10 +614,10 @@ export function AIPhotoStudio() {
           {kpis.map((kpi) => {
             const Icon = kpi.icon;
             return (
-              <div key={kpi.label} className="bg-card border border-white/[0.06] rounded-xl p-4">
+              <div key={kpi.label} className="bg-card border border-border rounded-xl p-4">
                 <Icon className={cn("w-4 h-4 mb-2", kpi.color, (kpi as { spin?: boolean }).spin && "animate-spin")} />
                 <div className={cn("text-2xl font-bold", kpi.color)}>{kpi.value}</div>
-                <div className="text-xs text-white/40 mt-0.5">{kpi.label}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{kpi.label}</div>
               </div>
             );
           })}
@@ -627,40 +627,40 @@ export function AIPhotoStudio() {
           <div className={cn(
             "flex items-center justify-between gap-4 rounded-xl border p-4",
             stats.providers.restoration?.enabled
-              ? "border-emerald-500/20 bg-emerald-500/[0.04]"
-              : "border-amber-500/20 bg-amber-500/[0.04]",
+              ? "border-success/20 bg-success/[0.04]"
+              : "border-warning/20 bg-warning/[0.04]",
           )}>
             <div className="flex items-center gap-3 min-w-0">
               <Sparkles className={cn(
                 "w-4 h-4 shrink-0",
-                stats.providers.restoration?.enabled ? "text-emerald-400" : "text-amber-400",
+                stats.providers.restoration?.enabled ? "text-success" : "text-warning",
               )} />
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-white/80 truncate">
+                <div className="text-sm font-semibold text-foreground truncate">
                   Enhancement engine: {stats.providers.enhancement}
                 </div>
-                <div className="text-xs text-white/35 truncate">
+                <div className="text-xs text-muted-foreground truncate">
                   Prompt {stats.providers.restoration?.promptVersion ?? "unknown"}
                 </div>
               </div>
             </div>
             <div className={cn(
-              "text-[10px] font-black uppercase tracking-[0.18em]",
-              stats.providers.restoration?.enabled ? "text-emerald-400" : "text-amber-400",
+              "text-xs font-semibold  tracking-wide",
+              stats.providers.restoration?.enabled ? "text-success" : "text-warning",
             )}>
               {stats.providers.restoration?.enabled ? "GPT Image Active" : "Fallback Active"}
             </div>
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-card/40 p-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card/40 p-3">
           <div className="min-w-0">
-            <div className="text-xs font-semibold text-white/75">Processing mode</div>
-            <div className="text-[11px] text-white/35">
+            <div className="text-xs font-semibold text-foreground">Processing mode</div>
+            <div className="text-[11px] text-muted-foreground">
               Cost is confirmed before OpenAI restoration starts.
             </div>
           </div>
-          <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-1">
+          <div className="flex rounded-lg border border-border bg-muted p-1">
             {([
               ["fidelity-first", "Fidelity First"],
               ["balanced", "Balanced"],
@@ -674,7 +674,7 @@ export function AIPhotoStudio() {
                   "px-3 py-1.5 text-[11px] font-semibold rounded-md transition-colors",
                   processingMode === mode
                     ? "bg-primary/20 text-primary border border-primary/25"
-                    : "text-white/40 hover:text-white/70",
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {label}
@@ -685,9 +685,9 @@ export function AIPhotoStudio() {
 
         {/* Stale warning */}
         {(allJobs?.jobs ?? []).some((j) => j.status === "Failed") && (
-          <div className="flex items-center gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.04]">
-            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-            <div className="flex-1 text-sm text-amber-300/80">
+          <div className="flex items-center gap-3 p-4 rounded-xl border border-warning/20 bg-warning/[0.04]">
+            <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+            <div className="flex-1 text-sm text-warning/80">
               Some vehicles failed to process. Use the inventory below to retry them.
             </div>
           </div>
@@ -697,22 +697,22 @@ export function AIPhotoStudio() {
         {!isLoading && processedVehicles.length > 0 && (
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Processing Queue</p>
-              <div className="flex-1 h-px bg-white/[0.04]" />
-              <div className="flex items-center gap-3 text-[10px] font-mono">
-                <span className="text-amber-400/70">{readyCount} ready</span>
-                {processingCount > 0 && <span className="text-blue-400/70">{processingCount} active</span>}
-                {failedCount > 0 && <span className="text-red-400/50">{failedCount} failed</span>}
+              <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">Processing Queue</p>
+              <div className="flex-1 h-px bg-muted" />
+              <div className="flex items-center gap-3 text-xs font-mono">
+                <span className="text-warning/70">{readyCount} ready</span>
+                {processingCount > 0 && <span className="text-primary/70">{processingCount} active</span>}
+                {failedCount > 0 && <span className="text-destructive/50">{failedCount} failed</span>}
               </div>
             </div>
             {/* Queue header */}
-            <div className="flex items-center gap-5 px-5 py-2 text-[9px] font-black uppercase tracking-[0.18em] text-white/18 border border-white/[0.05] rounded-t-xl">
+            <div className="flex items-center gap-5 px-5 py-2 text-[11px] font-semibold  tracking-wide text-muted-foreground border border-border rounded-t-xl">
               <div className="w-[72px] shrink-0">Frame</div>
               <div className="flex-1 min-w-0">Vehicle</div>
               <div className="shrink-0 hidden md:block w-28">Status</div>
               <div className="shrink-0 w-24 text-right">Action</div>
             </div>
-            <div className="border border-t-0 border-white/[0.05] bg-white/[0.005] rounded-b-xl overflow-hidden">
+            <div className="border border-t-0 border-border bg-muted rounded-b-xl overflow-hidden">
               {processedVehicles.map((job) => (
                 <VehicleCard
                   key={job.vehicleId}

@@ -22,9 +22,9 @@ import { cn } from "@/lib/utils";
 const DEALER_ID = 1;
 
 const COLUMNS = [
-  { key: "Hot", label: "Hot", icon: Flame, color: "text-red-400" },
+  { key: "Hot", label: "Hot", icon: Flame, color: "text-destructive" },
   { key: "Warm", label: "Warm", icon: Thermometer, color: "text-orange-400" },
-  { key: "Cold", label: "Cold", icon: Snowflake, color: "text-blue-400" },
+  { key: "Cold", label: "Cold", icon: Snowflake, color: "text-primary" },
   { key: "Appointment Ready", label: "Appt Ready", icon: Calendar, color: "text-yellow-400" },
   { key: "Sold", label: "Sold", icon: Trophy, color: "text-primary" },
   { key: "Lost", label: "Lost", icon: XCircle, color: "text-muted-foreground" },
@@ -32,13 +32,13 @@ const COLUMNS = [
 
 function statusBadge(status: string) {
   const map: Record<string, string> = {
-    New: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    Contacted: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-    Qualified: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    New: "bg-primary/10 text-primary border-primary/20",
+    Contacted: "bg-primary/10 text-primary border-primary/20",
+    Qualified: "bg-success/10 text-success border-success/20",
     "Appointment Ready": "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-    "Appointment Set": "bg-green-500/10 text-green-400 border-green-500/20",
+    "Appointment Set": "bg-success/10 text-success border-success/20",
     Sold: "bg-primary/10 text-primary border-primary/20",
-    Lost: "bg-white/5 text-muted-foreground border-white/10",
+    Lost: "bg-muted text-muted-foreground border-border",
   };
   return map[status] ?? "bg-secondary/50";
 }
@@ -62,7 +62,7 @@ export function LeadsCRM() {
                 size="sm"
                 variant="outline"
                 onClick={() => navigate("/sales-ai")}
-                className="gap-2 border-white/10 text-muted-foreground hover:text-white text-[10px] font-bold uppercase tracking-widest"
+                className="gap-2 border-border text-muted-foreground hover:text-foreground text-xs font-bold  tracking-wide"
               >
                 ← Sales AI
               </Button>
@@ -94,7 +94,7 @@ export function LeadsCRM() {
                         <Icon className={cn("w-4 h-4", color)} />
                         <span
                           className={cn(
-                            "text-[11px] font-bold uppercase tracking-widest",
+                            "text-[11px] font-bold  tracking-wide",
                             color,
                           )}
                         >
@@ -106,24 +106,24 @@ export function LeadsCRM() {
                       </div>
                       <div className="space-y-3">
                         {colLeads.length === 0 ? (
-                          <div className="p-4 rounded-xl border border-dashed border-white/10 text-center text-xs text-muted-foreground/40">
+                          <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground/40">
                             Empty
                           </div>
                         ) : (
                           colLeads.map((lead) => (
                             <div
                               key={lead.id}
-                              className="p-4 rounded-xl border border-white/5 bg-card/40 hover:bg-card/70 hover:border-primary/20 transition-all cursor-pointer group"
+                              className="p-4 rounded-xl border border-border bg-card/40 hover:bg-card/70 hover:border-primary/20 transition cursor-pointer group"
                               onClick={() => navigate(`/leads/${lead.id}`)}
                             >
                               <div className="flex items-start justify-between gap-2 mb-3">
-                                <span className="font-bold text-sm text-white/90 truncate">
+                                <span className="font-bold text-sm text-foreground truncate">
                                   {lead.buyerName ?? "Buyer"}
                                 </span>
                                 <Badge
                                   variant="outline"
                                   className={cn(
-                                    "text-[9px] font-bold uppercase tracking-widest shrink-0",
+                                    "text-[11px] font-bold  tracking-wide shrink-0",
                                     statusBadge(lead.status),
                                   )}
                                 >
@@ -145,7 +145,7 @@ export function LeadsCRM() {
                                   </div>
                                 )}
                                 {lead.phone && (
-                                  <div className="flex items-center gap-1 text-[11px] text-emerald-400">
+                                  <div className="flex items-center gap-1 text-[11px] text-success">
                                     <Phone className="w-3 h-3" />
                                     {lead.phone}
                                   </div>
@@ -160,23 +160,23 @@ export function LeadsCRM() {
 
                               <div className="flex items-center gap-2">
                                 {lead.hasId && (
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" aria-label="Has ID" />
+                                  <CheckCircle2 className="w-3 h-3 text-success" aria-label="Has ID" />
                                 )}
                                 {lead.hasProofOfIncome && (
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" aria-label="Income proof" />
+                                  <CheckCircle2 className="w-3 h-3 text-success" aria-label="Income proof" />
                                 )}
                                 {lead.appointmentIntent && (
                                   <Calendar className="w-3 h-3 text-yellow-400" aria-label="Appointment intent" />
                                 )}
                                 {lead.leadScore != null && (
-                                  <span className="ml-auto text-[10px] font-bold text-muted-foreground/60">
+                                  <span className="ml-auto text-xs font-bold text-muted-foreground/60">
                                     {lead.leadScore}pts
                                   </span>
                                 )}
                               </div>
 
                               {lead.leadScore != null && (
-                                <div className="mt-2 h-0.5 bg-white/5 rounded-full overflow-hidden">
+                                <div className="mt-2 h-0.5 bg-muted rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-primary rounded-full"
                                     style={{ width: `${Math.min(lead.leadScore, 100)}%` }}
@@ -188,7 +188,7 @@ export function LeadsCRM() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="gap-1 h-6 text-[9px] font-bold uppercase tracking-widest text-primary hover:text-primary px-2"
+                                  className="gap-1 h-6 text-[11px] font-bold  tracking-wide text-primary hover:text-primary px-2"
                                 >
                                   View <ArrowRight className="w-2.5 h-2.5" />
                                 </Button>

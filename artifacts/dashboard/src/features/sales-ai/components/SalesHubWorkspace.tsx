@@ -64,28 +64,28 @@ import {
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 
 function scoreColor(score: number | null) {
-  if (score == null) return { pill: "bg-white/[0.06] border-white/10 text-white/25", label: "" };
-  if (score >= 80) return { pill: "bg-green-500/15 border-green-500/25 text-green-400", label: "HOT" };
-  if (score >= 70) return { pill: "bg-amber-500/15 border-amber-500/25 text-amber-400", label: "WARM" };
-  return { pill: "bg-white/[0.06] border-white/10 text-white/35", label: "WATCH" };
+  if (score == null) return { pill: "bg-muted border-border text-muted-foreground", label: "" };
+  if (score >= 80) return { pill: "bg-success/15 border-success/25 text-success", label: "HOT" };
+  if (score >= 70) return { pill: "bg-warning/15 border-warning/25 text-warning", label: "WARM" };
+  return { pill: "bg-muted border-border text-muted-foreground", label: "WATCH" };
 }
 
 function langBadgeClass(lang: string) {
   if (lang === "Spanish-first") return "text-orange-400/70";
   if (lang === "Bilingual") return "text-teal-400/70";
-  return "text-white/20";
+  return "text-muted-foreground";
 }
 
 function riskColor(level: "LOW" | "MEDIUM" | "HIGH") {
-  if (level === "LOW") return "text-emerald-400";
-  if (level === "MEDIUM") return "text-amber-400";
-  return "text-red-400";
+  if (level === "LOW") return "text-success";
+  if (level === "MEDIUM") return "text-warning";
+  return "text-destructive";
 }
 
 function roiColor(roi: "HIGH" | "MEDIUM" | "LOW") {
-  if (roi === "HIGH") return "text-emerald-400";
-  if (roi === "MEDIUM") return "text-amber-400";
-  return "text-white/30";
+  if (roi === "HIGH") return "text-success";
+  if (roi === "MEDIUM") return "text-warning";
+  return "text-muted-foreground";
 }
 
 // ─── Morning Brief ────────────────────────────────────────────────────────────
@@ -93,30 +93,30 @@ function roiColor(roi: "HIGH" | "MEDIUM" | "LOW") {
 function MorningBrief({ plan }: { plan: DailyMarketplacePlan }) {
   const brief = generateMorningBrief(plan);
   return (
-    <div className="rounded-2xl border border-blue-500/10 bg-blue-500/[0.018] p-6 mb-7">
+    <div className="rounded-xl border border-primary/10 bg-primary/[0.018] p-6 mb-7">
       <div className="flex items-center gap-2 mb-4">
         <span className="relative flex h-[6px] w-[6px] shrink-0">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-40" />
-          <span className="relative inline-flex rounded-full h-[6px] w-[6px] bg-blue-400" />
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-40" />
+          <span className="relative inline-flex rounded-full h-[6px] w-[6px] bg-primary" />
         </span>
-        <p className="text-[9px] font-black text-blue-400/40 uppercase tracking-[0.28em]">
+        <p className="text-[11px] font-semibold text-primary/40  tracking-wide">
           DealerPilot · Morning Brief
         </p>
       </div>
-      <p className="text-[20px] font-semibold text-white/72 mb-3 leading-snug">
+      <p className="text-[20px] font-semibold text-foreground mb-3 leading-snug">
         {brief.greeting}
       </p>
-      <p className="text-[13px] text-white/38 leading-relaxed max-w-xl mb-0">
+      <p className="text-[13px] text-muted-foreground leading-relaxed max-w-xl mb-0">
         {brief.body}
       </p>
       {brief.primaryVehicle && (
-        <div className="mt-4 pt-4 border-t border-white/[0.05]">
-          <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em] mb-1.5">
+        <div className="mt-4 pt-4 border-t border-border">
+          <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide mb-1.5">
             Primary Opportunity
           </p>
-          <p className="text-[14px] font-bold text-white/65">{brief.primaryVehicle}</p>
+          <p className="text-[14px] font-bold text-muted-foreground">{brief.primaryVehicle}</p>
           {brief.primaryReason && (
-            <p className="text-[11px] text-white/32 mt-1 italic leading-relaxed max-w-lg">
+            <p className="text-[11px] text-muted-foreground mt-1 italic leading-relaxed max-w-lg">
               {brief.primaryReason}
             </p>
           )}
@@ -140,34 +140,34 @@ function PublishingSchedule({ plan }: { plan: DailyMarketplacePlan }) {
   return (
     <div className="mb-8">
       <div className="flex items-center gap-3 mb-4">
-        <CalendarDays className="w-3.5 h-3.5 text-white/18" />
-        <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">
+        <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
+        <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">
           Campaign Schedule
         </p>
-        <div className="flex-1 h-px bg-white/[0.04]" />
+        <div className="flex-1 h-px bg-muted" />
       </div>
-      <div className="rounded-2xl border border-white/[0.05] overflow-hidden">
+      <div className="rounded-xl border border-border overflow-hidden">
         {/* Today */}
-        <div className="px-5 py-2 bg-white/[0.008] border-b border-white/[0.04]">
-          <p className="text-[9px] font-black text-blue-400/50 uppercase tracking-[0.22em]">Today</p>
+        <div className="px-5 py-2 bg-muted border-b border-border">
+          <p className="text-[11px] font-semibold text-primary/50  tracking-wide">Today</p>
         </div>
         {todayVehicles.map((v, i) => (
-          <div key={v.vehicleId} className="flex items-center gap-4 px-5 py-2.5 border-b border-white/[0.025] last:border-b-0 hover:bg-white/[0.015] transition-colors">
-            <span className="text-[11px] font-bold text-blue-400/40 font-mono w-[42px] shrink-0">
+          <div key={v.vehicleId} className="flex items-center gap-4 px-5 py-2.5 border-b border-border last:border-b-0 hover:bg-muted transition-colors">
+            <span className="text-[11px] font-bold text-primary/40 font-mono w-[42px] shrink-0">
               {TODAY_SLOTS[i]}
             </span>
-            <div className="w-8 h-6 rounded-md overflow-hidden shrink-0 bg-white/[0.03]">
+            <div className="w-8 h-6 rounded-md overflow-hidden shrink-0 bg-muted">
               {v.primaryImageUrl
                 ? <img src={v.primaryImageUrl} alt={v.label} className="w-full h-full object-cover" />
                 : <div className="w-full h-full" />}
             </div>
-            <p className="flex-1 text-[12px] font-semibold text-white/60 truncate">{v.label}</p>
+            <p className="flex-1 text-[12px] font-semibold text-muted-foreground truncate">{v.label}</p>
             {v.primarySegment !== "General" && (
-              <span className="text-[9px] font-bold text-white/20 uppercase tracking-wide shrink-0 hidden lg:block">
+              <span className="text-[11px] font-bold text-muted-foreground  tracking-wide shrink-0 hidden lg:block">
                 {v.primarySegment}
               </span>
             )}
-            <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0", scoreColor(v.opportunityScore).pill)}>
+            <span className={cn("text-[11px] font-bold px-1.5 py-0.5 rounded border shrink-0", scoreColor(v.opportunityScore).pill)}>
               {v.opportunityScore ?? "—"}
             </span>
           </div>
@@ -175,18 +175,18 @@ function PublishingSchedule({ plan }: { plan: DailyMarketplacePlan }) {
         {/* Tomorrow */}
         {tomorrowVehicles.length > 0 && (
           <>
-            <div className="px-5 py-2 bg-white/[0.005] border-y border-white/[0.04]">
-              <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em]">Tomorrow</p>
+            <div className="px-5 py-2 bg-muted border-y border-border">
+              <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">Tomorrow</p>
             </div>
             {tomorrowVehicles.map((v) => (
-              <div key={v.vehicleId} className="flex items-center gap-4 px-5 py-2.5 border-b border-white/[0.025] last:border-b-0 opacity-55">
-                <span className="text-[11px] font-bold text-white/12 font-mono w-[42px] shrink-0">—</span>
-                <div className="w-8 h-6 rounded-md overflow-hidden shrink-0 bg-white/[0.03]">
+              <div key={v.vehicleId} className="flex items-center gap-4 px-5 py-2.5 border-b border-border last:border-b-0 opacity-55">
+                <span className="text-[11px] font-bold text-muted-foreground font-mono w-[42px] shrink-0">—</span>
+                <div className="w-8 h-6 rounded-md overflow-hidden shrink-0 bg-muted">
                   {v.primaryImageUrl
                     ? <img src={v.primaryImageUrl} alt={v.label} className="w-full h-full object-cover" />
                     : <div className="w-full h-full" />}
                 </div>
-                <p className="flex-1 text-[12px] font-semibold text-white/45 truncate">{v.label}</p>
+                <p className="flex-1 text-[12px] font-semibold text-muted-foreground truncate">{v.label}</p>
               </div>
             ))}
           </>
@@ -194,18 +194,18 @@ function PublishingSchedule({ plan }: { plan: DailyMarketplacePlan }) {
         {/* This Week */}
         {weekVehicles.length > 0 && (
           <>
-            <div className="px-5 py-2 bg-white/[0.005] border-y border-white/[0.04]">
-              <p className="text-[9px] font-black text-white/12 uppercase tracking-[0.22em]">This Week</p>
+            <div className="px-5 py-2 bg-muted border-y border-border">
+              <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">This Week</p>
             </div>
             {weekVehicles.map((v) => (
-              <div key={v.vehicleId} className="flex items-center gap-4 px-5 py-2.5 border-b border-white/[0.025] last:border-b-0 opacity-35">
-                <span className="text-[11px] font-bold text-white/10 font-mono w-[42px] shrink-0">—</span>
-                <div className="w-8 h-6 rounded-md overflow-hidden shrink-0 bg-white/[0.03]">
+              <div key={v.vehicleId} className="flex items-center gap-4 px-5 py-2.5 border-b border-border last:border-b-0 opacity-35">
+                <span className="text-[11px] font-bold text-muted-foreground font-mono w-[42px] shrink-0">—</span>
+                <div className="w-8 h-6 rounded-md overflow-hidden shrink-0 bg-muted">
                   {v.primaryImageUrl
                     ? <img src={v.primaryImageUrl} alt={v.label} className="w-full h-full object-cover" />
                     : <div className="w-full h-full" />}
                 </div>
-                <p className="flex-1 text-[12px] font-semibold text-white/30 truncate">{v.label}</p>
+                <p className="flex-1 text-[12px] font-semibold text-muted-foreground truncate">{v.label}</p>
               </div>
             ))}
           </>
@@ -257,17 +257,17 @@ function StrategyRow({
       {/* ── Row ────────────────────────────────────────────────────────────── */}
       <div
         className={cn(
-          "flex items-center gap-0 border-b border-white/[0.035] hover:bg-white/[0.018] transition-colors group",
+          "flex items-center gap-0 border-b border-border hover:bg-muted transition-colors group",
           isTopMove && "border-l-[2px] border-l-blue-500/25",
         )}
       >
         {/* Rank + Score */}
         <div className="w-[58px] shrink-0 py-3.5 pl-4 flex flex-col items-center gap-1.5">
-          <span className={cn("text-[12px] font-black leading-none", isTopMove ? "text-blue-400" : "text-white/18")}>
+          <span className={cn("text-[12px] font-semibold leading-none", isTopMove ? "text-primary" : "text-muted-foreground")}>
             #{rank}
           </span>
           {rec.opportunityScore != null && (
-            <span className={cn("text-[9px] font-black px-1.5 rounded border leading-[18px]", sc.pill)}>
+            <span className={cn("text-[11px] font-semibold px-1.5 rounded border leading-[18px]", sc.pill)}>
               {rec.opportunityScore}
             </span>
           )}
@@ -275,25 +275,25 @@ function StrategyRow({
 
         {/* Photo + Vehicle */}
         <div className="flex items-center gap-3 py-3 pr-5 flex-[2.2] min-w-0">
-          <div className="w-[58px] h-[44px] rounded-lg overflow-hidden shrink-0 bg-white/[0.03] border border-white/[0.04]">
+          <div className="w-[58px] h-[44px] rounded-lg overflow-hidden shrink-0 bg-muted border border-border">
             {rec.primaryImageUrl ? (
               <img src={rec.primaryImageUrl} alt={rec.label} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <Car className="w-3 h-3 text-white/10" />
+                <Car className="w-3 h-3 text-muted-foreground" />
               </div>
             )}
           </div>
           <div className="min-w-0">
-            <p className="text-[13px] font-bold text-white/85 truncate leading-snug">{rec.label}</p>
-            <p className="text-[10px] text-white/22 mt-0.5 flex items-center gap-2">
+            <p className="text-[13px] font-bold text-foreground truncate leading-snug">{rec.label}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
               {rec.priceMode === "DOWN_PAYMENT" && rec.marketplacePrice != null ? (
-                <span className="text-amber-400/70">{formatCurrency(rec.marketplacePrice)} down</span>
+                <span className="text-warning/70">{formatCurrency(rec.marketplacePrice)} down</span>
               ) : rec.actualPrice != null ? (
                 <span>{formatCurrency(rec.actualPrice)}</span>
               ) : null}
               {rec.imageCount > 0 && (
-                <span className="flex items-center gap-0.5 text-white/15">
+                <span className="flex items-center gap-0.5 text-muted-foreground">
                   <ImageIcon className="w-2.5 h-2.5" />{rec.imageCount}
                 </span>
               )}
@@ -305,25 +305,25 @@ function StrategyRow({
         <div className="py-3 pr-5 w-[148px] shrink-0">
           {hasSegment ? (
             <>
-              <p className="text-[11px] font-semibold text-white/55 leading-tight truncate">{rec.primarySegment}</p>
-              <p className={cn("text-[9px] font-bold mt-0.5 uppercase tracking-wide", langBadgeClass(rec.suggestedLanguage))}>
+              <p className="text-[11px] font-semibold text-muted-foreground leading-tight truncate">{rec.primarySegment}</p>
+              <p className={cn("text-[11px] font-bold mt-0.5  tracking-wide", langBadgeClass(rec.suggestedLanguage))}>
                 {rec.suggestedLanguage}
               </p>
             </>
           ) : (
-            <p className="text-[11px] text-white/22">General</p>
+            <p className="text-[11px] text-muted-foreground">General</p>
           )}
         </div>
 
         {/* Reason */}
         <div className="py-3 pr-5 flex-[1.8] min-w-0 hidden lg:block">
-          <p className="text-[11px] text-white/32 leading-relaxed line-clamp-2">{reason}</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">{reason}</p>
         </div>
 
         {/* Actions */}
         <div className="py-3 pr-4 shrink-0 flex items-center gap-1.5">
           <button
-            className="text-white/12 hover:text-white/35 p-1 transition-colors"
+            className="text-muted-foreground hover:text-muted-foreground p-1 transition-colors"
             onClick={() => setExpanded(v => !v)}
             title="DealerPilot Analysis"
           >
@@ -334,8 +334,8 @@ function StrategyRow({
             className={cn(
               "h-7 gap-1.5 text-[11px] font-bold px-3.5 rounded-lg",
               isTopMove
-                ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20"
-                : "bg-white/[0.05] hover:bg-white/[0.09] text-white/50 border border-white/[0.06]",
+                ? "bg-primary hover:bg-primary text-foreground shadow-lg shadow-blue-500/20"
+                : "bg-muted hover:bg-muted text-muted-foreground border border-border",
             )}
             onClick={() => onPublish(rec.vehicleId)}
           >
@@ -347,7 +347,7 @@ function StrategyRow({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 text-white/15 hover:text-white/40 hover:bg-white/[0.04] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-muted rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <MoreHorizontal className="w-3.5 h-3.5" />
               </Button>
@@ -363,145 +363,145 @@ function StrategyRow({
 
       {/* ── GM Intelligence Panel ──────────────────────────────────────────── */}
       {expanded && intelligence && (
-        <div className="border-b border-white/[0.04] bg-white/[0.006]">
+        <div className="border-b border-border bg-muted">
           <div className="px-6 py-5 space-y-4 max-w-[820px]">
 
             {/* DealerPilot Reasoning */}
-            <div className="rounded-xl border border-blue-500/12 bg-blue-500/[0.025] p-4">
+            <div className="rounded-xl border border-primary/12 bg-primary/[0.025] p-4">
               <div className="flex items-center gap-2 mb-2.5">
-                <Brain className="w-3.5 h-3.5 text-blue-400/50 shrink-0" />
-                <p className="text-[9px] font-black text-blue-400/40 uppercase tracking-[0.24em]">
+                <Brain className="w-3.5 h-3.5 text-primary/50 shrink-0" />
+                <p className="text-[11px] font-semibold text-primary/40  tracking-wide">
                   DealerPilot Reasoning
                 </p>
               </div>
-              <p className="text-[12px] text-white/48 leading-relaxed">{intelligence.reasoning}</p>
+              <p className="text-[12px] text-muted-foreground leading-relaxed">{intelligence.reasoning}</p>
             </div>
 
             {/* Confidence + Risk */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-white/[0.05] bg-white/[0.018] p-3.5">
-                <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em] mb-2">
+              <div className="rounded-xl border border-border bg-muted p-3.5">
+                <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide mb-2">
                   Confidence
                 </p>
                 <div className={cn(
-                  "text-[30px] font-black leading-none tabular-nums",
-                  intelligence.confidence >= 90 ? "text-emerald-400" : intelligence.confidence >= 75 ? "text-blue-400" : "text-amber-400",
+                  "text-[30px] font-semibold leading-none tabular-nums",
+                  intelligence.confidence >= 90 ? "text-success" : intelligence.confidence >= 75 ? "text-primary" : "text-warning",
                 )}>
                   {intelligence.confidence}%
                 </div>
-                <p className="text-[10px] text-white/22 mt-1.5 leading-relaxed">
+                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
                   Calculated from inventory quality, pricing, audience match, creative data, and duplicate protection.
                 </p>
               </div>
-              <div className="rounded-xl border border-white/[0.05] bg-white/[0.018] p-3.5">
-                <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em] mb-2">Risk</p>
-                <div className={cn("text-[20px] font-black leading-none", riskColor(intelligence.risk.level))}>
+              <div className="rounded-xl border border-border bg-muted p-3.5">
+                <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide mb-2">Risk</p>
+                <div className={cn("text-[20px] font-semibold leading-none", riskColor(intelligence.risk.level))}>
                   {intelligence.risk.level}
                 </div>
-                <p className="text-[10px] text-white/25 mt-1.5 leading-relaxed">
+                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
                   {intelligence.risk.explanation}
                 </p>
               </div>
             </div>
 
             {/* Expected Results */}
-            <div className="rounded-xl border border-white/[0.05] bg-white/[0.018] p-3.5">
-              <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em] mb-3">
-                Expected Results <span className="text-white/10 font-normal normal-case tracking-normal">(projections — not guarantees)</span>
+            <div className="rounded-xl border border-border bg-muted p-3.5">
+              <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide mb-3">
+                Expected Results <span className="text-muted-foreground font-normal normal-case tracking-normal">(projections — not guarantees)</span>
               </p>
               <div className="grid grid-cols-4 gap-4">
                 <div>
-                  <div className="text-[20px] font-black text-blue-400 leading-none tabular-nums">
+                  <div className="text-[20px] font-semibold text-primary leading-none tabular-nums">
                     {intelligence.results.conversations[0]}–{intelligence.results.conversations[1]}
                   </div>
                   <div className="flex items-center gap-1 mt-1.5">
-                    <MessageSquare className="w-2.5 h-2.5 text-white/20" />
-                    <span className="text-[9px] text-white/22 uppercase tracking-wide">Conversations</span>
+                    <MessageSquare className="w-2.5 h-2.5 text-muted-foreground" />
+                    <span className="text-[11px] text-muted-foreground  tracking-wide">Conversations</span>
                   </div>
                 </div>
                 <div>
-                  <div className="text-[20px] font-black text-blue-400/70 leading-none tabular-nums">
+                  <div className="text-[20px] font-semibold text-primary/70 leading-none tabular-nums">
                     {intelligence.results.appointments[0]}–{intelligence.results.appointments[1]}
                   </div>
-                  <div className="text-[9px] text-white/22 uppercase tracking-wide mt-1.5">Appointments</div>
+                  <div className="text-[11px] text-muted-foreground  tracking-wide mt-1.5">Appointments</div>
                 </div>
                 <div>
-                  <div className="text-[20px] font-black text-emerald-400/70 leading-none tabular-nums">
+                  <div className="text-[20px] font-semibold text-success/70 leading-none tabular-nums">
                     {intelligence.results.saleProbability}%
                   </div>
-                  <div className="text-[9px] text-white/22 uppercase tracking-wide mt-1.5">Sale Probability</div>
+                  <div className="text-[11px] text-muted-foreground  tracking-wide mt-1.5">Sale Probability</div>
                 </div>
                 <div>
-                  <div className={cn("text-[20px] font-black leading-none", roiColor(intelligence.results.roi))}>
+                  <div className={cn("text-[20px] font-semibold leading-none", roiColor(intelligence.results.roi))}>
                     {intelligence.results.roi}
                   </div>
-                  <div className="text-[9px] text-white/22 uppercase tracking-wide mt-1.5">Expected ROI</div>
+                  <div className="text-[11px] text-muted-foreground  tracking-wide mt-1.5">Expected ROI</div>
                 </div>
               </div>
             </div>
 
             {/* Cost of Waiting */}
-            <div className="rounded-xl border border-red-500/[0.10] bg-red-500/[0.018] p-3.5">
+            <div className="rounded-xl border border-destructive/[0.10] bg-destructive/[0.018] p-3.5">
               <div className="flex items-center gap-2 mb-3">
-                <TrendingDown className="w-3 h-3 text-red-400/40 shrink-0" />
-                <p className="text-[9px] font-black text-red-400/35 uppercase tracking-[0.22em]">
+                <TrendingDown className="w-3 h-3 text-destructive/40 shrink-0" />
+                <p className="text-[11px] font-semibold text-destructive/35  tracking-wide">
                   Cost of Waiting — If Delayed 48 Hours
                 </p>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <div className="text-[18px] font-black text-red-400/50 leading-none tabular-nums">
+                  <div className="text-[18px] font-semibold text-destructive/50 leading-none tabular-nums">
                     {intelligence.cost.reachLoss.toLocaleString()}
                   </div>
-                  <div className="text-[9px] text-white/18 mt-1">Buyers missed</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">Buyers missed</div>
                 </div>
                 <div>
-                  <div className="text-[18px] font-black text-red-400/50 leading-none tabular-nums">
+                  <div className="text-[18px] font-semibold text-destructive/50 leading-none tabular-nums">
                     {intelligence.cost.conversationsLost}
                   </div>
-                  <div className="text-[9px] text-white/18 mt-1">Conversations lost</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">Conversations lost</div>
                 </div>
                 <div>
-                  <div className="text-[18px] font-black text-red-400/50 leading-none tabular-nums">
+                  <div className="text-[18px] font-semibold text-destructive/50 leading-none tabular-nums">
                     ${intelligence.cost.revenueLoss.toLocaleString()}
                   </div>
-                  <div className="text-[9px] text-white/18 mt-1">Revenue opportunity</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">Revenue opportunity</div>
                 </div>
               </div>
             </div>
 
             {/* Creative Recommendation */}
-            <div className="rounded-xl border border-white/[0.05] bg-white/[0.018] p-3.5">
+            <div className="rounded-xl border border-border bg-muted p-3.5">
               <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-3 h-3 text-violet-400/40 shrink-0" />
-                <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.22em]">
+                <Sparkles className="w-3 h-3 text-primary/40 shrink-0" />
+                <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">
                   Creative Recommendation
                 </p>
               </div>
               <div className="flex flex-wrap gap-3 mb-2">
                 {intelligence.creative.formats.map((f, i) => (
                   <div key={f.name} className={cn("flex items-center gap-1.5", i > 0 && "opacity-60")}>
-                    <span className="text-[10px] text-white/40">{f.name}</span>
-                    <span className={cn("text-[10px] font-black", i === 0 ? "text-violet-400/70" : "text-white/20")}>
+                    <span className="text-xs text-muted-foreground">{f.name}</span>
+                    <span className={cn("text-xs font-semibold", i === 0 ? "text-primary/70" : "text-muted-foreground")}>
                       {f.score}%
                     </span>
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] text-white/30 leading-relaxed">
-                Hook: <span className="text-white/48 italic">"{intelligence.creative.hook}"</span>
-                <span className="text-white/18 ml-2">· CTR est. {intelligence.creative.ctr}</span>
-                <span className="text-white/18 mx-2">·</span>
-                <span className="text-white/30">Audience: {intelligence.creative.audience}</span>
-                <span className="text-white/18 mx-2">·</span>
-                <span className="text-white/30">Language: {intelligence.creative.language}</span>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Hook: <span className="text-muted-foreground italic">"{intelligence.creative.hook}"</span>
+                <span className="text-muted-foreground ml-2">· CTR est. {intelligence.creative.ctr}</span>
+                <span className="text-muted-foreground mx-2">·</span>
+                <span className="text-muted-foreground">Audience: {intelligence.creative.audience}</span>
+                <span className="text-muted-foreground mx-2">·</span>
+                <span className="text-muted-foreground">Language: {intelligence.creative.language}</span>
               </p>
             </div>
 
             {/* Counter Analysis — Why not the other model? */}
             {intelligence.group && intelligence.group.holdOthers.length > 0 && (
-              <div className="rounded-xl border border-amber-500/10 bg-amber-500/[0.015] p-3.5">
-                <p className="text-[9px] font-black text-amber-400/35 uppercase tracking-[0.22em] mb-3">
+              <div className="rounded-xl border border-warning/10 bg-warning/[0.015] p-3.5">
+                <p className="text-[11px] font-semibold text-warning/35  tracking-wide mb-3">
                   Counter Analysis — Why Not the Other {rec.make} {rec.model}{intelligence.group.holdOthers.length > 1 ? "s" : ""}?
                 </p>
                 <div className="space-y-2.5">
@@ -509,16 +509,16 @@ function StrategyRow({
                     const holdReasons = buildHoldReasons(v, rec);
                     return (
                       <div key={v.vehicleId}>
-                        <p className="text-[11px] font-bold text-white/45 mb-1">{v.label}</p>
+                        <p className="text-[11px] font-bold text-muted-foreground mb-1">{v.label}</p>
                         <div className="flex flex-wrap gap-1.5">
                           {holdReasons.slice(0, 3).map((r, i) => (
-                            <span key={i} className="text-[10px] text-amber-400/40 bg-amber-500/[0.06] border border-amber-500/10 px-2 py-0.5 rounded-full">
+                            <span key={i} className="text-xs text-warning/40 bg-warning/[0.06] border border-warning/10 px-2 py-0.5 rounded-full">
                               {r}
                             </span>
                           ))}
                         </div>
                         {holdReasons.length > 3 && (
-                          <p className="text-[10px] text-white/18 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Recommended publishing date: after this campaign matures.
                           </p>
                         )}
@@ -549,14 +549,14 @@ function StrategyTable({
 }) {
   const all10 = [...plan.recommendedToday, ...plan.nextBest];
   return (
-    <div className="rounded-2xl border border-white/[0.05] overflow-hidden">
+    <div className="rounded-xl border border-border overflow-hidden">
       {/* Table header */}
-      <div className="flex items-center gap-0 border-b border-white/[0.05] bg-white/[0.008]">
+      <div className="flex items-center gap-0 border-b border-border bg-muted">
         <div className="w-[58px] shrink-0" />
-        <div className="flex-[2.2] pr-5 py-2.5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Vehicle</div>
-        <div className="w-[148px] shrink-0 pr-5 py-2.5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Audience</div>
-        <div className="flex-[1.8] pr-5 py-2.5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em] hidden lg:block">Reason</div>
-        <div className="w-[130px] shrink-0 pr-4 py-2.5 text-[9px] font-black text-white/18 uppercase tracking-[0.22em] text-right">Action</div>
+        <div className="flex-[2.2] pr-5 py-2.5 text-[11px] font-semibold text-muted-foreground  tracking-wide">Vehicle</div>
+        <div className="w-[148px] shrink-0 pr-5 py-2.5 text-[11px] font-semibold text-muted-foreground  tracking-wide">Audience</div>
+        <div className="flex-[1.8] pr-5 py-2.5 text-[11px] font-semibold text-muted-foreground  tracking-wide hidden lg:block">Reason</div>
+        <div className="w-[130px] shrink-0 pr-4 py-2.5 text-[11px] font-semibold text-muted-foreground  tracking-wide text-right">Action</div>
       </div>
 
       {/* Top 3 — Publish Today */}
@@ -573,12 +573,12 @@ function StrategyTable({
 
       {/* Divider: Next Best */}
       {plan.nextBest.length > 0 && (
-        <div className="flex items-center gap-3 px-5 py-2 border-y border-white/[0.04] bg-white/[0.004]">
-          <div className="h-px flex-1 bg-white/[0.04]" />
-          <span className="text-[9px] font-black text-white/14 uppercase tracking-[0.24em]">
+        <div className="flex items-center gap-3 px-5 py-2 border-y border-border bg-muted">
+          <div className="h-px flex-1 bg-muted" />
+          <span className="text-[11px] font-semibold text-muted-foreground  tracking-wide">
             Next Best · Positions 4–{3 + plan.nextBest.length}
           </span>
-          <div className="h-px flex-1 bg-white/[0.04]" />
+          <div className="h-px flex-1 bg-muted" />
         </div>
       )}
 
@@ -596,9 +596,9 @@ function StrategyTable({
 
       {all10.length === 0 && (
         <div className="p-12 text-center">
-          <CheckCircle2 className="w-7 h-7 text-emerald-400/22 mx-auto mb-3" />
-          <p className="text-[14px] font-semibold text-white/30">Queue is clear</p>
-          <p className="text-[11px] text-white/18 mt-1.5">No vehicles require action right now</p>
+          <CheckCircle2 className="w-7 h-7 text-success/22 mx-auto mb-3" />
+          <p className="text-[14px] font-semibold text-muted-foreground">Queue is clear</p>
+          <p className="text-[11px] text-muted-foreground mt-1.5">No vehicles require action right now</p>
         </div>
       )}
     </div>
@@ -609,7 +609,7 @@ function StrategyTable({
 
 function HoldCard({ rec }: { rec: DailyVehicleRec }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-white/[0.04] bg-white/[0.012]">
+    <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-border bg-muted">
       <div className="w-8 h-8 rounded-md overflow-hidden bg-secondary/40 flex-shrink-0">
         {rec.primaryImageUrl ? (
           <img src={rec.primaryImageUrl} alt={rec.label} className="w-full h-full object-cover" />
@@ -620,13 +620,13 @@ function HoldCard({ rec }: { rec: DailyVehicleRec }) {
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-white/65 truncate">{rec.label}</p>
-        {rec.holdReason && <p className="text-[10px] text-muted-foreground/50 truncate">{rec.holdReason}</p>}
+        <p className="text-xs font-semibold text-muted-foreground truncate">{rec.label}</p>
+        {rec.holdReason && <p className="text-xs text-muted-foreground/50 truncate">{rec.holdReason}</p>}
       </div>
       {rec.priceMode === "DOWN_PAYMENT" && rec.marketplacePrice != null ? (
-        <span className="text-[10px] text-amber-400 flex-shrink-0">{formatCurrency(rec.marketplacePrice)} down</span>
+        <span className="text-xs text-warning flex-shrink-0">{formatCurrency(rec.marketplacePrice)} down</span>
       ) : rec.actualPrice != null ? (
-        <span className="text-[10px] text-muted-foreground flex-shrink-0">{formatCurrency(rec.actualPrice)}</span>
+        <span className="text-xs text-muted-foreground flex-shrink-0">{formatCurrency(rec.actualPrice)}</span>
       ) : null}
     </div>
   );
@@ -715,7 +715,7 @@ export function SalesHub() {
 
   const isLoading = workspacesLoading || recsLoading;
   const top10Count = plan ? plan.recommendedToday.length + plan.nextBest.length : 0;
-  const pendingLeads = leads?.leads.filter(l => l.status === "new").length ?? 0;
+  const pendingLeads = leads?.leads?.filter((lead) => lead.status === "new").length ?? 0;
   const priceChanges = vehicleStats?.priceChanged ?? 0;
   const queuedCount = (jobsData?.jobs ?? []).filter(j => ["Queued", "Scheduled", "Publishing", "Assigned"].includes(j.status)).length;
   const listingsLive = (workspacesData?.workspaces ?? []).filter(
@@ -749,34 +749,34 @@ export function SalesHub() {
 
   return (
     <AppLayout>
-      <div className="h-full flex overflow-hidden">
+      <div className="flex h-full min-w-0 overflow-hidden">
 
         {/* ── MAIN COLUMN ────────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-8 max-w-[960px]">
+        <div className="min-w-0 flex-1 overflow-y-auto">
+          <div className="max-w-[960px] p-5 sm:p-8">
 
             {/* Mission Header */}
             <div className="mb-8 pt-1">
-              <p className="text-[9px] font-black text-blue-400/32 uppercase tracking-[0.28em] mb-5">
+              <p className="text-[11px] font-semibold text-primary/32  tracking-wide mb-5">
                 Command · {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
               </p>
-              <div className="flex items-end gap-6">
+              <div className="flex flex-col items-stretch gap-5 sm:flex-row sm:items-end sm:gap-6">
                 <div className="flex-1">
-                  <h1 className="text-[52px] font-black text-white tracking-tight leading-[0.9] mb-3">
+                  <h1 className="mb-3 text-[42px] font-semibold leading-[0.95] tracking-tight text-foreground sm:text-[52px]">
                     {isLoading ? (
-                      <span className="text-white/12">Loading…</span>
+                      <span className="text-muted-foreground">Loading…</span>
                     ) : top10Count > 0 ? (
-                      <><span className="text-blue-400">{top10Count}</span>{" "}Opportunit{top10Count !== 1 ? "ies" : "y"}{"\n"}Today</>
+                      <><span className="text-primary">{top10Count}</span>{" "}Opportunit{top10Count !== 1 ? "ies" : "y"}{"\n"}Today</>
                     ) : (
                       "All Clear"
                     )}
                   </h1>
-                  <p className="text-[16px] text-white/28 leading-relaxed font-normal max-w-lg">
+                  <p className="text-[16px] text-muted-foreground leading-relaxed font-normal max-w-lg">
                     {isLoading ? "" : plan?.summary ?? `${dealer?.name ?? "Alpha Motorsport"} — no action required right now.`}
                   </p>
                 </div>
                 <Button
-                  className="shrink-0 h-11 gap-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[14px] px-7 shadow-xl shadow-blue-500/20 rounded-xl mb-0.5"
+                  className="h-11 w-full shrink-0 gap-2.5 rounded-lg bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:w-auto"
                   disabled={!plan?.recommendedToday[0] || isLoading}
                   onClick={() => plan?.recommendedToday[0] && handlePublish(plan.recommendedToday[0].vehicleId)}
                 >
@@ -787,17 +787,17 @@ export function SalesHub() {
             </div>
 
             {/* Metric strip */}
-            <div className="flex items-stretch border-y border-white/[0.04] mb-8 -mx-8 px-8">
+            <div className="-mx-5 mb-8 flex items-stretch overflow-x-auto border-y border-border px-5 sm:-mx-8 sm:px-8">
               {[
-                { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? top10Count), label: "Ready", accent: "text-blue-400", path: "/listings" },
-                { value: isLoading ? "—" : String(listingsLive), label: "Live", accent: listingsLive > 0 ? "text-green-400" : "text-white/15", path: "/listings?tab=published" },
-                { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", accent: pendingLeads > 0 ? "text-violet-400" : "text-white/15", path: "/sales-ai" },
-                { value: "0", label: "Appts", accent: "text-white/15", path: "/sales-ai" },
-                { value: isLoading ? "—" : String(issueCount), label: "Issues", accent: issueCount > 0 ? "text-red-400" : "text-white/15", path: "/listings?tab=failed" },
+                { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? top10Count), label: "Ready", accent: "text-primary", path: "/listings" },
+                { value: isLoading ? "—" : String(listingsLive), label: "Live", accent: listingsLive > 0 ? "text-success" : "text-muted-foreground", path: "/listings?tab=published" },
+                { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", accent: pendingLeads > 0 ? "text-primary" : "text-muted-foreground", path: "/sales-ai" },
+                { value: "0", label: "Appts", accent: "text-muted-foreground", path: "/sales-ai" },
+                { value: isLoading ? "—" : String(issueCount), label: "Issues", accent: issueCount > 0 ? "text-destructive" : "text-muted-foreground", path: "/listings?tab=failed" },
               ].map(m => (
-                <button key={m.label} onClick={() => setLocation(m.path)} className="flex-1 py-5 px-4 text-left hover:bg-white/[0.02] transition-colors border-r border-white/[0.04] last:border-r-0 first:pl-0 last:pr-0">
-                  <div className={cn("text-[40px] font-black leading-none mb-1.5 tracking-tighter", m.accent)}>{m.value}</div>
-                  <div className="text-[9px] font-bold text-white/18 uppercase tracking-[0.18em]">{m.label}</div>
+                <button key={m.label} onClick={() => setLocation(m.path)} className="min-w-[68px] flex-1 border-r border-border px-3 py-5 text-left transition-colors hover:bg-muted first:pl-0 last:border-r-0 last:pr-0 sm:px-4">
+                  <div className={cn("text-[40px] font-semibold leading-none mb-1.5 tracking-tighter", m.accent)}>{m.value}</div>
+                  <div className="text-[11px] font-bold text-muted-foreground  tracking-wide">{m.label}</div>
                 </button>
               ))}
             </div>
@@ -806,14 +806,14 @@ export function SalesHub() {
             {!isLoading && duplicateGroupCount > 0 && (
               <button
                 onClick={() => setLocation("/marketplace-intelligence/publishing-conflicts")}
-                className="w-full flex items-center gap-3 mb-6 px-4 py-3 rounded-xl border border-amber-500/15 bg-amber-500/[0.04] hover:bg-amber-500/[0.07] transition-colors text-left group"
+                className="w-full flex items-center gap-3 mb-6 px-4 py-3 rounded-xl border border-warning/15 bg-warning/[0.04] hover:bg-warning/[0.07] transition-colors text-left group"
               >
-                <ShieldCheck className="w-4 h-4 text-amber-400/60 shrink-0" />
-                <span className="flex-1 text-[11px] text-amber-400/60">
+                <ShieldCheck className="w-4 h-4 text-warning/60 shrink-0" />
+                <span className="flex-1 text-[11px] text-warning/60">
                   <span className="font-bold">{duplicateGroupCount} duplicate group{duplicateGroupCount !== 1 ? "s" : ""} detected</span>
                   {" "}— DealerPilot is protecting these vehicles from self-competition.
                 </span>
-                <span className="text-[10px] font-bold text-amber-400/40 group-hover:text-amber-400/70 transition-colors uppercase tracking-wider">
+                <span className="text-xs font-bold text-warning/40 group-hover:text-warning/70 transition-colors  tracking-wider">
                   View →
                 </span>
               </button>
@@ -825,29 +825,29 @@ export function SalesHub() {
             {/* Today's Publishing Strategy */}
             <div className="mb-8">
               <div className="flex items-center gap-3 mb-4">
-                <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">
+                <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">
                   Today's Publishing Strategy
                 </p>
                 {plan && (
-                  <span className="text-[9px] font-bold text-blue-400/38 font-mono">
+                  <span className="text-[11px] font-bold text-primary/38 font-mono">
                     {top10Count} vehicle{top10Count !== 1 ? "s" : ""}
                   </span>
                 )}
-                <div className="flex-1 h-px bg-white/[0.04]" />
+                <div className="flex-1 h-px bg-muted" />
               </div>
 
               {isLoading ? (
                 <div className="space-y-2">
                   {[1, 2, 3, 4, 5].map(i => (
-                    <div key={i} className="h-[72px] rounded-xl bg-white/[0.015] animate-pulse" />
+                    <div key={i} className="h-[72px] rounded-xl bg-muted animate-pulse" />
                   ))}
                 </div>
               ) : plan ? (
                 <StrategyTable plan={plan} onPublish={handlePublish} onAddToBatch={handleAddToBatch} />
               ) : (
-                <div className="rounded-2xl border border-white/[0.04] bg-white/[0.01] p-12 text-center">
-                  <CheckCircle2 className="w-7 h-7 text-emerald-400/22 mx-auto mb-3" />
-                  <p className="text-[14px] font-semibold text-white/30">
+                <div className="rounded-xl border border-border bg-muted p-12 text-center">
+                  <CheckCircle2 className="w-7 h-7 text-success/22 mx-auto mb-3" />
+                  <p className="text-[14px] font-semibold text-muted-foreground">
                     {queuedCount > 0 ? `${queuedCount} vehicle${queuedCount !== 1 ? "s" : ""} already publishing` : "No vehicles require action right now"}
                   </p>
                 </div>
@@ -861,9 +861,9 @@ export function SalesHub() {
             {plan && plan.holdToday.length > 0 && (
               <div className="mb-8">
                 <button className="flex items-center gap-2 w-full mb-3" onClick={() => setShowHold(v => !v)}>
-                  <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.22em]">Hold Today · {plan.holdToday.length}</p>
-                  <div className="flex-1 h-px bg-white/[0.04]" />
-                  {showHold ? <ChevronUp className="w-3 h-3 text-white/18" /> : <ChevronDown className="w-3 h-3 text-white/18" />}
+                  <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">Hold Today · {plan.holdToday.length}</p>
+                  <div className="flex-1 h-px bg-muted" />
+                  {showHold ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
                 </button>
                 {showHold && (
                   <div className="space-y-1.5">
@@ -880,33 +880,30 @@ export function SalesHub() {
         </div>
 
         {/* ── System Timeline ────────────────────────────────────────────────── */}
-        <div className="w-[260px] shrink-0 border-l border-white/[0.04] flex flex-col h-full">
-          <div className="px-5 pt-5 pb-3.5 border-b border-white/[0.04] shrink-0">
+        <div className="hidden h-full w-[260px] shrink-0 flex-col border-l border-border xl:flex">
+          <div className="px-5 pt-5 pb-3.5 border-b border-border shrink-0">
             <div className="flex items-center gap-2">
-              <span className="relative flex h-[6px] w-[6px] shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-40" />
-                <span className="relative inline-flex rounded-full h-[6px] w-[6px] bg-blue-400" />
-              </span>
-              <p className="text-[9px] font-black text-white/22 uppercase tracking-[0.22em]">System Timeline</p>
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+              <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">System Timeline</p>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
             {activityItems.length === 0 ? (
-              <div className="p-8 text-center text-white/15 text-[12px]">No recent activity</div>
+              <div className="p-8 text-center text-muted-foreground text-[12px]">No recent activity</div>
             ) : (
               <div className="flex flex-col">
                 {activityItems.map((item, idx) => (
-                  <div key={item.id} className="px-5 py-3 border-b border-white/[0.03] hover:bg-white/[0.015] transition-colors relative">
-                    {idx === 0 && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-blue-500 via-blue-500/30 to-transparent" />}
+                  <div key={item.id} className="px-5 py-3 border-b border-border hover:bg-muted transition-colors relative">
+                    {idx === 0 && <div className="absolute bottom-0 left-0 top-0 w-0.5 bg-primary" />}
                     <div className="flex items-start gap-2.5">
                       <span className={cn("w-[5px] h-[5px] rounded-full mt-[5px] shrink-0 opacity-70", item.color)} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-semibold text-white/60 leading-snug">{item.label}</p>
-                        <p className="text-[10px] text-white/20 truncate mt-0.5">{item.sub}</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground leading-snug">{item.label}</p>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{item.sub}</p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-[9px] text-white/12 font-mono">{format(item.date, "HH:mm")}</p>
+                          <p className="text-[11px] text-muted-foreground font-mono">{format(item.date, "HH:mm")}</p>
                           {item.action && item.actionPath && (
-                            <button className="text-[9px] text-blue-400/40 hover:text-blue-400 font-bold uppercase tracking-wider transition-colors" onClick={() => setLocation(item.actionPath!)}>
+                            <button className="text-[11px] text-primary/40 hover:text-primary font-bold  tracking-wider transition-colors" onClick={() => setLocation(item.actionPath!)}>
                               {item.action} →
                             </button>
                           )}

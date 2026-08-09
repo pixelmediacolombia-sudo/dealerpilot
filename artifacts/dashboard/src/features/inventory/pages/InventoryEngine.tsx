@@ -82,9 +82,9 @@ function ScoreBar({ score }: { score: number }) {
   const color =
     score >= 80 ? "bg-success" : score >= 60 ? "bg-yellow-400" : "bg-destructive";
   return (
-    <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
+    <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
       <div
-        className={cn("h-full rounded-full transition-all duration-500", color)}
+        className={cn("h-full rounded-full transition duration-500", color)}
         style={{ width: `${score}%` }}
       />
     </div>
@@ -103,7 +103,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-white transition-colors"
+      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
     >
       {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
       {copied ? "Copied" : label}
@@ -113,16 +113,16 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 
 function FeedUrlRow({ label, url }: { label: string; url: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-2 border-b border-white/5 last:border-0">
+    <div className="flex items-center justify-between gap-3 py-2 border-b border-border last:border-0">
       <span className="text-xs text-muted-foreground">{label}</span>
       <div className="flex items-center gap-2">
-        <span className="text-xs text-white/70 font-mono truncate max-w-[260px]">{url}</span>
+        <span className="text-xs text-foreground font-mono truncate max-w-[260px]">{url}</span>
         <CopyButton text={url} label="Copy" />
         <a
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-muted-foreground hover:text-white transition-colors"
+          className="text-muted-foreground hover:text-foreground transition-colors"
         >
           <ExternalLink className="w-3.5 h-3.5" />
         </a>
@@ -138,7 +138,7 @@ export function InventoryEngine() {
   const [syncLoading, setSyncLoading] = useState(false);
 
   const { data: dealersData } = useListDealers();
-  const dealerId = dealersData?.dealers[0]?.id ?? DEALER_ID;
+  const dealerId = dealersData?.dealers?.[0]?.id ?? DEALER_ID;
 
   const { data: health, isLoading: healthLoading, refetch: refetchHealth } = useGetInventoryHealth({
     query: { queryKey: getGetInventoryHealthQueryKey(), refetchInterval: 60_000 },
@@ -224,7 +224,7 @@ export function InventoryEngine() {
               health ? (
                 <div className="flex items-center gap-3">
                   <HealthBadge status={health.healthStatus} />
-                  <span className="text-sm font-semibold text-white">{health.healthScore}/100</span>
+                  <span className="text-sm font-semibold text-foreground">{health.healthScore}/100</span>
                 </div>
               ) : undefined
             }
@@ -239,19 +239,19 @@ export function InventoryEngine() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>Feed health score</span>
-                    <span className="font-medium text-white">{health.healthScore} / 100</span>
+                    <span className="font-medium text-foreground">{health.healthScore} / 100</span>
                   </div>
                   <ScoreBar score={health.healthScore} />
                 </div>
 
                 {/* Sync timing */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3 space-y-1">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wider">
+                  <div className="rounded-lg bg-muted border border-border px-4 py-3 space-y-1">
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground  tracking-wider">
                       <Clock className="w-3 h-3" />
                       Last Sync
                     </div>
-                    <div className="text-sm font-medium text-white">
+                    <div className="text-sm font-medium text-foreground">
                       {health.lastSyncAt ? formatDate(health.lastSyncAt) : "Never"}
                     </div>
                     {health.lastSyncStatus && (
@@ -265,12 +265,12 @@ export function InventoryEngine() {
                       </div>
                     )}
                   </div>
-                  <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3 space-y-1">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wider">
+                  <div className="rounded-lg bg-muted border border-border px-4 py-3 space-y-1">
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground  tracking-wider">
                       <Clock className="w-3 h-3" />
                       Next Auto-Sync
                     </div>
-                    <div className="text-sm font-medium text-white">
+                    <div className="text-sm font-medium text-foreground">
                       {health.nextSyncAt ? formatDate(health.nextSyncAt) : "Not scheduled"}
                     </div>
                     <div className="text-[11px] text-muted-foreground">Every 24 hours</div>
@@ -312,7 +312,7 @@ export function InventoryEngine() {
                     <div className="text-2xl font-bold text-primary">{health.updatedVehicles}</div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">Updated</div>
                   </div>
-                  <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3 text-center">
+                  <div className="rounded-lg bg-muted border border-border px-4 py-3 text-center">
                     <div className="text-2xl font-bold text-muted-foreground">{health.removedVehicles}</div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">Removed / Sold</div>
                   </div>
@@ -321,7 +321,7 @@ export function InventoryEngine() {
                 {/* Issues */}
                 {(health.vehiclesMissingPrice > 0 || health.vehiclesMissingImages > 0) && (
                   <div className="space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <div className="text-xs font-semibold text-muted-foreground  tracking-wider">
                       Issues
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -348,14 +348,14 @@ export function InventoryEngine() {
                 {/* Feed run history */}
                 {feedRuns.length > 0 && (
                   <div className="space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <div className="text-xs font-semibold text-muted-foreground  tracking-wider">
                       Sync History
                     </div>
                     <div className="space-y-1.5">
                       {feedRuns.slice(0, 5).map((run) => (
                         <div
                           key={run.id}
-                          className="flex items-center justify-between rounded-lg bg-white/[0.02] border border-white/5 px-3 py-2"
+                          className="flex items-center justify-between rounded-lg bg-muted border border-border px-3 py-2"
                         >
                           <div className="flex items-center gap-2">
                             {run.status === "success" ? (
@@ -365,7 +365,7 @@ export function InventoryEngine() {
                             ) : (
                               <Loader2 className="w-3.5 h-3.5 text-muted-foreground animate-spin" />
                             )}
-                            <span className="text-xs text-white/70">
+                            <span className="text-xs text-foreground">
                               {run.startedAt ? formatDate(run.startedAt) : "—"}
                             </span>
                             {run.errorMessage && (
@@ -466,10 +466,10 @@ export function InventoryEngine() {
                                 <XCircle className="w-4 h-4 text-destructive shrink-0" />
                               )}
                               <div className="min-w-0">
-                                <div className="text-xs font-mono font-semibold text-white truncate">
+                                <div className="text-xs font-mono font-semibold text-foreground truncate">
                                   {label}
                                 </div>
-                                <div className="text-[10px] text-muted-foreground truncate">
+                                <div className="text-xs text-muted-foreground truncate">
                                   {desc}
                                 </div>
                               </div>
@@ -513,10 +513,10 @@ export function InventoryEngine() {
                               <div key={v.vin} className="flex items-start gap-2 text-[11px] py-1 border-t border-destructive/10 first:border-0">
                                 <XCircle className="w-3 h-3 text-destructive mt-0.5 shrink-0" />
                                 <div className="min-w-0">
-                                  <span className="font-medium text-white/80">{v.title}</span>
+                                  <span className="font-medium text-foreground">{v.title}</span>
                                   <div className="flex flex-wrap gap-1 mt-0.5">
                                     {v.errors.map((e) => (
-                                      <span key={e} className="text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5">
+                                      <span key={e} className="text-xs text-destructive bg-destructive/10 rounded px-1.5 py-0.5">
                                         {e}
                                       </span>
                                     ))}
@@ -575,7 +575,7 @@ export function InventoryEngine() {
             ) : diagnostics ? (
               <div className="space-y-5">
                 {/* Feed URLs */}
-                <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3 space-y-0.5">
+                <div className="rounded-lg bg-muted border border-border px-4 py-3 space-y-0.5">
                   <FeedUrlRow label="XML Feed (Meta Commerce Manager)" url={diagnostics.feedXmlUrl} />
                   <FeedUrlRow label="CSV Feed (Meta Business Suite)" url={diagnostics.feedCsvUrl} />
                 </div>
@@ -618,7 +618,7 @@ export function InventoryEngine() {
                   <div>
                     <button
                       onClick={() => setShowVehicleIssues((s) => !s)}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-white transition-colors"
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {showVehicleIssues ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                       {showVehicleIssues ? "Hide" : "Show"} per-vehicle issues (
@@ -632,7 +632,7 @@ export function InventoryEngine() {
                           .map((v) => (
                             <div
                               key={v.vin}
-                              className="rounded-lg bg-white/[0.02] border border-white/5 px-3 py-2"
+                              className="rounded-lg bg-muted border border-border px-3 py-2"
                             >
                               <div className="flex items-center gap-2 mb-1">
                                 {v.valid ? (
@@ -640,10 +640,10 @@ export function InventoryEngine() {
                                 ) : (
                                   <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
                                 )}
-                                <span className="text-xs font-medium text-white truncate">
+                                <span className="text-xs font-medium text-foreground truncate">
                                   {v.title}
                                 </span>
-                                <span className="text-[10px] text-muted-foreground font-mono">
+                                <span className="text-xs text-muted-foreground font-mono">
                                   {v.vin}
                                 </span>
                               </div>
@@ -652,7 +652,7 @@ export function InventoryEngine() {
                                   {v.errors.map((e) => (
                                     <span
                                       key={e}
-                                      className="inline-flex items-center gap-1 text-[10px] bg-destructive/10 text-destructive border border-destructive/20 rounded px-1.5 py-0.5"
+                                      className="inline-flex items-center gap-1 text-xs bg-destructive/10 text-destructive border border-destructive/20 rounded px-1.5 py-0.5"
                                     >
                                       {e}
                                     </span>
@@ -664,7 +664,7 @@ export function InventoryEngine() {
                                   {v.warnings.map((w) => (
                                     <span
                                       key={w}
-                                      className="inline-flex items-center gap-1 text-[10px] bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded px-1.5 py-0.5"
+                                      className="inline-flex items-center gap-1 text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded px-1.5 py-0.5"
                                     >
                                       {w}
                                     </span>
@@ -698,7 +698,7 @@ export function InventoryEngine() {
                     <Store className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-white">Marketplace</div>
+                    <div className="text-sm font-semibold text-foreground">Marketplace</div>
                     <div className="text-[11px] text-muted-foreground">Personal account</div>
                   </div>
                 </div>
@@ -708,10 +708,10 @@ export function InventoryEngine() {
                     <span>Chrome Extension</span>
                   </div>
                   <div className="flex items-center gap-2 pl-4">
-                    <span className="text-white/60">Operator-driven publishing</span>
+                    <span className="text-muted-foreground">Operator-driven publishing</span>
                   </div>
                   <div className="flex items-center gap-2 pl-4">
-                    <span className="text-white/60">VIN-deduplicated inventory</span>
+                    <span className="text-muted-foreground">VIN-deduplicated inventory</span>
                   </div>
                 </div>
                 <div className="pt-1">
@@ -731,7 +731,7 @@ export function InventoryEngine() {
                     <Globe className="w-4 h-4 text-accent" />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-white">Meta Catalog</div>
+                    <div className="text-sm font-semibold text-foreground">Meta Catalog</div>
                     <div className="text-[11px] text-muted-foreground">DealerPilot hosted</div>
                   </div>
                 </div>
@@ -741,10 +741,10 @@ export function InventoryEngine() {
                     <span>Commerce Manager</span>
                   </div>
                   <div className="flex items-center gap-2 pl-4">
-                    <span className="text-white/60">XML + CSV feed endpoints</span>
+                    <span className="text-muted-foreground">XML + CSV feed endpoints</span>
                   </div>
                   <div className="flex items-center gap-2 pl-4">
-                    <span className="text-white/60">Auto-normalized inventory</span>
+                    <span className="text-muted-foreground">Auto-normalized inventory</span>
                   </div>
                 </div>
                 <div className="pt-1 space-y-1">
@@ -768,19 +768,19 @@ export function InventoryEngine() {
               </div>
 
               {/* Facebook Page */}
-              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-5 space-y-3 opacity-60">
+              <div className="rounded-xl border border-border bg-muted p-5 space-y-3 opacity-60">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                     <Flag className="w-4 h-4 text-muted-foreground" />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-white/60">Facebook Page</div>
+                    <div className="text-sm font-semibold text-muted-foreground">Facebook Page</div>
                     <div className="text-[11px] text-muted-foreground">Official Page API</div>
                   </div>
                 </div>
                 <div className="space-y-1.5 text-[12px] text-muted-foreground">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-white/20 inline-block" />
+                    <span className="w-2 h-2 rounded-full bg-muted inline-block" />
                     <span>Coming later</span>
                   </div>
                   <div className="flex items-center gap-2 pl-4">
@@ -791,7 +791,7 @@ export function InventoryEngine() {
                   </div>
                 </div>
                 <div className="pt-1">
-                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-white/5 rounded px-2 py-0.5">
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted rounded px-2 py-0.5">
                     Planned
                   </span>
                 </div>

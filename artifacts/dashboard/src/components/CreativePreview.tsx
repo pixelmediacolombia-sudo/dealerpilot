@@ -70,7 +70,7 @@ export function CreativePreview({
           <img
             src={spec.vehicleImageUrl}
             alt={spec.headline}
-            className="w-full h-full object-contain drop-shadow-2xl"
+            className="w-full h-full object-contain drop-shadow-lg"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -107,7 +107,7 @@ export function CreativePreview({
           </span>
         </div>
         <span
-          className="uppercase tracking-widest font-medium"
+          className=" tracking-wide font-medium"
           style={{ fontSize: "2.2cqw", color: muted }}
         >
           {spec.brandStyle}

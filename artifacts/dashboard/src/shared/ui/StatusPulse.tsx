@@ -8,29 +8,29 @@ interface StatusPulseProps {
 }
 
 const colorMap: Record<string, string> = {
-  primary: "bg-blue-400",
-  blue: "bg-blue-400",
-  info: "bg-blue-400",
-  success: "bg-emerald-400",
-  green: "bg-emerald-400",
-  online: "bg-emerald-400",
-  healthy: "bg-emerald-400",
-  connected: "bg-emerald-400",
-  warning: "bg-amber-400",
-  orange: "bg-amber-400",
-  degraded: "bg-amber-400",
-  pending: "bg-amber-400",
-  destructive: "bg-red-400",
-  red: "bg-red-400",
-  error: "bg-red-400",
-  offline: "bg-red-400",
-  muted: "bg-white/20",
-  unknown: "bg-white/20",
+  primary: "bg-primary",
+  blue: "bg-primary",
+  info: "bg-primary",
+  success: "bg-success",
+  green: "bg-success",
+  online: "bg-success",
+  healthy: "bg-success",
+  connected: "bg-success",
+  warning: "bg-warning",
+  orange: "bg-warning",
+  degraded: "bg-warning",
+  pending: "bg-warning",
+  destructive: "bg-destructive",
+  red: "bg-destructive",
+  error: "bg-destructive",
+  offline: "bg-destructive",
+  muted: "bg-muted",
+  unknown: "bg-muted",
 };
 
 export function StatusPulse({ color, status, label, className }: StatusPulseProps) {
   const key = (status ?? color ?? "primary").toLowerCase();
-  const bgClass = colorMap[key] ?? "bg-blue-400";
+  const bgClass = colorMap[key] ?? "bg-primary";
 
   const dot = (
     <span className={cn("relative flex h-[6px] w-[6px]", !label && className)}>
@@ -44,7 +44,7 @@ export function StatusPulse({ color, status, label, className }: StatusPulseProp
   return (
     <span className={cn("inline-flex items-center gap-1.5", className)}>
       {dot}
-      <span className="text-[11px] text-white/40">{label}</span>
+      <span className="text-[11px] text-muted-foreground">{label}</span>
     </span>
   );
 }

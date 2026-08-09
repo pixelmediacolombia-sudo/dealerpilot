@@ -51,16 +51,16 @@ function StepRow({ label, state }: {
     <div className="flex items-center gap-2.5 py-1">
       <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
         {state === "done" ? (
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <CheckCircle2 className="w-4 h-4 text-success" />
         ) : state === "active" ? (
           <Loader2 className="w-4 h-4 animate-spin text-primary" />
         ) : (
-          <Circle className="w-4 h-4 text-white/20" />
+          <Circle className="w-4 h-4 text-muted-foreground" />
         )}
       </span>
       <span className={[
         "text-xs leading-tight",
-        state === "done"    ? "text-emerald-400"       :
+        state === "done"    ? "text-success"       :
         state === "active"  ? "text-foreground font-semibold" :
                               "text-muted-foreground/60",
       ].join(" ")}>
@@ -193,10 +193,10 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <SheetContent
         side="right"
-        className="w-[360px] sm:w-[400px] bg-[#0b1220] border-white/[0.08] flex flex-col gap-0 p-0"
+        className="w-[360px] sm:w-[400px] bg-[#0b1220] border-border flex flex-col gap-0 p-0"
       >
         {/* Header */}
-        <SheetHeader className="px-5 pt-5 pb-4 border-b border-white/[0.06]">
+        <SheetHeader className="px-5 pt-5 pb-4 border-b border-border">
           <SheetTitle className="text-sm font-semibold">
             {isDone ? "Published to Marketplace" : isReview ? "Needs Review" : isFailed ? "Publish Failed" : "Publishing Now..."}
           </SheetTitle>
@@ -210,9 +210,9 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
           {/* Error: job creation failed */}
           {createError && !jobId && (
             <div className="space-y-3">
-              <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-                <XCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-red-300">{createError}</p>
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+                <XCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-destructive">{createError}</p>
               </div>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" onClick={handleRetry} className="gap-1.5">
@@ -230,7 +230,7 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
               <div className="space-y-2">
                 <Progress
                   value={displayPct}
-                  className="h-1.5 bg-white/10 [&>div]:bg-primary [&>div]:transition-all [&>div]:duration-500"
+                  className="h-1.5 bg-muted [&>div]:bg-primary [&>div]:transition [&>div]:duration-500"
                 />
                 <div className="flex items-center gap-1.5 min-h-[18px]">
                   {(isCreating || (!!jobId && !isDone && !isReview && !isFailed)) && (
@@ -243,7 +243,7 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
               </div>
 
               {/* Granular step list */}
-              <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 space-y-0.5">
+              <div className="rounded-lg border border-border bg-muted px-3 py-2 space-y-0.5">
                 {PUBLISH_STEPS.map((step, i) => {
                   const stepState =
                     (isDone || i < activeStepIdx)  ? "done"    :
@@ -257,19 +257,19 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
 
               {/* Extension wake + visibility debug */}
               {(wakeDebug !== null || jobVisibleToExt !== null) && (
-                <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 space-y-1">
+                <div className="rounded-lg border border-border bg-muted px-3 py-2 space-y-1">
                   {jobVisibleToExt !== null && (
                     <p className={[
-                      "text-[10px] font-mono",
-                      jobVisibleToExt ? "text-emerald-400" : "text-amber-400",
+                      "text-xs font-mono",
+                      jobVisibleToExt ? "text-success" : "text-warning",
                     ].join(" ")}>
                       Job visible to extension: {jobVisibleToExt ? "yes ✓" : "no ✗"}
                     </p>
                   )}
                   {wakeDebug !== null && (
                     <p className={[
-                      "text-[10px] font-mono break-all",
-                      wakeDebug.startsWith("Extension wake sent") ? "text-emerald-400" : "text-amber-400",
+                      "text-xs font-mono break-all",
+                      wakeDebug.startsWith("Extension wake sent") ? "text-success" : "text-warning",
                     ].join(" ")}>
                       {wakeDebug}
                     </p>
@@ -282,12 +282,12 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
           {/* Needs review state */}
           {isReview && (
             <div className="space-y-3">
-              <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-                <XCircle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3">
+                <XCircle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
                 <div className="space-y-1">
-                  <p className="text-xs text-amber-300 font-medium">Marketplace publish needs review</p>
+                  <p className="text-xs text-warning font-medium">Marketplace publish needs review</p>
                   {progress?.failedReason && (
-                    <p className="text-[11px] text-amber-300/80">{progress.failedReason}</p>
+                    <p className="text-[11px] text-warning/80">{progress.failedReason}</p>
                   )}
                 </div>
               </div>
@@ -298,10 +298,10 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
           {/* Success state */}
           {isDone && (
             <div className="space-y-3">
-              <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+              <div className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/10 p-3">
+                <CheckCircle2 className="w-4 h-4 text-success mt-0.5 flex-shrink-0" />
                 <div className="space-y-1">
-                  <p className="text-xs text-emerald-300 font-medium">Vehicle published to Marketplace</p>
+                  <p className="text-xs text-success font-medium">Vehicle published to Marketplace</p>
                   {progress?.listingUrl && (
                     <a
                       href={progress.listingUrl}
@@ -321,12 +321,12 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
           {/* Failure state */}
           {isFailed && (
             <div className="space-y-3">
-              <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-                <XCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+                <XCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
                 <div className="space-y-1">
-                  <p className="text-xs text-red-300 font-medium">Auto-publish failed</p>
+                  <p className="text-xs text-destructive font-medium">Auto-publish failed</p>
                   {progress?.failedReason && (
-                    <p className="text-[11px] text-red-300/80">{progress.failedReason}</p>
+                    <p className="text-[11px] text-destructive/80">{progress.failedReason}</p>
                   )}
                 </div>
               </div>

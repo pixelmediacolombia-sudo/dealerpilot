@@ -1,30 +1,30 @@
 export const motion = {
-  fast: "duration-150",
-  normal: "duration-250",
-  slow: "duration-400",
+  fast: "duration-100",
+  normal: "duration-200",
+  slow: "duration-300",
   easing: "ease-out",
 } as const;
 
 export const spacing = {
-  pageGutter: "p-8",
-  sectionGap: "space-y-8",
-  cardPadding: "p-6",
+  pageGutter: "p-4 sm:p-6",
+  sectionGap: "space-y-6",
+  cardPadding: "p-5",
   cardPaddingCompact: "p-4",
-  headerGap: "pb-6",
+  headerGap: "pb-5",
 } as const;
 
 export const radius = {
-  card: "rounded-xl",
-  cardLarge: "rounded-2xl",
-  cardHero: "rounded-3xl",
-  icon: "rounded-lg",
-  iconLarge: "rounded-xl",
+  card: "rounded-lg",
+  cardLarge: "rounded-xl",
+  cardHero: "rounded-xl",
+  icon: "rounded-md",
+  iconLarge: "rounded-lg",
   pill: "rounded-full",
   badge: "rounded-md",
 } as const;
 
 export const shadow = {
   card: "shadow-sm",
-  cardHover: "shadow-md shadow-black/20",
-  glow: "shadow-xl",
+  cardHover: "shadow-md",
+  glow: "shadow-md",
 } as const;

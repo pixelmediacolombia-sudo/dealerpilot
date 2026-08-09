@@ -38,11 +38,11 @@ import { toast } from "@/hooks/use-toast";
 function batchStatusClass(status: string) {
   switch (status) {
     case "Active":
-      return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+      return "bg-primary/10 text-primary border-primary/20";
     case "Completed":
       return "bg-success/10 text-success border-success/20";
     case "Scheduled":
-      return "bg-purple-500/10 text-purple-400 border-purple-500/20";
+      return "bg-primary/10 text-primary border-primary/20";
     case "Preparing":
       return "bg-warning/10 text-warning border-warning/20";
     case "Failed":
@@ -111,7 +111,7 @@ function BatchCard({ batch, onCancel, onDismiss, isMutating }: BatchCardProps) {
             <Badge
               variant="outline"
               className={cn(
-                "text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 flex items-center gap-1",
+                "text-xs font-bold tracking-wide  px-2 py-0.5 flex items-center gap-1",
                 batchStatusClass(batch.status),
               )}
             >
@@ -121,10 +121,10 @@ function BatchCard({ batch, onCancel, onDismiss, isMutating }: BatchCardProps) {
             <Badge
               variant="outline"
               className={cn(
-                "text-[10px] font-bold tracking-widest uppercase px-2 py-0.5",
+                "text-xs font-bold tracking-wide  px-2 py-0.5",
                 batch.mode === "Controlled"
                   ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
-                  : "bg-blue-500/10 text-blue-400 border-blue-500/20",
+                  : "bg-primary/10 text-primary border-primary/20",
               )}
             >
               {batch.mode}
@@ -185,7 +185,7 @@ function BatchCard({ batch, onCancel, onDismiss, isMutating }: BatchCardProps) {
         <div className="h-2 bg-secondary/50 rounded-full overflow-hidden">
           <div
             className={cn(
-              "h-full rounded-full transition-all duration-700",
+              "h-full rounded-full transition duration-700",
               batch.status === "Completed"
                 ? "bg-success"
                 : batch.status === "Failed" || batch.status === "Cancelled"
@@ -309,7 +309,7 @@ export function BatchProgressCard({ dealerId, refreshKey, location }: BatchProgr
             <Layers className="w-4 h-4 text-primary" />
             Publishing Batches
             {activeBatches.length > 0 && (
-              <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px] font-bold tracking-wider px-2">
+              <Badge className="bg-primary/20 text-primary border-primary/30 text-xs font-bold tracking-wider px-2">
                 {activeBatches.length} ACTIVE
               </Badge>
             )}

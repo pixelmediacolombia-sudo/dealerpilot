@@ -103,7 +103,7 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
               <Badge
                 variant="outline"
                 className={cn(
-                  "text-[10px] font-bold tracking-widest uppercase px-2 py-0.5",
+                  "text-xs font-bold tracking-wide  px-2 py-0.5",
                   settings.enabled
                     ? "bg-success/10 text-success border-success/20"
                     : "bg-secondary/50 text-muted-foreground border-border",
@@ -115,10 +115,10 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
                 <Badge
                   variant="outline"
                   className={cn(
-                    "text-[10px] font-bold tracking-widest uppercase px-2 py-0.5",
+                    "text-xs font-bold tracking-wide  px-2 py-0.5",
                     settings.autoClickPublish
                       ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
-                      : "bg-blue-500/10 text-blue-400 border-blue-500/20",
+                      : "bg-primary/10 text-primary border-primary/20",
                   )}
                 >
                   {modeLabel}
@@ -199,7 +199,7 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
         <div className="mt-6 pt-6 border-t border-border/30 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Vehicles per batch */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Label className="text-xs font-semibold  tracking-wider text-muted-foreground">
               Vehicles per Batch
             </Label>
             <div className="flex items-center gap-3">
@@ -217,7 +217,7 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
 
           {/* Frequency */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Label className="text-xs font-semibold  tracking-wider text-muted-foreground">
               Frequency
             </Label>
             <Select
@@ -238,7 +238,7 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
 
           {/* Max per day */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Label className="text-xs font-semibold  tracking-wider text-muted-foreground">
               Max Posts Per Day
             </Label>
             <div className="flex items-center gap-3">
@@ -256,7 +256,7 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
 
           {/* Delay between posts */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Label className="text-xs font-semibold  tracking-wider text-muted-foreground">
               Min Delay Between Posts
             </Label>
             <Select
@@ -278,7 +278,7 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
 
           {/* Require approval */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Label className="text-xs font-semibold  tracking-wider text-muted-foreground">
               Require Operator Approval
             </Label>
             <div className="flex items-center gap-3 h-10">
@@ -294,7 +294,7 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
 
           {/* Controlled auto mode */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Label className="text-xs font-semibold  tracking-wider text-muted-foreground">
               Controlled Auto Mode
             </Label>
             <div className="flex items-center gap-3 h-10">
@@ -312,7 +312,7 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
 
           {/* Photo strategy */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Label className="text-xs font-semibold  tracking-wider text-muted-foreground">
               Photo Strategy
             </Label>
             <div className="space-y-2">
@@ -335,7 +335,7 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
 
           {/* Photo score threshold */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Label className="text-xs font-semibold  tracking-wider text-muted-foreground">
               Photo Score Threshold
             </Label>
             <div className="flex items-center gap-3">

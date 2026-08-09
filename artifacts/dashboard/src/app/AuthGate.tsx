@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState, type ReactNode } from "react";
-import { KeyRound, Lock, Loader2, LogOut } from "lucide-react";
+import { KeyRound, Loader2, LogOut } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 
@@ -51,29 +51,31 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, user: AuthUser) => 
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+    <main className="flex min-h-[100dvh] items-center justify-center bg-background p-5 text-foreground">
       <form
         onSubmit={(event) => void handleSubmit(event)}
-        className="w-full max-w-sm border border-white/[0.08] bg-card rounded-lg p-6 shadow-2xl"
+        className="w-full max-w-md rounded-xl border border-border bg-card p-7 shadow-lg sm:p-8"
       >
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-lg border border-primary/25 bg-primary/10 flex items-center justify-center">
-            <Lock className="w-5 h-5 text-primary" />
+        <div className="mb-7 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-primary text-xs font-bold tracking-tight text-primary-foreground shadow-sm">
+            DP
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-white">DealerPilot</h1>
-            <p className="text-xs text-muted-foreground">Alpha Motorsport access</p>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">DealerPilot</h1>
+            <p className="text-sm text-muted-foreground">Alpha MotorSports access</p>
           </div>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Username</label>
-            <Input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" />
+            <label htmlFor="dealerpilot-username" className="mb-1.5 block text-sm font-medium text-foreground">Username</label>
+            <Input id="dealerpilot-username" name="username" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Password</label>
+            <label htmlFor="dealerpilot-password" className="mb-1.5 block text-sm font-medium text-foreground">Password</label>
             <Input
+              id="dealerpilot-password"
+              name="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               type="password"
@@ -81,7 +83,7 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, user: AuthUser) => 
               autoFocus
             />
           </div>
-          {error && <div className="text-xs text-destructive">{error}</div>}
+          {error && <div role="alert" className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Sign in
@@ -134,25 +136,27 @@ function ChangePasswordPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/25 p-4 backdrop-blur-sm">
       <form
         onSubmit={(event) => void handleSubmit(event)}
-        className="w-full max-w-md rounded-lg border border-white/[0.08] bg-card p-5 shadow-2xl"
+        className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl"
       >
         <div className="mb-5 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-primary/25 bg-primary/10">
             <KeyRound className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-white">Change password</h2>
+            <h2 className="text-base font-semibold text-foreground">Change password</h2>
             <p className="text-xs text-muted-foreground">Use a unique password with 14+ characters.</p>
           </div>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Current password</label>
+            <label htmlFor="current-password" className="mb-1.5 block text-sm font-medium text-foreground">Current password</label>
             <Input
+              id="current-password"
+              name="currentPassword"
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
               type="password"
@@ -161,8 +165,10 @@ function ChangePasswordPanel({
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">New password</label>
+            <label htmlFor="new-password" className="mb-1.5 block text-sm font-medium text-foreground">New password</label>
             <Input
+              id="new-password"
+              name="newPassword"
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
               type="password"
@@ -170,15 +176,17 @@ function ChangePasswordPanel({
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Confirm new password</label>
+            <label htmlFor="confirm-password" className="mb-1.5 block text-sm font-medium text-foreground">Confirm new password</label>
             <Input
+              id="confirm-password"
+              name="confirmPassword"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               type="password"
               autoComplete="new-password"
             />
           </div>
-          {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>}
+          {error && <div role="alert" className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
@@ -252,13 +260,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <div className="fixed right-4 top-3 z-50 flex items-center gap-2 rounded-lg border border-white/[0.08] bg-background/90 px-2 py-1.5 text-xs text-muted-foreground shadow-xl shadow-black/20 backdrop-blur">
-        <span className="hidden max-w-[160px] truncate px-1.5 font-medium text-white/70 sm:inline">
+      <div className="fixed right-2 top-2 z-50 flex items-center gap-1.5 rounded-lg border border-border bg-card/95 p-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur sm:right-4">
+        <span className="hidden max-w-[160px] truncate px-1.5 font-medium text-foreground lg:inline">
           {user.displayName}
         </span>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-3 text-[11px] font-semibold text-white/70 transition hover:border-primary/35 hover:bg-primary/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-accent"
           title="Change password"
           aria-label="Change password"
           onClick={() => setChangingPassword(true)}
@@ -268,7 +276,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         </button>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-3 text-[11px] font-semibold text-white/70 transition hover:border-primary/35 hover:bg-primary/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-accent"
           title="Log out"
           aria-label="Log out and remove access token"
           onClick={handleLogout}

@@ -37,8 +37,8 @@ export function FloatingBulkBar({
     <div
       className={cn(
         "fixed bottom-6 left-1/2 -translate-x-1/2 z-50",
-        "flex items-center gap-2 px-4 py-3 rounded-2xl",
-        "bg-card/95 backdrop-blur-xl border border-border/60 shadow-2xl shadow-black/40",
+        "flex items-center gap-2 px-4 py-3 rounded-xl",
+        "bg-card/95 backdrop-blur-md border border-border/60 shadow-lg shadow-black/40",
         "animate-in slide-in-from-bottom-4 duration-300",
       )}
     >
@@ -64,7 +64,7 @@ export function FloatingBulkBar({
         variant="ghost"
         onClick={onMarkReady}
         disabled={isLoading}
-        className="h-8 gap-1.5 text-xs hover:bg-blue-500/10 hover:text-blue-400"
+        className="h-8 gap-1.5 text-xs hover:bg-primary/10 hover:text-primary"
       >
         <CheckCircle2 className="w-3.5 h-3.5" />
         Mark Ready
@@ -97,7 +97,7 @@ export function FloatingBulkBar({
         variant="ghost"
         onClick={onMarkSold}
         disabled={isLoading}
-        className="h-8 gap-1.5 text-xs hover:bg-amber-500/10 hover:text-amber-400"
+        className="h-8 gap-1.5 text-xs hover:bg-warning/10 hover:text-warning"
       >
         <Tag className="w-3.5 h-3.5" />
         Mark Sold

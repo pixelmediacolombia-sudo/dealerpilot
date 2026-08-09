@@ -34,7 +34,7 @@ export function Settings() {
 
   // Get dealer
   const { data: dealersData } = useListDealers();
-  const dealerId = dealersData?.dealers[0]?.id;
+  const dealerId = dealersData?.dealers?.[0]?.id;
   const { data: dealer, isLoading: dealerLoading } = useGetDealer(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getGetDealerQueryKey(dealerId!) }
   });
@@ -157,22 +157,22 @@ export function Settings() {
               <div className="space-y-6">
                 <div className="grid gap-6 sm:grid-cols-2">
                   <div className="space-y-3">
-                    <Label htmlFor="name" className="text-xs uppercase tracking-wider text-muted-foreground">Dealership Name</Label>
+                    <Label htmlFor="name" className="text-xs  tracking-wider text-muted-foreground">Dealership Name</Label>
                     <Input 
                       id="name" 
                       value={name} 
                       onChange={(e) => setName(e.target.value)} 
-                      className="bg-black/20 border-white/10"
+                      className="bg-black/20 border-border"
                     />
                   </div>
                   <div className="space-y-3">
-                    <Label htmlFor="website" className="text-xs uppercase tracking-wider text-muted-foreground">Website URL</Label>
+                    <Label htmlFor="website" className="text-xs  tracking-wider text-muted-foreground">Website URL</Label>
                     <Input 
                       id="website" 
                       value={websiteUrl} 
                       onChange={(e) => setWebsiteUrl(e.target.value)}
                       placeholder="https://"
-                      className="bg-black/20 border-white/10"
+                      className="bg-black/20 border-border"
                     />
                   </div>
                 </div>
@@ -197,36 +197,36 @@ export function Settings() {
             >
               <div className="space-y-8">
                 <div className="space-y-3">
-                  <Label htmlFor="xml" className="text-xs uppercase tracking-wider text-muted-foreground">XML Feed URL</Label>
+                  <Label htmlFor="xml" className="text-xs  tracking-wider text-muted-foreground">XML Feed URL</Label>
                   <div className="flex gap-3">
                     <Input 
                       id="xml" 
                       value={xmlFeedUrl} 
                       onChange={(e) => setXmlFeedUrl(e.target.value)}
                       placeholder="https://..."
-                      className="flex-1 font-mono text-sm bg-black/20 border-white/10"
+                      className="flex-1 font-mono text-sm bg-black/20 border-border"
                     />
                     <Button 
                       variant="secondary"
                       onClick={handleSaveDealer}
                       disabled={updateDealer.isPending}
-                      className="whitespace-nowrap bg-white/10 hover:bg-white/15"
+                      className="whitespace-nowrap bg-muted hover:bg-muted"
                     >
                       Save URL
                     </Button>
                   </div>
                 </div>
 
-                <div className="bg-black/20 rounded-xl p-6 border border-white/5 relative overflow-hidden">
+                <div className="bg-black/20 rounded-xl p-6 border border-border relative overflow-hidden">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 relative z-10">
                     <div>
-                      <h4 className="font-medium text-foreground text-sm uppercase tracking-wider">Manual Sync Trigger</h4>
+                      <h4 className="font-medium text-foreground text-sm  tracking-wider">Manual Sync Trigger</h4>
                       <p className="text-sm text-muted-foreground mt-1">Force an immediate data pull from the configured feed.</p>
                     </div>
                     <Button 
                       onClick={handleSync} 
                       disabled={syncFeed.isPending || !dealer?.xmlFeedUrl}
-                      className="whitespace-nowrap gap-2 bg-white/5 hover:bg-white/10 text-foreground border border-white/10"
+                      className="whitespace-nowrap gap-2 bg-muted hover:bg-muted text-foreground border border-border"
                       variant="outline"
                     >
                       {syncFeed.isPending ? (
@@ -238,9 +238,9 @@ export function Settings() {
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-white/5 relative z-10">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-border relative z-10">
                     <div>
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Sync Status</p>
+                      <p className="text-xs font-semibold text-muted-foreground  tracking-wider mb-2">Sync Status</p>
                       <div className="flex items-center gap-2">
                         {dealer?.lastSyncStatus === 'success' ? (
                           <><CheckCircle2 className="w-4 h-4 text-success" /><span className="text-sm font-medium text-success">Healthy</span></>
@@ -252,11 +252,11 @@ export function Settings() {
                       </div>
                     </div>
                     <div>
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Last Run</p>
+                      <p className="text-xs font-semibold text-muted-foreground  tracking-wider mb-2">Last Run</p>
                       <p className="text-sm font-medium text-foreground">{formatDate(dealer?.lastSyncAt) || "—"}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Total Imported</p>
+                      <p className="text-xs font-semibold text-muted-foreground  tracking-wider mb-2">Total Imported</p>
                       <p className="text-sm font-medium text-primary">{dealer?.totalVehiclesImported || 0}</p>
                     </div>
                   </div>
@@ -291,7 +291,7 @@ export function Settings() {
                   const config = getStatusConfig(svc?.status || "unknown");
 
                   return (
-                    <div key={key} className="flex flex-col justify-between p-4 rounded-xl bg-black/20 border border-white/5 hover:border-white/10 transition-colors">
+                    <div key={key} className="flex flex-col justify-between p-4 rounded-xl bg-black/20 border border-border hover:border-border transition-colors">
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <Icon className="w-5 h-5 text-muted-foreground" />
@@ -303,12 +303,12 @@ export function Settings() {
                         </div>
                       </div>
                       {(svc?.lastHeartbeatAt || svc?.backendUrl || svc?.detail) && (
-                        <div className="mt-4 pt-3 border-t border-white/5">
+                        <div className="mt-4 pt-3 border-t border-border">
                           {svc?.detail && (
-                            <p className="text-[10px] text-muted-foreground line-clamp-1 truncate mb-2">{svc.detail}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-1 truncate mb-2">{svc.detail}</p>
                           )}
                           {svc?.lastHeartbeatAt && (
-                            <p className="text-[10px] text-muted-foreground">Last active: {formatDate(svc.lastHeartbeatAt)}</p>
+                            <p className="text-xs text-muted-foreground">Last active: {formatDate(svc.lastHeartbeatAt)}</p>
                           )}
                         </div>
                       )}
@@ -326,12 +326,12 @@ export function Settings() {
             >
               <div className="space-y-3">
                 {(!feedRunsData?.feedRuns || feedRunsData.feedRuns.length === 0) ? (
-                  <div className="text-center p-6 bg-black/20 rounded-xl border border-white/5 border-dashed">
+                  <div className="text-center p-6 bg-black/20 rounded-xl border border-border border-dashed">
                     <p className="text-sm text-muted-foreground">No sync history available.</p>
                   </div>
                 ) : (
                   feedRunsData.feedRuns.slice(0, 5).map((run) => (
-                    <div key={run.id} className="flex items-center justify-between p-4 rounded-xl bg-black/20 border border-white/5">
+                    <div key={run.id} className="flex items-center justify-between p-4 rounded-xl bg-black/20 border border-border">
                       <div className="flex items-center gap-4">
                         {run.status === "success" ? (
                           <div className="p-2 bg-success/10 text-success rounded-lg">

@@ -9,27 +9,20 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   return (
-    <div className="flex h-[100dvh] bg-[#06040d] text-foreground overflow-hidden selection:bg-primary/30 selection:text-white">
-
-      {/* Deep cockpit ambient */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        {/* Base graphite */}
-        <div className="absolute inset-0 bg-[#06040d]" />
-        {/* Top-left blue glow — subtle system pulse */}
-        <div className="absolute top-[-80px] left-[120px] w-[700px] h-[500px] rounded-full bg-blue-500/[0.032] blur-[180px]" />
-        {/* Bottom-right violet glow — ambient depth */}
-        <div className="absolute bottom-[-100px] right-[-50px] w-[500px] h-[400px] rounded-full bg-violet-500/[0.022] blur-[140px]" />
-      </div>
-
+    <div className="flex h-[100dvh] min-w-0 overflow-hidden bg-background text-foreground selection:bg-primary/15 selection:text-foreground">
+      <a
+        href="#dealerpilot-main"
+        className="sr-only z-50 rounded-md bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-lg focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
+      >
+        Skip to main content
+      </a>
       <Sidebar />
-
-      <main className="flex-1 flex flex-col overflow-hidden relative z-10 min-w-0">
+      <main id="dealerpilot-main" className="relative flex min-w-0 flex-1 flex-col overflow-hidden pb-[68px] md:pb-0">
         <GlobalHeader />
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
           {children}
         </div>
       </main>
-
       <FloatingAssistant />
     </div>
   );

@@ -135,9 +135,9 @@ const STRATEGY_STATUS_CONFIG: Record<
   },
   not_prioritized: {
     label: "Ready, not prioritized",
-    color: "text-amber-400",
-    bg: "bg-amber-500/8",
-    border: "border-amber-500/20",
+    color: "text-warning",
+    bg: "bg-warning/8",
+    border: "border-warning/20",
     icon: Star,
   },
   needs_strategy_review: {
@@ -154,7 +154,7 @@ function ratingClass(rating: string | null | undefined) {
     case "Excellent":
       return "bg-success/10 text-success border-success/20";
     case "Good":
-      return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+      return "bg-primary/10 text-primary border-primary/20";
     case "Needs Improvement":
       return "bg-warning/10 text-warning border-warning/20";
     default:
@@ -167,17 +167,17 @@ function publishStatusClass(status: string) {
     case "Published":
       return "bg-success/80 text-success-foreground border-success/20";
     case "Assigned":
-      return "bg-indigo-500/80 text-white border-indigo-500/20";
+      return "bg-indigo-500/80 text-foreground border-indigo-500/20";
     case "Opening Facebook":
     case "Filling Form":
-      return "bg-violet-500/80 text-white border-violet-500/20";
+      return "bg-primary/80 text-foreground border-primary/20";
     case "Ready for Review":
-      return "bg-amber-500/80 text-white border-amber-500/20";
+      return "bg-warning/80 text-foreground border-warning/20";
     case "Approved":
     case "Queued":
     case "Scheduled":
     case "Publishing":
-      return "bg-blue-500/80 text-white border-blue-500/20";
+      return "bg-primary/80 text-foreground border-primary/20";
     case "Failed":
     case "Retry":
       return "bg-destructive/80 text-destructive-foreground border-destructive/20";
@@ -191,21 +191,21 @@ function publishStatusClass(status: string) {
 function getStatusBadge(w: { publishStatus: string; aiStatus: string }) {
   if (w.publishStatus === "Published") {
     return (
-      <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md uppercase text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full text-white bg-success/90 border-0 hover:bg-success/90">
+      <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md  text-xs font-bold tracking-wide px-2.5 py-1 rounded-full text-foreground bg-success/90 border-0 hover:bg-success/90">
         LIVE
       </Badge>
     );
   }
   if (w.aiStatus === "Generating") {
     return (
-      <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md uppercase text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full text-white bg-warning/80 border-0 hover:bg-warning/80 flex items-center gap-1.5">
+      <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md  text-xs font-bold tracking-wide px-2.5 py-1 rounded-full text-foreground bg-warning/80 border-0 hover:bg-warning/80 flex items-center gap-1.5">
         <Loader2 className="w-3 h-3 animate-spin" /> GENERATING
       </Badge>
     );
   }
   if (w.publishStatus === "Approved" || w.publishStatus === "Queued") {
     return (
-      <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md uppercase text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full text-white bg-primary/90 border-0 hover:bg-primary/90">
+      <Badge className="absolute top-4 right-4 z-10 backdrop-blur-md  text-xs font-bold tracking-wide px-2.5 py-1 rounded-full text-foreground bg-primary/90 border-0 hover:bg-primary/90">
         READY
       </Badge>
     );
@@ -222,7 +222,7 @@ function PhotoBadge({
 }) {
   if (!decision || decision === "needs_review") {
     return (
-      <Badge className="absolute bottom-4 left-4 z-10 backdrop-blur-md text-[10px] font-bold px-2 py-0.5 rounded-md bg-warning/80 text-warning-foreground border-0 flex items-center gap-1">
+      <Badge className="absolute bottom-4 left-4 z-10 backdrop-blur-md text-xs font-bold px-2 py-0.5 rounded-md bg-warning/80 text-warning-foreground border-0 flex items-center gap-1">
         <AlertTriangle className="w-3 h-3" />
         Review Photos
       </Badge>
@@ -230,7 +230,7 @@ function PhotoBadge({
   }
   if (decision === "use_original") {
     return (
-      <Badge className="absolute bottom-4 left-4 z-10 backdrop-blur-md text-[10px] font-bold px-2 py-0.5 rounded-md bg-success/80 text-success-foreground border-0 flex items-center gap-1">
+      <Badge className="absolute bottom-4 left-4 z-10 backdrop-blur-md text-xs font-bold px-2 py-0.5 rounded-md bg-success/80 text-success-foreground border-0 flex items-center gap-1">
         <ImageIcon className="w-3 h-3" />
         {score ?? "—"} · Original
       </Badge>
@@ -238,7 +238,7 @@ function PhotoBadge({
   }
   if (decision === "use_original_recommend_ai_cover") {
     return (
-      <Badge className="absolute bottom-4 left-4 z-10 backdrop-blur-md text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/80 text-white border-0 flex items-center gap-1">
+      <Badge className="absolute bottom-4 left-4 z-10 backdrop-blur-md text-xs font-bold px-2 py-0.5 rounded-md bg-primary/80 text-foreground border-0 flex items-center gap-1">
         <Eye className="w-3 h-3" />
         {score ?? "—"} · AI Cover Rec
       </Badge>
@@ -246,7 +246,7 @@ function PhotoBadge({
   }
   if (decision === "generate_ai_creative") {
     return (
-      <Badge className="absolute bottom-4 left-4 z-10 backdrop-blur-md text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-500/80 text-white border-0 flex items-center gap-1">
+      <Badge className="absolute bottom-4 left-4 z-10 backdrop-blur-md text-xs font-bold px-2 py-0.5 rounded-md bg-primary/80 text-foreground border-0 flex items-center gap-1">
         <Wand2 className="w-3 h-3" />
         AI Creative Needed
       </Badge>
@@ -474,11 +474,11 @@ export function ListingsWorkspace() {
     ["ready", "scheduled", "failed", "all"].includes(activeTab);
 
   const tabClass =
-    "text-[10px] font-bold uppercase tracking-[0.15em] px-3 py-1.5 rounded-none border-0 border-b-2 border-transparent data-[state=active]:border-green-400 data-[state=active]:text-green-400 data-[state=inactive]:text-white/30 data-[state=inactive]:hover:text-white/55 gap-1.5 transition-all bg-transparent data-[state=active]:bg-transparent shadow-none";
+    "text-xs font-semibold px-3 py-1.5 rounded-none border-0 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground gap-1.5 transition-colors bg-transparent data-[state=active]:bg-transparent shadow-none";
 
   const countBadge = (n: number) =>
     n > 0 ? (
-      <span className="text-[9px] font-black tabular-nums opacity-60">{n}</span>
+      <span className="text-[11px] font-semibold tabular-nums opacity-60">{n}</span>
     ) : null;
 
   const handleMarkPublished = (marketplaceUrl: string) => {
@@ -523,7 +523,7 @@ export function ListingsWorkspace() {
             description={`${allCount} listing workspaces · ${publishedWorkspacesCount} live · ${readyCount} ready`}
             action={
               <Link href="/listings/readiness">
-                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-[11px] text-white/35 hover:text-white/70">
+                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   Readiness
                 </Button>
@@ -534,7 +534,7 @@ export function ListingsWorkspace() {
 
           {/* Tab rail */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-0">
-            <TabsList className="bg-transparent border-0 border-b border-white/[0.04] gap-0 flex-nowrap overflow-x-auto whitespace-nowrap w-full rounded-none h-auto px-0 pb-0 justify-start">
+            <TabsList className="bg-transparent border-0 border-b border-border gap-0 flex-nowrap overflow-x-auto whitespace-nowrap w-full rounded-none h-auto px-0 pb-0 justify-start">
               <TabsTrigger value="ready" className={tabClass}>
                 Ready {countBadge(readyCount)}
               </TabsTrigger>
@@ -544,7 +544,7 @@ export function ListingsWorkspace() {
               <TabsTrigger value="published" className={tabClass}>
                 Live {countBadge(publishedWorkspacesCount)}
               </TabsTrigger>
-              <TabsTrigger value="failed" className={cn(tabClass, failedCount > 0 && "data-[state=inactive]:text-red-400/60")}>
+              <TabsTrigger value="failed" className={cn(tabClass, failedCount > 0 && "data-[state=inactive]:text-destructive/60")}>
                 Failed {countBadge(failedCount)}
               </TabsTrigger>
               <TabsTrigger value="all" className={tabClass}>
@@ -569,7 +569,7 @@ export function ListingsWorkspace() {
               }}
               onPublishBatch={(vehicleIds) => {
                 const vehicles: BatchVehicle[] = vehicleIds.map((id) => {
-                  const ws = workspacesData?.workspaces.find((w) => w.vehicleId === id);
+                  const ws = workspacesData?.workspaces?.find((w) => w.vehicleId === id);
                   return { id, label: ws?.label ?? `Vehicle #${id}` };
                 });
                 setBatchTodayVehicles(vehicles);
@@ -592,12 +592,12 @@ export function ListingsWorkspace() {
           {/* ── Live tab — engagement-rich cards ── */}
           {isPublishedTab && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-              <div className="flex items-center gap-3 py-3 border-b border-white/[0.04]">
+              <div className="flex items-center gap-3 py-3 border-b border-border">
                 <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/22" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input
                     placeholder="VIN, make, model…"
-                    className="pl-9 h-8 text-[13px] bg-transparent border-white/[0.08] focus-visible:ring-0 focus-visible:border-green-500/40 text-white/70 placeholder:text-white/18"
+                    className="pl-9 h-10 text-sm bg-transparent border-border focus-visible:ring-0 focus-visible:border-primary/40 text-foreground placeholder:text-muted-foreground"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -657,12 +657,12 @@ export function ListingsWorkspace() {
           {isCardTab && (
             <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
               {/* Toolbar */}
-              <div className="flex flex-col sm:flex-row gap-3 items-center py-3 border-y border-white/[0.04]">
+              <div className="flex flex-col sm:flex-row gap-3 items-center py-3 border-y border-border">
                 <div className="relative flex-1 w-full max-w-sm">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/22" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input
                     placeholder="VIN, make, model…"
-                    className="pl-9 h-8 text-[13px] bg-transparent border-white/[0.08] focus-visible:ring-0 focus-visible:border-green-500/40 text-white/70 placeholder:text-white/18"
+                    className="pl-9 h-10 text-sm bg-transparent border-border focus-visible:ring-0 focus-visible:border-primary/40 text-foreground placeholder:text-muted-foreground"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -671,18 +671,18 @@ export function ListingsWorkspace() {
                 <div className="flex items-center gap-2 shrink-0 ml-auto">
                   {selectionCount > 0 ? (
                     <>
-                      <span className="text-[11px] text-green-400 font-bold">{selectionCount} selected</span>
-                      <Button size="sm" variant="ghost" onClick={selectAll} className="h-7 text-[11px] px-2 text-white/40 hover:text-white/70">All</Button>
-                      <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 w-7 p-0 text-white/30 hover:text-white/60"><X className="w-3 h-3" /></Button>
+                      <span className="text-[11px] text-success font-bold">{selectionCount} selected</span>
+                      <Button size="sm" variant="ghost" onClick={selectAll} className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground">All</Button>
+                      <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground"><X className="w-3 h-3" /></Button>
                     </>
                   ) : (
-                    <Button size="sm" variant="ghost" onClick={selectAll} className="h-7 text-[11px] px-2.5 gap-1.5 text-white/30 hover:text-white/60">
+                    <Button size="sm" variant="ghost" onClick={selectAll} className="h-7 text-[11px] px-2.5 gap-1.5 text-muted-foreground hover:text-muted-foreground">
                       <ListChecks className="w-3 h-3" /> Select All
                     </Button>
                   )}
                   <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-                    <SelectTrigger className="w-[140px] h-7 text-[12px] bg-transparent border-white/[0.08] text-white/45 gap-1">
-                      <ArrowUpDown className="w-3 h-3 text-white/22 shrink-0" />
+                    <SelectTrigger className="w-[140px] h-7 text-[12px] bg-transparent border-border text-muted-foreground gap-1">
+                      <ArrowUpDown className="w-3 h-3 text-muted-foreground shrink-0" />
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -693,15 +693,15 @@ export function ListingsWorkspace() {
                       <SelectItem value="needs_review">Needs Review First</SelectItem>
                     </SelectContent>
                   </Select>
-                  <div className="flex items-center rounded-lg border border-white/[0.07] overflow-hidden shrink-0">
+                  <div className="flex items-center rounded-lg border border-border overflow-hidden shrink-0">
                     <button
                       onClick={() => setViewMode("list")}
-                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold transition-colors", viewMode === "list" ? "bg-green-500/10 text-green-400" : "text-white/25 hover:text-white/50")}
+                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors", viewMode === "list" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground")}
                     ><List className="w-3 h-3" /> List</button>
-                    <div className="w-px h-4 bg-white/[0.06]" />
+                    <div className="w-px h-4 bg-muted" />
                     <button
                       onClick={() => setViewMode("grid")}
-                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold transition-colors", viewMode === "grid" ? "bg-green-500/10 text-green-400" : "text-white/25 hover:text-white/50")}
+                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors", viewMode === "grid" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground")}
                     ><LayoutGrid className="w-3 h-3" /> Grid</button>
                   </div>
                 </div>
@@ -709,7 +709,7 @@ export function ListingsWorkspace() {
 
               {activeTab === "scheduled" && (
                 <SectionCard className="p-0 overflow-hidden border-border/50">
-                  <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/[0.04]">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
                     <div>
                       <div className="text-sm font-semibold text-foreground flex items-center gap-2">
                         <CalendarClock className="w-4 h-4 text-primary" />
@@ -766,9 +766,9 @@ export function ListingsWorkspace() {
                                     onChange={(e) =>
                                       setRescheduleValues((prev) => ({ ...prev, [job.id]: e.target.value }))
                                     }
-                                    className="h-8 w-[190px] text-xs bg-transparent border-white/[0.08]"
+                                    className="h-8 w-[190px] text-xs bg-transparent border-border"
                                   />
-                                  <span className="text-[10px] text-muted-foreground">
+                                  <span className="text-xs text-muted-foreground">
                                     Current: {formatDate(job.scheduledAt)}
                                   </span>
                                 </div>
@@ -779,7 +779,7 @@ export function ListingsWorkspace() {
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline" className="bg-secondary/50 text-muted-foreground border-border text-[10px] uppercase tracking-wider">
+                                <Badge variant="outline" className="bg-secondary/50 text-muted-foreground border-border text-xs  tracking-wider">
                                   {(job as { mode?: string }).mode ?? "Assisted"}
                                 </Badge>
                               </TableCell>
@@ -826,7 +826,7 @@ export function ListingsWorkspace() {
                 </SectionCard>
               )}
 
-              <div className="text-[10px] text-white/18 font-mono">
+              <div className="text-xs text-muted-foreground font-mono">
                 {filteredSortedWorkspaces.length} vehicle{filteredSortedWorkspaces.length !== 1 ? "s" : ""}
               </div>
 
@@ -860,7 +860,7 @@ export function ListingsWorkspace() {
                 /* ── Compact List View ── */
                 <div className="rounded-xl border border-border/40 overflow-hidden">
                   {/* List header */}
-                  <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.04] text-[9px] font-black uppercase tracking-[0.18em] text-white/18">
+                  <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border text-[11px] font-semibold  tracking-wide text-muted-foreground">
                     <div className="w-5 flex-shrink-0">
                       <Checkbox
                         checked={selectionCount === filteredSortedWorkspaces.length && filteredSortedWorkspaces.length > 0}
@@ -890,14 +890,14 @@ export function ListingsWorkspace() {
                       : "Review";
                     const recColor = !decision ? ""
                       : decision === "use_original" ? "text-success bg-success/10"
-                      : decision === "enhance" ? "text-amber-400 bg-amber-500/10"
+                      : decision === "enhance" ? "text-warning bg-warning/10"
                       : "text-muted-foreground bg-muted/30";
                     return (
                       <div
                         key={w.vehicleId}
                         className={cn(
-                          "flex items-center gap-3 px-4 py-2.5 min-h-[72px] border-b border-white/[0.03] last:border-b-0 transition-colors hover:bg-white/[0.015]",
-                          isSelected && "bg-green-500/[0.04] border-l-2 border-l-green-500/40"
+                          "flex items-center gap-3 px-4 py-2.5 min-h-[72px] border-b border-border last:border-b-0 transition-colors hover:bg-muted",
+                          isSelected && "bg-success/[0.04] border-l-2 border-l-green-500/40"
                         )}
                       >
                         <div className="w-5 flex-shrink-0">
@@ -913,7 +913,7 @@ export function ListingsWorkspace() {
                             </div>
                           )}
                           {(w.imageCount ?? 0) > 0 && (
-                            <div className="absolute bottom-0.5 right-0.5 flex items-center gap-0.5 bg-black/70 text-white text-[8px] font-bold px-1 py-0.5 rounded">
+                            <div className="absolute bottom-0.5 right-0.5 flex items-center gap-0.5 bg-black/70 text-white text-[11px] font-bold px-1 py-0.5 rounded">
                               <ImageIcon className="w-2 h-2" />{w.imageCount}
                             </div>
                           )}
@@ -930,9 +930,9 @@ export function ListingsWorkspace() {
                             {w.bodyStyle && <><span className="text-border/80">·</span><span>{w.bodyStyle}</span></>}
                             {w.publishStatus && (
                               <span className={cn(
-                                "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest",
+                                "px-1.5 py-0.5 rounded text-[11px] font-bold  tracking-wide",
                                 w.publishStatus === "Approved" || w.publishStatus === "Queued" ? "bg-success/10 text-success" :
-                                w.publishStatus === "Needs Review" ? "bg-red-500/10 text-red-400" :
+                                w.publishStatus === "Needs Review" ? "bg-destructive/10 text-destructive" :
                                 w.publishStatus === "Published" ? "bg-primary/10 text-primary" :
                                 "bg-muted text-muted-foreground"
                               )}>
@@ -941,7 +941,7 @@ export function ListingsWorkspace() {
                             )}
                           </div>
                           {recLabel && (
-                            <span className={cn("inline-flex items-center text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded mt-0.5", recColor)}>
+                            <span className={cn("inline-flex items-center text-[11px] font-bold  tracking-wide px-1.5 py-0.5 rounded mt-0.5", recColor)}>
                               {recLabel}
                             </span>
                           )}
@@ -950,14 +950,14 @@ export function ListingsWorkspace() {
                         <div className="w-[90px] flex-shrink-0 text-center hidden lg:block">
                           {photoScore != null ? (
                             <div className={cn(
-                              "inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold",
+                              "inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold",
                               photoScore >= 88 ? "bg-success/15 text-success" :
-                              photoScore >= 65 ? "bg-amber-500/15 text-amber-400" :
-                              "bg-red-500/15 text-red-400"
+                              photoScore >= 65 ? "bg-warning/15 text-warning" :
+                              "bg-destructive/15 text-destructive"
                             )}>
                               <Gauge className="w-3 h-3" />{photoScore}
                             </div>
-                          ) : <span className="text-muted-foreground text-[10px]">—</span>}
+                          ) : <span className="text-muted-foreground text-xs">—</span>}
                         </div>
                         {/* Prices */}
                         <div className="w-[120px] flex-shrink-0 hidden md:block">
@@ -965,7 +965,7 @@ export function ListingsWorkspace() {
                             {w.price ? formatCurrency(w.price) : "—"}
                           </div>
                           {mpPrice && (
-                            <div className="text-amber-400 text-xs font-bold mt-0.5">
+                            <div className="text-warning text-xs font-bold mt-0.5">
                               {formatCurrency(mpPrice)} down
                             </div>
                           )}
@@ -973,16 +973,16 @@ export function ListingsWorkspace() {
                         {/* Strategy */}
                         <div className="w-[150px] flex-shrink-0 hidden xl:block">
                           {intel?.strategyName ? (
-                            <span className="inline-block px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-semibold truncate max-w-full">
+                            <span className="inline-block px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs font-semibold truncate max-w-full">
                               {intel.strategyName}
                             </span>
                           ) : (
-                            <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded inline-block", statusCfg.bg, statusCfg.color)}>
+                            <span className={cn("text-xs font-semibold px-1.5 py-0.5 rounded inline-block", statusCfg.bg, statusCfg.color)}>
                               {strategyStatus === "needs_strategy_review" ? "Needs Review" : "Not Prioritized"}
                             </span>
                           )}
                           {w.priorityScore > 0 && (
-                            <div className={cn("text-[9px] mt-0.5 font-semibold", w.priorityScore >= 70 ? "text-primary" : "text-muted-foreground")}>
+                            <div className={cn("text-[11px] mt-0.5 font-semibold", w.priorityScore >= 70 ? "text-primary" : "text-muted-foreground")}>
                               Priority {w.priorityScore}
                             </div>
                           )}
@@ -991,7 +991,7 @@ export function ListingsWorkspace() {
                         <div className="w-[140px] flex-shrink-0 flex items-center justify-end gap-1.5">
                           <Button
                             size="sm"
-                            className="h-7 px-2 text-[10px] gap-1 bg-success hover:bg-success/90 text-white whitespace-nowrap font-bold uppercase tracking-widest"
+                            className="h-7 px-2 text-xs gap-1 bg-success hover:bg-success/90 text-foreground whitespace-nowrap font-bold  tracking-wide"
                             onClick={(e) => { e.stopPropagation(); setPublishNowVehicleId(w.vehicleId); }}
                           >
                             <UploadCloud className="w-3 h-3" />
@@ -1031,7 +1031,7 @@ export function ListingsWorkspace() {
                           >
                             <Users className="w-3.5 h-3.5 text-muted-foreground" />
                             <span className="font-semibold text-foreground">{key}</span>
-                            <Badge variant="secondary" className="text-[10px] font-bold px-1.5 py-0">
+                            <Badge variant="secondary" className="text-xs font-bold px-1.5 py-0">
                               {group.length} ready
                             </Badge>
                             <button
@@ -1069,10 +1069,10 @@ export function ListingsWorkspace() {
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSelected(w.vehicleId); }}
                         >
                           <div className={cn(
-                            "w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all duration-150 shadow-sm cursor-pointer",
+                            "w-6 h-6 rounded-md border-2 flex items-center justify-center transition duration-150 shadow-sm cursor-pointer",
                             isSelected
                               ? "bg-primary border-primary"
-                              : "bg-black/40 border-white/60 hover:border-white backdrop-blur-sm"
+                              : "bg-black/40 border-border hover:border-border backdrop-blur-sm"
                           )}>
                             {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary-foreground" />}
                           </div>
@@ -1081,7 +1081,7 @@ export function ListingsWorkspace() {
                         <Link href={`/listings/${w.vehicleId}`}>
                           <Card
                             className={cn(
-                              "overflow-hidden hover-lift cursor-pointer group bg-card border-border/40 hover:border-primary/30 transition-all duration-500 h-full flex flex-col relative",
+                              "overflow-hidden hover-lift cursor-pointer group bg-card border-border/40 hover:border-primary/30 transition duration-500 h-full flex flex-col relative",
                               isSelected && "ring-2 ring-primary border-primary/50"
                             )}
                             style={{ animationDelay: `${i * 50}ms` }}
@@ -1108,7 +1108,7 @@ export function ListingsWorkspace() {
                                   <Badge
                                     variant="outline"
                                     className={cn(
-                                      "backdrop-blur-md px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase border",
+                                      "backdrop-blur-md px-2.5 py-1 text-xs font-bold tracking-wide  border",
                                       ratingClass(w.listingRating),
                                     )}
                                   >
@@ -1120,7 +1120,7 @@ export function ListingsWorkspace() {
 
                               {/* Photo count badge — bottom left */}
                               {(w.imageCount ?? 0) > 0 && (
-                                <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-white text-[10px] font-semibold">
+                                <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-white text-xs font-semibold">
                                   <ImageIcon className="w-3 h-3" />
                                   {w.imageCount} photos
                                 </div>
@@ -1141,7 +1141,7 @@ export function ListingsWorkspace() {
                               {/* Strategy status — only on ready tab */}
                               {activeTab === "ready" && (
                                 <div className={cn(
-                                  "inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-md border mb-2 w-fit",
+                                  "inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-md border mb-2 w-fit",
                                   statusCfg.bg, statusCfg.color, statusCfg.border,
                                 )}>
                                   <StatusIcon className="w-3 h-3 shrink-0" />
@@ -1166,7 +1166,7 @@ export function ListingsWorkspace() {
                                 <div className="font-bold text-xl text-foreground">
                                   {formatCurrency(w.price)}
                                 </div>
-                                <div className="text-xs font-semibold text-primary/80 group-hover:text-primary flex items-center gap-1 uppercase tracking-widest transition-colors">
+                                <div className="text-xs font-semibold text-primary/80 group-hover:text-primary flex items-center gap-1  tracking-wide transition-colors">
                                   View Listing &rarr;
                                 </div>
                               </div>
@@ -1181,7 +1181,7 @@ export function ListingsWorkspace() {
                             e.stopPropagation();
                             setPublishNowVehicleId(w.vehicleId);
                           }}
-                          className="absolute bottom-[72px] right-6 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success/90 hover:bg-success text-white text-xs font-bold uppercase tracking-widest shadow-lg transition-all duration-150 border border-success/50"
+                          className="absolute bottom-[72px] right-6 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success/90 hover:bg-success text-foreground text-xs font-bold  tracking-wide shadow-lg transition duration-150 border border-success/50"
                         >
                           <UploadCloud className="w-3.5 h-3.5" />
                           Publish Now
@@ -1196,7 +1196,7 @@ export function ListingsWorkspace() {
               {/* ── Floating AI action bar — visible in both list and grid modes ── */}
               {selectionCount > 0 && (
                   <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
-                    <div className="flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-card/97 border border-primary/20 shadow-2xl shadow-primary/10 backdrop-blur-md">
+                    <div className="flex items-center gap-3 px-5 py-3.5 rounded-xl bg-card/97 border border-primary/20 shadow-lg shadow-primary/10 backdrop-blur-md">
                       {/* AI label */}
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
@@ -1213,7 +1213,7 @@ export function ListingsWorkspace() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="gap-1.5 px-4 font-bold text-[11px] uppercase tracking-widest whitespace-nowrap border-success/40 text-success hover:bg-success/10"
+                        className="gap-1.5 px-4 font-bold text-[11px]  tracking-wide whitespace-nowrap border-success/40 text-success hover:bg-success/10"
                         disabled={bulkSchedule.isPending}
                         onClick={() => {
                           const readyIds = filteredSortedWorkspaces
@@ -1257,7 +1257,7 @@ export function ListingsWorkspace() {
 
                       {/* Primary CTA */}
                       <Button
-                        className="gap-2 px-5 font-bold text-[11px] uppercase tracking-widest premium-gradient-btn whitespace-nowrap"
+                        className="gap-2 px-5 font-bold text-[11px]  tracking-wide premium-gradient-btn whitespace-nowrap"
                         onClick={() => setShowBatchReview(true)}
                       >
                         <Wand2 className="w-3.5 h-3.5" />
@@ -1302,7 +1302,7 @@ export function ListingsWorkspace() {
                               );
                             }}
                           >
-                            <Tag className="w-3.5 h-3.5 text-amber-400" />
+                            <Tag className="w-3.5 h-3.5 text-warning" />
                             Mark Sold
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
@@ -1363,7 +1363,7 @@ export function ListingsWorkspace() {
                     >
                       {label}
                       {count > 0 && (
-                        <span className="ml-1.5 bg-primary/20 text-primary rounded-full px-1.5 text-[10px]">
+                        <span className="ml-1.5 bg-primary/20 text-primary rounded-full px-1.5 text-xs">
                           {count}
                         </span>
                       )}
@@ -1448,7 +1448,7 @@ export function ListingsWorkspace() {
                             <Badge
                               variant="outline"
                               className={cn(
-                                "px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                                "px-2 py-0.5 text-xs font-bold  tracking-wider",
                                 (job as { mode?: string }).mode === "Controlled"
                                   ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
                                   : "bg-secondary/50 text-muted-foreground border-border",
@@ -1526,7 +1526,7 @@ export function ListingsWorkspace() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-7 px-2 text-xs border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                                    className="h-7 px-2 text-xs border-warning/40 text-warning hover:bg-warning/10"
                                     disabled={retryMutation.isPending}
                                     onClick={() => retryMutation.mutate({ id: job.id })}
                                   >
@@ -1540,7 +1540,7 @@ export function ListingsWorkspace() {
                                     href={`/vehicles/${job.vehicleId}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 h-7 px-2 text-xs text-muted-foreground hover:text-white transition-colors"
+                                    className="inline-flex items-center gap-1 h-7 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
                                     title="Open vehicle page for manual review"
                                   >
                                     <ExternalLink className="w-3 h-3" />
@@ -1611,7 +1611,7 @@ export function ListingsWorkspace() {
 
       <PublishNowModal
         vehicleId={publishNowVehicleId}
-        vehicleLabel={workspacesData?.workspaces.find((w) => w.vehicleId === publishNowVehicleId)?.label}
+        vehicleLabel={workspacesData?.workspaces?.find((w) => w.vehicleId === publishNowVehicleId)?.label}
         onClose={() => { setPublishNowVehicleId(null); invalidateWorkspaces(); }}
       />
 

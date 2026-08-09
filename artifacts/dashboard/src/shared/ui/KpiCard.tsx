@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { AnimatedCounter } from "./AnimatedCounter";
-import { type ModuleKey, getModuleTheme } from "@/design-system/module-themes";
+import { type ModuleKey } from "@/design-system/module-themes";
 
 interface KpiTrend {
   value: number;
@@ -25,71 +25,37 @@ interface KpiCardProps {
   onClick?: () => void;
 }
 
-const legacyAccentText: Record<string, string> = {
-  blue: "text-blue-400",
-  green: "text-emerald-400",
-  orange: "text-orange-400",
-  purple: "text-violet-400",
-  cyan: "text-cyan-400",
-  amber: "text-amber-400",
-  violet: "text-violet-400",
-};
-
-export function KpiCard({
-  title,
-  label,
-  value,
-  formatValue,
-  trend,
-  delta,
-  module,
-  accentColor,
-  valueColor,
-  isLoading,
-  className,
-  onClick,
-}: KpiCardProps) {
+export function KpiCard({ title, label, value, formatValue, trend, delta, valueColor, isLoading, className, onClick }: KpiCardProps) {
   const heading = title ?? label ?? "";
-  const theme = module ? getModuleTheme(module) : null;
   const movement = trend ?? delta;
-
-  const resolvedValueColor =
-    valueColor ??
-    (theme ? theme.textAccent : legacyAccentText[accentColor ?? "blue"] ?? "text-white/75");
-
   const Wrapper = onClick ? "button" : "div";
 
   return (
     <Wrapper
+      data-kpi-card="true"
       onClick={onClick}
       className={cn(
-        "flex flex-col border border-white/[0.05] bg-white/[0.01] rounded-xl px-5 py-4 text-left",
-        onClick && "hover:border-white/[0.09] hover:bg-white/[0.025] transition-all cursor-pointer",
+        "flex min-w-0 flex-col rounded-lg border border-border bg-card px-5 py-4 text-left text-card-foreground shadow-sm",
+        onClick && "cursor-pointer transition-[border-color,box-shadow] hover:border-primary/25 hover:shadow-md",
         className,
       )}
     >
-      <div className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 mb-3">
-        {heading}
-      </div>
-      <div className={cn("text-[34px] font-black tracking-tight leading-none tabular-nums", resolvedValueColor)}>
+      <div className="mb-3 text-xs font-medium text-muted-foreground">{heading}</div>
+      <div data-kpi-value="true" className={cn("text-[30px] font-semibold leading-none tracking-[-0.025em] tabular-nums text-foreground", valueColor?.replace(/text-(blue|cyan|violet|purple)-400/g, "text-primary"))}>
         {isLoading ? (
-          <div className="h-8 w-16 rounded bg-white/[0.04] animate-pulse" />
+          <div className="h-8 w-16 animate-pulse rounded-md bg-muted" />
         ) : typeof value === "number" ? (
           <AnimatedCounter value={value} format={formatValue} />
         ) : (
           value
         )}
       </div>
-      {movement && (
-        <div className="text-[10px] mt-2">
-          <span className={movement.isPositive ? "text-emerald-400" : "text-red-400"}>
-            {movement.isPositive ? "+" : ""}{movement.value}%
-          </span>
-          {movement.label && (
-            <span className="text-white/20 ml-1">{movement.label}</span>
-          )}
+      {movement ? (
+        <div className="mt-2 text-xs text-muted-foreground">
+          <span className="tabular-nums">{movement.isPositive ? "+" : ""}{movement.value}%</span>
+          {movement.label ? <span className="ml-1">{movement.label}</span> : null}
         </div>
-      )}
+      ) : null}
     </Wrapper>
   );
 }

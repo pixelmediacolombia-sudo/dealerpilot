@@ -35,15 +35,15 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 function temperatureBadge(temp: string | null | undefined) {
-  if (temp === "Hot") return "bg-red-500/10 text-red-400 border-red-500/20";
+  if (temp === "Hot") return "bg-destructive/10 text-destructive border-destructive/20";
   if (temp === "Warm") return "bg-orange-500/10 text-orange-400 border-orange-500/20";
-  return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+  return "bg-primary/10 text-primary border-primary/20";
 }
 
 function temperatureIcon(temp: string | null | undefined) {
-  if (temp === "Hot") return <Flame className="w-3.5 h-3.5 text-red-400" />;
+  if (temp === "Hot") return <Flame className="w-3.5 h-3.5 text-destructive" />;
   if (temp === "Warm") return <Thermometer className="w-3.5 h-3.5 text-orange-400" />;
-  return <Snowflake className="w-3.5 h-3.5 text-blue-400" />;
+  return <Snowflake className="w-3.5 h-3.5 text-primary" />;
 }
 
 function getNextBestAction(lead: {
@@ -196,7 +196,7 @@ export function ConversationDetail() {
                   variant="ghost"
                   size="sm"
                   onClick={() => navigate("/sales-ai")}
-                  className="gap-2 -ml-2 h-8 text-muted-foreground hover:text-white"
+                  className="gap-2 -ml-2 h-8 text-muted-foreground hover:text-foreground"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   Back to Sales AI
@@ -211,7 +211,7 @@ export function ConversationDetail() {
                     size="sm"
                     variant="outline"
                     onClick={() => handleConvStatus("needs_human")}
-                    className="gap-2 border-orange-500/20 text-orange-400 hover:bg-orange-500/10 text-[10px] font-bold uppercase tracking-widest"
+                    className="gap-2 border-orange-500/20 text-orange-400 hover:bg-orange-500/10 text-xs font-bold  tracking-wide"
                   >
                     <AlertCircle className="w-3.5 h-3.5" />
                     Needs Human
@@ -221,7 +221,7 @@ export function ConversationDetail() {
                   size="sm"
                   variant="outline"
                   onClick={() => handleConvStatus("closed")}
-                  className="gap-2 border-white/10 text-muted-foreground hover:text-white text-[10px] font-bold uppercase tracking-widest"
+                  className="gap-2 border-border text-muted-foreground hover:text-foreground text-xs font-bold  tracking-wide"
                 >
                   Close
                 </Button>
@@ -251,26 +251,26 @@ export function ConversationDetail() {
                             "w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-1",
                             m.role === "assistant"
                               ? "bg-primary/20 border border-primary/30"
-                              : "bg-white/10 border border-white/10",
+                              : "bg-muted border border-border",
                           )}
                         >
                           {m.role === "assistant" ? (
                             <Bot className="w-3.5 h-3.5 text-primary" />
                           ) : (
-                            <User className="w-3.5 h-3.5 text-white/60" />
+                            <User className="w-3.5 h-3.5 text-muted-foreground" />
                           )}
                         </div>
                         <div
                           className={cn(
-                            "max-w-[75%] p-3.5 rounded-2xl text-sm",
+                            "max-w-[75%] p-3.5 rounded-xl text-sm",
                             m.role === "assistant"
                               ? "bg-primary/10 border border-primary/20 text-foreground/90 rounded-tr-sm"
-                              : "bg-card/60 border border-white/5 text-foreground/80 rounded-tl-sm",
+                              : "bg-card/60 border border-border text-foreground/80 rounded-tl-sm",
                           )}
                         >
                           {m.role === "assistant" && (
                             <div className="flex items-center gap-1.5 mb-1.5">
-                              <span className="text-[9px] font-bold text-primary uppercase tracking-widest">
+                              <span className="text-[11px] font-bold text-primary  tracking-wide">
                                 DealerPilot AI
                               </span>
                             </div>
@@ -288,14 +288,14 @@ export function ConversationDetail() {
                   {/* Auto-reply toggle */}
                   <div className="flex items-center justify-between mb-4 px-1">
                     <div>
-                      <div className="text-[11px] font-bold text-white/80">Auto-Reply</div>
-                      <div className="text-[10px] text-muted-foreground">
+                      <div className="text-[11px] font-bold text-foreground">Auto-Reply</div>
+                      <div className="text-xs text-muted-foreground">
                         {autoReplyEnabled ? "AI replies automatically" : "Manual copy & paste"}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={cn(
-                        "text-[10px] font-bold uppercase tracking-widest",
+                        "text-xs font-bold  tracking-wide",
                         autoReplyEnabled ? "text-primary" : "text-muted-foreground",
                       )}>
                         {autoReplyEnabled ? "ON" : "OFF"}
@@ -314,7 +314,7 @@ export function ConversationDetail() {
                     <Button
                       size="sm"
                       onClick={handleCopy}
-                      className="gap-2 text-[10px] font-bold uppercase tracking-widest"
+                      className="gap-2 text-xs font-bold  tracking-wide"
                     >
                       {copied ? (
                         <>
@@ -336,9 +336,9 @@ export function ConversationDetail() {
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
                 <div className="flex items-center gap-2 mb-1.5">
                   <Zap className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Next Best Action</span>
+                  <span className="text-xs font-bold text-primary  tracking-wide">Next Best Action</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-sm font-medium text-white/90">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                   <ChevronRight className="w-3.5 h-3.5 text-primary shrink-0" />
                   {nextBestAction}
                 </div>
@@ -348,14 +348,14 @@ export function ConversationDetail() {
                 <SectionCard title="Buyer Profile" icon={User}>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-white/90">
+                      <span className="font-bold text-foreground">
                         {lead.buyerName ?? "Unknown"}
                       </span>
                       {lead.temperature && (
                         <Badge
                           variant="outline"
                           className={cn(
-                            "text-[9px] font-bold uppercase tracking-widest flex items-center gap-1",
+                            "text-[11px] font-bold  tracking-wide flex items-center gap-1",
                             temperatureBadge(lead.temperature),
                           )}
                         >
@@ -369,9 +369,9 @@ export function ConversationDetail() {
                       <div>
                         <div className="flex justify-between text-[11px] mb-1">
                           <span className="text-muted-foreground">Lead Score</span>
-                          <span className="font-bold text-white/80">{lead.leadScore}/100</span>
+                          <span className="font-bold text-foreground">{lead.leadScore}/100</span>
                         </div>
-                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                           <div
                             className="h-full bg-primary rounded-full"
                             style={{ width: `${Math.min(lead.leadScore, 100)}%` }}
@@ -380,12 +380,12 @@ export function ConversationDetail() {
                       </div>
                     )}
 
-                    <div className="space-y-2 pt-2 border-t border-white/5">
+                    <div className="space-y-2 pt-2 border-t border-border">
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-muted-foreground flex items-center gap-1">
                           <DollarSign className="w-3 h-3" /> Published down
                         </span>
-                        <span className="font-medium text-white/80">
+                        <span className="font-medium text-foreground">
                           {lead.publishedDownPayment
                             ? `$${lead.publishedDownPayment.toLocaleString()}`
                             : "—"}
@@ -410,7 +410,7 @@ export function ConversationDetail() {
                         <span className="text-muted-foreground flex items-center gap-1">
                           <Phone className="w-3 h-3" /> Phone
                         </span>
-                        <span className={lead.phone ? "text-emerald-400" : "text-muted-foreground"}>
+                        <span className={lead.phone ? "text-success" : "text-muted-foreground"}>
                           {lead.phone ?? "—"}
                         </span>
                       </div>
@@ -418,14 +418,14 @@ export function ConversationDetail() {
                         <span className="text-muted-foreground flex items-center gap-1">
                           <Calendar className="w-3 h-3" /> Timeline
                         </span>
-                        <span className="text-white/70 capitalize">
+                        <span className="text-foreground capitalize">
                           {lead.buyerTimeline?.replace(/_/g, " ") ?? "—"}
                         </span>
                       </div>
                     </div>
 
-                    <div className="space-y-2 pt-2 border-t border-white/5">
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                    <div className="space-y-2 pt-2 border-t border-border">
+                      <div className="text-xs font-bold  tracking-wide text-muted-foreground mb-2">
                         Qualification
                       </div>
                       {[
@@ -436,9 +436,9 @@ export function ConversationDetail() {
                         <div key={label} className="flex items-center justify-between text-[11px]">
                           <span className="text-muted-foreground">{label}</span>
                           {value === true ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                            <CheckCircle2 className="w-3.5 h-3.5 text-success" />
                           ) : value === false ? (
-                            <XCircle className="w-3.5 h-3.5 text-red-400/60" />
+                            <XCircle className="w-3.5 h-3.5 text-destructive/60" />
                           ) : (
                             <span className="text-muted-foreground/40">—</span>
                           )}
@@ -448,15 +448,15 @@ export function ConversationDetail() {
 
                     {/* Missing fields */}
                     {missingFields.length > 0 && (
-                      <div className="pt-2 border-t border-white/5">
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-orange-400/80 mb-2">
+                      <div className="pt-2 border-t border-border">
+                        <div className="text-xs font-bold  tracking-wide text-orange-400/80 mb-2">
                           Still needed
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {missingFields.map((f) => (
                             <span
                               key={f}
-                              className="text-[9px] px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400/80"
+                              className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400/80"
                             >
                               {f}
                             </span>
@@ -472,11 +472,11 @@ export function ConversationDetail() {
                 <SectionCard title="Vehicle" icon={Car}>
                   <div className="space-y-2 text-[11px]">
                     {conv.detectedVehicleTitle && (
-                      <div className="font-medium text-white/90">{conv.detectedVehicleTitle}</div>
+                      <div className="font-medium text-foreground">{conv.detectedVehicleTitle}</div>
                     )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Type</span>
-                      <span className="capitalize text-white/70">{conv.vehicleType}</span>
+                      <span className="capitalize text-foreground">{conv.vehicleType}</span>
                     </div>
                     {conv.marketplaceDownPayment && (
                       <div className="flex justify-between">
@@ -494,10 +494,10 @@ export function ConversationDetail() {
                 <SectionCard title="Actions" icon={FileText}>
                   <div className="space-y-2">
                     {[
-                      { label: "Mark Hot", status: "Contacted", color: "text-red-400 border-red-500/20 hover:bg-red-500/10" },
-                      { label: "Mark Qualified", status: "Qualified", color: "text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10" },
+                      { label: "Mark Hot", status: "Contacted", color: "text-destructive border-destructive/20 hover:bg-destructive/10" },
+                      { label: "Mark Qualified", status: "Qualified", color: "text-success border-success/20 hover:bg-success/10" },
                       { label: "Mark Appt Ready", status: "Appointment Ready", color: "text-yellow-400 border-yellow-500/20 hover:bg-yellow-500/10" },
-                      { label: "Mark Lost", status: "Lost", color: "text-muted-foreground border-white/10 hover:bg-white/5" },
+                      { label: "Mark Lost", status: "Lost", color: "text-muted-foreground border-border hover:bg-muted" },
                     ].map(({ label, status, color }) => (
                       <Button
                         key={status}
@@ -505,7 +505,7 @@ export function ConversationDetail() {
                         size="sm"
                         onClick={() => handleMarkStatus(status)}
                         className={cn(
-                          "w-full text-[10px] font-bold uppercase tracking-widest",
+                          "w-full text-xs font-bold  tracking-wide",
                           color,
                         )}
                       >

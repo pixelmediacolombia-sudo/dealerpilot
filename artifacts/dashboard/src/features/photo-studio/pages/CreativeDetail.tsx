@@ -45,7 +45,7 @@ export function CreativeDetail() {
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+            <p className="text-xs font-bold text-muted-foreground  tracking-wide">
               Loading vehicle…
             </p>
           </div>
@@ -91,13 +91,13 @@ export function CreativeDetail() {
         <div className="animate-in fade-in duration-500">
 
           {/* ── Sticky header ── */}
-          <div className="sticky top-0 z-20 border-b border-border/30 bg-background/95 backdrop-blur-xl">
+          <div className="sticky top-0 z-20 border-b border-border/30 bg-background/95 backdrop-blur-md">
             <div className="px-8 py-3 max-w-7xl mx-auto flex items-center gap-4">
               <Link href="/creative-studio">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="gap-1.5 h-7 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground -ml-2"
+                  className="gap-1.5 h-7 text-xs font-bold  tracking-wide text-muted-foreground hover:text-foreground -ml-2"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> AI Vehicle Studio
                 </Button>
@@ -110,7 +110,7 @@ export function CreativeDetail() {
                   · {sortedPhotos.length} photos · VIN {vehicle.vin.slice(-8)}
                 </span>
               </div>
-              <Badge className="text-[9px] font-bold uppercase tracking-widest border bg-muted/40 text-muted-foreground border-border/40 gap-1 flex-shrink-0">
+              <Badge className="text-[11px] font-bold  tracking-wide border bg-muted/40 text-muted-foreground border-border/40 gap-1 flex-shrink-0">
                 <Clock className="w-2.5 h-2.5" /> Pending AI Review
               </Badge>
             </div>
@@ -124,11 +124,11 @@ export function CreativeDetail() {
               {/* Left: photo viewer */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <p className="text-xs font-bold text-muted-foreground  tracking-wide">
                     Vehicle Photos
                   </p>
                   {activePhoto && activePhoto.position === 0 && (
-                    <Badge className="text-[9px] font-bold bg-amber-400/20 text-amber-400 border-amber-400/30 gap-1">
+                    <Badge className="text-[11px] font-bold bg-warning/20 text-warning border-warning/30 gap-1">
                       <Star className="w-2.5 h-2.5 fill-amber-400" /> Cover Photo
                     </Badge>
                   )}
@@ -149,23 +149,23 @@ export function CreativeDetail() {
                   )}
                   {activePhoto && (
                     <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                      <span className="bg-black/70 text-white text-[9px] font-bold px-2 py-1 rounded backdrop-blur-sm">
+                      <span className="bg-black/70 text-foreground text-[11px] font-bold px-2 py-1 rounded backdrop-blur-sm">
                         Photo #{activePhoto.position + 1}
                       </span>
                       {activePhoto.category && (
-                        <span className="bg-black/60 text-white/80 text-[8px] px-1.5 py-0.5 rounded backdrop-blur-sm capitalize">
+                        <span className="bg-black/60 text-foreground text-[11px] px-1.5 py-0.5 rounded backdrop-blur-sm capitalize">
                           {activePhoto.category}
                         </span>
                       )}
                     </div>
                   )}
                   <div className="absolute bottom-3 right-3">
-                    <Badge className="bg-black/60 text-white/70 border-white/10 text-[8px] uppercase tracking-widest backdrop-blur-sm">
+                    <Badge className="bg-black/60 text-foreground border-border text-[11px]  tracking-wide backdrop-blur-sm">
                       <Clock className="w-2.5 h-2.5 mr-1" /> Pending AI Review
                     </Badge>
                   </div>
                 </div>
-                <p className="text-[10px] text-muted-foreground/50 text-center">
+                <p className="text-xs text-muted-foreground/50 text-center">
                   Source photo from XML feed · {sortedPhotos.length} total
                 </p>
 
@@ -184,7 +184,7 @@ export function CreativeDetail() {
                     >
                       <ArrowLeft className="w-3 h-3" /> Prev
                     </Button>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       {sortedPhotos.findIndex((p) => p.position === activePhoto.position) + 1} / {sortedPhotos.length}
                     </span>
                     <Button
@@ -209,7 +209,7 @@ export function CreativeDetail() {
                 {/* Vehicle info */}
                 <div className="rounded-xl border border-border/40 bg-card/50 overflow-hidden">
                   <div className="px-5 py-4 border-b border-border/30">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Vehicle</p>
+                    <p className="text-xs font-bold text-muted-foreground  tracking-wide">Vehicle</p>
                   </div>
                   <div className="p-5 space-y-3">
                     <div>
@@ -251,7 +251,7 @@ export function CreativeDetail() {
                 <div className="rounded-xl border border-border/40 bg-card/50 overflow-hidden">
                   <div className="px-5 py-4 border-b border-border/30 flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">AI Photo Review</span>
+                    <span className="text-xs font-bold text-muted-foreground  tracking-wide">AI Photo Review</span>
                   </div>
                   <div className="p-5 space-y-4">
                     <div className="text-center py-6 space-y-3">
@@ -290,10 +290,10 @@ export function CreativeDetail() {
             {sortedPhotos.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <p className="text-xs font-bold text-muted-foreground  tracking-wide">
                     All Photos ({sortedPhotos.length} total)
                   </p>
-                  <p className="text-[10px] text-muted-foreground/60">Click to preview · position from feed</p>
+                  <p className="text-xs text-muted-foreground/60">Click to preview · position from feed</p>
                 </div>
 
                 <div className="flex gap-2.5 overflow-x-auto pb-3" style={{ scrollbarWidth: "thin" }}>
@@ -305,7 +305,7 @@ export function CreativeDetail() {
                         key={p.position}
                         onClick={() => setSelectedPhotoIdx(p.position)}
                         className={cn(
-                          "flex-shrink-0 w-24 rounded-lg overflow-hidden border-2 transition-all duration-200 text-left",
+                          "flex-shrink-0 w-24 rounded-lg overflow-hidden border-2 transition duration-200 text-left",
                           isActive
                             ? "border-primary shadow-lg shadow-primary/20 ring-1 ring-primary/30"
                             : "border-border/40 hover:border-border opacity-70 hover:opacity-100",
@@ -321,15 +321,15 @@ export function CreativeDetail() {
                           )}
                           {isCover && (
                             <div className="absolute top-1 left-1">
-                              <span className="bg-amber-400/90 text-black text-[7px] font-black px-1 rounded">
+                              <span className="bg-warning/90 text-black text-[7px] font-semibold px-1 rounded">
                                 Cover
                               </span>
                             </div>
                           )}
                         </div>
                         <div className="px-1.5 py-1 bg-card/80 space-y-0.5">
-                          <div className="text-[8px] font-bold text-foreground/70">#{p.position + 1}</div>
-                          <div className="text-[7px] text-muted-foreground/50 uppercase tracking-widest">
+                          <div className="text-[11px] font-bold text-foreground/70">#{p.position + 1}</div>
+                          <div className="text-[7px] text-muted-foreground/50  tracking-wide">
                             {p.category ?? "photo"}
                           </div>
                         </div>
@@ -347,10 +347,10 @@ export function CreativeDetail() {
                 className="w-full flex items-center gap-3 px-5 py-4 hover:bg-muted/10 transition-colors"
               >
                 <ImageIcon className="w-4 h-4 text-muted-foreground" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex-1 text-left">
+                <span className="text-xs font-bold  tracking-wide text-muted-foreground flex-1 text-left">
                   Full Photo Gallery — {sortedPhotos.length} photos
                 </span>
-                <span className="text-[9px] text-muted-foreground/60 mr-2">
+                <span className="text-[11px] text-muted-foreground/60 mr-2">
                   {showGallery ? "Collapse" : "Expand"}
                 </span>
                 {showGallery

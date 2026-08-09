@@ -134,7 +134,7 @@ function FallbackImage({
 
   if (failed) {
     return (
-      <div className={cn("flex items-center justify-center bg-white/[0.03] text-white/25", className)}>
+      <div className={cn("flex items-center justify-center bg-muted text-muted-foreground", className)}>
         <ImageOff className="w-5 h-5" />
       </div>
     );
@@ -168,7 +168,7 @@ function GalleryGrid({ images, urlFn, label }: { images: PhotoSetImage[]; urlFn:
 
   if (images.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-white/30">
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
         <ImageIcon className="w-8 h-8 mb-2" />
         <p className="text-sm">No photos available</p>
       </div>
@@ -181,7 +181,7 @@ function GalleryGrid({ images, urlFn, label }: { images: PhotoSetImage[]; urlFn:
   return (
     <div className="space-y-4">
       {/* Large preview */}
-      <div className="relative rounded-2xl overflow-hidden bg-white/[0.03] border border-white/[0.06]" style={{ aspectRatio: "16/9" }}>
+      <div className="relative rounded-xl overflow-hidden bg-muted border border-border" style={{ aspectRatio: "16/9" }}>
         <FallbackImage
           src={urlFn(selectedImg!)}
           fallbackSrc={selectedImg?.originalUrl}
@@ -190,7 +190,7 @@ function GalleryGrid({ images, urlFn, label }: { images: PhotoSetImage[]; urlFn:
         />
         {label && (
           <div className="absolute top-3 left-3">
-            <span className="text-[11px] font-medium px-2 py-1 rounded-lg bg-black/60 text-white/80 backdrop-blur-sm">
+            <span className="text-[11px] font-medium px-2 py-1 rounded-lg bg-black/60 text-foreground backdrop-blur-sm">
               {label}
             </span>
           </div>
@@ -199,22 +199,22 @@ function GalleryGrid({ images, urlFn, label }: { images: PhotoSetImage[]; urlFn:
         {images.length > 1 && (
           <>
             <button
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center hover:bg-black/80 transition-colors disabled:opacity-30"
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm border border-border flex items-center justify-center hover:bg-black/80 transition-colors disabled:opacity-30"
               onClick={() => setSelected(Math.max(0, selectedIdx - 1))}
               disabled={selectedIdx === 0}
             >
-              <ChevronLeft className="w-4 h-4 text-white" />
+              <ChevronLeft className="w-4 h-4 text-foreground" />
             </button>
             <button
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center hover:bg-black/80 transition-colors disabled:opacity-30"
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm border border-border flex items-center justify-center hover:bg-black/80 transition-colors disabled:opacity-30"
               onClick={() => setSelected(Math.min(images.length - 1, selectedIdx + 1))}
               disabled={selectedIdx === images.length - 1}
             >
-              <ChevronRight className="w-4 h-4 text-white" />
+              <ChevronRight className="w-4 h-4 text-foreground" />
             </button>
           </>
         )}
-        <div className="absolute bottom-3 right-3 text-[11px] text-white/40 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
+        <div className="absolute bottom-3 right-3 text-[11px] text-muted-foreground bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
           {selectedIdx + 1} / {images.length}
         </div>
       </div>
@@ -226,8 +226,8 @@ function GalleryGrid({ images, urlFn, label }: { images: PhotoSetImage[]; urlFn:
             key={img.id}
             onClick={() => setSelected(i)}
             className={cn(
-              "relative shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-all",
-              i === selectedIdx ? "border-primary" : "border-white/[0.06] opacity-50 hover:opacity-80",
+              "relative shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition",
+              i === selectedIdx ? "border-primary" : "border-border opacity-50 hover:opacity-80",
             )}
           >
             <FallbackImage
@@ -253,7 +253,7 @@ function BeforeAfterView({ images }: { images: PhotoSetImage[] }) {
 
   if (exterior.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-white/30">
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
         <ArrowLeftRight className="w-8 h-8 mb-2" />
         <p className="text-sm">No exterior photos to compare</p>
       </div>
@@ -272,8 +272,8 @@ function BeforeAfterView({ images }: { images: PhotoSetImage[] }) {
               key={ph.id}
               onClick={() => setSelectedIdx(i)}
               className={cn(
-                "relative shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-all",
-                i === selectedIdx ? "border-primary" : "border-white/[0.06] opacity-50 hover:opacity-80",
+                "relative shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition",
+                i === selectedIdx ? "border-primary" : "border-border opacity-50 hover:opacity-80",
               )}
             >
               <FallbackImage src={ph.originalUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -286,17 +286,17 @@ function BeforeAfterView({ images }: { images: PhotoSetImage[] }) {
       {img && (
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <div className="text-[11px] font-medium text-white/40 uppercase tracking-wide pl-1">Original</div>
-            <div className="rounded-xl overflow-hidden border border-white/[0.06]" style={{ aspectRatio: "4/3" }}>
+            <div className="text-[11px] font-medium text-muted-foreground  tracking-wide pl-1">Original</div>
+            <div className="rounded-xl overflow-hidden border border-border" style={{ aspectRatio: "4/3" }}>
               <FallbackImage src={img.originalUrl} alt="Original" className="w-full h-full object-cover" />
             </div>
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-2 pl-1">
-              <div className="text-[11px] font-medium text-white/40 uppercase tracking-wide">AI Enhanced</div>
-              {enhanced && <span className="text-[10px] text-green-400">✓ Improved</span>}
+              <div className="text-[11px] font-medium text-muted-foreground  tracking-wide">AI Enhanced</div>
+              {enhanced && <span className="text-xs text-success">✓ Improved</span>}
             </div>
-            <div className={cn("rounded-xl overflow-hidden border", enhanced ? "border-green-500/20" : "border-white/[0.06]")} style={{ aspectRatio: "4/3" }}>
+            <div className={cn("rounded-xl overflow-hidden border", enhanced ? "border-success/20" : "border-border")} style={{ aspectRatio: "4/3" }}>
               <FallbackImage
                 src={aiOutputUrl(img)}
                 fallbackSrc={img.originalUrl}
@@ -309,10 +309,10 @@ function BeforeAfterView({ images }: { images: PhotoSetImage[] }) {
       )}
 
       {img?.classification && (
-        <div className="text-[11px] text-white/30 text-center">
-          Classified as: <span className="text-white/50">{img.classification}</span>
+        <div className="text-[11px] text-muted-foreground text-center">
+          Classified as: <span className="text-muted-foreground">{img.classification}</span>
           {img.classificationConfidence !== null && img.classificationConfidence !== undefined && (
-            <span className="ml-2 text-white/20">
+            <span className="ml-2 text-muted-foreground">
               {Math.round((img.classificationConfidence) * 100)}% confidence
             </span>
           )}
@@ -370,25 +370,25 @@ function QualityReport({ data }: { data: PhotoSetResponse }) {
       {items.map((item) => (
         <div key={item.label} className={cn(
           "flex items-center gap-4 p-3.5 rounded-xl border",
-          item.status === "good" ? "bg-green-500/[0.04] border-green-500/15"
-            : item.status === "warn" ? "bg-amber-500/[0.04] border-amber-500/15"
-            : "bg-red-500/[0.04] border-red-500/15"
+          item.status === "good" ? "bg-success/[0.04] border-success/15"
+            : item.status === "warn" ? "bg-warning/[0.04] border-warning/15"
+            : "bg-destructive/[0.04] border-destructive/15"
         )}>
           <div className={cn(
             "w-2 h-2 rounded-full shrink-0",
-            item.status === "good" ? "bg-green-400"
-              : item.status === "warn" ? "bg-amber-400"
-              : "bg-red-400"
+            item.status === "good" ? "bg-success"
+              : item.status === "warn" ? "bg-warning"
+              : "bg-destructive"
           )} />
           <div className="flex-1 min-w-0">
-            <div className="text-sm text-white/80">{item.label}</div>
-            <div className="text-[11px] text-white/30 mt-0.5">{item.note}</div>
+            <div className="text-sm text-foreground">{item.label}</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">{item.note}</div>
           </div>
           <div className={cn(
             "text-sm font-semibold shrink-0",
-            item.status === "good" ? "text-green-400"
-              : item.status === "warn" ? "text-amber-400"
-              : "text-red-400"
+            item.status === "good" ? "text-success"
+              : item.status === "warn" ? "text-warning"
+              : "text-destructive"
           )}>
             {item.value}
           </div>
@@ -433,25 +433,25 @@ export function PhotoSetViewer({
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center gap-4 px-6 py-4 border-b border-white/[0.06] bg-card/50 shrink-0">
+      <div className="flex items-center gap-4 px-6 py-4 border-b border-border bg-card/50 shrink-0">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="text-base font-semibold text-white truncate">{vehicleName}</h2>
+            <h2 className="text-base font-semibold text-foreground truncate">{vehicleName}</h2>
             {data?.vehicle.vin && (
-              <span className="text-[11px] text-white/30 font-mono shrink-0">{data.vehicle.vin}</span>
+              <span className="text-[11px] text-muted-foreground font-mono shrink-0">{data.vehicle.vin}</span>
             )}
             {data?.isActiveForMarketplace && (
-              <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20 shrink-0">
+              <span className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-success/15 text-success border border-success/20 shrink-0">
                 <Store className="w-3 h-3" />
                 Marketplace Ready
               </span>
             )}
           </div>
           {data?.summary && (
-            <div className="flex items-center gap-3 mt-1.5 text-[11px] text-white/30">
-              <span><span className="text-white/60 font-medium">{data.summary.exteriorCount}</span> exterior</span>
-              <span><span className="text-white/60 font-medium">{data.summary.interiorCount}</span> interior</span>
-              <span><span className="text-white/60 font-medium">{data.set?.processedPhotos ?? 0}</span> enhanced</span>
+            <div className="flex items-center gap-3 mt-1.5 text-[11px] text-muted-foreground">
+              <span><span className="text-muted-foreground font-medium">{data.summary.exteriorCount}</span> exterior</span>
+              <span><span className="text-muted-foreground font-medium">{data.summary.interiorCount}</span> interior</span>
+              <span><span className="text-muted-foreground font-medium">{data.set?.processedPhotos ?? 0}</span> enhanced</span>
             </div>
           )}
         </div>
@@ -473,7 +473,7 @@ export function PhotoSetViewer({
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 px-6 py-2 border-b border-white/[0.06] bg-card/30 shrink-0">
+      <div className="flex items-center gap-1 px-6 py-2 border-b border-border bg-card/30 shrink-0">
         {tabs.map((t) => {
           const Icon = t.icon;
           return (
@@ -483,8 +483,8 @@ export function PhotoSetViewer({
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
                 tab === t.id
-                  ? "bg-white/[0.08] text-white"
-                  : "text-white/40 hover:text-white/60 hover:bg-white/[0.04]",
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-muted-foreground hover:bg-muted",
               )}
             >
               <Icon className="w-3.5 h-3.5" />
@@ -498,12 +498,12 @@ export function PhotoSetViewer({
       <div className="flex-1 overflow-y-auto">
         {isLoading && (
           <div className="flex items-center justify-center py-24">
-            <Loader2 className="w-6 h-6 animate-spin text-white/30" />
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         )}
 
         {isError && (
-          <div className="flex items-center gap-2 text-sm text-red-400 py-20 justify-center">
+          <div className="flex items-center gap-2 text-sm text-destructive py-20 justify-center">
             <ImageOff className="w-4 h-4" />
             Failed to load photos.
           </div>
@@ -511,8 +511,8 @@ export function PhotoSetViewer({
 
         {data && !data.set && (
           <div className="flex flex-col items-center justify-center py-24 text-center space-y-3">
-            <LayoutGrid className="w-8 h-8 text-white/20" />
-            <p className="text-white/40 text-sm">No enhanced photos yet.</p>
+            <LayoutGrid className="w-8 h-8 text-muted-foreground" />
+            <p className="text-muted-foreground text-sm">No enhanced photos yet.</p>
             <Button size="sm" variant="outline" onClick={() => onReprocess(vehicleId)}>
               <Sparkles className="w-3.5 h-3.5 mr-1.5" />
               Enhance Photos
@@ -544,8 +544,8 @@ export function PhotoSetViewer({
 
       {/* Footer action bar */}
       {data?.set && (
-        <div className="flex items-center justify-between px-6 py-3 border-t border-white/[0.06] bg-card/30 shrink-0">
-          <div className="text-[11px] text-white/20">
+        <div className="flex items-center justify-between px-6 py-3 border-t border-border bg-card/30 shrink-0">
+          <div className="text-[11px] text-muted-foreground">
             {allImages.length} photo{allImages.length !== 1 ? "s" : ""} · {exteriorImages.length} exterior enhanced
           </div>
           <Button variant="outline" size="sm" className="h-7 text-xs" disabled>
