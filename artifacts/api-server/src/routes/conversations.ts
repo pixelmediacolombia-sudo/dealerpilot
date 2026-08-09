@@ -296,6 +296,7 @@ type SalesReplyStage =
   | "financing_intro"
   | "financing_declined"
   | "cash_visit_request_phone"
+  | "urgent_vehicle_request_phone"
   | "request_phone"
   | "phone_received"
   | "address_request"
@@ -394,6 +395,25 @@ function buyerAskedAdvisorQuestion(latest: string): boolean {
     /^(?:what|how|when|where|why|can|could|do|does|did|is|are|will|would|cu[aá]l|c[oó]mo|cu[aá]ndo|d[oó]nde|por qu[eé]|puede|pueden|tiene|tienen|hay|es|est[aá])\b/i.test(latest);
 }
 
+function hasPersistentUnansweredBuyerTurns(
+  visibleMessages: string[],
+  currentMessage: string,
+): boolean {
+  const parsed = visibleMessages
+    .slice(-12)
+    .map(parseConversationMessage)
+    .filter((message): message is ParsedConversationMessage => message !== null);
+  const current = parseConversationMessage(`Buyer: ${currentMessage}`);
+  const chronological = mergeCurrentConversationMessage(parsed, current);
+  const consecutiveBuyerMessages: ParsedConversationMessage[] = [];
+  for (let index = chronological.length - 1; index >= 0; index -= 1) {
+    const message = chronological[index];
+    if (message.role === "assistant") break;
+    consecutiveBuyerMessages.unshift(message);
+  }
+  return consecutiveBuyerMessages.length >= 3;
+}
+
 function isTerminalBuyerAcknowledgement(value: string): boolean {
   const normalized = cleanConversationText(value)
     .normalize("NFD")
@@ -417,7 +437,9 @@ function replyIncludesStorePhone(reply: string, storePhone: string): boolean {
 }
 
 function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
-  return stage === "request_phone" || stage === "cash_visit_request_phone";
+  return stage === "request_phone" ||
+    stage === "cash_visit_request_phone" ||
+    stage === "urgent_vehicle_request_phone";
 }
 
 function historyHasDealerReply(visibleMessages: string[]): boolean {
@@ -525,6 +547,9 @@ function buildSafeFallbackReply(
     if (stage === "cash_visit_request_phone") {
       return `Perfecto. Cual es el mejor numero de telefono para coordinar la visita o la compra del ${vehicle}? Tambien puedes llamarnos al ${storePhone}.`;
     }
+    if (stage === "urgent_vehicle_request_phone") {
+      return `Con gusto te ayudamos de inmediato con el ${vehicle}. Cual es el mejor numero de telefono para comunicarnos contigo? Tambien puedes llamarnos al ${storePhone}.`;
+    }
     if (stage === "availability") {
       return availabilityQuickReplyAccepted
         ? `Hola, somos Alpha Motorsports. Tenemos el ${vehicle} disponible. ¿Estás interesado en financiarlo?`
@@ -570,6 +595,9 @@ function buildSafeFallbackReply(
   }
   if (stage === "cash_visit_request_phone") {
     return `Great. What's the best phone number to coordinate a visit or cash purchase for the ${vehicle}? You can also call us at ${storePhone}.`;
+  }
+  if (stage === "urgent_vehicle_request_phone") {
+    return `We can help you right away with the ${vehicle}. What's the best phone number to reach you? You can also call us at ${storePhone}.`;
   }
   if (stage === "availability") {
     return availabilityQuickReplyAccepted
@@ -646,6 +674,10 @@ function isAiReplyAligned(
   }
   if (stage === "request_phone") {
     return /phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
+  }
+  if (stage === "urgent_vehicle_request_phone") {
+    return /phone|number|telefono|numero/.test(normalizeIntentText(reply)) &&
+      !/financing requirements|requisitos de financiamiento|bank account|cuenta bancaria|passport|pasaporte|tax\s*id/.test(normalized);
   }
   if (stage === "cash_visit_request_phone") {
     return /phone|number|telefono|numero/.test(normalized) &&
@@ -767,6 +799,7 @@ const SALES_REPLY_STAGES: readonly SalesReplyStage[] = [
   "financing_intro",
   "financing_declined",
   "cash_visit_request_phone",
+  "urgent_vehicle_request_phone",
   "request_phone",
   "phone_received",
   "address_request",
@@ -782,7 +815,14 @@ function isSalesReplyStage(value: unknown): value is SalesReplyStage {
   return typeof value === "string" && (SALES_REPLY_STAGES as readonly string[]).includes(value);
 }
 
-function parseStructuredReply(content: unknown): { intent?: string; reply?: string } | null {
+type StructuredSalesReply = {
+  intent?: string;
+  urgency?: "high" | "normal";
+  vehicleIntent?: "strong" | "unclear";
+  reply?: string;
+};
+
+function parseStructuredReply(content: unknown): StructuredSalesReply | null {
   const text = typeof content === "string" ? content.trim() : "";
   if (!text) return null;
   const jsonText = text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\s*```$/i, "").trim();
@@ -795,14 +835,18 @@ function parseStructuredReply(content: unknown): { intent?: string; reply?: stri
   return extractStructuredReply(jsonText);
 }
 
-function extractStructuredReply(jsonText: string): { intent?: string; reply?: string } | null {
+function extractStructuredReply(jsonText: string): StructuredSalesReply | null {
   try {
     const parsed = JSON.parse(jsonText) as unknown;
     if (!parsed || typeof parsed !== "object") return null;
     const intent = (parsed as Record<string, unknown>).intent;
+    const urgency = (parsed as Record<string, unknown>).urgency;
+    const vehicleIntent = (parsed as Record<string, unknown>).vehicleIntent;
     const reply = (parsed as Record<string, unknown>).reply;
     return {
       intent: typeof intent === "string" && intent.trim() ? intent.trim() : undefined,
+      urgency: urgency === "high" || urgency === "normal" ? urgency : undefined,
+      vehicleIntent: vehicleIntent === "strong" || vehicleIntent === "unclear" ? vehicleIntent : undefined,
       reply: typeof reply === "string" && reply.trim() ? reply.trim() : undefined,
     };
   } catch {
@@ -816,6 +860,7 @@ You are a warm, helpful, and professional sales representative speaking directly
 CONVERSATION FUNNEL:
 1. Initial availability inquiry: greet with "Hello, this is Alpha Motorsports" / "Hola, somos Alpha Motorsports", explicitly confirm that the specific vehicle from the Vehicle field is available, then ask whether the buyer is interested in financing it. Always name the year, make, and model. Do not ask for a phone number.
 1a. If the buyer asks whether there are more vehicles, other options, similar vehicles, or "only that one", confirm that Alpha Motorsports has more vehicles available, then continue the flow by asking whether they are interested in financing this vehicle or seeing similar options. Do not ask for requirements yet.
+1b. Urgent vehicle-intent exception: read the full recent conversation with careful human judgment. Use urgent_vehicle_request_phone only when the buyer has sent several consecutive unanswered messages, shows unmistakably high urgency, and shows strong concrete intent to acquire or act on this vehicle, such as buying it, coming today or tomorrow, scheduling, visiting, or test driving. Mere repetition, impatience, curiosity, a price question, or one emotional phrase is not enough. When all signals are present, skip the normal funnel and ask for the best phone number immediately; include Alpha's dealership phone. Do not mention financing requirements.
 2. If the buyer says they are interested in financing, do not ask for the phone number yet. Explain the basic requirements: ID and active bank account; passport or Tax ID works. Ask if they have those requirements.
 2a. If the buyer declines financing or says they do not need financing, do not ask about financing again and do not explain requirements. Thank them, ask whether they plan to purchase cash or would like to come see the vehicle, then continue by collecting a phone number if they say yes.
 3. If the buyer asks what requirements/documents are needed to apply, answer the requirements first: ID and active bank account; passport or Tax ID works. Ask if they have those requirements. Do not ask for a phone number in this same reply.
@@ -844,10 +889,11 @@ Language rules:
 - Use "easy financing options" / "opciones de financiamiento fáciles"
 - Use "approval based on qualification" / "aprobación basada en calificación"
 - Do not use the words "advisor" or "asesor". Use "our team" / "nuestro equipo".
-- Do not push a call, ask for a phone number, or include the store phone in the first reply
+- Do not push a call, ask for a phone number, or include the store phone in the first reply, except when the confirmed stage is urgent_vehicle_request_phone
 - Never ask for the "best phone number so we can help you" in response to a vehicle-detail or warranty question; return to the next sequential funnel step instead
 - Do not ask for a phone number in the same reply that first explains the financing requirements
 - If the current stage is request_phone, ask for the buyer's phone number and include Alpha's dealership phone as an immediate call option
+- If the current stage is urgent_vehicle_request_phone, ask for the buyer's phone number immediately, include Alpha's dealership phone, and do not mention financing requirements
 - NEVER say: guaranteed approval, everyone approved, bad credit, denied, rejected, disqualified
 - NEVER promise a loan or specific rate
 - NEVER invent price, down payment, vehicle history, or financing terms
@@ -928,6 +974,10 @@ export async function generateAiReply(
   const history = visibleMessages.slice(-8).join("\n");
 
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage);
+  const persistentUnansweredBuyerTurns = hasPersistentUnansweredBuyerTurns(
+    visibleMessages,
+    currentMessage,
+  );
   const firstDealerReply = isFirstDealerReply(visibleMessages);
   const promptStage = stage === "advisor_question" ? "detailed_question" : stage;
   const stageInstruction = {
@@ -938,6 +988,7 @@ export async function generateAiReply(
     financing_intro: "The buyer is interested in financing. Do not ask for a phone number yet. Explain the basic requirements: ID and an active bank account; passport or Tax ID works. Ask if they have those requirements.",
     financing_declined: "The buyer declined financing. Do not ask about financing again and do not explain financing requirements. Thank them, then ask whether they plan to purchase cash or would like to come see the vehicle.",
     cash_visit_request_phone: `The buyer is continuing without financing. Ask for the buyer's best phone number to coordinate a visit or cash purchase. Include Alpha's dealership phone as an immediate call option: ${storePhone}. Do not mention financing.`,
+    urgent_vehicle_request_phone: `The buyer has sent several consecutive messages, is explicitly pressing for an answer, and has shown strong intent to buy, visit, schedule, or test drive. Skip the normal funnel. Ask for the buyer's best phone number immediately and include Alpha's dealership phone: ${storePhone}. Do not mention financing requirements.`,
     request_phone: `Ask for the buyer's best phone number so we can help them. End with Alpha's dealership phone as an immediate call option: ${storePhone}.`,
     phone_received: `A phone number was provided. Thank the buyer warmly, say "we will contact you shortly," and optionally offer ${storePhone} as an immediate call option. Do not transfer them to or mention a separate sales team.`,
     address_request: `The buyer is asking for the address or directions. Provide the dealership address and invite them to visit, then ask whether they are interested in financing. Do NOT ask clarifying questions.`,
@@ -956,6 +1007,7 @@ ${locationContext}
 ${phoneContext}
 Current funnel stage: ${promptStage}
 Stage instruction: ${stageInstruction}
+Urgent-intent eligibility: ${persistentUnansweredBuyerTurns ? "The deterministic history check found at least three consecutive unanswered buyer messages. Evaluate urgency and concrete vehicle intent carefully; use urgent_vehicle_request_phone only if both are genuinely high/strong." : "Not eligible for urgent_vehicle_request_phone because fewer than three consecutive unanswered buyer messages were found. Keep urgency normal and do not choose the urgent stage."}
 First reply instruction: ${firstDealerReply ? "This is Alpha Motorsports' first reply in this conversation. Start with a warm greeting as Alpha Motorsports." : "This is not the first Alpha Motorsports reply; do not restart the greeting unless it sounds natural."}
 
 Recent conversation:
@@ -964,9 +1016,10 @@ ${history}
 Latest buyer message: "${currentMessage}"
 
 ${langNote}
-Respond with a single JSON object, no markdown, with exactly two keys:
-{"intent": "the sales funnel stage that best matches this buyer message", "reply": "your reply"}
-Valid intent values: availability, price_inquiry, financing_intro, financing_declined, cash_visit_request_phone, request_phone, phone_received, address_request, inventory_options, document_requirements, clean_title, warranty_info, advisor_question, general.
+Respond with a single JSON object, no markdown, with exactly four keys:
+{"intent": "the sales funnel stage that best matches the conversation", "urgency": "high or normal", "vehicleIntent": "strong or unclear", "reply": "your reply"}
+Valid intent values: availability, price_inquiry, financing_intro, financing_declined, cash_visit_request_phone, urgent_vehicle_request_phone, request_phone, phone_received, address_request, inventory_options, document_requirements, clean_title, warranty_info, advisor_question, general.
+Choose urgent_vehicle_request_phone only when Urgent-intent eligibility allows it, urgency is high, and vehicleIntent is strong. Otherwise follow the supplied Current funnel stage and Stage instruction.
 The "reply" must be one short message that follows the stage instruction exactly, mentions the vehicle naturally, and mirrors the buyer's language.`;
 
   const response = await openai.chat.completions.create({
@@ -980,8 +1033,15 @@ The "reply" must be one short message that follows the stage instruction exactly
   const structured = parseStructuredReply(raw);
   const candidateReply = (structured?.reply ?? raw ?? "").trim();
   const ambiguousStage = stage === "general" || stage === "advisor_question";
+  const modelConfirmedUrgentVehicleIntent =
+    persistentUnansweredBuyerTurns &&
+    structured?.intent === "urgent_vehicle_request_phone" &&
+    structured.urgency === "high" &&
+    structured.vehicleIntent === "strong";
   const candidateStage =
-    structured?.intent && isSalesReplyStage(structured.intent) && ambiguousStage
+    modelConfirmedUrgentVehicleIntent
+      ? "urgent_vehicle_request_phone"
+      : structured?.intent && isSalesReplyStage(structured.intent) && ambiguousStage
       ? structured.intent
       : stage;
 
