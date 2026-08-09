@@ -8,6 +8,7 @@
   const OWN_REPLY_GUARD_MS = 120000;
   const SEND_EVIDENCE_TIMEOUT_MS = 8000;
   const SEND_EVIDENCE_INTERVAL_MS = 300;
+  const MAX_IDENTICAL_BUYER_QUESTION_OCCURRENCES = 10;
   const DEFAULT_STORE_PHONE = "+1 703-763-4675";
   const PENDING_BUYER_STORE_KEY = "dealerpilotMessengerPendingBuyerByThreadV1";
 
@@ -407,9 +408,23 @@
     };
   }
 
-  function deliveryIsVisible(reply, messages = []) {
+  function deliveryIsVisible(reply, messages = [], currentMessage = "") {
     const expected = normalizeLanguageText(reply);
-    return messages.some((message) => {
+    let relevantMessages = messages;
+    const expectedBuyerMessage = cleanText(currentMessage);
+    if (expectedBuyerMessage) {
+      let buyerIndex = -1;
+      for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index];
+        if (message?.speaker !== "Dealer" && cleanText(message?.text || "") === expectedBuyerMessage) {
+          buyerIndex = index;
+          break;
+        }
+      }
+      if (buyerIndex < 0) return false;
+      relevantMessages = messages.slice(buyerIndex + 1);
+    }
+    return relevantMessages.some((message) => {
       if (message.speaker !== "Dealer") return false;
       const actual = normalizeLanguageText(message.text);
       return actual === expected || actual.includes(expected) || expected.includes(actual);
@@ -794,7 +809,10 @@
     const autoActionKey = JSON.stringify({
       thread: externalThreadRef,
       currentMessage,
-      currentBuyerMessageOccurrence,
+      currentBuyerMessageOccurrence: Math.min(
+        currentBuyerMessageOccurrence,
+        MAX_IDENTICAL_BUYER_QUESTION_OCCURRENCES,
+      ),
     });
     return {
       externalThreadRef,
@@ -816,6 +834,7 @@
       detectedMarketplaceListingUrl: snapshot.context.listingUrl || undefined,
       messageHash: captureHash,
       autoActionKey,
+      currentBuyerMessageOccurrence,
       idempotencyKey: captureHash,
     };
   }
@@ -888,7 +907,7 @@
       );
       liveComposer = findComposer(snapshot.root) || inserted.box;
       liveMessages = Array.isArray(liveCapture?.messages) ? liveCapture.messages : snapshot.messages;
-      delivered = deliveryIsVisible(reply, liveMessages) ||
+      delivered = deliveryIsVisible(reply, liveMessages, payload?.currentMessage || "") ||
         ((inserted.reusedExistingDraft === true || sendResult.composerWriteConfirmed === true) &&
           !readComposerText(liveComposer));
       if (delivered) break;
@@ -1022,6 +1041,10 @@
 
     if (automatic) {
       const autoActionKey = payload.autoActionKey || payload.messageHash;
+      if (payload.currentBuyerMessageOccurrence > MAX_IDENTICAL_BUYER_QUESTION_OCCURRENCES) {
+        await sendDebug("blocked", { ...debug, reason: "repeated_question_limit_exceeded" });
+        return { skipped: true, reason: "repeated_question_limit_exceeded" };
+      }
       if (autoActionKey === lastAutoSendHashByThread.get(threadKey)) {
         await sendDebug("blocked", { ...debug, reason: "duplicate_auto_send_hash" });
         return { skipped: true, reason: "duplicate_auto_send_hash" };
@@ -1116,7 +1139,7 @@
     }
     lastSuggestedReplyByThread.set(threadKey, lastSuggestedReply);
 
-    if (lastSuggestedReply && deliveryIsVisible(lastSuggestedReply, snapshot.messages)) {
+    if (lastSuggestedReply && deliveryIsVisible(lastSuggestedReply, snapshot.messages, payload.currentMessage)) {
       const autoActionKey = payload.autoActionKey || payload.messageHash;
       lastAutoSendHashByThread.set(threadKey, autoActionKey);
       lastAutoReplyByThread.set(threadKey, { text: cleanText(lastSuggestedReply), at: Date.now() });
@@ -1144,7 +1167,14 @@
       return { ok: true, suggestedReply: lastSuggestedReply, autoSent: false, reason: "auto_reply_disabled" };
     }
 
-    if (lastSuggestedReply && replyRepeatsConversation(lastSuggestedReply, snapshot.messages, payload.currentMessage)) {
+    const repeatedBuyerQuestionWithinLimit =
+      payload.currentBuyerMessageOccurrence > 1 &&
+      payload.currentBuyerMessageOccurrence <= MAX_IDENTICAL_BUYER_QUESTION_OCCURRENCES;
+    if (
+      lastSuggestedReply &&
+      !repeatedBuyerQuestionWithinLimit &&
+      replyRepeatsConversation(lastSuggestedReply, snapshot.messages, payload.currentMessage)
+    ) {
       lastAutoSendHashByThread.set(threadKey, payload.autoActionKey || payload.messageHash);
       await sendDebug("auto_send_blocked", {
         ...debug,

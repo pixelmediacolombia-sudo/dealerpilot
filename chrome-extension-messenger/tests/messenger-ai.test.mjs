@@ -1140,6 +1140,58 @@ test("buyer repeating the same question is processed again instead of duplicate_
   assert.equal(resent.deliveryConfirmed, true);
 });
 
+test("the same buyer question is processed up to ten occurrences and the eleventh is blocked", async () => {
+  const question = "Please answer, I want to know where I can test drive it.";
+  const messages = [{ speaker: "Virginia", text: question }];
+  const { ai, calls, setNow } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages,
+    sendSucceeds: true,
+    nowMs: 100000,
+  });
+
+  for (let occurrence = 1; occurrence <= 10; occurrence += 1) {
+    const waiting = await ai.captureConversation({ automatic: true });
+    assert.equal(waiting.reason, "waiting_quiet_window");
+    setNow(100000 + occurrence * 8000);
+    const sent = await ai.captureConversation({ automatic: true });
+    assert.equal(sent.autoSent, true);
+    if (occurrence < 10) messages.push({ speaker: "Virginia", text: question });
+  }
+
+  messages.push({ speaker: "Virginia", text: question });
+  const blocked = await ai.captureConversation({ automatic: true });
+
+  assert.equal(calls.intake.length, 10);
+  assert.equal(blocked.skipped, true);
+  assert.equal(blocked.reason, "repeated_question_limit_exceeded");
+  assert.equal(calls.debug.at(-1).stage, "blocked");
+});
+
+test("a repeated buyer question may receive the same reply again when the old reply predates it", async () => {
+  const question = "Please answer, I want to know where I can test drive it.";
+  const suggestedReply =
+    "I can help right away. What's the best phone number to reach you? You can also call us at +1 703-763-4675.";
+  const messages = [
+    { speaker: "Virginia", text: question },
+    { speaker: "Dealer", text: suggestedReply },
+    { speaker: "Virginia", text: question },
+  ];
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages,
+    intakeResponse: { ok: true, data: { suggestedReply, deliveryRetry: true } },
+    sendSucceeds: true,
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, true);
+  assert.notEqual(result.reason, "reply_already_delivered");
+  assert.equal(result.deliveryConfirmed, true);
+});
+
 test("quiet-window state survives a Messenger page reload before intake", async () => {
   const sessionStore = {};
   const sessionStorageRef = {
