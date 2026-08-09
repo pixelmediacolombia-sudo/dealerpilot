@@ -2431,7 +2431,7 @@ components:
     Vehicle:
       type: object
       required:
-        [id, dealerId, vin, year, make, model, status, imageCount, createdAt, updatedAt]
+        [id, dealerId, vin, year, make, model, status, imageCount, marketplaceListingUrl, marketplaceListingStatus, marketplaceRemovalRequired, createdAt, updatedAt]
       properties:
         id: { type: integer }
         dealerId: { type: integer }
@@ -2453,6 +2453,15 @@ components:
         status: { type: string }
         primaryImageUrl: { type: ["string", "null"] }
         imageCount: { type: integer }
+        marketplaceListingUrl:
+          type: ["string", "null"]
+          description: Facebook Marketplace listing URL previously captured for this vehicle.
+        marketplaceListingStatus:
+          type: ["string", "null"]
+          description: DealerPilot's current Marketplace lifecycle status for this vehicle.
+        marketplaceRemovalRequired:
+          type: boolean
+          description: True when the vehicle is sold and its captured Marketplace listing still requires removal.
         lastSyncAt: { type: ["string", "null"] }
         createdAt: { type: string }
         updatedAt: { type: string }

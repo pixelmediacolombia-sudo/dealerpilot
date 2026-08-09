@@ -19,6 +19,7 @@ function toVehicle(
   v: Vehicle,
   primaryImageUrl: string | null,
   imageCount: number,
+  marketplaceListing?: { listingUrl: string | null; status: string } | null,
 ) {
   return {
     id: v.id,
@@ -42,6 +43,12 @@ function toVehicle(
     status: v.status,
     primaryImageUrl,
     imageCount,
+    marketplaceListingUrl: marketplaceListing?.listingUrl ?? null,
+    marketplaceListingStatus: marketplaceListing?.status ?? null,
+    marketplaceRemovalRequired:
+      v.status === "Sold/Removed" &&
+      marketplaceListing?.status === "Sold" &&
+      Boolean(marketplaceListing.listingUrl),
     lastSyncAt: v.lastSyncAt ? v.lastSyncAt.toISOString() : null,
     createdAt: v.createdAt.toISOString(),
     updatedAt: v.updatedAt.toISOString(),
@@ -51,19 +58,37 @@ function toVehicle(
 async function attachImages(vehicles: Vehicle[]) {
   if (vehicles.length === 0) return [];
   const ids = vehicles.map((v) => v.id);
-  const images = await db
-    .select()
-    .from(vehicleImagesTable)
-    .where(inArray(vehicleImagesTable.vehicleId, ids));
+  const [images, marketplaceListings] = await Promise.all([
+    db
+      .select()
+      .from(vehicleImagesTable)
+      .where(inArray(vehicleImagesTable.vehicleId, ids)),
+    db
+      .select({
+        vehicleId: marketplaceListingsTable.vehicleId,
+        listingUrl: marketplaceListingsTable.listingUrl,
+        status: marketplaceListingsTable.status,
+      })
+      .from(marketplaceListingsTable)
+      .where(inArray(marketplaceListingsTable.vehicleId, ids)),
+  ]);
   const byVehicle = new Map<number, { url: string; position: number }[]>();
   for (const im of images) {
     const list = byVehicle.get(im.vehicleId) ?? [];
     list.push({ url: im.url, position: im.position });
     byVehicle.set(im.vehicleId, list);
   }
+  const marketplaceByVehicle = new Map(
+    marketplaceListings.map((listing) => [listing.vehicleId, listing]),
+  );
   return vehicles.map((v) => {
     const list = (byVehicle.get(v.id) ?? []).sort((a, b) => a.position - b.position);
-    return toVehicle(v, list[0]?.url ?? null, list.length);
+    return toVehicle(
+      v,
+      list[0]?.url ?? null,
+      list.length,
+      marketplaceByVehicle.get(v.id),
+    );
   });
 }
 

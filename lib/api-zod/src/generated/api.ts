@@ -442,6 +442,9 @@ export const ListVehiclesResponse = zod.object({
   "status": zod.string(),
   "primaryImageUrl": zod.string().nullish(),
   "imageCount": zod.number(),
+  "marketplaceListingUrl": zod.string().nullable(),
+  "marketplaceListingStatus": zod.string().nullable(),
+  "marketplaceRemovalRequired": zod.boolean(),
   "lastSyncAt": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -497,6 +500,9 @@ export const GetVehicleResponse = zod.object({
   "status": zod.string(),
   "primaryImageUrl": zod.string().nullish(),
   "imageCount": zod.number(),
+  "marketplaceListingUrl": zod.string().nullable(),
+  "marketplaceListingStatus": zod.string().nullable(),
+  "marketplaceRemovalRequired": zod.boolean(),
   "lastSyncAt": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -555,6 +561,9 @@ export const UpdateVehicleStatusResponse = zod.object({
   "status": zod.string(),
   "primaryImageUrl": zod.string().nullish(),
   "imageCount": zod.number(),
+  "marketplaceListingUrl": zod.string().nullable(),
+  "marketplaceListingStatus": zod.string().nullable(),
+  "marketplaceRemovalRequired": zod.boolean(),
   "lastSyncAt": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -886,6 +895,9 @@ export const GetListingDetailResponse = zod.object({
   "status": zod.string(),
   "primaryImageUrl": zod.string().nullish(),
   "imageCount": zod.number(),
+  "marketplaceListingUrl": zod.string().nullable(),
+  "marketplaceListingStatus": zod.string().nullable(),
+  "marketplaceRemovalRequired": zod.boolean(),
   "lastSyncAt": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()

@@ -239,6 +239,11 @@ export interface Vehicle {
   primaryImageUrl?: string | null;
   imageCount: number;
   /** @nullable */
+  marketplaceListingUrl: string | null;
+  /** @nullable */
+  marketplaceListingStatus: string | null;
+  marketplaceRemovalRequired: boolean;
+  /** @nullable */
   lastSyncAt?: string | null;
   createdAt: string;
   updatedAt: string;
