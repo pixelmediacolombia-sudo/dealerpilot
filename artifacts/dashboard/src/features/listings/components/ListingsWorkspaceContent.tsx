@@ -991,7 +991,7 @@ export function ListingsWorkspace() {
                         <div className="w-[140px] flex-shrink-0 flex items-center justify-end gap-1.5">
                           <Button
                             size="sm"
-                            className="h-7 px-2 text-xs gap-1 bg-success hover:bg-success/90 text-foreground whitespace-nowrap font-bold  tracking-wide"
+                            className="h-7 px-2 text-xs gap-1 bg-success hover:bg-success/90 text-white whitespace-nowrap font-bold tracking-wide"
                             onClick={(e) => { e.stopPropagation(); setPublishNowVehicleId(w.vehicleId); }}
                           >
                             <UploadCloud className="w-3 h-3" />
@@ -1181,7 +1181,7 @@ export function ListingsWorkspace() {
                             e.stopPropagation();
                             setPublishNowVehicleId(w.vehicleId);
                           }}
-                          className="absolute bottom-[72px] right-6 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success/90 hover:bg-success text-foreground text-xs font-bold  tracking-wide shadow-lg transition duration-150 border border-success/50"
+                          className="absolute bottom-[72px] right-6 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success/90 hover:bg-success text-white text-xs font-bold tracking-wide shadow-lg transition duration-150 border border-success/50"
                         >
                           <UploadCloud className="w-3.5 h-3.5" />
                           Publish Now

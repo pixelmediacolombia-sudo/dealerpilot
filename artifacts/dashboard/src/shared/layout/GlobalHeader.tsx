@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useDealerLocation, type DealerLocation } from "@/context/LocationContext";
+import { AccountMenu } from "@/app/AuthGate";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -224,6 +225,8 @@ export function GlobalHeader() {
 
       {/* Connect button — only when not ready */}
       <ThemeToggle />
+
+      <AccountMenu />
 
       {conn.needsConnect && (
         <>

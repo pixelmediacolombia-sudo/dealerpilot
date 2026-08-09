@@ -171,7 +171,7 @@ function RecRow({
           </button>
           <Button
             size="sm"
-            className="h-7 px-2.5 gap-1 bg-success hover:bg-success/90 text-foreground text-xs font-bold  tracking-wide whitespace-nowrap"
+            className="h-7 px-2.5 gap-1 bg-success hover:bg-success/90 text-white text-xs font-bold tracking-wide whitespace-nowrap"
             disabled={isPublishing}
             onClick={() => onPublish(rec.vehicleId)}
           >
@@ -319,7 +319,7 @@ export function DailyOperatorPanel({
         {canBatch && (
           <Button
             size="sm"
-            className="h-7 px-2.5 gap-1.5 bg-primary hover:bg-primary/90 text-foreground text-xs font-bold  tracking-wide whitespace-nowrap flex-shrink-0"
+            className="h-7 px-2.5 gap-1.5 bg-primary hover:bg-primary/90 text-white text-xs font-bold tracking-wide whitespace-nowrap flex-shrink-0"
             onClick={() => onPublishBatch!(plan.recommendedToday.slice(0, 3).map((r) => r.vehicleId))}
           >
             <PlayCircle className="w-3 h-3" />

@@ -1,6 +1,14 @@
-import { FormEvent, useEffect, useState, type ReactNode } from "react";
-import { KeyRound, Loader2, LogOut } from "lucide-react";
+import { createContext, FormEvent, useContext, useEffect, useState, type ReactNode } from "react";
+import { ChevronDown, KeyRound, Loader2, LogOut, UserRound } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
 import { Input } from "@/shared/ui/input";
 
 const TOKEN_KEY = "dealerpilot.sessionToken";
@@ -11,6 +19,53 @@ interface AuthUser {
   username: string;
   displayName: string;
   role: string;
+}
+
+interface AccountMenuContextValue {
+  user: AuthUser;
+  openPasswordPanel: () => void;
+  logout: () => void;
+}
+
+const AccountMenuContext = createContext<AccountMenuContextValue | null>(null);
+
+export function AccountMenu() {
+  const account = useContext(AccountMenuContext);
+
+  if (!account) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-10 max-w-[220px] items-center gap-2 rounded-lg border border-border bg-card px-2.5 text-xs font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+          aria-label={`Open account menu for ${account.user.displayName}`}
+        >
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <UserRound className="h-3.5 w-3.5" />
+          </span>
+          <span className="hidden min-w-0 truncate lg:inline">{account.user.displayName}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={8} className="w-56 p-1.5">
+        <DropdownMenuLabel className="px-2 py-2">
+          <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Account</span>
+          <span className="mt-1 block truncate text-sm text-foreground">{account.user.displayName}</span>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="cursor-pointer py-2" onSelect={account.openPasswordPanel}>
+          <KeyRound className="h-4 w-4" />
+          Change password
+        </DropdownMenuItem>
+        <DropdownMenuItem className="cursor-pointer py-2 text-destructive focus:text-destructive" onSelect={account.logout}>
+          <LogOut className="h-4 w-4" />
+          Log out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 async function authFetch(path: string, token?: string, init?: RequestInit) {
@@ -259,36 +314,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <>
-      <div className="fixed right-2 top-2 z-50 flex items-center gap-1.5 rounded-lg border border-border bg-card/95 p-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur sm:right-4">
-        <span className="hidden max-w-[160px] truncate px-1.5 font-medium text-foreground lg:inline">
-          {user.displayName}
-        </span>
-        <button
-          type="button"
-          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-accent"
-          title="Change password"
-          aria-label="Change password"
-          onClick={() => setChangingPassword(true)}
-        >
-          <KeyRound className="w-3.5 h-3.5" />
-          Password
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-accent"
-          title="Log out"
-          aria-label="Log out and remove access token"
-          onClick={handleLogout}
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          Log out
-        </button>
-      </div>
+    <AccountMenuContext.Provider value={{ user, openPasswordPanel: () => setChangingPassword(true), logout: handleLogout }}>
       {changingPassword && token ? (
         <ChangePasswordPanel token={token} onClose={() => setChangingPassword(false)} onChanged={clearSession} />
       ) : null}
       {children}
-    </>
+    </AccountMenuContext.Provider>
   );
 }
