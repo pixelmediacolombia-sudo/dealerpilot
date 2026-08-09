@@ -61,21 +61,30 @@ const sections = [
 const assistants = [
   {
     label: "PUBLICACIÓN",
-    title: "Publicador de Marketplace",
-    text: "Toma un vehículo aprobado, prepara sus fotos y datos, y acompaña al operador hasta dejar el anuncio publicado.",
-    guardrail: "El dealer conserva la revisión y el control final.",
+    title: "DealerPilot AI Publisher",
+    plainName: "Publicador de Marketplace",
+    where: "Facebook Marketplace del vendedor",
+    text: "Toma de la cola un vehículo aprobado, abre el formulario de Marketplace, carga las fotos y completa los datos del anuncio.",
+    steps: ["Recibe el vehículo listo", "Completa fotos y datos", "Continúa según el modo elegido"],
+    guardrail: "Se detiene ante inicios de sesión, verificaciones o bloqueos de Facebook. El dealer define el nivel de automatización.",
   },
   {
     label: "COMPRADORES",
-    title: "Asistente de mensajes",
-    text: "Reconoce conversaciones de compradores y propone respuestas usando la información real del vehículo y del dealer.",
-    guardrail: "Solo responde automáticamente cuando el dealer lo habilita.",
+    title: "DealerPilot Messenger AI",
+    plainName: "Asistente de mensajes",
+    where: "Conversaciones de Facebook Marketplace",
+    text: "Identifica al comprador, el vehículo y la intención del mensaje. Luego prepara una respuesta usando los datos reales del inventario y del dealer.",
+    steps: ["Detecta la conversación", "Propone una respuesta", "Registra el seguimiento"],
+    guardrail: "Puede dejar la respuesta para revisión o enviarla cuando la respuesta automática está habilitada.",
   },
   {
     label: "MARCA",
-    title: "Publicador de la página del dealer",
-    text: "Prepara publicaciones para la página comercial del dealer a partir del mismo inventario, con una revisión humana antes de salir.",
-    guardrail: "La página comercial se mantiene separada de Marketplace.",
+    title: "DealerPilot Alpha Page Publisher",
+    plainName: "Publicador de la página comercial",
+    where: "Meta Business Suite",
+    text: "Convierte un vehículo del inventario en un borrador para la página comercial, con texto y hasta diez fotos preparados.",
+    steps: ["Elige el vehículo", "Prepara texto y fotos", "El equipo revisa y publica"],
+    guardrail: "La publicación final siempre es humana y esta página se mantiene separada del Marketplace personal del vendedor.",
   },
 ];
 
@@ -94,14 +103,13 @@ export default function Home() {
           <span>DealerPilot</span>
         </a>
         <div className="navLinks">
-          <a href="#como-ayuda">Cómo ayuda</a>
-          <a href="#incluye">Qué incluye</a>
-          <a href="#herramientas">Herramientas</a>
+          <a href="#como-ayuda">Cómo funciona</a>
+          <a href="#incluye">Secciones</a>
+          <a href="#herramientas">Extensiones</a>
         </div>
         <div className="languageSwitch" aria-label="Cambiar idioma">
           <a href="/en" lang="en">EN</a><span>/</span><a href="/" className="active" aria-current="page">ES</a>
         </div>
-        <a className="navCta" href="#demo">Solicitar demo</a>
       </nav>
 
       <section className="hero section" id="inicio">
@@ -109,11 +117,11 @@ export default function Home() {
           <p className="eyebrow"><span /> Para dealers de vehículos</p>
           <h1>Tu operación de ventas, en un solo lugar.</h1>
           <p className="heroLead">
-            DealerPilot ayuda a tu equipo a organizar el inventario, preparar anuncios, atender compradores y dar seguimiento sin depender de hojas sueltas ni procesos repetitivos.
+            DealerPilot conecta el inventario, las publicaciones y las conversaciones con compradores. Tu equipo ve qué vehículo necesita atención, qué se puede publicar y cuál es el siguiente paso para avanzar una venta.
           </p>
           <div className="heroActions">
-            <a className="primaryButton" href="#demo">Quiero ver una demostración <span aria-hidden="true">→</span></a>
-            <a className="textLink" href="#como-ayuda">Conocer el flujo diario <span aria-hidden="true">↓</span></a>
+            <a className="primaryButton" href="#como-ayuda">Ver cómo funciona <span aria-hidden="true">→</span></a>
+            <a className="textLink" href="#herramientas">Conocer las 3 extensiones <span aria-hidden="true">→</span></a>
           </div>
           <p className="quietNote">Pensado para el ritmo real de un dealer independiente.</p>
         </div>
@@ -155,15 +163,17 @@ export default function Home() {
       <section className="section flowSection" id="como-ayuda">
         <header className="sectionHeading">
           <p className="eyebrow"><span /> Un día con DealerPilot</p>
-          <h2>Del inventario a la conversación, sin perder el hilo.</h2>
-          <p>Cada parte del trabajo se conecta con la siguiente para que el equipo sepa qué hacer y por qué.</p>
+          <h2>Así acompaña DealerPilot una venta, de principio a fin.</h2>
+          <p>El sistema convierte el inventario en tareas concretas y mantiene conectados al vehículo, la publicación y el comprador.</p>
         </header>
         <div className="flowGrid">
           {[
-            ["1", "Entra el inventario", "DealerPilot reúne la información y detecta qué falta."],
-            ["2", "Se prepara la venta", "Ordena fotos y ayuda a crear un anuncio claro y completo."],
-            ["3", "Se atiende al comprador", "La conversación parte de los datos reales del vehículo."],
-            ["4", "Se cierra el ciclo", "Cuando se vende, avisa si el anuncio todavía sigue publicado."],
+            ["1", "Recibe el inventario", "Organiza precio, millaje, fotos, ubicación y estado de cada vehículo."],
+            ["2", "Detecta lo pendiente", "Señala datos o fotos faltantes y muestra qué unidad está lista para avanzar."],
+            ["3", "Prepara la publicación", "Ordena la galería y reúne la información necesaria para presentar bien el carro."],
+            ["4", "Publica en cada canal", "Marketplace y la página comercial trabajan por rutas separadas para evitar confusiones."],
+            ["5", "Atiende al comprador", "Relaciona la conversación con el vehículo y ayuda a responder con contexto real."],
+            ["6", "Cierra el ciclo", "Cuando el carro se vende, cancela trabajo pendiente y recuerda retirar el anuncio activo."],
           ].map(([number, title, text]) => (
             <article className="flowStep" key={number}>
               <span>{number}</span><h3>{title}</h3><p>{text}</p>
@@ -191,14 +201,18 @@ export default function Home() {
 
       <section className="section assistantsSection" id="herramientas">
         <header className="sectionHeading splitHeading">
-          <div><p className="eyebrow"><span /> Herramientas que trabajan contigo</p><h2>Tres asistentes, cada uno con una responsabilidad clara.</h2></div>
-          <p>Se instalan en el navegador del equipo y ayudan dentro de las páginas que ya usan. El operador sigue teniendo control.</p>
+          <div><p className="eyebrow"><span /> Las extensiones de DealerPilot</p><h2>Tres extensiones, tres trabajos distintos.</h2></div>
+          <p>Trabajan en el navegador junto a las páginas de Facebook que el equipo ya usa. Comparten el inventario de DealerPilot, pero cada una conserva su propio canal y sus propios controles.</p>
         </header>
         <div className="assistantGrid">
           {assistants.map((assistant, index) => (
             <article className="assistantCard" key={assistant.title}>
               <div className="assistantTop"><span className="assistantIcon">{index + 1}</span><small>{assistant.label}</small></div>
-              <h3>{assistant.title}</h3><p>{assistant.text}</p>
+              <h3>{assistant.title}</h3>
+              <p className="assistantPlainName">{assistant.plainName}</p>
+              <div className="assistantWhere"><small>DÓNDE TRABAJA</small><strong>{assistant.where}</strong></div>
+              <p>{assistant.text}</p>
+              <ol>{assistant.steps.map((step) => <li key={step}>{step}</li>)}</ol>
               <div className="guardrail"><span aria-hidden="true">✓</span>{assistant.guardrail}</div>
             </article>
           ))}
@@ -227,9 +241,9 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="ctaSection" id="demo">
-        <div><p className="eyebrow lightEyebrow"><span /> Siguiente paso</p><h2>Veamos DealerPilot con el flujo de tu dealer.</h2><p>Una demostración corta es suficiente para ver cómo encaja con tu inventario, tus publicaciones y tu equipo de ventas.</p></div>
-        <a href="mailto:?subject=Quiero%20una%20demostraci%C3%B3n%20de%20DealerPilot&body=Hola%2C%20quiero%20conocer%20DealerPilot%20para%20mi%20dealer.">Solicitar una demostración <span aria-hidden="true">→</span></a>
+      <section className="ctaSection" aria-label="Resumen de DealerPilot">
+        <div><p className="eyebrow lightEyebrow"><span /> El ciclo completo</p><h2>Un vehículo entra una vez. DealerPilot mantiene conectado todo lo que ocurre después.</h2><p>El inventario alimenta las publicaciones; las publicaciones generan conversaciones; las conversaciones se convierten en seguimiento; y el estado vendido cierra el ciclo para que el equipo no trabaje con información atrasada.</p></div>
+        <div className="cycleSummary" aria-label="Ciclo de trabajo"><span>Inventario</span><i>→</i><span>Publicación</span><i>→</i><span>Comprador</span><i>→</i><span>Venta</span></div>
       </section>
 
       <footer><a className="brand" href="#inicio"><span className="brandMark">DP</span><span>DealerPilot</span></a><p>Más ventas. Menos trabajo manual.</p><a href="#inicio">Volver arriba ↑</a></footer>
