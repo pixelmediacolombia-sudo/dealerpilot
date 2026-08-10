@@ -332,7 +332,7 @@ paths:
           in: query
           required: false
           schema: { type: string }
-          description: Filter by lot location (e.g. Manassas, Fredericksburg)
+          description: Filter by lot location (e.g. Manassas, Manassas)
       responses:
         "200":
           description: Vehicle list
@@ -350,7 +350,7 @@ paths:
           in: query
           required: false
           schema: { type: string }
-          description: Filter by lot location (e.g. Manassas, Fredericksburg)
+          description: Filter by lot location (e.g. Manassas, Manassas)
       responses:
         "200":
           description: Inventory stats
@@ -575,7 +575,7 @@ paths:
           in: query
           required: false
           schema: { type: string }
-          description: Filter by lot location (e.g. Manassas, Fredericksburg)
+          description: Filter by lot location (e.g. Manassas, Manassas)
       responses:
         "200":
           description: Listing workspaces
@@ -775,7 +775,7 @@ paths:
           in: query
           required: false
           schema: { type: string }
-          description: Filter by lot location (e.g. Manassas, Fredericksburg)
+          description: Filter by lot location (e.g. Manassas, Manassas)
       responses:
         "200":
           description: Publishing jobs
@@ -1268,7 +1268,7 @@ paths:
           in: query
           required: false
           schema: { type: string }
-          description: Filter by lot location (e.g. Manassas, Fredericksburg)
+          description: Filter by lot location (e.g. Manassas, Manassas)
       responses:
         "200":
           description: Batches
@@ -2039,7 +2039,7 @@ paths:
           in: query
           required: false
           schema: { type: string }
-          description: Filter by lot location (e.g. Manassas, Fredericksburg)
+          description: Filter by lot location (e.g. Manassas, Manassas)
       responses:
         "200":
           description: Vehicle recommendations

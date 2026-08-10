@@ -16,7 +16,7 @@ q?: string;
  */
 status?: string;
 /**
- * Filter by lot location (e.g. Manassas, Fredericksburg)
+ * Filter by lot location (e.g. Manassas, Manassas)
  */
 location?: string;
 };

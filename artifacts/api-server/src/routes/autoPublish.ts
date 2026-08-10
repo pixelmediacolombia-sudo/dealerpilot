@@ -508,7 +508,7 @@ router.post("/auto-publish/batches", async (req, res) => {
     const photoAnalysis = analyzePhotos(imgs);
     let validation = validateVehicleForPublish(v, imgs.length);
 
-    // Lot location must exist and be a known, mapped city (Manassas or Fredericksburg).
+    // Lot location must exist and be the active Manassas destination.
     if (validation.eligible && (!v.lotLocation || !LOT_CITY_MAP[v.lotLocation])) {
       validation = { eligible: false, reason: `Unmapped lot location "${v.lotLocation ?? "unknown"}"` };
     }

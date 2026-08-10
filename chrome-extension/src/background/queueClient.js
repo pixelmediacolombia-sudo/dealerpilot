@@ -454,7 +454,8 @@ const handlers = {
     // Reject jobs older than 10 minutes. Stale queued jobs must not auto-open
     // Facebook — the user must explicitly trigger them from the popup.
     const JOB_MAX_AGE_MS = 10 * 60 * 1000;
-    if (message.createdAt) {
+    const isAutomaticBatch = message.source === "auto_publish_batch";
+    if (message.createdAt && !isAutomaticBatch) {
       const age = Date.now() - new Date(message.createdAt).getTime();
       if (age > JOB_MAX_AGE_MS && message.forceUserAction !== true) {
         await logAudit("AUTO_START_BLOCKED_STALE", {
@@ -696,7 +697,7 @@ const handlers = {
         jobId: assignedJob.id,
         createdAt: assignedJob.assignedAt || assignedJob.createdAt || null,
         mode: assignedJob.mode || "Controlled",
-        source: "assigned",
+        source: assignedJob.source || "assigned",
         scheduledAt: assignedJob.scheduledAt || null,
         approvedByUser: true,
         forceUserAction,

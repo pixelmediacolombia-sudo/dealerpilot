@@ -288,6 +288,11 @@ test("enabling a fully automatic plan kicks the publishing worker without Schedu
   );
 });
 
+test("Controlled Auto stays automatic without requiring a second deployment switch", () => {
+  assert.match(controlledModeSource, /if \(isFullAutoMode\(\) \|\| dealerAutoClickPublish\) return "Controlled"/);
+  assert.match(routeSource, /job\.source === "publish_now"[\s\S]*resolvePublishMode\(autoPublishSettings\?\.autoClickPublish \?\? false\)/);
+});
+
 test("cancelled and dismissed batches do not block the auto-publish frequency gate", () => {
   assert.match(
     workerSource,
@@ -564,6 +569,8 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /ubicad\[oa\]s\?/);
   assert.match(conversationsSource, /Nuestra dirección es: \$\{storeAddress\}/);
   assert.match(conversationsSource, /9120 Euclid Ave, Manassas, VA 20110/);
+  assert.match(conversationsSource, /Alpha Motorsports serves customers from Manassas only/);
+  assert.match(conversationsSource, /legacyLocationToken/);
   assert.match(conversationsSource, /UI_MESSAGE_TEXT/);
   assert.match(conversationsSource, /isParticipantLabelText/);
   assert.match(conversationsSource, /buyer\|seller\|participant\|miembro\|comprador\|vendedor/);
@@ -728,6 +735,8 @@ test("extension closes Marketplace after a completed publish and respects schedu
   assert.match(publisherFlowSource, /type: "CLOSE_MARKETPLACE_TABS"/);
   assert.match(queueClientSource, /scheduled_at_wait/);
   assert.match(queueClientSource, /Math\.max\(finishedMs \+ INTER_JOB_DELAY_MS/);
+  assert.match(queueClientSource, /const isAutomaticBatch = message\.source === "auto_publish_batch"/);
+  assert.match(queueClientSource, /source: assignedJob\.source \|\| "assigned"/);
 });
 
 test("Marketplace vehicle category selector prefers the broad Vehicles option", () => {

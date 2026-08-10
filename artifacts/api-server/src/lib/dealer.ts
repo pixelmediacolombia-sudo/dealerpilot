@@ -6,24 +6,19 @@
  * The XML feed itself contains NO location discriminator — all 315 vehicles
  * share the same dealer address, phone, and lat/lon in the feed.
  *
- * Correct location values after sync:
- *   "Fredericksburg"  — VehicleLocationID 3004265  (~196 vehicles)
- *   "Manassas"        — VehicleLocationID 3004268  (~119 vehicles)
+ * The active Alpha Motorsports location is Manassas only.
  *
  * Scope rules:
  *   - Active dealer scope  → eq(vehiclesTable.dealerId, ALPHA_DEALER_ID)
  *   - Manassas only        → and(eq(vehiclesTable.dealerId, ALPHA_DEALER_ID), eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS))
- *   - Fredericksburg only  → and(eq(vehiclesTable.dealerId, ALPHA_DEALER_ID), eq(vehiclesTable.lotLocation, ALPHA_LOT_FREDERICKSBURG))
  */
 
 export const ALPHA_DEALER_ID = 1;
 export const ALPHA_DEALER_LABEL = "Alpha Motorsport";
 
-export const ALPHA_LOT_FREDERICKSBURG = "Fredericksburg";
 export const ALPHA_LOT_MANASSAS = "Manassas";
 
 /** DealerCentric VehicleLocationID → city name (used by locationScraper.ts) */
 export const ALPHA_VEHICLE_LOCATION_IDS: Record<string, string> = {
-  "3004265": ALPHA_LOT_FREDERICKSBURG,
   "3004268": ALPHA_LOT_MANASSAS,
 };

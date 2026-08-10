@@ -6,11 +6,11 @@ import {
   vehicleChangesTable,
   type Vehicle,
 } from "@workspace/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import type { Logger } from "pino";
 import { parseInventoryXml, type FeedImage } from "./xmlEngine";
 import { scrapeAlphaLocationMapping } from "./locationScraper";
-import { ALPHA_DEALER_ID } from "../lib/dealer";
+import { ALPHA_DEALER_ID, ALPHA_LOT_MANASSAS } from "../lib/dealer";
 
 const ACTIVE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish", "Published"];
 
@@ -306,10 +306,22 @@ export async function importFeed(
 
   // For Alpha Motorsport: the combined XML feed does NOT contain VehicleLocationID.
   // Scrape the website's location-filtered pages to determine which lot each vehicle
-  // is physically parked at (Fredericksburg vs Manassas) and write it to lot_location.
+  // is physically parked at the active Manassas location and write it to lot_location.
   if (dealerId === ALPHA_DEALER_ID) {
     try {
       const locationMap = await scrapeAlphaLocationMapping(log);
+      if (locationMap.size === 0) {
+        throw new Error("Manassas location scrape returned no vehicles");
+      }
+      await db
+        .update(vehiclesTable)
+        .set({ lotLocation: null })
+        .where(
+          and(
+            eq(vehiclesTable.dealerId, dealerId),
+            ne(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
+          ),
+        );
       const byLocation = new Map<string, string[]>();
       for (const [stock, loc] of locationMap) {
         const list = byLocation.get(loc) ?? [];

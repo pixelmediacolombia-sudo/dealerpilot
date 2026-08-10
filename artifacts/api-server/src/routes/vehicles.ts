@@ -101,7 +101,7 @@ router.get("/vehicles/stats", async (req, res) => {
 
   // Two queries in parallel: filtered stats + global unknown-lot count.
   // noLot is always dealer-wide so the warning shows regardless of location tab.
-  const KNOWN_LOTS = new Set(["Manassas", "Fredericksburg"]);
+  const KNOWN_LOTS = new Set(["Manassas"]);
   const [rows, allLotRows] = await Promise.all([
     db
       .select({ status: vehiclesTable.status })

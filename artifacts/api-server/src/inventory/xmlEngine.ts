@@ -21,7 +21,7 @@ export type NormalizedVehicle = {
   fuelType: string | null;
   description: string | null;
   vdpUrl: string | null;
-  // Dealer branch/lot location parsed from the feed (e.g. "Manassas", "Fredericksburg").
+  // Active dealer lot location parsed from the feed (Manassas only).
   // null = not provided by this feed format.
   lotLocation: string | null;
   images: FeedImage[];
@@ -228,7 +228,7 @@ function findVehicleNodes(value: unknown): Record<string, unknown>[] {
 }
 
 // Extract the city from a Google Base <g:address> block.
-// The parsed structure is: address → { component: [{ "@_name": "city", "#text": "FREDERICKSBURG" }, ...] }
+// The parsed structure is: address → { component: [{ "@_name": "city", "#text": "MANASSAS" }, ...] }
 // Keys may carry the "g:" namespace prefix before normalizeKey strips it.
 function extractAddressCity(node: Record<string, unknown>): string | null {
   // Find the address object (key may be "address" or "g:address")
@@ -257,7 +257,7 @@ function extractAddressCity(node: Record<string, unknown>): string | null {
       if (k === "#text") textVal = String(v).trim();
     }
     if (nameAttr === "city" && textVal) {
-      // Title-case: "FREDERICKSBURG" → "Fredericksburg"
+      // Title-case: "MANASSAS" → "Manassas"
       return textVal.charAt(0).toUpperCase() + textVal.slice(1).toLowerCase();
     }
   }
@@ -289,7 +289,7 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
   // Priority order:
   //   1. Explicit feed fields (location, lot, branch, etc.)
   //   2. <g:address><g:component name="city"> — Google Base / AIA format
-  //   3. City name in the VDP URL path (e.g. "fredericksburg" in the URL slug)
+  //   3. City name in the VDP URL path (e.g. "manassas" in the URL slug)
   //
   // NOTE: "dealername" is intentionally EXCLUDED from this lookup.
   // The Alpha Motorsport feed stores the dealer name ("Alpha Motorsports") in
@@ -305,8 +305,8 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
   if (!lotLocation && vdpUrl) {
     const urlLower = vdpUrl.toLowerCase();
     if (urlLower.includes("manassas")) lotLocation = "Manassas";
-    else if (urlLower.includes("fredericksburg")) lotLocation = "Fredericksburg";
   }
+  if (lotLocation && !lotLocation.toLowerCase().includes("manassas")) lotLocation = null;
 
   return {
     vin,

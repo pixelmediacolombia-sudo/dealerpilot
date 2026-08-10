@@ -18,7 +18,6 @@ import { getMarketplacePricing } from "../listings/pricing";
 import {
   checkPublishGuardrails,
   isExtensionOnline,
-  isControlledModeEnabled,
   isFullAutoMode,
   resolvePublishMode,
   LOT_CITY_MAP,
@@ -294,9 +293,15 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     // MARKETPLACE_PUBLISH_MODE=full_auto was set. Re-derive every time the
     // payload is fetched so the extension always gets the current mode.
     // resolvePublishMode(true) = same logic as publish-now (treats dealer as opted-in).
-    const resolvedMode = resolvePublishMode(true);
+    const [autoPublishSettings] = await db
+      .select({ autoClickPublish: autoPublishSettingsTable.autoClickPublish })
+      .from(autoPublishSettingsTable)
+      .where(eq(autoPublishSettingsTable.dealerId, job.dealerId));
+    const resolvedMode = job.source === "publish_now"
+      ? resolvePublishMode(true)
+      : resolvePublishMode(autoPublishSettings?.autoClickPublish ?? false);
     const autoClickPublish = resolvedMode === "Controlled";
-    const controlledMode = isControlledModeEnabled();
+    const controlledMode = autoClickPublish;
     const publishMode = isFullAutoMode() ? "full_auto" : autoClickPublish ? "controlled" : "assisted";
 
     // Heal stale mode in DB so future queries and the UI show the right value.
@@ -369,7 +374,7 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
         "Publishing blocked: unknown or unmapped lot location",
       );
       res.status(422).json({
-        error: `Cannot publish: vehicle lot location "${vehicle.lotLocation ?? "unknown"}" is not mapped to a city. Assign this vehicle to Manassas or Fredericksburg before publishing.`,
+        error: `Cannot publish: vehicle lot location "${vehicle.lotLocation ?? "unknown"}" is not mapped to Manassas before publishing.`,
         code: "UNKNOWN_LOT",
         jobId: id,
         vehicleId: vehicle.id,
@@ -481,7 +486,7 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       vehicleId: job.vehicleId,
       dealerId: job.dealerId,
       publishMode,          // "full_auto" | "controlled" | "assisted"
-      controlledMode,       // true when MARKETPLACE_CONTROLLED_MODE_ENABLED=true
+      controlledMode,       // true when the resolved job mode auto-clicks Publish
       autoClickPublish,     // true when extension should auto-click Publish
       backendEnvironment: process.env.NODE_ENV ?? "production",
       hasPhotos: images.length > 0,

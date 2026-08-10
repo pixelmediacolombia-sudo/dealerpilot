@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "DealerPilot AI Publisher",
-  "version": "1.3.90",
-  "description": "Connects the DealerPilot AI dashboard to Facebook Marketplace: claims publishing jobs, uploads photos, fills listing forms, and auto-clicks Next + Publish in Full Auto mode.",
+  "version": "1.3.92",
+  "description": "Connects the DealerPilot AI dashboard to Facebook Marketplace: claims publishing jobs, uploads photos, fills listing forms, and auto-clicks Next + Publish for configured Controlled Auto jobs.",
   "permissions": [
     "storage",
     "scripting",

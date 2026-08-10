@@ -7,10 +7,9 @@
 // Publish), so every guardrail below must pass before a job is allowed to run
 // in Controlled Mode.
 //
-// MARKETPLACE_CONTROLLED_MODE_ENABLED is the global launch switch. It is
-// ANDed with the existing per-dealer `autoPublishSettings.autoClickPublish`
-// toggle — either one being off forces Assisted Mode. This preserves
-// per-dealer opt-in while giving ops a single kill switch across the app.
+// The per-dealer `autoPublishSettings.autoClickPublish` toggle is the
+// dashboard's explicit choice for automatic Marketplace publishing. The
+// deployment mode remains available for the global full-auto override.
 import { and, eq, inArray } from "drizzle-orm";
 import { db, extensionConnectionsTable, publishingJobsTable } from "@workspace/db";
 import { getCachedGmDecision } from "../routes/gm";
@@ -18,7 +17,6 @@ import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 
 export const LOT_CITY_MAP: Record<string, string> = {
   Manassas: "Manassas, VA",
-  Fredericksburg: "Fredericksburg, VA",
 };
 
 const EXTENSION_ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
@@ -74,12 +72,15 @@ export function isFullAutoMode(): boolean {
 /**
  * Resolves the mode a job should actually run in.
  * - Full Auto (MARKETPLACE_PUBLISH_MODE=full_auto): always Controlled, no dealer toggle needed.
- * - Controlled Mode (MARKETPLACE_CONTROLLED_MODE_ENABLED=true): requires dealer's autoClickPublish=true.
+ * - Controlled Auto: dealer's autoClickPublish=true is sufficient for automatic execution.
  * - Otherwise: Assisted (human clicks Publish).
  */
 export function resolvePublishMode(dealerAutoClickPublish: boolean): "Assisted" | "Controlled" {
-  if (isFullAutoMode()) return "Controlled";
-  return isControlledModeEnabled() && dealerAutoClickPublish ? "Controlled" : "Assisted";
+  // The saved Controlled Auto setting is the explicit operator choice shown
+  // in the dashboard. A missing deployment flag must not silently turn that
+  // visible setting into an Assisted job that waits for a human.
+  if (isFullAutoMode() || dealerAutoClickPublish) return "Controlled";
+  return "Assisted";
 }
 
 export async function isExtensionOnline(): Promise<boolean> {
@@ -117,13 +118,13 @@ export async function checkPublishGuardrails(params: {
     };
   }
 
-  // 2. Lot location must exist and be a known, mapped city (Manassas or Fredericksburg).
+  // 2. Lot location must be the active Alpha Motorsports destination.
   const lotCity = vehicle.lotLocation ? LOT_CITY_MAP[vehicle.lotLocation] : undefined;
   if (!lotCity) {
     return {
       ok: false,
       code: "UNKNOWN_LOT",
-      reason: `Vehicle lot location "${vehicle.lotLocation ?? "unknown"}" is not mapped to Manassas or Fredericksburg.`,
+      reason: `Vehicle lot location "${vehicle.lotLocation ?? "unknown"}" is not mapped to Manassas.`,
     };
   }
 

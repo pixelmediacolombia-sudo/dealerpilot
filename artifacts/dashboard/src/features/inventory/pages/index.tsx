@@ -181,7 +181,7 @@ export function InventoryDashboard() {
               <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-warning" />
               <div className="text-[13px] leading-relaxed">
                 <span className="font-semibold text-warning">{stats!.noLot} vehicle{stats!.noLot !== 1 ? "s" : ""} with unknown lot location</span>
-                {" — "}these cannot be published to Marketplace until their lot is assigned to Manassas or Fredericksburg. Use the{" "}
+                {" — "}these cannot be published to Marketplace until their lot is assigned to Manassas. Use the{" "}
                 <span className="font-medium text-warning">location filter</span> to find them (they appear in the "All" view only).
               </div>
             </div>

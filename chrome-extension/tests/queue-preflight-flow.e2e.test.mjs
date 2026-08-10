@@ -211,7 +211,7 @@ test("a retried job receives fresh queue ownership before Marketplace opens agai
       exteriorColor: "White",
       fuelType: "Gasoline",
       transmission: "Automatic",
-      location: "Fredericksburg, VA",
+      location: "Manassas, VA",
       description: "Clean unit ready for financing.",
       price: 1000,
     },

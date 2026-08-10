@@ -2080,7 +2080,7 @@ q?: string;
 status?: string;
 sort?: ListVehiclesSort;
 /**
- * Filter by lot location (e.g. Manassas, Fredericksburg)
+ * Filter by lot location (e.g. Manassas, Manassas)
  */
 location?: string;
 };
@@ -2097,7 +2097,7 @@ export const ListVehiclesSort = {
 
 export type GetVehicleStatsParams = {
 /**
- * Filter by lot location (e.g. Manassas, Fredericksburg)
+ * Filter by lot location (e.g. Manassas, Manassas)
  */
 location?: string;
 };
@@ -2116,7 +2116,7 @@ q?: string;
  */
 status?: string;
 /**
- * Filter by lot location (e.g. Manassas, Fredericksburg)
+ * Filter by lot location (e.g. Manassas, Manassas)
  */
 location?: string;
 };
@@ -2138,7 +2138,7 @@ export type ListPublishingJobsParams = {
  */
 status?: string;
 /**
- * Filter by lot location (e.g. Manassas, Fredericksburg)
+ * Filter by lot location (e.g. Manassas, Manassas)
  */
 location?: string;
 };
@@ -2214,7 +2214,7 @@ export type BulkSchedulePublishing202 = {
 export type ListPublishingBatchesParams = {
 dealerId?: number;
 /**
- * Filter by lot location (e.g. Manassas, Fredericksburg)
+ * Filter by lot location (e.g. Manassas, Manassas)
  */
 location?: string;
 };
@@ -2301,7 +2301,7 @@ dealerId?: number;
 
 export type ListMarketplaceRecommendationsParams = {
 /**
- * Filter by lot location (e.g. Manassas, Fredericksburg)
+ * Filter by lot location (e.g. Manassas, Manassas)
  */
 location?: string;
 };

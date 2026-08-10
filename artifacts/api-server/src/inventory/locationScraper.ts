@@ -6,12 +6,8 @@
  * The split is managed entirely in the DealerCentric DMS and is exposed only
  * through the website's ?VehicleLocationID= filter parameter.
  *
- * This module scrapes both location pages to produce a stock_number → city
- * mapping so that lot_location in our DB reflects real physical locations.
- *
- * Alpha Motorsport locations (as of 2026):
- *   3004265 → Fredericksburg  (196 vehicles / ~62% of inventory)
- *   3004268 → Manassas        (119 vehicles / ~38% of inventory)
+ * This module scrapes the active Manassas page to produce a stock number to
+ * city mapping so that lot_location in our DB reflects the active destination.
  */
 
 import type { Logger } from "pino";
@@ -35,8 +31,8 @@ async function fetchPage(locationId: string, page: number): Promise<string> {
 }
 
 /**
- * Scrape both Alpha Motorsport location pages and return a
- * Map<stockNumber, locationName> (e.g. "SGF018252" → "Fredericksburg").
+ * Scrape the active Alpha Motorsport location page and return a
+ * Map<stockNumber, locationName> (e.g. "SGF018252" → "Manassas").
  *
  * Paginates up to MAX_PAGES per location; stops when a page returns no stock
  * numbers (empty page = past the end of inventory).

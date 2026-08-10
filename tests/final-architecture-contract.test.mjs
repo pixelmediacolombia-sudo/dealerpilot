@@ -75,7 +75,7 @@ test("publishing queue and completion contracts are idempotent and extension-own
 
 test("inventory routes preserve sync, creation, state transition, and stats contracts", () => {
   assert.match(vehicles, /router\.get\("\/vehicles\/stats"/);
-  assert.match(vehicles, /KNOWN_LOTS = new Set\(\["Manassas", "Fredericksburg"\]\)/);
+  assert.match(vehicles, /KNOWN_LOTS = new Set\(\["Manassas"\]\)/);
   assert.match(vehicles, /readyToPublish: by\("Ready to Publish"\)/);
   assert.match(vehicles, /priceChanged: by\("Price Changed"\)/);
   assert.match(vehicles, /router\.get\("\/vehicles"/);

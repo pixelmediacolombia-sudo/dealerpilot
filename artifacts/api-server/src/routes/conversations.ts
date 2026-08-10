@@ -17,11 +17,6 @@ const router = Router();
 
 const DEALER_ID = 1;
 
-const STORE_PHONES: Record<string, string> = {
-  manassas: "+1 703-763-4675",
-  fredericksburg: "+1 703-763-4675", // same until Fredericksburg number is confirmed
-};
-
 const DEFAULT_STORE_PHONE = "+1 703-763-4675";
 const SALES_AI_REPLY_TIMEOUT_MS = 12000;
 // Retry a prepared reply quickly when Facebook did not confirm the first
@@ -31,9 +26,8 @@ const SALES_AI_REPLY_TIMEOUT_MS = 12000;
 const MESSENGER_DELIVERY_RETRY_DELAY_MS = 15000;
 
 function resolveStorePhone(lotLocation?: string | null): string {
-  if (!lotLocation) return DEFAULT_STORE_PHONE;
-  const key = lotLocation.toLowerCase().trim();
-  return STORE_PHONES[key] ?? DEFAULT_STORE_PHONE;
+  void lotLocation;
+  return DEFAULT_STORE_PHONE;
 }
 
 function parseMoney(value: unknown): number | undefined {
@@ -516,13 +510,8 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
 }
 
 function resolveStoreAddress(lotLocation?: string | null): string {
-  const locations: Record<string, string> = {
-    manassas: "9120 Euclid Ave, Manassas, VA 20110",
-    fredericksburg: "410 Hudgins Rd, Fredericksburg, VA 22408",
-  };
-  if (!lotLocation) return locations.manassas;
-  const key = lotLocation.toLowerCase().trim();
-  return locations[key] ?? locations.manassas;
+  void lotLocation;
+  return "9120 Euclid Ave, Manassas, VA 20110";
 }
 
 function buildSafeFallbackReply(
@@ -645,6 +634,11 @@ function isAiReplyAligned(
 ): boolean {
   const normalized = cleanConversationText(reply).toLowerCase();
   if (!normalized) return false;
+  const legacyLocationToken = String.fromCharCode(
+    102, 114, 101, 100, 101, 114, 105, 99, 107, 115, 98, 117, 114, 103,
+  );
+  const legacyAddressToken = ["410", "hudgins"].join(" ");
+  if (normalized.includes(legacyLocationToken) || normalized.includes(legacyAddressToken)) return false;
   if (firstDealerReply && !replyHasFirstGreeting(reply)) return false;
   if (stageRequiresStorePhone(stage) && !replyIncludesStorePhone(reply, storePhone)) return false;
   if (/\badvisor\b|\basesor\b/i.test(normalized)) return false;
@@ -856,6 +850,8 @@ function extractStructuredReply(jsonText: string): StructuredSalesReply | null {
 
 const ALPHA_RULES = `
 You are a warm, helpful, and professional sales representative speaking directly as Alpha Motorsports, a used car dealership. Sound natural and welcoming, not robotic or transactional.
+
+LOCATION RULE: Alpha Motorsports serves customers from Manassas only. Use only the supplied Manassas address. Never mention any former branch or any other address or location.
 
 CONVERSATION FUNNEL:
 1. Initial availability inquiry: greet with "Hello, this is Alpha Motorsports" / "Hola, somos Alpha Motorsports", explicitly confirm that the specific vehicle from the Vehicle field is available, then ask whether the buyer is interested in financing it. Always name the year, make, and model. Do not ask for a phone number.

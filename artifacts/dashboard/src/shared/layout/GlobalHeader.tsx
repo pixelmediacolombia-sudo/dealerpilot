@@ -89,7 +89,6 @@ type LocationOption = { value: DealerLocation; label: string };
 const LOCATIONS: LocationOption[] = [
   { value: "", label: "All Locations" },
   { value: "Manassas", label: "Manassas" },
-  { value: "Fredericksburg", label: "Fredericksburg" },
 ];
 
 function LocationSelector() {

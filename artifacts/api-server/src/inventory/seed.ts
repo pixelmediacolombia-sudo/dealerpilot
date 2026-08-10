@@ -22,13 +22,13 @@ export async function seedDealerAndInventory(log: Logger): Promise<void> {
   const wasOnSampleFeed = !dealer || isSampleFeedUrl(dealer.xmlFeedUrl);
 
   const ALPHA_ADDRESS = {
-    addressLine1: "410 Hudgins Road",
-    city: "Fredericksburg",
+    addressLine1: "9120 Euclid Ave",
+    city: "Manassas",
     state: "VA",
     country: "US",
-    postalCode: "22408",
-    latitude: "38.3032",
-    longitude: "-77.4605",
+    postalCode: "20110",
+    latitude: "38.7594",
+    longitude: "-77.4753",
   };
 
   if (!dealer) {
