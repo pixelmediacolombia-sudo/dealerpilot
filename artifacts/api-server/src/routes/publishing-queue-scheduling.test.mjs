@@ -222,6 +222,18 @@ test("publishing worker repairs legacy stale assignments before selecting the ne
   assert.match(workerSource, /Publishing worker repaired legacy stale assignments back to Retry/);
 });
 
+test("automatic selection excludes vehicles whose latest publishing job is Needs Review", () => {
+  assert.match(autoPublishSource, /findLatestNeedsReviewVehicleIds/);
+  assert.match(autoPublishSource, /needsReviewVehicleIds\.has\(v\.id\)/);
+  assert.match(autoPublishSource, /Latest publishing job is Needs Review/);
+  assert.match(workerSource, /findLatestNeedsReviewVehicleIds/);
+  assert.match(workerSource, /needsReviewVehicleIds\.has\(vehicle\.id\)/);
+});
+
+test("marking a job Published clears stale review metadata", () => {
+  assert.match(routeSource, /status: "Published"[\s\S]*needsReview: false[\s\S]*reviewReason: null/);
+});
+
 test("Alpha inventory normalizes every non-empty legacy lot to Manassas", () => {
   assert.match(controlledModeSource, /function normalizeAlphaLotLocation\(lotLocation: string \| null\)/);
   assert.match(controlledModeSource, /return lotLocation && lotLocation\.trim\(\) \? "Manassas" : null/);

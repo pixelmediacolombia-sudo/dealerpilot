@@ -748,6 +748,8 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
       status: "Published",
       completedAt: now,
       failedReason: null,
+      needsReview: false,
+      reviewReason: null,
       listingUrl: listingUrl ?? job.listingUrl,
       progressPercent: 100,
       currentStep: "Published on Marketplace",

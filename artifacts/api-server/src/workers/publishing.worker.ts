@@ -40,6 +40,7 @@ import {
 } from "drizzle-orm";
 import { getCachedGmDecision } from "../routes/gm";
 import { getDuplicateConflictVehicleIds } from "./market.worker";
+import { findLatestNeedsReviewVehicleIds } from "../publishing/needsReviewGuard";
 import type { WorkerDefinition, WorkerRunOutcome } from "./types";
 import {
   ACTIVE_PUBLISHING_JOB_STATUSES,
@@ -250,6 +251,7 @@ async function maybeCreateAutomaticBatch(
   if (vehicles.length === 0) return { created: 0, summary: "No active vehicles available for auto-publish" };
 
   const vehicleIds = vehicles.map((v) => v.id);
+  const needsReviewVehicleIds = await findLatestNeedsReviewVehicleIds(vehicleIds);
   const allImages = await db
     .select()
     .from(vehicleImagesTable)
@@ -279,6 +281,7 @@ async function maybeCreateAutomaticBatch(
 
   const selectedCandidates = vehicles
     .map((vehicle) => {
+      if (needsReviewVehicleIds.has(vehicle.id)) return null;
       const images = imagesByVehicle.get(vehicle.id) ?? [];
       const listing = listingByVehicle.get(vehicle.id);
       const gm = getCachedGmDecision(vehicle.id);

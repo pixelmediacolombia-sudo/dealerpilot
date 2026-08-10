@@ -38,6 +38,7 @@ import {
   resolvePublishMode,
 } from "../publishing/controlledMode";
 import { deriveBatchProgress, getInitialBatchTiming } from "../publishing/batchProgress";
+import { findLatestNeedsReviewVehicleIds } from "../publishing/needsReviewGuard";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 import { publishingWorker } from "../workers/publishing.worker";
 import { runWorkerOnce } from "../workers/scheduler";
@@ -465,6 +466,7 @@ router.post("/auto-publish/batches", async (req, res) => {
       ),
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
+  const needsReviewVehicleIds = await findLatestNeedsReviewVehicleIds(vehicleIds);
 
   // Build maps
   const imagesByVehicle = new Map<number, typeof allImages>();
@@ -498,6 +500,7 @@ router.post("/auto-publish/batches", async (req, res) => {
 
   for (const v of vehicles) {
     if (alreadyQueued.has(v.id)) continue; // already in queue
+    if (needsReviewVehicleIds.has(v.id)) continue; // operator review required before retry
 
     const imgs = imagesByVehicle.get(v.id) ?? [];
     const listing = listingByVehicle.get(v.id);
@@ -1214,6 +1217,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
       ),
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
+  const needsReviewVehicleIds = await findLatestNeedsReviewVehicleIds(vehicleIds);
   const duplicateConflictIds = await getDuplicateConflictVehicleIds();
 
   const imagesByVehicle = new Map<number, typeof allImages>();
@@ -1253,6 +1257,10 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     }
 
     const imgs = imagesByVehicle.get(v.id) ?? [];
+    if (needsReviewVehicleIds.has(v.id)) {
+      scored.push({ vehicleId: v.id, label, vin: v.vin, price: v.price, mileage: v.mileage, photoCount: imgs.length, photoScore: 0, photoDecision: "needs_review", priorityScore: 0, eligible: false, skipReason: "Latest publishing job is Needs Review — operator action required" });
+      continue;
+    }
     const listing = listingByVehicle.get(v.id);
     if (listing?.status === "Published") {
       scored.push({ vehicleId: v.id, label, vin: v.vin, price: v.price, mileage: v.mileage, photoCount: imgs.length, photoScore: 0, photoDecision: "needs_review", priorityScore: 0, eligible: false, skipReason: "Already published" });
