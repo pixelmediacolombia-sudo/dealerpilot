@@ -686,7 +686,12 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
         "complete: Published job missing URL; backfilling live listing URL");
     } else {
       req.log.info({ jobId: id, extensionId }, "complete: already Published — idempotent 200");
-      const [enriched] = await enrich([job]);
+      const [cleaned] = await db
+        .update(publishingJobsTable)
+        .set({ needsReview: false, reviewReason: null })
+        .where(eq(publishingJobsTable.id, id))
+        .returning();
+      const [enriched] = await enrich([cleaned ?? job]);
       res.json(enriched);
       return;
     }

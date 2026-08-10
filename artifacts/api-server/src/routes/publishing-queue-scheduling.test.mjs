@@ -232,6 +232,7 @@ test("automatic selection excludes vehicles whose latest publishing job is Needs
 
 test("marking a job Published clears stale review metadata", () => {
   assert.match(routeSource, /status: "Published"[\s\S]*needsReview: false[\s\S]*reviewReason: null/);
+  assert.match(routeSource, /already Published[\s\S]*set\(\{ needsReview: false, reviewReason: null \}\)/);
 });
 
 test("Alpha inventory normalizes every non-empty legacy lot to Manassas", () => {
