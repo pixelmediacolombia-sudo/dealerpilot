@@ -20,7 +20,8 @@ import {
   isExtensionOnline,
   isFullAutoMode,
   resolvePublishMode,
-  LOT_CITY_MAP,
+  normalizeAlphaLotLocation,
+  resolveAlphaLotCity,
   ACTIVE_PUBLISHING_JOB_STATUSES,
 } from "../publishing/controlledMode";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
@@ -367,7 +368,18 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       return;
     }
 
-    const lotCity = vehicle.lotLocation ? LOT_CITY_MAP[vehicle.lotLocation] : undefined;
+    const normalizedLotLocation = normalizeAlphaLotLocation(vehicle.lotLocation);
+    if (normalizedLotLocation && vehicle.lotLocation !== normalizedLotLocation) {
+      await db
+        .update(vehiclesTable)
+        .set({ lotLocation: normalizedLotLocation })
+        .where(eq(vehiclesTable.id, vehicle.id));
+      req.log.info(
+        { vehicleId: vehicle.id, previousLotLocation: vehicle.lotLocation, normalizedLotLocation },
+        "Publishing payload normalized stale Alpha lot location",
+      );
+    }
+    const lotCity = resolveAlphaLotCity(normalizedLotLocation);
     if (!lotCity) {
       req.log.warn(
         { jobId: job.id, vehicleId: vehicle.id, lotLocation: vehicle.lotLocation },
@@ -1146,7 +1158,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
       otherBlocked.push({ vehicleId: v.id, code: "EXTENSION_OFFLINE", reason: "Extension offline" });
       return false;
     }
-    const lotCity = v.lotLocation ? LOT_CITY_MAP[v.lotLocation] : undefined;
+    const lotCity = resolveAlphaLotCity(v.lotLocation);
     if (!lotCity) {
       otherBlocked.push({ vehicleId: v.id, code: "UNKNOWN_LOT", reason: `Unmapped lot location "${v.lotLocation ?? "unknown"}"` });
       return false;

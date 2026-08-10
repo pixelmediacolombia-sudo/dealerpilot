@@ -43,7 +43,8 @@ import { getDuplicateConflictVehicleIds } from "./market.worker";
 import type { WorkerDefinition, WorkerRunOutcome } from "./types";
 import {
   ACTIVE_PUBLISHING_JOB_STATUSES,
-  LOT_CITY_MAP,
+  normalizeAlphaLotLocation,
+  resolveAlphaLotCity,
   resolvePublishMode,
 } from "../publishing/controlledMode";
 import { getInitialBatchTiming } from "../publishing/batchProgress";
@@ -281,7 +282,7 @@ async function maybeCreateAutomaticBatch(
       const images = imagesByVehicle.get(vehicle.id) ?? [];
       const listing = listingByVehicle.get(vehicle.id);
       const gm = getCachedGmDecision(vehicle.id);
-      const lotCity = vehicle.lotLocation ? LOT_CITY_MAP[vehicle.lotLocation] : undefined;
+      const lotCity = resolveAlphaLotCity(vehicle.lotLocation);
       const photoAnalysis = analyzePhotos(images);
       const invalid =
         !vehicle.vin ||
@@ -458,6 +459,50 @@ async function repairLegacyStaleAssignedJobs(log: import("pino").Logger): Promis
   return stale.length;
 }
 
+async function normalizeAlphaInventoryAndRequeueLotReviews(log: import("pino").Logger): Promise<{ normalizedVehicles: number; requeuedJobs: number }> {
+  const normalized = await db
+    .update(vehiclesTable)
+    .set({ lotLocation: "Manassas" })
+    .where(
+      and(
+        eq(vehiclesTable.dealerId, DEALER_ID),
+        sql`${vehiclesTable.lotLocation} is not null`,
+        ne(vehiclesTable.lotLocation, "Manassas"),
+      ),
+    )
+    .returning({ id: vehiclesTable.id });
+
+  const requeued = await db
+    .update(publishingJobsTable)
+    .set({
+      status: "Retry",
+      currentStep: null,
+      progressPercent: 0,
+      failedReason: null,
+      reviewReason: null,
+      needsReview: false,
+      claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
+    })
+    .where(
+      and(
+        eq(publishingJobsTable.dealerId, DEALER_ID),
+        eq(publishingJobsTable.status, "Needs Review"),
+        sql`${publishingJobsTable.reviewReason} like '%payload failed: 422%'`,
+      ),
+    )
+    .returning({ id: publishingJobsTable.id });
+
+  if (normalized.length > 0 || requeued.length > 0) {
+    log.warn(
+      { normalizedVehicles: normalized.length, requeuedJobs: requeued.map((job) => job.id) },
+      "Publishing worker normalized Alpha inventory to Manassas and requeued lot preflight reviews",
+    );
+  }
+  return { normalizedVehicles: normalized.length, requeuedJobs: requeued.length };
+}
+
 async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOutcome> {
   const extension = await findOnlineExtension();
   if (!extension) {
@@ -465,6 +510,7 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
   }
 
   const duplicateConflictIds = await getDuplicateConflictVehicleIds();
+  const lotRepair = await normalizeAlphaInventoryAndRequeueLotReviews(log);
   const autoBatch = await maybeCreateAutomaticBatch(log, duplicateConflictIds);
   const repairedStaleAssignments = await repairLegacyStaleAssignedJobs(log);
   const reboundAssignments = await rebindDueAssignedJobsToOnlineExtension(extension.id);
@@ -581,13 +627,13 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
     return {
       summary: `${autoSummary}No jobs assigned - ${skippedUnknownLot} unknown lot, ${skippedDuplicate} duplicate conflicts, ${skippedGm} GM held, ${skippedPhotoDirector} waiting for Photo Director`,
       skipped: true,
-      detail: { autoCreated: autoBatch.created, repairedStaleAssignments, reboundAssignments, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
+      detail: { autoCreated: autoBatch.created, lotRepair, repairedStaleAssignments, reboundAssignments, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
     };
   }
 
   return {
     summary: `${autoBatch.summary ? `${autoBatch.summary}; ` : ""}Assigned ${assigned} publishing job${assigned === 1 ? "" : "s"} to extension "${extension.id}"`,
-    detail: { autoCreated: autoBatch.created, repairedStaleAssignments, reboundAssignments, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
+    detail: { autoCreated: autoBatch.created, lotRepair, repairedStaleAssignments, reboundAssignments, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
   };
 }
 

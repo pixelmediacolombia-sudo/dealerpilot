@@ -222,6 +222,14 @@ test("publishing worker repairs legacy stale assignments before selecting the ne
   assert.match(workerSource, /Publishing worker repaired legacy stale assignments back to Retry/);
 });
 
+test("Alpha inventory normalizes every non-empty legacy lot to Manassas", () => {
+  assert.match(controlledModeSource, /function normalizeAlphaLotLocation\(lotLocation: string \| null\)/);
+  assert.match(controlledModeSource, /return lotLocation && lotLocation\.trim\(\) \? "Manassas" : null/);
+  assert.match(workerSource, /normalizeAlphaInventoryAndRequeueLotReviews/);
+  assert.match(workerSource, /set\(\{ lotLocation: "Manassas" \}\)/);
+  assert.match(workerSource, /payload failed: 422/);
+});
+
 test("extension records the next queue vehicle and clears terminal local jobs", () => {
   assert.match(queueClientSource, /lastQueueDecision/);
   assert.match(queueClientSource, /QUEUE_NEXT_OBSERVED/);

@@ -19,6 +19,18 @@ export const LOT_CITY_MAP: Record<string, string> = {
   Manassas: "Manassas, VA",
 };
 
+// Alpha Motorsports is now a single-location operation. Existing feed rows may
+// still carry a retired non-empty location; normalize those rows to the only
+// active destination instead of allowing stale data to strand a publish job.
+export function normalizeAlphaLotLocation(lotLocation: string | null): string | null {
+  return lotLocation && lotLocation.trim() ? "Manassas" : null;
+}
+
+export function resolveAlphaLotCity(lotLocation: string | null): string | undefined {
+  const normalized = normalizeAlphaLotLocation(lotLocation);
+  return normalized ? LOT_CITY_MAP[normalized] : undefined;
+}
+
 const EXTENSION_ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
 
 export const QUEUED_PUBLISHING_JOB_STATUSES = ["Queued", "Scheduled", "Retry"] as const;
@@ -119,7 +131,7 @@ export async function checkPublishGuardrails(params: {
   }
 
   // 2. Lot location must be the active Alpha Motorsports destination.
-  const lotCity = vehicle.lotLocation ? LOT_CITY_MAP[vehicle.lotLocation] : undefined;
+  const lotCity = resolveAlphaLotCity(vehicle.lotLocation);
   if (!lotCity) {
     return {
       ok: false,
