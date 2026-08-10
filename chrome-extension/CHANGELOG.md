@@ -1,5 +1,10 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.93
+
+- Records the next Marketplace queue vehicle, scheduled time, and auto-start decision in extension diagnostics.
+- Clears terminal `Needs Review` jobs from local active state so a completed or blocked job cannot halt the next automatic vehicle.
+
 ## v1.3.83
 
 - Isolates Marketplace Messenger capture from the publisher DOM automation.

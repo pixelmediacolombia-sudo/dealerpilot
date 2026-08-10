@@ -81,6 +81,37 @@ async function logAudit(event, details = {}) {
   } catch (_) { /* non-critical */ }
 }
 
+function getQueueDecision(job, extra = {}) {
+  const nowMs = Date.now();
+  const scheduledMs = job?.scheduledAt ? new Date(job.scheduledAt).getTime() : null;
+  const eligibleNow = scheduledMs == null || (Number.isFinite(scheduledMs) && scheduledMs <= nowMs);
+  return {
+    at: new Date(nowMs).toISOString(),
+    jobId: job?.id ?? null,
+    vehicleId: job?.vehicleId ?? null,
+    vehicleLabel: job?.vehicleLabel ?? null,
+    status: job?.status ?? null,
+    mode: job?.mode ?? null,
+    source: job?.source ?? null,
+    approvedByUser: job?.approvedByUser ?? null,
+    scheduledAt: job?.scheduledAt ?? null,
+    eligibleNow,
+    secondsUntilEligible: eligibleNow || scheduledMs == null
+      ? 0
+      : Math.max(0, Math.ceil((scheduledMs - nowMs) / 1000)),
+    ...extra,
+  };
+}
+
+async function recordQueueDecision(event, job, extra = {}) {
+  const decision = getQueueDecision(job, { event, ...extra });
+  console.log("[DealerPilot AI] [QUEUE]", JSON.stringify(decision));
+  try {
+    await chrome.storage.local.set({ lastQueueDecision: decision });
+  } catch (_) { /* non-critical */ }
+  return decision;
+}
+
 // ---- Clear connectRequested on backend immediately after opening connection tab ----
 // Prevents repeated tab-opens on every 15-second poll if the FB page doesn't load.
 async function clearConnectRequested() {
@@ -663,8 +694,12 @@ const handlers = {
     if (activeJob) {
       try {
         const progress = await apiGet(`/api/publishing/jobs/${activeJob.id}/progress`);
-        const terminal = ["Published", "Failed", "Cancelled"];
+        const terminal = ["Published", "Failed", "Cancelled", "Needs Review"];
         if (terminal.includes(progress.status)) {
+          await recordQueueDecision("ACTIVE_JOB_CLEARED_TERMINAL", activeJob, {
+            backendStatus: progress.status,
+            decision: "continue_queue",
+          });
           await chrome.storage.local.remove("activeJob");
           // fall through to normal poll
         } else {
@@ -693,6 +728,10 @@ const handlers = {
     }
     const assignedJob = data && data.job && data.job.id ? data.job : null;
     if (assignedJob) {
+      await recordQueueDecision("QUEUE_ASSIGNED_OBSERVED", assignedJob, {
+        decision: "auto_start_assigned",
+        endpoint: "/api/publishing/jobs/assigned",
+      });
       return handlers.AUTO_START_ASSIGNED({
         jobId: assignedJob.id,
         createdAt: assignedJob.assignedAt || assignedJob.createdAt || null,
@@ -725,6 +764,14 @@ const handlers = {
       return { job: null };
     }
     const nextJob = nextData && nextData.job && nextData.job.id ? nextData.job : null;
+    await recordQueueDecision(
+      nextJob ? "QUEUE_NEXT_OBSERVED" : "QUEUE_NEXT_EMPTY",
+      nextJob,
+      {
+        decision: nextJob ? "evaluate" : "no_claimable_job",
+        endpoint: "/api/publishing/jobs/next",
+      },
+    );
     if (!nextJob) {
       try {
         const soldData = await apiGet("/api/extension/marketplace-sold-actions");

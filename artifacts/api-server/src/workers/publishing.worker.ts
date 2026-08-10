@@ -36,6 +36,7 @@ import {
   lte,
   ne,
   or,
+  sql,
 } from "drizzle-orm";
 import { getCachedGmDecision } from "../routes/gm";
 import { getDuplicateConflictVehicleIds } from "./market.worker";
@@ -427,6 +428,36 @@ async function rebindDueAssignedJobsToOnlineExtension(extensionId: string): Prom
   return rebound.length;
 }
 
+async function repairLegacyStaleAssignedJobs(log: import("pino").Logger): Promise<number> {
+  const stale = await db
+    .update(publishingJobsTable)
+    .set({
+      status: "Retry",
+      currentStep: null,
+      progressPercent: 0,
+      failedReason: null,
+      claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
+    })
+    .where(
+      and(
+        eq(publishingJobsTable.status, "Assigned"),
+        isNull(publishingJobsTable.claimedByExtension),
+        sql`${publishingJobsTable.failedReason} like 'Auto-expired:%'`,
+      ),
+    )
+    .returning({ id: publishingJobsTable.id });
+
+  if (stale.length > 0) {
+    log.warn(
+      { jobIds: stale.map((job) => job.id) },
+      "Publishing worker repaired legacy stale assignments back to Retry",
+    );
+  }
+  return stale.length;
+}
+
 async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOutcome> {
   const extension = await findOnlineExtension();
   if (!extension) {
@@ -435,6 +466,7 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
 
   const duplicateConflictIds = await getDuplicateConflictVehicleIds();
   const autoBatch = await maybeCreateAutomaticBatch(log, duplicateConflictIds);
+  const repairedStaleAssignments = await repairLegacyStaleAssignedJobs(log);
   const reboundAssignments = await rebindDueAssignedJobsToOnlineExtension(extension.id);
   if (reboundAssignments > 0) {
     log.info(
@@ -467,6 +499,21 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
     )
     .orderBy(desc(publishingJobsTable.priority), asc(publishingJobsTable.createdAt))
     .limit(25);
+
+  log.info(
+    {
+      nextJobId: candidates[0]?.job.id ?? null,
+      nextVehicleLabel: candidates[0]?.vehicle
+        ? `${candidates[0].vehicle.year ?? ""} ${candidates[0].vehicle.make} ${candidates[0].vehicle.model}`.trim()
+        : null,
+      nextSource: candidates[0]?.job.source ?? null,
+      nextStatus: candidates[0]?.job.status ?? null,
+      nextScheduledAt: candidates[0]?.job.scheduledAt?.toISOString() ?? null,
+      candidateCount: candidates.length,
+      repairedStaleAssignments,
+    },
+    "Publishing worker next queue decision",
+  );
 
   let assigned = 0;
   let skippedUnknownLot = 0;
@@ -534,13 +581,13 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
     return {
       summary: `${autoSummary}No jobs assigned - ${skippedUnknownLot} unknown lot, ${skippedDuplicate} duplicate conflicts, ${skippedGm} GM held, ${skippedPhotoDirector} waiting for Photo Director`,
       skipped: true,
-      detail: { autoCreated: autoBatch.created, reboundAssignments, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
+      detail: { autoCreated: autoBatch.created, repairedStaleAssignments, reboundAssignments, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
     };
   }
 
   return {
     summary: `${autoBatch.summary ? `${autoBatch.summary}; ` : ""}Assigned ${assigned} publishing job${assigned === 1 ? "" : "s"} to extension "${extension.id}"`,
-    detail: { autoCreated: autoBatch.created, reboundAssignments, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
+    detail: { autoCreated: autoBatch.created, repairedStaleAssignments, reboundAssignments, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
   };
 }
 

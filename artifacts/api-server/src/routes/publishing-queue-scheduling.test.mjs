@@ -215,6 +215,20 @@ test("publishing worker rebinds due unclaimed jobs after the Chrome extension id
   assert.match(workerSource, /Publishing worker rebound unclaimed jobs to the active extension/);
 });
 
+test("publishing worker repairs legacy stale assignments before selecting the next vehicle", () => {
+  assert.match(workerSource, /repairLegacyStaleAssignedJobs/);
+  assert.match(workerSource, /status:\s*"Retry"/);
+  assert.match(workerSource, /failedReason} like 'Auto-expired:%'/);
+  assert.match(workerSource, /Publishing worker repaired legacy stale assignments back to Retry/);
+});
+
+test("extension records the next queue vehicle and clears terminal local jobs", () => {
+  assert.match(queueClientSource, /lastQueueDecision/);
+  assert.match(queueClientSource, /QUEUE_NEXT_OBSERVED/);
+  assert.match(queueClientSource, /secondsUntilEligible/);
+  assert.match(queueClientSource, /\["Published", "Failed", "Cancelled", "Needs Review"\]/);
+});
+
 test("scheduled jobs expire relative to their scheduled slot instead of batch creation", () => {
   assert.match(
     staleCleanerSource,
