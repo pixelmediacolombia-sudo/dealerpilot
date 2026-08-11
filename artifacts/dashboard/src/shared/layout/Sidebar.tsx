@@ -33,7 +33,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { name: "Command center", shortName: "Command", path: "/", icon: Command, group: "Workspace" },
   { name: "Marketplace", shortName: "Market", path: "/listings", icon: ShoppingBag, group: "Workspace" },
-  { name: "Pages", shortName: "Pages", path: "/pages", icon: Send, group: "Workspace" },
+  { name: "Page", shortName: "Page", path: "/pages", icon: Send, group: "Workspace" },
   { name: "Inventory", shortName: "Inventory", path: "/inventory", icon: Boxes, group: "Workspace" },
   { name: "Photo studio", shortName: "Studio", path: "/ai-photo-studio", icon: Camera, group: "Tools" },
   { name: "Sales", shortName: "Sales", path: "/sales-ai", icon: MessageSquare, group: "Tools" },

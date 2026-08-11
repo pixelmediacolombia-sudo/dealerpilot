@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarClock, Check, Facebook, Loader2, RefreshCw, Send, Settings2, Sparkles, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAccount } from "@/app/AuthGate";
+import { AppLayout } from "@/shared/layout/AppLayout";
 
 type PageSettings = {
   enabled: boolean;
@@ -71,9 +72,9 @@ async function readJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 function formatDate(value: string | null): string {
-  if (!value) return "Sin hora programada";
-  return new Intl.DateTimeFormat("es-CO", {
-    timeZone: "America/Bogota",
+  if (!value) return "Not scheduled";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
     weekday: "short",
     day: "2-digit",
     month: "short",
@@ -83,8 +84,8 @@ function formatDate(value: string | null): string {
 }
 
 function formatPrice(value: number | null): string {
-  if (value == null) return "Precio pendiente";
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+  if (value == null) return "Price pending";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 }
 
 function statusTone(status: string): string {
@@ -135,7 +136,7 @@ export function PagesWorkspace() {
       setSettings(settingsResponse.settings ?? DEFAULT_SETTINGS);
       setBatch(batchResponse.batch);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "No se pudo cargar Pages");
+      setError(loadError instanceof Error ? loadError.message : "Unable to load Page publishing");
     } finally {
       setLoading(false);
     }
@@ -155,7 +156,7 @@ export function PagesWorkspace() {
       setConfigured(true);
       await load();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar el plan");
+      setError(saveError instanceof Error ? saveError.message : "Unable to save the plan");
     } finally {
       setSaving(false);
     }
@@ -168,37 +169,38 @@ export function PagesWorkspace() {
       await readJson("/api/pages/worker/run", { method: "POST" });
       await load();
     } catch (runError) {
-      setError(runError instanceof Error ? runError.message : "No se pudo procesar la cola");
+      setError(runError instanceof Error ? runError.message : "Unable to process the queue");
     } finally {
       setRunning(false);
     }
   };
 
   const nextVehicleLabel = useMemo(() => {
-    if (!batch?.vehicles.length) return "Todavía no hay vehículos en cola";
-    return `${batch.vehicles.length} vehículo${batch.vehicles.length === 1 ? "" : "s"} preparados`;
+    if (!batch?.vehicles.length) return "No vehicles are queued yet";
+    return `${batch.vehicles.length} vehicle${batch.vehicles.length === 1 ? "" : "s"} ready`;
   }, [batch]);
 
   return (
-    <div className="min-h-full bg-background px-4 py-5 sm:px-6 lg:px-8">
+    <AppLayout>
+      <div className="min-h-full bg-background px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1440px] space-y-5">
         <header className="flex flex-col justify-between gap-4 border-b border-border pb-5 lg:flex-row lg:items-end">
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
               <span className="h-1.5 w-6 rounded-full bg-primary" aria-hidden="true" />
-              Meta Pages
+              Meta Page
             </div>
-            <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.025em] text-foreground">Publicación directa</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Programa los vehículos que deben aparecer en la página de Facebook sin depender de una extensión ni del DOM.</p>
+            <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.025em] text-foreground">Direct publishing</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Schedule vehicles for your Facebook Page without depending on an extension or the DOM.</p>
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => void load()} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground transition-[background-color,border-color] hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden="true" />
-              Actualizar
+              Refresh
             </button>
             <button type="button" onClick={() => void runWorker()} disabled={running || !settings.enabled} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-[background-color,transform] hover:bg-primary/90 hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
               {running ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
-              Procesar cola
+              Process queue
             </button>
           </div>
         </header>
@@ -210,35 +212,36 @@ export function PagesWorkspace() {
             <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-primary/10 text-primary"><CalendarClock className="h-5 w-5" aria-hidden="true" /></span>
-                <div><h2 className="text-base font-semibold text-foreground">Auto Publish Plan</h2><p className="text-xs text-muted-foreground">Cola independiente para publicaciones de Pages</p></div>
+                <div><h2 className="text-base font-semibold text-foreground">Auto Publish Plan</h2><p className="text-xs text-muted-foreground">Independent queue for Page publishing</p></div>
               </div>
-              <Toggle checked={settings.enabled} onChange={(value) => updateSetting("enabled", value)} label="Activar publicación automática de Pages" />
+              <Toggle checked={settings.enabled} onChange={(value) => updateSetting("enabled", value)} label="Enable automatic Page publishing" />
             </div>
             <div className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4">
-              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Vehículos por batch<input type="number" min={1} max={20} value={settings.vehiclesPerBatch} onChange={(event) => updateSetting("vehiclesPerBatch", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>
-              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Máximo diario<input type="number" min={1} max={50} value={settings.maxPostsPerDay} onChange={(event) => updateSetting("maxPostsPerDay", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>
-              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Separación entre posts<select value={settings.minDelayMinutes} onChange={(event) => updateSetting("minDelayMinutes", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"><option value={0}>Sin separación</option><option value={15}>15 minutos</option><option value={30}>30 minutos</option><option value={60}>1 hora</option></select></label>
-              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Ventana diaria<div className="flex h-10 items-center gap-1"><input type="time" value={settings.preferredWindowStart} onChange={(event) => updateSetting("preferredWindowStart", event.target.value)} className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary" /><span className="text-muted-foreground">–</span><input type="time" value={settings.preferredWindowEnd} onChange={(event) => updateSetting("preferredWindowEnd", event.target.value)} className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary" /></div></label>
+              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Vehicles per batch<input type="number" min={1} max={20} value={settings.vehiclesPerBatch} onChange={(event) => updateSetting("vehiclesPerBatch", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>
+              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Daily maximum<input type="number" min={1} max={50} value={settings.maxPostsPerDay} onChange={(event) => updateSetting("maxPostsPerDay", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>
+              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Post spacing<select value={settings.minDelayMinutes} onChange={(event) => updateSetting("minDelayMinutes", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"><option value={0}>No spacing</option><option value={15}>15 minutes</option><option value={30}>30 minutes</option><option value={60}>1 hour</option></select></label>
+              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Daily window<div className="flex h-10 items-center gap-1"><input type="time" value={settings.preferredWindowStart} onChange={(event) => updateSetting("preferredWindowStart", event.target.value)} className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary" /><span className="text-muted-foreground">–</span><input type="time" value={settings.preferredWindowEnd} onChange={(event) => updateSetting("preferredWindowEnd", event.target.value)} className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary" /></div></label>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
-              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-600" />Publicación por Graph API</span><span className="inline-flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-primary" />Fotos gestionadas por DealerPilot</span></div>
-              <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"><Settings2 className="h-4 w-4" aria-hidden="true" />{saving ? "Guardando…" : "Guardar plan"}</button>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-600" />Published through Graph API</span><span className="inline-flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-primary" />Photos managed by DealerPilot</span></div>
+              <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"><Settings2 className="h-4 w-4" aria-hidden="true" />{saving ? "Saving…" : "Save plan"}</button>
             </div>
           </div>
 
           <aside className="rounded-[10px] border border-border bg-card p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)]">
-            <div className="flex items-start gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#1877F2]/10 text-[#1877F2]"><Facebook className="h-5 w-5" aria-hidden="true" /></span><div><h2 className="text-base font-semibold text-foreground">Conexión de Pages</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">La cuenta se valida en el backend con las variables de producción.</p></div></div>
-            <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-sm text-muted-foreground">Plan local</span><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", settings.enabled ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-border bg-muted/40 text-muted-foreground")}>{settings.enabled ? "Activo" : "Pausado"}</span></div>
-            <div className="mt-3 flex items-center justify-between"><span className="text-sm text-muted-foreground">Configuración guardada</span><span className="text-sm font-semibold text-foreground">{configured ? "Sí" : "Pendiente"}</span></div>
-            <p className="mt-4 rounded-md bg-muted/45 px-3 py-2.5 text-xs leading-5 text-muted-foreground">Los tokens no se muestran ni se almacenan en el frontend.</p>
+            <div className="flex items-start gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#1877F2]/10 text-[#1877F2]"><Facebook className="h-5 w-5" aria-hidden="true" /></span><div><h2 className="text-base font-semibold text-foreground">Page connection</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">The account is validated in the backend using production configuration.</p></div></div>
+            <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-sm text-muted-foreground">Local plan</span><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", settings.enabled ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-border bg-muted/40 text-muted-foreground")}>{settings.enabled ? "Active" : "Paused"}</span></div>
+            <div className="mt-3 flex items-center justify-between"><span className="text-sm text-muted-foreground">Configuration saved</span><span className="text-sm font-semibold text-foreground">{configured ? "Yes" : "Pending"}</span></div>
+            <p className="mt-4 rounded-md bg-muted/45 px-3 py-2.5 text-xs leading-5 text-muted-foreground">Tokens are never shown or stored in the frontend.</p>
           </aside>
         </section>
 
         <section className="rounded-[10px] border border-border bg-card shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)]">
-          <div className="flex flex-col justify-between gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center"><div><div className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">Siguiente lote</div><h2 className="mt-1 text-lg font-semibold tracking-[-0.015em] text-foreground">{batch ? `Batch #${batch.batchNumber}` : "La cola está esperando vehículos"}</h2><p className="mt-1 text-sm text-muted-foreground">{batch ? `${nextVehicleLabel} · programado para ${formatDate(batch.scheduledAt)}` : "Cuando el plan esté activo, el worker reservará el próximo batch automáticamente."}</p></div>{batch ? <div className="text-left sm:text-right"><span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(batch.status))}>{batch.status}</span><p className="mt-1 text-xs text-muted-foreground">{batch.completedCount}/{batch.totalVehicles} completados</p></div> : null}</div>
-          {loading ? <div className="flex items-center gap-2 px-5 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Consultando la cola…</div> : batch?.vehicles.length ? <div className="divide-y divide-border">{batch.vehicles.map((vehicle, index) => <div key={vehicle.id} className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-muted/20 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span><div className="min-w-0"><div className="truncate text-sm font-semibold text-foreground">{vehicle.year} {vehicle.make} {vehicle.model}{vehicle.trim ? ` ${vehicle.trim}` : ""}</div><div className="mt-1 text-xs text-muted-foreground">{formatPrice(vehicle.price)}{vehicle.stockNumber ? ` · Stock ${vehicle.stockNumber}` : ""} · {formatDate(vehicle.scheduledAt)}</div></div></div><div className="flex items-center gap-3 sm:shrink-0"><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(vehicle.status))}>{vehicle.status}</span>{vehicle.postUrl ? <a href={vehicle.postUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">Ver publicación</a> : null}</div></div>)}</div> : <div className="px-5 py-10 text-center"><p className="text-sm font-semibold text-foreground">{settings.enabled ? "Aún no hay un batch reservado" : "Activa el plan para comenzar"}</p><p className="mt-1 text-sm text-muted-foreground">La cola se crea automáticamente y queda separada de Marketplace.</p></div>}
+          <div className="flex flex-col justify-between gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center"><div><div className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">NEXT BATCH</div><h2 className="mt-1 text-lg font-semibold tracking-[-0.015em] text-foreground">{batch ? `Batch #${batch.batchNumber}` : "Queue is waiting for vehicles"}</h2><p className="mt-1 text-sm text-muted-foreground">{batch ? `${nextVehicleLabel} · scheduled for ${formatDate(batch.scheduledAt)}` : "When the plan is active, the worker will reserve the next batch automatically."}</p></div>{batch ? <div className="text-left sm:text-right"><span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(batch.status))}>{batch.status}</span><p className="mt-1 text-xs text-muted-foreground">{batch.completedCount}/{batch.totalVehicles} completed</p></div> : null}</div>
+          {loading ? <div className="flex items-center gap-2 px-5 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Checking queue…</div> : batch?.vehicles.length ? <div className="divide-y divide-border">{batch.vehicles.map((vehicle, index) => <div key={vehicle.id} className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-muted/20 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span><div className="min-w-0"><div className="truncate text-sm font-semibold text-foreground">{vehicle.year} {vehicle.make} {vehicle.model}{vehicle.trim ? ` ${vehicle.trim}` : ""}</div><div className="mt-1 text-xs text-muted-foreground">{formatPrice(vehicle.price)}{vehicle.stockNumber ? ` · Stock ${vehicle.stockNumber}` : ""} · {formatDate(vehicle.scheduledAt)}</div></div></div><div className="flex items-center gap-3 sm:shrink-0"><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(vehicle.status))}>{vehicle.status}</span>{vehicle.postUrl ? <a href={vehicle.postUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">View post</a> : null}</div></div>)}</div> : <div className="px-5 py-10 text-center"><p className="text-sm font-semibold text-foreground">{settings.enabled ? "No batch reserved yet" : "Enable the plan to get started"}</p><p className="mt-1 text-sm text-muted-foreground">The queue is created automatically and remains separate from Marketplace.</p></div>}
         </section>
       </div>
-    </div>
+      </div>
+    </AppLayout>
   );
 }
