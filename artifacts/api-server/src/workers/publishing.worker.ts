@@ -103,6 +103,30 @@ function parseTimeToMinutes(value: string): number | null {
   return hour * 60 + minute;
 }
 
+function newYorkCalendarDate(date: Date, daysFromDate: number): string {
+  const [year, month, day] = newYorkDateKey(date).split("-").map(Number);
+  const shifted = new Date(Date.UTC(year!, month! - 1, day! + daysFromDate));
+  return `${shifted.getUTCFullYear().toString().padStart(4, "0")}-${(shifted.getUTCMonth() + 1).toString().padStart(2, "0")}-${shifted.getUTCDate().toString().padStart(2, "0")}`;
+}
+
+function newYorkTimeZoneOffsetMinutes(date: Date): number {
+  const part = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    timeZoneName: "longOffset",
+  }).formatToParts(date).find((entry) => entry.type === "timeZoneName");
+  const match = /^GMT([+-])(\d{2}):?(\d{2})?$/.exec(part?.value ?? "GMT+00:00");
+  if (!match) return 0;
+  const hours = Number(match[2]);
+  const minutes = Number(match[3] ?? "0");
+  return (match[1] === "-" ? -1 : 1) * (hours * 60 + minutes);
+}
+
+function newYorkDateTimeToUtc(date: string, minutes: number): Date {
+  const [year, month, day] = date.split("-").map(Number);
+  const asUtc = Date.UTC(year!, month! - 1, day!, Math.floor(minutes / 60), minutes % 60);
+  return new Date(asUtc - newYorkTimeZoneOffsetMinutes(new Date(asUtc)) * 60_000);
+}
+
 function isWithinWindow(now: Date, start: string, end: string): boolean {
   const startMin = parseTimeToMinutes(start);
   const endMin = parseTimeToMinutes(end);
@@ -206,19 +230,13 @@ async function maybeCreateAutomaticBatch(
     return { created: 0, summary: `${activeJobs.length} active publishing job(s) already in queue` };
   }
 
-  const allTodayJobs = await db
-    .select({ createdAt: publishingJobsTable.createdAt })
+  const allScheduledJobs = await db
+    .select({ createdAt: publishingJobsTable.createdAt, scheduledAt: publishingJobsTable.scheduledAt })
     .from(publishingJobsTable)
     .where(eq(publishingJobsTable.dealerId, DEALER_ID));
-  const todayKey = newYorkDateKey(now);
-  const postsToday = allTodayJobs.filter((j) => newYorkDateKey(j.createdAt) === todayKey).length;
-  const remainingToday = Math.max(0, settings.maxPostsPerDay - postsToday);
-  if (remainingToday <= 0) {
-    return { created: 0, summary: `Daily auto-publish cap reached (${settings.maxPostsPerDay})` };
-  }
 
   const [lastBatch] = await db
-    .select({ createdAt: publishingBatchesTable.createdAt })
+    .select({ createdAt: publishingBatchesTable.createdAt, scheduledAt: publishingBatchesTable.scheduledAt })
     .from(publishingBatchesTable)
     .where(
       and(
@@ -230,11 +248,22 @@ async function maybeCreateAutomaticBatch(
     )
     .orderBy(desc(publishingBatchesTable.createdAt))
     .limit(1);
-  if (lastBatch) {
-    const ageDays = (now.getTime() - lastBatch.createdAt.getTime()) / 86_400_000;
-    if (ageDays < settings.frequencyDays) {
-      return { created: 0, summary: `Auto-publish frequency not due for ${Math.ceil(settings.frequencyDays - ageDays)} day(s)` };
-    }
+  const todayKey = newYorkDateKey(now);
+  const planStart = parseTimeToMinutes(settings.preferredWindowStart) ?? newYorkMinuteOfDay(now);
+  const lastBatchScheduledAt = lastBatch?.scheduledAt ?? lastBatch?.createdAt ?? null;
+  const targetBatchAt = lastBatchScheduledAt && newYorkDateKey(lastBatchScheduledAt) === todayKey
+    ? newYorkDateTimeToUtc(newYorkCalendarDate(now, 1), planStart)
+    : now;
+  const targetBatchDateKey = newYorkDateKey(targetBatchAt);
+  const lastBatchDateKey = lastBatch ? newYorkDateKey(lastBatch.scheduledAt ?? lastBatch.createdAt) : null;
+  if (lastBatchDateKey && targetBatchDateKey <= lastBatchDateKey) {
+    return { created: 0, summary: `Auto-publish next batch already planned for ${lastBatchDateKey}` };
+  }
+
+  const postsOnTargetDay = allScheduledJobs.filter((job) => newYorkDateKey(job.scheduledAt ?? job.createdAt) === targetBatchDateKey).length;
+  const remainingTargetDay = Math.max(0, settings.maxPostsPerDay - postsOnTargetDay);
+  if (remainingTargetDay <= 0) {
+    return { created: 0, summary: `Daily auto-publish cap reached for ${targetBatchDateKey} (${settings.maxPostsPerDay})` };
   }
 
   const vehicles = await db
@@ -311,7 +340,7 @@ async function maybeCreateAutomaticBatch(
 
   const selected: typeof selectedCandidates = [];
   for (const entry of selectedCandidates) {
-    if (selected.length >= Math.min(settings.vehiclesPerBatch, remainingToday)) break;
+    if (selected.length >= Math.min(settings.vehiclesPerBatch, remainingTargetDay)) break;
     const photoReadiness = await ensurePhotoDirectorReadyForPublish(entry.vehicle, log);
     if (!photoReadiness.ready) {
       log.info(
@@ -332,7 +361,7 @@ async function maybeCreateAutomaticBatch(
     .from(publishingBatchesTable)
     .where(eq(publishingBatchesTable.dealerId, DEALER_ID));
   const batchNumber = batchCountResult.length + 1;
-  const batchTiming = getInitialBatchTiming(now, now.getTime());
+  const batchTiming = getInitialBatchTiming(targetBatchAt, now.getTime());
 
   const [batch] = await db
     .insert(publishingBatchesTable)
@@ -343,7 +372,7 @@ async function maybeCreateAutomaticBatch(
       mode,
       totalVehicles: selected.length,
       needsReviewCount: 0,
-      scheduledAt: now,
+      scheduledAt: targetBatchAt,
       startedAt: batchTiming.startedAt,
       notes: "Created automatically by Publishing Agent",
     })
@@ -351,7 +380,7 @@ async function maybeCreateAutomaticBatch(
 
   for (let i = 0; i < selected.length; i++) {
     const entry = selected[i]!;
-    const jobScheduledAt = new Date(now.getTime() + i * settings.minDelayMinutes * 60_000);
+    const jobScheduledAt = new Date(targetBatchAt.getTime() + i * settings.minDelayMinutes * 60_000);
     const jobDueNow = jobScheduledAt.getTime() <= Date.now() + 1000;
     await db
       .insert(publishPriorityScoresTable)

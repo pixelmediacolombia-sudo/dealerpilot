@@ -255,6 +255,7 @@ export async function getNextAutoPublishForecast(params: {
       source: "persisted",
       timezone: PLAN_TIME_ZONE,
       displayTimezone: DISPLAY_TIME_ZONE,
+      batchNumber: batches[0]?.batchNumber ?? null,
       batch: batches[0] ?? null,
       jobs: activeJobs.sort((a, b) => (a.scheduledAt?.getTime() ?? 0) - (b.scheduledAt?.getTime() ?? 0)).map((job) => ({
         ...job,
@@ -273,19 +274,30 @@ export async function getNextAutoPublishForecast(params: {
 
   const start = parseTimeToMinutes(settings.preferredWindowStart) ?? 0;
   const end = parseTimeToMinutes(settings.preferredWindowEnd) ?? start;
-  const [lastAutoBatch] = await db.select({ createdAt: publishingBatchesTable.createdAt })
+  const [lastAutoBatch] = await db.select({ createdAt: publishingBatchesTable.createdAt, scheduledAt: publishingBatchesTable.scheduledAt })
     .from(publishingBatchesTable)
     .where(and(eq(publishingBatchesTable.dealerId, params.dealerId), eq(publishingBatchesTable.notes, "Created automatically by Publishing Agent")))
     .orderBy(desc(publishingBatchesTable.createdAt))
     .limit(1);
+  const [latestBatch] = await db.select({ batchNumber: publishingBatchesTable.batchNumber })
+    .from(publishingBatchesTable)
+    .where(eq(publishingBatchesTable.dealerId, params.dealerId))
+    .orderBy(desc(publishingBatchesTable.batchNumber))
+    .limit(1);
   const today = dateKey(now, PLAN_TIME_ZONE);
-  const todayJobs = await db.select({ createdAt: publishingJobsTable.createdAt }).from(publishingJobsTable).where(eq(publishingJobsTable.dealerId, params.dealerId));
-  const postsToday = todayJobs.filter((job) => dateKey(job.createdAt, PLAN_TIME_ZONE) === today).length;
+  const todayJobs = await db.select({ createdAt: publishingJobsTable.createdAt, scheduledAt: publishingJobsTable.scheduledAt }).from(publishingJobsTable).where(eq(publishingJobsTable.dealerId, params.dealerId));
+  const postsToday = todayJobs.filter((job) => dateKey(job.scheduledAt ?? job.createdAt, PLAN_TIME_ZONE) === today).length;
   const capReached = postsToday >= settings.maxPostsPerDay;
-  const frequencyNotBefore = lastAutoBatch ? new Date(lastAutoBatch.createdAt.getTime() + settings.frequencyDays * 86_400_000) : now;
+  const lastAutoScheduledAt = lastAutoBatch?.scheduledAt ?? lastAutoBatch?.createdAt ?? null;
+  const frequencyNotBefore = lastAutoScheduledAt ? new Date(lastAutoScheduledAt.getTime() + settings.frequencyDays * 86_400_000) : now;
   const capNotBefore = capReached ? zonedDateTimeToUtc(addCalendarDays(now, 1, PLAN_TIME_ZONE), 0, PLAN_TIME_ZONE) : now;
   const notBefore = frequencyNotBefore.getTime() > capNotBefore.getTime() ? frequencyNotBefore : capNotBefore;
-  const plannedAt = nextWindowStartAt(now, notBefore, start, end);
+  const rollingNextDate = lastAutoScheduledAt && dateKey(lastAutoScheduledAt, PLAN_TIME_ZONE) === today
+    ? addCalendarDays(now, settings.frequencyDays, PLAN_TIME_ZONE)
+    : null;
+  const plannedAt = rollingNextDate
+    ? zonedDateTimeToUtc(rollingNextDate, start, PLAN_TIME_ZONE)
+    : nextWindowStartAt(now, notBefore, start, end);
   const preview = await previewAutoPublishVehicles(params.dealerId, Math.min(params.count, settings.vehiclesPerBatch));
   const jobs = preview.selected.map((vehicle, index) => ({
     sequence: index + 1,
@@ -298,6 +310,7 @@ export async function getNextAutoPublishForecast(params: {
     enabled: true,
     status: "Forecast",
     source: "read_only_projection",
+    batchNumber: (latestBatch?.batchNumber ?? 0) + 1,
     timezone: PLAN_TIME_ZONE,
     displayTimezone: DISPLAY_TIME_ZONE,
     planWindow: { start: settings.preferredWindowStart, end: settings.preferredWindowEnd },
