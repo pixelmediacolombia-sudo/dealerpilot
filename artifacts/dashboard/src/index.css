@@ -49,7 +49,7 @@
 
 :root {
   color-scheme: light;
-  --background: 210 28% 97%;
+  --background: 225 27% 96%;
   --foreground: 215 28% 16%;
   --card: 0 0% 100%;
   --card-foreground: 220 18% 14%;
@@ -57,31 +57,31 @@
   --popover: 0 0% 100%;
   --popover-foreground: 220 18% 14%;
   --popover-border: 220 13% 86%;
-  --primary: 154 62% 36%;
+  --primary: 256 58% 58%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 210 22% 93%;
+  --secondary: 225 22% 93%;
   --secondary-foreground: 215 22% 23%;
-  --muted: 210 22% 93%;
+  --muted: 225 22% 93%;
   --muted-foreground: 215 12% 43%;
-  --accent: 153 55% 94%;
-  --accent-foreground: 154 59% 29%;
+  --accent: 256 65% 96%;
+  --accent-foreground: 256 55% 39%;
   --destructive: 0 72% 46%;
   --destructive-foreground: 0 0% 100%;
   --success: 145 55% 34%;
   --success-foreground: 0 0% 100%;
   --warning: 36 92% 40%;
   --warning-foreground: 25 40% 14%;
-  --border: 215 20% 87%;
-  --input: 215 19% 82%;
-  --ring: 154 62% 36%;
-  --sidebar: 210 25% 94%;
-  --sidebar-foreground: 215 20% 24%;
-  --sidebar-border: 215 19% 87%;
-  --sidebar-primary: 154 62% 36%;
+  --border: 225 20% 88%;
+  --input: 225 19% 82%;
+  --ring: 256 58% 58%;
+  --sidebar: 231 35% 16%;
+  --sidebar-foreground: 231 18% 92%;
+  --sidebar-border: 231 22% 25%;
+  --sidebar-primary: 256 72% 68%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 153 55% 89%;
-  --sidebar-accent-foreground: 154 59% 27%;
-  --sidebar-ring: 154 62% 36%;
+  --sidebar-accent: 256 48% 29%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-ring: 256 72% 68%;
   --radius: 0.75rem;
   --shadow-raised: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 20px rgb(15 23 42 / 0.05);
   --shadow-overlay: 0 18px 44px rgb(15 23 42 / 0.12), 0 4px 12px rgb(15 23 42 / 0.06);
@@ -101,21 +101,21 @@
   --popover: 220 15% 13%;
   --popover-foreground: 30 12% 94%;
   --popover-border: 220 10% 24%;
-  --primary: 154 58% 58%;
+  --primary: 256 72% 70%;
   --primary-foreground: 220 18% 10%;
   --secondary: 220 12% 17%;
   --secondary-foreground: 30 10% 90%;
   --muted: 220 12% 17%;
   --muted-foreground: 220 8% 66%;
-  --accent: 154 28% 20%;
-  --accent-foreground: 154 70% 75%;
+  --accent: 256 34% 24%;
+  --accent-foreground: 256 80% 82%;
   --border: 220 10% 22%;
   --input: 220 10% 25%;
-  --sidebar: 215 22% 12%;
+  --sidebar: 231 35% 10%;
   --sidebar-foreground: 30 10% 90%;
   --sidebar-border: 220 10% 21%;
-  --sidebar-accent: 154 28% 20%;
-  --sidebar-accent-foreground: 154 70% 75%;
+  --sidebar-accent: 256 42% 25%;
+  --sidebar-accent-foreground: 256 90% 88%;
 }
 
 @layer base {
@@ -189,6 +189,26 @@
   transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
 
+.gymove-kpi-purple {
+  background: hsl(256 72% 96%);
+  border-color: hsl(256 70% 88%);
+}
+
+.gymove-kpi-blue {
+  background: hsl(211 78% 96%);
+  border-color: hsl(211 70% 88%);
+}
+
+.gymove-kpi-pink {
+  background: hsl(337 76% 96%);
+  border-color: hsl(337 70% 89%);
+}
+
+.gymove-kpi-green {
+  background: hsl(150 50% 95%);
+  border-color: hsl(150 48% 86%);
+}
+
 @media (hover: hover) and (pointer: fine) {
   .hover-lift:hover {
     border-color: hsl(var(--border));
@@ -199,7 +219,17 @@
 
 .glass-panel {
   @apply border border-border bg-card text-card-foreground;
-  box-shadow: var(--shadow-overlay);
+  border-radius: 1rem;
+  box-shadow: 0 10px 24px rgb(30 37 62 / 0.045);
+}
+
+[class~="bg-card"] {
+  box-shadow: 0 10px 24px rgb(30 37 62 / 0.035);
+}
+
+[class~="border-border/50"],
+[class~="border-border/40"] {
+  border-color: hsl(var(--border));
 }
 
 .premium-gradient-btn {

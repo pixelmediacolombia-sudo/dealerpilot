@@ -30,4 +30,5 @@ An operator can identify the most urgent item and reach the correct workflow wit
 
 - **2026-08-09** — Avoid the generic AI look: forced dark mode, blue-violet gradients, glows, glass panels, excessive cards, and repeated uppercase labels. *Why:* the user wants DealerPilot to read as professional operational software.
 - **2026-08-09** — Use the restrained light dashboard direction demonstrated by UI Craft. *Why:* the user explicitly selected that before/after example.
+- **2026-08-11** — The dashboard surface must visibly adopt the Gymove admin grammar: dark grouped navigation, white operational panels, compact KPI blocks, and violet/blue/pink semantic accents. *Why:* the user clarified that the prior pass changed tokens but did not transform the overall appearance enough.
 - **2026-08-09** — The browser identity uses a DP monogram in the product accent. *Why:* the previous colored dot did not identify DealerPilot.

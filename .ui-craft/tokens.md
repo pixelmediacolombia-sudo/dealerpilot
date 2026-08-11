@@ -2,7 +2,7 @@
 
 - Style: restrained operational dashboard
 - Theme: light by default, intentional dark token mapping retained
-- Accent: soft UI Craft blue; never decorative blue-violet gradients
+- Accent: Gymove violet with restrained supporting KPI colors; never decorative gradients
 - Density: 7/10
 - Variance: 4/10
 - Motion: 2/10; color, opacity, and short state transitions only
@@ -15,8 +15,9 @@
 - Primary text: charcoal, `hsl(220 18% 14%)`
 - Secondary text: `hsl(220 8% 42%)`
 - Border: `hsl(220 13% 88%)`
-- Accent: soft blue, `hsl(213 62% 45%)`
-- Accent soft: `hsl(213 50% 95%)`
+- Accent: Gymove violet, `hsl(256 58% 58%)`
+- Accent soft: `hsl(256 65% 96%)`
+- Supporting accents: blue `hsl(211 78% 53%)`, pink `hsl(337 76% 63%)`; use only for distinct KPI states
 - Success, warning, and destructive colors are semantic only
 
 ## Typography

@@ -18,7 +18,7 @@ export function SectionCard({ title, description, icon, action, children, module
   const theme = module ? getModuleTheme(module) : null;
 
   return (
-    <section className={cn("overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm", className)}>
+    <section className={cn("overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-[0_10px_24px_rgb(30_37_62/0.045)]", className)}>
       {(title || action || icon) ? (
         <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">

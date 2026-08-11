@@ -19,11 +19,11 @@ export function PageHeader({ title, subtitle, description, eyebrow, module, acti
   const theme = module ? getModuleTheme(module) : null;
 
   return (
-    <header className={cn("border-b border-border pb-5", className)}>
+    <header className={cn("border-b border-border pb-6", className)}>
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end sm:gap-6">
         <div className="min-w-0">
           {eyebrow ? <p className={cn("mb-2 text-xs font-medium tracking-wide text-muted-foreground", theme?.eyebrow)}>{eyebrow}</p> : null}
-          <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.025em] text-foreground">{title}</h1>
+          <h1 className="text-[32px] font-bold leading-tight tracking-[-0.035em] text-foreground">{title}</h1>
           {sub ? <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{sub}</p> : null}
         </div>
         {(children || action) ? (
