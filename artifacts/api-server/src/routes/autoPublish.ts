@@ -46,6 +46,7 @@ import {
   ensurePhotoDirectorReadyForPublish,
   photoDirectorPublishBlockReason,
 } from "../photo/publishReadiness";
+import { getNextAutoPublishForecast } from "../publishing/autoPublishForecast";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
 // Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
@@ -53,6 +54,29 @@ const DEALER_ID = 1;
 const DEALER_FILTER = eq(vehiclesTable.dealerId, DEALER_ID);
 
 const router: IRouter = Router();
+
+// GET /auto-publish/next-batch — read-only Postman/API forecast.
+// This endpoint never creates a batch, job, photo job, or reservation.
+router.get("/auto-publish/next-batch", async (req, res) => {
+  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : DEALER_ID;
+  const count = typeof req.query.count === "string" ? Number(req.query.count) : 3;
+  if (!Number.isInteger(dealerId) || dealerId < 1) {
+    res.status(400).json({ error: "dealerId must be a positive integer" });
+    return;
+  }
+  if (!Number.isInteger(count) || count < 1 || count > 20) {
+    res.status(400).json({ error: "count must be an integer between 1 and 20" });
+    return;
+  }
+
+  try {
+    const forecast = await getNextAutoPublishForecast({ dealerId, count });
+    res.json({ generatedAt: new Date().toISOString(), ...forecast });
+  } catch (error) {
+    req.log.error({ err: error, dealerId }, "Failed to build next auto-publish forecast");
+    res.status(500).json({ error: "Failed to build next auto-publish forecast" });
+  }
+});
 
 function shouldKickAutoPublish(settings: AutoPublishSettings): boolean {
   return settings.enabled && !settings.requireApproval && resolvePublishMode(settings.autoClickPublish) === "Controlled";
