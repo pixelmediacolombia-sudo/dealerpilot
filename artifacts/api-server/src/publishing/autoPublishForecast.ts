@@ -106,6 +106,12 @@ function nextWindowStartAt(
   for (let offset = 0; offset < 31; offset++) {
     const localDate = addCalendarDays(notBefore, offset, PLAN_TIME_ZONE);
     const candidate = zonedDateTimeToUtc(localDate, start, PLAN_TIME_ZONE);
+    const windowEnd = zonedDateTimeToUtc(localDate, end, PLAN_TIME_ZONE);
+    if (dateKey(notBefore, PLAN_TIME_ZONE) === localDate
+      && notBefore.getTime() > candidate.getTime()
+      && notBefore.getTime() <= windowEnd.getTime()) {
+      return new Date(notBefore);
+    }
     if (candidate.getTime() >= now.getTime() && candidate.getTime() >= notBefore.getTime()) {
       return candidate;
     }
