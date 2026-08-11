@@ -81,6 +81,12 @@ async function logAudit(event, details = {}) {
   } catch (_) { /* non-critical */ }
 }
 
+async function getDealerId() {
+  const stored = await chrome.storage.local.get("dealerId");
+  const value = Number(stored.dealerId);
+  return Number.isInteger(value) && value > 0 ? value : 1;
+}
+
 function getQueueDecision(job, extra = {}) {
   const nowMs = Date.now();
   const scheduledMs = job?.scheduledAt ? new Date(job.scheduledAt).getTime() : null;
@@ -244,17 +250,6 @@ async function detectFacebookTabState() {
   }
 }
 
-function isCloseableMarketplaceUrl(url) {
-  const state = detectFacebookTabStateFromUrl(url || "");
-  if (!state?.marketplaceDetected) return false;
-  const path = state.marketplacePath || "";
-  return (
-    path.includes("/marketplace/create") ||
-    path.includes("/marketplace/you/selling") ||
-    path.includes("/marketplace/item/")
-  );
-}
-
 async function closeMarketplaceTabs(sender, message = {}) {
   const ids = new Set();
   const senderTabId = sender?.tab?.id;
@@ -263,21 +258,10 @@ async function closeMarketplaceTabs(sender, message = {}) {
   const requestedTabId = Number(message.tabId);
   if (Number.isFinite(requestedTabId) && requestedTabId > 0) ids.add(requestedTabId);
 
-  try {
-    const tabs = await chrome.tabs.query({
-      url: [
-        "https://www.facebook.com/marketplace/*",
-        "https://web.facebook.com/marketplace/*",
-        "https://facebook.com/marketplace/*",
-      ],
-    });
-    for (const tab of tabs) {
-      if (!tab?.id) continue;
-      if (tab.id === senderTabId || isCloseableMarketplaceUrl(tab.url)) ids.add(tab.id);
-    }
-  } catch (err) {
-    console.warn("[DealerPilot AI] Marketplace tab sweep failed:", err);
-  }
+  // Only close the tab that explicitly requested cleanup. A broad Marketplace
+  // sweep could close a user's existing listing, promotion, or seller tab.
+  // Duplicate candidates are resolved by the content flow before completion;
+  // unrelated tabs must never be treated as extension-owned.
 
   const closed = [];
   for (const id of ids) {
@@ -1035,14 +1019,15 @@ const handlers = {
     ];
     const stored = await chrome.storage.local.get(keys);
     const base = await getBackendUrl();
+    const dealerId = await getDealerId();
     const manifest = chrome.runtime.getManifest();
     return {
       version: manifest.version,
       extensionId: stored.extensionId || null,
       backendUrl: base,
       environment: detectEnvironment(base),
-      dealerId: 1,
-      dealerName: "Alpha Motorsport",
+      dealerId,
+      dealerName: dealerId === 1 ? "Alpha Motorsport" : `Dealer ${dealerId}`,
       lastHeartbeat: stored.lastHeartbeat || null,
       lastHeartbeatUrl: stored.lastHeartbeatUrl || null,
       lastHeartbeatResponse: stored.lastHeartbeatResponse || null,

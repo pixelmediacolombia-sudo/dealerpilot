@@ -391,18 +391,7 @@
         box.textContent = text;
         box.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
       }
-      if (sendButton) {
-        sendButton.focus?.();
-        sendButton.click();
-        return { ok: true, method: "button_click" };
-      }
-      if (!box) return { ok: false, method: "none" };
-      box.focus?.();
-      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-      box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-      return { ok: true, method: "enter" };
     }
-    if (raw.startsWith("error:")) return { ok: false, method: "main_world_error", error: raw.slice(6) };
     if (sendButton) {
       sendButton.scrollIntoView?.({ block: "center", behavior: "instant" });
       await sleep(300);
@@ -426,9 +415,10 @@
       box?.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
       return { ok: true, method: "button_click" };
     }
-    box?.focus?.();
-    box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-    box?.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+    if (!box) return { ok: false, method: "none" };
+    box.focus?.();
+    box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+    box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
     return { ok: true, method: "enter" };
   }
 

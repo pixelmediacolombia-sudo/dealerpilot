@@ -10,6 +10,7 @@ import {
   ChevronUp,
   Plug,
   Plus,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGetDealer, useListDealers, getGetDealerQueryKey } from "@workspace/api-client-react";
@@ -32,6 +33,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { name: "Command center", shortName: "Command", path: "/", icon: Command, group: "Workspace" },
   { name: "Marketplace", shortName: "Market", path: "/listings", icon: ShoppingBag, group: "Workspace" },
+  { name: "Pages", shortName: "Pages", path: "/pages", icon: Send, group: "Workspace" },
   { name: "Inventory", shortName: "Inventory", path: "/inventory", icon: Boxes, group: "Workspace" },
   { name: "Photo studio", shortName: "Studio", path: "/ai-photo-studio", icon: Camera, group: "Tools" },
   { name: "Sales", shortName: "Sales", path: "/sales-ai", icon: MessageSquare, group: "Tools" },
@@ -41,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
 const ACTIVE_PATHS: Record<string, string[]> = {
   "/": ["/"],
   "/listings": ["/listings", "/publishing", "/marketplace-intelligence"],
+  "/pages": ["/pages"],
   "/inventory": ["/inventory", "/inventory-engine"],
   "/ai-photo-studio": ["/ai-photo-studio", "/creative-studio"],
   "/sales-ai": ["/sales-ai", "/conversations", "/leads", "/sales-ai/marketplace-listings"],
@@ -149,7 +152,7 @@ export function Sidebar() {
         </div>
       </aside>
 
-      <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 grid h-[68px] grid-cols-6 border-t border-sidebar-border bg-sidebar px-1 pb-[env(safe-area-inset-bottom)] text-sidebar-foreground shadow-[0_-8px_24px_rgb(15_23_42/0.18)] md:hidden">
+      <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 grid h-[68px] grid-cols-7 border-t border-sidebar-border bg-sidebar px-1 pb-[env(safe-area-inset-bottom)] text-sidebar-foreground shadow-[0_-8px_24px_rgb(15_23_42/0.18)] md:hidden">
         {NAV_ITEMS.map((item) => {
           const active = isActive(item);
           return (

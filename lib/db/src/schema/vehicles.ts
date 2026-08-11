@@ -8,12 +8,15 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { dealersTable } from "./dealers";
 
 export const vehiclesTable = pgTable(
   "vehicles",
   {
     id: serial("id").primaryKey(),
-    dealerId: integer("dealer_id").notNull(),
+    dealerId: integer("dealer_id")
+      .notNull()
+      .references(() => dealersTable.id),
     vin: text("vin").notNull(),
     stockNumber: text("stock_number"),
     year: integer("year"),

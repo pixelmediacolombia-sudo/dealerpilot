@@ -20,6 +20,7 @@ import { InventoryEngine } from "@/features/inventory/pages/InventoryEngine";
 import { AIPhotoStudio } from "@/features/photo-studio/pages/AIPhotoStudio";
 import MarketIntelligencePage from "@/features/marketplace-intelligence/pages/MarketplaceIntelligencePage";
 import { PublishingConflictsPage } from "@/features/marketplace-intelligence/pages/PublishingConflicts";
+import { PagesWorkspace } from "@/features/pages/pagesWorkspace";
 
 function DashboardRoutes() {
   return (
@@ -31,6 +32,7 @@ function DashboardRoutes() {
 
       <Route path="/listings/readiness" component={ProductionReadiness} />
       <Route path="/listings" component={ListingsWorkspace} />
+      <Route path="/pages" component={PagesWorkspace} />
       <Route path="/listings/:id" component={ListingDetail} />
       <Route path="/publishing" component={PublishingQueue} />
 

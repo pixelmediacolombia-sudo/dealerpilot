@@ -13,7 +13,7 @@ import { Input } from "@/shared/ui/input";
 
 const TOKEN_KEY = "dealerpilot.sessionToken";
 
-interface AuthUser {
+export interface AuthUser {
   id: number;
   dealerId: number;
   username: string;
@@ -28,6 +28,12 @@ interface AccountMenuContextValue {
 }
 
 const AccountMenuContext = createContext<AccountMenuContextValue | null>(null);
+
+export function useAccount(): AuthUser {
+  const account = useContext(AccountMenuContext);
+  if (!account) throw new Error("useAccount must be used inside AuthGate");
+  return account.user;
+}
 
 export function AccountMenu() {
   const account = useContext(AccountMenuContext);

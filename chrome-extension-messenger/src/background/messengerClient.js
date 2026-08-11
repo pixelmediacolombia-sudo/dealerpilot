@@ -4,6 +4,7 @@
     dryRun: true,
     autoReplyEnabled: false,
     backendUrl: "https://1987dealerpilot.com",
+    dealerId: 1,
     sellerProfileNames: ["Alpha Manassas", "Alpha Motorsport", "Andres Ibanez"],
   });
 
@@ -27,6 +28,7 @@
       ...stored,
       dryRun: stored.dryRun !== false,
       autoReplyEnabled: stored.autoReplyEnabled === true,
+      dealerId: Number.isInteger(Number(stored.dealerId)) && Number(stored.dealerId) > 0 ? Number(stored.dealerId) : 1,
       sellerProfileNames: Array.isArray(stored.sellerProfileNames)
         ? stored.sellerProfileNames.filter(Boolean)
         : DEFAULT_SETTINGS.sellerProfileNames,
@@ -162,6 +164,7 @@
       if (typeof message.dryRun === "boolean") patch.dryRun = message.dryRun;
       if (typeof message.autoReplyEnabled === "boolean") patch.autoReplyEnabled = message.autoReplyEnabled;
       if (typeof message.backendUrl === "string") patch.backendUrl = message.backendUrl.trim().replace(/\/+$/, "");
+      if (Number.isInteger(Number(message.dealerId)) && Number(message.dealerId) > 0) patch.dealerId = Number(message.dealerId);
       if (Array.isArray(message.sellerProfileNames)) {
         patch.sellerProfileNames = message.sellerProfileNames.map((name) => String(name).trim()).filter(Boolean);
       }

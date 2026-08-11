@@ -272,10 +272,6 @@
     return Math.abs(firstCenterX - secondCenterX) + Math.abs(firstCenterY - secondCenterY);
   }
 
-  function escapeJs(value) {
-    return JSON.stringify(value);
-  }
-
   function generateSelector(element) {
     if (!element || !element.parentElement) return "";
     const cssEscape = typeof CSS !== "undefined" && CSS.escape ? CSS.escape.bind(CSS) : function(v) { return v.replace(/["\\]/g, "\\$&"); };
@@ -298,14 +294,6 @@
       cur = parent;
     }
     return path.join(" > ");
-  }
-
-  function executeInMainWorld(code) {
-    if (typeof document === "undefined" || !document.createElement) return;
-    const el = document.createElement("script");
-    el.textContent = code;
-    document.documentElement.appendChild(el);
-    el.remove();
   }
 
   function findSendButton(root, box = null) {
@@ -358,51 +346,19 @@
   async function clickSend(box, root, replyText) {
     await sleep(250);
     const text = replyText || (box ? cleanText(readComposerText(box)) : "");
-    const escapedReply = escapeJs(text);
     const sendButton = findSendButton(root, box);
-    const script = `
-(function() {
-  try {
-    var c = document.querySelector('[contenteditable="true"][role="textbox"], [contenteditable="true"][aria-label], [contenteditable="true"][data-lexical-editor]');
-    if (!c) { window.__DP_SEND_RESULT = 'composer_missing'; return; }
-    c.focus();
-    var s = window.getSelection();
-    if (s && s.rangeCount) s.removeAllRanges();
-    var r = document.createRange();
-    r.selectNodeContents(c); s && s.addRange(r);
-    document.execCommand('delete', false, null);
-    document.execCommand('insertText', false, ${escapedReply});
-    window.__DP_SEND_RESULT = 'text_inserted';
-  } catch(e) { window.__DP_SEND_RESULT = 'error:' + e.message; }
-})();
-`;
-    executeInMainWorld(script);
-    await sleep(400);
-    const raw = globalThis.__DP_SEND_RESULT || "";
-    delete globalThis.__DP_SEND_RESULT;
-    if (!raw || raw === "composer_missing") {
-      if (box && box.tagName !== "TEXTAREA" && document.execCommand) {
+    if (box && !cleanText(readComposerText(box))) {
+      if (box.tagName !== "TEXTAREA" && document.execCommand) {
         box.focus?.();
         document.execCommand("selectAll", false, undefined);
         document.execCommand("insertText", false, text);
-      } else if (box && box.tagName === "TEXTAREA") {
+      } else if (box.tagName === "TEXTAREA") {
         setNativeValue(box, text);
-      } else if (box) {
+      } else {
         box.textContent = text;
         box.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
       }
-      if (sendButton) {
-        sendButton.focus?.();
-        sendButton.click();
-        return { ok: true, method: "button_click" };
-      }
-      if (!box) return { ok: false, method: "none" };
-      box.focus?.();
-      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-      box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-      return { ok: true, method: "enter" };
     }
-    if (raw.startsWith("error:")) return { ok: false, method: "main_world_error", error: raw.slice(6) };
     if (sendButton) {
       sendButton.scrollIntoView?.({ block: "center", behavior: "instant" });
       await sleep(300);
@@ -426,9 +382,10 @@
       box?.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
       return { ok: true, method: "button_click" };
     }
-    box?.focus?.();
-    box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-    box?.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+    if (!box) return { ok: false, method: "none" };
+    box.focus?.();
+    box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+    box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
     return { ok: true, method: "enter" };
   }
 

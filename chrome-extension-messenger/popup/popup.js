@@ -13,6 +13,7 @@
     const response = await send({ type: "GET_SETTINGS" });
     const settings = response.ok ? response.data : {};
     $("backendUrl").value = settings.backendUrl || "https://1987dealerpilot.com";
+    $("dealerId").value = Number.isInteger(Number(settings.dealerId)) && Number(settings.dealerId) > 0 ? String(Number(settings.dealerId)) : "1";
     $("sellerProfileNames").value = (settings.sellerProfileNames || []).join("\n");
     $("dryRun").checked = settings.dryRun !== false;
     $("autoReplyEnabled").checked = settings.autoReplyEnabled === true;
@@ -133,6 +134,7 @@
     const response = await send({
       type: "SAVE_SETTINGS",
       backendUrl: $("backendUrl").value,
+      dealerId: Number($("dealerId").value),
       sellerProfileNames: $("sellerProfileNames").value.split(/\r?\n/),
       dryRun: $("dryRun").checked,
       autoReplyEnabled: $("autoReplyEnabled").checked,

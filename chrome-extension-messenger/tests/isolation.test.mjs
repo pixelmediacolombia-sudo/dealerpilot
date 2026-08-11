@@ -46,6 +46,7 @@ test("manifest loads only Messenger AI runtime files", () => {
 
   assert.equal(manifest.name, "DealerPilot Messenger AI");
   assert.deepEqual(scripts, [
+    "src/shared/theme.js",
     "src/content/facebook/messengerCapture.js",
     "src/content/facebook/messengerAutonomy.js",
     "src/content/facebook/messengerAi.js",

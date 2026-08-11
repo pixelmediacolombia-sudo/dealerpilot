@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DealerPilot Messenger AI",
-  "version": "0.1.57",
+  "version": "0.1.58",
   "description": "Detects Facebook Marketplace buyer conversations, requests DealerPilot AI suggestions, and replies only when explicitly enabled.",
   "permissions": [
     "storage",
@@ -31,6 +31,7 @@
         "https://facebook.com/marketplace/inbox*"
       ],
       "js": [
+        "src/shared/theme.js",
         "src/content/facebook/messengerCapture.js",
         "src/content/facebook/messengerAutonomy.js",
         "src/content/facebook/messengerAi.js",

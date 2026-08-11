@@ -56,7 +56,7 @@ const copy = {
     extensions: [
       ["01", "Publisher", "Publica inventario en Facebook Marketplace con fotos y datos preparados."],
       ["02", "Messenger AI", "Prepara respuestas usando el vehículo real, el dealer y la intención del comprador."],
-      ["03", "Page Publisher", "Mantiene separada la página comercial del Marketplace del vendedor."],
+      ["03", "Pages", "Publica inventario directamente en la página comercial mediante Meta."],
     ],
     trustTitle: "Ayuda donde sirve. Decisión humana donde importa.",
     trust: ["Tu inventario es la referencia", "El equipo conserva el control", "Cada canal tiene su función"],
@@ -105,7 +105,7 @@ const copy = {
     modules: [["01", "Command center", "Start the day with priorities, alerts, and the next move."], ["02", "Inventory", "Price, mileage, photos, and unit health in context."], ["03", "Marketplace", "Move from ready to publish to active listing with fewer steps."], ["04", "Messages", "Reply to buyers with the vehicle in context."], ["05", "Photo studio", "Prepare consistent galleries and selling cover photos."], ["06", "Dealer DNA", "Keep your business tone, rules, and data consistent."]],
     extensionsEyebrow: "DealerPilot extensions",
     extensionsTitle: "Context-aware automation with control.",
-    extensions: [["01", "Publisher", "Publish inventory to Facebook Marketplace with prepared photos and data."], ["02", "Messenger AI", "Prepare replies using the real vehicle, dealer, and buyer intent."], ["03", "Page Publisher", "Keep the commercial page separate from the seller Marketplace flow."]],
+    extensions: [["01", "Publisher", "Publish inventory to Facebook Marketplace with prepared photos and data."], ["02", "Messenger AI", "Prepare replies using the real vehicle, dealer, and buyer intent."], ["03", "Pages", "Publish inventory directly to the business Page through Meta."]],
     trustTitle: "Help where it matters. Human decisions where they count.",
     trust: ["Your inventory is the source of truth", "Your team stays in control", "Every channel has a job"],
     pricingEyebrow: "Plans built for operations",

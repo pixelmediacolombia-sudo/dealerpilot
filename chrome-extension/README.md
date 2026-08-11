@@ -5,9 +5,9 @@ Facebook Marketplace. It claims queued publishing jobs, opens the Marketplace
 create-listing page, fills the listing form from real inventory data, and lets the
 operator review and report the outcome back to the backend.
 
-**Safety first:** the extension **never** auto-clicks Publish, never stores a
-Facebook password, and stops if Facebook shows a login / checkpoint / captcha /
-security screen.
+**Safety first:** the extension never stores a Facebook password, requires an
+explicit operator authorization before publishing a paid Marketplace promotion,
+and stops if Facebook shows a login / checkpoint / captcha / security screen.
 
 ## What's in v1.2
 
@@ -34,7 +34,10 @@ security screen.
   plus **Facebook** and **Marketplace** status pills, and a **Start Publishing Job** button.
 - On the Marketplace **create listing** page: automatic form fill from the claimed
   job plus an **operator review** panel (filled / missing / warnings, **Mark
-  Published**, **Mark Failed**). **It never clicks Publish.**
+  Published**, **Mark Failed**).
+- On Facebook's **Promote Marketplace listing** page: shows an explicit
+  **Authorize and publish** action; after authorization it clicks the promotion
+  `Publish` action and then `Go to your listings` from the confirmation dialog.
 - Messenger AI is handled by the separate `DealerPilot Messenger AI` extension.
 
 ## Install (Load Unpacked)
@@ -96,7 +99,8 @@ jobs — it contains no Facebook credentials.
 ### Marketplace fill + review
 - [ ] On the create page the panel auto-fills the form. Status reads "Fields filled… Publish was NOT clicked."
 - [ ] Review panel lists filled fields, missing fields, and warnings.
-- [ ] **Publish is never clicked.**
+- [ ] On the promotion page, no Facebook action is clicked until **Authorize and publish** is pressed in the DealerPilot AI panel.
+- [ ] After authorization, the exact promotion **Publish** action is clicked, followed by **Go to your listings** in Facebook's confirmation dialog.
 
 ### Complete / Fail
 - [ ] Click **Mark Published**, paste a listing URL. Status reads "Job marked Published."

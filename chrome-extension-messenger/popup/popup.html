@@ -1,195 +1,125 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>DealerPilot Messenger AI</title>
-    <style>
-      body {
-        width: 360px;
-        margin: 0;
-        font: 13px/1.45 Arial, sans-serif;
-        color: #172033;
-        background: #f7f8fb;
-      }
-      main {
-        padding: 14px;
-      }
-      h1 {
-        margin: 0 0 10px;
-        font-size: 16px;
-      }
-      label {
-        display: block;
-        margin: 10px 0 4px;
-        font-weight: 700;
-      }
-      input[type="text"],
-      textarea {
-        box-sizing: border-box;
-        width: 100%;
-        border: 1px solid #c9ced8;
-        border-radius: 6px;
-        padding: 8px;
-        font: inherit;
-      }
-      textarea {
-        min-height: 64px;
-        resize: vertical;
-      }
-      .row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        padding: 9px 0;
-        border-top: 1px solid #e1e4ea;
-      }
-      .row span {
-        font-weight: 700;
-      }
-      button {
-        margin-top: 12px;
-        width: 100%;
-        border: 0;
-        border-radius: 6px;
-        padding: 9px 10px;
-        font-weight: 700;
-        color: white;
-        background: #1c6dd0;
-        cursor: pointer;
-      }
-      pre {
-        max-height: 160px;
-        overflow: auto;
-        margin: 12px 0 0;
-        padding: 9px;
-        border-radius: 6px;
-        background: #111827;
-        color: #e5e7eb;
-        white-space: pre-wrap;
-      }
-      .muted {
-        color: #5d687a;
-        font-size: 12px;
-      }
-      .debug-card {
-        margin-top: 12px;
-        padding: 10px;
-        border: 1px solid #d5d9e2;
-        border-radius: 8px;
-        background: white;
-      }
-      .debug-card h2 {
-        margin: 0 0 8px;
-        font-size: 12px;
-        text-transform: uppercase;
-        color: #5d687a;
-      }
-      .debug-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 4px 0;
-        border-top: 1px solid #edf0f5;
-      }
-      .debug-row:first-of-type {
-        border-top: 0;
-      }
-      .debug-label {
-        color: #5d687a;
-      }
-      .debug-value {
-        max-width: 190px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        text-align: right;
-        font-weight: 700;
-      }
-      .ok { color: #0f8f45; }
-      .warn { color: #a96500; }
-      .err { color: #b42318; }
-      button.secondary {
-        background: #44546a;
-      }
-      textarea.readonly {
-        min-height: 86px;
-        background: #f9fafc;
-      }
-    </style>
+    <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <main>
-      <h1>DealerPilot Messenger AI</h1>
-      <div class="muted">Independent Marketplace conversation assistant.</div>
-
-      <label for="backendUrl">Backend URL</label>
-      <input id="backendUrl" type="text" autocomplete="off">
-
-      <label for="sellerProfileNames">Seller profile names</label>
-      <textarea id="sellerProfileNames" spellcheck="false"></textarea>
-
-      <div class="row">
-        <span>Dry run</span>
-        <input id="dryRun" type="checkbox">
+    <header class="app-header">
+      <div class="brand-mark" aria-hidden="true">DP</div>
+      <div class="brand-copy">
+        <h1>DealerPilot Messenger AI</h1>
+        <p>Conversation operations</p>
+        <span>Marketplace assistant</span>
       </div>
-      <div class="row">
-        <span>Auto reply</span>
-        <input id="autoReplyEnabled" type="checkbox">
+      <div class="header-status" title="Messenger AI extension">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span>Ready</span>
       </div>
+    </header>
 
-      <button id="save">Save Settings</button>
-
-      <section class="debug-card">
-        <h2>AI Debugger</h2>
-        <div class="debug-row">
-          <span class="debug-label">Mode</span>
-          <span class="debug-value" id="dbg-mode">—</span>
+    <main class="popup-content">
+      <section class="mode-banner" aria-label="Extension mode">
+        <div class="banner-icon" aria-hidden="true">✓</div>
+        <div>
+          <strong>Connected to DealerPilot</strong>
+          <p>The extension monitors assigned conversations automatically.</p>
+          <span id="v-publish-mode-banner">Mode: Assistant controls are managed here.</span>
         </div>
-        <div class="debug-row">
-          <span class="debug-label">Stage</span>
-          <span class="debug-value" id="dbg-stage">Never</span>
-        </div>
-        <div class="debug-row">
-          <span class="debug-label">Seller</span>
-          <span class="debug-value" id="dbg-seller">—</span>
-        </div>
-        <div class="debug-row">
-          <span class="debug-label">Buyer</span>
-          <span class="debug-value" id="dbg-buyer">—</span>
-        </div>
-        <div class="debug-row">
-          <span class="debug-label">DOM</span>
-          <span class="debug-value" id="dbg-dom">—</span>
-        </div>
-        <div class="debug-row">
-          <span class="debug-label">Images</span>
-          <span class="debug-value" id="dbg-images">—</span>
-        </div>
-        <div class="debug-row">
-          <span class="debug-label">Backend</span>
-          <span class="debug-value" id="dbg-backend">—</span>
-        </div>
-        <div class="debug-row">
-          <span class="debug-label">Auto Send</span>
-          <span class="debug-value" id="dbg-send">Blocked</span>
-        </div>
-        <div class="debug-row">
-          <span class="debug-label">Specific Error</span>
-          <span class="debug-value" id="dbg-error-specific">None</span>
-        </div>
-        <label for="suggested-reply">Manual fallback reply</label>
-        <textarea id="suggested-reply" class="readonly" readonly placeholder="No AI suggestion yet."></textarea>
-        <button id="copy-suggested" class="secondary" type="button" disabled>Copy Suggested Reply</button>
-        <label for="raw-error">Raw Error</label>
-        <pre id="raw-error">None</pre>
-        <button id="reload-debug" class="secondary">Reload Debugger</button>
-        <button id="show-debug" class="secondary">Show Debug Object</button>
       </section>
 
-      <pre id="diagnostics">Loading...</pre>
+      <section class="surface-card settings-card" aria-labelledby="settings-title">
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">Workspace setup</p>
+            <h2 id="settings-title">Messenger controls</h2>
+          </div>
+          <span class="card-index">01</span>
+        </div>
+
+        <label for="backendUrl">Backend URL</label>
+        <input id="backendUrl" type="text" autocomplete="off" />
+
+        <label for="dealerId">Dealer ID</label>
+        <input id="dealerId" type="number" min="1" step="1" value="1" />
+        <p class="field-help">Se guarda por instalación para aplicar el Dealer DNA correcto.</p>
+
+        <label for="sellerProfileNames">Seller profile names</label>
+        <textarea id="sellerProfileNames" spellcheck="false"></textarea>
+        <p class="field-help">One profile per line. Matching keeps replies scoped to the right seller.</p>
+
+        <div class="control-list">
+          <label class="control-row" for="dryRun">
+            <span>
+              <strong>Dry run</strong>
+              <small>Review suggestions before sending.</small>
+            </span>
+            <span class="switch">
+              <input id="dryRun" type="checkbox" />
+              <span class="switch-track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <label class="control-row" for="autoReplyEnabled">
+            <span>
+              <strong>Auto reply</strong>
+              <small>Allow approved replies to send automatically.</small>
+            </span>
+            <span class="switch">
+              <input id="autoReplyEnabled" type="checkbox" />
+              <span class="switch-track" aria-hidden="true"></span>
+            </span>
+          </label>
+        </div>
+
+        <button id="save" type="button" class="primary-action">Save settings</button>
+      </section>
+
+      <section class="surface-card debug-card" aria-labelledby="debug-title">
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">Live diagnostics</p>
+            <h2 id="debug-title">AI Debugger</h2>
+          </div>
+          <span class="live-chip"><span class="status-dot" aria-hidden="true"></span> Live</span>
+        </div>
+
+        <div class="debug-grid">
+          <div class="debug-row"><span>Mode</span><strong id="dbg-mode">—</strong></div>
+          <div class="debug-row"><span>Stage</span><strong id="dbg-stage">Never</strong></div>
+          <div class="debug-row"><span>Seller</span><strong id="dbg-seller">—</strong></div>
+          <div class="debug-row"><span>Buyer</span><strong id="dbg-buyer">—</strong></div>
+          <div class="debug-row"><span>DOM</span><strong id="dbg-dom">—</strong></div>
+          <div class="debug-row"><span>Images</span><strong id="dbg-images">—</strong></div>
+          <div class="debug-row"><span>Backend</span><strong id="dbg-backend">—</strong></div>
+          <div class="debug-row"><span>Auto send</span><strong id="dbg-send">Blocked</strong></div>
+        </div>
+
+        <div class="issue-row">
+          <span>Specific Error</span>
+          <strong id="dbg-error-specific">None</strong>
+        </div>
+
+        <label for="suggested-reply">Manual fallback reply</label>
+        <textarea id="suggested-reply" class="readonly" readonly placeholder="No AI suggestion yet."></textarea>
+        <button id="copy-suggested" type="button" class="secondary-action" disabled>Copy suggested reply</button>
+
+        <details class="raw-details">
+          <summary>Raw Error details</summary>
+          <pre id="raw-error">None</pre>
+        </details>
+
+        <div class="debug-actions">
+          <button id="reload-debug" type="button" class="secondary-action">Reload debugger</button>
+          <button id="show-debug" type="button" class="secondary-action">Show Debug Object</button>
+        </div>
+      </section>
+
+      <p id="diagnostics" class="diagnostic-note" role="status">Loading...</p>
     </main>
+
+    <script src="../src/shared/theme.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

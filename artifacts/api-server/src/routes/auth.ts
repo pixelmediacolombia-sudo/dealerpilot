@@ -7,10 +7,14 @@ const router: IRouter = Router();
 
 const ALPHA_DEALER_ID = 1;
 const ALPHA_USERNAME = "alpha.manassas";
-const ALPHA_INITIAL_PASSWORD = process.env.ALPHA_INITIAL_PASSWORD ?? "Alpha2026";
+const ALPHA_INITIAL_PASSWORD = process.env.ALPHA_INITIAL_PASSWORD;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const MAX_LOGIN_FAILURES = 5;
 const LOGIN_LOCK_MS = 15 * 60 * 1000;
+const SCRYPT_COST = 32_768;
+const SCRYPT_BLOCK_SIZE = 8;
+const SCRYPT_PARALLELIZATION = 1;
+const SCRYPT_KEY_LENGTH = 64;
 
 const sessions = new Map<string, { userId: number; expiresAt: number; issuedAt: number }>();
 const loginFailures = new Map<string, { count: number; lockedUntil: number }>();
@@ -30,18 +34,55 @@ type DealerUserRow = {
 };
 
 function hashPassword(password: string, salt = crypto.randomBytes(16).toString("hex")) {
-  const hash = crypto.pbkdf2Sync(password, salt, 120_000, 32, "sha256").toString("hex");
-  return `pbkdf2_sha256$120000$${salt}$${hash}`;
+  const hash = crypto.scryptSync(password, Buffer.from(salt, "hex"), SCRYPT_KEY_LENGTH, {
+    N: SCRYPT_COST,
+    r: SCRYPT_BLOCK_SIZE,
+    p: SCRYPT_PARALLELIZATION,
+    maxmem: 64 * 1024 * 1024,
+  }).toString("hex");
+  return `scrypt$${SCRYPT_COST}$${SCRYPT_BLOCK_SIZE}$${SCRYPT_PARALLELIZATION}$${salt}$${hash}`;
 }
 
 function verifyPassword(password: string, stored: string): boolean {
-  const [scheme, iterationsRaw, salt, expected] = stored.split("$");
-  if (scheme !== "pbkdf2_sha256" || !iterationsRaw || !salt || !expected) return false;
-  const iterations = Number(iterationsRaw);
-  const hash = crypto.pbkdf2Sync(password, salt, iterations, 32, "sha256").toString("hex");
-  const actualBuffer = Buffer.from(hash, "hex");
+  try {
+    const parts = stored.split("$");
+    const [scheme, ...rest] = parts;
+    if (scheme === "scrypt") {
+      const [costRaw, blockSizeRaw, parallelizationRaw, salt, expected] = rest;
+      const cost = Number(costRaw);
+      const blockSize = Number(blockSizeRaw);
+      const parallelization = Number(parallelizationRaw);
+      if (!cost || !blockSize || !parallelization || !salt || !expected || !/^[0-9a-f]+$/i.test(salt) || !/^[0-9a-f]+$/i.test(expected)) return false;
+      const hash = crypto.scryptSync(password, Buffer.from(salt, "hex"), SCRYPT_KEY_LENGTH, {
+        N: cost,
+        r: blockSize,
+        p: parallelization,
+        maxmem: 64 * 1024 * 1024,
+      }).toString("hex");
+      return safeEqualHex(hash, expected);
+    }
+
+  // Existing Alpha users may still have the original PBKDF2 record. Keep it
+  // readable for one migration window and upgrade it after the next login.
+    const [iterationsRaw, salt, expected] = rest;
+    if (scheme !== "pbkdf2_sha256" || !iterationsRaw || !salt || !expected) return false;
+    const iterations = Number(iterationsRaw);
+    if (!Number.isInteger(iterations) || iterations <= 0) return false;
+    const hash = crypto.pbkdf2Sync(password, salt, iterations, 32, "sha256").toString("hex");
+    return safeEqualHex(hash, expected);
+  } catch {
+    return false;
+  }
+}
+
+function safeEqualHex(actual: string, expected: string): boolean {
+  const actualBuffer = Buffer.from(actual, "hex");
   const expectedBuffer = Buffer.from(expected, "hex");
   return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function needsPasswordRehash(stored: string): boolean {
+  return !stored.startsWith(`scrypt$${SCRYPT_COST}$${SCRYPT_BLOCK_SIZE}$${SCRYPT_PARALLELIZATION}$`);
 }
 
 async function ensureAuthSchema() {
@@ -115,6 +156,9 @@ async function ensureAlphaUser() {
     return existing;
   }
 
+  if (!ALPHA_INITIAL_PASSWORD) {
+    throw new Error("ALPHA_INITIAL_PASSWORD is required before creating the Alpha user");
+  }
   const created = await pool.query<DealerUserRow>(
     `insert into dealer_users (dealer_id, username, password_hash, display_name, role, status)
      values ($1, $2, $3, 'Alpha Manassas', 'admin', 'Active')
@@ -286,6 +330,13 @@ router.post("/auth/login", async (req, res) => {
     await recordLoginFailure(req, username, user ?? null);
     res.status(401).json({ error: "Invalid username or password" });
     return;
+  }
+
+  if (needsPasswordRehash(user.password_hash)) {
+    await pool.query(
+      "update dealer_users set password_hash = $1, updated_at = now() where id = $2",
+      [hashPassword(parsed.data.password), user.id],
+    );
   }
 
   await pool.query(

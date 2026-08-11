@@ -368,7 +368,7 @@ test("page detection remains true when another Facebook tab reports a non-Market
   assert.equal(storage.marketplaceDetected, false);
 });
 
-test("publish completion closes current and related Marketplace tabs", async () => {
+test("publish completion closes only the requesting Marketplace tab", async () => {
   const payload = { fill: {}, images: [] };
   const { handlers, calls } = createHarness(payload, {
     facebookTabs: [
@@ -385,5 +385,5 @@ test("publish completion closes current and related Marketplace tabs", async () 
   );
 
   assert.equal(result.closed, true);
-  assert.deepEqual(calls.removedTabs.sort((a, b) => a - b), [76, 77, 78]);
+  assert.deepEqual(calls.removedTabs.sort((a, b) => a - b), [76]);
 });

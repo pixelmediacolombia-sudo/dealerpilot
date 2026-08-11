@@ -9,6 +9,7 @@ import { seedAiStudio } from "./photo/seed";
 import { seedPhotoQualityProfiles } from "./photo/seedProfiles";
 import { startPhotoWorker } from "./photo/worker";
 import { startWorkers } from "./workers";
+import { startPagesPublishingWorker } from "./pages/pagesPublishing.worker";
 
 const rawPort = process.env["PORT"];
 
@@ -41,6 +42,7 @@ app.listen(port, (err) => {
     .then(() => seedPhotoQualityProfiles(logger))
     .then(() => startPhotoWorker(logger))
     .then(() => startWorkers(logger))
+    .then(() => startPagesPublishingWorker(logger))
     .catch((seedErr) => {
       logger.error({ err: seedErr }, "Failed to seed/start engines");
     });

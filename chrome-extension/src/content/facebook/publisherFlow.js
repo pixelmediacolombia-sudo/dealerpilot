@@ -884,13 +884,17 @@
   panel.id = "mai-panel";
   panel.innerHTML = `
     <div id="mai-header">
+      <span id="mai-drag-handle" title="Arrastra para mover DealerPilot AI" aria-label="Arrastra para mover DealerPilot AI" role="button" tabindex="0">
+        <span id="mai-drag-grip" aria-hidden="true">⋮⋮</span>
+      </span>
       <span id="mai-dot"></span>
       <span id="mai-title">DealerPilot AI</span>
       <span style="font-size:9px;opacity:.55;margin-left:4px;letter-spacing:.02em;">v${EXT_VERSION}</span>
-      <button id="mai-toggle" title="Collapse">_</button>
+      <button id="mai-reset-position" type="button" title="Restablecer posición" aria-label="Restablecer posición">↗</button>
+      <button id="mai-toggle" type="button" title="Collapse" aria-label="Collapse DealerPilot AI">_</button>
     </div>
     <div id="mai-body">
-      <div id="mai-status" class="mai-status">Checking connection…</div>
+      <div id="mai-status" class="mai-status" role="status" aria-live="polite">Checking connection…</div>
       <div id="mai-job-box"></div>
       <div id="mai-actions"></div>
       <div id="mai-output" class="mai-output" hidden></div>
@@ -904,6 +908,103 @@
   const jobBoxEl = panel.querySelector("#mai-job-box");
   const dotEl = panel.querySelector("#mai-dot");
   const bodyEl = panel.querySelector("#mai-body");
+  const dragHandleEl = panel.querySelector("#mai-drag-handle");
+  const resetPositionEl = panel.querySelector("#mai-reset-position");
+  let promotionFlowPromise = null;
+  let promotionAuthorizationResolver = null;
+
+  const PANEL_POSITION_KEY = "marketplacePanelPosition";
+  const PANEL_MARGIN = 12;
+
+  function clampPanelPosition(left, top) {
+    const rect = panel.getBoundingClientRect();
+    const maxLeft = Math.max(PANEL_MARGIN, window.innerWidth - rect.width - PANEL_MARGIN);
+    const maxTop = Math.max(PANEL_MARGIN, window.innerHeight - rect.height - PANEL_MARGIN);
+    return {
+      left: Math.min(Math.max(PANEL_MARGIN, left), maxLeft),
+      top: Math.min(Math.max(PANEL_MARGIN, top), maxTop),
+    };
+  }
+
+  function applyPanelPosition(position) {
+    const next = clampPanelPosition(Number(position.left), Number(position.top));
+    panel.style.left = `${next.left}px`;
+    panel.style.top = `${next.top}px`;
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+  }
+
+  async function restorePanelPosition() {
+    try {
+      const stored = await chrome.storage.local.get(PANEL_POSITION_KEY);
+      if (stored[PANEL_POSITION_KEY]?.left != null && stored[PANEL_POSITION_KEY]?.top != null) {
+        applyPanelPosition(stored[PANEL_POSITION_KEY]);
+      }
+    } catch (error) {
+      console.warn("[DealerPilot AI] Could not restore panel position", error);
+    }
+  }
+
+  function savePanelPosition() {
+    const rect = panel.getBoundingClientRect();
+    chrome.storage.local.set({
+      [PANEL_POSITION_KEY]: { left: Math.round(rect.left), top: Math.round(rect.top) },
+    }).catch((error) => console.warn("[DealerPilot AI] Could not save panel position", error));
+  }
+
+  function resetPanelPosition() {
+    chrome.storage.local.remove(PANEL_POSITION_KEY).catch(() => {});
+    panel.style.left = "auto";
+    panel.style.top = "auto";
+    panel.style.right = "18px";
+    panel.style.bottom = "18px";
+  }
+
+  function startPanelDrag(event) {
+    if (event.button !== 0) return;
+    const rect = panel.getBoundingClientRect();
+    const offsetX = event.clientX - rect.left;
+    const offsetY = event.clientY - rect.top;
+    let moved = false;
+
+    panel.classList.add("mai-dragging");
+    dragHandleEl.setPointerCapture?.(event.pointerId);
+
+    const move = (moveEvent) => {
+      moved = true;
+      applyPanelPosition({
+        left: moveEvent.clientX - offsetX,
+        top: moveEvent.clientY - offsetY,
+      });
+    };
+    const stop = () => {
+      panel.classList.remove("mai-dragging");
+      dragHandleEl.removeEventListener("pointermove", move);
+      dragHandleEl.removeEventListener("pointerup", stop);
+      dragHandleEl.removeEventListener("pointercancel", stop);
+      if (moved) savePanelPosition();
+    };
+
+    dragHandleEl.addEventListener("pointermove", move);
+    dragHandleEl.addEventListener("pointerup", stop, { once: true });
+    dragHandleEl.addEventListener("pointercancel", stop, { once: true });
+  }
+
+  dragHandleEl.addEventListener("pointerdown", startPanelDrag);
+  dragHandleEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      resetPanelPosition();
+    }
+  });
+  resetPositionEl.addEventListener("click", resetPanelPosition);
+  window.addEventListener("resize", () => {
+    if (panel.style.left && panel.style.top) {
+      applyPanelPosition({ left: panel.getBoundingClientRect().left, top: panel.getBoundingClientRect().top });
+      savePanelPosition();
+    }
+  });
+  restorePanelPosition();
 
   panel.querySelector("#mai-toggle").addEventListener("click", () => {
     bodyEl.hidden = !bodyEl.hidden;
@@ -926,6 +1027,7 @@
 
   function button(label, onClick, variant) {
     const b = document.createElement("button");
+    b.type = "button";
     b.className = "mai-btn" + (variant ? " " + variant : "");
     b.textContent = label;
     b.addEventListener("click", onClick);
@@ -934,6 +1036,70 @@
 
   function escapeHtml(str) {
     return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function promotionPageKey() {
+    return String(window.location.href || "").split("#")[0];
+  }
+
+  async function isPromotionAuthorizationGranted(job) {
+    const { marketplacePromotionAuthorization } = await chrome.storage.local.get(
+      "marketplacePromotionAuthorization",
+    );
+    if (!marketplacePromotionAuthorization?.pageKey) return false;
+    if (marketplacePromotionAuthorization.pageKey !== promotionPageKey()) return false;
+    if (job?.id && Number(marketplacePromotionAuthorization.jobId) !== Number(job.id)) return false;
+    return true;
+  }
+
+  function renderPromotionAuthorization(job) {
+    if (!isMarketplacePromotionPage() || panel.querySelector("#mai-promotion-auth")) return;
+
+    const card = document.createElement("section");
+    card.id = "mai-promotion-auth";
+    card.className = "mai-promotion-card";
+    card.setAttribute("aria-labelledby", "mai-promotion-title");
+    card.innerHTML = `
+      <div id="mai-promotion-title" class="mai-promotion-title">Promoción de Marketplace detectada</div>
+      <div class="mai-promotion-copy">Autoriza una vez para publicar la promoción y volver a tus anuncios automáticamente.</div>
+    `;
+
+    const authorizeButton = button("Autorizar y publicar", async () => {
+      authorizeButton.disabled = true;
+      authorizeButton.textContent = "Autorización recibida…";
+      await chrome.storage.local.set({
+        marketplacePromotionAuthorization: {
+          pageKey: promotionPageKey(),
+          jobId: job?.id ?? null,
+          authorizedAt: new Date().toISOString(),
+        },
+      });
+      promotionAuthorizationResolver?.(true);
+      promotionAuthorizationResolver = null;
+    });
+    authorizeButton.setAttribute("aria-describedby", "mai-promotion-title");
+    card.appendChild(authorizeButton);
+    actionsEl.prepend(card);
+  }
+
+  async function waitForPromotionAuthorization(job) {
+    if (await isPromotionAuthorizationGranted(job)) return true;
+    renderPromotionAuthorization(job);
+    setStatus("Promoción detectada. Esperando tu autorización…");
+
+    return new Promise((resolve) => {
+      let settled = false;
+      let timeout;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        promotionAuthorizationResolver = null;
+        resolve(value);
+      };
+      timeout = setTimeout(() => finish(false), 10 * 60 * 1000);
+      promotionAuthorizationResolver = finish;
+    });
   }
 
   // ---- Connection check ----
@@ -3031,6 +3197,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
   // clickEnabledButtonByText — only clicks buttons that are NOT disabled.
   async function clickPublishUntilListingUrl(job) {
+    // Facebook may navigate directly to the paid promotion screen after the
+    // vehicle publish action. Complete that flow with the separate explicit
+    // authorization gate before scanning generic Marketplace Publish buttons.
+    if (isMarketplacePromotionPage()) {
+      return runMarketplacePromotionFlow(job);
+    }
+
     const publishTexts = ["publish listing", "publish", "post listing", "post", "publicar", "publicar anuncio"];
     for (let attempt = 1; attempt <= 2; attempt++) {
       setStatus(attempt === 1
@@ -3369,27 +3542,37 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   }
 
   function findMarketplaceListingUrlOnPage(job) {
+    const urls = findMarketplaceListingUrlsOnPage(job);
+    return urls.length === 1 ? urls[0] : null;
+  }
+
+  function findMarketplaceListingUrlsOnPage(job) {
     const anchors = Array.from(document.querySelectorAll('a[href*="/marketplace/item/"]'));
-    if (anchors.length === 0) return null;
+    if (anchors.length === 0) return [];
 
     const expectedTokens = expectedMarketplaceListingTokens(job);
+    const urls = new Set();
 
     for (const anchor of anchors) {
       const href = anchor.href;
       if (!href) continue;
-      const text = normalizeText(
-        [
-          anchor.innerText || anchor.textContent || "",
-          anchor.closest('[role="button"], [role="article"], div')?.innerText || "",
-        ].join(" "),
-      );
-      if (marketplaceTextMatchesExpectedListing(text, expectedTokens)) {
-        return href;
+      const contexts = [anchor.innerText || anchor.textContent || ""];
+      let parent = anchor.parentElement;
+      let depth = 0;
+      while (parent && depth < 6) {
+        const text = parent.innerText || parent.textContent || "";
+        // Keep the search scoped to a vehicle card. A large list container can
+        // contain several vehicles and would make every link look identical.
+        if (text.length <= 1200) contexts.push(text);
+        parent = parent.parentElement;
+        depth += 1;
+      }
+      if (contexts.some((context) => marketplaceTextMatchesExpectedListing(context, expectedTokens))) {
+        urls.add(href);
       }
     }
 
-
-    return null;
+    return [...urls];
   }
 
   function expectedMarketplaceListingTokens(job) {
@@ -3436,6 +3619,229 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     return marketplaceTextMatchesExpectedListing(document.body?.innerText || "", expectedTokens);
   }
 
+  function isMarketplacePromotionPage() {
+    const path = normalizePublishText(window.location.pathname || "");
+    if (path.includes("/marketplace/promote") || path.includes("/marketplace/boost") || path.includes("/promote/")) {
+      return true;
+    }
+    const body = normalizePublishText(document.body?.innerText || "");
+    const promotionHeading = Array.from(document.querySelectorAll("h1, h2, [role=heading]"))
+      .some((el) => normalizePublishText(el.innerText || el.textContent || "").includes("promote marketplace listing"));
+    const promotionBudget = body.includes("select your budget type")
+      && body.includes("daily budget")
+      && body.includes("ad preview");
+    return promotionHeading
+      || promotionBudget
+      || body.includes("promote marketplace listing")
+      || body.includes("promote your marketplace listing")
+      || body.includes("promocionar anuncio de marketplace")
+      || body.includes("promocionar publicacion de marketplace");
+  }
+
+  function promotionElementIsVisible(el) {
+    if (!el || el.closest?.("#mai-panel")) return false;
+    if (el.disabled || el.hasAttribute?.("disabled") || el.getAttribute?.("aria-disabled") === "true") return false;
+    const rect = el.getBoundingClientRect?.();
+    return !rect || (rect.width > 0 && rect.height > 0);
+  }
+
+  function promotionElementLabels(el) {
+    const labels = [
+      el.getAttribute?.("aria-label"),
+      el.getAttribute?.("title"),
+      el.innerText,
+      el.textContent,
+    ].map(normalizePublishText).filter(Boolean);
+    return [...new Set(labels)];
+  }
+
+  function findExactPromotionAction(labels, root = document) {
+    const wanted = labels.map(normalizePublishText);
+    return Array.from(root.querySelectorAll?.('button, [role="button"], a') || [])
+      .find((el) => promotionElementIsVisible(el)
+        && promotionElementLabels(el).some((label) => wanted.includes(label)));
+  }
+
+  function promotionConfirmationVisible() {
+    const confirmationWords = [
+      "your ads are being created",
+      "tus anuncios se estan creando",
+      "tus anuncios se están creando",
+    ];
+    const scopes = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]'))
+      .filter(promotionElementIsVisible);
+    return scopes.some((scope) => confirmationWords.some((word) => normalizePublishText(scope.innerText || scope.textContent).includes(normalizePublishText(word))))
+      || confirmationWords.some((word) => normalizePublishText(document.body?.innerText || "").includes(normalizePublishText(word)));
+  }
+
+  function findPromotionConfirmationAction() {
+    const dialogs = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]'))
+      .filter(promotionElementIsVisible);
+    for (const dialog of dialogs) {
+      const action = findExactPromotionAction([
+        "go to your listings",
+        "go to listings",
+        "ir a tus anuncios",
+        "ir a tus publicaciones",
+        "ver tus anuncios",
+      ], dialog);
+      if (action) return action;
+    }
+    return dialogs.length === 0
+      ? findExactPromotionAction([
+        "go to your listings",
+        "go to listings",
+        "ir a tus anuncios",
+        "ir a tus publicaciones",
+        "ver tus anuncios",
+      ])
+      : null;
+  }
+
+  async function waitForPromotionAction(labels, timeoutMs) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const action = findExactPromotionAction(labels);
+      if (action) return action;
+      await sleep(350);
+    }
+    return findExactPromotionAction(labels);
+  }
+
+  async function runMarketplacePromotionFlow(job) {
+    if (promotionFlowPromise) return promotionFlowPromise;
+
+    promotionFlowPromise = (async () => {
+      const authorized = await waitForPromotionAuthorization(job);
+      if (!authorized) {
+        return {
+          listingUrl: null,
+          blockReason: "Marketplace promotion authorization was not granted.",
+          publishedLanding: false,
+        };
+      }
+
+      setStatus("Publicando la promoción de Marketplace…", "ok");
+      const publishButton = await waitForPromotionAction(["publish", "publicar"], 30_000);
+      if (!publishButton) {
+        return {
+          listingUrl: null,
+          blockReason: "Facebook's promotion Publish button was not available.",
+          publishedLanding: false,
+        };
+      }
+
+      publishButton.scrollIntoView?.({ block: "center", inline: "nearest" });
+      publishButton.click();
+      stateLog("Marketplace promotion: Publish clicked after explicit authorization");
+      send({
+        type: "SEND_JOB_EVENT",
+        jobId: job?.id,
+        event: "marketplace_promotion_publish_clicked",
+        details: "Promotion Publish clicked after explicit operator authorization.",
+      }).catch(() => { });
+
+      const confirmationStart = Date.now();
+      let goToListingsButton = null;
+      while (Date.now() - confirmationStart < 30_000) {
+        if (promotionConfirmationVisible()) {
+          goToListingsButton = findPromotionConfirmationAction();
+          if (goToListingsButton) break;
+        }
+        await sleep(350);
+      }
+
+      if (!goToListingsButton) {
+        return {
+          listingUrl: null,
+          blockReason: "Facebook created the promotion but did not expose Go to your listings.",
+          publishedLanding: false,
+        };
+      }
+
+      goToListingsButton.scrollIntoView?.({ block: "center", inline: "nearest" });
+      goToListingsButton.click();
+      stateLog("Marketplace promotion: Go to your listings clicked");
+      await chrome.storage.local.set({
+        promotionHandledJobId: job?.id ?? null,
+        promotionHandledAt: new Date().toISOString(),
+      });
+      await chrome.storage.local.remove("marketplacePromotionAuthorization");
+
+      const listingUrl = await waitForMarketplaceListingAfterPromotion(job, 30_000);
+      return { listingUrl, blockReason: null, publishedLanding: true };
+    })().finally(() => {
+      promotionFlowPromise = null;
+    });
+
+    return promotionFlowPromise;
+  }
+
+  async function handleMarketplacePromotionLanding() {
+    if (promotionFlowPromise) return;
+    const { activeJob, promotionHandledJobId } = await chrome.storage.local.get([
+      "activeJob",
+      "promotionHandledJobId",
+    ]);
+    if (!activeJob?.id) {
+      renderPromotionAuthorization(null);
+      setStatus("Promoción detectada. Esperando autorización para publicar.");
+      return;
+    }
+    if (Number(promotionHandledJobId) === Number(activeJob.id)) return;
+
+    const validation = await send({ type: "VALIDATE_JOB", jobId: activeJob.id }).catch(() => null);
+    const status = validation?.ok ? validation.data?.status : null;
+    const activeStatuses = new Set([
+      "Claimed",
+      "Publishing",
+      "Opening Facebook",
+      "Filling Form",
+      "Auto Publishing",
+      "Ready for Review",
+    ]);
+    if (!activeStatuses.has(status)) {
+      await chrome.storage.local.remove("activeJob");
+      await send({ type: "POLL_NOW" }).catch(() => { });
+      return;
+    }
+
+    const promotionOutcome = await runMarketplacePromotionFlow(activeJob);
+    if (!promotionOutcome.publishedLanding) {
+      setStatus(promotionOutcome.blockReason || "Marketplace promotion was not completed.", "err");
+      return;
+    }
+
+    const listingUrl = promotionOutcome.listingUrl;
+    const reason = "Facebook completed the Marketplace promotion flow, but the individual listing URL was not exposed.";
+    await send({
+      type: "SEND_JOB_EVENT",
+      jobId: activeJob.id,
+      event: "marketplace_promotion_page_detected",
+      details: listingUrl ? `Promotion published and listing URL captured: ${listingUrl}` : reason,
+    }).catch(() => { });
+
+    if (listingUrl) {
+      const completed = await send({
+        type: "COMPLETE_JOB",
+        jobId: activeJob.id,
+        listingUrl,
+      }).catch(() => null);
+      if (!completed?.ok) {
+        await send({
+          type: "MARK_NEEDS_REVIEW",
+          jobId: activeJob.id,
+        reason: `${reason} Backend completion did not acknowledge the listing URL.`,
+        }).catch(() => { });
+      }
+    } else {
+      await send({ type: "MARK_NEEDS_REVIEW", jobId: activeJob.id, reason }).catch(() => { });
+    }
+
+    await chrome.storage.local.remove("activeJob");
+    await send({ type: "POLL_NOW" }).catch(() => { });
+  }
+
   async function findMarketplaceListingUrlFromSellerDialog(job) {
     const expectedTokens = expectedMarketplaceListingTokens(job);
     if (expectedTokens.length === 0) return null;
@@ -3473,12 +3879,52 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     return null;
   }
 
+  async function waitForMarketplaceListingAfterPromotion(job, timeoutMs) {
+    const start = Date.now();
+    let sellerDialogAttempted = false;
+
+    while (Date.now() - start < timeoutMs) {
+      if (window.location.pathname.includes("/marketplace/item/") && currentMarketplaceItemMatchesJob(job)) {
+        return window.location.href;
+      }
+
+      const pageUrls = findMarketplaceListingUrlsOnPage(job);
+      if (pageUrls.length === 1) return pageUrls[0];
+
+      if (!sellerDialogAttempted && window.location.pathname.includes("/marketplace/you/selling")) {
+        sellerDialogAttempted = true;
+        const dialogUrl = await findMarketplaceListingUrlFromSellerDialog(job);
+        if (dialogUrl) return dialogUrl;
+      }
+
+      await sleep(500);
+    }
+
+    if (window.location.pathname.includes("/marketplace/item/") && currentMarketplaceItemMatchesJob(job)) {
+      return window.location.href;
+    }
+    const pageUrls = findMarketplaceListingUrlsOnPage(job);
+    return pageUrls.length === 1 ? pageUrls[0] : null;
+  }
+
   async function waitForPublishOutcome(job, timeoutMs) {
     const startUrl = window.location.href;
     const start = Date.now();
     let sawSellingLanding = false;
     while (Date.now() - start < timeoutMs) {
       const cur = window.location.href;
+      if (isMarketplacePromotionPage()) {
+        const promotionOutcome = await runMarketplacePromotionFlow(job);
+        send({
+          type: "SEND_JOB_EVENT",
+          jobId: job.id,
+          event: "marketplace_promotion_page_detected",
+          details: promotionOutcome.publishedLanding
+            ? "Facebook promotion was published after explicit operator authorization."
+            : promotionOutcome.blockReason || "Marketplace promotion was not completed.",
+        }).catch(() => { });
+        return promotionOutcome;
+      }
       if (cur !== startUrl && cur.includes("/marketplace/item/")) {
         if (currentMarketplaceItemMatchesJob(job)) {
           return { listingUrl: cur, blockReason: null, publishedLanding: false };
@@ -3724,6 +4170,14 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     }, 1600);
   }
 
+  if (isMarketplacePromotionPage()) {
+    setTimeout(() => {
+      handleMarketplacePromotionLanding().catch((err) => {
+        stateError("Marketplace promotion landing handling failed", err);
+      });
+    }, 1200);
+  }
+
   if (isMarketplaceCreate) {
     chrome.storage.local.get("activeJob").then(async ({ activeJob }) => {
       if (activeJob) {
@@ -3825,9 +4279,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       }
 
       // Debug button — always visible on create page
-      const dbgBtn = button("🔍 DEBUG: Vehicle Type only", () => debugVehicleType(), "mai-btn-secondary");
+      const dbgBtn = button("Debug vehicle type", () => debugVehicleType(), "mai-btn-secondary");
       dbgBtn.title = "Selects Vehicle Type = Car/Truck then stops. Use Fill Marketplace Fields for the full workflow.";
-      dbgBtn.style.cssText += ";margin-top:6px;border:2px dashed #e74c3c;color:#e74c3c;font-weight:700;font-size:10px;";
+      dbgBtn.style.cssText += ";margin-top:6px;border:1px dashed #cfc6f5;color:#7658d6;font-weight:700;font-size:10px;";
       actionsEl.appendChild(dbgBtn);
     });
   }

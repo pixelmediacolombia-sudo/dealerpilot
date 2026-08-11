@@ -776,7 +776,7 @@
     return ranked[0] || null;
   }
 
-  function buildIntakePayload(snapshot, validation, detectedAtMs = Date.now()) {
+  function buildIntakePayload(snapshot, validation, detectedAtMs = Date.now(), settings = DEFAULT_SETTINGS) {
     const messages = snapshot.messages;
     const currentMessage = cleanText(snapshot.lastMessage?.text || "");
     const externalThreadRef = buildThreadRef({
@@ -818,7 +818,7 @@
       externalThreadRef,
       sourceUrl: location.href,
       buyerName: snapshot.buyerName || undefined,
-      dealerId: 1,
+      dealerId: Number.isInteger(Number(settings.dealerId)) && Number(settings.dealerId) > 0 ? Number(settings.dealerId) : 1,
       messageDetectedAt: new Date(detectedAtMs).toISOString(),
       routeAllowed: validation.routeAllowed,
       conversationThreadDetected: validation.conversationThreadDetected,
@@ -1005,7 +1005,7 @@
       return { skipped: true, reason, validation, debug };
     }
 
-    const payload = buildIntakePayload(snapshot, validation, detectedAtMs);
+    const payload = buildIntakePayload(snapshot, validation, detectedAtMs, settings);
     const threadKey = payload.externalThreadRef;
     const latestText = cleanText(snapshot.lastMessage?.text || "");
     const lastAutoReply = lastAutoReplyByThread.get(threadKey) || {};

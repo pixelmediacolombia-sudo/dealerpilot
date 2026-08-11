@@ -17,6 +17,7 @@ const BUILD_DATE = DealerPilotPopupSettings.buildDate;
 
 // ---- DOM refs: main panel ----
 const urlInput   = document.getElementById("url");
+const dealerIdInput = document.getElementById("dealerId");
 const statusEl   = document.getElementById("status");
 const startBtn   = document.getElementById("dev-start");
 const refreshBtn = document.getElementById("refresh");
@@ -707,11 +708,16 @@ document.getElementById("btn-show-poll")?.addEventListener("click", async () => 
 chrome.storage.local.get("backendUrl").then(({ backendUrl }) => {
   urlInput.value = backendUrl || DEFAULT_BACKEND_URL;
 });
+chrome.storage.local.get("dealerId").then(({ dealerId }) => {
+  if (dealerIdInput) dealerIdInput.value = Number.isInteger(Number(dealerId)) && Number(dealerId) > 0 ? String(Number(dealerId)) : "1";
+});
 
 document.getElementById("save").addEventListener("click", async () => {
   const value = urlInput.value.trim().replace(/\/+$/, "");
   if (!value) { setStatus("Please enter a URL.", "err"); return; }
-  await chrome.storage.local.set({ backendUrl: value });
+  const dealerId = Number(dealerIdInput?.value);
+  if (!Number.isInteger(dealerId) || dealerId < 1) { setStatus("Dealer ID must be a positive integer.", "err"); return; }
+  await chrome.storage.local.set({ backendUrl: value, dealerId });
   setStatus("Saved. Testing connection…");
   await refresh();
 });

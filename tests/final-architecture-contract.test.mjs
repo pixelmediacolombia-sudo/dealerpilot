@@ -18,6 +18,15 @@ const extensionQueueClient = read("chrome-extension/src/background/queueClient.j
 const extensionPublisherFlow = read("chrome-extension/src/content/facebook/publisherFlow.js");
 const manifest = read("chrome-extension/manifest.json");
 const dashboardRouter = read("artifacts/dashboard/src/app/router.tsx");
+const pagesWorker = read("artifacts/api-server/src/pages/pagesPublishing.worker.ts");
+const metaPageConnections = read("artifacts/api-server/src/pages/metaPageConnections.ts");
+const pagesSchema = read("artifacts/api-server/src/pages/schema.ts");
+const dashboardAuth = read("artifacts/dashboard/src/app/AuthGate.tsx");
+const pagesWorkspace = read("artifacts/dashboard/src/features/pages/pagesWorkspace.tsx");
+const publisherTheme = read("chrome-extension/src/shared/theme.js");
+const messengerTheme = read("chrome-extension-messenger/src/shared/theme.js");
+const messengerClient = read("chrome-extension-messenger/src/background/messengerClient.js");
+const messengerAi = read("chrome-extension-messenger/src/content/facebook/messengerAi.js");
 
 test("listings domain rules keep deterministic category, down-payment, and priority decisions", () => {
   assert.match(listingRules, /export function categorize\(vehicle: Vehicle\): VehicleCategory/);
@@ -161,4 +170,30 @@ test("batch progress application service preserves done and failed states", () =
   assert.match(batchProgress, /const terminal = completed \+ failed \+ skipped \+ needsReview/);
   assert.match(batchProgress, /const isDone = totalVehicles > 0 && terminal >= totalVehicles/);
   assert.match(batchProgress, /status: isDone \? \(failed > 0 \? "Failed" : "Completed"\) : "Active"/);
+});
+
+test("Meta Pages is dealer-scoped and never exposes tokens to the dashboard", () => {
+  assert.match(pagesWorker, /getMetaPageConnection\(job\.dealerId/);
+  assert.match(pagesWorker, /const dealers = await db\.select\(\{ id: dealersTable\.id \}\)/);
+  assert.match(pagesWorker, /for \(const dealer of dealers\)/);
+  assert.doesNotMatch(pagesWorker, /const DEALER_ID\s*=\s*1/);
+  assert.match(metaPageConnections, /encryptMetaToken/);
+  assert.match(metaPageConnections, /META_TOKEN_ENCRYPTION_KEY/);
+  assert.match(metaPageConnections, /pageAccessToken: decryptMetaToken/);
+  assert.match(pagesSchema, /dealer_meta_connections/);
+  assert.match(pagesSchema, /dealer_meta_connections_dealer_fk/);
+  assert.match(dashboardAuth, /export function useAccount\(\)/);
+  assert.match(pagesWorkspace, /const dealerId = user\.dealerId/);
+  assert.match(pagesWorkspace, /\/api\/pages\/batches\/next\?dealerId=\$\{dealerId\}/);
+});
+
+test("extensions resolve Dealer DNA and Messenger intake by installation dealer ID", () => {
+  for (const theme of [publisherTheme, messengerTheme]) {
+    assert.match(theme, /chrome\.storage\.local\.get\("dealerId"\)/);
+    assert.match(theme, /\/api\/dealers\/\" \+ encodeURIComponent\(id\) \+ \"\/theme/);
+    assert.match(theme, /refreshInFlight/);
+  }
+  assert.match(messengerClient, /dealerId: 1/);
+  assert.match(messengerClient, /patch\.dealerId = Number\(message\.dealerId\)/);
+  assert.match(messengerAi, /dealerId: Number\.isInteger\(Number\(settings\.dealerId\)\)/);
 });

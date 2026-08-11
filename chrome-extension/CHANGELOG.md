@@ -1,9 +1,42 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.3.99
+
+- Adds a draggable Marketplace panel header with persisted position and a reset-position control.
+
+## v1.3.98
+
+- Prepares the authorized Marketplace promotion flow for future queued jobs.
+- Waits for Facebook's post-promotion listings page and captures exactly one
+  vehicle-matching listing URL before completing the backend job.
+- Prevents cleanup from closing unrelated Marketplace tabs.
+
+## v1.3.97
+
+- Applies the Gymove visual system to the full extension popup, including status cards, actions, settings, diagnostics, and controls.
+- Keeps the floating Facebook panel and popup on the same navy/violet/light-surface design tokens.
+
+## v1.3.96
+
+- Restyles the in-page DealerPilot AI Publisher panel with the Gymove navy/violet UI.
+- Adds an explicit operator authorization card for Facebook Marketplace promotion pages.
+- After authorization, clicks the exact promotion `Publish` action and then `Go to your listings` inside Facebook's confirmation dialog.
+- Keeps promotion automation scoped to the promotion page and leaves Messenger and normal Marketplace publishing unchanged.
+
+## v1.3.95
+
+- Adds a fail-closed guard before scanning generic `Publish` buttons.
+- Prevents the paid `Promote Marketplace listing` CTA from being clicked if Facebook loads that page directly.
+
 ## v1.3.93
 
 - Records the next Marketplace queue vehicle, scheduled time, and auto-start decision in extension diagnostics.
 - Clears terminal `Needs Review` jobs from local active state so a completed or blocked job cannot halt the next automatic vehicle.
+
+## v1.3.94
+
+- Detects Facebook's `Promote Marketplace listing` DOM after a successful vehicle Publish navigation.
+- Does not click the paid promotion Publish button; captures the listing when possible, otherwise records review and releases the next queue job.
 
 ## v1.3.83
 
