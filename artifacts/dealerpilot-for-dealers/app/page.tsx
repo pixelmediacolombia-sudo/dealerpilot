@@ -140,7 +140,6 @@ export function DealerLanding({ locale = "es" }: { locale?: Locale }) {
           <nav className="topbarSections" aria-label="Landing page sections">
             {t.nav.map((item, index) => <a className={index === 0 ? "active" : ""} href={index === 0 ? "#inicio" : index === 1 ? "#flujo" : index === 2 ? "#modulos" : index === 3 ? "#extensiones" : "#precios"} key={item}>{item}</a>)}
           </nav>
-          <div className="topbarStatus"><span className="onlineDot" /> {t.ready}</div>
           <div className="topbarActions"><a href={locale === "es" ? "/en" : "/"}>{t.otherLanguage}</a><span>/</span><a className="current" href={locale === "es" ? "/" : "/en"}>{t.language}</a><span className="topbarAvatar">OP</span></div>
         </header>
 
