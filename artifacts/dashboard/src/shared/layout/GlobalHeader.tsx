@@ -51,7 +51,7 @@ function ThemeToggle() {
       type="button"
       variant="ghost"
       size="icon"
-      className="h-10 w-10 shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+      className="h-10 w-10 shrink-0 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
       aria-label={label}
       title={label}
       onClick={() => setTheme(isDark ? "light" : "dark")}
@@ -198,7 +198,7 @@ export function GlobalHeader() {
   const div = () => <div className="mx-2 h-4 w-px bg-border" />;
 
   return (
-    <header className="relative z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur-md sm:gap-3 sm:px-5">
+    <header className="relative z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card/95 px-3 shadow-[0_1px_0_rgb(15_23_42/0.02)] backdrop-blur-md sm:gap-3 sm:px-6">
 
       {/* Location */}
       <LocationSelector />

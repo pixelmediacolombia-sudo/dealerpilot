@@ -49,42 +49,42 @@
 
 :root {
   color-scheme: light;
-  --background: 30 20% 98%;
-  --foreground: 220 18% 14%;
+  --background: 210 28% 97%;
+  --foreground: 215 28% 16%;
   --card: 0 0% 100%;
   --card-foreground: 220 18% 14%;
   --card-border: 220 13% 88%;
   --popover: 0 0% 100%;
   --popover-foreground: 220 18% 14%;
   --popover-border: 220 13% 86%;
-  --primary: 213 62% 45%;
+  --primary: 154 62% 36%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 30 12% 94%;
-  --secondary-foreground: 220 15% 22%;
-  --muted: 30 12% 94%;
-  --muted-foreground: 220 8% 42%;
-  --accent: 213 50% 95%;
-  --accent-foreground: 213 58% 34%;
+  --secondary: 210 22% 93%;
+  --secondary-foreground: 215 22% 23%;
+  --muted: 210 22% 93%;
+  --muted-foreground: 215 12% 43%;
+  --accent: 153 55% 94%;
+  --accent-foreground: 154 59% 29%;
   --destructive: 0 72% 46%;
   --destructive-foreground: 0 0% 100%;
   --success: 145 55% 34%;
   --success-foreground: 0 0% 100%;
   --warning: 36 92% 40%;
   --warning-foreground: 25 40% 14%;
-  --border: 220 13% 88%;
-  --input: 220 13% 84%;
-  --ring: 213 62% 45%;
-  --sidebar: 30 22% 96%;
-  --sidebar-foreground: 220 16% 22%;
-  --sidebar-border: 220 12% 88%;
-  --sidebar-primary: 213 62% 45%;
+  --border: 215 20% 87%;
+  --input: 215 19% 82%;
+  --ring: 154 62% 36%;
+  --sidebar: 210 25% 94%;
+  --sidebar-foreground: 215 20% 24%;
+  --sidebar-border: 215 19% 87%;
+  --sidebar-primary: 154 62% 36%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 213 48% 93%;
-  --sidebar-accent-foreground: 213 58% 32%;
-  --sidebar-ring: 213 62% 45%;
-  --radius: 0.625rem;
-  --shadow-raised: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 12px rgb(15 23 42 / 0.035);
-  --shadow-overlay: 0 10px 30px rgb(15 23 42 / 0.10), 0 2px 8px rgb(15 23 42 / 0.06);
+  --sidebar-accent: 153 55% 89%;
+  --sidebar-accent-foreground: 154 59% 27%;
+  --sidebar-ring: 154 62% 36%;
+  --radius: 0.75rem;
+  --shadow-raised: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 20px rgb(15 23 42 / 0.05);
+  --shadow-overlay: 0 18px 44px rgb(15 23 42 / 0.12), 0 4px 12px rgb(15 23 42 / 0.06);
   --duration-fast: 120ms;
   --duration-normal: 180ms;
   --duration-slow: 260ms;
@@ -93,7 +93,7 @@
 
 .dark {
   color-scheme: dark;
-  --background: 220 16% 9%;
+  --background: 215 24% 10%;
   --foreground: 30 12% 94%;
   --card: 220 15% 12%;
   --card-foreground: 30 12% 94%;
@@ -101,21 +101,21 @@
   --popover: 220 15% 13%;
   --popover-foreground: 30 12% 94%;
   --popover-border: 220 10% 24%;
-  --primary: 212 72% 68%;
+  --primary: 154 58% 58%;
   --primary-foreground: 220 18% 10%;
   --secondary: 220 12% 17%;
   --secondary-foreground: 30 10% 90%;
   --muted: 220 12% 17%;
   --muted-foreground: 220 8% 66%;
-  --accent: 213 36% 21%;
-  --accent-foreground: 212 74% 78%;
+  --accent: 154 28% 20%;
+  --accent-foreground: 154 70% 75%;
   --border: 220 10% 22%;
   --input: 220 10% 25%;
-  --sidebar: 220 15% 11%;
+  --sidebar: 215 22% 12%;
   --sidebar-foreground: 30 10% 90%;
   --sidebar-border: 220 10% 21%;
-  --sidebar-accent: 213 36% 21%;
-  --sidebar-accent-foreground: 212 74% 78%;
+  --sidebar-accent: 154 28% 20%;
+  --sidebar-accent-foreground: 154 70% 75%;
 }
 
 @layer base {
@@ -133,6 +133,7 @@
   body {
     @apply bg-background font-sans text-foreground antialiased;
     min-width: 320px;
+    letter-spacing: -0.005em;
   }
 
   h1,
@@ -185,13 +186,14 @@
 }
 
 .hover-lift {
-  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .hover-lift:hover {
     border-color: hsl(var(--border));
     box-shadow: var(--shadow-raised);
+    transform: translateY(-1px);
   }
 }
 
@@ -209,6 +211,15 @@
 .premium-gradient-btn:hover {
   background: hsl(var(--primary) / 0.92);
   box-shadow: 0 2px 8px hsl(var(--primary) / 0.18);
+}
+
+.dashboard-enter {
+  animation: dashboard-enter 360ms var(--ease-out) both;
+}
+
+@keyframes dashboard-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .pulse-ring {

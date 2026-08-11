@@ -94,6 +94,22 @@ const outcomes = [
   ["Mejor seguimiento", "Las oportunidades pendientes y los vehículos que requieren acción son visibles."],
 ];
 
+const plans = [
+  {
+    name: "Marketplace",
+    price: "$97",
+    description: "Para dealers que quieren mantener su inventario publicándose con orden.",
+    features: ["Publicación en Facebook Marketplace", "Cola de vehículos listos", "Inventario y estado centralizados", "Controles de revisión antes de publicar"],
+  },
+  {
+    name: "Marketplace + IA",
+    price: "$150",
+    description: "Para equipos que quieren publicar y contestar compradores con contexto real.",
+    features: ["Todo lo incluido en Marketplace", "Respuestas sugeridas por IA", "Seguimiento de conversaciones", "Datos del dealer y del vehículo en cada respuesta"],
+    featured: true,
+  },
+];
+
 export default function Home() {
   return (
     <main>
@@ -105,6 +121,7 @@ export default function Home() {
         <div className="navLinks">
           <a href="#como-ayuda">Cómo funciona</a>
           <a href="#incluye">Secciones</a>
+          <a href="#precios">Precios</a>
           <a href="#herramientas">Extensiones</a>
         </div>
         <div className="languageSwitch" aria-label="Cambiar idioma">
@@ -113,7 +130,7 @@ export default function Home() {
       </nav>
 
       <section className="hero section" id="inicio">
-        <div className="heroCopy">
+        <div className="heroCopy reveal reveal-delay-1">
           <p className="eyebrow"><span /> Para dealers de vehículos</p>
           <h1>Tu operación de ventas, en un solo lugar.</h1>
           <p className="heroLead">
@@ -126,7 +143,7 @@ export default function Home() {
           <p className="quietNote">Pensado para el ritmo real de un dealer independiente.</p>
         </div>
 
-        <div className="productFrame" aria-label="Ejemplo del centro de mando de DealerPilot">
+        <div className="productFrame reveal reveal-delay-2" aria-label="Ejemplo del centro de mando de DealerPilot">
           <div className="frameTop">
             <div className="miniBrand"><span>DP</span> Centro de mando</div>
             <span className="status"><i /> Operación lista</span>
@@ -154,13 +171,13 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="outcomeStrip" aria-label="Beneficios principales">
+      <section className="outcomeStrip reveal reveal-delay-3" aria-label="Beneficios principales">
         {outcomes.map(([title, text]) => (
           <article key={title}><strong>{title}</strong><p>{text}</p></article>
         ))}
       </section>
 
-      <section className="section flowSection" id="como-ayuda">
+      <section className="section flowSection reveal" id="como-ayuda">
         <header className="sectionHeading">
           <p className="eyebrow"><span /> Un día con DealerPilot</p>
           <h2>Así acompaña DealerPilot una venta, de principio a fin.</h2>
@@ -182,7 +199,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section featureSection" id="incluye">
+      <section className="section featureSection reveal" id="incluye">
         <header className="sectionHeading splitHeading">
           <div><p className="eyebrow"><span /> Todo lo que incluye</p><h2>Una vista clara para cada parte del negocio.</h2></div>
           <p>No necesitas aprender palabras técnicas. Cada sección responde una pregunta concreta de la operación diaria.</p>
@@ -199,7 +216,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section assistantsSection" id="herramientas">
+      <section className="section assistantsSection reveal" id="herramientas">
         <header className="sectionHeading splitHeading">
           <div><p className="eyebrow"><span /> Las extensiones de DealerPilot</p><h2>Tres extensiones, tres trabajos distintos.</h2></div>
           <p>Trabajan en el navegador junto a las páginas de Facebook que el equipo ya usa. Comparten el inventario de DealerPilot, pero cada una conserva su propio canal y sus propios controles.</p>
@@ -219,7 +236,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section soldSection">
+      <section className="section soldSection reveal">
         <div className="soldCopy">
           <p className="eyebrow"><span /> Un detalle que evita confusiones</p>
           <h2>Cuando un carro se vende, el trabajo no termina en el lote.</h2>
@@ -232,12 +249,32 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section trustSection">
+      <section className="section trustSection reveal">
         <header className="sectionHeading"><p className="eyebrow"><span /> Control para el dealer</p><h2>Ayuda donde sirve. Decisión humana donde importa.</h2></header>
         <div className="trustGrid">
           <article><span>01</span><h3>Tu inventario es la referencia</h3><p>Los textos, fotos y respuestas parten de la información real de cada vehículo.</p></article>
           <article><span>02</span><h3>El equipo conserva el control</h3><p>La publicación y las respuestas automáticas se habilitan según la forma de trabajar del dealer.</p></article>
           <article><span>03</span><h3>Cada canal tiene su función</h3><p>Marketplace, mensajes y página comercial se gestionan por separado para evitar cruces.</p></article>
+        </div>
+      </section>
+
+      <section className="section pricingSection reveal" id="precios">
+        <header className="sectionHeading splitHeading">
+          <div><p className="eyebrow"><span /> Planes claros para empezar</p><h2>Elige cuánto quieres automatizar.</h2></div>
+          <p>Comienza publicando con orden y suma respuestas con IA cuando tu equipo esté listo para atender más conversaciones.</p>
+        </header>
+        <div className="pricingGrid">
+          {plans.map((plan) => (
+            <article className={`pricingCard${plan.featured ? " pricingCardFeatured" : ""}`} key={plan.name}>
+              {plan.featured ? <span className="recommendedTag">Recomendado</span> : null}
+              <div className="pricingTop"><span className="pricingLabel">DealerPilot</span><span className="pricingCheck" aria-hidden="true">✓</span></div>
+              <h3>{plan.name}</h3>
+              <p className="pricingDescription">{plan.description}</p>
+              <div className="price"><strong>{plan.price}</strong><span>/ mes</span></div>
+              <ul>{plan.features.map((feature) => <li key={feature}><span aria-hidden="true">✓</span>{feature}</li>)}</ul>
+              <a className={plan.featured ? "primaryButton" : "secondaryButton"} href="#inicio">Elegir este plan <span aria-hidden="true">→</span></a>
+            </article>
+          ))}
         </div>
       </section>
 

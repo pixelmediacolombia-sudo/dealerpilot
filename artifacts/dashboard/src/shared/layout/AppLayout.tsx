@@ -19,7 +19,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <Sidebar />
       <main id="dealerpilot-main" className="relative flex min-w-0 flex-1 flex-col overflow-hidden pb-[68px] md:pb-0">
         <GlobalHeader />
-        <div className="flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
+        <div className="dashboard-enter flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
           {children}
         </div>
       </main>
