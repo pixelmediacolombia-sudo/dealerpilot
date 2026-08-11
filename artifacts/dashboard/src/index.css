@@ -234,6 +234,7 @@
 
 .premium-gradient-btn {
   @apply border border-primary bg-primary text-primary-foreground;
+  color: hsl(var(--primary-foreground));
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
   transition: background-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
@@ -247,9 +248,43 @@
   animation: dashboard-enter 360ms var(--ease-out) both;
 }
 
+.workspace-transition {
+  position: relative;
+  isolation: isolate;
+}
+
+.workspace-transition::before {
+  position: fixed;
+  z-index: 20;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  content: "";
+  pointer-events: none;
+  background: hsl(var(--primary));
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: workspace-progress 320ms var(--ease-out) both;
+}
+
 @keyframes dashboard-enter {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes workspace-progress {
+  0% { opacity: 0; transform: scaleX(0); }
+  12% { opacity: 1; }
+  100% { opacity: 0; transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-transition,
+  .workspace-transition::before,
+  .dashboard-enter {
+    animation: none;
+  }
 }
 
 .pulse-ring {

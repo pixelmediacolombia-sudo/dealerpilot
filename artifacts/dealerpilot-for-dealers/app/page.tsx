@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LandingMotion } from "./LandingMotion";
 
 export const metadata: Metadata = {
   title: "DealerPilot para dealers | Operación comercial en un solo lugar",
@@ -13,15 +14,13 @@ const copy = {
   es: {
     language: "ES",
     otherLanguage: "EN",
-    dealer: "Alpha MotorSports",
-    location: "Manassas",
-    nav: ["Resumen", "Inventario", "Marketplace", "Mensajes", "Estudio"],
+    nav: ["Inicio", "Cómo funciona", "Secciones", "Extensiones", "Precios"],
     title: "Tu operación de ventas, en un solo lugar.",
     intro:
       "DealerPilot convierte el inventario, las publicaciones y las conversaciones en una operación ordenada para que tu equipo sepa qué sigue.",
     primaryCta: "Ver cómo funciona",
     secondaryCta: "Conocer los planes",
-    welcome: "Buenos días, Alpha",
+    welcome: "Una operación más clara",
     ready: "Operación lista",
     attention: "3 oportunidades requieren atención",
     attentionText: "DealerPilot ordena el trabajo y te muestra el siguiente paso.",
@@ -74,15 +73,13 @@ const copy = {
   en: {
     language: "EN",
     otherLanguage: "ES",
-    dealer: "Alpha MotorSports",
-    location: "Manassas",
-    nav: ["Overview", "Inventory", "Marketplace", "Messages", "Studio"],
+    nav: ["Overview", "How it works", "Sections", "Extensions", "Pricing"],
     title: "Your sales operation, in one place.",
     intro:
       "DealerPilot turns inventory, listings, and buyer conversations into a clear operating system for your team.",
     primaryCta: "See how it works",
     secondaryCta: "View plans",
-    welcome: "Good morning, Alpha",
+    welcome: "A clearer operation",
     ready: "Operation ready",
     attention: "3 opportunities need attention",
     attentionText: "DealerPilot sorts the work and shows your next move.",
@@ -137,26 +134,19 @@ export function DealerLanding({ locale = "es" }: { locale?: Locale }) {
   const t = copy[locale];
   return (
     <main className="gymoveLanding">
-      <aside className="landingSidebar">
-        <Brand />
-        <div className="landingDealer"><span className="onlineDot" /> <span>{t.dealer}</span><small>{t.location}</small></div>
-        <p className="landingNavLabel">WORKSPACE</p>
-        <nav className="landingNav" aria-label="Product navigation">
-          {t.nav.map((item, index) => <a className={index === 0 ? "active" : ""} href={index === 0 ? "#inicio" : index === 1 ? "#modulos" : index === 2 ? "#precios" : "#extensiones"} key={item}><span className={`navGlyph glyph-${index}`} />{item}</a>)}
-        </nav>
-        <div className="sidebarBottom"><span className="miniGear">⚙</span><span>DealerPilot v4</span></div>
-      </aside>
-
       <div className="landingMain">
         <header className="landingTopbar">
-          <div className="mobileBrand"><Brand /></div>
-          <div className="topbarContext"><span className="topbarPin">⌖</span><strong>{t.dealer}</strong><span>{t.location}</span></div>
+          <Brand />
+          <nav className="topbarSections" aria-label="Landing page sections">
+            {t.nav.map((item, index) => <a className={index === 0 ? "active" : ""} href={index === 0 ? "#inicio" : index === 1 ? "#flujo" : index === 2 ? "#modulos" : index === 3 ? "#extensiones" : "#precios"} key={item}>{item}</a>)}
+          </nav>
           <div className="topbarStatus"><span className="onlineDot" /> {t.ready}</div>
           <div className="topbarActions"><a href={locale === "es" ? "/en" : "/"}>{t.otherLanguage}</a><span>/</span><a className="current" href={locale === "es" ? "/" : "/en"}>{t.language}</a><span className="topbarAvatar">OP</span></div>
         </header>
 
         <div className="landingContent">
-          <section className="landingHero" id="inicio">
+          <LandingMotion />
+          <section className="landingHero motion-reveal" id="inicio">
             <div className="heroIntro">
               <p className="landingEyebrow"><span /> {t.welcome}</p>
               <h1>{t.title}</h1>
@@ -169,29 +159,29 @@ export function DealerLanding({ locale = "es" }: { locale?: Locale }) {
             </div>
           </section>
 
-          <section className="kpiGrid" aria-label="DealerPilot metrics">
+          <section className="kpiGrid motion-reveal" aria-label="DealerPilot metrics">
             <article className="kpiCard kpiPurple"><span className="kpiIcon">↗</span><div><strong>94</strong><span>Eligible vehicles</span></div><small>+12% this month</small></article>
             <article className="kpiCard kpiBlue"><span className="kpiIcon">▣</span><div><strong>30</strong><span>Live listings</span></div><small>+8 published today</small></article>
             <article className="kpiCard kpiPink"><span className="kpiIcon">♡</span><div><strong>27</strong><span>Active buyers</span></div><small>7 need a reply</small></article>
             <article className="kpiCard kpiGreen"><span className="kpiIcon">✓</span><div><strong>98%</strong><span>Operation health</span></div><small>All systems ready</small></article>
           </section>
 
-          <section className="dashboardGrid" id="flujo">
+          <section className="dashboardGrid motion-reveal" id="flujo">
             <article className="landingPanel chartPanel"><div className="panelHeading"><div><p className="panelEyebrow">{t.activity}</p><h2>{t.activityText}</h2></div><select aria-label="Activity range" defaultValue="week"><option value="week">This week</option><option value="month">This month</option></select></div><MiniChart /><div className="chartLegend"><span><i className="legendViolet" />Listings</span><span><i className="legendBlue" />Buyer conversations</span><strong>+24.8%</strong></div></article>
             <article className="landingPanel statusPanel"><div className="panelHeading"><div><p className="panelEyebrow">{t.marketplace}</p><h2>{t.marketplaceText}</h2></div><span className="panelMore">···</span></div><div className="statusRows"><div><span className="statusBullet publishedBullet" /><div><strong>{t.published}</strong><small>30 vehicles live</small></div><b>70%</b></div><div><span className="statusBullet scheduledBullet" /><div><strong>{t.scheduled}</strong><small>12 vehicles queued</small></div><b>20%</b></div><div><span className="statusBullet reviewBullet" /><div><strong>{t.review}</strong><small>4 need a final check</small></div><b>10%</b></div></div><a className="panelLink" href="#precios">{t.view} <span>→</span></a></article>
           </section>
 
-          <section className="actionStrip"><div><span className="actionBolt">✦</span><div><strong>{t.actionTitle}</strong><p>{t.actionItems[0]}</p></div></div><div className="actionList">{t.actionItems.slice(1).map((item, index) => <span key={item}><b>{index + 2}</b>{item}</span>)}</div><a href="#modulos">View all <span>→</span></a></section>
+          <section className="actionStrip motion-reveal"><div><span className="actionBolt">✦</span><div><strong>{t.actionTitle}</strong><p>{t.actionItems[0]}</p></div></div><div className="actionList">{t.actionItems.slice(1).map((item, index) => <span key={item}><b>{index + 2}</b>{item}</span>)}</div><a href="#modulos">View all <span>→</span></a></section>
 
-          <section className="contentSection workflowSection"><div className="sectionIntro"><p className="landingEyebrow"><span /> {t.workflowEyebrow}</p><h2>{t.workflowTitle}</h2><p>{t.workflowText}</p></div><div className="workflowSteps">{[["01", "Inventory", "Organize every vehicle before it becomes a task."], ["02", "Publish", "Move ready inventory through the right channel."], ["03", "Follow up", "Keep buyer conversations connected to the sale."]].map(([number, title, text]) => <article key={number}><span>{number}</span><h3>{title}</h3><p>{text}</p><i>→</i></article>)}</div></section>
+          <section className="contentSection workflowSection motion-reveal"><div className="sectionIntro"><p className="landingEyebrow"><span /> {t.workflowEyebrow}</p><h2>{t.workflowTitle}</h2><p>{t.workflowText}</p></div><div className="workflowSteps">{[["01", "Inventory", "Organize every vehicle before it becomes a task."], ["02", "Publish", "Move ready inventory through the right channel."], ["03", "Follow up", "Keep buyer conversations connected to the sale."]].map(([number, title, text]) => <article key={number}><span>{number}</span><h3>{title}</h3><p>{text}</p><i>→</i></article>)}</div></section>
 
-          <section className="contentSection" id="modulos"><div className="sectionIntro centered"><p className="landingEyebrow"><span /> {t.modulesTitle}</p><h2>{t.modulesTitle}</h2><p>{t.modulesText}</p></div><div className="moduleGrid">{t.modules.map(([number, title, text], index) => <article className="moduleCard" key={number}><span className={`moduleIcon moduleIcon-${index}`}>{["⌘", "▦", "↗", "◌", "▧", "✦"][index]}</span><small>{number}</small><h3>{title}</h3><p>{text}</p><a href="#extensiones">Explore module <span>→</span></a></article>)}</div></section>
+          <section className="contentSection motion-reveal" id="modulos"><div className="sectionIntro centered"><p className="landingEyebrow"><span /> {t.modulesTitle}</p><h2>{t.modulesTitle}</h2><p>{t.modulesText}</p></div><div className="moduleGrid">{t.modules.map(([number, title, text], index) => <article className="moduleCard" key={number}><span className={`moduleIcon moduleIcon-${index}`}>{["⌘", "▦", "↗", "◌", "▧", "✦"][index]}</span><small>{number}</small><h3>{title}</h3><p>{text}</p><a href="#extensiones">Explore module <span>→</span></a></article>)}</div></section>
 
-          <section className="contentSection extensionSection" id="extensiones"><div className="sectionIntro"><p className="landingEyebrow"><span /> {t.extensionsEyebrow}</p><h2>{t.extensionsTitle}</h2></div><div className="extensionGrid">{t.extensions.map(([number, title, text]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div><b>↗</b></article>)}</div></section>
+          <section className="contentSection extensionSection motion-reveal" id="extensiones"><div className="sectionIntro"><p className="landingEyebrow"><span /> {t.extensionsEyebrow}</p><h2>{t.extensionsTitle}</h2></div><div className="extensionGrid">{t.extensions.map(([number, title, text]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div><b>↗</b></article>)}</div></section>
 
-          <section className="trustBanner"><div><p className="landingEyebrow"><span /> {t.trustTitle}</p><h2>{t.trustTitle}</h2></div><div className="trustItems">{t.trust.map((item, index) => <div key={item}><span>0{index + 1}</span><strong>{item}</strong><p>Built into every DealerPilot workflow.</p></div>)}</div></section>
+          <section className="trustBanner motion-reveal"><div><p className="landingEyebrow"><span /> {t.trustTitle}</p><h2>{t.trustTitle}</h2></div><div className="trustItems">{t.trust.map((item, index) => <div key={item}><span>0{index + 1}</span><strong>{item}</strong><p>Built into every DealerPilot workflow.</p></div>)}</div></section>
 
-          <section className="pricingSection" id="precios"><div className="sectionIntro centered"><p className="landingEyebrow"><span /> {t.pricingEyebrow}</p><h2>{t.pricingTitle}</h2><p>{t.pricingText}</p></div><div className="pricingGrid">{t.plans.map(([name, price, description, features], index) => <article className={`priceCard ${index === 1 ? "featured" : ""}`} key={name}>{index === 1 && <span className="popularTag">MOST POPULAR</span>}<div className="priceTop"><h3>{name}</h3><span className="priceIcon">{index === 0 ? "↗" : "✦"}</span></div><p>{description}</p><strong className="price">{price}<small>/month</small></strong><ul>{features.map((feature) => <li key={feature}><span>✓</span>{feature}</li>)}</ul><a href="#inicio" className={index === 1 ? "landingPrimary" : "landingSecondary"}>{t.choose}<span>→</span></a></article>)}</div></section>
+          <section className="pricingSection motion-reveal" id="precios"><div className="sectionIntro centered"><p className="landingEyebrow"><span /> {t.pricingEyebrow}</p><h2>{t.pricingTitle}</h2><p>{t.pricingText}</p></div><div className="pricingGrid">{t.plans.map(([name, price, description, features], index) => <article className={`priceCard ${index === 1 ? "featured" : ""}`} key={name}>{index === 1 && <span className="popularTag">MOST POPULAR</span>}<div className="priceTop"><h3>{name}</h3><span className="priceIcon">{index === 0 ? "↗" : "✦"}</span></div><p>{description}</p><strong className="price">{price}<small>/month</small></strong><ul>{features.map((feature) => <li key={feature}><span>✓</span>{feature}</li>)}</ul><a href="#inicio" className={index === 1 ? "landingPrimary" : "landingSecondary"}>{t.choose}<span>→</span></a></article>)}</div></section>
 
           <footer className="landingFooter"><Brand /><span>{t.footer}</span><a href="#inicio">Back to top ↑</a></footer>
         </div>

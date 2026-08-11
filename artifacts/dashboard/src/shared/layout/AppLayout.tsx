@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
 import { GlobalHeader } from "./GlobalHeader";
 import { FloatingAssistant } from "./FloatingAssistant";
@@ -8,6 +9,8 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
+  const [location] = useLocation();
+
   return (
     <div className="flex h-[100dvh] min-w-0 overflow-hidden bg-background text-foreground selection:bg-primary/15 selection:text-foreground">
       <a
@@ -19,7 +22,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <Sidebar />
       <main id="dealerpilot-main" className="relative flex min-w-0 flex-1 flex-col overflow-hidden pb-[68px] md:pb-0">
         <GlobalHeader />
-        <div className="dashboard-enter flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
+        <div key={location} className="workspace-transition dashboard-enter flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
           {children}
         </div>
       </main>

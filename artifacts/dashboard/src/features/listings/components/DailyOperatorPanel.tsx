@@ -171,7 +171,7 @@ function RecRow({
           </button>
           <Button
             size="sm"
-            className="h-7 px-2.5 gap-1 bg-success hover:bg-success/90 text-white text-xs font-bold tracking-wide whitespace-nowrap"
+            className="h-8 px-3 gap-1 premium-gradient-btn text-primary-foreground text-xs font-bold tracking-wide whitespace-nowrap"
             disabled={isPublishing}
             onClick={() => onPublish(rec.vehicleId)}
           >
