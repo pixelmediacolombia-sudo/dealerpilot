@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
+import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
   useGetConnectionStatus,
@@ -150,6 +151,7 @@ function deriveConn(data: ConnectionStatus | undefined) {
 // ── GlobalHeader ──────────────────────────────────────────────────────────────
 
 export function GlobalHeader() {
+  const [location] = useLocation();
   const queryClient = useQueryClient();
   const { data: dealersData } = useListDealers();
   const dealerId = dealersData?.dealers?.[0]?.id;
@@ -196,9 +198,34 @@ export function GlobalHeader() {
 
   const dot = (s: string) => <span className="text-muted-foreground text-[11px] select-none">·</span>;
   const div = () => <div className="mx-2 h-4 w-px bg-border" />;
+  const pageTitle = location === "/"
+    ? "Command center"
+    : location.startsWith("/listings") || location.startsWith("/publishing")
+      ? "Marketplace"
+      : location.startsWith("/inventory")
+        ? "Inventory"
+        : location.startsWith("/sales-ai") || location.startsWith("/leads") || location.startsWith("/conversations")
+          ? "Sales"
+          : location.startsWith("/dealer-dna")
+            ? "Dealer DNA"
+            : location.startsWith("/ai-photo-studio") || location.startsWith("/creative-studio")
+              ? "Photo studio"
+              : location.startsWith("/connection-center")
+                ? "Connection center"
+                : location.startsWith("/settings")
+                  ? "Settings"
+                  : "Dealer operations";
 
   return (
-    <header className="relative z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card/95 px-3 shadow-[0_1px_0_rgb(15_23_42/0.02)] backdrop-blur-md sm:gap-3 sm:px-6">
+    <header className="relative z-30 flex h-[72px] shrink-0 items-center gap-3 border-b border-border bg-card px-3 shadow-[0_1px_0_rgb(15_23_42/0.02)] sm:gap-5 sm:px-6">
+
+      <div className="hidden min-w-0 items-center gap-3 lg:flex">
+        <div className="h-8 w-px bg-primary/30" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="truncate text-[15px] font-semibold tracking-tight text-foreground">{pageTitle}</p>
+          <p className="text-[11px] text-muted-foreground">Dealer operations</p>
+        </div>
+      </div>
 
       {/* Location */}
       <LocationSelector />

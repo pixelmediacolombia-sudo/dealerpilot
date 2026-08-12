@@ -753,7 +753,7 @@ export function SalesHub() {
 
         {/* ── MAIN COLUMN ────────────────────────────────────────────────────── */}
         <div className="min-w-0 flex-1 overflow-y-auto">
-          <div className="max-w-[960px] p-5 sm:p-8">
+          <div className="max-w-[1180px] p-4 sm:p-6 lg:p-8">
 
             {/* Mission Header */}
             <div className="mb-8 pt-1">
@@ -786,18 +786,18 @@ export function SalesHub() {
               </div>
             </div>
 
-            {/* Metric strip */}
-            <div className="-mx-5 mb-8 flex items-stretch overflow-x-auto border-y border-border px-5 sm:-mx-8 sm:px-8">
+            {/* Gymove-style KPI row: same live values, denser operational presentation */}
+            <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
               {[
-                { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? top10Count), label: "Ready", accent: "text-primary", path: "/listings" },
-                { value: isLoading ? "—" : String(listingsLive), label: "Live", accent: listingsLive > 0 ? "text-success" : "text-muted-foreground", path: "/listings?tab=published" },
-                { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", accent: pendingLeads > 0 ? "text-primary" : "text-muted-foreground", path: "/sales-ai" },
-                { value: "0", label: "Appts", accent: "text-muted-foreground", path: "/sales-ai" },
-                { value: isLoading ? "—" : String(issueCount), label: "Issues", accent: issueCount > 0 ? "text-destructive" : "text-muted-foreground", path: "/listings?tab=failed" },
+                { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? top10Count), label: "Ready", accent: "text-primary", tone: "gymove-kpi-purple", path: "/listings" },
+                { value: isLoading ? "—" : String(listingsLive), label: "Live", accent: listingsLive > 0 ? "text-success" : "text-muted-foreground", tone: "gymove-kpi-green", path: "/listings?tab=published" },
+                { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", accent: pendingLeads > 0 ? "text-primary" : "text-muted-foreground", tone: "gymove-kpi-blue", path: "/sales-ai" },
+                { value: "0", label: "Appts", accent: "text-muted-foreground", tone: "gymove-kpi-pink", path: "/sales-ai" },
+                { value: isLoading ? "—" : String(issueCount), label: "Issues", accent: issueCount > 0 ? "text-destructive" : "text-muted-foreground", tone: "bg-card", path: "/listings?tab=failed" },
               ].map(m => (
-                <button key={m.label} onClick={() => setLocation(m.path)} className="min-w-[68px] flex-1 border-r border-border px-3 py-5 text-left transition-colors hover:bg-muted first:pl-0 last:border-r-0 last:pr-0 sm:px-4">
-                  <div className={cn("text-[40px] font-semibold leading-none mb-1.5 tracking-tighter", m.accent)}>{m.value}</div>
-                  <div className="text-[11px] font-bold text-muted-foreground  tracking-wide">{m.label}</div>
+                <button key={m.label} onClick={() => setLocation(m.path)} className={cn("min-h-[112px] rounded-lg border px-4 py-4 text-left shadow-sm transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md", m.tone)}>
+                  <div className={cn("mb-2 text-[34px] font-semibold leading-none tracking-tighter tabular-nums", m.accent)}>{m.value}</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">{m.label}</div>
                 </button>
               ))}
             </div>

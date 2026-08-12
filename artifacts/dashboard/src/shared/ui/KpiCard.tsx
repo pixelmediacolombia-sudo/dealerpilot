@@ -12,7 +12,7 @@ interface KpiCardProps {
   title?: string;
   label?: string;
   value: number | string;
-  icon?: unknown;
+  icon?: React.ReactNode;
   formatValue?: (val: number) => string;
   trend?: KpiTrend;
   delta?: KpiTrend;
@@ -25,10 +25,17 @@ interface KpiCardProps {
   onClick?: () => void;
 }
 
-export function KpiCard({ title, label, value, formatValue, trend, delta, valueColor, isLoading, className, onClick }: KpiCardProps) {
+export function KpiCard({ title, label, value, formatValue, trend, delta, icon, module, valueColor, isLoading, className, onClick }: KpiCardProps) {
   const heading = title ?? label ?? "";
   const movement = trend ?? delta;
   const Wrapper = onClick ? "button" : "div";
+  const toneClass = module === "inventory"
+    ? "gymove-kpi-blue"
+    : module === "marketplace"
+      ? "gymove-kpi-purple"
+      : module === "sales-ai"
+        ? "gymove-kpi-pink"
+        : undefined;
 
   return (
     <Wrapper
@@ -36,11 +43,15 @@ export function KpiCard({ title, label, value, formatValue, trend, delta, valueC
       onClick={onClick}
       className={cn(
         "flex min-w-0 flex-col rounded-lg border border-border bg-card px-5 py-4 text-left text-card-foreground shadow-sm",
+        toneClass,
         onClick && "cursor-pointer transition-[border-color,box-shadow] hover:border-primary/25 hover:shadow-md",
         className,
       )}
     >
-      <div className="mb-3 text-xs font-medium text-muted-foreground">{heading}</div>
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="text-xs font-medium text-muted-foreground">{heading}</div>
+        {icon ? <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-0 bg-white/70 text-primary shadow-sm">{icon}</span> : null}
+      </div>
       <div data-kpi-value="true" className={cn("text-[30px] font-semibold leading-none tracking-[-0.025em] tabular-nums text-foreground", valueColor?.replace(/text-(blue|cyan|violet|purple)-400/g, "text-primary"))}>
         {isLoading ? (
           <div className="h-8 w-16 animate-pulse rounded-md bg-muted" />

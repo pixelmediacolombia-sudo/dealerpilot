@@ -20,7 +20,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         Skip to main content
       </a>
       <Sidebar />
-      <main id="dealerpilot-main" className="relative flex min-w-0 flex-1 flex-col overflow-hidden pb-[68px] md:pb-0">
+      <main id="dealerpilot-main" className="relative flex min-w-0 flex-1 flex-col overflow-hidden pb-[68px] lg:pb-0">
         <GlobalHeader />
         <div key={location} className="workspace-transition dashboard-enter flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
           {children}
