@@ -10,7 +10,7 @@ import {
 } from "@workspace/db";
 import { ensurePagesSchema } from "../pages/schema";
 import { pagesPublishingWorker } from "../pages/pagesPublishing.worker";
-import { getMetaPageConnection, getMetaPageConnectionSummary, ensureLegacyAlphaMetaConnection, recordMetaPageValidation } from "../pages/metaPageConnections";
+import { getMetaPageConnection, getMetaPageConnectionSummary, ensureLegacyAlphaMetaConnection, persistValidatedMetaPageConnection, readBootstrapMetaPageConfig, recordMetaPageValidation } from "../pages/metaPageConnections";
 import { validateMetaPageConnection } from "../pages/metaPagesPublisher";
 import { runWorkerOnce } from "../workers/scheduler";
 import { ALPHA_DEALER_ID } from "../lib/dealer";
@@ -276,21 +276,64 @@ router.post("/pages/connection/:dealerId/validate", async (req, res) => {
   try {
     await ensurePagesSchema();
     await ensureLegacyAlphaMetaConnection(dealerId);
-    const connection = await getMetaPageConnection(dealerId);
+    let connection = await getMetaPageConnection(dealerId);
     if (!connection) {
-      res.status(404).json({ error: "Meta Page credentials are not configured for this dealer" });
-      return;
+      const bootstrap = readBootstrapMetaPageConfig();
+      if (!bootstrap) {
+        res.status(404).json({ error: "Meta Page credentials are not configured for this dealer" });
+        return;
+      }
+      connection = {
+        dealerId,
+        pageId: bootstrap.pageId,
+        pageAccessToken: bootstrap.pageAccessToken,
+        graphApiVersion: process.env.META_GRAPH_API_VERSION?.trim() || "v23.0",
+        businessId: null,
+        pageName: null,
+        scopes: [],
+        expiresAt: null,
+      };
     }
 
     const validation = await validateMetaPageConnection(
       connection,
       connection.scopes,
     );
-    await recordMetaPageValidation(dealerId, {
-      pageName: validation.pageName,
-      lastError: validation.error,
-      valid: validation.ok,
-    });
+    if (validation.ok) {
+      await persistValidatedMetaPageConnection(dealerId, {
+        pageId: connection.pageId,
+        pageAccessToken: connection.pageAccessToken,
+      }, validation);
+    } else {
+      const bootstrap = readBootstrapMetaPageConfig();
+      const canRepair = Boolean(bootstrap && bootstrap.pageId === connection.pageId && bootstrap.pageAccessToken !== connection.pageAccessToken);
+      if (canRepair && bootstrap) {
+        const replacement = {
+          ...connection,
+          pageAccessToken: bootstrap.pageAccessToken,
+          pageName: null,
+          scopes: [],
+        };
+        const replacementValidation = await validateMetaPageConnection(replacement, []);
+        if (replacementValidation.ok) {
+          await persistValidatedMetaPageConnection(dealerId, bootstrap, replacementValidation);
+          connection = replacement;
+          Object.assign(validation, replacementValidation);
+        } else {
+          await recordMetaPageValidation(dealerId, {
+            pageName: validation.pageName,
+            lastError: replacementValidation.error,
+            valid: false,
+          });
+        }
+      } else {
+        await recordMetaPageValidation(dealerId, {
+          pageName: validation.pageName,
+          lastError: validation.error,
+          valid: false,
+        });
+      }
+    }
     res.status(validation.ok ? 200 : 422).json({
       dealerId,
       validation,

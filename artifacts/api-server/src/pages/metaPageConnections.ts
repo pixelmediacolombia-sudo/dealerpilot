@@ -59,6 +59,15 @@ export type ResolvedMetaPageConnection = {
   expiresAt: Date | null;
 };
 
+export function readBootstrapMetaPageConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): { pageId: string; pageAccessToken: string } | null {
+  const pageId = envValue("META_BOOTSTRAP_PAGE_ID", env) || envValue("META_PAGE_ID", env);
+  const pageAccessToken = envValue("META_BOOTSTRAP_PAGE_ACCESS_TOKEN", env) || envValue("META_PAGE_ACCESS_TOKEN", env);
+  if (!pageId || !pageAccessToken) return null;
+  return { pageId, pageAccessToken };
+}
+
 export async function getMetaPageConnection(
   dealerId: number,
   env: NodeJS.ProcessEnv = process.env,
@@ -125,6 +134,50 @@ export async function recordMetaPageValidation(
     .where(eq(dealerMetaConnectionsTable.dealerId, dealerId));
 }
 
+export async function persistValidatedMetaPageConnection(
+  dealerId: number,
+  config: { pageId: string; pageAccessToken: string },
+  validation: {
+    pageName: string | null;
+    grantedPermissions: string[];
+    tokenExpiresAt: string | null;
+  },
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
+  const now = new Date();
+  const values = {
+    dealerId,
+    pageId: config.pageId,
+    pageName: validation.pageName,
+    accessTokenCiphertext: encryptMetaToken(config.pageAccessToken, env),
+    tokenKeyVersion: KEY_VERSION,
+    scopes: [...new Set(validation.grantedPermissions)],
+    status: "active",
+    lastValidatedAt: now,
+    expiresAt: validation.tokenExpiresAt ? new Date(validation.tokenExpiresAt) : null,
+    lastError: null,
+    updatedAt: now,
+  };
+
+  await db
+    .insert(dealerMetaConnectionsTable)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [dealerMetaConnectionsTable.dealerId, dealerMetaConnectionsTable.pageId],
+      set: {
+        pageName: values.pageName,
+        accessTokenCiphertext: values.accessTokenCiphertext,
+        tokenKeyVersion: values.tokenKeyVersion,
+        scopes: values.scopes,
+        status: values.status,
+        lastValidatedAt: values.lastValidatedAt,
+        expiresAt: values.expiresAt,
+        lastError: values.lastError,
+        updatedAt: values.updatedAt,
+      },
+    });
+}
+
 /**
  * One-time bridge for the Alpha deployment. It imports the old global env
  * values into the dealer connection row and is intentionally never used to
@@ -141,18 +194,17 @@ export async function ensureLegacyAlphaMetaConnection(
     .limit(1);
   if (existing) return existing;
 
-  const pageId = envValue("META_BOOTSTRAP_PAGE_ID", env) || envValue("META_PAGE_ID", env);
-  const pageAccessToken = envValue("META_BOOTSTRAP_PAGE_ACCESS_TOKEN", env) || envValue("META_PAGE_ACCESS_TOKEN", env);
-  if (!pageId || !pageAccessToken) return null;
+  const config = readBootstrapMetaPageConfig(env);
+  if (!config) return null;
 
   const [created] = await db
     .insert(dealerMetaConnectionsTable)
     .values({
       dealerId,
-      pageId,
+      pageId: config.pageId,
       businessId: envValue("META_BOOTSTRAP_BUSINESS_ID", env) || envValue("META_BUSINESS_ID", env),
       pageName: envValue("META_BOOTSTRAP_PAGE_NAME", env),
-      accessTokenCiphertext: encryptMetaToken(pageAccessToken, env),
+      accessTokenCiphertext: encryptMetaToken(config.pageAccessToken, env),
       tokenKeyVersion: KEY_VERSION,
       scopes: (envValue("META_PAGE_SCOPES", env) || "")
         .split(",")
