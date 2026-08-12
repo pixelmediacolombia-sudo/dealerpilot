@@ -118,6 +118,7 @@ export function DealerDna() {
   const queryClient = useQueryClient();
   const { data: dealersData } = useListDealers();
   const dealerId = dealersData?.dealers?.[0]?.id;
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
 
   const { data: dna, isLoading } = useGetDealerBrandDna(dealerId!, {
     query: {
@@ -137,7 +138,11 @@ export function DealerDna() {
 
   const update = useUpdateDealerBrandDna({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (savedDna) => {
+        // Use the API response as the source of truth so the form immediately
+        // reflects what the backend actually persisted, including palette arrays.
+        setForm(toForm(savedDna));
+        setSavedAt(new Date());
         if (dealerId) {
           queryClient.invalidateQueries({ queryKey: getGetDealerBrandDnaQueryKey(dealerId) });
         }
@@ -215,14 +220,23 @@ export function DealerDna() {
             description="Brand defaults that drive every creative DealerPilot generates."
             icon={Dna}
             action={
-              <Button onClick={handleSave} disabled={update.isPending} className="gap-2 h-11 px-6 rounded-xl font-bold text-[11px]  tracking-wide premium-gradient-btn shadow-lg">
-                {update.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                Save Brand DNA
-              </Button>
+              <div className="flex items-center gap-3">
+                <span aria-live="polite" className="text-[11px] font-medium text-muted-foreground">
+                  {update.isPending
+                    ? "Saving..."
+                    : savedAt
+                      ? `Saved ${savedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+                      : null}
+                </span>
+                <Button onClick={handleSave} disabled={update.isPending} className="gap-2 h-11 px-6 rounded-xl font-bold text-[11px]  tracking-wide premium-gradient-btn shadow-lg">
+                  {update.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  Save Brand DNA
+                </Button>
+              </div>
             }
           />
 
