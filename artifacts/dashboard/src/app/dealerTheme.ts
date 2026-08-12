@@ -98,7 +98,9 @@ export function applyDealerTheme(payload: DealerThemePayload): void {
     "--ring": hslChannel(primary),
     "--border": lightTint(secondary, Math.max(0.7, hexToHsl(secondary)[2] - 0.12)),
     "--input": lightTint(secondary, Math.max(0.64, hexToHsl(secondary)[2] - 0.18)),
-    "--sidebar": hslChannel(sidebar),
+    // `sidebar` is already an HSL channel string from `darkSurface`.
+    // Converting it as if it were hex makes the CSS variable invalid.
+    "--sidebar": sidebar,
     "--sidebar-foreground": sidebarForeground,
     "--sidebar-border": darkSurface(secondary, 0.28),
     "--sidebar-primary": hslChannel(primary),
