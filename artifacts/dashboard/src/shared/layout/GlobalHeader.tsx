@@ -29,10 +29,23 @@ import {
   WifiOff,
   Moon,
   Sun,
+  Search,
+  Maximize2,
+  Bell,
+  Settings2,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useDealerLocation, type DealerLocation } from "@/context/LocationContext";
 import { AccountMenu } from "@/app/AuthGate";
+import {
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandShortcut,
+} from "@/shared/ui/command";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -99,7 +112,7 @@ function LocationSelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="group flex min-h-10 items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-muted">
+        <button className="group flex min-h-10 items-center gap-2 rounded-xl border border-border/70 bg-card px-3 text-left shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-colors hover:bg-muted">
           <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span className="hidden text-sm font-medium text-foreground lg:inline">
             Alpha Motorsport
@@ -127,6 +140,63 @@ function LocationSelector() {
   );
 }
 
+function WorkspaceSearch({ onNavigate }: { onNavigate: (path: string) => void }) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const navigate = (path: string) => {
+    setOpen(false);
+    onNavigate(path);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="hidden h-11 min-w-0 flex-1 items-center gap-3 rounded-xl bg-accent/75 px-4 text-left text-sm text-muted-foreground shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-colors hover:bg-accent xl:flex xl:max-w-[360px]"
+        onClick={() => setOpen(true)}
+        aria-label="Search DealerPilot"
+      >
+        <Search className="h-[18px] w-[18px] shrink-0 text-foreground/80" aria-hidden="true" />
+        <span className="flex-1 truncate">Search workspace</span>
+        <kbd className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">⌘ K</kbd>
+      </button>
+      <CommandDialog open={open} onOpenChange={setOpen}>
+        <CommandInput placeholder="Search DealerPilot..." />
+        <CommandList>
+          <CommandEmpty>No workspace matches found.</CommandEmpty>
+          <CommandGroup heading="Workspace">
+            <CommandItem onSelect={() => navigate("/")}>
+              <span>Command center</span><CommandShortcut>⌘ 1</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => navigate("/listings")}>
+              <span>Marketplace</span><CommandShortcut>⌘ 2</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => navigate("/inventory")}>
+              <span>Inventory</span><CommandShortcut>⌘ 3</CommandShortcut>
+            </CommandItem>
+          </CommandGroup>
+          <CommandGroup heading="Tools">
+            <CommandItem onSelect={() => navigate("/sales-ai")}>Sales</CommandItem>
+            <CommandItem onSelect={() => navigate("/dealer-dna")}>Dealer DNA</CommandItem>
+            <CommandItem onSelect={() => navigate("/settings")}>Settings</CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
+    </>
+  );
+}
+
 // ── Derive connection state ───────────────────────────────────────────────────
 
 function deriveConn(data: ConnectionStatus | undefined) {
@@ -151,7 +221,7 @@ function deriveConn(data: ConnectionStatus | undefined) {
 // ── GlobalHeader ──────────────────────────────────────────────────────────────
 
 export function GlobalHeader() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { data: dealersData } = useListDealers();
   const dealerId = dealersData?.dealers?.[0]?.id;
@@ -217,18 +287,19 @@ export function GlobalHeader() {
                   : "Dealer operations";
 
   return (
-    <header className="relative z-30 flex h-[72px] shrink-0 items-center gap-3 border-b border-border bg-card px-3 shadow-[0_1px_0_rgb(15_23_42/0.02)] sm:gap-5 sm:px-6">
+    <header className="relative z-30 flex min-h-[78px] shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-3 shadow-[0_1px_0_rgb(15_23_42/0.02)] sm:gap-5 sm:px-6">
 
       <div className="hidden min-w-0 items-center gap-3 lg:flex">
-        <div className="h-8 w-px bg-primary/30" aria-hidden="true" />
         <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold tracking-tight text-foreground">{pageTitle}</p>
+          <p className="truncate text-[17px] font-bold tracking-[-0.02em] text-foreground">{pageTitle}</p>
           <p className="text-[11px] text-muted-foreground">Dealer operations</p>
         </div>
       </div>
 
       {/* Location */}
       <LocationSelector />
+
+      <WorkspaceSearch onNavigate={setLocation} />
 
       <div className="flex-1" />
 
@@ -250,6 +321,19 @@ export function GlobalHeader() {
       </div>
 
       {/* Connect button — only when not ready */}
+      <div className="hidden items-center gap-2 xl:flex">
+        <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/70 text-accent-foreground transition-colors hover:bg-accent" onClick={() => void document.documentElement.requestFullscreen?.()} aria-label="Enter fullscreen" title="Fullscreen">
+          <Maximize2 className="h-[17px] w-[17px]" aria-hidden="true" />
+        </button>
+        <button type="button" className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-accent/70 text-accent-foreground transition-colors hover:bg-accent" onClick={() => toast({ title: "System timeline", description: "Notifications are available in Command center." })} aria-label="View notifications" title="Notifications">
+          <Bell className="h-[17px] w-[17px]" aria-hidden="true" />
+          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-warning" aria-hidden="true" />
+        </button>
+        <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/70 text-accent-foreground transition-colors hover:bg-accent" onClick={() => setLocation("/settings")} aria-label="Open settings" title="Settings">
+          <Settings2 className="h-[17px] w-[17px]" aria-hidden="true" />
+        </button>
+      </div>
+
       <ThemeToggle />
 
       <AccountMenu />

@@ -29,21 +29,18 @@ export function KpiCard({ title, label, value, formatValue, trend, delta, icon, 
   const heading = title ?? label ?? "";
   const movement = trend ?? delta;
   const Wrapper = onClick ? "button" : "div";
-  const toneClass = module === "inventory"
-    ? "gymove-kpi-blue"
-    : module === "marketplace"
-      ? "gymove-kpi-purple"
-      : module === "sales-ai"
-        ? "gymove-kpi-pink"
-        : undefined;
+  const tone = module === "inventory" ? "blue" : module === "marketplace" ? "purple" : module === "sales-ai" ? "pink" : undefined;
+  const toneClass = tone ? `gymove-kpi-${tone}` : undefined;
 
   return (
     <Wrapper
       data-kpi-card="true"
+      data-kpi-tone={tone}
       onClick={onClick}
       className={cn(
-        "flex min-w-0 flex-col rounded-lg border border-border bg-card px-5 py-4 text-left text-card-foreground shadow-sm",
+        "gymove-kpi-card flex min-w-0 flex-col rounded-2xl border border-border bg-card px-5 py-4 text-left text-card-foreground shadow-[0_5px_16px_rgb(15_23_42/0.045)]",
         toneClass,
+        tone ? `gymove-kpi-tone-${tone}` : undefined,
         onClick && "cursor-pointer transition-[border-color,box-shadow] hover:border-primary/25 hover:shadow-md",
         className,
       )}

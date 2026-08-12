@@ -74,14 +74,14 @@
   --border: 225 20% 88%;
   --input: 225 19% 82%;
   --ring: 256 58% 58%;
-  --sidebar: 231 35% 16%;
-  --sidebar-foreground: 231 18% 92%;
-  --sidebar-border: 231 22% 25%;
-  --sidebar-primary: 256 72% 68%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 220 18% 25%;
+  --sidebar-border: 220 18% 91%;
+  --sidebar-primary: 256 58% 58%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 256 48% 29%;
-  --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-ring: 256 72% 68%;
+  --sidebar-accent: 256 65% 96%;
+  --sidebar-accent-foreground: 256 55% 39%;
+  --sidebar-ring: 256 58% 58%;
   --radius: 0.75rem;
   --shadow-raised: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 20px rgb(15 23 42 / 0.05);
   --shadow-overlay: 0 18px 44px rgb(15 23 42 / 0.12), 0 4px 12px rgb(15 23 42 / 0.06);
@@ -207,6 +207,32 @@
 .gymove-kpi-green {
   background: hsl(150 50% 95%);
   border-color: hsl(150 48% 86%);
+}
+
+.gymove-kpi-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.gymove-kpi-card::after {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 3px;
+  content: "";
+  background: hsl(var(--primary) / 0.78);
+}
+
+.gymove-kpi-card[data-kpi-tone="blue"]::after {
+  background: hsl(211 78% 58% / 0.8);
+}
+
+.gymove-kpi-card[data-kpi-tone="pink"]::after {
+  background: hsl(337 82% 62% / 0.8);
+}
+
+.gymove-kpi-card[data-kpi-tone="green"]::after {
+  background: hsl(145 58% 46% / 0.8);
 }
 
 @media (hover: hover) and (pointer: fine) {

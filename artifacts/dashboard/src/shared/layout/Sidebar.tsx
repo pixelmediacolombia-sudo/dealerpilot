@@ -76,48 +76,48 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="relative z-20 hidden h-[100dvh] w-[248px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[8px_0_28px_rgb(15_23_42/0.12)] lg:flex">
-        <Link href="/" className="flex h-[78px] items-center gap-3 border-b border-sidebar-border px-5" aria-label="DealerPilot home">
+      <aside className="relative z-20 hidden h-[100dvh] w-[260px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[4px_0_18px_rgb(15_23_42/0.035)] lg:flex">
+        <Link href="/" className="flex h-[82px] items-center gap-3 border-b border-sidebar-border px-6" aria-label="DealerPilot home">
           <BrandMark />
           <span className="min-w-0">
-            <span className="block text-[15px] font-semibold tracking-tight text-sidebar-foreground">DealerPilot</span>
-            <span className="block text-xs text-sidebar-foreground/55">Dealer operations</span>
+            <span className="block text-[16px] font-bold tracking-[-0.02em] text-sidebar-foreground">DealerPilot</span>
+            <span className="block text-[11px] text-sidebar-foreground/55">Dealer operations</span>
           </span>
         </Link>
 
         <div className="px-5 pb-4 pt-5">
-          <div className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar/60 px-3 py-2.5">
+          <div className="flex items-center gap-2 rounded-xl border border-sidebar-border bg-sidebar px-3.5 py-3 shadow-[0_3px_12px_rgb(15_23_42/0.035)]">
             <span className={cn("h-1.5 w-1.5 rounded-full", dealer?.status === "active" ? "bg-success" : "bg-muted-foreground/40")} />
-            <span className="min-w-0 truncate text-xs font-medium text-sidebar-foreground/65">
+            <span className="min-w-0 truncate text-xs font-semibold text-sidebar-foreground/75">
               {dealer?.name ?? "Alpha MotorSports"}
             </span>
           </div>
-          <Link href="/inventory" className="mt-3 flex min-h-10 items-center justify-center gap-2 rounded-lg bg-sidebar-primary px-3 text-xs font-semibold text-sidebar-primary-foreground shadow-[0_8px_18px_rgb(111_85_217/0.22)] transition-[background-color,transform] hover:bg-sidebar-primary/90 hover:-translate-y-px">
+          <Link href="/inventory" className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-sidebar-primary px-3 text-xs font-semibold text-sidebar-primary-foreground shadow-[0_8px_18px_rgb(111_85_217/0.18)] transition-[background-color,transform] hover:bg-sidebar-primary/90 hover:-translate-y-px">
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add vehicle
           </Link>
         </div>
 
-        <nav aria-label="Main navigation" className="flex-1 space-y-1 overflow-y-auto px-2.5 py-2 overscroll-contain xl:px-3">
+        <nav aria-label="Main navigation" className="flex-1 space-y-1 overflow-y-auto px-4 py-2 overscroll-contain">
           {visibleNavItems.map((item, index) => {
             const active = isActive(item);
             return (
               <div key={item.path}>
                 {index === 0 || visibleNavItems[index - 1].group !== item.group ? (
-                <p className="px-3 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/40 first:pt-1">{item.group}</p>
+                <p className="px-3 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[0.16em] text-sidebar-foreground/40 first:pt-2">{item.group}</p>
                 ) : null}
                 <Link
                   href={item.path}
                   aria-current={active ? "page" : undefined}
                   title={item.name}
                   className={cn(
-                    "group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm transition-[background-color,color]",
+                    "group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] transition-[background-color,color,box-shadow]",
                     active
                       ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                      : "text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
                   )}
                 >
-                  {active ? <span className="absolute -left-2.5 h-6 w-0.5 rounded-r-full bg-sidebar-primary xl:-left-3" /> : null}
+                  {active ? <span className="absolute -left-4 h-7 w-1 rounded-r-full bg-sidebar-primary" /> : null}
                   <item.icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-sidebar-primary" : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground")} aria-hidden="true" />
                   <span className="truncate">{item.name}</span>
                 </Link>
@@ -126,11 +126,11 @@ export function Sidebar() {
           })}
         </nav>
 
-        <div className="border-t border-sidebar-border p-2.5 xl:p-3">
+        <div className="border-t border-sidebar-border p-4">
           <DropdownMenu>
           <DropdownMenuTrigger asChild>
-              <button className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground" aria-label="Open operator menu">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-sidebar-border bg-sidebar-accent text-[10px] font-semibold text-sidebar-foreground">OP</span>
+              <button className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground" aria-label="Open operator menu">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sidebar-border bg-sidebar-accent text-[10px] font-semibold text-sidebar-accent-foreground">OP</span>
                 <span className="flex-1 text-left text-sm font-medium">Operator</span>
                 <ChevronUp className="h-4 w-4" aria-hidden="true" />
               </button>
