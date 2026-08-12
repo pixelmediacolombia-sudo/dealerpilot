@@ -62,7 +62,7 @@ button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 3px solid rgb(118 88 214 / 28%);
+  outline: 3px solid color-mix(in srgb, var(--dp-violet) 28%, transparent);
   outline-offset: 2px;
 }
 
@@ -86,7 +86,7 @@ summary:focus-visible {
   color: var(--dp-violet-foreground);
   background: var(--dp-violet);
   border-radius: 11px;
-  box-shadow: 0 7px 15px rgb(118 88 214 / 28%);
+  box-shadow: 0 7px 15px color-mix(in srgb, var(--dp-violet) 28%, transparent);
   font-size: 16px;
   font-weight: 800;
   letter-spacing: -.05em;
@@ -230,7 +230,7 @@ textarea {
   transition: border-color var(--motion-fast) ease-out, box-shadow var(--motion-fast) ease-out;
 }
 input[type="text"]:focus,
-textarea:focus { border-color: #bdb1f0; box-shadow: 0 0 0 3px rgb(118 88 214 / 12%); }
+textarea:focus { border-color: color-mix(in srgb, var(--dp-violet) 45%, white); box-shadow: 0 0 0 3px color-mix(in srgb, var(--dp-violet) 12%, transparent); }
 textarea { min-height: 58px; resize: vertical; }
 .field-help { margin: 5px 0 0; color: var(--dp-subtle); font-size: 10px; }
 
@@ -277,7 +277,7 @@ textarea { min-height: 58px; resize: vertical; }
 }
 .switch input:checked + .switch-track { background: var(--dp-violet); }
 .switch input:checked + .switch-track::after { transform: translateX(16px); }
-.switch input:focus-visible + .switch-track { outline: 3px solid rgb(118 88 214 / 28%); outline-offset: 2px; }
+.switch input:focus-visible + .switch-track { outline: 3px solid color-mix(in srgb, var(--dp-violet) 28%, transparent); outline-offset: 2px; }
 
 button.primary-action,
 button.secondary-action {
@@ -293,7 +293,7 @@ button.primary-action {
   color: #fff;
   background: var(--dp-violet);
   border: 1px solid var(--dp-violet);
-  box-shadow: 0 6px 14px rgb(118 88 214 / 18%);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--dp-violet) 18%, transparent);
 }
 button.primary-action:not(:disabled):hover { background: var(--dp-violet-dark); border-color: var(--dp-violet-dark); }
 button.primary-action:not(:disabled):active,

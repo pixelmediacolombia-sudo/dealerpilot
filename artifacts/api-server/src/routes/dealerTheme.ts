@@ -6,7 +6,15 @@ const router: IRouter = Router();
 
 function safeColors(value: unknown, fallback: string[]): string[] {
   if (!Array.isArray(value)) return fallback;
-  const colors = value.filter((color): color is string => typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color));
+  const colors = value
+    .map((color) => {
+      if (typeof color !== "string") return null;
+      const match = color.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+      if (!match) return null;
+      const hex = match[1]!.toLowerCase();
+      return `#${hex.length === 3 ? hex.split("").map((channel) => channel + channel).join("") : hex}`;
+    })
+    .filter((color): color is string => color !== null);
   return colors.length > 0 ? colors : fallback;
 }
 

@@ -51,7 +51,7 @@
 #mai-drag-handle:active,
 #mai-panel.mai-dragging #mai-drag-handle { cursor: grabbing; }
 #mai-drag-handle:focus-visible {
-  outline: 3px solid rgb(118 88 214 / 42%);
+  outline: 3px solid color-mix(in srgb, var(--dp-violet) 42%, transparent);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -104,7 +104,7 @@
   line-height: 1;
 }
 #mai-reset-position:hover { background: rgb(255 255 255 / 10%); }
-#mai-reset-position:focus-visible { outline: 3px solid rgb(118 88 214 / 32%); outline-offset: 2px; }
+#mai-reset-position:focus-visible { outline: 3px solid color-mix(in srgb, var(--dp-violet) 32%, transparent); outline-offset: 2px; }
 
 #mai-body { padding: 14px; }
 
@@ -131,7 +131,7 @@
   background: var(--dp-violet);
   border: 1px solid var(--dp-violet);
   border-radius: 8px;
-  box-shadow: 0 6px 14px rgb(118 88 214 / 18%);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--dp-violet) 18%, transparent);
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
@@ -140,7 +140,7 @@
 .mai-btn:hover { background: var(--dp-violet-dark); border-color: var(--dp-violet-dark); }
 .mai-btn:active { transform: translateY(1px); }
 .mai-btn:focus-visible,
-#mai-toggle:focus-visible { outline: 3px solid rgb(118 88 214 / 32%); outline-offset: 2px; }
+#mai-toggle:focus-visible { outline: 3px solid color-mix(in srgb, var(--dp-violet) 32%, transparent); outline-offset: 2px; }
 .mai-btn-secondary {
   color: #46506a;
   background: #fff;

@@ -579,7 +579,7 @@ router.put("/creative/dna/:dealerId", async (req, res) => {
     .values({ dealerId, ...parsed.data })
     .onConflictDoUpdate({
       target: dealerBrandDnaTable.dealerId,
-      set: { ...parsed.data },
+      set: { ...parsed.data, updatedAt: new Date() },
     })
     .returning();
 

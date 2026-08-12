@@ -10,12 +10,16 @@
   const THEME_STORAGE_KEY = "dealerTheme";
   const REFRESH_MS = 30 * 1000;
 
-  function isHexColor(value) {
-    return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
+  function normalizeHexColor(value) {
+    if (typeof value !== "string") return null;
+    const match = value.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!match) return null;
+    const hex = match[1].toLowerCase();
+    return "#" + (hex.length === 3 ? hex.split("").map((channel) => channel + channel).join("") : hex);
   }
 
   function firstColor(values, fallback) {
-    return Array.isArray(values) && values.find(isHexColor) || fallback;
+    return Array.isArray(values) && values.map(normalizeHexColor).find(Boolean) || fallback;
   }
 
   function hexToHsl(hex) {
