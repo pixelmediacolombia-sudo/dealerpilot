@@ -29,7 +29,6 @@ import {
   WifiOff,
   Moon,
   Sun,
-  Search,
   Maximize2,
   Bell,
   Settings2,
@@ -37,15 +36,6 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useDealerLocation, type DealerLocation } from "@/context/LocationContext";
 import { AccountMenu } from "@/app/AuthGate";
-import {
-  CommandDialog,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandShortcut,
-} from "@/shared/ui/command";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -140,60 +130,69 @@ function LocationSelector() {
   );
 }
 
-function WorkspaceSearch({ onNavigate }: { onNavigate: (path: string) => void }) {
-  const [open, setOpen] = useState(false);
+type HeaderStatusKey = "extension" | "facebook" | "marketplace" | "publishing" | "sync" | "ai";
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setOpen(true);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+interface HeaderStatusOption {
+  key: HeaderStatusKey;
+  label: string;
+  shortLabel: string;
+  value: string;
+  state: PillState;
+}
 
-  const navigate = (path: string) => {
-    setOpen(false);
-    onNavigate(path);
-  };
+function statusTone(state: PillState) {
+  return state === "ok"
+    ? { dot: "bg-success", text: "text-success" }
+    : state === "warn"
+      ? { dot: "bg-warning", text: "text-warning" }
+      : state === "error"
+        ? { dot: "bg-destructive/80", text: "text-destructive/80" }
+        : { dot: "bg-muted-foreground/35", text: "text-muted-foreground" };
+}
+
+function StatusSelector({ items }: { items: HeaderStatusOption[] }) {
+  const [selectedKey, setSelectedKey] = useState<HeaderStatusKey>("marketplace");
+  const selected = items.find((item) => item.key === selectedKey) ?? items[0];
+  const selectedTone = statusTone(selected.state);
 
   return (
-    <>
-      <button
-        type="button"
-        className="hidden h-11 w-[260px] shrink-0 items-center gap-3 rounded-xl bg-primary/10 px-4 text-left text-sm text-muted-foreground shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/15 hover:shadow-sm xl:flex 2xl:w-[320px]"
-        onClick={() => setOpen(true)}
-        aria-label="Search DealerPilot"
-      >
-        <Search className="h-[18px] w-[18px] shrink-0 text-primary" aria-hidden="true" />
-        <span className="flex-1 truncate">Search workspace</span>
-        <kbd className="shrink-0 whitespace-nowrap rounded-md border border-primary/20 bg-card px-1.5 py-0.5 text-[10px] font-semibold text-primary">⌘ K</kbd>
-      </button>
-      <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Search DealerPilot..." />
-        <CommandList>
-          <CommandEmpty>No workspace matches found.</CommandEmpty>
-          <CommandGroup heading="Workspace">
-            <CommandItem onSelect={() => navigate("/")}>
-              <span>Command center</span><CommandShortcut>⌘ 1</CommandShortcut>
-            </CommandItem>
-            <CommandItem onSelect={() => navigate("/listings")}>
-              <span>Marketplace</span><CommandShortcut>⌘ 2</CommandShortcut>
-            </CommandItem>
-            <CommandItem onSelect={() => navigate("/inventory")}>
-              <span>Inventory</span><CommandShortcut>⌘ 3</CommandShortcut>
-            </CommandItem>
-          </CommandGroup>
-          <CommandGroup heading="Tools">
-            <CommandItem onSelect={() => navigate("/sales-ai")}>Sales</CommandItem>
-            <CommandItem onSelect={() => navigate("/dealer-dna")}>Dealer DNA</CommandItem>
-            <CommandItem onSelect={() => navigate("/settings")}>Settings</CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </CommandDialog>
-    </>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="hidden h-11 w-[220px] shrink-0 items-center gap-2 rounded-xl border border-primary/15 bg-primary/[0.06] px-3 text-left shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/10 hover:shadow-sm xl:flex 2xl:w-[250px]"
+          aria-label={`Selected status: ${selected.label}`}
+        >
+          <span className={cn("h-2 w-2 shrink-0 rounded-full", selectedTone.dot)} aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="mr-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{selected.shortLabel}</span>
+            <span className={cn("truncate text-xs font-semibold", selectedTone.text)}>{selected.value}</span>
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64 p-1.5">
+        <div className="px-2.5 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Connection status</div>
+        {items.map((item) => {
+          const tone = statusTone(item.state);
+          const isSelected = item.key === selectedKey;
+          return (
+            <DropdownMenuItem
+              key={item.key}
+              className={cn("cursor-pointer gap-2.5 rounded-lg px-2.5 py-2", isSelected && "bg-primary/10 text-primary")}
+              onSelect={() => setSelectedKey(item.key)}
+            >
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", tone.dot)} aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold text-foreground">{item.label}</span>
+                <span className={cn("block text-[11px] font-medium", tone.text)}>{item.value}</span>
+              </span>
+              {isSelected ? <span className="text-xs font-bold text-primary" aria-hidden="true">✓</span> : null}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -266,6 +265,15 @@ export function GlobalHeader() {
   const activeJobs = jobs.filter(j => j.status === "Queued" || j.status === "Generating").length;
   const aiDetail = activeJobs > 0 ? `${activeJobs} active` : "Idle";
 
+  const statusOptions: HeaderStatusOption[] = [
+    { key: "extension", label: "Chrome extension", shortLabel: "EXT", value: conn.extState === "ok" ? "Online" : "Offline", state: conn.extState },
+    { key: "facebook", label: "Facebook", shortLabel: "FB", value: conn.fbState === "ok" ? "Active" : conn.fbState === "error" ? "Offline" : "Unknown", state: conn.fbState },
+    { key: "marketplace", label: "Marketplace", shortLabel: "MKT", value: conn.mktState === "ok" ? "Ready" : conn.mktState === "error" ? "Blocked" : "Unknown", state: conn.mktState },
+    { key: "publishing", label: "Publishing", shortLabel: "PUB", value: conn.pubState === "ok" ? "Ready" : conn.pubState === "error" ? "Pending" : "Unknown", state: conn.pubState },
+    { key: "sync", label: "Inventory sync", shortLabel: "SYNC", value: syncDetail, state: lastRun?.status === "success" ? "ok" : lastRun ? "error" : "unknown" },
+    { key: "ai", label: "AI jobs", shortLabel: "AI", value: aiDetail, state: activeJobs > 0 ? "warn" : "ok" },
+  ];
+
   const dot = (s: string) => <span className="text-muted-foreground text-[11px] select-none">·</span>;
   const div = () => <div className="mx-2 h-4 w-px bg-border" />;
   const pageTitle = location === "/"
@@ -301,7 +309,7 @@ export function GlobalHeader() {
         <LocationSelector />
       </div>
 
-      <WorkspaceSearch onNavigate={setLocation} />
+      <StatusSelector items={statusOptions} />
 
       <div className="flex-1" />
 
