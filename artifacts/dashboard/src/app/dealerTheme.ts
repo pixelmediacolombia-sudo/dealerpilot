@@ -72,8 +72,11 @@ export function applyDealerTheme(payload: DealerThemePayload): void {
   const accent = firstColor(payload.accentColors, FALLBACK_THEME.accentColors[0]);
   const primaryForeground = readableForeground(primary);
   const secondaryForeground = readableForeground(secondary);
-  const sidebar = darkSurface(secondary, 0.16);
-  const sidebarForeground = "0 0% 100%";
+  // The shell follows Gymove's light admin grammar. Dealer colors still drive
+  // brand surfaces and Dealer DNA, but the navigation chrome stays readable
+  // and consistent across dealer themes.
+  const sidebar = "0 0% 100%";
+  const sidebarForeground = "220 18% 25%";
   const root = document.documentElement;
 
   const values: Record<string, string> = {
@@ -98,16 +101,16 @@ export function applyDealerTheme(payload: DealerThemePayload): void {
     "--ring": hslChannel(primary),
     "--border": lightTint(secondary, Math.max(0.7, hexToHsl(secondary)[2] - 0.12)),
     "--input": lightTint(secondary, Math.max(0.64, hexToHsl(secondary)[2] - 0.18)),
-    // `sidebar` is already an HSL channel string from `darkSurface`.
-    // Converting it as if it were hex makes the CSS variable invalid.
+    // Keep the navigation surface independent from dealer branding so the
+    // light shell remains consistent with the admin template.
     "--sidebar": sidebar,
     "--sidebar-foreground": sidebarForeground,
-    "--sidebar-border": darkSurface(secondary, 0.28),
-    "--sidebar-primary": hslChannel(primary),
-    "--sidebar-primary-foreground": primaryForeground,
-    "--sidebar-accent": hslChannel(primary, 0.28),
-    "--sidebar-accent-foreground": "0 0% 100%",
-    "--sidebar-ring": hslChannel(primary),
+    "--sidebar-border": "220 18% 91%",
+    "--sidebar-primary": "226 68% 44%",
+    "--sidebar-primary-foreground": "0 0% 100%",
+    "--sidebar-accent": "231 52% 95%",
+    "--sidebar-accent-foreground": "226 68% 44%",
+    "--sidebar-ring": "226 68% 44%",
   };
 
   Object.entries(values).forEach(([name, value]) => root.style.setProperty(name, value));

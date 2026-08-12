@@ -92,7 +92,7 @@ export function Sidebar() {
               {dealer?.name ?? "Alpha MotorSports"}
             </span>
           </div>
-          <Link href="/inventory" className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-sidebar-primary px-3 text-xs font-semibold text-sidebar-primary-foreground shadow-[0_8px_18px_rgb(111_85_217/0.18)] transition-[background-color,transform] hover:bg-sidebar-primary/90 hover:-translate-y-px">
+          <Link href="/inventory" className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-[0_8px_18px_rgb(15_23_42/0.12)] transition-[background-color,transform] hover:bg-primary/90 hover:-translate-y-px">
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add vehicle
           </Link>

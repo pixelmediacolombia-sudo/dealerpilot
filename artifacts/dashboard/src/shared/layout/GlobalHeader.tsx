@@ -163,13 +163,13 @@ function WorkspaceSearch({ onNavigate }: { onNavigate: (path: string) => void })
     <>
       <button
         type="button"
-        className="hidden h-11 min-w-0 flex-1 items-center gap-3 rounded-xl bg-accent/75 px-4 text-left text-sm text-muted-foreground shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-colors hover:bg-accent xl:flex xl:max-w-[360px]"
+        className="hidden h-11 min-w-0 flex-1 items-center gap-3 rounded-xl bg-[hsl(231_52%_95%)] px-4 text-left text-sm text-muted-foreground shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-colors hover:bg-[hsl(231_52%_91%)] xl:flex xl:max-w-[360px]"
         onClick={() => setOpen(true)}
         aria-label="Search DealerPilot"
       >
-        <Search className="h-[18px] w-[18px] shrink-0 text-foreground/80" aria-hidden="true" />
+        <Search className="h-[18px] w-[18px] shrink-0 text-[hsl(226_68%_44%)]" aria-hidden="true" />
         <span className="flex-1 truncate">Search workspace</span>
-        <kbd className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">⌘ K</kbd>
+        <kbd className="rounded-md border border-[hsl(225_35%_88%)] bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">⌘ K</kbd>
       </button>
       <CommandDialog open={open} onOpenChange={setOpen}>
         <CommandInput placeholder="Search DealerPilot..." />
@@ -322,14 +322,14 @@ export function GlobalHeader() {
 
       {/* Connect button — only when not ready */}
       <div className="hidden items-center gap-2 xl:flex">
-        <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/70 text-accent-foreground transition-colors hover:bg-accent" onClick={() => void document.documentElement.requestFullscreen?.()} aria-label="Enter fullscreen" title="Fullscreen">
+        <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(231_52%_95%)] text-[hsl(226_68%_44%)] transition-colors hover:bg-[hsl(231_52%_91%)]" onClick={() => void document.documentElement.requestFullscreen?.()} aria-label="Enter fullscreen" title="Fullscreen">
           <Maximize2 className="h-[17px] w-[17px]" aria-hidden="true" />
         </button>
-        <button type="button" className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-accent/70 text-accent-foreground transition-colors hover:bg-accent" onClick={() => toast({ title: "System timeline", description: "Notifications are available in Command center." })} aria-label="View notifications" title="Notifications">
+        <button type="button" className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(231_52%_95%)] text-[hsl(226_68%_44%)] transition-colors hover:bg-[hsl(231_52%_91%)]" onClick={() => toast({ title: "System timeline", description: "Notifications are available in Command center." })} aria-label="View notifications" title="Notifications">
           <Bell className="h-[17px] w-[17px]" aria-hidden="true" />
           <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-warning" aria-hidden="true" />
         </button>
-        <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/70 text-accent-foreground transition-colors hover:bg-accent" onClick={() => setLocation("/settings")} aria-label="Open settings" title="Settings">
+        <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(231_52%_95%)] text-[hsl(226_68%_44%)] transition-colors hover:bg-[hsl(231_52%_91%)]" onClick={() => setLocation("/settings")} aria-label="Open settings" title="Settings">
           <Settings2 className="h-[17px] w-[17px]" aria-hidden="true" />
         </button>
       </div>
