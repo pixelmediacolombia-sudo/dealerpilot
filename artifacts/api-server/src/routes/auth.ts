@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type NextFunction, type Response } from "express";
 import crypto from "crypto";
 import { z } from "zod/v4";
 import { pool } from "@workspace/db";
@@ -286,6 +286,23 @@ async function authenticatedUser(req: Request) {
   }
 
   return { token, session, user };
+}
+
+export type AuthenticatedDealerUser = ReturnType<typeof safeUser>;
+
+export async function requireAuthenticatedUser(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const authContext = await authenticatedUser(req);
+  if (!authContext) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  res.locals.authUser = safeUser(authContext.user);
+  next();
 }
 
 const LoginBody = z.object({

@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
@@ -10,13 +10,27 @@ import {
 } from "@workspace/db";
 import { ensurePagesSchema } from "../pages/schema";
 import { pagesPublishingWorker } from "../pages/pagesPublishing.worker";
+import { getMetaPageConnection, getMetaPageConnectionSummary, ensureLegacyAlphaMetaConnection, recordMetaPageValidation } from "../pages/metaPageConnections";
+import { validateMetaPageConnection } from "../pages/metaPagesPublisher";
 import { runWorkerOnce } from "../workers/scheduler";
 import { ALPHA_DEALER_ID } from "../lib/dealer";
+import { requireAuthenticatedUser } from "./auth";
 
 const router: IRouter = Router();
 const DEFAULT_DEALER_ID = ALPHA_DEALER_ID;
 const OPEN_BATCH_STATUSES = ["Scheduled", "Active"];
 const PAGE_JOB_STATUSES = ["Scheduled", "Queued", "Publishing", "Published", "Needs Review", "Failed"];
+
+router.use(requireAuthenticatedUser);
+
+function hasDealerAccess(res: Response, dealerId: number): boolean {
+  const user = res.locals.authUser as { dealerId?: number } | undefined;
+  if (!user || user.dealerId !== dealerId) {
+    res.status(403).json({ error: "Dealer access denied" });
+    return false;
+  }
+  return true;
+}
 
 const settingsPatchSchema = z.object({
   enabled: z.boolean().optional(),
@@ -43,6 +57,7 @@ router.get("/pages/settings/:dealerId", async (req, res) => {
     res.status(400).json({ error: "Invalid dealerId" });
     return;
   }
+  if (!hasDealerAccess(res, dealerId)) return;
 
   try {
     await ensurePagesSchema();
@@ -63,6 +78,7 @@ router.put("/pages/settings/:dealerId", async (req, res) => {
     res.status(400).json({ error: "Invalid dealerId" });
     return;
   }
+  if (!hasDealerAccess(res, dealerId)) return;
   const parsed = settingsPatchSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid Pages settings", details: parsed.error.flatten() });
@@ -92,6 +108,7 @@ router.get("/pages/batches/next", async (req, res) => {
     res.status(400).json({ error: "dealerId must be a positive integer" });
     return;
   }
+  if (!hasDealerAccess(res, dealerId)) return;
 
   try {
     await ensurePagesSchema();
@@ -160,6 +177,7 @@ router.get("/pages/batches", async (req, res) => {
     res.status(400).json({ error: "dealerId must be positive and limit must be between 1 and 100" });
     return;
   }
+  if (!hasDealerAccess(res, dealerId)) return;
 
   try {
     await ensurePagesSchema();
@@ -185,6 +203,16 @@ router.get("/pages/batches/:batchId/jobs", async (req, res) => {
 
   try {
     await ensurePagesSchema();
+    const [batch] = await db
+      .select({ dealerId: pagePublishingBatchesTable.dealerId })
+      .from(pagePublishingBatchesTable)
+      .where(eq(pagePublishingBatchesTable.id, batchId))
+      .limit(1);
+    if (!batch) {
+      res.status(404).json({ error: "Pages batch not found" });
+      return;
+    }
+    if (!hasDealerAccess(res, batch.dealerId)) return;
     const jobs = await db
       .select()
       .from(pagePublishingJobsTable)
@@ -201,12 +229,76 @@ router.get("/pages/batches/:batchId/jobs", async (req, res) => {
 });
 
 router.post("/pages/worker/run", async (req, res) => {
+  const user = res.locals.authUser as { role?: string } | undefined;
+  if (user?.role !== "admin") {
+    res.status(403).json({ error: "Administrator access required" });
+    return;
+  }
   try {
     const outcome = await runWorkerOnce(pagesPublishingWorker, req.log, "manual", null);
     res.json({ worker: pagesPublishingWorker.id, outcome });
   } catch (error) {
     req.log.error({ err: error }, "Failed to run Pages worker");
     res.status(500).json({ error: "Failed to run Pages worker" });
+  }
+});
+
+router.get("/pages/connection/:dealerId", async (req, res) => {
+  const dealerId = dealerIdFromParam(req.params.dealerId);
+  if (!dealerId) {
+    res.status(400).json({ error: "Invalid dealerId" });
+    return;
+  }
+  if (!hasDealerAccess(res, dealerId)) return;
+
+  try {
+    await ensurePagesSchema();
+    const connection = await getMetaPageConnectionSummary(dealerId);
+    res.json({
+      dealerId,
+      configured: Boolean(connection),
+      connection,
+    });
+  } catch (error) {
+    req.log.error({ err: error, dealerId }, "Failed to load Meta Page connection");
+    res.status(500).json({ error: "Failed to load Meta Page connection" });
+  }
+});
+
+router.post("/pages/connection/:dealerId/validate", async (req, res) => {
+  const dealerId = dealerIdFromParam(req.params.dealerId);
+  if (!dealerId) {
+    res.status(400).json({ error: "Invalid dealerId" });
+    return;
+  }
+  if (!hasDealerAccess(res, dealerId)) return;
+
+  try {
+    await ensurePagesSchema();
+    await ensureLegacyAlphaMetaConnection(dealerId);
+    const connection = await getMetaPageConnection(dealerId);
+    if (!connection) {
+      res.status(404).json({ error: "Meta Page credentials are not configured for this dealer" });
+      return;
+    }
+
+    const validation = await validateMetaPageConnection(
+      connection,
+      connection.scopes,
+    );
+    await recordMetaPageValidation(dealerId, {
+      pageName: validation.pageName,
+      lastError: validation.error,
+      valid: validation.ok,
+    });
+    res.status(validation.ok ? 200 : 422).json({
+      dealerId,
+      validation,
+      connection: await getMetaPageConnectionSummary(dealerId),
+    });
+  } catch (error) {
+    req.log.error({ err: error, dealerId }, "Failed to validate Meta Page connection");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to validate Meta Page connection" });
   }
 });
 

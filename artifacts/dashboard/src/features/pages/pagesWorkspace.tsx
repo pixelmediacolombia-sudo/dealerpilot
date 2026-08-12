@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarClock, Check, Facebook, Loader2, RefreshCw, Send, Settings2, Sparkles, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAccount } from "@/app/AuthGate";
+import { getAuthToken, useAccount } from "@/app/AuthGate";
 import { AppLayout } from "@/shared/layout/AppLayout";
 
 type PageSettings = {
@@ -47,6 +47,32 @@ type NextBatch = {
   vehicles: BatchVehicle[];
 };
 
+type PageConnection = {
+  pageId: string;
+  pageName: string | null;
+  scopes: string[];
+  status: string;
+  lastValidatedAt: string | null;
+  expiresAt: string | null;
+  lastError: string | null;
+};
+
+type PageConnectionResponse = {
+  configured: boolean;
+  connection: PageConnection | null;
+};
+
+type PageValidationResponse = {
+  validation: {
+    ok: boolean;
+    pageName: string | null;
+    grantedPermissions: string[];
+    missingPermissions: string[];
+    error: string | null;
+  };
+  connection: PageConnection | null;
+};
+
 const DEFAULT_SETTINGS: PageSettings = {
   enabled: false,
   vehiclesPerBatch: 3,
@@ -62,19 +88,24 @@ const DEFAULT_SETTINGS: PageSettings = {
 };
 
 async function readJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const token = getAuthToken();
   const response = await fetch(url, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
   });
-  const payload = (await response.json().catch(() => ({}))) as T & { error?: string };
-  if (!response.ok) throw new Error(payload.error ?? `Request failed (${response.status})`);
+  const payload = (await response.json().catch(() => ({}))) as T & { error?: string; validation?: { error?: string | null } };
+  if (!response.ok) throw new Error(payload.validation?.error || payload.error || `Request failed (${response.status})`);
   return payload;
 }
 
 function formatDate(value: string | null): string {
   if (!value) return "Not scheduled";
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
+    timeZone: "America/Bogota",
     weekday: "short",
     day: "2-digit",
     month: "short",
@@ -118,23 +149,27 @@ export function PagesWorkspace() {
   const dealerId = user.dealerId;
   const [settings, setSettings] = useState<PageSettings>(DEFAULT_SETTINGS);
   const [configured, setConfigured] = useState(false);
+  const [connection, setConnection] = useState<PageConnection | null>(null);
   const [batch, setBatch] = useState<NextBatch | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [settingsResponse, batchResponse] = await Promise.all([
+      const [settingsResponse, batchResponse, connectionResponse] = await Promise.all([
         readJson<{ configured: boolean; settings: PageSettings | null }>(`/api/pages/settings/${dealerId}`),
         readJson<{ batch: NextBatch | null }>(`/api/pages/batches/next?dealerId=${dealerId}`),
+        readJson<PageConnectionResponse>(`/api/pages/connection/${dealerId}`),
       ]);
       setConfigured(settingsResponse.configured);
       setSettings(settingsResponse.settings ?? DEFAULT_SETTINGS);
       setBatch(batchResponse.batch);
+      setConnection(connectionResponse.connection);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load Page publishing");
     } finally {
@@ -146,6 +181,20 @@ export function PagesWorkspace() {
 
   const updateSetting = <K extends keyof PageSettings>(key: K, value: PageSettings[K]) => {
     setSettings((current) => ({ ...current, [key]: value }));
+  };
+
+  const validateConnection = async () => {
+    setValidating(true);
+    setError(null);
+    try {
+      const response = await readJson<PageValidationResponse>(`/api/pages/connection/${dealerId}/validate`, { method: "POST", body: "{}" });
+      setConnection(response.connection);
+      if (!response.validation.ok) setError(response.validation.error || "Meta Page validation failed");
+    } catch (validationError) {
+      setError(validationError instanceof Error ? validationError.message : "Unable to validate the Meta Page connection");
+    } finally {
+      setValidating(false);
+    }
   };
 
   const save = async () => {
@@ -229,9 +278,13 @@ export function PagesWorkspace() {
           </div>
 
           <aside className="rounded-[10px] border border-border bg-card p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)]">
-            <div className="flex items-start gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#1877F2]/10 text-[#1877F2]"><Facebook className="h-5 w-5" aria-hidden="true" /></span><div><h2 className="text-base font-semibold text-foreground">Page connection</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">The account is validated in the backend using production configuration.</p></div></div>
+            <div className="flex items-start gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#1877F2]/10 text-[#1877F2]"><Facebook className="h-5 w-5" aria-hidden="true" /></span><div><h2 className="text-base font-semibold text-foreground">Page connection</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Credentials stay on the backend; this check confirms the Page and publish permission with Meta.</p></div></div>
+            <div className="mt-5 flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2.5"><div><p className="text-sm font-semibold text-foreground">{connection?.pageName || "Meta Page not validated"}</p><p className="mt-0.5 text-xs text-muted-foreground">{connection?.pageId || "No Page connection found"}</p></div><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", connection?.status === "active" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : connection?.status === "error" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-border bg-muted/40 text-muted-foreground")}>{connection?.status === "active" ? "Validated" : connection?.status === "error" ? "Needs attention" : "Not validated"}</span></div>
+            <button type="button" onClick={() => void validateConnection()} disabled={validating} className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50">{validating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-4 w-4" aria-hidden="true" />}{validating ? "Validating with Meta…" : "Validate connection"}</button>
             <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-sm text-muted-foreground">Local plan</span><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", settings.enabled ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-border bg-muted/40 text-muted-foreground")}>{settings.enabled ? "Active" : "Paused"}</span></div>
             <div className="mt-3 flex items-center justify-between"><span className="text-sm text-muted-foreground">Configuration saved</span><span className="text-sm font-semibold text-foreground">{configured ? "Yes" : "Pending"}</span></div>
+            <div className="mt-3 flex items-center justify-between"><span className="text-sm text-muted-foreground">Publish permission</span><span className="text-sm font-semibold text-foreground">{connection?.scopes.includes("pages_manage_posts") ? "Granted" : "Pending"}</span></div>
+            {connection?.lastValidatedAt ? <p className="mt-3 text-xs text-muted-foreground">Last checked {formatDate(connection.lastValidatedAt)}</p> : null}
             <p className="mt-4 rounded-md bg-muted/45 px-3 py-2.5 text-xs leading-5 text-muted-foreground">Tokens are never shown or stored in the frontend.</p>
           </aside>
         </section>

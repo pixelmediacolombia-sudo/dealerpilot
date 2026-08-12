@@ -19,13 +19,14 @@ import {
   type PagePublishSettings,
 } from "@workspace/db";
 import type { WorkerDefinition, WorkerRunOutcome } from "../workers/types";
-import { getVehiclePhotos } from "../features/publishing/infrastructure/publishingRepository";
+import { getVehiclePhotos, getVehicleRawPhotos } from "../features/publishing/infrastructure/publishingRepository";
 import { ensurePagesSchema } from "./schema";
-import { MetaPagesPublisher } from "./metaPagesPublisher";
-import { ensureLegacyAlphaMetaConnection, getMetaPageConnection } from "./metaPageConnections";
+import { MetaPagesPublisher, validateMetaPageConnection } from "./metaPagesPublisher";
+import { ensureLegacyAlphaMetaConnection, getMetaPageConnection, recordMetaPageValidation } from "./metaPageConnections";
 import { ALPHA_DEALER_ID } from "../lib/dealer";
 
 const PAGE_TIME_ZONE = process.env.META_PAGE_TIME_ZONE?.trim() || "America/Bogota";
+const PAGE_ELIGIBLE_VEHICLE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish"];
 const DEFAULT_SETTINGS: Omit<PagePublishSettings, "id" | "createdAt" | "updatedAt" | "dealerId"> = {
   enabled: false,
   vehiclesPerBatch: 3,
@@ -53,14 +54,14 @@ function message(vehicle: {
   mileage: number | null;
   vdpUrl: string | null;
   stockNumber: string | null;
-}): string {
+}, dealerName: string | null): string {
   const lines = [
     title(vehicle),
     vehicle.price ? `Price: $${vehicle.price.toLocaleString("en-US")}` : null,
     vehicle.mileage ? `Mileage: ${vehicle.mileage.toLocaleString("en-US")} miles` : null,
     vehicle.stockNumber ? `Stock #: ${vehicle.stockNumber}` : null,
     vehicle.vdpUrl ? `More details: ${vehicle.vdpUrl}` : null,
-    "Easy credit options available. Message us for availability and financing details.",
+    dealerName ? `Available now at ${dealerName}. Message us for availability and financing details.` : "Message us for availability and financing details.",
   ];
   return lines.filter((line): line is string => Boolean(line)).join("\n");
 }
@@ -102,6 +103,30 @@ function nextWindowStart(now: Date, settings: PagePublishSettings): Date {
   return target;
 }
 
+function publicPhotoUrl(value: string | null): string | null {
+  if (!value) return null;
+  if (/^https:\/\//i.test(value)) return value;
+  const base = (process.env.BACKEND_PUBLIC_URL || process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || "").replace(/\/+$/, "");
+  return base && value.startsWith("/") ? `${base}${value}` : null;
+}
+
+async function assertPublicImageUrls(imageUrls: string[]): Promise<void> {
+  for (const imageUrl of imageUrls) {
+    if (!/^https:\/\//i.test(imageUrl)) throw new Error(`Photo URL is not publicly reachable over HTTPS: ${imageUrl}`);
+    const response = await fetch(imageUrl, {
+      method: "GET",
+      headers: { Range: "bytes=0-1023" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(10_000),
+    });
+    const contentType = response.headers.get("content-type") || "";
+    if (!response.ok || !contentType.toLowerCase().startsWith("image/")) {
+      throw new Error(`Photo URL is not a public image (${response.status}): ${imageUrl}`);
+    }
+    await response.body?.cancel();
+  }
+}
+
 async function updateBatchProgress(batchId: number, now: Date): Promise<void> {
   const [batch] = await db.select().from(pagePublishingBatchesTable).where(eq(pagePublishingBatchesTable.id, batchId));
   if (!batch || batch.completedCount + batch.failedCount < batch.totalVehicles) return;
@@ -128,11 +153,23 @@ async function getSettings(dealerId: number): Promise<PagePublishSettings> {
 async function publishOne(job: typeof pagePublishingJobsTable.$inferSelect, log: import("pino").Logger): Promise<void> {
   const config = await getMetaPageConnection(job.dealerId);
   if (!config) throw new Error("Meta Pages publishing is not configured");
+  const validation = await validateMetaPageConnection(config, config.scopes);
+  await recordMetaPageValidation(job.dealerId, {
+    pageName: validation.pageName,
+    lastError: validation.error,
+    valid: validation.ok,
+  });
+  if (!validation.ok) throw new Error(validation.error || "Meta Page connection validation failed");
   const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
   if (!vehicle) throw new Error("Vehicle not found");
-  const photos = await getVehiclePhotos(vehicle.id, vehicle.aiPhotoSetId, vehicle.aiPhotoStatus);
-  const imageUrls = photos.map((photo) => photo.url).filter((url): url is string => Boolean(url));
+  const [dealer] = await db.select({ name: dealersTable.name }).from(dealersTable).where(eq(dealersTable.id, job.dealerId)).limit(1);
+  const settings = await getSettings(job.dealerId);
+  const photos = settings.useOriginalPhotos
+    ? await getVehicleRawPhotos(vehicle.id)
+    : await getVehiclePhotos(vehicle.id, vehicle.aiPhotoSetId, vehicle.aiPhotoStatus);
+  const imageUrls = photos.map((photo) => publicPhotoUrl(photo.url)).filter((url): url is string => Boolean(url));
   if (imageUrls.length === 0) throw new Error("Vehicle has no publishable photos");
+  await assertPublicImageUrls(imageUrls);
 
   await db.update(pagePublishingJobsTable).set({
     status: "Publishing",
@@ -143,7 +180,7 @@ async function publishOne(job: typeof pagePublishingJobsTable.$inferSelect, log:
   }).where(eq(pagePublishingJobsTable.id, job.id));
 
   const result = await new MetaPagesPublisher(config).publishVehicle({
-    message: message(vehicle),
+    message: message(vehicle, dealer?.name ?? null),
     imageUrls,
   });
   await db.update(pagePublishingJobsTable).set({
@@ -187,9 +224,18 @@ async function createNextBatch(settings: PagePublishSettings, now: Date, dealerI
       inArray(pagePublishingJobsTable.status, ["Scheduled", "Queued", "Publishing", "Published"]),
     ));
   const excluded = new Set([...publishedVehicleRows, ...reservedRows].map((row) => row.vehicleId));
+  const startMinutes = Number(settings.preferredWindowStart.slice(0, 2)) * 60 + Number(settings.preferredWindowStart.slice(3, 5));
+  const endMinutes = Number(settings.preferredWindowEnd.slice(0, 2)) * 60 + Number(settings.preferredWindowEnd.slice(3, 5));
+  const windowMinutes = Math.max(0, endMinutes - startMinutes);
+  const windowCapacity = settings.minDelayMinutes > 0 ? Math.floor(windowMinutes / settings.minDelayMinutes) + 1 : settings.maxPostsPerDay;
+  const batchLimit = Math.max(1, Math.min(settings.vehiclesPerBatch, settings.maxPostsPerDay, windowCapacity));
   const candidates = await db.select().from(vehiclesTable)
-    .where(and(eq(vehiclesTable.dealerId, dealerId), notInArray(vehiclesTable.id, [...excluded].length ? [...excluded] : [-1])))
-    .orderBy(asc(vehiclesTable.updatedAt)).limit(Math.min(settings.vehiclesPerBatch, settings.maxPostsPerDay));
+    .where(and(
+      eq(vehiclesTable.dealerId, dealerId),
+      inArray(vehiclesTable.status, PAGE_ELIGIBLE_VEHICLE_STATUSES),
+      notInArray(vehiclesTable.id, [...excluded].length ? [...excluded] : [-1]),
+    ))
+    .orderBy(asc(vehiclesTable.updatedAt)).limit(batchLimit);
   if (candidates.length === 0) return 0;
 
   const [batch] = await db.insert(pagePublishingBatchesTable).values({
@@ -246,19 +292,20 @@ export const pagesPublishingWorker: WorkerDefinition = {
       }
     }
 
-    const openJobs = await db
-      .select({ id: pagePublishingJobsTable.id })
-      .from(pagePublishingJobsTable)
-      .where(and(
-        inArray(pagePublishingJobsTable.status, ["Scheduled", "Queued", "Publishing"]),
-      ));
-    if (openJobs.length > 0) return { summary: `${openJobs.length} Pages job(s) queued`, detail: { queued: openJobs.length }, skipped: true };
     const dealers = await db.select({ id: dealersTable.id }).from(dealersTable).where(eq(dealersTable.status, "Active"));
     let created = 0;
     for (const dealer of dealers) {
       const settings = await getSettings(dealer.id);
-      if (!settings.enabled) continue;
-      if (!(await getMetaPageConnection(dealer.id))) continue;
+      if (!settings.enabled || settings.requireApproval) continue;
+      const connection = await getMetaPageConnection(dealer.id);
+      if (!connection) continue;
+      const validation = await validateMetaPageConnection(connection, connection.scopes);
+      await recordMetaPageValidation(dealer.id, {
+        pageName: validation.pageName,
+        lastError: validation.error,
+        valid: validation.ok,
+      });
+      if (!validation.ok) continue;
       created += await createNextBatch(settings, now, dealer.id);
     }
     return created > 0

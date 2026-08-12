@@ -13,6 +13,10 @@ import { Input } from "@/shared/ui/input";
 
 const TOKEN_KEY = "dealerpilot.sessionToken";
 
+export function getAuthToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
 export interface AuthUser {
   id: number;
   dealerId: number;

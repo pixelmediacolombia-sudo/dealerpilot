@@ -21,11 +21,11 @@ import { AIPhotoStudio } from "@/features/photo-studio/pages/AIPhotoStudio";
 import MarketIntelligencePage from "@/features/marketplace-intelligence/pages/MarketplaceIntelligencePage";
 import { PublishingConflictsPage } from "@/features/marketplace-intelligence/pages/PublishingConflicts";
 import { PagesWorkspace } from "@/features/pages/pagesWorkspace";
-import { useGetDealer, useListDealers, getGetDealerQueryKey } from "@workspace/api-client-react";
+import { useAccount } from "@/app/AuthGate";
+import { useGetDealer, getGetDealerQueryKey } from "@workspace/api-client-react";
 
 function PageRoute() {
-  const { data: dealersData } = useListDealers();
-  const dealerId = dealersData?.dealers?.[0]?.id;
+  const { dealerId } = useAccount();
   const { data: dealer, isLoading } = useGetDealer(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getGetDealerQueryKey(dealerId!) },
   });

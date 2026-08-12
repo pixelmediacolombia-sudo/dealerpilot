@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import {
   db,
   dealerMetaConnectionsTable,
@@ -55,6 +55,8 @@ export type ResolvedMetaPageConnection = {
   graphApiVersion: string;
   businessId: string | null;
   pageName: string | null;
+  scopes: string[];
+  expiresAt: Date | null;
 };
 
 export async function getMetaPageConnection(
@@ -78,7 +80,49 @@ export async function getMetaPageConnection(
     graphApiVersion: envValue("META_GRAPH_API_VERSION", env) || "v23.0",
     businessId: connection.businessId,
     pageName: connection.pageName,
+    scopes: connection.scopes ?? [],
+    expiresAt: connection.expiresAt,
   };
+}
+
+export async function getMetaPageConnectionSummary(dealerId: number) {
+  const [connection] = await db
+    .select({
+      pageId: dealerMetaConnectionsTable.pageId,
+      pageName: dealerMetaConnectionsTable.pageName,
+      scopes: dealerMetaConnectionsTable.scopes,
+      status: dealerMetaConnectionsTable.status,
+      lastValidatedAt: dealerMetaConnectionsTable.lastValidatedAt,
+      expiresAt: dealerMetaConnectionsTable.expiresAt,
+      lastError: dealerMetaConnectionsTable.lastError,
+    })
+    .from(dealerMetaConnectionsTable)
+    .where(eq(dealerMetaConnectionsTable.dealerId, dealerId))
+    .orderBy(desc(dealerMetaConnectionsTable.updatedAt))
+    .limit(1);
+  if (!connection) return null;
+  return {
+    ...connection,
+    scopes: connection.scopes ?? [],
+    lastValidatedAt: connection.lastValidatedAt?.toISOString() ?? null,
+    expiresAt: connection.expiresAt?.toISOString() ?? null,
+  };
+}
+
+export async function recordMetaPageValidation(
+  dealerId: number,
+  patch: { pageName?: string | null; lastError: string | null; valid: boolean },
+): Promise<void> {
+  await db
+    .update(dealerMetaConnectionsTable)
+    .set({
+      ...(patch.pageName !== undefined ? { pageName: patch.pageName } : {}),
+      status: patch.valid ? "active" : "error",
+      lastValidatedAt: new Date(),
+      lastError: patch.lastError,
+      updatedAt: new Date(),
+    })
+    .where(eq(dealerMetaConnectionsTable.dealerId, dealerId));
 }
 
 /**
@@ -110,7 +154,10 @@ export async function ensureLegacyAlphaMetaConnection(
       pageName: envValue("META_BOOTSTRAP_PAGE_NAME", env),
       accessTokenCiphertext: encryptMetaToken(pageAccessToken, env),
       tokenKeyVersion: KEY_VERSION,
-      scopes: ["business_management", "pages_show_list"],
+      scopes: (envValue("META_PAGE_SCOPES", env) || "")
+        .split(",")
+        .map((scope) => scope.trim())
+        .filter(Boolean),
       status: "active",
       lastValidatedAt: new Date(),
     })
