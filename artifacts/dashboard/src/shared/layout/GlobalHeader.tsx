@@ -112,7 +112,7 @@ function LocationSelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="group flex min-h-10 items-center gap-2 rounded-xl border border-border/70 bg-card px-3 text-left shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-colors hover:bg-muted">
+        <button className="group flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-border/70 bg-card px-3 text-left shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-colors hover:bg-muted">
           <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span className="hidden text-sm font-medium text-foreground lg:inline">
             Alpha Motorsport
@@ -163,13 +163,13 @@ function WorkspaceSearch({ onNavigate }: { onNavigate: (path: string) => void })
     <>
       <button
         type="button"
-        className="hidden h-11 min-w-0 flex-1 items-center gap-3 rounded-xl bg-primary/10 px-4 text-left text-sm text-muted-foreground shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/15 hover:shadow-sm xl:flex xl:max-w-[360px]"
+        className="hidden h-11 w-[260px] shrink-0 items-center gap-3 rounded-xl bg-primary/10 px-4 text-left text-sm text-muted-foreground shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/15 hover:shadow-sm xl:flex 2xl:w-[320px]"
         onClick={() => setOpen(true)}
         aria-label="Search DealerPilot"
       >
         <Search className="h-[18px] w-[18px] shrink-0 text-primary" aria-hidden="true" />
         <span className="flex-1 truncate">Search workspace</span>
-        <kbd className="rounded-md border border-primary/20 bg-card px-1.5 py-0.5 text-[10px] font-semibold text-primary">⌘ K</kbd>
+        <kbd className="shrink-0 whitespace-nowrap rounded-md border border-primary/20 bg-card px-1.5 py-0.5 text-[10px] font-semibold text-primary">⌘ K</kbd>
       </button>
       <CommandDialog open={open} onOpenChange={setOpen}>
         <CommandInput placeholder="Search DealerPilot..." />
@@ -287,24 +287,26 @@ export function GlobalHeader() {
                   : "Dealer operations";
 
   return (
-    <header className="relative z-30 flex min-h-[78px] shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-3 shadow-[0_1px_0_rgb(15_23_42/0.02)] sm:gap-5 sm:px-6">
+    <header className="relative z-30 flex min-h-[78px] shrink-0 items-center gap-3 overflow-hidden border-b border-border bg-card px-4 py-3 shadow-[0_1px_0_rgb(15_23_42/0.02)] sm:gap-4 sm:px-6 2xl:gap-5">
 
-      <div className="hidden min-w-0 items-center gap-3 lg:flex">
-        <div className="min-w-0">
+      <div className="hidden w-[142px] shrink-0 items-center gap-3 lg:flex">
+        <div className="min-w-0 max-w-full">
           <p className="truncate text-[17px] font-bold tracking-[-0.02em] text-foreground">{pageTitle}</p>
           <p className="text-[11px] text-muted-foreground">Dealer operations</p>
         </div>
       </div>
 
       {/* Location */}
-      <LocationSelector />
+      <div className="shrink-0">
+        <LocationSelector />
+      </div>
 
       <WorkspaceSearch onNavigate={setLocation} />
 
       <div className="flex-1" />
 
       {/* ── Telemetry strip ─────────────────────────────────── */}
-      <div className="hidden items-center gap-2 2xl:flex">
+      <div className="hidden shrink-0 items-center gap-2 min-[1750px]:flex">
         <TelSeg label="EXT" value={conn.extState === "ok" ? "ONLINE" : "OFFLINE"} state={conn.extState} />
         {dot("·")}
         <TelSeg label="FB" value={conn.fbState === "ok" ? "ACTIVE" : conn.fbState === "error" ? "OFFLINE" : "—"} state={conn.fbState} />
