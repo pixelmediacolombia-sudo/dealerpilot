@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes";
 import { LocationProvider } from "@/context/LocationContext";
 import { TooltipProvider } from "@/shared/ui/tooltip";
 import { Toaster } from "@/shared/ui/toaster";
+import { DealerThemeProvider } from "./DealerThemeProvider";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,12 +20,14 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem storageKey="dealerpilot-theme">
       <QueryClientProvider client={queryClient}>
-        <LocationProvider>
-          <TooltipProvider delayDuration={200}>
-            {children}
-            <Toaster />
-          </TooltipProvider>
-        </LocationProvider>
+        <DealerThemeProvider>
+          <LocationProvider>
+            <TooltipProvider delayDuration={200}>
+              {children}
+              <Toaster />
+            </TooltipProvider>
+          </LocationProvider>
+        </DealerThemeProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

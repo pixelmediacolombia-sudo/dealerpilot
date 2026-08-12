@@ -6,6 +6,8 @@
   --dp-violet: #7658d6;
   --dp-violet-dark: #6748c9;
   --dp-violet-soft: #f0edff;
+  --dp-violet-foreground: #fff;
+  --dp-accent: #42b883;
   --dp-canvas: #f6f7fb;
   --dp-surface: #ffffff;
   --dp-text: #24283b;
@@ -51,7 +53,7 @@ body {
 .header-logo {
   width: 38px !important;
   height: 38px !important;
-  color: #fff !important;
+  color: var(--dp-violet-foreground) !important;
   background: var(--dp-violet) !important;
   border-radius: 10px !important;
   box-shadow: 0 6px 14px rgb(118 88 214 / 28%);
@@ -92,7 +94,7 @@ h1 { margin: 0 0 2px !important; color: #fff; font-size: 16px !important; letter
 .row .value { color: var(--dp-text); }
 
 .dot { background: #aeb5c7; }
-.dot.on { background: #42b883 !important; box-shadow: none !important; }
+.dot.on { background: var(--dp-accent) !important; box-shadow: none !important; }
 .dot.off { background: #e46a7b !important; }
 .dot.warn { background: #f2b84b !important; }
 
@@ -126,7 +128,7 @@ button {
   min-height: 40px;
   margin-top: 10px !important;
   padding: 10px 14px !important;
-  color: #fff !important;
+  color: var(--dp-violet-foreground) !important;
   background: var(--dp-violet) !important;
   border: 1px solid var(--dp-violet) !important;
   border-radius: 8px !important;
@@ -151,10 +153,10 @@ button.secondary,
 button.secondary:not(:disabled):hover,
 #save:not(:disabled):hover,
 #switch-backend:not(:disabled):hover,
-#refresh:not(:disabled):hover { color: var(--dp-violet) !important; background: #faf9ff !important; border-color: #cfc6f5 !important; }
+#refresh:not(:disabled):hover { color: var(--dp-violet) !important; background: var(--dp-violet-soft) !important; border-color: var(--dp-violet) !important; }
 
 button.ghost { color: var(--dp-muted) !important; background: transparent !important; border-color: var(--dp-border) !important; box-shadow: none !important; }
-button.ghost:not(:disabled):hover { color: var(--dp-violet) !important; background: var(--dp-violet-soft) !important; border-color: #cfc6f5 !important; }
+button.ghost:not(:disabled):hover { color: var(--dp-violet) !important; background: var(--dp-violet-soft) !important; border-color: var(--dp-violet) !important; }
 button.danger { color: var(--dp-danger) !important; background: var(--dp-danger-soft) !important; border: 1px solid #f2c8d2 !important; box-shadow: none !important; }
 button.btn-fb-login { color: #fff !important; background: #3f76c5 !important; border-color: #3f76c5 !important; box-shadow: none !important; }
 

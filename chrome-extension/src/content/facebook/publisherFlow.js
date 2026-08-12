@@ -4281,7 +4281,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       // Debug button — always visible on create page
       const dbgBtn = button("Debug vehicle type", () => debugVehicleType(), "mai-btn-secondary");
       dbgBtn.title = "Selects Vehicle Type = Car/Truck then stops. Use Fill Marketplace Fields for the full workflow.";
-      dbgBtn.style.cssText += ";margin-top:6px;border:1px dashed #cfc6f5;color:#7658d6;font-weight:700;font-size:10px;";
+      dbgBtn.style.cssText += ";margin-top:6px;border:1px dashed var(--dp-violet);color:var(--dp-violet);font-weight:700;font-size:10px;";
       actionsEl.appendChild(dbgBtn);
     });
   }

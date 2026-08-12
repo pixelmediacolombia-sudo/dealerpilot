@@ -23,6 +23,7 @@ import {
 } from "@/shared/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { CreativePreviewCard } from "@/components/CreativePreview";
+import { dispatchDealerThemeUpdated } from "@/app/dealerTheme";
 import { Loader2, Save, Dna, Plus, X, Palette, Type, LayoutTemplate } from "lucide-react";
 
 const FONTS = ["Inter", "Poppins", "Montserrat", "Roboto", "Oswald", "Playfair Display"];
@@ -143,6 +144,11 @@ export function DealerDna() {
         // reflects what the backend actually persisted, including palette arrays.
         setForm(toForm(savedDna));
         setSavedAt(new Date());
+        dispatchDealerThemeUpdated({
+          ...savedDna,
+          dealerId,
+          dealerName: dealersData?.dealers?.[0]?.name,
+        });
         if (dealerId) {
           queryClient.invalidateQueries({ queryKey: getGetDealerBrandDnaQueryKey(dealerId) });
         }

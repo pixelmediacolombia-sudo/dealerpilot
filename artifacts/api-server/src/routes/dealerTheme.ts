@@ -32,7 +32,11 @@ router.get("/dealers/:dealerId/theme", async (req, res) => {
     return;
   }
 
-  res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  // Theme changes must be visible immediately in the dashboard and extensions.
+  // The payload is public brand data, but serving an old palette is worse than
+  // a small extra request because it makes a successful save appear broken.
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
   res.json({
     dealerId,
     dealerName: dealer.name,
