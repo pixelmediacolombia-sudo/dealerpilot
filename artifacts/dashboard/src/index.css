@@ -235,6 +235,59 @@
   background: hsl(145 58% 46% / 0.8);
 }
 
+.theme-kpi-primary {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.theme-kpi-primary .text-muted-foreground {
+  color: hsl(var(--primary-foreground) / 0.78);
+}
+
+.theme-kpi-primary [data-kpi-value="true"] {
+  color: hsl(var(--primary-foreground));
+}
+
+.theme-kpi-primary::after {
+  background: hsl(var(--primary-foreground) / 0.4);
+}
+
+.sales-panel-enter {
+  animation: sales-panel-enter 220ms var(--ease-out) both;
+}
+
+.sales-message-enter {
+  animation: sales-message-enter 240ms var(--ease-out) both;
+}
+
+.sales-row-enter {
+  animation: sales-row-enter 180ms var(--ease-out) both;
+}
+
+@keyframes sales-panel-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sales-message-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes sales-row-enter {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sales-panel-enter,
+  .sales-message-enter,
+  .sales-row-enter {
+    animation: none;
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .hover-lift:hover {
     border-color: hsl(var(--border));

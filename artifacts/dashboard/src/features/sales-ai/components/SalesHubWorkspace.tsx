@@ -789,15 +789,15 @@ export function SalesHub() {
             {/* Gymove-style KPI row: same live values, denser operational presentation */}
             <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
               {[
-                { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? top10Count), label: "Ready", accent: "text-primary", tone: "gymove-kpi-purple", path: "/listings" },
-                { value: isLoading ? "—" : String(listingsLive), label: "Live", accent: listingsLive > 0 ? "text-success" : "text-muted-foreground", tone: "gymove-kpi-green", path: "/listings?tab=published" },
-                { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", accent: pendingLeads > 0 ? "text-primary" : "text-muted-foreground", tone: "gymove-kpi-blue", path: "/sales-ai" },
-                { value: "0", label: "Appts", accent: "text-muted-foreground", tone: "gymove-kpi-pink", path: "/sales-ai" },
-                { value: isLoading ? "—" : String(issueCount), label: "Issues", accent: issueCount > 0 ? "text-destructive" : "text-muted-foreground", tone: "bg-card", path: "/listings?tab=failed" },
+                { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? top10Count), label: "Ready", path: "/listings" },
+                { value: isLoading ? "—" : String(listingsLive), label: "Live", path: "/listings?tab=published" },
+                { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", path: "/sales-ai" },
+                { value: "0", label: "Appts", path: "/sales-ai" },
+                { value: isLoading ? "—" : String(issueCount), label: "Issues", path: "/listings?tab=failed" },
               ].map(m => (
-                <button key={m.label} onClick={() => setLocation(m.path)} className={cn("min-h-[112px] rounded-lg border px-4 py-4 text-left shadow-sm transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md", m.tone)}>
-                  <div className={cn("mb-2 text-[34px] font-semibold leading-none tracking-tighter tabular-nums", m.accent)}>{m.value}</div>
-                  <div className="text-[11px] font-semibold text-muted-foreground">{m.label}</div>
+                <button key={m.label} onClick={() => setLocation(m.path)} className="theme-kpi-primary min-h-[112px] rounded-2xl border px-4 py-4 text-left shadow-[0_5px_16px_rgb(15_23_42/0.045)] transition-[box-shadow,transform] hover:-translate-y-px hover:shadow-md">
+                  <div className="mb-2 text-[34px] font-semibold leading-none tracking-tighter tabular-nums text-primary-foreground">{m.value}</div>
+                  <div className="text-[11px] font-semibold text-primary-foreground/78">{m.label}</div>
                 </button>
               ))}
             </div>

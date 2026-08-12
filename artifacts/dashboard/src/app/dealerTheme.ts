@@ -106,11 +106,11 @@ export function applyDealerTheme(payload: DealerThemePayload): void {
     "--sidebar": sidebar,
     "--sidebar-foreground": sidebarForeground,
     "--sidebar-border": "220 18% 91%",
-    "--sidebar-primary": "226 68% 44%",
-    "--sidebar-primary-foreground": "0 0% 100%",
-    "--sidebar-accent": "231 52% 95%",
-    "--sidebar-accent-foreground": "226 68% 44%",
-    "--sidebar-ring": "226 68% 44%",
+    "--sidebar-primary": hslChannel(primary),
+    "--sidebar-primary-foreground": primaryForeground,
+    "--sidebar-accent": lightTint(primary, 0.95),
+    "--sidebar-accent-foreground": "220 18% 25%",
+    "--sidebar-ring": hslChannel(primary),
   };
 
   Object.entries(values).forEach(([name, value]) => root.style.setProperty(name, value));

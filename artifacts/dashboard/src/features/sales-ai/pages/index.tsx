@@ -165,9 +165,9 @@ function ConvRow({ conv, selected, onClick }: {
     <button
       onClick={onClick}
       className={cn(
-        "w-full text-left px-4 py-4 border-b border-border transition group relative",
+        "sales-row-enter w-full text-left px-4 py-4 border-b border-border transition-[background-color,transform] group relative",
         selected
-          ? "bg-primary/[0.10] border-l-[3px] border-l-violet-500"
+          ? "bg-primary/[0.10] border-l-[3px] border-l-primary"
           : "hover:bg-muted border-l-[3px] border-l-transparent",
       )}
     >
@@ -243,7 +243,7 @@ function ReplyBox({ aiReply, convId }: { aiReply: string | undefined; convId: nu
   }
 
   return (
-    <div className="shrink-0 border-t border-border bg-card px-5 py-4">
+    <div className="shrink-0 border-t border-border bg-card px-5 py-4 shadow-[0_-8px_22px_rgb(15_23_42/0.035)]">
       <div className="flex items-center gap-2 mb-2.5">
         <div className="w-5 h-5 rounded bg-primary/20 border border-primary/25 flex items-center justify-center">
           <Zap className="w-3 h-3 text-primary" />
@@ -269,7 +269,7 @@ function ReplyBox({ aiReply, convId }: { aiReply: string | undefined; convId: nu
         <Button
           onClick={() => void handleCopy()}
           disabled={!text}
-          className="flex-1 gap-2 h-9 bg-primary hover:bg-primary text-foreground font-semibold text-[12px]"
+          className="flex-1 gap-2 h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-[12px] transition-transform hover:-translate-y-px"
         >
           {copied ? <><Check className="w-3.5 h-3.5" />Copied!</> : <><Send className="w-3.5 h-3.5" />Copy &amp; Send</>}
         </Button>
@@ -341,10 +341,10 @@ function ThreadPanel({ convId }: { convId: number }) {
   const si = statusInfo(conv.status);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="sales-panel-enter flex-1 flex flex-col overflow-hidden">
 
       {/* Thread header */}
-      <div className="shrink-0 border-b border-border bg-accent/55 px-6 py-4">
+      <div className="shrink-0 border-b border-primary/15 bg-primary/[0.07] px-6 py-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center">
@@ -396,7 +396,7 @@ function ThreadPanel({ convId }: { convId: number }) {
               <div className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 border",
                 m.role === "assistant"
-                  ? "bg-primary/20 border-primary/25"
+                  ? "bg-primary/15 border-primary/25"
                   : "bg-muted border-border",
               )}>
                 {m.role === "assistant"
@@ -404,13 +404,13 @@ function ThreadPanel({ convId }: { convId: number }) {
                   : <User className="w-4 h-4 text-muted-foreground" />}
               </div>
               <div className={cn(
-                "max-w-[72%] px-4 py-3.5 rounded-xl text-[13px] leading-relaxed",
+                "sales-message-enter max-w-[72%] px-4 py-3.5 rounded-xl text-[13px] leading-relaxed shadow-[0_4px_14px_rgb(15_23_42/0.04)]",
                 m.role === "assistant"
-                  ? "bg-primary/[0.10] border border-primary/15 text-foreground rounded-tr-sm"
+                  ? "bg-primary border border-primary text-primary-foreground rounded-tr-sm"
                   : "bg-muted border border-border text-foreground rounded-tl-sm",
               )}>
                 {m.role === "assistant" && (
-                  <div className="text-[11px] font-semibold text-primary/50  tracking-wide mb-2">
+                  <div className="text-[11px] font-semibold text-primary-foreground/70 tracking-wide mb-2">
                     DealerPilot AI
                   </div>
                 )}
@@ -772,7 +772,7 @@ export function SalesAIWorkspace() {
         <div className="w-[280px] flex flex-col border-r border-border overflow-hidden shrink-0 bg-card">
 
           {/* Panel header */}
-          <div className="border-b border-border bg-accent/45 px-4 pb-4 pt-5">
+          <div className="border-b border-primary/15 bg-primary/[0.05] px-4 pb-4 pt-5">
             <div className="flex items-center gap-2.5 mb-4">
               <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center">
                 <MessageSquare className="w-4 h-4 text-primary" />
