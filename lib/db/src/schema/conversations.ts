@@ -5,6 +5,7 @@ import {
   timestamp,
   integer,
   boolean,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -20,7 +21,8 @@ export const conversationsTable = pgTable("conversations", {
   source: text("source").notNull().default("marketplace_extension"),
   externalPageId: text("external_page_id"),
   externalSenderId: text("external_sender_id"),
-  externalThreadRef: text("external_thread_ref").notNull().unique(),
+  externalThreadRef: text("external_thread_ref").notNull(),
+  sessionId: text("session_id"),
   buyerName: text("buyer_name"),
   language: text("language").notNull().default("en"),
   sourceUrl: text("source_url"),
@@ -36,7 +38,9 @@ export const conversationsTable = pgTable("conversations", {
   lastMessageAt: timestamp("last_message_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("conversations_dealer_external_thread_ref_idx").on(table.dealerId, table.externalThreadRef),
+]);
 
 export const insertConversationSchema = createInsertSchema(
   conversationsTable,

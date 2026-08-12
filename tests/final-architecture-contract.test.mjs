@@ -95,7 +95,7 @@ test("inventory routes preserve sync, creation, state transition, and stats cont
 test("sales-ai intake protects lead handoff and conversation continuity", () => {
   assert.match(conversations, /router\.post\("\/conversations\/intake"/);
   assert.match(conversations, /externalThreadRef required/);
-  assert.match(conversations, /\.where\(eq\(conversationsTable\.externalThreadRef, externalThreadRef\)\)/);
+  assert.match(conversations, /eq\(conversationsTable\.dealerId, dealerId\)[\s\S]*eq\(conversationsTable\.externalThreadRef, externalThreadRef\)/);
   assert.match(conversations, /\.values\(\{[\s\S]*externalThreadRef,/);
   assert.match(conversations, /status: extractedPhone \? "BDC Assigned" : "New"/);
   assert.match(conversations, /router\.patch\("\/conversations\/:id\/auto-reply"/);

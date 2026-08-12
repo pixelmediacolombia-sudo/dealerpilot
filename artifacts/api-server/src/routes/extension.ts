@@ -7,22 +7,26 @@ const EXTENSION_NAME = "Chrome Extension";
 
 const router: IRouter = Router();
 
-let chromeExtensionIdColumnReady: Promise<void> | null = null;
+let extensionColumnsReady: Promise<void> | null = null;
 
-function ensureChromeExtensionIdColumn(): Promise<void> {
-  chromeExtensionIdColumnReady ??= pool
-    .query("alter table extension_connections add column if not exists chrome_extension_id text")
+function ensureExtensionColumns(): Promise<void> {
+  extensionColumnsReady ??= Promise.all([
+    pool.query("alter table extension_connections add column if not exists chrome_extension_id text"),
+    pool.query("alter table extension_connections add column if not exists dealer_id integer"),
+    pool.query("alter table extension_connections add column if not exists session_id text"),
+    pool.query("create index if not exists extension_connections_dealer_session_idx on extension_connections (dealer_id, session_id)"),
+  ])
     .then(() => undefined)
     .catch((err) => {
-      chromeExtensionIdColumnReady = null;
+      extensionColumnsReady = null;
       throw err;
     });
-  return chromeExtensionIdColumnReady;
+  return extensionColumnsReady;
 }
 
 async function saveChromeExtensionId(rowId: number, chromeExtensionId: string | undefined): Promise<void> {
   if (!chromeExtensionId) return;
-  await ensureChromeExtensionIdColumn();
+  await ensureExtensionColumns();
   await pool.query("update extension_connections set chrome_extension_id = $1 where id = $2", [
     chromeExtensionId,
     rowId,
@@ -31,7 +35,7 @@ async function saveChromeExtensionId(rowId: number, chromeExtensionId: string | 
 
 async function getChromeExtensionId(rowId: number | undefined): Promise<string | null> {
   if (!rowId) return null;
-  await ensureChromeExtensionIdColumn();
+  await ensureExtensionColumns();
   const result = await pool.query<{ chrome_extension_id: string | null }>(
     "select chrome_extension_id from extension_connections where id = $1 limit 1",
     [rowId],
@@ -127,18 +131,47 @@ router.post("/extension/message-context", async (req, res) => {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-async function getExtRow() {
+type ExtensionIdentity = {
+  dealerId?: number | null;
+  sessionId?: string | null;
+};
+
+function normalizedIdentity(identity: ExtensionIdentity = {}): Required<ExtensionIdentity> {
+  const dealerId = Number(identity.dealerId);
+  const sessionId = typeof identity.sessionId === "string" ? identity.sessionId.trim() : "";
+  return {
+    dealerId: Number.isInteger(dealerId) && dealerId > 0 ? dealerId : null,
+    sessionId: sessionId || null,
+  };
+}
+
+function sessionName(identity: ExtensionIdentity = {}): string {
+  const normalized = normalizedIdentity(identity);
+  if (!normalized.dealerId || !normalized.sessionId) return EXTENSION_NAME;
+  return `${EXTENSION_NAME} [dealer=${normalized.dealerId};session=${normalized.sessionId}]`;
+}
+
+async function getExtRow(identity: ExtensionIdentity = {}) {
+  await ensureExtensionColumns();
+  const normalized = normalizedIdentity(identity);
+  const conditions = normalized.dealerId && normalized.sessionId
+    ? and(
+        eq(extensionConnectionsTable.dealerId, normalized.dealerId),
+        eq(extensionConnectionsTable.sessionId, normalized.sessionId),
+      )
+    : eq(extensionConnectionsTable.name, EXTENSION_NAME);
   const [ext] = await db
     .select()
     .from(extensionConnectionsTable)
-    .where(eq(extensionConnectionsTable.name, EXTENSION_NAME));
+    .where(conditions);
   return ext ?? null;
 }
 
 async function upsertExtRow(
   values: Partial<typeof extensionConnectionsTable.$inferInsert>,
 ) {
-  const existing = await getExtRow();
+  const normalized = normalizedIdentity(values);
+  const existing = await getExtRow(normalized);
   if (existing) {
     const [row] = await db
       .update(extensionConnectionsTable)
@@ -149,7 +182,12 @@ async function upsertExtRow(
   }
   const [row] = await db
     .insert(extensionConnectionsTable)
-    .values({ name: EXTENSION_NAME, ...values })
+    .values({
+      name: sessionName(normalized),
+      ...(normalized.dealerId ? { dealerId: normalized.dealerId } : {}),
+      ...(normalized.sessionId ? { sessionId: normalized.sessionId } : {}),
+      ...values,
+    })
     .returning();
   return row!;
 }
@@ -160,6 +198,8 @@ const HeartbeatBody = z.object({
   backendUrl: z.string().optional(),
   status: z.string().optional(),
   chromeExtensionId: z.string().optional(),
+  dealerId: z.number().int().positive().optional(),
+  sessionId: z.string().trim().min(1).max(160).optional(),
   fbLoggedIn: z.boolean().nullable().optional(),
   marketplaceConnected: z.boolean().nullable().optional(),
 });
@@ -170,14 +210,16 @@ router.post("/extension/heartbeat", async (req, res) => {
     res.status(400).json({ error: "Invalid heartbeat" });
     return;
   }
-  const { status = "online", backendUrl, chromeExtensionId, fbLoggedIn, marketplaceConnected } =
+  const { status = "online", backendUrl, chromeExtensionId, dealerId, sessionId, fbLoggedIn, marketplaceConnected } =
     parsed.data;
 
-  const existing = await getExtRow();
+  const existing = await getExtRow({ dealerId, sessionId });
   const updates: Partial<typeof extensionConnectionsTable.$inferInsert> = {
     status,
     lastHeartbeatAt: new Date(),
   };
+  if (dealerId !== undefined) updates.dealerId = dealerId;
+  if (sessionId !== undefined) updates.sessionId = sessionId;
   if (backendUrl !== undefined) updates.backendUrl = backendUrl;
   if (fbLoggedIn !== undefined) updates.fbLoggedIn = fbLoggedIn;
   if (marketplaceConnected !== undefined)
@@ -196,6 +238,8 @@ router.post("/extension/heartbeat", async (req, res) => {
     extensionId: chromeExtensionId ?? (await getChromeExtensionId(row.id)),
     backendUrl: row.backendUrl ?? null,
     status: row.status,
+    dealerId: row.dealerId ?? null,
+    sessionId: row.sessionId ?? null,
     lastHeartbeatAt: row.lastHeartbeatAt ? row.lastHeartbeatAt.toISOString() : null,
     fbLoggedIn: row.fbLoggedIn ?? null,
     marketplaceConnected: row.marketplaceConnected ?? null,
@@ -291,6 +335,8 @@ router.get("/extension/marketplace-sold-actions", async (_req, res) => {
 
 const SessionReportBody = z.object({
   extensionId: z.string().optional(),
+  dealerId: z.number().int().positive().optional(),
+  sessionId: z.string().trim().min(1).max(160).optional(),
   fbLoggedIn: z.boolean(),
   marketplaceConnected: z.boolean(),
 });
@@ -301,9 +347,11 @@ router.post("/extension/session-report", async (req, res) => {
     res.status(400).json({ error: "Invalid session report" });
     return;
   }
-  const { extensionId, fbLoggedIn, marketplaceConnected } = parsed.data;
+  const { extensionId, dealerId, sessionId, fbLoggedIn, marketplaceConnected } = parsed.data;
 
   const row = await upsertExtRow({
+    ...(dealerId !== undefined ? { dealerId } : {}),
+    ...(sessionId !== undefined ? { sessionId } : {}),
     status: "online",
     lastHeartbeatAt: new Date(),
     fbLoggedIn,
@@ -318,6 +366,8 @@ router.post("/extension/session-report", async (req, res) => {
     ok: true,
     extensionId: extensionId ?? (await getChromeExtensionId(row.id)),
     status: row.status,
+    dealerId: row.dealerId ?? null,
+    sessionId: row.sessionId ?? null,
     lastHeartbeatAt: row.lastHeartbeatAt ? row.lastHeartbeatAt.toISOString() : null,
     fbLoggedIn: row.fbLoggedIn ?? null,
     marketplaceConnected: row.marketplaceConnected ?? null,

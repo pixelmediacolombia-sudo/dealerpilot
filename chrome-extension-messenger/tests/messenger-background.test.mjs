@@ -8,8 +8,8 @@ const source = readFileSync(
   "utf8",
 );
 
-function createHarness({ apiPost } = {}) {
-  const storage = { extensionId: "msg-ext-test" };
+function createHarness({ apiPost, initialStorage = {} } = {}) {
+  const storage = { extensionId: "msg-ext-test", ...initialStorage };
   const calls = { apiPost: [], debugger: [] };
   let runtimeComposerText = "";
   const chrome = {
@@ -215,4 +215,33 @@ test("backend JSON errors are preserved for the popup debugger", async () => {
     { error: "buyer_message_missing", details: { field: "currentMessage" } },
   );
   assert.equal(storage.lastConversationIntake.error.raw.message, "POST /api/conversations/intake failed: 422");
+});
+
+test("two installations keep dealer and browser session identity in the intake contract", async () => {
+  const calls = [];
+  const makeApiPost = (name) => async (path, body) => {
+    calls.push({ name, path, body });
+    return { suggestedReply: `${name} reply` };
+  };
+  const first = createHarness({
+    initialStorage: { extensionId: "msg-ext-dealer-1" },
+    apiPost: makeApiPost("dealer-1"),
+  });
+  const second = createHarness({
+    initialStorage: { extensionId: "msg-ext-lucky-mazda" },
+    apiPost: makeApiPost("lucky-mazda"),
+  });
+
+  await first.handlers.SAVE_SETTINGS({ dealerId: 1, sessionId: "dealer-1" });
+  await second.handlers.SAVE_SETTINGS({ dealerId: 2, sessionId: "lucky-mazda" });
+  await first.handlers.CONVERSATION_INTAKE({ ...intakePayload, messageHash: "session-a", idempotencyKey: "session-a" });
+  await second.handlers.CONVERSATION_INTAKE({ ...intakePayload, messageHash: "session-b", idempotencyKey: "session-b" });
+
+  assert.deepEqual(
+    calls.map(({ name, body }) => ({ name, dealerId: body.dealerId, sessionId: body.sessionId })),
+    [
+      { name: "dealer-1", dealerId: 1, sessionId: "dealer-1" },
+      { name: "lucky-mazda", dealerId: 2, sessionId: "lucky-mazda" },
+    ],
+  );
 });

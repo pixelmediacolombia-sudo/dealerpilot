@@ -1,10 +1,13 @@
-import { pgTable, serial, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { dealersTable } from "./dealers";
 
 export const extensionConnectionsTable = pgTable("extension_connections", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
+  dealerId: integer("dealer_id").references(() => dealersTable.id),
+  sessionId: text("session_id"),
   chromeExtensionId: text("chrome_extension_id"),
   backendUrl: text("backend_url"),
   status: text("status").notNull().default("offline"),

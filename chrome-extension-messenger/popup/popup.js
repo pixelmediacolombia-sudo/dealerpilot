@@ -14,6 +14,7 @@
     const settings = response.ok ? response.data : {};
     $("backendUrl").value = settings.backendUrl || "https://1987dealerpilot.com";
     $("dealerId").value = Number.isInteger(Number(settings.dealerId)) && Number(settings.dealerId) > 0 ? String(Number(settings.dealerId)) : "1";
+    $("sessionId").value = settings.sessionId || "";
     $("sellerProfileNames").value = (settings.sellerProfileNames || []).join("\n");
     $("dryRun").checked = settings.dryRun !== false;
     $("autoReplyEnabled").checked = settings.autoReplyEnabled === true;
@@ -135,6 +136,7 @@
       type: "SAVE_SETTINGS",
       backendUrl: $("backendUrl").value,
       dealerId: Number($("dealerId").value),
+      sessionId: $("sessionId").value.trim(),
       sellerProfileNames: $("sellerProfileNames").value.split(/\r?\n/),
       dryRun: $("dryRun").checked,
       autoReplyEnabled: $("autoReplyEnabled").checked,

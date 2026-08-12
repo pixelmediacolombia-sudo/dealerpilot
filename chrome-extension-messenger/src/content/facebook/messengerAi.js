@@ -819,6 +819,7 @@
       sourceUrl: location.href,
       buyerName: snapshot.buyerName || undefined,
       dealerId: Number.isInteger(Number(settings.dealerId)) && Number(settings.dealerId) > 0 ? Number(settings.dealerId) : 1,
+      sessionId: typeof settings.sessionId === "string" ? settings.sessionId.trim() : "",
       messageDetectedAt: new Date(detectedAtMs).toISOString(),
       routeAllowed: validation.routeAllowed,
       conversationThreadDetected: validation.conversationThreadDetected,

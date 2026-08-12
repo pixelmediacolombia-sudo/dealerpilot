@@ -9,6 +9,7 @@ import {
   vehiclesTable,
   listingsTable,
   marketplaceListingsTable,
+  dealersTable,
 } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
 
@@ -1190,7 +1191,8 @@ router.post("/conversations/intake", async (req, res) => {
     marketplaceDownPayment,
     marketplaceAskingPrice,
     vehicleType,
-    dealerId: _dealerId,
+    dealerId: requestedDealerId,
+    sessionId,
     messageDetectedAt: rawMessageDetectedAt,
     messageHash,
     idempotencyKey,
@@ -1215,6 +1217,7 @@ router.post("/conversations/intake", async (req, res) => {
     marketplaceAskingPrice?: number | string;
     vehicleType?: string;
     dealerId?: number | string;
+    sessionId?: string;
     messageDetectedAt?: string;
     messageHash?: string;
     idempotencyKey?: string;
@@ -1238,6 +1241,20 @@ router.post("/conversations/intake", async (req, res) => {
 
   if (!externalThreadRef) {
     res.status(400).json({ error: "externalThreadRef required" });
+    return;
+  }
+
+  const parsedDealerId = Number(requestedDealerId);
+  const dealerId = Number.isInteger(parsedDealerId) && parsedDealerId > 0
+    ? parsedDealerId
+    : DEALER_ID;
+  const [targetDealer] = await db
+    .select({ id: dealersTable.id })
+    .from(dealersTable)
+    .where(eq(dealersTable.id, dealerId))
+    .limit(1);
+  if (!targetDealer) {
+    res.status(400).json({ error: "Unknown dealerId" });
     return;
   }
 
@@ -1336,7 +1353,10 @@ router.post("/conversations/intake", async (req, res) => {
   const [existingConv] = await db
     .select()
     .from(conversationsTable)
-    .where(eq(conversationsTable.externalThreadRef, externalThreadRef))
+    .where(and(
+      eq(conversationsTable.dealerId, dealerId),
+      eq(conversationsTable.externalThreadRef, externalThreadRef),
+    ))
     .limit(1);
 
   if (detectedMarketplaceListingUrl) {
@@ -1348,7 +1368,7 @@ router.post("/conversations/intake", async (req, res) => {
         facebookListingId: marketplaceListingsTable.facebookListingId,
       })
       .from(marketplaceListingsTable)
-      .where(eq(marketplaceListingsTable.dealerId, DEALER_ID));
+      .where(eq(marketplaceListingsTable.dealerId, dealerId));
     const marketplaceListing = marketplaceListings.find((listing) => {
       if (!detectedMarketplaceItemId) return listing.listingUrl === detectedMarketplaceListingUrl;
       return (
@@ -1367,7 +1387,7 @@ router.post("/conversations/intake", async (req, res) => {
     const vRow = await db
       .select()
       .from(vehiclesTable)
-      .where(eq(vehiclesTable.dealerId, DEALER_ID));
+      .where(eq(vehiclesTable.dealerId, dealerId));
 
     const match = vRow.find((v) => {
       if (!detectedVehicleTitle) return false;
@@ -1455,6 +1475,7 @@ router.post("/conversations/intake", async (req, res) => {
         marketplaceAskingPrice:
           parsedAskingPrice ?? existingConv.marketplaceAskingPrice,
         vehicleType: vehicleType ?? existingConv.vehicleType,
+        sessionId: sessionId ?? existingConv.sessionId,
         detectedListingUrl:
           detectedMarketplaceListingUrl ?? existingConv.detectedListingUrl,
         detectedVehicleTitle:
@@ -1469,7 +1490,8 @@ router.post("/conversations/intake", async (req, res) => {
     const [created] = await db
       .insert(conversationsTable)
       .values({
-        dealerId: DEALER_ID,
+        dealerId,
+        sessionId: sessionId ?? null,
         externalThreadRef,
         buyerName,
         language,
@@ -1687,7 +1709,7 @@ router.post("/conversations/intake", async (req, res) => {
       .insert(leadsTable)
       .values({
         conversationId,
-        dealerId: DEALER_ID,
+        dealerId,
         buyerName,
         language,
         vehicleId,
@@ -1708,7 +1730,7 @@ router.post("/conversations/intake", async (req, res) => {
     db
       .insert(downPaymentIntelligenceTable)
       .values({
-        dealerId: DEALER_ID,
+        dealerId,
         conversationId,
         vehicleId,
         listingId,

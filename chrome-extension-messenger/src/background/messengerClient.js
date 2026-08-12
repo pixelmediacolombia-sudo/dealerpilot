@@ -5,11 +5,37 @@
     autoReplyEnabled: false,
     backendUrl: "https://1987dealerpilot.com",
     dealerId: 1,
+    sessionId: "",
     sellerProfileNames: ["Alpha Manassas", "Alpha Motorsport", "Andres Ibanez"],
   });
 
   const conversationIntakeInFlight = new Set();
   const recentConversationIntakes = new Map();
+
+  async function reportSessionStatus() {
+    const settings = await getSettings();
+    if (!settings.sessionId) return { skipped: true, reason: "session_id_missing" };
+    const extensionId = await getExtensionId();
+    const tabs = await chrome.tabs.query({
+      url: [
+        "https://www.facebook.com/*",
+        "https://web.facebook.com/*",
+        "https://facebook.com/*",
+      ],
+    });
+    const facebookTabs = tabs.filter((tab) => typeof tab.url === "string");
+    const marketplaceConnected = facebookTabs.some((tab) =>
+      /facebook\.com\/(marketplace|messages)/i.test(tab.url || ""),
+    );
+    return DealerPilotMessengerApiClient.apiPost("/api/extension/heartbeat", {
+      extensionId,
+      dealerId: settings.dealerId,
+      sessionId: settings.sessionId,
+      status: "online",
+      fbLoggedIn: facebookTabs.length > 0,
+      marketplaceConnected,
+    });
+  }
 
   async function getExtensionId() {
     const { extensionId } = await chrome.storage.local.get("extensionId");
@@ -29,6 +55,7 @@
       dryRun: stored.dryRun !== false,
       autoReplyEnabled: stored.autoReplyEnabled === true,
       dealerId: Number.isInteger(Number(stored.dealerId)) && Number(stored.dealerId) > 0 ? Number(stored.dealerId) : 1,
+      sessionId: typeof stored.sessionId === "string" ? stored.sessionId.trim() : "",
       sellerProfileNames: Array.isArray(stored.sellerProfileNames)
         ? stored.sellerProfileNames.filter(Boolean)
         : DEFAULT_SETTINGS.sellerProfileNames,
@@ -125,6 +152,10 @@
       return getSettings();
     },
 
+    async REPORT_SESSION_STATUS() {
+      return reportSessionStatus();
+    },
+
     async LOAD_AUTO_SEND_STATE() {
       return loadAutoSendState();
     },
@@ -165,10 +196,12 @@
       if (typeof message.autoReplyEnabled === "boolean") patch.autoReplyEnabled = message.autoReplyEnabled;
       if (typeof message.backendUrl === "string") patch.backendUrl = message.backendUrl.trim().replace(/\/+$/, "");
       if (Number.isInteger(Number(message.dealerId)) && Number(message.dealerId) > 0) patch.dealerId = Number(message.dealerId);
+      if (typeof message.sessionId === "string") patch.sessionId = message.sessionId.trim();
       if (Array.isArray(message.sellerProfileNames)) {
         patch.sellerProfileNames = message.sellerProfileNames.map((name) => String(name).trim()).filter(Boolean);
       }
       await chrome.storage.local.set(patch);
+      reportSessionStatus().catch(() => {});
       return getSettings();
     },
 
@@ -280,6 +313,7 @@
       if (dedupeKey) conversationIntakeInFlight.add(dedupeKey);
       try {
         const extensionId = await getExtensionId();
+        const settings = await getSettings();
         const response = await DealerPilotMessengerApiClient.apiPost("/api/conversations/intake", {
           extensionId,
           externalThreadRef: message.externalThreadRef,
@@ -293,7 +327,8 @@
           marketplaceDownPayment: message.marketplaceDownPayment,
           marketplaceAskingPrice: message.marketplaceAskingPrice,
           vehicleType: message.vehicleType,
-          dealerId: message.dealerId || 1,
+          dealerId: settings.dealerId,
+          sessionId: settings.sessionId,
           messageDetectedAt: message.messageDetectedAt,
           messageHash: message.messageHash,
           idempotencyKey: message.idempotencyKey,
@@ -367,6 +402,15 @@
       backendUrl: DEFAULT_SETTINGS.backendUrl,
       sellerProfileNames: DEFAULT_SETTINGS.sellerProfileNames,
     }).catch(() => {});
+    chrome.alarms?.create?.("dealerpilot-messenger-heartbeat", { periodInMinutes: 1 });
+  });
+
+  chrome.runtime.onStartup?.addListener(() => {
+    chrome.alarms?.create?.("dealerpilot-messenger-heartbeat", { periodInMinutes: 1 });
+    reportSessionStatus().catch(() => {});
+  });
+  chrome.alarms?.onAlarm?.addListener((alarm) => {
+    if (alarm?.name === "dealerpilot-messenger-heartbeat") reportSessionStatus().catch(() => {});
   });
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
