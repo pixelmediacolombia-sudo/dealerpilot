@@ -7,6 +7,7 @@ export const dealersTable = pgTable("dealers", {
   name: text("name").notNull(),
   websiteUrl: text("website_url"),
   xmlFeedUrl: text("xml_feed_url"),
+  plan: text("plan").notNull().default("complete"),
   status: text("status").notNull().default("Active"),
   notes: text("notes"),
   addressLine1: text("address_line1"),

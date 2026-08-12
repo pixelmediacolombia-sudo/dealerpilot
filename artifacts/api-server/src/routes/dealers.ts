@@ -53,6 +53,7 @@ async function toDealer(dealer: Dealer) {
     name: dealer.name,
     websiteUrl: dealer.websiteUrl ?? null,
     xmlFeedUrl: dealer.xmlFeedUrl ?? null,
+    plan: dealer.plan === "basic" ? "basic" : "complete",
     status: dealer.status,
     notes: dealer.notes ?? null,
     lastSyncAt,
@@ -83,6 +84,7 @@ const DealerUpdateBody = z.object({
   name: z.string().min(1).optional(),
   websiteUrl: z.string().optional(),
   xmlFeedUrl: z.string().optional(),
+  plan: z.enum(["basic", "complete"]).optional(),
   status: z.string().optional(),
   notes: z.string().optional(),
 });

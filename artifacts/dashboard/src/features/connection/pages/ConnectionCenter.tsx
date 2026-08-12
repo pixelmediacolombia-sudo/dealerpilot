@@ -27,6 +27,7 @@ import {
 import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
 import { PageHeader, StatusPulse } from "@/shared/ui";
+import { useGetDealer, useListDealers, getGetDealerQueryKey } from "@workspace/api-client-react";
 import {
   Server,
   Database,
@@ -716,6 +717,12 @@ const SERVICES = [
 export function ConnectionCenter() {
   const queryClient = useQueryClient();
   const [isConnecting, setIsConnecting] = useState(false);
+  const { data: dealersData } = useListDealers();
+  const dealerId = dealersData?.dealers?.[0]?.id;
+  const { data: dealer } = useGetDealer(dealerId!, {
+    query: { enabled: !!dealerId, queryKey: getGetDealerQueryKey(dealerId!) },
+  });
+  const visibleServices = SERVICES.filter((service) => !(dealer?.plan === "basic" && service.key === "facebookPage"));
 
   const { data: status, isLoading } = useGetConnectionStatus({
     query: {
@@ -788,7 +795,7 @@ export function ConnectionCenter() {
                   <div className="flex-1 h-px bg-muted" />
                 </div>
                 <div className="border border-border bg-muted rounded-xl overflow-hidden">
-                  {SERVICES.map(({ key, name, icon: Icon, description }, idx) => {
+                  {visibleServices.map(({ key, name, icon: Icon, description }, idx) => {
                     const svc = (status as unknown as Record<string, SvcStatus> | undefined)?.[key];
                     const color = svcColor(svc?.status);
                     const label = svcLabel(svc?.status);
@@ -799,7 +806,7 @@ export function ConnectionCenter() {
                         key={key}
                         className={cn(
                           "transition-colors hover:bg-muted",
-                          idx < SERVICES.length - 1 && "border-b border-border",
+                          idx < visibleServices.length - 1 && "border-b border-border",
                         )}
                       >
                         {/* Main row */}

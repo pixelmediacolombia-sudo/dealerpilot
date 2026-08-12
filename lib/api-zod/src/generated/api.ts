@@ -134,6 +134,7 @@ export const ListDealersResponse = zod.object({
   "name": zod.string(),
   "websiteUrl": zod.string().nullish(),
   "xmlFeedUrl": zod.string().nullish(),
+  "plan": zod.enum(['basic', 'complete']),
   "status": zod.string(),
   "notes": zod.string().nullish(),
   "lastSyncAt": zod.string().nullish(),
@@ -157,6 +158,7 @@ export const GetDealerResponse = zod.object({
   "name": zod.string(),
   "websiteUrl": zod.string().nullish(),
   "xmlFeedUrl": zod.string().nullish(),
+  "plan": zod.enum(['basic', 'complete']),
   "status": zod.string(),
   "notes": zod.string().nullish(),
   "lastSyncAt": zod.string().nullish(),
@@ -181,6 +183,7 @@ export const UpdateDealerBody = zod.object({
   "name": zod.string().min(1).optional(),
   "websiteUrl": zod.string().optional(),
   "xmlFeedUrl": zod.string().optional(),
+  "plan": zod.enum(['basic', 'complete']).optional(),
   "status": zod.string().optional(),
   "notes": zod.string().optional()
 })
@@ -190,6 +193,7 @@ export const UpdateDealerResponse = zod.object({
   "name": zod.string(),
   "websiteUrl": zod.string().nullish(),
   "xmlFeedUrl": zod.string().nullish(),
+  "plan": zod.enum(['basic', 'complete']),
   "status": zod.string(),
   "notes": zod.string().nullish(),
   "lastSyncAt": zod.string().nullish(),

@@ -150,6 +150,8 @@ export interface ErrorResponse {
   error: string;
 }
 
+export type DealerPlan = "basic" | "complete";
+
 export interface Dealer {
   id: number;
   name: string;
@@ -157,6 +159,7 @@ export interface Dealer {
   websiteUrl?: string | null;
   /** @nullable */
   xmlFeedUrl?: string | null;
+  plan: DealerPlan;
   status: string;
   /** @nullable */
   notes?: string | null;
@@ -179,6 +182,7 @@ export interface DealerUpdate {
   name?: string;
   websiteUrl?: string;
   xmlFeedUrl?: string;
+  plan?: DealerPlan;
   status?: string;
   notes?: string;
 }

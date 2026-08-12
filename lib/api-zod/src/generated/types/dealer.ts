@@ -13,6 +13,7 @@ export interface Dealer {
   websiteUrl?: string | null;
   /** @nullable */
   xmlFeedUrl?: string | null;
+  plan: "basic" | "complete";
   status: string;
   /** @nullable */
   notes?: string | null;

@@ -65,6 +65,8 @@ export function Sidebar() {
   const { data: dealer } = useGetDealer(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getGetDealerQueryKey(dealerId!) },
   });
+  const isBasicPlan = dealer?.plan === "basic";
+  const visibleNavItems = NAV_ITEMS.filter((item) => !(isBasicPlan && item.path === "/pages"));
 
   function isActive(item: NavItem): boolean {
     const paths = ACTIVE_PATHS[item.path] ?? [item.path];
@@ -97,11 +99,11 @@ export function Sidebar() {
         </div>
 
         <nav aria-label="Main navigation" className="flex-1 space-y-1 overflow-y-auto px-2.5 py-2 overscroll-contain xl:px-3">
-          {NAV_ITEMS.map((item, index) => {
+          {visibleNavItems.map((item, index) => {
             const active = isActive(item);
             return (
               <div key={item.path}>
-                {index === 0 || NAV_ITEMS[index - 1].group !== item.group ? (
+                {index === 0 || visibleNavItems[index - 1].group !== item.group ? (
                   <p className="hidden px-3 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/40 first:pt-1 xl:block">{item.group}</p>
                 ) : null}
                 <Link
@@ -152,8 +154,8 @@ export function Sidebar() {
         </div>
       </aside>
 
-      <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 grid h-[68px] grid-cols-7 border-t border-sidebar-border bg-sidebar px-1 pb-[env(safe-area-inset-bottom)] text-sidebar-foreground shadow-[0_-8px_24px_rgb(15_23_42/0.18)] md:hidden">
-        {NAV_ITEMS.map((item) => {
+      <nav aria-label="Mobile navigation" className={cn("fixed inset-x-0 bottom-0 z-40 grid h-[68px] border-t border-sidebar-border bg-sidebar px-1 pb-[env(safe-area-inset-bottom)] text-sidebar-foreground shadow-[0_-8px_24px_rgb(15_23_42/0.18)] md:hidden", isBasicPlan ? "grid-cols-6" : "grid-cols-7")}>
+        {visibleNavItems.map((item) => {
           const active = isActive(item);
           return (
             <Link

@@ -11,6 +11,7 @@ export interface DealerUpdate {
   name?: string;
   websiteUrl?: string;
   xmlFeedUrl?: string;
+  plan?: "basic" | "complete";
   status?: string;
   notes?: string;
 }

@@ -2361,12 +2361,13 @@ components:
 
     Dealer:
       type: object
-      required: [id, name, status, totalVehiclesImported, createdAt]
+      required: [id, name, plan, status, totalVehiclesImported, createdAt]
       properties:
         id: { type: integer }
         name: { type: string }
         websiteUrl: { type: ["string", "null"] }
         xmlFeedUrl: { type: ["string", "null"] }
+        plan: { type: string, enum: [basic, complete], default: complete }
         status: { type: string }
         notes: { type: ["string", "null"] }
         lastSyncAt: { type: ["string", "null"] }
@@ -2388,6 +2389,7 @@ components:
         name: { type: string, minLength: 1 }
         websiteUrl: { type: string }
         xmlFeedUrl: { type: string }
+        plan: { type: string, enum: [basic, complete] }
         status: { type: string }
         notes: { type: string }
 
