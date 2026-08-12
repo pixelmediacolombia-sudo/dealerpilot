@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/shared/layout/AppLayout";
 import {
-  useListDealers,
+  useGetDealer,
+  getGetDealerQueryKey,
   useGetDealerBrandDna,
   getGetDealerBrandDnaQueryKey,
   useUpdateDealerBrandDna,
@@ -24,6 +25,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { CreativePreviewCard } from "@/components/CreativePreview";
 import { dispatchDealerThemeUpdated } from "@/app/dealerTheme";
+import { useAccount } from "@/app/AuthGate";
 import { Loader2, Save, Dna, Plus, X, Palette, Type, LayoutTemplate } from "lucide-react";
 
 const FONTS = ["Inter", "Poppins", "Montserrat", "Roboto", "Oswald", "Playfair Display"];
@@ -117,8 +119,10 @@ function ColorList({
 
 export function DealerDna() {
   const queryClient = useQueryClient();
-  const { data: dealersData } = useListDealers();
-  const dealerId = dealersData?.dealers?.[0]?.id;
+  const { dealerId } = useAccount();
+  const { data: currentDealer } = useGetDealer(dealerId, {
+    query: { enabled: !!dealerId, queryKey: getGetDealerQueryKey(dealerId) },
+  });
   const [savedAt, setSavedAt] = useState<Date | null>(null);
 
   const { data: dna, isLoading } = useGetDealerBrandDna(dealerId!, {
@@ -147,7 +151,7 @@ export function DealerDna() {
         dispatchDealerThemeUpdated({
           ...savedDna,
           dealerId,
-          dealerName: dealersData?.dealers?.[0]?.name,
+          dealerName: currentDealer?.name,
         });
         if (dealerId) {
           queryClient.invalidateQueries({ queryKey: getGetDealerBrandDnaQueryKey(dealerId) });
@@ -171,7 +175,7 @@ export function DealerDna() {
         accent: form.accentColors[0] ?? "#f59e0b",
       },
       font: form.preferredFont,
-      dealerName: dealersData?.dealers?.[0]?.name ?? "Your Dealership",
+      dealerName: currentDealer?.name ?? "Your Dealership",
       logoUrl: form.logoUrl || null,
       vehicleImageUrl: null,
       headline: "Your Vehicle Listing",
@@ -180,7 +184,7 @@ export function DealerDna() {
       cta: "Message for a Test Drive",
       steps: [],
     };
-  }, [form, dealersData]);
+  }, [form, currentDealer]);
 
   const set = <K extends keyof DnaForm>(key: K, value: DnaForm[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));

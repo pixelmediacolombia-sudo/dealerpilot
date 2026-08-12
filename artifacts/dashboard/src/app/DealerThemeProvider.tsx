@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from "react";
-import { useListDealers } from "@workspace/api-client-react";
+import { useAccount } from "./AuthGate";
 import {
   applyDealerTheme,
   DEALER_THEME_UPDATED_EVENT,
@@ -9,8 +9,7 @@ import {
 const REFRESH_INTERVAL_MS = 30 * 1000;
 
 export function DealerThemeProvider({ children }: { children: ReactNode }) {
-  const { data: dealersData } = useListDealers();
-  const dealerId = dealersData?.dealers?.[0]?.id;
+  const { dealerId } = useAccount();
 
   useEffect(() => {
     if (!dealerId) return;
