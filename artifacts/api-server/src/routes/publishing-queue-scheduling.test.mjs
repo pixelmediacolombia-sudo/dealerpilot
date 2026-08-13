@@ -676,6 +676,8 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /financing_intro/);
   assert.match(conversationsSource, /financing_declined/);
   assert.match(conversationsSource, /cash_visit_request_phone/);
+  assert.match(conversationsSource, /buyerRequestedVisitOrTestDrive/);
+  assert.match(conversationsSource, /historyShowsFinancingDeclined/);
   assert.match(conversationsSource, /urgent_vehicle_request_phone/);
   assert.match(conversationsSource, /hasPersistentUnansweredBuyerTurns/);
   assert.match(conversationsSource, /consecutiveBuyerMessages\.length >= 3/);

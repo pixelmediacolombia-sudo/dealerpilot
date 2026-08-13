@@ -119,6 +119,60 @@ test("background deduplicates identical intakes inside the extension", async () 
   assert.equal(calls.apiPost.length, 1);
 });
 
+test("background keeps the active thread reference when it claims follow-up state", async () => {
+  const { handlers, calls, storage } = createHarness({
+    apiPost(path) {
+      if (path === "/api/conversations/follow-ups/claim") {
+        return {
+          ok: true,
+          job: null,
+          followUp: {
+            cycleNumber: 8,
+            followUpsSent: 0,
+            maxFollowUps: 3,
+            status: "Active",
+            nextDueAt: "2026-08-14T01:30:00.000Z",
+          },
+        };
+      }
+      return {};
+    },
+  });
+
+  await handlers.CLAIM_DUE_MESSENGER_FOLLOW_UP({
+    externalThreadRef: "marketplace-thread::facebook-messages-thread-2007150843270449::vinay::2020-tesla-model-y",
+  });
+
+  assert.equal(calls.apiPost[0].body.externalThreadRef, "marketplace-thread::facebook-messages-thread-2007150843270449::vinay::2020-tesla-model-y");
+  assert.equal(storage.lastMessengerFollowUp.status, "Active");
+  assert.equal(storage.lastMessengerFollowUp.cycleNumber, 8);
+});
+
+test("an empty follow-up claim does not erase a still-active timer for the open thread", async () => {
+  const externalThreadRef = "marketplace-thread::facebook-messages-thread-2007150843270449::vinay::2020-tesla-model-y";
+  const { handlers, storage } = createHarness({
+    initialStorage: {
+      lastMessengerFollowUp: {
+        externalThreadRef,
+        cycleNumber: 8,
+        followUpsSent: 0,
+        maxFollowUps: 3,
+        status: "Active",
+        nextDueAt: "2099-08-14T01:30:00.000Z",
+      },
+    },
+    apiPost() {
+      return { ok: true, job: null, followUp: { status: "idle", followUpsSent: 0, maxFollowUps: 3, nextDueAt: null } };
+    },
+  });
+
+  await handlers.CLAIM_DUE_MESSENGER_FOLLOW_UP({ externalThreadRef });
+
+  assert.equal(storage.lastMessengerFollowUp.status, "Active");
+  assert.equal(storage.lastMessengerFollowUp.cycleNumber, 8);
+  assert.equal(storage.lastMessengerFollowUp.externalThreadRef, externalThreadRef);
+});
+
 test("background keeps the latest 20 Messenger diagnostics", async () => {
   const { handlers, storage } = createHarness();
   for (let index = 0; index < 22; index += 1) {

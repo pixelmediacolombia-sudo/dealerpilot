@@ -409,6 +409,7 @@ export async function confirmOutboundDelivery(params: {
 export async function claimDueFollowUp(params: {
   dealerId: number;
   extensionId: string;
+  externalThreadRef?: string | null;
 }): Promise<{ job: MessengerOutboundJob | null; followUp: FollowUpDebugState }> {
   await ensureMessengerFollowUpSchema();
   const client = await pool.connect();
@@ -450,7 +451,17 @@ export async function claimDueFollowUp(params: {
            where conversation_id = $1 and cycle_number = $2 limit 1`,
           [job.conversationId, job.cycleNumber],
         )
-      : { rows: [] };
+      : params.externalThreadRef
+        ? await client.query(
+            `select cycle.*
+             from messenger_follow_up_cycles cycle
+             join conversations c on c.id = cycle.conversation_id
+             where c.dealer_id = $1 and c.external_thread_ref = $2
+             order by cycle.updated_at desc, cycle.id desc
+             limit 1`,
+            [params.dealerId, params.externalThreadRef],
+          )
+        : { rows: [] };
     await client.query("commit");
     return { job, followUp: toDebugState(cycle.rows[0]) };
   } catch (error) {

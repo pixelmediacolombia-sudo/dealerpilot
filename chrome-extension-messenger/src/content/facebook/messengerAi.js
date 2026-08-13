@@ -1479,7 +1479,24 @@
 
   async function claimAndQueueFollowUp(controller) {
     if (!controller?.enqueue) return { skipped: true, reason: "autonomy_missing" };
-    const response = await send({ type: "CLAIM_DUE_MESSENGER_FOLLOW_UP" });
+    const activeThreadId = getCurrentThreadId();
+    const settings = await getSettings();
+    const activeSnapshot = activeThreadId
+      ? selectWinningSnapshot(deduplicateSnapshots(createCaptureSnapshots(settings)))?.snapshot
+      : null;
+    const activeThreadRef = activeSnapshot
+      ? buildThreadRef({
+          buyerName: activeSnapshot.buyerName,
+          vehicleTitle: activeSnapshot.context.vehicleTitle,
+          listingUrl: activeSnapshot.context.listingUrl || location.href,
+          messages: activeSnapshot.messages,
+          threadIdentity: `facebook-messages-thread-${activeThreadId}`,
+        })
+      : "";
+    const response = await send({
+      type: "CLAIM_DUE_MESSENGER_FOLLOW_UP",
+      externalThreadRef: activeThreadRef,
+    });
     if (!response?.ok) return { skipped: true, reason: response?.error || "follow_up_claim_failed" };
     const claim = response.data || {};
     await rememberFollowUpState(response);

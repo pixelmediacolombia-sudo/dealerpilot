@@ -17,6 +17,8 @@ test("follow-up queue is durable and schedules exactly three four-hour jobs", ()
   assert.match(source, /coalesce\(l\.phone, ''\) = ''/);
   assert.match(source, /Este será nuestro último recordatorio/);
   assert.match(source, /Whenever you have a moment/);
+  assert.match(source, /externalThreadRef\?: string \| null/);
+  assert.match(source, /order by cycle\.updated_at desc, cycle\.id desc/);
 });
 
 test("migration owns the queue schema and the indexes needed by the extension claim loop", () => {

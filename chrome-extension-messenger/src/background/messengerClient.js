@@ -402,21 +402,38 @@
       }
     },
 
-    async CLAIM_DUE_MESSENGER_FOLLOW_UP() {
+    async CLAIM_DUE_MESSENGER_FOLLOW_UP(message) {
       const extensionId = await getExtensionId();
       const settings = await getSettings();
+      const externalThreadRef = typeof message?.externalThreadRef === "string"
+        ? message.externalThreadRef.trim()
+        : "";
+      const stored = await chrome.storage.local.get("lastMessengerFollowUp");
+      const previous = stored.lastMessengerFollowUp || {};
       const response = await DealerPilotMessengerApiClient.apiPost("/api/conversations/follow-ups/claim", {
         extensionId,
         dealerId: settings.dealerId,
+        externalThreadRef,
       });
       const data = response?.data || response || {};
+      const nextState = data.followUp || {};
+      const previousIsActive =
+        previous.externalThreadRef === externalThreadRef &&
+        previous.nextDueAt &&
+        new Date(previous.nextDueAt).getTime() > Date.now() &&
+        !["idle", "canceled", "buyer_message_missing", "closed"].includes(String(previous.status || "").toLowerCase());
+      const shouldKeepActiveState = !data.job &&
+        String(nextState.status || "idle").toLowerCase() === "idle" &&
+        previousIsActive;
       await chrome.storage.local.set({
         lastMessengerFollowUp: {
-          ...(data.followUp || {}),
+          ...(shouldKeepActiveState ? previous : nextState),
           jobId: data.job?.id || null,
-          status: data.job ? "claimed" : data.followUp?.status || "idle",
+          status: data.job ? "claimed" : shouldKeepActiveState ? previous.status : nextState.status || "idle",
+          externalThreadRef: externalThreadRef || previous.externalThreadRef || null,
           updatedAt: new Date().toISOString(),
         },
+        lastError: null,
       });
       return data;
     },
@@ -437,8 +454,10 @@
         lastMessengerFollowUp: {
           ...(data.followUp || {}),
           jobId: data.job?.id || message.jobId || null,
+          externalThreadRef: message.externalThreadRef || null,
           updatedAt: new Date().toISOString(),
         },
+        lastError: null,
       });
       return data;
     },

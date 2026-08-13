@@ -339,6 +339,14 @@ function historyAskedCashOrVisit(history: string): boolean {
   return /\b(?:dealer|dealerpilot ai|assistant):[\s\S]{0,320}\b(?:purchase cash|pay cash|cash purchase|come see|visit|venir a ver|comprar de contado|pagar en efectivo)\b/i.test(history);
 }
 
+function historyShowsFinancingDeclined(history: string): boolean {
+  return /\b(?:buyer|comprador):[\s\S]{0,180}\b(?:no financing|no finance|cash buyer|pay(?:ing)? cash|no necesito financiamiento|no quiero financiamiento|no me interesa financiar|contado|efectivo)\b/i.test(history);
+}
+
+function buyerRequestedVisitOrTestDrive(latest: string): boolean {
+  return /\b(?:test drive|take (?:it|the vehicle) for a drive|drive it|come see|come by|stop by|visit|appointment|cita|prueba de manejo|probarlo|manejarlo|venir a verlo|visitar)\b/i.test(normalizeIntentText(latest));
+}
+
 function buyerDeclinedFinancing(latest: string, history: string): boolean {
   const normalized = normalizeIntentText(latest);
   if (historyAskedCashOrVisit(history)) return false;
@@ -493,6 +501,9 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   const latestIntent = normalizeIntentText(currentMessage);
   const history = visibleMessages.slice(-8).map(cleanConversationText).join(" ").toLowerCase();
   if (hasPhoneNumber(latest)) return "phone_received";
+  if (buyerRequestedVisitOrTestDrive(latest) && (historyAskedCashOrVisit(history) || historyShowsFinancingDeclined(history))) {
+    return "cash_visit_request_phone";
+  }
   if (historyAskedCashOrVisit(history) && buyerAcceptedCashOrVisitStep(latest)) {
     return "cash_visit_request_phone";
   }
@@ -1890,11 +1901,12 @@ router.post("/conversations/outbound/:jobId/delivered", async (req, res) => {
 router.post("/conversations/follow-ups/claim", async (req, res) => {
   const dealerId = Number(req.body?.dealerId) || DEALER_ID;
   const extensionId = String(req.body?.extensionId || "").trim();
+  const externalThreadRef = String(req.body?.externalThreadRef || "").trim();
   if (!extensionId) {
     res.status(400).json({ error: "extensionId required" });
     return;
   }
-  const claimed = await claimDueFollowUp({ dealerId, extensionId });
+  const claimed = await claimDueFollowUp({ dealerId, extensionId, externalThreadRef: externalThreadRef || null });
   res.json({ ok: true, ...claimed });
 });
 
