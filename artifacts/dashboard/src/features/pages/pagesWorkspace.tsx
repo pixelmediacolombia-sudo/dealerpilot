@@ -151,6 +151,11 @@ function statusTone(status: string): string {
   return "border-border bg-muted/40 text-muted-foreground";
 }
 
+function statusLabel(status: string, currentStep: string | null): string {
+  if (status === "Needs Review" && currentStep === "Post removed from Facebook Page") return "Not published";
+  return status;
+}
+
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) {
   return (
     <button
@@ -183,6 +188,7 @@ export function PagesWorkspace() {
   const [validating, setValidating] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [publishingNow, setPublishingNow] = useState(false);
+  const [removingJobId, setRemovingJobId] = useState<number | null>(null);
   const [preview, setPreview] = useState<PageBatchPreview | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -294,6 +300,23 @@ export function PagesWorkspace() {
       setError(publishError instanceof Error ? publishError.message : "Unable to publish the Page vehicle now");
     } finally {
       setPublishingNow(false);
+    }
+  };
+
+  const markPostRemoved = async (job: PageBatchJob) => {
+    const label = `${job.year} ${job.make} ${job.model}`;
+    if (!window.confirm(`Only continue after deleting the Facebook post for ${label}. DealerPilot will mark it as not published and will not queue it again automatically.`)) return;
+    setRemovingJobId(job.id);
+    setError(null);
+    setSuccess(null);
+    try {
+      await readJson(`/api/pages/jobs/${job.id}/mark-post-removed`, { method: "POST", body: "{}" });
+      setSuccess(`${label} is marked as not published. Its Facebook Page link was cleared.`);
+      await load();
+    } catch (removalError) {
+      setError(removalError instanceof Error ? removalError.message : "Unable to mark the Facebook Page post as removed");
+    } finally {
+      setRemovingJobId(null);
     }
   };
 
@@ -423,7 +446,11 @@ export function PagesWorkspace() {
               <div className="mt-3 divide-y divide-border/70 rounded-md border border-border/70">
                 {entry.jobs.map((job) => <div key={job.id} className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{job.year} {job.make} {job.model}{job.trim ? ` ${job.trim}` : ""}</p><p className="mt-1 text-xs text-muted-foreground">{formatPrice(job.price)}{job.stockNumber ? ` · Stock ${job.stockNumber}` : ""}</p><p className="mt-1 text-xs font-medium text-foreground">{job.currentStep ?? "Queued for Meta Page"}{job.attempts > 1 ? ` · Attempt ${job.attempts}` : ""}</p>{job.failedReason ? <p className="mt-1 text-xs text-destructive">{job.failedReason}</p> : null}</div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:shrink-0 sm:justify-end"><span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(job.status))}>{job.status === "Publishing" ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : null}{job.status}</span>{job.postUrl ? <a href={job.postUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">View post</a> : connection?.pageId ? <a href={`https://www.facebook.com/${connection.pageId}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">Open Alpha Page</a> : null}</div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:shrink-0 sm:justify-end">
+                    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(job.status))}>{job.status === "Publishing" ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : null}{statusLabel(job.status, job.currentStep)}</span>
+                    {job.postUrl ? <a href={job.postUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">View post</a> : connection?.pageId ? <a href={`https://www.facebook.com/${connection.pageId}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">Open Alpha Page</a> : null}
+                    {job.status === "Published" ? <button type="button" onClick={() => void markPostRemoved(job)} disabled={removingJobId === job.id} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 text-xs font-semibold text-amber-800 transition-[background-color,border-color] hover:border-amber-400 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/50">{removingJobId === job.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}{removingJobId === job.id ? "Updating…" : "Mark as not published"}</button> : null}
+                  </div>
                 </div>)}
               </div>
             </div>)}

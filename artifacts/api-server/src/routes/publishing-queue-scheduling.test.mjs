@@ -819,6 +819,21 @@ test("Alpha Pages activity exposes each job step and publication link", () => {
   assert.match(pagesWorkspaceSource, /View post/);
 });
 
+test("an operator can clean up a deleted Alpha Page test post without requeueing it", () => {
+  assert.match(pagesRouteSource, /router\.post\("\/pages\/jobs\/:jobId\/mark-post-removed"/);
+  assert.match(pagesRouteSource, /Administrator access required/);
+  assert.match(pagesRouteSource, /status: "Needs Review"/);
+  assert.match(pagesRouteSource, /currentStep: "Post removed from Facebook Page"/);
+  assert.match(pagesRouteSource, /metaPostId: null/);
+  assert.match(pagesRouteSource, /postUrl: null/);
+  assert.match(pagesRouteSource, /externalUrl: null/);
+  assert.match(pagesRouteSource, /reconcilePagesBatchProgress/);
+  assert.match(pagesWorkerSource, /inArray\(pagePublishingJobsTable\.status, \["Scheduled", "Queued", "Publishing", "Published", "Needs Review"\]\)/);
+  assert.match(pagesWorkspaceSource, /markPostRemoved/);
+  assert.match(pagesWorkspaceSource, /Mark as not published/);
+  assert.match(pagesWorkspaceSource, /statusLabel\(job\.status, job\.currentStep\)/);
+});
+
 test("Alpha Pages schedule controls stay legible inside narrow responsive columns", () => {
   assert.match(pagesWorkspaceSource, /Daily window \(ET\)/);
   assert.match(pagesWorkspaceSource, /grid-cols-\[minmax\(0,1fr\)_auto_minmax\(0,1fr\)\]/);

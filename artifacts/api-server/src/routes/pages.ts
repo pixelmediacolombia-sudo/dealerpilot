@@ -6,10 +6,11 @@ import {
   pagePublishSettingsTable,
   pagePublishingBatchesTable,
   pagePublishingJobsTable,
+  listingsTable,
   vehiclesTable,
 } from "@workspace/db";
 import { ensurePagesSchema } from "../pages/schema";
-import { createImmediatePagesBatch, pagesPublishingWorker, previewNextPagesBatch } from "../pages/pagesPublishing.worker";
+import { createImmediatePagesBatch, pagesPublishingWorker, previewNextPagesBatch, reconcilePagesBatchProgress } from "../pages/pagesPublishing.worker";
 import { getMetaPageConnection, getMetaPageConnectionSummary, ensureLegacyAlphaMetaConnection, persistValidatedMetaPageConnection, readBootstrapMetaPageConfig, recordMetaPageValidation } from "../pages/metaPageConnections";
 import { validateMetaPageConnection } from "../pages/metaPagesPublisher";
 import { runWorkerOnce } from "../workers/scheduler";
@@ -222,6 +223,77 @@ router.post("/pages/publish-now", async (req, res) => {
   } catch (error) {
     req.log.error({ err: error, dealerId, vehicleId: requestedVehicleId }, "Failed to publish Page vehicle now");
     res.status(500).json({ error: "Failed to publish Page vehicle now" });
+  }
+});
+
+router.post("/pages/jobs/:jobId/mark-post-removed", async (req, res) => {
+  const user = res.locals.authUser as { role?: string } | undefined;
+  if (user?.role !== "admin") {
+    res.status(403).json({ error: "Administrator access required" });
+    return;
+  }
+  const jobId = Number(req.params.jobId);
+  if (!Number.isInteger(jobId) || jobId < 1) {
+    res.status(400).json({ error: "Invalid Pages job id" });
+    return;
+  }
+
+  try {
+    await ensurePagesSchema();
+    const [job] = await db
+      .select()
+      .from(pagePublishingJobsTable)
+      .where(eq(pagePublishingJobsTable.id, jobId))
+      .limit(1);
+    if (!job) {
+      res.status(404).json({ error: "Pages job not found" });
+      return;
+    }
+    if (!hasDealerAccess(res, job.dealerId)) return;
+    if (job.status !== "Published") {
+      res.status(409).json({ error: "Only a published Pages job can be marked as removed" });
+      return;
+    }
+
+    const now = new Date();
+    const removalReason = "Post removed from Facebook Page by operator";
+    await db.transaction(async (tx) => {
+      await tx
+        .update(pagePublishingJobsTable)
+        .set({
+          status: "Needs Review",
+          currentStep: "Post removed from Facebook Page",
+          failedReason: removalReason,
+          completedAt: null,
+          metaPostId: null,
+          postUrl: null,
+          updatedAt: now,
+        })
+        .where(eq(pagePublishingJobsTable.id, job.id));
+      await tx
+        .update(listingsTable)
+        .set({
+          status: "Needs Review",
+          externalId: null,
+          externalUrl: null,
+          publishedAt: null,
+        })
+        .where(and(
+          eq(listingsTable.vehicleId, job.vehicleId),
+          eq(listingsTable.channel, "facebook_page"),
+        ));
+    });
+    await reconcilePagesBatchProgress(job.batchId, now);
+    req.log.info({ jobId: job.id, vehicleId: job.vehicleId }, "Pages post marked as removed by operator");
+    res.json({
+      ok: true,
+      jobId: job.id,
+      status: "Needs Review",
+      currentStep: "Post removed from Facebook Page",
+    });
+  } catch (error) {
+    req.log.error({ err: error, jobId }, "Failed to mark Pages post as removed");
+    res.status(500).json({ error: "Failed to mark Pages post as removed" });
   }
 });
 

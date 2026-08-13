@@ -127,12 +127,24 @@ async function assertPublicImageUrls(imageUrls: string[]): Promise<void> {
   }
 }
 
-async function updateBatchProgress(batchId: number, now: Date): Promise<void> {
-  const [batch] = await db.select().from(pagePublishingBatchesTable).where(eq(pagePublishingBatchesTable.id, batchId));
-  if (!batch || batch.completedCount + batch.failedCount < batch.totalVehicles) return;
+export async function reconcilePagesBatchProgress(batchId: number, now = new Date()): Promise<void> {
+  const [counts] = await db
+    .select({
+      published: sql<number>`count(*) filter (where ${pagePublishingJobsTable.status} = 'Published')`,
+      needsReview: sql<number>`count(*) filter (where ${pagePublishingJobsTable.status} in ('Needs Review', 'Failed'))`,
+      total: sql<number>`count(*)`,
+    })
+    .from(pagePublishingJobsTable)
+    .where(eq(pagePublishingJobsTable.batchId, batchId));
+  const completedCount = Number(counts?.published ?? 0);
+  const failedCount = Number(counts?.needsReview ?? 0);
+  const totalVehicles = Number(counts?.total ?? 0);
+  const isComplete = totalVehicles > 0 && completedCount + failedCount >= totalVehicles;
   await db.update(pagePublishingBatchesTable).set({
-    status: batch.failedCount > 0 ? "Needs Review" : "Completed",
-    completedAt: now,
+    status: isComplete ? (failedCount > 0 ? "Needs Review" : "Completed") : "Active",
+    completedCount,
+    failedCount,
+    completedAt: isComplete ? now : null,
     updatedAt: now,
   }).where(eq(pagePublishingBatchesTable.id, batchId));
 }
@@ -172,12 +184,16 @@ async function selectNextBatchCandidates(
     .select({ vehicleId: listingsTable.vehicleId })
     .from(listingsTable)
     .innerJoin(vehiclesTable, eq(listingsTable.vehicleId, vehiclesTable.id))
-    .where(and(eq(listingsTable.channel, "facebook_page"), eq(vehiclesTable.dealerId, dealerId)));
+    .where(and(
+      eq(listingsTable.channel, "facebook_page"),
+      eq(listingsTable.status, "Published"),
+      eq(vehiclesTable.dealerId, dealerId),
+    ));
   const reservedRows = await db.select({ vehicleId: pagePublishingJobsTable.vehicleId })
     .from(pagePublishingJobsTable)
     .where(and(
       eq(pagePublishingJobsTable.dealerId, dealerId),
-      inArray(pagePublishingJobsTable.status, ["Scheduled", "Queued", "Publishing", "Published"]),
+      inArray(pagePublishingJobsTable.status, ["Scheduled", "Queued", "Publishing", "Published", "Needs Review"]),
     ));
   const excluded = new Set([...publishedVehicleRows, ...reservedRows].map((row) => row.vehicleId));
   const startMinutes = Number(settings.preferredWindowStart.slice(0, 2)) * 60 + Number(settings.preferredWindowStart.slice(3, 5));
@@ -365,7 +381,7 @@ export async function createImmediatePagesBatch(dealerId: number, requestedVehic
     .where(and(
       eq(pagePublishingJobsTable.dealerId, dealerId),
       eq(pagePublishingJobsTable.vehicleId, candidate.id),
-      inArray(pagePublishingJobsTable.status, ["Scheduled", "Queued", "Publishing", "Published"]),
+      inArray(pagePublishingJobsTable.status, ["Scheduled", "Queued", "Publishing", "Published", "Needs Review"]),
     ))
     .limit(1);
   if (existing) {
@@ -409,17 +425,13 @@ export const pagesPublishingWorker: WorkerDefinition = {
     if (dueJob) {
       try {
         await publishOne(dueJob, log);
-        await db.update(pagePublishingBatchesTable).set({ completedCount: sql`${pagePublishingBatchesTable.completedCount} + 1`, updatedAt: now })
-          .where(eq(pagePublishingBatchesTable.id, dueJob.batchId));
-        await updateBatchProgress(dueJob.batchId, now);
+        await reconcilePagesBatchProgress(dueJob.batchId, now);
         return { summary: `Published Pages job #${dueJob.id}`, detail: { jobId: dueJob.id, vehicleId: dueJob.vehicleId } };
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
         await db.update(pagePublishingJobsTable).set({ status: "Needs Review", currentStep: "Needs Review", failedReason: reason, updatedAt: now })
           .where(eq(pagePublishingJobsTable.id, dueJob.id));
-        await db.update(pagePublishingBatchesTable).set({ failedCount: sql`${pagePublishingBatchesTable.failedCount} + 1`, updatedAt: now })
-          .where(eq(pagePublishingBatchesTable.id, dueJob.batchId));
-        await updateBatchProgress(dueJob.batchId, now);
+        await reconcilePagesBatchProgress(dueJob.batchId, now);
         return { summary: `Pages job #${dueJob.id} needs review: ${reason}`, detail: { jobId: dueJob.id, vehicleId: dueJob.vehicleId } };
       }
     }
