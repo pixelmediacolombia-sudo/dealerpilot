@@ -1413,3 +1413,54 @@ test("Message sent metadata cannot beat the real buyer message", async () => {
   assert.equal(calls.intake[0].currentMessage, "Hola. Sigue disponible?");
   assert.deepEqual(result.buyersDetected.map((buyer) => buyer.selectedForProcessing), [false, true]);
 });
+
+test("Facebook Are you interested quick reply loses to a real buyer message", async () => {
+  const quickReplyRoot = new FakeElement({
+    attributes: { "aria-label": "Marketplace conversation" },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Gabriel - 2022 Toyota TUNDRA" }),
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } }),
+    ],
+  });
+  const buyerRoot = new FakeElement({
+    attributes: { "aria-label": "Marketplace conversation" },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Gabriel - 2022 Toyota TUNDRA" }),
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" } }),
+    ],
+  });
+  const baseEvidence = {
+    threadRootDetected: true,
+    messageScopeDetected: true,
+    extractionMode: "semantic",
+    selectedHeaderText: "Gabriel - 2022 Toyota TUNDRA",
+    latestMessageDirection: "buyer",
+    composerDetected: true,
+    threadIdentity: "thread-gabriel",
+  };
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
+    captures: [
+      {
+        root: quickReplyRoot,
+        scope: quickReplyRoot,
+        buyerName: "Gabriel",
+        messages: [{ speaker: "Gabriel", text: "Yes, are you interested?" }],
+        evidence: baseEvidence,
+      },
+      {
+        root: buyerRoot,
+        scope: buyerRoot,
+        buyerName: "Gabriel",
+        messages: [{ speaker: "Gabriel", text: "Hola. ¿Sigue disponible?" }],
+        evidence: baseEvidence,
+      },
+    ],
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(calls.intake[0].currentMessage, "Hola. ¿Sigue disponible?");
+  assert.deepEqual(result.buyersDetected.map((buyer) => buyer.selectedForProcessing), [false, true]);
+});

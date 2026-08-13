@@ -128,6 +128,12 @@
     return /^(?:message sent|mensaje enviado)(?:\s|$)/i.test(cleanText(value));
   }
 
+  function isFacebookQuickReplySuggestion(value) {
+    const text = cleanText(value);
+    return /^(?:yes|si)\s*,?\s*(?:are you|est[aá]s)\s+(?:interested|interesad[oa])\??$/i.test(text) ||
+      /^(?:yes|si)\s*,?\s*(?:the vehicle|the car|el veh[ií]culo|el carro)\s+(?:is|est[aá])\s+(?:still )?(?:available|disponible)\b/i.test(text);
+  }
+
   function activeThreadHeaderDetected(snapshot) {
     if (!globalThis.DealerPilotMessengerAutonomy?.isMessagesThreadRoute?.(location.pathname)) return true;
     const header = cleanText(snapshot?.evidence?.selectedHeaderText || "");
@@ -762,6 +768,7 @@
     if (area > 0 && area < 60000) score -= 180;
     if (isUiText(buyerName)) score -= 700;
     if (isUiText(currentMessage)) score -= 500;
+    if (isFacebookQuickReplySuggestion(currentMessage)) score -= 10000;
     if (validation.latestMessageIsMetadata || isMessageSentMetadata(currentMessage)) score -= 2000;
     if (metadataCandidateCount > 0) score -= Math.min(metadataCandidateCount, 8) * 1200;
     if (!validation.activeThreadHeaderDetected) score -= 900;
