@@ -1,5 +1,6 @@
 (function () {
   const $ = (id) => document.getElementById(id);
+  let followUpTimerId = null;
 
   function send(message) {
     return new Promise((resolve) => {
@@ -41,6 +42,34 @@
     ).trim();
   }
 
+  function followUpTimerLabel(followUp = {}) {
+    const nextDueAt = followUp.nextDueAt ? new Date(followUp.nextDueAt).getTime() : NaN;
+    const remaining = Number.isFinite(nextDueAt) ? Math.max(0, nextDueAt - Date.now()) : 0;
+    const seconds = Math.floor(remaining / 1000);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  }
+
+  function renderFollowUpTimer(followUp = {}) {
+    const terminal = ["idle", "canceled", "buyer_message_missing", "closed"].includes(String(followUp.status || "idle").toLowerCase());
+    const active = !terminal && (!!followUp.nextDueAt || String(followUp.status || "").toLowerCase() === "claimed");
+    const count = Number(followUp.followUpsSent || 0);
+    const max = Number(followUp.maxFollowUps || 3);
+    setDebugValue(
+      "dbg-follow-up",
+      active ? `${count}/${max} · ${followUpTimerLabel(followUp)}` : `0/${max} · 00:00:00`,
+      active ? "ok" : "err",
+    );
+  }
+
+  function startFollowUpTimer(followUp = {}) {
+    if (followUpTimerId) clearInterval(followUpTimerId);
+    renderFollowUpTimer(followUp);
+    followUpTimerId = setInterval(() => renderFollowUpTimer(followUp), 1000);
+  }
+
   async function copySuggestedReply() {
     const text = $("suggested-reply").value.trim();
     if (!text) return;
@@ -62,6 +91,7 @@
     const settings = state.settings || {};
     const debug = state.lastMessengerCaptureDebug || {};
     const intake = state.lastConversationIntake || {};
+    const followUp = debug.followUp || state.lastMessengerFollowUp || {};
     const mode = settings.dryRun
       ? "Dry run"
       : settings.autoReplyEnabled
@@ -111,6 +141,7 @@
       debug.autoSent ? `Sent ${debug.sendMethod || ""}` : debug.reason || "Blocked",
       debug.autoSent ? "ok" : "warn",
     );
+    startFollowUpTimer(followUp);
     const specificError = debug.rawError || debug.errorData || intake.error || state.lastError || null;
     const specificErrorText =
       debug.reason ||

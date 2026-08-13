@@ -245,3 +245,29 @@ test("two installations keep dealer and browser session identity in the intake c
     ],
   );
 });
+
+test("background claims follow-ups and retains the durable countdown state for the debugger", async () => {
+  const { handlers, calls, storage } = createHarness({
+    apiPost(path) {
+      assert.equal(path, "/api/conversations/follow-ups/claim");
+      return {
+        job: { id: 91, externalThreadRef: "marketplace-thread::facebook-messages-thread-991" },
+        followUp: {
+          cycleNumber: 2,
+          followUpsSent: 1,
+          maxFollowUps: 3,
+          status: "Active",
+          nextDueAt: "2026-08-14T17:00:00.000Z",
+        },
+      };
+    },
+  });
+
+  const claimed = await handlers.CLAIM_DUE_MESSENGER_FOLLOW_UP();
+
+  assert.equal(claimed.job.id, 91);
+  assert.equal(calls.apiPost[0].body.extensionId, "msg-ext-test");
+  assert.equal(storage.lastMessengerFollowUp.jobId, 91);
+  assert.equal(storage.lastMessengerFollowUp.followUpsSent, 1);
+  assert.equal(storage.lastMessengerFollowUp.maxFollowUps, 3);
+});

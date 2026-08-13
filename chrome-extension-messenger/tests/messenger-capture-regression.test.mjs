@@ -345,6 +345,7 @@ test("semantic descriptors strip Facebook timestamp metadata from buyer message"
   const messages = JSON.parse(JSON.stringify(capture.messages));
 
   assert.equal(capture.buyerName, "Juan");
+  assert.equal(capture.evidence.metadataCandidateCount, 1);
   assert.deepEqual(messages, [{ speaker: "Juan", text: "Hola. Sigue disponible?" }]);
 });
 
@@ -532,4 +533,41 @@ test("visual buyer bubble survives incomplete semantic Message sent metadata", (
   assert.equal(capture.messages.at(-1).speaker, "Barış");
   assert.equal(capture.messages.at(-1).text, "Is this vehicle a hybrid");
   assert.equal(capture.messages.some((message) => message.text === "Barış · Buyer"), false);
+});
+
+test("semantic stale quick reply cannot replace a Spanish buyer bubble", () => {
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 376, right: 1505, top: 233, width: 1129, height: 420 },
+    children: [
+      new FakeElement({
+        attributes: { "aria-label": "Message sent 2:20 PM by You: Yes, are you interested?" },
+        text: "Message sent",
+        rect: { left: 1200, right: 1450, top: 500, width: 250, height: 44 },
+      }),
+      new FakeElement({
+        attributes: { dir: "auto" },
+        text: "Hola. ¿Sigue disponible?",
+        rect: { left: 400, right: 616, top: 610, width: 216, height: 42 },
+      }),
+    ],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Conversation" },
+    rect: { left: 376, right: 1505, top: 71, width: 1129, height: 642 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Theduyn Antonio · 2018 Honda ACCORD" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 740, right: 1420, top: 665, width: 680, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root, [], "/messages/t/1412301194091605");
+
+  assert.equal(capture.messages.at(-1).speaker, "Theduyn Antonio");
+  assert.equal(capture.messages.at(-1).text, "Hola. ¿Sigue disponible?");
+  assert.equal(capture.messages.some((message) => /Yes, are you interested/i.test(message.text)), false);
 });

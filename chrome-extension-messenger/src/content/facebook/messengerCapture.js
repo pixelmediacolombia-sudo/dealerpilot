@@ -391,12 +391,21 @@
     });
   }
 
-  function parseDescriptor(element, sellerNameCandidates) {
+  function structuredDescriptor(element) {
     const labels = [
       element.getAttribute?.("aria-label") || "",
       ...Array.from(element.querySelectorAll?.("[aria-label]") || []).map((node) => node.getAttribute("aria-label") || ""),
     ].filter(Boolean);
-    const descriptor = labels.find((label) => /(?:\bby\b|\bpor\b|message sent|mensaje enviado)/i.test(label)) || "";
+    return labels.find((label) => /(?:\bby\b|\bpor\b|message sent|mensaje enviado)/i.test(label)) || "";
+  }
+
+  function isStandaloneMessageMetadataElement(element) {
+    const descriptor = structuredDescriptor(element) || textOf(element);
+    return !!descriptor && isMessageMetadataText(descriptor);
+  }
+
+  function parseDescriptor(element, sellerNameCandidates) {
+    const descriptor = structuredDescriptor(element);
     if (!descriptor) return null;
     const senderMatch = descriptor.match(/(?:\bby\b|\bpor\b)\s+([^:]{1,100}):\s*(.+)$/i);
     const sentMatch = senderMatch ? null : descriptor.match(/(?:message sent|mensaje enviado)[^:]*:\s*(.+)$/i);
@@ -406,8 +415,8 @@
     const sentWithoutNamedSender = !!sentMatch;
     const isDealer = senderIsDealer(sender, sellerNameCandidates) || /\b(?:by\s+you|por\s+t[iú])\b/i.test(descriptor);
     const text = cleanMessageText(senderMatch?.[2] || sentMatch?.[1] || textOf(element));
-    if (!text || UI_TEXT.test(text) || text.length > 500 || isMessageMetadataText(text) || isFacebookRatingCardText(text)) return null;
-    const ownAutoReply = sentWithoutNamedSender || isLikelyAutoReplyText(text);
+    if (!text || UI_TEXT.test(text) || text.length > 500 || isUntrustedMessageText(text)) return null;
+    const ownAutoReply = sentWithoutNamedSender || isLikelyAutoReplyText(text) || isStaleQuickReplyText(text);
     return { speaker: isDealer || ownAutoReply ? "Dealer" : "Buyer", text, __top: rectOf(element).top || 0 };
   }
 
@@ -428,7 +437,7 @@
     return elements.filter((element) => {
       if (isComposerNode(element)) return false;
       const text = cleanMessageText(textOf(element));
-      if (!text || text.length < 2 || text.length > 500 || UI_TEXT.test(text) || isMessageMetadataText(text) || isFacebookRatingCardText(text)) return false;
+      if (!text || text.length < 2 || text.length > 500 || UI_TEXT.test(text) || isUntrustedMessageText(text)) return false;
       if (/^(?:send a quick response|tap a response|yes, are you inter|in talks\. i'll let you|sorry, it'?s not av)/i.test(text)) return false;
       if (element.querySelector?.('a[href*="/marketplace/item/"], button, [role="button"], [contenteditable="true"], textarea')) return false;
       if (scoreBubbleCandidate(element, scope) < 20) return false;
@@ -457,6 +466,17 @@
       /\b(?:id|tax id|passport|pasaporte).{0,120}\b(?:bank account|cuenta bancaria|cuenta de banco)\b/.test(normalized) ||
       /^perfect\b[\s\S]{0,80}\b(?:we will contact|contact you)\b/.test(normalized) ||
       /^good morning\b[\s\S]{0,120}\b(?:includes vin|all the info)\b/.test(normalized);
+  }
+
+  function isStaleQuickReplyText(value) {
+    const normalized = normalizeForMatch(cleanMessageText(value));
+    return /^(?:yes|si)\s*,?\s*(?:are you|estas|est[aá]s)\s+(?:interested|interesad[oa])\??$/.test(normalized) ||
+      /^(?:yes|si)\s*,?\s*(?:the vehicle|the car|el veh[ií]culo|el carro)\s+(?:is|esta|est[aá])\s+(?:still )?(?:available|disponible)\b/.test(normalized);
+  }
+
+  function isUntrustedMessageText(value) {
+    const text = cleanMessageText(value);
+    return !text || isMessageMetadataText(text) || isFacebookRatingCardText(text) || isStaleQuickReplyText(text);
   }
 
   function isLikelyBuyerNameCandidate(value) {
@@ -515,7 +535,7 @@
         .trim();
       const fallbackMatch = text.match(new RegExp(`${buyer.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]{0,160}?(are you still interested\\?|what(?:'s| is) the best number[\\s\\S]{0,120}\\?|hola[\\s\\S]{0,120}\\?|me interesa[\\s\\S]{0,160}\\?|(?:¿|\\?)?todav[ií]a[\\s\\S]{0,160}\\?|is this available\\?)`, "i"));
       const message = cleanDisplayName(fallbackMatch?.[1] || afterVehicle);
-      if (message && message.length >= 4 && message.length <= 240 && !UI_TEXT.test(message)) {
+      if (message && message.length >= 4 && message.length <= 240 && !isUntrustedMessageText(message)) {
         return { speaker: buyer, text: message };
       }
     }
@@ -524,7 +544,7 @@
 
   function extractMessageLikeText(value) {
     const text = cleanMessageText(value);
-    if (isMessageMetadataText(text)) return "";
+    if (isUntrustedMessageText(text)) return "";
     if (isLikelyAutoReplyText(text)) return "";
     if (isFacebookRatingCardText(text)) return "";
     const requirementsMatch = text.match(
@@ -612,7 +632,7 @@
       const clearlyRightAligned =
         leftGap > rightGap + minDealerOffset &&
         rect.left > scopeRect.left + (scopeRect.width * 0.35);
-      if (!text || text.length < 2 || UI_TEXT.test(text)) continue;
+      if (!text || text.length < 2 || isUntrustedMessageText(text)) continue;
       if (isParticipantLabelText(normalizedText)) continue;
       if (/^[\p{L}][\p{L}\s.'’\-]{1,80}\s*(?:[\u00b7\u2022|]|Â·|â€¢)\s*buyer$/u.test(normalizedText)) continue;
       if (isLikelyAutoReplyText(text) && !clearlyRightAligned) continue;
@@ -671,8 +691,17 @@
     const scope = findMessageScope(root);
     const headerText = extractHeaderText(root);
     const buyerName = extractBuyerName(root);
-    const semantic = Array.from(scope?.querySelectorAll?.(STRUCTURED_MESSAGE_SELECTORS.join(", ")) || [])
+    const structuredElements = Array.from(scope?.querySelectorAll?.(STRUCTURED_MESSAGE_SELECTORS.join(", ")) || [])
       .filter(isVisible)
+      .filter((element, index, all) => all.indexOf(element) === index);
+    const metadataCandidates = Array.from(scope?.querySelectorAll?.('[aria-label], div[dir="auto"], span[dir="auto"]') || [])
+      .filter(isVisible)
+      .filter(isStandaloneMessageMetadataElement)
+      .filter((element, index, all) => {
+        const descriptor = structuredDescriptor(element) || textOf(element);
+        return all.findIndex((candidate) => (structuredDescriptor(candidate) || textOf(candidate)) === descriptor) === index;
+      });
+    const semantic = structuredElements
       .map((element) => parseDescriptor(element, sellerNameCandidates))
       .filter(Boolean);
     const scopedVisualMessages = scope ? readVisualMessages(scope, buyerName) : [];
@@ -694,7 +723,7 @@
       .map((message) =>
         message.speaker === "Buyer" && buyerName ? { ...message, speaker: buyerName } : message,
       )
-      .filter((message) => !isMessageMetadataText(message.text));
+      .filter((message) => !isUntrustedMessageText(message.text));
     const visibleBuyerMessages = extractVisibleBuyerMessages(root, documentRef, buyerName, scope);
     const hasBuyerMessage = messages.some((message) => message.speaker !== "Dealer");
     const inboxPreview = !hasBuyerMessage && !visibleBuyerMessages.length
@@ -724,7 +753,7 @@
       .filter((message) => {
         const token = normalizeForMatch(message.text);
         return token &&
-          !isMessageMetadataText(message.text) &&
+          !isUntrustedMessageText(message.text) &&
           !(buyerToken && token === buyerToken) &&
           !sellerTokens.includes(token);
       });
@@ -743,6 +772,11 @@
         selectedRootRect: rectOf(root),
         selectedScopeRect: rectOf(scope),
         messageCandidateCount: semantic.length || (scope ? bubbleTextCandidates(scope).length : 0),
+        metadataCandidateCount: metadataCandidates.length,
+        metadataCandidateLabels: metadataCandidates
+          .map((element) => (structuredDescriptor(element) || textOf(element)).slice(0, 180))
+          .filter(Boolean)
+          .slice(0, 12),
         imageCandidateCount: imageCandidates.length,
         imageMessageCount: imageMessages.length,
         imageCandidates: imageCandidates.slice(0, 12),

@@ -15,9 +15,16 @@
   let captureInFlight = false;
   const lastCaptureHashByThread = new Map();
   const lastAutoSendHashByThread = new Map();
+  const lastBlockedReplyKeyByThread = new Map();
   const pendingBuyerByThread = new Map();
   const lastAutoReplyByThread = new Map();
   const lastSuggestedReplyByThread = new Map();
+  let lastFollowUpState = {
+    followUpsSent: 0,
+    maxFollowUps: 3,
+    status: "idle",
+    nextDueAt: null,
+  };
   let lastDiagnostics = {};
 
   function cleanText(value) {
@@ -720,6 +727,7 @@
       sellerIsCurrentUser,
       marketplaceContextDetected,
       latestMessageIsMetadata,
+      metadataCandidateCount: Math.max(0, Number(snapshot.evidence.metadataCandidateCount) || 0),
     };
   }
 
@@ -731,6 +739,7 @@
     const header = cleanText(evidence.selectedHeaderText || "");
     const buyerName = cleanText(snapshot.buyerName || "");
     const currentMessage = cleanText(snapshot.lastMessage?.text || "");
+    const metadataCandidateCount = Math.max(0, Number(evidence.metadataCandidateCount) || 0);
     let score = 0;
 
     if (validation.ok) score += 1000;
@@ -751,6 +760,7 @@
     if (isUiText(buyerName)) score -= 700;
     if (isUiText(currentMessage)) score -= 500;
     if (validation.latestMessageIsMetadata || isMessageSentMetadata(currentMessage)) score -= 2000;
+    if (metadataCandidateCount > 0) score -= Math.min(metadataCandidateCount, 8) * 1200;
     if (!validation.activeThreadHeaderDetected) score -= 900;
     if (/^(?:settings|messenger|messages|notifications|chats)\b/i.test(buyerName)) score -= 1000;
     if (!header) score -= 120;
@@ -837,7 +847,62 @@
       autoActionKey,
       currentBuyerMessageOccurrence,
       idempotencyKey: captureHash,
+      followUpEligible: false,
     };
+  }
+
+  function isConversationClosingAcknowledgement(value) {
+    const normalized = normalizeLanguageText(value)
+      .replace(/[.,!?;:]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return /\b(?:not interested|no thanks|do not contact|stop messaging|goodbye|bye)\b/.test(normalized) ||
+      /\b(?:no me interesa|ya no estoy interesado|no gracias|no me contacten|deja de escribir|adios|chao)\b/.test(normalized);
+  }
+
+  function threadIdFromExternalRef(externalThreadRef) {
+    const match = String(externalThreadRef || "").match(/facebook-messages-thread-([^\s:]+)/i);
+    return match?.[1] || "";
+  }
+
+  async function rememberFollowUpState(response) {
+    const state = response?.data?.followUp || response?.followUp || null;
+    if (state) lastFollowUpState = { ...lastFollowUpState, ...state };
+    return lastFollowUpState;
+  }
+
+  async function confirmOutboundDelivery(job, externalThreadRef) {
+    if (!job?.id || !externalThreadRef) return lastFollowUpState;
+    const response = await send({
+      type: "CONFIRM_MESSENGER_OUTBOUND_DELIVERY",
+      jobId: job.id,
+      externalThreadRef,
+    });
+    if (response?.ok) return rememberFollowUpState(response);
+    return lastFollowUpState;
+  }
+
+  async function cancelFollowUpJob(job, externalThreadRef, reason) {
+    if (!job?.id || !externalThreadRef) return lastFollowUpState;
+    const response = await send({
+      type: "CANCEL_MESSENGER_FOLLOW_UP",
+      jobId: job.id,
+      externalThreadRef,
+      reason,
+    });
+    if (response?.ok) return rememberFollowUpState(response);
+    return lastFollowUpState;
+  }
+
+  async function cancelFollowUpsForBuyer(payload, reason = "buyer_replied") {
+    if (!payload?.externalThreadRef) return lastFollowUpState;
+    const response = await send({
+      type: "CANCEL_MESSENGER_FOLLOW_UPS_FOR_BUYER",
+      externalThreadRef: payload.externalThreadRef,
+      reason,
+    });
+    if (response?.ok) return rememberFollowUpState(response);
+    return lastFollowUpState;
   }
 
   function extractSuggestedReply(response) {
@@ -927,6 +992,7 @@
       };
     }
     lastAutoSendHashByThread.set(threadKey, autoActionKey);
+    lastBlockedReplyKeyByThread.delete(threadKey);
     lastAutoReplyByThread.set(threadKey, {
       text: cleanText(reply),
       at: Date.now(),
@@ -941,6 +1007,99 @@
       sendMethod: sendResult.method,
       deliveryConfirmed: true,
     };
+  }
+
+  function followUpSnapshotActionable(job, snapshot, settings) {
+    const currentThreadId = getCurrentThreadId();
+    const expectedThreadId = threadIdFromExternalRef(job?.externalThreadRef);
+    if (expectedThreadId && currentThreadId && expectedThreadId !== currentThreadId) {
+      return { ok: false, reason: "thread_changed" };
+    }
+    const latest = snapshot.messages[snapshot.messages.length - 1] || null;
+    if (latest?.speaker !== "Dealer") return { ok: false, reason: "buyer_replied" };
+    if (
+      job?.expectedPreviousReply &&
+      cleanText(latest?.text || "") !== cleanText(job.expectedPreviousReply)
+    ) {
+      return { ok: false, reason: "manual_reply_detected" };
+    }
+    const composer = findComposer(snapshot.root);
+    if (!composer) return { ok: false, reason: "composer_missing" };
+    const draft = cleanText(readComposerText(composer));
+    if (draft && draft !== cleanText(job.content) && !isLikelyOwnAiReply(draft)) {
+      return { ok: false, reason: "composer_not_empty" };
+    }
+    return { ok: true, composer };
+  }
+
+  async function processFollowUpJob({ job, settings, snapshot, debug, onBuyerReply }) {
+    const actionable = followUpSnapshotActionable(job, snapshot, settings);
+    if (!actionable.ok) {
+      const state = await cancelFollowUpJob(job, job.externalThreadRef, actionable.reason);
+      await sendDebug("follow_up_canceled", {
+        ...debug,
+        reason: actionable.reason,
+        followUp: state,
+        autoSent: false,
+      });
+      if (actionable.reason === "buyer_replied" && typeof onBuyerReply === "function") {
+        return onBuyerReply();
+      }
+      return { skipped: true, reason: actionable.reason, followUp: state };
+    }
+    if (settings.dryRun || !settings.autoReplyEnabled) {
+      await sendDebug("follow_up_waiting", {
+        ...debug,
+        reason: settings.dryRun ? "dry_run_enabled" : "auto_reply_disabled",
+        followUp: lastFollowUpState,
+        autoSent: false,
+      });
+      return { skipped: true, reason: settings.dryRun ? "dry_run_enabled" : "auto_reply_disabled" };
+    }
+    // This key is intentionally distinct from the normal-reply hash. It opens
+    // exactly one sending opportunity for this claimed job, then closes again.
+    const followUpActionKey = `follow_up_job:${job.id}`;
+    if (lastAutoSendHashByThread.get(job.externalThreadRef) === followUpActionKey) {
+      return { skipped: true, reason: "duplicate_follow_up_job" };
+    }
+    const inserted = insertReply(job.content, snapshot.root);
+    if (!inserted.ok) return { skipped: true, reason: inserted.reason };
+    const sendResult = await sendThroughComposer(inserted.box, job.content, inserted.needsWrite === true);
+    if (!sendResult.ok) return { skipped: true, reason: sendResult.reason || "send_dispatch_failed" };
+    const started = Date.now();
+    let delivered = false;
+    while (Date.now() - started <= SEND_EVIDENCE_TIMEOUT_MS) {
+      const liveCapture = globalThis.DealerPilotMessengerCapture?.captureFromRoot?.(
+        snapshot.root,
+        settings.sellerProfileNames,
+        document,
+      );
+      delivered = deliveryIsVisible(job.content, liveCapture?.messages || snapshot.messages, "") ||
+        !readComposerText(findComposer(snapshot.root) || inserted.box);
+      if (delivered) break;
+      await sleep(SEND_EVIDENCE_INTERVAL_MS);
+    }
+    if (!delivered) {
+      await sendDebug("follow_up_delivery_unconfirmed", {
+        ...debug,
+        reason: "delivery_unconfirmed",
+        followUp: lastFollowUpState,
+        autoSent: false,
+      });
+      return { skipped: true, reason: "delivery_unconfirmed" };
+    }
+    lastAutoSendHashByThread.set(job.externalThreadRef, followUpActionKey);
+    lastAutoReplyByThread.set(job.externalThreadRef, { text: cleanText(job.content), at: Date.now() });
+    const state = await confirmOutboundDelivery(job, job.externalThreadRef);
+    await sendDebug("follow_up_sent", {
+      ...debug,
+      followUp: state,
+      followUpJobId: job.id,
+      autoSent: true,
+      deliveryConfirmed: true,
+      sendMethod: sendResult.method,
+    });
+    return { ok: true, autoSent: true, followUp: state };
   }
 
   function buildBuyersState(snapshots = [], winnerIndex = -1) {
@@ -977,6 +1136,10 @@
       latestMessageDirection: snapshot.evidence.latestMessageDirection || "none",
       imageCandidateCount: snapshot.evidence.imageCandidateCount || 0,
       imageMessageCount: snapshot.evidence.imageMessageCount || 0,
+      metadataCandidateCount: snapshot.evidence.metadataCandidateCount || 0,
+      metadataCandidateLabels: Array.isArray(snapshot.evidence.metadataCandidateLabels)
+        ? snapshot.evidence.metadataCandidateLabels.slice(0, 12)
+        : [],
       latestIsImage: snapshot.evidence.latestIsImage === true,
       imageCandidates: Array.isArray(snapshot.evidence.imageCandidates)
         ? snapshot.evidence.imageCandidates.slice(0, 12)
@@ -996,9 +1159,40 @@
     };
   }
 
-  async function processSnapshot({ automatic, detectedAtMs, settings, snapshot, snapshots, winnerIndex }) {
+  async function processSnapshot({ automatic, detectedAtMs, settings, snapshot, snapshots, winnerIndex, followUpJob, followUpEligible }) {
     const validation = validateSnapshot(snapshot);
     const debug = buildDebugBase({ automatic, settings, snapshot, validation, snapshots, winnerIndex });
+
+    if (followUpJob) {
+      const followUpContextSafe =
+        validation.routeAllowed === true &&
+        validation.conversationThreadDetected === true &&
+        validation.buyerNameDetected === true &&
+        validation.activeThreadHeaderDetected === true &&
+        validation.sellerIsCurrentUser === true &&
+        validation.marketplaceContextDetected === true;
+      if (!followUpContextSafe) {
+        await cancelFollowUpJob(followUpJob, followUpJob.externalThreadRef, "thread_changed");
+        await sendDebug("follow_up_canceled", { ...debug, reason: "follow_up_context_invalid", autoSent: false });
+        return { skipped: true, reason: "follow_up_context_invalid" };
+      }
+      return processFollowUpJob({
+        job: followUpJob,
+        settings,
+        snapshot,
+        debug,
+        onBuyerReply: () => processSnapshot({
+          automatic,
+          detectedAtMs,
+          settings,
+          snapshot,
+          snapshots,
+          winnerIndex,
+          followUpJob: null,
+          followUpEligible: true,
+        }),
+      });
+    }
 
     if (!validation.ok) {
       const reason = validation.missing[0] || "invalid_sales_context";
@@ -1006,7 +1200,10 @@
       return { skipped: true, reason, validation, debug };
     }
 
-    const payload = buildIntakePayload(snapshot, validation, detectedAtMs, settings);
+    const payload = {
+      ...buildIntakePayload(snapshot, validation, detectedAtMs, settings),
+      followUpEligible: followUpEligible === true,
+    };
     const threadKey = payload.externalThreadRef;
     const latestText = cleanText(snapshot.lastMessage?.text || "");
     const lastAutoReply = lastAutoReplyByThread.get(threadKey) || {};
@@ -1026,11 +1223,19 @@
       return { skipped: true, reason: "facebook_rating_card" };
     }
 
-    if (isTerminalAcknowledgement(payload.currentMessage)) {
+    if (isTerminalAcknowledgement(payload.currentMessage) || isConversationClosingAcknowledgement(payload.currentMessage)) {
+      const closing = isConversationClosingAcknowledgement(payload.currentMessage);
+      const followUp = await cancelFollowUpsForBuyer(
+        payload,
+        closing ? "conversation_closed" : "buyer_replied",
+      );
       lastCaptureHashByThread.set(threadKey, payload.messageHash);
       clearPendingBuyer(threadKey);
-      await sendDebug("blocked", { ...debug, reason: "terminal_acknowledgement" });
-      return { skipped: true, reason: "terminal_acknowledgement" };
+      const reason = closing
+        ? "conversation_closed"
+        : "terminal_acknowledgement";
+      await sendDebug("blocked", { ...debug, reason, followUp });
+      return { skipped: true, reason };
     }
 
     if (isGroupSystemEventMessage(payload.currentMessage)) {
@@ -1049,6 +1254,17 @@
       if (autoActionKey === lastAutoSendHashByThread.get(threadKey)) {
         await sendDebug("blocked", { ...debug, reason: "duplicate_auto_send_hash" });
         return { skipped: true, reason: "duplicate_auto_send_hash" };
+      }
+      if (autoActionKey === lastBlockedReplyKeyByThread.get(threadKey)) {
+        await sendDebug("auto_send_blocked", {
+          ...debug,
+          aiReplyReceived: true,
+          backendIntakeSent: false,
+          backendIntakeReceived: false,
+          autoSent: false,
+          reason: "reply_repeats_conversation",
+        });
+        return { ok: false, suggestedReply: "", autoSent: false, reason: "reply_repeats_conversation" };
       }
       const now = Date.now();
       const pending = getPendingBuyer(threadKey);
@@ -1143,7 +1359,9 @@
     if (lastSuggestedReply && deliveryIsVisible(lastSuggestedReply, snapshot.messages, payload.currentMessage)) {
       const autoActionKey = payload.autoActionKey || payload.messageHash;
       lastAutoSendHashByThread.set(threadKey, autoActionKey);
+      lastBlockedReplyKeyByThread.delete(threadKey);
       lastAutoReplyByThread.set(threadKey, { text: cleanText(lastSuggestedReply), at: Date.now() });
+      const followUp = await confirmOutboundDelivery(response.data?.outboundJob, payload.externalThreadRef);
       await sendDebug("intake_ok", {
         ...debug,
         aiReplyReceived: true,
@@ -1152,6 +1370,7 @@
         autoSent: true,
         reason: "reply_already_delivered",
         deliveryConfirmed: true,
+        followUp,
       });
       return { ok: true, suggestedReply: lastSuggestedReply, autoSent: true, reason: "reply_already_delivered", deliveryConfirmed: true };
     }
@@ -1176,7 +1395,7 @@
       !repeatedBuyerQuestionWithinLimit &&
       replyRepeatsConversation(lastSuggestedReply, snapshot.messages, payload.currentMessage)
     ) {
-      lastAutoSendHashByThread.set(threadKey, payload.autoActionKey || payload.messageHash);
+      lastBlockedReplyKeyByThread.set(threadKey, payload.autoActionKey || payload.messageHash);
       await sendDebug("auto_send_blocked", {
         ...debug,
         aiReplyReceived: true,
@@ -1190,14 +1409,18 @@
     }
 
     const sendResult = await maybeSendReply(lastSuggestedReply, payload, snapshot, threadKey, settings);
+    const followUp = sendResult.autoSent
+      ? await confirmOutboundDelivery(response.data?.outboundJob, payload.externalThreadRef)
+      : lastFollowUpState;
     await sendDebug(sendResult.autoSent ? "intake_ok" : "auto_send_blocked", {
       ...debug,
       ...sendResult,
       aiReplyReceived: !!lastSuggestedReply,
       backendIntakeSent: true,
       backendIntakeReceived: true,
+      followUp,
     });
-    return { ok: true, suggestedReply: lastSuggestedReply, ...sendResult };
+    return { ok: true, suggestedReply: lastSuggestedReply, followUp, ...sendResult };
   }
 
   async function captureConversationOnce(options = {}) {
@@ -1231,6 +1454,8 @@
       snapshot: winning.snapshot,
       snapshots,
       winnerIndex: winning.index,
+      followUpJob: options.followUpJob || null,
+      followUpEligible: options.followUpEligible === true,
     });
     return {
       ...result,
@@ -1250,6 +1475,37 @@
     } finally {
       captureInFlight = false;
     }
+  }
+
+  async function claimAndQueueFollowUp(controller) {
+    if (!controller?.enqueue) return { skipped: true, reason: "autonomy_missing" };
+    const response = await send({ type: "CLAIM_DUE_MESSENGER_FOLLOW_UP" });
+    if (!response?.ok) return { skipped: true, reason: response?.error || "follow_up_claim_failed" };
+    const claim = response.data || {};
+    await rememberFollowUpState(response);
+    const job = claim.job;
+    if (!job?.id || !job.externalThreadRef) return { skipped: true, reason: "no_follow_up_due" };
+    const threadId = threadIdFromExternalRef(job.externalThreadRef);
+    if (!threadId) {
+      await cancelFollowUpJob(job, job.externalThreadRef, "thread_changed");
+      return { skipped: true, reason: "follow_up_thread_missing" };
+    }
+    const expectedThreadPath = `/messages/t/${encodeURIComponent(threadId)}`;
+    const sourceUrl = String(job.sourceUrl || "");
+    const url = sourceUrl.includes(expectedThreadPath)
+      ? sourceUrl
+      : new URL(expectedThreadPath, location.origin).href;
+    controller.enqueue({
+      threadId,
+      url,
+      signature: `follow-up:${job.id}`,
+      incomingPreview: false,
+      explicitUnread: false,
+      followUpJob: job,
+      reason: "scheduled_follow_up",
+      observedAt: Date.now(),
+    });
+    return { ok: true, jobId: job.id };
   }
 
   async function restoreAutoSendState() {
@@ -1273,10 +1529,14 @@
     if (!isFacebookMessagesThreadRoute()) return;
     restoreAutoSendState().then(() => {
       getSettings().then((settings) => {
-        globalThis.DealerPilotMessengerAutonomy.start({
+        const controller = globalThis.DealerPilotMessengerAutonomy.start({
           processThread: captureConversation,
           sellerProfileNames: settings.sellerProfileNames,
         });
+        setInterval(() => {
+          claimAndQueueFollowUp(controller).catch(() => {});
+        }, 30000);
+        claimAndQueueFollowUp(controller).catch(() => {});
       }).catch(console.warn);
     }).catch(console.warn);
     setInterval(() => {
@@ -1298,6 +1558,7 @@
     isFacebookMessagesThreadRoute,
     isFacebookRatingCard,
     isTerminalAcknowledgement,
+    isConversationClosingAcknowledgement,
     replyMirrorsBuyerLanguage,
     replyRepeatsConversation,
     selectWinningSnapshot,
@@ -1306,6 +1567,7 @@
     _state: () => ({
       lastCaptureHashByThread: Object.fromEntries(lastCaptureHashByThread),
       lastAutoSendHashByThread: Object.fromEntries(lastAutoSendHashByThread),
+      lastBlockedReplyKeyByThread: Object.fromEntries(lastBlockedReplyKeyByThread),
       pendingBuyerByThread: Object.fromEntries(pendingBuyerByThread),
       lastSuggestedReplyByThread: Object.fromEntries(lastSuggestedReplyByThread),
     }),

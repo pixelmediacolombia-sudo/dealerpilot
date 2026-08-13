@@ -346,6 +346,8 @@
         result = await processThread({
           automatic: true,
           expectedThreadId: target.syntheticActiveThread ? "" : target.threadId,
+          followUpJob: target.followUpJob || null,
+          followUpEligible: target.followUpEligible === true,
         });
         const retryable = RETRYABLE_PROCESS_REASONS.has(result?.reason);
         if (!retryable) break;
@@ -371,7 +373,12 @@
         target.incomingPreview &&
         (target.explicitUnread || target.needsSellerResponse || changed)
       ) {
-        queue.enqueue({ ...target, reason, observedAt: Date.now() });
+        queue.enqueue({
+          ...target,
+          reason,
+          observedAt: Date.now(),
+          followUpEligible: reason !== "initial_unread" && reason !== "restored_queue",
+        });
       }
     }
 
@@ -400,6 +407,7 @@
         syntheticActiveThread,
         reason,
         observedAt: Date.now(),
+        followUpEligible: reason === "active_buyer_message_mutation",
       });
     }
 

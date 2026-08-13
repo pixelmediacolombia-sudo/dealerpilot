@@ -175,6 +175,7 @@
         "lastMessengerCaptureDebugByTab",
         "messengerCaptureDebugHistory",
         "lastConversationIntake",
+        "lastMessengerFollowUp",
         "lastError",
         "extensionId",
       ]);
@@ -186,6 +187,12 @@
         lastMessengerCaptureDebugByTab: stored.lastMessengerCaptureDebugByTab || {},
         messengerCaptureDebugHistory: stored.messengerCaptureDebugHistory || [],
         lastConversationIntake: stored.lastConversationIntake || null,
+        lastMessengerFollowUp: stored.lastMessengerFollowUp || {
+          followUpsSent: 0,
+          maxFollowUps: 3,
+          status: "idle",
+          nextDueAt: null,
+        },
         lastError: stored.lastError || null,
       };
     },
@@ -338,6 +345,7 @@
           buyerNameDetected: message.buyerNameDetected,
           sellerIsCurrentUser: message.sellerIsCurrentUser,
           marketplaceContextDetected: message.marketplaceContextDetected,
+          followUpEligible: message.followUpEligible === true,
           availabilityQuickReplyAccepted: false,
           timestamp: new Date().toISOString(),
         });
@@ -392,6 +400,89 @@
       } finally {
         if (dedupeKey) conversationIntakeInFlight.delete(dedupeKey);
       }
+    },
+
+    async CLAIM_DUE_MESSENGER_FOLLOW_UP() {
+      const extensionId = await getExtensionId();
+      const settings = await getSettings();
+      const response = await DealerPilotMessengerApiClient.apiPost("/api/conversations/follow-ups/claim", {
+        extensionId,
+        dealerId: settings.dealerId,
+      });
+      const data = response?.data || response || {};
+      await chrome.storage.local.set({
+        lastMessengerFollowUp: {
+          ...(data.followUp || {}),
+          jobId: data.job?.id || null,
+          status: data.job ? "claimed" : data.followUp?.status || "idle",
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      return data;
+    },
+
+    async CONFIRM_MESSENGER_OUTBOUND_DELIVERY(message) {
+      const extensionId = await getExtensionId();
+      const settings = await getSettings();
+      const response = await DealerPilotMessengerApiClient.apiPost(
+        `/api/conversations/outbound/${encodeURIComponent(message.jobId)}/delivered`,
+        {
+          extensionId,
+          dealerId: settings.dealerId,
+          externalThreadRef: message.externalThreadRef,
+        },
+      );
+      const data = response?.data || response || {};
+      await chrome.storage.local.set({
+        lastMessengerFollowUp: {
+          ...(data.followUp || {}),
+          jobId: data.job?.id || message.jobId || null,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      return data;
+    },
+
+    async CANCEL_MESSENGER_FOLLOW_UP(message) {
+      const settings = await getSettings();
+      const response = await DealerPilotMessengerApiClient.apiPost(
+        `/api/conversations/follow-ups/${encodeURIComponent(message.jobId)}/cancel`,
+        {
+          dealerId: settings.dealerId,
+          externalThreadRef: message.externalThreadRef,
+          reason: message.reason,
+        },
+      );
+      const data = response?.data || response || {};
+      await chrome.storage.local.set({
+        lastMessengerFollowUp: {
+          ...(data.followUp || {}),
+          jobId: message.jobId || null,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      return data;
+    },
+
+    async CANCEL_MESSENGER_FOLLOW_UPS_FOR_BUYER(message) {
+      const settings = await getSettings();
+      const response = await DealerPilotMessengerApiClient.apiPost(
+        "/api/conversations/follow-ups/cancel-by-thread",
+        {
+          dealerId: settings.dealerId,
+          externalThreadRef: message.externalThreadRef,
+          reason: message.reason,
+        },
+      );
+      const data = response?.data || response || {};
+      await chrome.storage.local.set({
+        lastMessengerFollowUp: {
+          ...(data.followUp || {}),
+          status: "canceled",
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      return data;
     },
   };
 

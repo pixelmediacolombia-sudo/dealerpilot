@@ -12,6 +12,15 @@ import {
   dealersTable,
 } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import {
+  cancelClaimedFollowUp,
+  cancelFollowUpsForBuyerActivity,
+  claimDueFollowUp,
+  confirmOutboundDelivery,
+  ensureMessengerFollowUpSchema,
+  findOutboundJobForAssistantMessage,
+  queueNormalReplyForFollowUp,
+} from "../conversations/followUpQueue";
 
 
 const router = Router();
@@ -435,6 +444,18 @@ function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
   return stage === "request_phone" ||
     stage === "cash_visit_request_phone" ||
     stage === "urgent_vehicle_request_phone";
+}
+
+function isConversationClosingBuyerAcknowledgement(value: string): boolean {
+  const normalized = cleanConversationText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[.,!?;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return /\b(?:not interested|no thanks|do not contact|stop messaging|goodbye|bye)\b/.test(normalized) ||
+    /\b(?:no me interesa|ya no estoy interesado|no gracias|no me contacten|deja de escribir|adios|chao)\b/.test(normalized);
 }
 
 function historyHasDealerReply(visibleMessages: string[]): boolean {
@@ -1203,6 +1224,7 @@ router.post("/conversations/intake", async (req, res) => {
     sellerIsCurrentUser,
     marketplaceContextDetected,
     availabilityQuickReplyAccepted,
+    followUpEligible,
     timestamp: _ts,
   } = req.body as {
     extensionId?: string;
@@ -1228,6 +1250,7 @@ router.post("/conversations/intake", async (req, res) => {
     sellerIsCurrentUser?: boolean;
     marketplaceContextDetected?: boolean;
     availabilityQuickReplyAccepted?: boolean;
+    followUpEligible?: boolean;
     timestamp?: string;
   };
   const backendReceivedAt = new Date();
@@ -1256,6 +1279,13 @@ router.post("/conversations/intake", async (req, res) => {
   if (!targetDealer) {
     res.status(400).json({ error: "Unknown dealerId" });
     return;
+  }
+  // Follow-up storage is additive. An unavailable migration must never stop
+  // the established Sales AI intake and normal response path.
+  try {
+    await ensureMessengerFollowUpSchema();
+  } catch (error) {
+    req.log.error({ error, dealerId }, "Messenger follow-up schema unavailable; normal intake continues");
   }
 
   const missingContext = [
@@ -1301,11 +1331,15 @@ router.post("/conversations/intake", async (req, res) => {
   const parsedMsgs = rawMsgs.map(parseConversationMessage).filter((msg): msg is ParsedConversationMessage => !!msg);
   const currentParsed = parseConversationMessage(currentMessage);
   const incomingMsgs = mergeCurrentConversationMessage(parsedMsgs, currentParsed);
+  // The extension validates currentMessage against the live Messenger bubble.
+  // Preserve it as the source of truth even if Facebook momentarily returns
+  // stale or reordered history rows around a DOM rerender.
+  const currentBuyerMessage = currentParsed?.role === "user" ? currentParsed.content : "";
   const latestParsed = incomingMsgs[incomingMsgs.length - 1] ?? null;
-  const latestBuyerMessage =
-    latestParsed?.role === "user"
+  const latestBuyerMessage = currentBuyerMessage ||
+    (latestParsed?.role === "user"
       ? latestParsed.content
-      : [...incomingMsgs].reverse().find((msg) => msg.role === "user")?.content ?? "";
+      : [...incomingMsgs].reverse().find((msg) => msg.role === "user")?.content ?? "");
   if (!latestBuyerMessage) {
     req.log.info(
       { externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
@@ -1324,14 +1358,21 @@ router.post("/conversations/intake", async (req, res) => {
   }
   const inbound = latestBuyerMessage;
   const language = detectLanguage(inbound);
-  if (isTerminalBuyerAcknowledgement(inbound)) {
+  const extractedPhone = extractPhoneNumber(inbound);
+  if (isTerminalBuyerAcknowledgement(inbound) || isConversationClosingBuyerAcknowledgement(inbound)) {
+    await cancelFollowUpsForBuyerActivity({
+      dealerId,
+      externalThreadRef,
+      reason: isConversationClosingBuyerAcknowledgement(inbound) ? "conversation_closed" : "buyer_replied",
+    })
+      .catch((error) => req.log.warn({ error, externalThreadRef }, "Terminal acknowledgement follow-up cancel skipped"));
     req.log.info(
       { externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
-      "Conversation intake skipped - terminal buyer acknowledgement",
+      "Conversation intake skipped - terminal or closed buyer acknowledgement",
     );
     res.json({
       skipped: true,
-      reason: "terminal_acknowledgement",
+      reason: isConversationClosingBuyerAcknowledgement(inbound) ? "conversation_closed" : "terminal_acknowledgement",
       language,
       timings: {
         messageDetectedAt: messageDetectedAt.toISOString(),
@@ -1537,6 +1578,18 @@ router.post("/conversations/intake", async (req, res) => {
     if (msg.role === "user") hasNewBuyerMessage = true;
   }
 
+  if (hasNewBuyerMessage) {
+    await cancelFollowUpsForBuyerActivity({
+      dealerId,
+      externalThreadRef,
+      reason: extractedPhone ? "phone_received" : "buyer_replied",
+    }).catch((error) => req.log.warn({ error, externalThreadRef }, "Buyer activity follow-up cancel skipped"));
+    await db
+      .update(conversationsTable)
+      .set({ status: extractedPhone ? "BDC Assigned" : "active", updatedAt: new Date() })
+      .where(eq(conversationsTable.id, conversationId));
+  }
+
   if (!hasNewBuyerMessage) {
     const latestAssistantMessage =
       latestParsed?.role === "user"
@@ -1588,6 +1641,13 @@ router.post("/conversations/intake", async (req, res) => {
       );
     }
     if (retryableReply) {
+      const outboundJob = latestAssistantMessage
+        ? await findOutboundJobForAssistantMessage(latestAssistantMessage.id)
+          .catch((error) => {
+            req.log.warn({ error, conversationId }, "Delivery retry continues without follow-up job lookup");
+            return null;
+          })
+        : null;
       req.log.info(
         { conversationId, externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
         "Conversation intake returning existing reply for Messenger delivery retry",
@@ -1596,6 +1656,7 @@ router.post("/conversations/intake", async (req, res) => {
         conversationId,
         suggestedReply: retryableReply,
         deliveryRetry: true,
+        outboundJob,
         language,
         fallbackUsed: retryFallbackUsed,
         fallbackReason: retryFallbackReason,
@@ -1624,10 +1685,8 @@ router.post("/conversations/intake", async (req, res) => {
     return;
   }
 
-  // Extract phone number if buyer included one in their message
-  const extractedPhone = extractPhoneNumber(inbound);
-
   let suggestedReply: string | null = null;
+  let outboundJob = null;
   let aiReplyResult: AiReplyResult | null = null;
   const latestExistingAssistant = existingMsgs.find((m) => m.role === "assistant");
   const shouldGenerateReply =
@@ -1650,11 +1709,24 @@ router.post("/conversations/intake", async (req, res) => {
     );
     suggestedReply = aiReplyResult.reply;
 
-    await db.insert(conversationMessagesTable).values({
+    const [assistantMessage] = await db.insert(conversationMessagesTable).values({
       conversationId,
       role: "assistant",
       content: suggestedReply,
-    });
+    }).returning({ id: conversationMessagesTable.id });
+    if (followUpEligible === true && !extractedPhone && assistantMessage?.id) {
+      outboundJob = await queueNormalReplyForFollowUp({
+        conversationId,
+        dealerId,
+        assistantMessageId: assistantMessage.id,
+        externalThreadRef,
+        sourceUrl: resolvedSourceUrl,
+        content: suggestedReply,
+      }).catch((error) => {
+        req.log.warn({ error, conversationId }, "Normal reply sent without follow-up queue entry");
+        return null;
+      });
+    }
   }
 
   const [existingLead] = await db
@@ -1785,11 +1857,83 @@ router.post("/conversations/intake", async (req, res) => {
     conversationId,
     leadId,
     suggestedReply,
+    outboundJob,
     language,
     fallbackUsed: aiReplyResult?.fallbackUsed ?? false,
     fallbackReason: aiReplyResult?.fallbackReason ?? null,
     timings,
   });
+});
+
+router.post("/conversations/outbound/:jobId/delivered", async (req, res) => {
+  const jobId = Number(req.params.jobId);
+  const dealerId = Number(req.body?.dealerId) || DEALER_ID;
+  const externalThreadRef = String(req.body?.externalThreadRef || "").trim();
+  if (!Number.isInteger(jobId) || jobId <= 0 || !externalThreadRef) {
+    res.status(400).json({ error: "jobId and externalThreadRef are required" });
+    return;
+  }
+  try {
+    const confirmed = await confirmOutboundDelivery({
+      jobId,
+      dealerId,
+      externalThreadRef,
+      extensionId: typeof req.body?.extensionId === "string" ? req.body.extensionId : null,
+    });
+    res.json({ ok: true, ...confirmed });
+  } catch (error) {
+    req.log.warn({ error, jobId, dealerId }, "Messenger outbound delivery confirmation rejected");
+    res.status(409).json({ error: error instanceof Error ? error.message : "outbound_delivery_confirmation_failed" });
+  }
+});
+
+router.post("/conversations/follow-ups/claim", async (req, res) => {
+  const dealerId = Number(req.body?.dealerId) || DEALER_ID;
+  const extensionId = String(req.body?.extensionId || "").trim();
+  if (!extensionId) {
+    res.status(400).json({ error: "extensionId required" });
+    return;
+  }
+  const claimed = await claimDueFollowUp({ dealerId, extensionId });
+  res.json({ ok: true, ...claimed });
+});
+
+router.post("/conversations/follow-ups/:jobId/cancel", async (req, res) => {
+  const jobId = Number(req.params.jobId);
+  const dealerId = Number(req.body?.dealerId) || DEALER_ID;
+  const externalThreadRef = String(req.body?.externalThreadRef || "").trim();
+  const reason = req.body?.reason === "manual_reply_detected"
+    ? "manual_reply_detected"
+    : req.body?.reason === "thread_changed"
+      ? "thread_changed"
+      : req.body?.reason === "conversation_closed"
+        ? "conversation_closed"
+      : "buyer_replied";
+  if (!Number.isInteger(jobId) || jobId <= 0 || !externalThreadRef) {
+    res.status(400).json({ error: "jobId and externalThreadRef are required" });
+    return;
+  }
+  const followUp = await cancelClaimedFollowUp({ jobId, dealerId, externalThreadRef, reason });
+  res.json({ ok: true, followUp });
+});
+
+router.post("/conversations/follow-ups/cancel-by-thread", async (req, res) => {
+  const dealerId = Number(req.body?.dealerId) || DEALER_ID;
+  const externalThreadRef = String(req.body?.externalThreadRef || "").trim();
+  if (!externalThreadRef) {
+    res.status(400).json({ error: "externalThreadRef required" });
+    return;
+  }
+  const followUp = await cancelFollowUpsForBuyerActivity({
+    dealerId,
+    externalThreadRef,
+    reason: req.body?.reason === "phone_received"
+      ? "phone_received"
+      : req.body?.reason === "conversation_closed"
+        ? "conversation_closed"
+        : "buyer_replied",
+  });
+  res.json({ ok: true, followUp });
 });
 
 router.get("/conversations", async (req, res) => {

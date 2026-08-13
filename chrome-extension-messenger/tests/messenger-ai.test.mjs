@@ -354,6 +354,28 @@ test("autoReply never sends a backend reply that echoes the buyer question verba
   assert.equal(calls.debug.at(-1).reason, "reply_repeats_conversation");
 });
 
+test("a rejected repeated reply is not mislabeled as duplicate_auto_send_hash", async () => {
+  const question = "Can I see the carfax?";
+  const { ai, calls, setNow } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [{ speaker: "Hector", text: question }],
+    intakeResponse: { ok: true, data: { suggestedReply: question } },
+    nowMs: 100000,
+  });
+
+  const waiting = await ai.captureConversation({ automatic: true });
+  assert.equal(waiting.reason, "waiting_quiet_window");
+  setNow(108000);
+  const rejected = await ai.captureConversation({ automatic: true });
+  assert.equal(rejected.reason, "reply_repeats_conversation");
+  assert.equal(calls.intake.length, 1);
+
+  const retried = await ai.captureConversation({ automatic: true });
+  assert.equal(retried.reason, "reply_repeats_conversation");
+  assert.equal(calls.intake.length, 1);
+  assert.equal(calls.debug.at(-1).reason, "reply_repeats_conversation");
+});
+
 test("autoReply still sends a fresh backend reply that does not repeat the conversation", async () => {
   const { ai, calls, composerElement } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
@@ -962,6 +984,18 @@ test("autoReply revalidates the same root before writing to Messenger", async ()
   assert.equal(result.reason, "new_dealer_message_in_history");
   assert.equal(composerElement.textContent, "");
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
+});
+
+test("conversation closing acknowledgement stops automation before backend intake", async () => {
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [{ speaker: "Luis", text: "No me interesa, gracias" }],
+  });
+
+  const result = await ai.captureConversation({ automatic: true });
+
+  assert.equal(result.reason, "conversation_closed");
+  assert.equal(calls.intake.length, 0);
 });
 
 test("autoReply blocks when an operator replies manually while backend intake is pending", async () => {
