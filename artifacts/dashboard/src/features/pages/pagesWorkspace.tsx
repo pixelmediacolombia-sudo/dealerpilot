@@ -47,6 +47,17 @@ type NextBatch = {
   vehicles: BatchVehicle[];
 };
 
+type PageBatchJob = Omit<BatchVehicle, "vin"> & {
+  batchId: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  attempts: number;
+};
+
+type PageBatchHistory = Omit<NextBatch, "vehicles"> & {
+  jobs: PageBatchJob[];
+};
+
 type PageBatchPreview = {
   dryRun: boolean;
   configured: boolean;
@@ -165,6 +176,7 @@ export function PagesWorkspace() {
   const [configured, setConfigured] = useState(false);
   const [connection, setConnection] = useState<PageConnection | null>(null);
   const [batch, setBatch] = useState<NextBatch | null>(null);
+  const [history, setHistory] = useState<PageBatchHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
@@ -179,15 +191,17 @@ export function PagesWorkspace() {
     setLoading(true);
     setError(null);
     try {
-      const [settingsResponse, batchResponse, connectionResponse] = await Promise.all([
+      const [settingsResponse, batchResponse, connectionResponse, historyResponse] = await Promise.all([
         readJson<{ configured: boolean; settings: PageSettings | null }>(`/api/pages/settings/${dealerId}`),
         readJson<{ batch: NextBatch | null }>(`/api/pages/batches/next?dealerId=${dealerId}`),
         readJson<PageConnectionResponse>(`/api/pages/connection/${dealerId}`),
+        readJson<{ batches: PageBatchHistory[] }>(`/api/pages/batches?dealerId=${dealerId}&limit=10`),
       ]);
       setConfigured(settingsResponse.configured);
       setSettings(settingsResponse.settings ?? DEFAULT_SETTINGS);
       setBatch(batchResponse.batch);
       setConnection(connectionResponse.connection);
+      setHistory(historyResponse.batches);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load Page publishing");
     } finally {
@@ -196,6 +210,11 @@ export function PagesWorkspace() {
   }, [dealerId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => { void load(); }, 15_000);
+    return () => window.clearInterval(interval);
+  }, [load]);
 
   const updateSetting = <K extends keyof PageSettings>(key: K, value: PageSettings[K]) => {
     setSettings((current) => ({ ...current, [key]: value }));
@@ -325,10 +344,10 @@ export function PagesWorkspace() {
               <Toggle checked={settings.enabled} onChange={(value) => updateSetting("enabled", value)} label="Enable automatic Page publishing" />
             </div>
             <div className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4">
-              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Vehicles per batch<input type="number" min={1} max={20} value={settings.vehiclesPerBatch} onChange={(event) => updateSetting("vehiclesPerBatch", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>
-              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Daily maximum<input type="number" min={1} max={50} value={settings.maxPostsPerDay} onChange={(event) => updateSetting("maxPostsPerDay", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>
-              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Post spacing<select value={settings.minDelayMinutes} onChange={(event) => updateSetting("minDelayMinutes", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"><option value={0}>No spacing</option><option value={15}>15 minutes</option><option value={30}>30 minutes</option><option value={60}>1 hour</option></select></label>
-              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Daily window (ET)<div className="flex h-10 items-center gap-2"><input aria-label="Daily window start" type="time" value={settings.preferredWindowStart} onChange={(event) => updateSetting("preferredWindowStart", event.target.value)} className="h-10 w-[104px] shrink-0 rounded-md border border-border bg-background px-2 text-center text-sm font-semibold tabular-nums tracking-tight text-foreground outline-none transition-[border-color,box-shadow] focus:border-primary focus:ring-2 focus:ring-primary/15" /><span className="text-sm font-medium text-muted-foreground">–</span><input aria-label="Daily window end" type="time" value={settings.preferredWindowEnd} onChange={(event) => updateSetting("preferredWindowEnd", event.target.value)} className="h-10 w-[104px] shrink-0 rounded-md border border-border bg-background px-2 text-center text-sm font-semibold tabular-nums tracking-tight text-foreground outline-none transition-[border-color,box-shadow] focus:border-primary focus:ring-2 focus:ring-primary/15" /></div></label>
+              <label className="min-w-0 space-y-1.5 text-xs font-semibold text-muted-foreground">Vehicles per batch<input type="number" min={1} max={20} value={settings.vehiclesPerBatch} onChange={(event) => updateSetting("vehiclesPerBatch", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium tabular-nums text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>
+              <label className="min-w-0 space-y-1.5 text-xs font-semibold text-muted-foreground">Daily maximum<input type="number" min={1} max={50} value={settings.maxPostsPerDay} onChange={(event) => updateSetting("maxPostsPerDay", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium tabular-nums text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>
+              <label className="min-w-0 space-y-1.5 text-xs font-semibold text-muted-foreground">Post spacing<select value={settings.minDelayMinutes} onChange={(event) => updateSetting("minDelayMinutes", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium tabular-nums text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"><option value={0}>No spacing</option><option value={15}>15 minutes</option><option value={30}>30 minutes</option><option value={60}>1 hour</option></select></label>
+              <label className="min-w-0 space-y-1.5 text-xs font-semibold text-muted-foreground">Daily window (ET)<div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5"><input aria-label="Daily window start" type="time" value={settings.preferredWindowStart} onChange={(event) => updateSetting("preferredWindowStart", event.target.value)} className="h-10 min-w-0 w-full rounded-md border border-border bg-background px-1.5 text-center text-sm font-semibold tabular-nums tracking-tight text-foreground outline-none transition-[border-color,box-shadow] focus:border-primary focus:ring-2 focus:ring-primary/15" /><span className="text-sm font-medium text-muted-foreground">–</span><input aria-label="Daily window end" type="time" value={settings.preferredWindowEnd} onChange={(event) => updateSetting("preferredWindowEnd", event.target.value)} className="h-10 min-w-0 w-full rounded-md border border-border bg-background px-1.5 text-center text-sm font-semibold tabular-nums tracking-tight text-foreground outline-none transition-[border-color,box-shadow] focus:border-primary focus:ring-2 focus:ring-primary/15" /></div></label>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-600" />Published through Graph API</span><span className="inline-flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-primary" />Photos managed by DealerPilot</span></div>
@@ -343,6 +362,7 @@ export function PagesWorkspace() {
             <div className="flex items-start gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#1877F2]/10 text-[#1877F2]"><Facebook className="h-5 w-5" aria-hidden="true" /></span><div><h2 className="text-base font-semibold text-foreground">Page connection</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Credentials stay on the backend; this check confirms the Page and publish permission with Meta.</p></div></div>
             <div className="mt-5 flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2.5"><div><p className="text-sm font-semibold text-foreground">{connection?.pageName || "Meta Page not validated"}</p><p className="mt-0.5 text-xs text-muted-foreground">{connection?.pageId || "No Page connection found"}</p></div><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", connection?.status === "active" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : connection?.status === "error" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-border bg-muted/40 text-muted-foreground")}>{connection?.status === "active" ? "Validated" : connection?.status === "error" ? "Needs attention" : "Not validated"}</span></div>
             <button type="button" onClick={() => void validateConnection()} disabled={validating} className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50">{validating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-4 w-4" aria-hidden="true" />}{validating ? "Validating with Meta…" : "Validate connection"}</button>
+            {connection?.pageId ? <a href={`https://www.facebook.com/${connection.pageId}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-9 w-full items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-muted/40">Open Alpha Page</a> : null}
             <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-sm text-muted-foreground">Local plan</span><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", settings.enabled ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-border bg-muted/40 text-muted-foreground")}>{settings.enabled ? "Active" : "Paused"}</span></div>
             <div className="mt-3 flex items-center justify-between"><span className="text-sm text-muted-foreground">Configuration saved</span><span className="text-sm font-semibold text-foreground">{configured ? "Yes" : "Pending"}</span></div>
             <div className="mt-3 flex items-center justify-between"><span className="text-sm text-muted-foreground">Publish permission</span><span className="text-sm font-semibold text-foreground">{connection?.scopes.includes("pages_manage_posts") ? "Granted" : "Pending"}</span></div>
@@ -358,9 +378,57 @@ export function PagesWorkspace() {
         </section> : null}
 
         <section className="rounded-[10px] border border-border bg-card shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)]">
-          <div className="flex flex-col justify-between gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center"><div><div className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">NEXT BATCH</div><h2 className="mt-1 text-lg font-semibold tracking-[-0.015em] text-foreground">{batch ? `Batch #${batch.batchNumber}` : "Queue is waiting for vehicles"}</h2><p className="mt-1 text-sm text-muted-foreground">{batch ? `${nextVehicleLabel} · scheduled for ${formatDate(batch.scheduledAt)}` : "When the plan is active, the worker will reserve the next batch automatically."}</p></div>{batch ? <div className="text-left sm:text-right"><span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(batch.status))}>{batch.status}</span><p className="mt-1 text-xs text-muted-foreground">{batch.completedCount}/{batch.totalVehicles} completed</p></div> : null}</div>
-          {loading ? <div className="flex items-center gap-2 px-5 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Checking queue…</div> : batch?.vehicles.length ? <div className="divide-y divide-border">{batch.vehicles.map((vehicle, index) => <div key={vehicle.id} className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-muted/20 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span><div className="min-w-0"><div className="truncate text-sm font-semibold text-foreground">{vehicle.year} {vehicle.make} {vehicle.model}{vehicle.trim ? ` ${vehicle.trim}` : ""}</div><div className="mt-1 text-xs text-muted-foreground">{formatPrice(vehicle.price)}{vehicle.stockNumber ? ` · Stock ${vehicle.stockNumber}` : ""} · {formatDate(vehicle.scheduledAt)}</div></div></div><div className="flex items-center gap-3 sm:shrink-0"><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(vehicle.status))}>{vehicle.status}</span>{vehicle.postUrl ? <a href={vehicle.postUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">View post</a> : null}</div></div>)}</div> : <div className="px-5 py-10 text-center"><p className="text-sm font-semibold text-foreground">{settings.enabled ? "No batch reserved yet" : "Enable the plan to get started"}</p><p className="mt-1 text-sm text-muted-foreground">The queue is created automatically and remains separate from Marketplace.</p></div>}
+          <div className="flex flex-col justify-between gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">NEXT BATCH</div>
+              <h2 className="mt-1 text-lg font-semibold tracking-[-0.015em] text-foreground">{batch ? `Batch #${batch.batchNumber}` : "Queue is waiting for vehicles"}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{batch ? `${nextVehicleLabel} · scheduled for ${formatDate(batch.scheduledAt)}` : "When the plan is active, the worker will reserve the next batch automatically."}</p>
+            </div>
+            {batch ? <div className="text-left sm:text-right"><span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(batch.status))}>{batch.status}</span><p className="mt-1 text-xs text-muted-foreground">{batch.completedCount}/{batch.totalVehicles} completed</p></div> : null}
+          </div>
+          {loading ? <div className="flex items-center gap-2 px-5 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Checking queue…</div> : batch?.vehicles.length ? <div className="divide-y divide-border">
+            {batch.vehicles.map((vehicle, index) => <div key={vehicle.id} className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-muted/20 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-foreground">{vehicle.year} {vehicle.make} {vehicle.model}{vehicle.trim ? ` ${vehicle.trim}` : ""}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{formatPrice(vehicle.price)}{vehicle.stockNumber ? ` · Stock ${vehicle.stockNumber}` : ""} · {formatDate(vehicle.scheduledAt)}</div>
+                  <div className="mt-2 text-xs font-medium text-foreground">{vehicle.currentStep ?? "Queued for Meta Page"}</div>
+                  {vehicle.failedReason ? <p className="mt-1 text-xs text-destructive">{vehicle.failedReason}</p> : null}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:shrink-0 sm:justify-end">
+                <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(vehicle.status))}>{vehicle.status === "Publishing" ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : null}{vehicle.status}</span>
+                {vehicle.postUrl ? <a href={vehicle.postUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">View post</a> : connection?.pageId ? <a href={`https://www.facebook.com/${connection.pageId}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">Open Alpha Page</a> : null}
+              </div>
+            </div>)}
+          </div> : <div className="px-5 py-10 text-center"><p className="text-sm font-semibold text-foreground">{settings.enabled ? "No batch reserved yet" : "Enable the plan to get started"}</p><p className="mt-1 text-sm text-muted-foreground">The queue is created automatically and remains separate from Marketplace.</p></div>}
         </section>
+
+        {history.filter((entry) => entry.id !== batch?.id).length ? <section className="rounded-[10px] border border-border bg-card shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)]">
+          <div className="flex flex-col justify-between gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-center">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">RECENT ACTIVITY</div>
+              <h2 className="mt-1 text-lg font-semibold tracking-[-0.015em] text-foreground">Page publishing history</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Status and current step refresh automatically every 15 seconds.</p>
+            </div>
+            {connection?.pageId ? <a href={`https://www.facebook.com/${connection.pageId}`} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-muted/40">Open Alpha Page</a> : null}
+          </div>
+          <div className="divide-y divide-border">
+            {history.filter((entry) => entry.id !== batch?.id).map((entry) => <div key={entry.id} className="px-5 py-4">
+              <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                <div><p className="text-sm font-semibold text-foreground">Batch #{entry.batchNumber}</p><p className="mt-1 text-xs text-muted-foreground">Scheduled for {formatDate(entry.scheduledAt)} · {entry.completedCount}/{entry.totalVehicles} completed</p></div>
+                <span className={cn("inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(entry.status))}>{entry.status}</span>
+              </div>
+              <div className="mt-3 divide-y divide-border/70 rounded-md border border-border/70">
+                {entry.jobs.map((job) => <div key={job.id} className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{job.year} {job.make} {job.model}{job.trim ? ` ${job.trim}` : ""}</p><p className="mt-1 text-xs text-muted-foreground">{formatPrice(job.price)}{job.stockNumber ? ` · Stock ${job.stockNumber}` : ""}</p><p className="mt-1 text-xs font-medium text-foreground">{job.currentStep ?? "Queued for Meta Page"}{job.attempts > 1 ? ` · Attempt ${job.attempts}` : ""}</p>{job.failedReason ? <p className="mt-1 text-xs text-destructive">{job.failedReason}</p> : null}</div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:shrink-0 sm:justify-end"><span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(job.status))}>{job.status === "Publishing" ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : null}{job.status}</span>{job.postUrl ? <a href={job.postUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">View post</a> : connection?.pageId ? <a href={`https://www.facebook.com/${connection.pageId}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">Open Alpha Page</a> : null}</div>
+                </div>)}
+              </div>
+            </div>)}
+          </div>
+        </section> : null}
       </div>
       </div>
     </AppLayout>

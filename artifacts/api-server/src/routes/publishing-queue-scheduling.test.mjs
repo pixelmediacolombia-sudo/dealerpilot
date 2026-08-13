@@ -806,3 +806,22 @@ test("Alpha Pages exposes an administrator-only immediate publish action", () =>
   assert.match(pagesWorkspaceSource, /\/api\/pages\/publish-now/);
   assert.match(pagesWorkspaceSource, /window\.confirm/);
 });
+
+test("Alpha Pages activity exposes each job step and publication link", () => {
+  assert.match(pagesRouteSource, /jobsByBatch/);
+  assert.match(pagesRouteSource, /currentStep: pagePublishingJobsTable\.currentStep/);
+  assert.match(pagesRouteSource, /postUrl: pagePublishingJobsTable\.postUrl/);
+  assert.match(pagesWorkspaceSource, /\/api\/pages\/batches\?dealerId=/);
+  assert.match(pagesWorkspaceSource, /setInterval\(\(\) => \{ void load\(\); \}, 15_000\)/);
+  assert.match(pagesWorkspaceSource, /Page publishing history/);
+  assert.match(pagesWorkspaceSource, /Queued for Meta Page/);
+  assert.match(pagesWorkspaceSource, /Open Alpha Page/);
+  assert.match(pagesWorkspaceSource, /View post/);
+});
+
+test("Alpha Pages schedule controls stay legible inside narrow responsive columns", () => {
+  assert.match(pagesWorkspaceSource, /Daily window \(ET\)/);
+  assert.match(pagesWorkspaceSource, /grid-cols-\[minmax\(0,1fr\)_auto_minmax\(0,1fr\)\]/);
+  assert.match(pagesWorkspaceSource, /min-w-0 w-full rounded-md border/);
+  assert.match(pagesWorkspaceSource, /tabular-nums/);
+});

@@ -242,7 +242,44 @@ router.get("/pages/batches", async (req, res) => {
       .where(eq(pagePublishingBatchesTable.dealerId, dealerId))
       .orderBy(desc(pagePublishingBatchesTable.batchNumber))
       .limit(limit);
-    res.json({ dealerId, batches });
+    const batchIds = batches.map((batch) => batch.id);
+    const jobs = batchIds.length
+      ? await db
+        .select({
+          id: pagePublishingJobsTable.id,
+          batchId: pagePublishingJobsTable.batchId,
+          vehicleId: pagePublishingJobsTable.vehicleId,
+          status: pagePublishingJobsTable.status,
+          currentStep: pagePublishingJobsTable.currentStep,
+          scheduledAt: pagePublishingJobsTable.scheduledAt,
+          startedAt: pagePublishingJobsTable.startedAt,
+          completedAt: pagePublishingJobsTable.completedAt,
+          metaPostId: pagePublishingJobsTable.metaPostId,
+          postUrl: pagePublishingJobsTable.postUrl,
+          failedReason: pagePublishingJobsTable.failedReason,
+          attempts: pagePublishingJobsTable.attempts,
+          year: vehiclesTable.year,
+          make: vehiclesTable.make,
+          model: vehiclesTable.model,
+          trim: vehiclesTable.trim,
+          price: vehiclesTable.price,
+          stockNumber: vehiclesTable.stockNumber,
+        })
+        .from(pagePublishingJobsTable)
+        .innerJoin(vehiclesTable, eq(pagePublishingJobsTable.vehicleId, vehiclesTable.id))
+        .where(inArray(pagePublishingJobsTable.batchId, batchIds))
+        .orderBy(asc(pagePublishingJobsTable.scheduledAt), asc(pagePublishingJobsTable.id))
+      : [];
+    const jobsByBatch = new Map<number, typeof jobs>();
+    for (const job of jobs) {
+      const current = jobsByBatch.get(job.batchId) ?? [];
+      current.push(job);
+      jobsByBatch.set(job.batchId, current);
+    }
+    res.json({
+      dealerId,
+      batches: batches.map((batch) => ({ ...batch, jobs: jobsByBatch.get(batch.id) ?? [] })),
+    });
   } catch (error) {
     req.log.error({ err: error, dealerId }, "Failed to load Pages batches");
     res.status(500).json({ error: "Failed to load Pages batches" });
