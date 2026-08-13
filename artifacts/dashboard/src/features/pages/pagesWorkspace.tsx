@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarClock, Check, Facebook, Loader2, RefreshCw, Send, Settings2, Sparkles, TriangleAlert } from "lucide-react";
+import { CalendarClock, Check, Facebook, Loader2, RefreshCw, Send, Settings2, Sparkles, TriangleAlert, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAuthToken, useAccount } from "@/app/AuthGate";
 import { AppLayout } from "@/shared/layout/AppLayout";
@@ -170,7 +170,9 @@ export function PagesWorkspace() {
   const [running, setRunning] = useState(false);
   const [validating, setValidating] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [publishingNow, setPublishingNow] = useState(false);
   const [preview, setPreview] = useState<PageBatchPreview | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -243,6 +245,7 @@ export function PagesWorkspace() {
   const previewBatch = async () => {
     setPreviewing(true);
     setError(null);
+    setSuccess(null);
     try {
       const response = await readJson<PageBatchPreview>(`/api/pages/batches/preview?dealerId=${dealerId}`);
       setPreview(response);
@@ -250,6 +253,28 @@ export function PagesWorkspace() {
       setError(previewError instanceof Error ? previewError.message : "Unable to preview the Pages batch");
     } finally {
       setPreviewing(false);
+    }
+  };
+
+  const publishNow = async () => {
+    const vehicle = preview?.vehicles[0];
+    const label = vehicle ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : "the next eligible vehicle";
+    if (!window.confirm(`Publish ${label} now to the Alpha MotorSports Page?`)) return;
+    setPublishingNow(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await readJson<{ outcome?: { summary?: string }; vehicleId?: number }>("/api/pages/publish-now", {
+        method: "POST",
+        body: JSON.stringify({ dealerId, vehicleId: vehicle?.id ?? null }),
+      });
+      setPreview(null);
+      setSuccess(response.outcome?.summary ?? "Page publish request completed");
+      await load();
+    } catch (publishError) {
+      setError(publishError instanceof Error ? publishError.message : "Unable to publish the Page vehicle now");
+    } finally {
+      setPublishingNow(false);
     }
   };
 
@@ -276,6 +301,10 @@ export function PagesWorkspace() {
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden="true" />
               Refresh
             </button>
+            <button type="button" onClick={() => void publishNow()} disabled={publishingNow} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 text-sm font-semibold text-amber-800 shadow-sm transition-[background-color,border-color] hover:border-amber-400 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/50">
+              {publishingNow ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Zap className="h-4 w-4" aria-hidden="true" />}
+              {publishingNow ? "Publishing…" : "Publish now"}
+            </button>
             <button type="button" onClick={() => void runWorker()} disabled={running || !settings.enabled} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-[background-color,transform] hover:bg-primary/90 hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
               {running ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
               Process queue
@@ -284,6 +313,7 @@ export function PagesWorkspace() {
         </header>
 
         {error ? <div role="alert" className="flex items-start gap-3 rounded-lg border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive"><TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{error}</div> : null}
+        {success ? <div role="status" className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"><Check className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{success}</div> : null}
 
         <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
           <div className="rounded-[10px] border border-border bg-card shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)]">
@@ -298,7 +328,7 @@ export function PagesWorkspace() {
               <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Vehicles per batch<input type="number" min={1} max={20} value={settings.vehiclesPerBatch} onChange={(event) => updateSetting("vehiclesPerBatch", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>
               <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Daily maximum<input type="number" min={1} max={50} value={settings.maxPostsPerDay} onChange={(event) => updateSetting("maxPostsPerDay", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>
               <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Post spacing<select value={settings.minDelayMinutes} onChange={(event) => updateSetting("minDelayMinutes", Number(event.target.value))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"><option value={0}>No spacing</option><option value={15}>15 minutes</option><option value={30}>30 minutes</option><option value={60}>1 hour</option></select></label>
-              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Daily window<div className="flex h-10 items-center gap-1"><input type="time" value={settings.preferredWindowStart} onChange={(event) => updateSetting("preferredWindowStart", event.target.value)} className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary" /><span className="text-muted-foreground">–</span><input type="time" value={settings.preferredWindowEnd} onChange={(event) => updateSetting("preferredWindowEnd", event.target.value)} className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary" /></div></label>
+              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">Daily window (ET)<div className="flex h-10 items-center gap-2"><input aria-label="Daily window start" type="time" value={settings.preferredWindowStart} onChange={(event) => updateSetting("preferredWindowStart", event.target.value)} className="h-10 w-[104px] shrink-0 rounded-md border border-border bg-background px-2 text-center text-sm font-semibold tabular-nums tracking-tight text-foreground outline-none transition-[border-color,box-shadow] focus:border-primary focus:ring-2 focus:ring-primary/15" /><span className="text-sm font-medium text-muted-foreground">–</span><input aria-label="Daily window end" type="time" value={settings.preferredWindowEnd} onChange={(event) => updateSetting("preferredWindowEnd", event.target.value)} className="h-10 w-[104px] shrink-0 rounded-md border border-border bg-background px-2 text-center text-sm font-semibold tabular-nums tracking-tight text-foreground outline-none transition-[border-color,box-shadow] focus:border-primary focus:ring-2 focus:ring-primary/15" /></div></label>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-600" />Published through Graph API</span><span className="inline-flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-primary" />Photos managed by DealerPilot</span></div>

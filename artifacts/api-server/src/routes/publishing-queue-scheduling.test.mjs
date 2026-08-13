@@ -65,6 +65,7 @@ const pagesWorkerSource = readFileSync(
   new URL("../pages/pagesPublishing.worker.ts", import.meta.url),
   "utf8",
 );
+const pagesRouteSource = readFileSync(new URL("./pages.ts", import.meta.url), "utf8");
 const pagesWorkspaceSource = readFileSync(
   new URL("../../../dashboard/src/features/pages/pagesWorkspace.tsx", import.meta.url),
   "utf8",
@@ -793,4 +794,15 @@ test("Alpha Pages scheduling and dashboard display use New York time", () => {
   assert.match(pagesWorkerSource, /META_PAGE_TIME_ZONE\?\.trim\(\) \|\| "America\/New_York"/);
   assert.match(pagesWorkspaceSource, /const PAGE_TIME_ZONE = "America\/New_York"/);
   assert.doesNotMatch(pagesWorkspaceSource, /timeZone: "America\/Bogota"/);
+});
+
+test("Alpha Pages exposes an administrator-only immediate publish action", () => {
+  assert.match(pagesWorkerSource, /createImmediatePagesBatch/);
+  assert.match(pagesWorkerSource, /Created by Pages Publish Now/);
+  assert.match(pagesRouteSource, /router\.post\("\/pages\/publish-now"/);
+  assert.match(pagesRouteSource, /Administrator access required/);
+  assert.match(pagesRouteSource, /already has an active Pages publishing job/);
+  assert.match(pagesWorkspaceSource, /Publish now/);
+  assert.match(pagesWorkspaceSource, /\/api\/pages\/publish-now/);
+  assert.match(pagesWorkspaceSource, /window\.confirm/);
 });

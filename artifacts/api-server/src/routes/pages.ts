@@ -9,7 +9,7 @@ import {
   vehiclesTable,
 } from "@workspace/db";
 import { ensurePagesSchema } from "../pages/schema";
-import { pagesPublishingWorker, previewNextPagesBatch } from "../pages/pagesPublishing.worker";
+import { createImmediatePagesBatch, pagesPublishingWorker, previewNextPagesBatch } from "../pages/pagesPublishing.worker";
 import { getMetaPageConnection, getMetaPageConnectionSummary, ensureLegacyAlphaMetaConnection, persistValidatedMetaPageConnection, readBootstrapMetaPageConfig, recordMetaPageValidation } from "../pages/metaPageConnections";
 import { validateMetaPageConnection } from "../pages/metaPagesPublisher";
 import { runWorkerOnce } from "../workers/scheduler";
@@ -185,6 +185,43 @@ router.get("/pages/batches/preview", async (req, res) => {
   } catch (error) {
     req.log.error({ err: error, dealerId }, "Failed to preview next Pages batch");
     res.status(500).json({ error: "Failed to preview next Pages batch" });
+  }
+});
+
+router.post("/pages/publish-now", async (req, res) => {
+  const user = res.locals.authUser as { role?: string } | undefined;
+  if (user?.role !== "admin") {
+    res.status(403).json({ error: "Administrator access required" });
+    return;
+  }
+  const dealerId = typeof req.body?.dealerId === "number" ? req.body.dealerId : DEFAULT_DEALER_ID;
+  const requestedVehicleId = req.body?.vehicleId == null ? null : Number(req.body.vehicleId);
+  if (!Number.isInteger(dealerId) || dealerId < 1 || (requestedVehicleId !== null && (!Number.isInteger(requestedVehicleId) || requestedVehicleId < 1))) {
+    res.status(400).json({ error: "Invalid dealerId or vehicleId" });
+    return;
+  }
+  if (!hasDealerAccess(res, dealerId)) return;
+
+  try {
+    await ensurePagesSchema();
+    const created = await createImmediatePagesBatch(dealerId, requestedVehicleId);
+    if (!created.created) {
+      const alreadyQueued = "alreadyQueued" in created && created.alreadyQueued;
+      res.status(alreadyQueued ? 409 : 422).json({
+        ...created,
+        error: alreadyQueued ? "This vehicle already has an active Pages publishing job" : created.reason,
+      });
+      return;
+    }
+    const outcome = await runWorkerOnce(pagesPublishingWorker, req.log, "manual", null);
+    if (outcome.summary.includes("needs review") || outcome.summary.startsWith("Failed:")) {
+      res.status(422).json({ ...created, worker: pagesPublishingWorker.id, outcome, error: outcome.summary });
+      return;
+    }
+    res.json({ ...created, worker: pagesPublishingWorker.id, outcome });
+  } catch (error) {
+    req.log.error({ err: error, dealerId, vehicleId: requestedVehicleId }, "Failed to publish Page vehicle now");
+    res.status(500).json({ error: "Failed to publish Page vehicle now" });
   }
 });
 

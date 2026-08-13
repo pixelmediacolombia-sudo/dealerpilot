@@ -330,6 +330,68 @@ async function createNextBatch(settings: PagePublishSettings, now: Date, dealerI
   return candidates.length;
 }
 
+export async function createImmediatePagesBatch(dealerId: number, requestedVehicleId?: number | null, now = new Date()) {
+  const [storedSettings] = await db
+    .select()
+    .from(pagePublishSettingsTable)
+    .where(eq(pagePublishSettingsTable.dealerId, dealerId));
+  const settings = storedSettings ?? ({
+    dealerId,
+    id: 0,
+    createdAt: now,
+    updatedAt: now,
+    ...DEFAULT_SETTINGS,
+  } satisfies PagePublishSettings);
+  const selection = await selectNextBatchCandidates({
+    ...settings,
+    vehiclesPerBatch: 1,
+    maxPostsPerDay: 1,
+  }, now, dealerId);
+  const candidate = requestedVehicleId == null
+    ? selection.candidates[0]
+    : selection.candidates.find((vehicle) => vehicle.id === requestedVehicleId);
+  if (!candidate) {
+    return {
+      created: false,
+      reason: requestedVehicleId == null
+        ? "No eligible vehicles for immediate Pages publishing"
+        : "The selected vehicle is no longer eligible for immediate Pages publishing",
+    };
+  }
+
+  const [existing] = await db
+    .select({ id: pagePublishingJobsTable.id, batchId: pagePublishingJobsTable.batchId, status: pagePublishingJobsTable.status })
+    .from(pagePublishingJobsTable)
+    .where(and(
+      eq(pagePublishingJobsTable.dealerId, dealerId),
+      eq(pagePublishingJobsTable.vehicleId, candidate.id),
+      inArray(pagePublishingJobsTable.status, ["Scheduled", "Queued", "Publishing", "Published"]),
+    ))
+    .limit(1);
+  if (existing) {
+    return { created: false, alreadyQueued: true, ...existing, vehicleId: candidate.id };
+  }
+
+  const [batch] = await db.insert(pagePublishingBatchesTable).values({
+    dealerId,
+    batchNumber: (selection.latest?.batchNumber ?? 0) + 1,
+    status: "Active",
+    totalVehicles: 1,
+    scheduledAt: now,
+    startedAt: now,
+    notes: "Created by Pages Publish Now",
+  }).returning();
+  const [job] = await db.insert(pagePublishingJobsTable).values({
+    batchId: batch!.id,
+    vehicleId: candidate.id,
+    dealerId,
+    status: "Queued",
+    scheduledAt: now,
+    currentStep: "Queued for immediate Meta Page publishing",
+  }).returning();
+  return { created: true, batchId: batch!.id, jobId: job!.id, vehicleId: candidate.id };
+}
+
 export const pagesPublishingWorker: WorkerDefinition = {
   id: "pages-publishing",
   name: "Pages Publisher",
