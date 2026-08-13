@@ -47,6 +47,17 @@ type NextBatch = {
   vehicles: BatchVehicle[];
 };
 
+type PageBatchPreview = {
+  dryRun: boolean;
+  configured: boolean;
+  planEnabled: boolean;
+  batchNumber: number;
+  scheduledAt: string;
+  batchLimit: number;
+  vehicles: Array<Pick<BatchVehicle, "id" | "year" | "make" | "model" | "trim" | "price" | "stockNumber"> & { status: string; photoCount: number; publicPhotoCount: number; photosReady: boolean; photoError: string | null }>;
+  reason: string | null;
+};
+
 type PageConnection = {
   pageId: string;
   pageName: string | null;
@@ -155,6 +166,8 @@ export function PagesWorkspace() {
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [preview, setPreview] = useState<PageBatchPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -224,6 +237,19 @@ export function PagesWorkspace() {
     }
   };
 
+  const previewBatch = async () => {
+    setPreviewing(true);
+    setError(null);
+    try {
+      const response = await readJson<PageBatchPreview>(`/api/pages/batches/preview?dealerId=${dealerId}`);
+      setPreview(response);
+    } catch (previewError) {
+      setError(previewError instanceof Error ? previewError.message : "Unable to preview the Pages batch");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   const nextVehicleLabel = useMemo(() => {
     if (!batch?.vehicles.length) return "No vehicles are queued yet";
     return `${batch.vehicles.length} vehicle${batch.vehicles.length === 1 ? "" : "s"} ready`;
@@ -273,7 +299,10 @@ export function PagesWorkspace() {
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-600" />Published through Graph API</span><span className="inline-flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-primary" />Photos managed by DealerPilot</span></div>
-              <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"><Settings2 className="h-4 w-4" aria-hidden="true" />{saving ? "Saving…" : "Save plan"}</button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => void previewBatch()} disabled={previewing} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted/40 disabled:opacity-50">{previewing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}{previewing ? "Previewing…" : "Preview batch (no publish)"}</button>
+                <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"><Settings2 className="h-4 w-4" aria-hidden="true" />{saving ? "Saving…" : "Save plan"}</button>
+              </div>
             </div>
           </div>
 
@@ -288,6 +317,12 @@ export function PagesWorkspace() {
             <p className="mt-4 rounded-md bg-muted/45 px-3 py-2.5 text-xs leading-5 text-muted-foreground">Tokens are never shown or stored in the frontend.</p>
           </aside>
         </section>
+
+        {preview ? <section className="rounded-[10px] border border-dashed border-primary/30 bg-primary/[0.03] shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+          <div className="flex flex-col justify-between gap-3 border-b border-primary/15 px-5 py-4 sm:flex-row sm:items-center"><div><div className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">DRY-RUN PREVIEW</div><h2 className="mt-1 text-lg font-semibold tracking-[-0.015em] text-foreground">No publication was created</h2><p className="mt-1 text-sm text-muted-foreground">This preview only reads the queue candidates and checks their image URLs. It does not create a batch or call Meta.</p></div><span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">Read-only</span></div>
+          <div className="grid gap-4 px-5 py-4 sm:grid-cols-3"><div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Next batch number</p><p className="mt-1 text-sm font-semibold text-foreground">#{preview.batchNumber}</p></div><div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Scheduled for</p><p className="mt-1 text-sm font-semibold text-foreground">{formatDate(preview.scheduledAt)}</p></div><div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Selected</p><p className="mt-1 text-sm font-semibold text-foreground">{preview.vehicles.length} of {preview.batchLimit} vehicle{preview.batchLimit === 1 ? "" : "s"}</p></div></div>
+          {preview.vehicles.length ? <div className="divide-y divide-primary/10 border-t border-primary/10">{preview.vehicles.map((vehicle) => <div key={vehicle.id} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-foreground">{vehicle.year} {vehicle.make} {vehicle.model}{vehicle.trim ? ` ${vehicle.trim}` : ""}</p><p className="mt-1 text-xs text-muted-foreground">{formatPrice(vehicle.price)}{vehicle.stockNumber ? ` · Stock ${vehicle.stockNumber}` : ""} · Inventory status: {vehicle.status} · Photos: {vehicle.publicPhotoCount}/{vehicle.photoCount} public</p>{vehicle.photoError ? <p className="mt-1 text-xs text-destructive">{vehicle.photoError}</p> : null}</div><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", vehicle.photosReady ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}>{vehicle.photosReady ? "Ready" : "Needs review"}</span></div>)}</div> : <p className="border-t border-primary/10 px-5 py-4 text-sm text-muted-foreground">{preview.reason ?? "No eligible vehicles found"}</p>}
+        </section> : null}
 
         <section className="rounded-[10px] border border-border bg-card shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)]">
           <div className="flex flex-col justify-between gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center"><div><div className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">NEXT BATCH</div><h2 className="mt-1 text-lg font-semibold tracking-[-0.015em] text-foreground">{batch ? `Batch #${batch.batchNumber}` : "Queue is waiting for vehicles"}</h2><p className="mt-1 text-sm text-muted-foreground">{batch ? `${nextVehicleLabel} · scheduled for ${formatDate(batch.scheduledAt)}` : "When the plan is active, the worker will reserve the next batch automatically."}</p></div>{batch ? <div className="text-left sm:text-right"><span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(batch.status))}>{batch.status}</span><p className="mt-1 text-xs text-muted-foreground">{batch.completedCount}/{batch.totalVehicles} completed</p></div> : null}</div>

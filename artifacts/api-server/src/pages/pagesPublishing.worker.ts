@@ -150,6 +150,105 @@ async function getSettings(dealerId: number): Promise<PagePublishSettings> {
   return created!;
 }
 
+type PageBatchCandidateSelection = {
+  latest: typeof pagePublishingBatchesTable.$inferSelect | undefined;
+  targetAt: Date;
+  batchLimit: number;
+  candidates: typeof vehiclesTable.$inferSelect[];
+};
+
+async function selectNextBatchCandidates(
+  settings: PagePublishSettings,
+  now: Date,
+  dealerId: number,
+): Promise<PageBatchCandidateSelection> {
+  const [latest] = await db.select().from(pagePublishingBatchesTable)
+    .where(eq(pagePublishingBatchesTable.dealerId, dealerId))
+    .orderBy(desc(pagePublishingBatchesTable.scheduledAt), desc(pagePublishingBatchesTable.id)).limit(1);
+  const targetAt = latest?.scheduledAt && latest.scheduledAt.getTime() >= now.getTime()
+    ? new Date(latest.scheduledAt.getTime() + settings.frequencyDays * 86_400_000)
+    : nextWindowStart(now, settings);
+  const publishedVehicleRows = await db
+    .select({ vehicleId: listingsTable.vehicleId })
+    .from(listingsTable)
+    .innerJoin(vehiclesTable, eq(listingsTable.vehicleId, vehiclesTable.id))
+    .where(and(eq(listingsTable.channel, "facebook_page"), eq(vehiclesTable.dealerId, dealerId)));
+  const reservedRows = await db.select({ vehicleId: pagePublishingJobsTable.vehicleId })
+    .from(pagePublishingJobsTable)
+    .where(and(
+      eq(pagePublishingJobsTable.dealerId, dealerId),
+      inArray(pagePublishingJobsTable.status, ["Scheduled", "Queued", "Publishing", "Published"]),
+    ));
+  const excluded = new Set([...publishedVehicleRows, ...reservedRows].map((row) => row.vehicleId));
+  const startMinutes = Number(settings.preferredWindowStart.slice(0, 2)) * 60 + Number(settings.preferredWindowStart.slice(3, 5));
+  const endMinutes = Number(settings.preferredWindowEnd.slice(0, 2)) * 60 + Number(settings.preferredWindowEnd.slice(3, 5));
+  const windowMinutes = Math.max(0, endMinutes - startMinutes);
+  const windowCapacity = settings.minDelayMinutes > 0 ? Math.floor(windowMinutes / settings.minDelayMinutes) + 1 : settings.maxPostsPerDay;
+  const batchLimit = Math.max(1, Math.min(settings.vehiclesPerBatch, settings.maxPostsPerDay, windowCapacity));
+  const candidates = await db.select().from(vehiclesTable)
+    .where(and(
+      eq(vehiclesTable.dealerId, dealerId),
+      inArray(vehiclesTable.status, PAGE_ELIGIBLE_VEHICLE_STATUSES),
+      notInArray(vehiclesTable.id, [...excluded].length ? [...excluded] : [-1]),
+    ))
+    .orderBy(asc(vehiclesTable.updatedAt)).limit(batchLimit);
+  return { latest, targetAt, batchLimit, candidates };
+}
+
+export async function previewNextPagesBatch(dealerId: number, now = new Date()) {
+  const [storedSettings] = await db
+    .select()
+    .from(pagePublishSettingsTable)
+    .where(eq(pagePublishSettingsTable.dealerId, dealerId));
+  const settings = storedSettings ?? ({
+    dealerId,
+    id: 0,
+    createdAt: now,
+    updatedAt: now,
+    ...DEFAULT_SETTINGS,
+  } satisfies PagePublishSettings);
+  const selection = await selectNextBatchCandidates(settings, now, dealerId);
+  const vehicles = await Promise.all(selection.candidates.map(async (vehicle) => {
+    const photos = settings.useOriginalPhotos
+      ? await getVehicleRawPhotos(vehicle.id)
+      : await getVehiclePhotos(vehicle.id, vehicle.aiPhotoSetId, vehicle.aiPhotoStatus);
+    const imageUrls = photos.map((photo) => publicPhotoUrl(photo.url)).filter((url): url is string => Boolean(url));
+    let photoError: string | null = imageUrls.length > 0 ? null : "Vehicle has no publishable photos";
+    if (!photoError) {
+      try {
+        await assertPublicImageUrls(imageUrls);
+      } catch (error) {
+        photoError = error instanceof Error ? error.message : String(error);
+      }
+    }
+    return {
+      id: vehicle.id,
+      year: vehicle.year,
+      make: vehicle.make,
+      model: vehicle.model,
+      trim: vehicle.trim,
+      price: vehicle.price,
+      stockNumber: vehicle.stockNumber,
+      status: vehicle.status,
+      photoCount: photos.length,
+      publicPhotoCount: imageUrls.length,
+      photosReady: photoError === null,
+      photoError,
+    };
+  }));
+  return {
+    dealerId,
+    dryRun: true,
+    configured: Boolean(storedSettings),
+    planEnabled: storedSettings?.enabled ?? false,
+    batchNumber: (selection.latest?.batchNumber ?? 0) + 1,
+    scheduledAt: selection.targetAt.toISOString(),
+    batchLimit: selection.batchLimit,
+    vehicles,
+    reason: selection.candidates.length > 0 ? null : "No eligible vehicles for a Pages batch",
+  };
+}
+
 async function publishOne(job: typeof pagePublishingJobsTable.$inferSelect, log: import("pino").Logger): Promise<void> {
   const config = await getMetaPageConnection(job.dealerId);
   if (!config) throw new Error("Meta Pages publishing is not configured");
@@ -206,36 +305,7 @@ async function publishOne(job: typeof pagePublishingJobsTable.$inferSelect, log:
 }
 
 async function createNextBatch(settings: PagePublishSettings, now: Date, dealerId: number): Promise<number> {
-  const [latest] = await db.select().from(pagePublishingBatchesTable)
-    .where(eq(pagePublishingBatchesTable.dealerId, dealerId))
-    .orderBy(desc(pagePublishingBatchesTable.scheduledAt), desc(pagePublishingBatchesTable.id)).limit(1);
-  const targetAt = latest?.scheduledAt && latest.scheduledAt.getTime() >= now.getTime()
-    ? new Date(latest.scheduledAt.getTime() + settings.frequencyDays * 86_400_000)
-    : nextWindowStart(now, settings);
-  const publishedVehicleRows = await db
-    .select({ vehicleId: listingsTable.vehicleId })
-    .from(listingsTable)
-    .innerJoin(vehiclesTable, eq(listingsTable.vehicleId, vehiclesTable.id))
-    .where(and(eq(listingsTable.channel, "facebook_page"), eq(vehiclesTable.dealerId, dealerId)));
-  const reservedRows = await db.select({ vehicleId: pagePublishingJobsTable.vehicleId })
-    .from(pagePublishingJobsTable)
-    .where(and(
-      eq(pagePublishingJobsTable.dealerId, dealerId),
-      inArray(pagePublishingJobsTable.status, ["Scheduled", "Queued", "Publishing", "Published"]),
-    ));
-  const excluded = new Set([...publishedVehicleRows, ...reservedRows].map((row) => row.vehicleId));
-  const startMinutes = Number(settings.preferredWindowStart.slice(0, 2)) * 60 + Number(settings.preferredWindowStart.slice(3, 5));
-  const endMinutes = Number(settings.preferredWindowEnd.slice(0, 2)) * 60 + Number(settings.preferredWindowEnd.slice(3, 5));
-  const windowMinutes = Math.max(0, endMinutes - startMinutes);
-  const windowCapacity = settings.minDelayMinutes > 0 ? Math.floor(windowMinutes / settings.minDelayMinutes) + 1 : settings.maxPostsPerDay;
-  const batchLimit = Math.max(1, Math.min(settings.vehiclesPerBatch, settings.maxPostsPerDay, windowCapacity));
-  const candidates = await db.select().from(vehiclesTable)
-    .where(and(
-      eq(vehiclesTable.dealerId, dealerId),
-      inArray(vehiclesTable.status, PAGE_ELIGIBLE_VEHICLE_STATUSES),
-      notInArray(vehiclesTable.id, [...excluded].length ? [...excluded] : [-1]),
-    ))
-    .orderBy(asc(vehiclesTable.updatedAt)).limit(batchLimit);
+  const { latest, targetAt, candidates } = await selectNextBatchCandidates(settings, now, dealerId);
   if (candidates.length === 0) return 0;
 
   const [batch] = await db.insert(pagePublishingBatchesTable).values({

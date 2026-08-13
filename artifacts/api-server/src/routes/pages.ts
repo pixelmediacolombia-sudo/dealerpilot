@@ -9,7 +9,7 @@ import {
   vehiclesTable,
 } from "@workspace/db";
 import { ensurePagesSchema } from "../pages/schema";
-import { pagesPublishingWorker } from "../pages/pagesPublishing.worker";
+import { pagesPublishingWorker, previewNextPagesBatch } from "../pages/pagesPublishing.worker";
 import { getMetaPageConnection, getMetaPageConnectionSummary, ensureLegacyAlphaMetaConnection, persistValidatedMetaPageConnection, readBootstrapMetaPageConfig, recordMetaPageValidation } from "../pages/metaPageConnections";
 import { validateMetaPageConnection } from "../pages/metaPagesPublisher";
 import { runWorkerOnce } from "../workers/scheduler";
@@ -167,6 +167,24 @@ router.get("/pages/batches/next", async (req, res) => {
   } catch (error) {
     req.log.error({ err: error, dealerId }, "Failed to load next Pages batch");
     res.status(500).json({ error: "Failed to load next Pages batch" });
+  }
+});
+
+router.get("/pages/batches/preview", async (req, res) => {
+  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : DEFAULT_DEALER_ID;
+  if (!Number.isInteger(dealerId) || dealerId < 1) {
+    res.status(400).json({ error: "dealerId must be a positive integer" });
+    return;
+  }
+  if (!hasDealerAccess(res, dealerId)) return;
+
+  try {
+    await ensurePagesSchema();
+    const preview = await previewNextPagesBatch(dealerId);
+    res.json(preview);
+  } catch (error) {
+    req.log.error({ err: error, dealerId }, "Failed to preview next Pages batch");
+    res.status(500).json({ error: "Failed to preview next Pages batch" });
   }
 });
 
