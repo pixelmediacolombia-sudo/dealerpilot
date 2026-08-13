@@ -98,6 +98,8 @@ const DEFAULT_SETTINGS: PageSettings = {
   photoScoreThreshold: 60,
 };
 
+const PAGE_TIME_ZONE = "America/New_York";
+
 async function readJson<T>(url: string, init?: RequestInit): Promise<T> {
   const token = getAuthToken();
   const response = await fetch(url, {
@@ -116,7 +118,8 @@ async function readJson<T>(url: string, init?: RequestInit): Promise<T> {
 function formatDate(value: string | null): string {
   if (!value) return "Not scheduled";
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Bogota",
+    timeZone: PAGE_TIME_ZONE,
+    timeZoneName: "short",
     weekday: "short",
     day: "2-digit",
     month: "short",

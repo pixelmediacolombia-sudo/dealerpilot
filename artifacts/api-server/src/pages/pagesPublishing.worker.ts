@@ -25,7 +25,7 @@ import { MetaPagesPublisher, validateMetaPageConnection } from "./metaPagesPubli
 import { ensureLegacyAlphaMetaConnection, getMetaPageConnection, recordMetaPageValidation } from "./metaPageConnections";
 import { ALPHA_DEALER_ID } from "../lib/dealer";
 
-const PAGE_TIME_ZONE = process.env.META_PAGE_TIME_ZONE?.trim() || "America/Bogota";
+const PAGE_TIME_ZONE = process.env.META_PAGE_TIME_ZONE?.trim() || "America/New_York";
 const PAGE_ELIGIBLE_VEHICLE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish"];
 const DEFAULT_SETTINGS: Omit<PagePublishSettings, "id" | "createdAt" | "updatedAt" | "dealerId"> = {
   enabled: false,

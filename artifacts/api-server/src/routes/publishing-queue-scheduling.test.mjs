@@ -61,6 +61,14 @@ const salesAiSource = readFileSync(
   new URL("../../../dashboard/src/features/sales-ai/pages/index.tsx", import.meta.url),
   "utf8",
 );
+const pagesWorkerSource = readFileSync(
+  new URL("../pages/pagesPublishing.worker.ts", import.meta.url),
+  "utf8",
+);
+const pagesWorkspaceSource = readFileSync(
+  new URL("../../../dashboard/src/features/pages/pagesWorkspace.tsx", import.meta.url),
+  "utf8",
+);
 const dailyPlanSource = readFileSync(
   new URL("../../../dashboard/src/lib/dailyPlan.ts", import.meta.url),
   "utf8",
@@ -779,4 +787,10 @@ test("Marketplace vehicle category selector prefers the broad Vehicles option", 
   assert.match(publisherFlowSource, /"suv": "Car\/Truck"/);
   assert.match(publisherFlowSource, /"vehicles"/);
   assert.match(publisherFlowSource, /CAR_ALIASES\.some/);
+});
+
+test("Alpha Pages scheduling and dashboard display use New York time", () => {
+  assert.match(pagesWorkerSource, /META_PAGE_TIME_ZONE\?\.trim\(\) \|\| "America\/New_York"/);
+  assert.match(pagesWorkspaceSource, /const PAGE_TIME_ZONE = "America\/New_York"/);
+  assert.doesNotMatch(pagesWorkspaceSource, /timeZone: "America\/Bogota"/);
 });
