@@ -571,3 +571,40 @@ test("semantic stale quick reply cannot replace a Spanish buyer bubble", () => {
   assert.equal(capture.messages.at(-1).text, "Hola. ¿Sigue disponible?");
   assert.equal(capture.messages.some((message) => /Yes, are you interested/i.test(message.text)), false);
 });
+
+test("Facebook quick-response tray never becomes the buyer message or its language", () => {
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 376, right: 1505, top: 233, width: 1129, height: 420 },
+    children: [
+      new FakeElement({
+        attributes: { dir: "auto" },
+        text: "Hola. ¿Sigue disponible?",
+        rect: { left: 400, right: 670, top: 530, width: 270, height: 42 },
+      }),
+      new FakeElement({
+        attributes: { dir: "auto" },
+        text: "Send a quick response Tap a response to send it to the buyer. Yes, are you interested? In talks. I'll let you know. Sorry, it's not available.",
+        rect: { left: 400, right: 1100, top: 590, width: 700, height: 42 },
+      }),
+    ],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Conversation" },
+    rect: { left: 376, right: 1505, top: 71, width: 1129, height: 642 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Gabriel · 2022 Toyota TUNDRA" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 740, right: 1420, top: 665, width: 680, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root, [], "/messages/t/1038009382303084");
+
+  assert.equal(capture.messages.at(-1).speaker, "Gabriel");
+  assert.equal(capture.messages.at(-1).text, "Hola. ¿Sigue disponible?");
+  assert.equal(capture.messages.some((message) => /send a quick response|are you interested/i.test(message.text)), false);
+});

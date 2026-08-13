@@ -118,7 +118,10 @@
   }
 
   function isUiText(value) {
-    return /^(?:messenger|messages|notifications|settings(?:, help and more)?|open more actions|back to previous page|thread composer|choose an emoji|choose a sticker|choose a gif|compose|chats|aa|unread message|write a message|marketplace|see details|more options|send a quick response|tap a response|message sent|mensaje enviado|joined facebook(?: in \d{4})?|se uni[oó] a facebook(?: en \d{4})?)$/i.test(cleanText(value));
+    const text = cleanText(value);
+    return /^(?:messenger|messages|notifications|settings(?:, help and more)?|open more actions|back to previous page|thread composer|choose an emoji|choose a sticker|choose a gif|compose|chats|aa|unread message|write a message|marketplace|see details|more options|send a quick response|tap a response|message sent|mensaje enviado|joined facebook(?: in \d{4})?|se uni[oó] a facebook(?: en \d{4})?)$/i.test(text) ||
+      /\b(?:send a quick response|enviar una respuesta r[a-z]+pida)\b/i.test(text) ||
+      /\b(?:tap|toca|pulse|selecciona)\s+(?:a |una )?(?:response|respuesta)\s+(?:to |para )?(?:send|enviar)/i.test(text);
   }
 
   function isMessageSentMetadata(value) {

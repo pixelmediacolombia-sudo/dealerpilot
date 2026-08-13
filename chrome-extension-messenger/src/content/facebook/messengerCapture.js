@@ -87,6 +87,12 @@
       /^[^.]{2,80}\s+(?:started|inici[oó])\s+(?:this|este)\s+chat\.?$/i.test(text);
   }
 
+  function isQuickResponsePromptText(value) {
+    const normalized = normalizeForMatch(cleanMessageText(value));
+    return /\b(?:send a quick response|enviar una respuesta r[a-z]+pida)\b/.test(normalized) ||
+      /\b(?:tap|toca|pulse|selecciona)\s+(?:a |una )?(?:response|respuesta)\s+(?:to |para )?(?:send|enviar)/.test(normalized);
+  }
+
   function isParticipantLabelText(value) {
     const normalized = normalizeForMatch(value);
     return /^[\p{L}\p{N}][\p{L}\p{N}\s.'’_-]{1,100}\s*(?:\u00b7|\u2022|\|)\s*(?:buyer|seller|participant|miembro|comprador|vendedor)$/u.test(normalized);
@@ -476,7 +482,11 @@
 
   function isUntrustedMessageText(value) {
     const text = cleanMessageText(value);
-    return !text || isMessageMetadataText(text) || isFacebookRatingCardText(text) || isStaleQuickReplyText(text);
+    return !text ||
+      isMessageMetadataText(text) ||
+      isQuickResponsePromptText(text) ||
+      isFacebookRatingCardText(text) ||
+      isStaleQuickReplyText(text);
   }
 
   function isLikelyBuyerNameCandidate(value) {
