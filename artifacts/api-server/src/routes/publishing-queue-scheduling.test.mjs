@@ -834,6 +834,33 @@ test("an operator can clean up a deleted Alpha Page test post without requeueing
   assert.match(pagesWorkspaceSource, /statusLabel\(job\.status, job\.currentStep\)/);
 });
 
+test("a removed Alpha Page test post can return to the next scheduled batch only by operator action", () => {
+  assert.match(pagesRouteSource, /router\.post\("\/pages\/jobs\/:jobId\/return-to-queue"/);
+  assert.match(pagesRouteSource, /Only a removed Pages post can return to the queue/);
+  assert.match(pagesRouteSource, /status: "Ready"/);
+  assert.match(pagesRouteSource, /currentStep: "Ready for next Pages batch"/);
+  assert.match(pagesRouteSource, /status: "Draft"/);
+  assert.match(pagesWorkspaceSource, /returnToQueue/);
+  assert.match(pagesWorkspaceSource, /Return to queue/);
+  assert.match(pagesWorkspaceSource, /This does not publish it now/);
+});
+
+test("Pages batch preflight moves invalid photo candidates to Needs Review and keeps scanning", () => {
+  assert.match(pagesWorkerSource, /async function checkPagePhotoReadiness/);
+  assert.match(pagesWorkerSource, /Automatically moved to Needs Review during Pages photo preflight/);
+  assert.match(pagesWorkerSource, /for \(const candidate of candidates\)/);
+  assert.match(pagesWorkerSource, /if \(readiness\.photoError\)/);
+  assert.match(pagesWorkerSource, /await createPagesNeedsReviewBatch/);
+  assert.match(pagesWorkerSource, /if \(readyCandidates\.length >= batchLimit\) break/);
+  assert.match(pagesWorkerSource, /moved \$\{needsReview\} vehicle\(s\) to Needs Review/);
+});
+
+test("a Pages review batch is terminal and does not reserve later Page candidates", () => {
+  assert.match(pagesWorkerSource, /failedCount > 0 \? "Needs Review" : "Completed"/);
+  assert.match(pagesWorkerSource, /inArray\(pagePublishingJobsTable\.status, \["Scheduled", "Queued", "Publishing", "Published", "Needs Review"\]\)/);
+  assert.match(pagesRouteSource, /const OPEN_BATCH_STATUSES = \["Scheduled", "Active"\]/);
+});
+
 test("Alpha Pages schedule controls stay legible inside narrow responsive columns", () => {
   assert.match(pagesWorkspaceSource, /Daily window \(ET\)/);
   assert.match(pagesWorkspaceSource, /grid-cols-\[minmax\(0,1fr\)_auto_minmax\(0,1fr\)\]/);

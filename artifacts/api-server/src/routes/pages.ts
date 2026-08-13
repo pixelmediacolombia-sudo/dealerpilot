@@ -20,7 +20,7 @@ import { requireAuthenticatedUser } from "./auth";
 const router: IRouter = Router();
 const DEFAULT_DEALER_ID = ALPHA_DEALER_ID;
 const OPEN_BATCH_STATUSES = ["Scheduled", "Active"];
-const PAGE_JOB_STATUSES = ["Scheduled", "Queued", "Publishing", "Published", "Needs Review", "Failed"];
+const PAGE_JOB_STATUSES = ["Scheduled", "Queued", "Publishing", "Published", "Needs Review", "Failed", "Ready"];
 
 router.use(requireAuthenticatedUser);
 
@@ -294,6 +294,76 @@ router.post("/pages/jobs/:jobId/mark-post-removed", async (req, res) => {
   } catch (error) {
     req.log.error({ err: error, jobId }, "Failed to mark Pages post as removed");
     res.status(500).json({ error: "Failed to mark Pages post as removed" });
+  }
+});
+
+router.post("/pages/jobs/:jobId/return-to-queue", async (req, res) => {
+  const user = res.locals.authUser as { role?: string } | undefined;
+  if (user?.role !== "admin") {
+    res.status(403).json({ error: "Administrator access required" });
+    return;
+  }
+  const jobId = Number(req.params.jobId);
+  if (!Number.isInteger(jobId) || jobId < 1) {
+    res.status(400).json({ error: "Invalid Pages job id" });
+    return;
+  }
+
+  try {
+    await ensurePagesSchema();
+    const [job] = await db
+      .select()
+      .from(pagePublishingJobsTable)
+      .where(eq(pagePublishingJobsTable.id, jobId))
+      .limit(1);
+    if (!job) {
+      res.status(404).json({ error: "Pages job not found" });
+      return;
+    }
+    if (!hasDealerAccess(res, job.dealerId)) return;
+    if (job.status !== "Needs Review" || job.currentStep !== "Post removed from Facebook Page") {
+      res.status(409).json({ error: "Only a removed Pages post can return to the queue" });
+      return;
+    }
+
+    const now = new Date();
+    await db.transaction(async (tx) => {
+      await tx
+        .update(pagePublishingJobsTable)
+        .set({
+          status: "Ready",
+          currentStep: "Ready for next Pages batch",
+          failedReason: null,
+          scheduledAt: null,
+          startedAt: null,
+          completedAt: null,
+          updatedAt: now,
+        })
+        .where(eq(pagePublishingJobsTable.id, job.id));
+      await tx
+        .update(listingsTable)
+        .set({
+          status: "Draft",
+          externalId: null,
+          externalUrl: null,
+          publishedAt: null,
+        })
+        .where(and(
+          eq(listingsTable.vehicleId, job.vehicleId),
+          eq(listingsTable.channel, "facebook_page"),
+        ));
+    });
+    await reconcilePagesBatchProgress(job.batchId, now);
+    req.log.info({ jobId: job.id, vehicleId: job.vehicleId }, "Pages vehicle returned to the next batch queue by operator");
+    res.json({
+      ok: true,
+      jobId: job.id,
+      status: "Ready",
+      currentStep: "Ready for next Pages batch",
+    });
+  } catch (error) {
+    req.log.error({ err: error, jobId }, "Failed to return Pages vehicle to the queue");
+    res.status(500).json({ error: "Failed to return Pages vehicle to the queue" });
   }
 });
 

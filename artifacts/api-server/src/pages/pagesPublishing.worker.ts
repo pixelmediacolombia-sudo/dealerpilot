@@ -131,7 +131,7 @@ export async function reconcilePagesBatchProgress(batchId: number, now = new Dat
   const [counts] = await db
     .select({
       published: sql<number>`count(*) filter (where ${pagePublishingJobsTable.status} = 'Published')`,
-      needsReview: sql<number>`count(*) filter (where ${pagePublishingJobsTable.status} in ('Needs Review', 'Failed'))`,
+      needsReview: sql<number>`count(*) filter (where ${pagePublishingJobsTable.status} in ('Needs Review', 'Failed', 'Ready'))`,
       total: sql<number>`count(*)`,
     })
     .from(pagePublishingJobsTable)
@@ -167,6 +167,13 @@ type PageBatchCandidateSelection = {
   targetAt: Date;
   batchLimit: number;
   candidates: typeof vehiclesTable.$inferSelect[];
+};
+
+type PagePhotoReadiness = {
+  photoCount: number;
+  publicPhotoCount: number;
+  imageUrls: string[];
+  photoError: string | null;
 };
 
 async function selectNextBatchCandidates(
@@ -207,8 +214,58 @@ async function selectNextBatchCandidates(
       inArray(vehiclesTable.status, PAGE_ELIGIBLE_VEHICLE_STATUSES),
       notInArray(vehiclesTable.id, [...excluded].length ? [...excluded] : [-1]),
     ))
-    .orderBy(asc(vehiclesTable.updatedAt)).limit(batchLimit);
+    .orderBy(asc(vehiclesTable.updatedAt)).limit(Math.max(batchLimit + 5, 10));
   return { latest, targetAt, batchLimit, candidates };
+}
+
+async function checkPagePhotoReadiness(
+  vehicle: typeof vehiclesTable.$inferSelect,
+  settings: PagePublishSettings,
+): Promise<PagePhotoReadiness> {
+  const photos = settings.useOriginalPhotos
+    ? await getVehicleRawPhotos(vehicle.id)
+    : await getVehiclePhotos(vehicle.id, vehicle.aiPhotoSetId, vehicle.aiPhotoStatus);
+  const imageUrls = photos.map((photo) => publicPhotoUrl(photo.url)).filter((url): url is string => Boolean(url));
+  let photoError: string | null = imageUrls.length > 0 ? null : "Vehicle has no publishable photos";
+  if (!photoError) {
+    try {
+      await assertPublicImageUrls(imageUrls);
+    } catch (error) {
+      photoError = error instanceof Error ? error.message : String(error);
+    }
+  }
+  return { photoCount: photos.length, publicPhotoCount: imageUrls.length, imageUrls, photoError };
+}
+
+async function createPagesNeedsReviewBatch(
+  dealerId: number,
+  batchNumber: number,
+  vehicleId: number,
+  reason: string,
+  now: Date,
+) {
+  const [batch] = await db.insert(pagePublishingBatchesTable).values({
+    dealerId,
+    batchNumber,
+    status: "Needs Review",
+    totalVehicles: 1,
+    completedCount: 0,
+    failedCount: 1,
+    scheduledAt: now,
+    completedAt: now,
+    notes: "Automatically moved to Needs Review during Pages photo preflight",
+  }).returning();
+  const [job] = await db.insert(pagePublishingJobsTable).values({
+    batchId: batch!.id,
+    vehicleId,
+    dealerId,
+    status: "Needs Review",
+    currentStep: "Needs Review",
+    scheduledAt: now,
+    completedAt: now,
+    failedReason: reason,
+  }).returning();
+  return { batch: batch!, job: job! };
 }
 
 export async function previewNextPagesBatch(dealerId: number, now = new Date()) {
@@ -224,19 +281,8 @@ export async function previewNextPagesBatch(dealerId: number, now = new Date()) 
     ...DEFAULT_SETTINGS,
   } satisfies PagePublishSettings);
   const selection = await selectNextBatchCandidates(settings, now, dealerId);
-  const vehicles = await Promise.all(selection.candidates.map(async (vehicle) => {
-    const photos = settings.useOriginalPhotos
-      ? await getVehicleRawPhotos(vehicle.id)
-      : await getVehiclePhotos(vehicle.id, vehicle.aiPhotoSetId, vehicle.aiPhotoStatus);
-    const imageUrls = photos.map((photo) => publicPhotoUrl(photo.url)).filter((url): url is string => Boolean(url));
-    let photoError: string | null = imageUrls.length > 0 ? null : "Vehicle has no publishable photos";
-    if (!photoError) {
-      try {
-        await assertPublicImageUrls(imageUrls);
-      } catch (error) {
-        photoError = error instanceof Error ? error.message : String(error);
-      }
-    }
+  const vehicles = await Promise.all(selection.candidates.slice(0, selection.batchLimit).map(async (vehicle) => {
+    const readiness = await checkPagePhotoReadiness(vehicle, settings);
     return {
       id: vehicle.id,
       year: vehicle.year,
@@ -246,10 +292,10 @@ export async function previewNextPagesBatch(dealerId: number, now = new Date()) 
       price: vehicle.price,
       stockNumber: vehicle.stockNumber,
       status: vehicle.status,
-      photoCount: photos.length,
-      publicPhotoCount: imageUrls.length,
-      photosReady: photoError === null,
-      photoError,
+      photoCount: readiness.photoCount,
+      publicPhotoCount: readiness.publicPhotoCount,
+      photosReady: readiness.photoError === null,
+      photoError: readiness.photoError,
     };
   }));
   return {
@@ -320,30 +366,46 @@ async function publishOne(job: typeof pagePublishingJobsTable.$inferSelect, log:
   log.info({ jobId: job.id, vehicleId: vehicle.id, postId: result.postId }, "Pages vehicle published");
 }
 
-async function createNextBatch(settings: PagePublishSettings, now: Date, dealerId: number): Promise<number> {
-  const { latest, targetAt, candidates } = await selectNextBatchCandidates(settings, now, dealerId);
-  if (candidates.length === 0) return 0;
+async function createNextBatch(settings: PagePublishSettings, now: Date, dealerId: number): Promise<{ queued: number; needsReview: number }> {
+  const { latest, targetAt, batchLimit, candidates } = await selectNextBatchCandidates(settings, now, dealerId);
+  if (candidates.length === 0) return { queued: 0, needsReview: 0 };
+
+  let nextBatchNumber = (latest?.batchNumber ?? 0) + 1;
+  let needsReview = 0;
+  const readyCandidates: typeof vehiclesTable.$inferSelect[] = [];
+  for (const candidate of candidates) {
+    const readiness = await checkPagePhotoReadiness(candidate, settings);
+    if (readiness.photoError) {
+      await createPagesNeedsReviewBatch(dealerId, nextBatchNumber, candidate.id, readiness.photoError, now);
+      nextBatchNumber += 1;
+      needsReview += 1;
+      continue;
+    }
+    readyCandidates.push(candidate);
+    if (readyCandidates.length >= batchLimit) break;
+  }
+  if (readyCandidates.length === 0) return { queued: 0, needsReview };
 
   const [batch] = await db.insert(pagePublishingBatchesTable).values({
     dealerId,
-    batchNumber: (latest?.batchNumber ?? 0) + 1,
+    batchNumber: nextBatchNumber,
     status: targetAt.getTime() <= now.getTime() ? "Active" : "Scheduled",
-    totalVehicles: candidates.length,
+    totalVehicles: readyCandidates.length,
     scheduledAt: targetAt,
     startedAt: targetAt.getTime() <= now.getTime() ? now : null,
     notes: "Created automatically by Pages Auto Publish",
   }).returning();
-  for (let index = 0; index < candidates.length; index += 1) {
+  for (let index = 0; index < readyCandidates.length; index += 1) {
     await db.insert(pagePublishingJobsTable).values({
       batchId: batch!.id,
-      vehicleId: candidates[index]!.id,
+      vehicleId: readyCandidates[index]!.id,
       dealerId,
       status: targetAt.getTime() + index * settings.minDelayMinutes * 60_000 <= now.getTime() ? "Queued" : "Scheduled",
       scheduledAt: new Date(targetAt.getTime() + index * settings.minDelayMinutes * 60_000),
       currentStep: "Queued for Meta Page",
     });
   }
-  return candidates.length;
+  return { queued: readyCandidates.length, needsReview };
 }
 
 export async function createImmediatePagesBatch(dealerId: number, requestedVehicleId?: number | null, now = new Date()) {
@@ -372,6 +434,25 @@ export async function createImmediatePagesBatch(dealerId: number, requestedVehic
       reason: requestedVehicleId == null
         ? "No eligible vehicles for immediate Pages publishing"
         : "The selected vehicle is no longer eligible for immediate Pages publishing",
+    };
+  }
+
+  const readiness = await checkPagePhotoReadiness(candidate, settings);
+  if (readiness.photoError) {
+    const review = await createPagesNeedsReviewBatch(
+      dealerId,
+      (selection.latest?.batchNumber ?? 0) + 1,
+      candidate.id,
+      readiness.photoError,
+      now,
+    );
+    return {
+      created: false,
+      autoNeedsReview: true,
+      batchId: review.batch.id,
+      jobId: review.job.id,
+      vehicleId: candidate.id,
+      reason: readiness.photoError,
     };
   }
 
@@ -437,7 +518,8 @@ export const pagesPublishingWorker: WorkerDefinition = {
     }
 
     const dealers = await db.select({ id: dealersTable.id }).from(dealersTable).where(eq(dealersTable.status, "Active"));
-    let created = 0;
+    let queued = 0;
+    let needsReview = 0;
     for (const dealer of dealers) {
       const settings = await getSettings(dealer.id);
       if (!settings.enabled || settings.requireApproval) continue;
@@ -450,10 +532,12 @@ export const pagesPublishingWorker: WorkerDefinition = {
         valid: validation.ok,
       });
       if (!validation.ok) continue;
-      created += await createNextBatch(settings, now, dealer.id);
+      const result = await createNextBatch(settings, now, dealer.id);
+      queued += result.queued;
+      needsReview += result.needsReview;
     }
-    return created > 0
-      ? { summary: `Queued Pages batch with ${created} vehicle(s)`, detail: { created } }
+    return queued > 0 || needsReview > 0
+      ? { summary: `Queued Pages batch with ${queued} vehicle(s); moved ${needsReview} vehicle(s) to Needs Review`, detail: { queued, needsReview } }
       : { summary: "No eligible vehicles for Pages auto-publish", skipped: true };
   },
 };

@@ -153,6 +153,7 @@ function statusTone(status: string): string {
 
 function statusLabel(status: string, currentStep: string | null): string {
   if (status === "Needs Review" && currentStep === "Post removed from Facebook Page") return "Not published";
+  if (status === "Ready" && currentStep === "Ready for next Pages batch") return "Ready for queue";
   return status;
 }
 
@@ -189,6 +190,7 @@ export function PagesWorkspace() {
   const [previewing, setPreviewing] = useState(false);
   const [publishingNow, setPublishingNow] = useState(false);
   const [removingJobId, setRemovingJobId] = useState<number | null>(null);
+  const [returningJobId, setReturningJobId] = useState<number | null>(null);
   const [preview, setPreview] = useState<PageBatchPreview | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -317,6 +319,23 @@ export function PagesWorkspace() {
       setError(removalError instanceof Error ? removalError.message : "Unable to mark the Facebook Page post as removed");
     } finally {
       setRemovingJobId(null);
+    }
+  };
+
+  const returnToQueue = async (job: PageBatchJob) => {
+    const label = `${job.year} ${job.make} ${job.model}`;
+    if (!window.confirm(`Return ${label} to the next Pages batch? This does not publish it now.`)) return;
+    setReturningJobId(job.id);
+    setError(null);
+    setSuccess(null);
+    try {
+      await readJson(`/api/pages/jobs/${job.id}/return-to-queue`, { method: "POST", body: "{}" });
+      setSuccess(`${label} is ready for the next Pages batch. No post was created.`);
+      await load();
+    } catch (queueError) {
+      setError(queueError instanceof Error ? queueError.message : "Unable to return the vehicle to the Pages queue");
+    } finally {
+      setReturningJobId(null);
     }
   };
 
@@ -450,6 +469,7 @@ export function PagesWorkspace() {
                     <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", statusTone(job.status))}>{job.status === "Publishing" ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : null}{statusLabel(job.status, job.currentStep)}</span>
                     {job.postUrl ? <a href={job.postUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">View post</a> : connection?.pageId ? <a href={`https://www.facebook.com/${connection.pageId}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">Open Alpha Page</a> : null}
                     {job.status === "Published" ? <button type="button" onClick={() => void markPostRemoved(job)} disabled={removingJobId === job.id} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 text-xs font-semibold text-amber-800 transition-[background-color,border-color] hover:border-amber-400 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/50">{removingJobId === job.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}{removingJobId === job.id ? "Updating…" : "Mark as not published"}</button> : null}
+                    {job.status === "Needs Review" && job.currentStep === "Post removed from Facebook Page" ? <button type="button" onClick={() => void returnToQueue(job)} disabled={returningJobId === job.id} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/25 bg-primary/5 px-2.5 text-xs font-semibold text-primary transition-[background-color,border-color] hover:border-primary/40 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{returningJobId === job.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}{returningJobId === job.id ? "Returning…" : "Return to queue"}</button> : null}
                   </div>
                 </div>)}
               </div>
