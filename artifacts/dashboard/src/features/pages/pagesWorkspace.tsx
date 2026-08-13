@@ -195,9 +195,10 @@ export function PagesWorkspace() {
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const settingsDraftRef = useRef(false);
+  const previousJobStatusesRef = useRef<Map<number, string> | null>(null);
   const [hasUnsavedSettings, setHasUnsavedSettings] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ announcePublished = false }: { announcePublished?: boolean } = {}) => {
     setLoading(true);
     setError(null);
     try {
@@ -212,6 +213,14 @@ export function PagesWorkspace() {
       setBatch(batchResponse.batch);
       setConnection(connectionResponse.connection);
       setHistory(historyResponse.batches);
+      const jobStatuses = new Map(historyResponse.batches.flatMap((entry) => entry.jobs.map((job) => [job.id, job.status])));
+      const newlyPublished = announcePublished && previousJobStatusesRef.current
+        ? historyResponse.batches.flatMap((entry) => entry.jobs).find((job) => job.status === "Published" && previousJobStatusesRef.current?.get(job.id) !== "Published")
+        : undefined;
+      previousJobStatusesRef.current = jobStatuses;
+      if (newlyPublished) {
+        setSuccess(`${newlyPublished.year} ${newlyPublished.make} ${newlyPublished.model} was published to the Alpha Page. Open the post from Page publishing history.`);
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load Page publishing");
     } finally {
@@ -222,7 +231,7 @@ export function PagesWorkspace() {
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => { void load(); }, 15_000);
+    const interval = window.setInterval(() => { void load({ announcePublished: true }); }, 15_000);
     return () => window.clearInterval(interval);
   }, [load]);
 

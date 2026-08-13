@@ -812,7 +812,7 @@ test("Alpha Pages activity exposes each job step and publication link", () => {
   assert.match(pagesRouteSource, /currentStep: pagePublishingJobsTable\.currentStep/);
   assert.match(pagesRouteSource, /postUrl: pagePublishingJobsTable\.postUrl/);
   assert.match(pagesWorkspaceSource, /\/api\/pages\/batches\?dealerId=/);
-  assert.match(pagesWorkspaceSource, /setInterval\(\(\) => \{ void load\(\); \}, 15_000\)/);
+  assert.match(pagesWorkspaceSource, /setInterval\(\(\) => \{ void load\(\{ announcePublished: true \}\); \}, 15_000\)/);
   assert.match(pagesWorkspaceSource, /Page publishing history/);
   assert.match(pagesWorkspaceSource, /Queued for Meta Page/);
   assert.match(pagesWorkspaceSource, /Open Alpha Page/);
@@ -875,4 +875,13 @@ test("Alpha Pages keeps an unsaved New York schedule draft during activity polli
   assert.match(pagesWorkspaceSource, /settingsDraftRef\.current = false/);
   assert.match(pagesWorkspaceSource, /Unsaved plan changes/);
   assert.match(pagesWorkspaceSource, /Save plan changes/);
+});
+
+test("Alpha Pages announces a scheduled publication after live activity polling", () => {
+  assert.match(pagesWorkspaceSource, /const previousJobStatusesRef = useRef<Map<number, string> \| null>\(null\)/);
+  assert.match(pagesWorkspaceSource, /announcePublished = false/);
+  assert.match(pagesWorkspaceSource, /load\(\{ announcePublished: true \}\)/);
+  assert.match(pagesWorkspaceSource, /job\.status === "Published"/);
+  assert.match(pagesWorkspaceSource, /was published to the Alpha Page/);
+  assert.match(pagesWorkspaceSource, /role="status"/);
 });
