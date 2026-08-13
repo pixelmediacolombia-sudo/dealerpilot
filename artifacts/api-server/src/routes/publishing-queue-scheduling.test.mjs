@@ -867,3 +867,12 @@ test("Alpha Pages schedule controls stay legible inside narrow responsive column
   assert.match(pagesWorkspaceSource, /min-w-0 w-full rounded-md border/);
   assert.match(pagesWorkspaceSource, /tabular-nums/);
 });
+
+test("Alpha Pages keeps an unsaved New York schedule draft during activity polling", () => {
+  assert.match(pagesWorkspaceSource, /const settingsDraftRef = useRef\(false\)/);
+  assert.match(pagesWorkspaceSource, /if \(!settingsDraftRef\.current\) setSettings\(settingsResponse\.settings \?\? DEFAULT_SETTINGS\)/);
+  assert.match(pagesWorkspaceSource, /settingsDraftRef\.current = true/);
+  assert.match(pagesWorkspaceSource, /settingsDraftRef\.current = false/);
+  assert.match(pagesWorkspaceSource, /Unsaved plan changes/);
+  assert.match(pagesWorkspaceSource, /Save plan changes/);
+});

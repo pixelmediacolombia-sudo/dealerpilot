@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, Check, Facebook, Loader2, RefreshCw, Send, Settings2, Sparkles, TriangleAlert, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAuthToken, useAccount } from "@/app/AuthGate";
@@ -194,6 +194,8 @@ export function PagesWorkspace() {
   const [preview, setPreview] = useState<PageBatchPreview | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const settingsDraftRef = useRef(false);
+  const [hasUnsavedSettings, setHasUnsavedSettings] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -206,7 +208,7 @@ export function PagesWorkspace() {
         readJson<{ batches: PageBatchHistory[] }>(`/api/pages/batches?dealerId=${dealerId}&limit=10`),
       ]);
       setConfigured(settingsResponse.configured);
-      setSettings(settingsResponse.settings ?? DEFAULT_SETTINGS);
+      if (!settingsDraftRef.current) setSettings(settingsResponse.settings ?? DEFAULT_SETTINGS);
       setBatch(batchResponse.batch);
       setConnection(connectionResponse.connection);
       setHistory(historyResponse.batches);
@@ -225,6 +227,8 @@ export function PagesWorkspace() {
   }, [load]);
 
   const updateSetting = <K extends keyof PageSettings>(key: K, value: PageSettings[K]) => {
+    settingsDraftRef.current = true;
+    setHasUnsavedSettings(true);
     setSettings((current) => ({ ...current, [key]: value }));
   };
 
@@ -247,6 +251,8 @@ export function PagesWorkspace() {
     setError(null);
     try {
       await readJson(`/api/pages/settings/${dealerId}`, { method: "PUT", body: JSON.stringify(settings) });
+      settingsDraftRef.current = false;
+      setHasUnsavedSettings(false);
       setConfigured(true);
       await load();
     } catch (saveError) {
@@ -393,9 +399,10 @@ export function PagesWorkspace() {
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-600" />Published through Graph API</span><span className="inline-flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-primary" />Photos managed by DealerPilot</span></div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {hasUnsavedSettings && <span role="status" aria-live="polite" className="text-xs font-medium text-amber-700">Unsaved plan changes</span>}
                 <button type="button" onClick={() => void previewBatch()} disabled={previewing} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted/40 disabled:opacity-50">{previewing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}{previewing ? "Previewing…" : "Preview batch (no publish)"}</button>
-                <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"><Settings2 className="h-4 w-4" aria-hidden="true" />{saving ? "Saving…" : "Save plan"}</button>
+                <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"><Settings2 className="h-4 w-4" aria-hidden="true" />{saving ? "Saving…" : hasUnsavedSettings ? "Save plan changes" : "Save plan"}</button>
               </div>
             </div>
           </div>
