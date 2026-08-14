@@ -197,6 +197,21 @@
       };
     },
 
+    async REFRESH_ACTIVE_MESSENGER_CONVERSATION() {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = tabs.find((candidate) =>
+        typeof candidate?.id === "number" &&
+        /^https:\/\/(?:www\.|web\.)?facebook\.com\/(?:messages\/t\/|marketplace\/inbox)/i.test(String(candidate.url || "")),
+      );
+      if (!tab?.id) return { ok: false, error: "facebook_messenger_tab_not_active" };
+      try {
+        const response = await chrome.tabs.sendMessage(tab.id, { type: "REFRESH_ACTIVE_MESSENGER_CONVERSATION" });
+        return response || { ok: false, error: "messenger_refresh_no_response" };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : "messenger_refresh_failed" };
+      }
+    },
+
     async SAVE_SETTINGS(message) {
       const patch = {};
       if (typeof message.dryRun === "boolean") patch.dryRun = message.dryRun;
@@ -458,6 +473,34 @@
           updatedAt: new Date().toISOString(),
         },
         lastError: null,
+      });
+      return data;
+    },
+
+    async CLOSE_MESSENGER_CONVERSATION(message) {
+      const conversationId = Number(message.conversationId);
+      const externalThreadRef = typeof message.externalThreadRef === "string"
+        ? message.externalThreadRef.trim()
+        : "";
+      if (!Number.isInteger(conversationId) || conversationId <= 0 || !externalThreadRef) {
+        return { ok: false, error: "conversation_id_and_thread_required" };
+      }
+      const settings = await getSettings();
+      const response = await DealerPilotMessengerApiClient.apiPost(
+        `/api/conversations/${encodeURIComponent(conversationId)}/close-after-delivery`,
+        {
+          dealerId: settings.dealerId,
+          externalThreadRef,
+        },
+      );
+      const data = response?.data || response || {};
+      await chrome.storage.local.set({
+        lastMessengerFollowUp: {
+          ...(data.followUp || {}),
+          status: "closed",
+          externalThreadRef,
+          updatedAt: new Date().toISOString(),
+        },
       });
       return data;
     },

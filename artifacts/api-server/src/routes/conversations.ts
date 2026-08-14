@@ -296,6 +296,7 @@ function parseTimestamp(value: unknown): Date | null {
 
 type SalesReplyStage =
   | "availability"
+  | "store_phone_requested"
   | "price_inquiry"
   | "financing_intro"
   | "financing_declined"
@@ -321,6 +322,13 @@ function extractPhoneNumber(text: string): string | null {
 
 function hasPhoneNumber(text: string): boolean {
   return extractPhoneNumber(text) !== null;
+}
+
+function buyerRequestedStorePhone(text: string): boolean {
+  const normalized = normalizeIntentText(text);
+  return /\b(?:send|give|share|text|whats|what is|can i have|may i have|call)\b[\s\S]{0,32}\b(?:your|the|dealer(?:ship)?s?|store|alpha(?: motorsports)?)?[\s\S]{0,16}\b(?:phone|number|telephone)\b/.test(normalized) ||
+    /\b(?:mandame|mandeme|envia(?:me)?|dame|compart(?:e|eme)|cual es|cual|me das|pasame|paseme)\b[\s\S]{0,32}\b(?:su|el|del|de la|de alpha)?[\s\S]{0,16}\b(?:telefono|numero)\b/.test(normalized) ||
+    /\b(?:quiero|necesito|puedo tener)\b[\s\S]{0,32}\b(?:el|su|tu)\s+(?:telefono|numero)\b/.test(normalized);
 }
 
 function historyAskedAboutFinancing(history: string): boolean {
@@ -449,7 +457,8 @@ function replyIncludesStorePhone(reply: string, storePhone: string): boolean {
 }
 
 function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
-  return stage === "request_phone" ||
+  return stage === "store_phone_requested" ||
+    stage === "request_phone" ||
     stage === "cash_visit_request_phone" ||
     stage === "urgent_vehicle_request_phone";
 }
@@ -483,7 +492,8 @@ function replyHasFirstGreeting(reply: string): boolean {
 
 function withFirstReplyGreeting(reply: string, language: string, firstDealerReply: boolean): string {
   const cleaned = reply.trim();
-  if (!firstDealerReply || replyHasFirstGreeting(cleaned)) return cleaned;
+  const isStorePhoneClosingReply = /^(?:con gusto|of course),?\s+(?:nuestro|our)\s+(?:n[uú]mero|number)\b/i.test(cleaned);
+  if (!firstDealerReply || replyHasFirstGreeting(cleaned) || isStorePhoneClosingReply) return cleaned;
   return language === "es"
     ? `Hola, somos Alpha Motorsports. ${cleaned}`
     : `Hello, this is Alpha Motorsports. ${cleaned}`;
@@ -500,6 +510,7 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   const latest = cleanConversationText(currentMessage).toLowerCase();
   const latestIntent = normalizeIntentText(currentMessage);
   const history = visibleMessages.slice(-8).map(cleanConversationText).join(" ").toLowerCase();
+  if (buyerRequestedStorePhone(latest)) return "store_phone_requested";
   if (hasPhoneNumber(latest)) return "phone_received";
   if (buyerRequestedVisitOrTestDrive(latest) && (historyAskedCashOrVisit(history) || historyShowsFinancingDeclined(history))) {
     return "cash_visit_request_phone";
@@ -560,6 +571,9 @@ function buildSafeFallbackReply(
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage);
   const storeAddress = resolveStoreAddress(lotLocation);
   if (language === "es") {
+    if (stage === "store_phone_requested") {
+      return `Con gusto, nuestro número es ${storePhone}. Quedamos atentos.`;
+    }
     if (stage === "phone_received") {
       return `¡Gracias! Recibimos tu número y te contactaremos pronto para ayudarte con el ${vehicle}. Si prefieres, también puedes llamarnos al ${storePhone}.`;
     }
@@ -608,6 +622,9 @@ function buildSafeFallbackReply(
       return `Buena pregunta. Con gusto podemos confirmar ese detalle del ${vehicle}. ¿Te interesa financiarlo?`;
     }
     return `Con gusto te ayudo con el ${vehicle}. ¿Te interesa financiarlo?`;
+  }
+  if (stage === "store_phone_requested") {
+    return `Of course, our number is ${storePhone}. We are here if you need anything else.`;
   }
   if (stage === "phone_received") {
     return `Thank you! We received your number and will contact you shortly to help with the ${vehicle}. You can also call us at ${storePhone} if you prefer.`;
@@ -672,7 +689,7 @@ function isAiReplyAligned(
   );
   const legacyAddressToken = ["410", "hudgins"].join(" ");
   if (normalized.includes(legacyLocationToken) || normalized.includes(legacyAddressToken)) return false;
-  if (firstDealerReply && !replyHasFirstGreeting(reply)) return false;
+  if (firstDealerReply && stage !== "store_phone_requested" && !replyHasFirstGreeting(reply)) return false;
   if (stageRequiresStorePhone(stage) && !replyIncludesStorePhone(reply, storePhone)) return false;
   if (/\badvisor\b|\basesor\b/i.test(normalized)) return false;
   if (replyGivesRestrictedVehicleDetails(reply)) return false;
@@ -687,6 +704,11 @@ function isAiReplyAligned(
       !/\$\s*\d/.test(normalized) &&
       !/id|tax\s*id|passport|pasaporte|bank account|cuenta bancaria|requirements|requisitos/.test(normalized) &&
       !/phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
+  }
+  if (stage === "store_phone_requested") {
+    return replyIncludesStorePhone(reply, storePhone) &&
+      !/\?/.test(normalized) &&
+      !/id|tax\s*id|passport|pasaporte|bank account|cuenta bancaria|requirements|requisitos/.test(normalized);
   }
   if (stage === "financing_intro") {
     return /\b(id|tax\s*id|passport|pasaporte)\b/.test(normalized) &&
@@ -822,6 +844,7 @@ type AiReplyResult = {
 
 const SALES_REPLY_STAGES: readonly SalesReplyStage[] = [
   "availability",
+  "store_phone_requested",
   "price_inquiry",
   "financing_intro",
   "financing_declined",
@@ -888,6 +911,7 @@ LOCATION RULE: Alpha Motorsports serves customers from Manassas only. Use only t
 
 CONVERSATION FUNNEL:
 1. Initial availability inquiry: greet with "Hello, this is Alpha Motorsports" / "Hola, somos Alpha Motorsports", explicitly confirm that the specific vehicle from the Vehicle field is available, then ask whether the buyer is interested in financing it. Always name the year, make, and model. Do not ask for a phone number.
+1c. If the buyer asks for Alpha Motorsports' phone number, give the supplied dealership phone immediately. Say "Con gusto, nuestro número es..." / "Of course, our number is..." and close the conversation politely. Do not ask another question, request buyer information, or mention financing requirements. This exception also applies to a first reply.
 1a. If the buyer asks whether there are more vehicles, other options, similar vehicles, or "only that one", confirm that Alpha Motorsports has more vehicles available, then continue the flow by asking whether they are interested in financing this vehicle or seeing similar options. Do not ask for requirements yet.
 1b. Urgent vehicle-intent exception: read the full recent conversation with careful human judgment. Use urgent_vehicle_request_phone only when the buyer has sent several consecutive unanswered messages, shows unmistakably high urgency, and shows strong concrete intent to acquire or act on this vehicle, such as buying it, coming today or tomorrow, scheduling, visiting, or test driving. Mere repetition, impatience, curiosity, a price question, or one emotional phrase is not enough. When all signals are present, skip the normal funnel and ask for the best phone number immediately; include Alpha's dealership phone. Do not mention financing requirements.
 2. If the buyer says they are interested in financing, do not ask for the phone number yet. Explain the basic requirements: ID and active bank account; passport or Tax ID works. Ask if they have those requirements.
@@ -918,11 +942,12 @@ Language rules:
 - Use "easy financing options" / "opciones de financiamiento fáciles"
 - Use "approval based on qualification" / "aprobación basada en calificación"
 - Do not use the words "advisor" or "asesor". Use "our team" / "nuestro equipo".
-- Do not push a call, ask for a phone number, or include the store phone in the first reply, except when the confirmed stage is urgent_vehicle_request_phone
+- Do not push a call, ask for a phone number, or include the store phone in the first reply, except when the confirmed stage is urgent_vehicle_request_phone or store_phone_requested
 - Never ask for the "best phone number so we can help you" in response to a vehicle-detail or warranty question; return to the next sequential funnel step instead
 - Do not ask for a phone number in the same reply that first explains the financing requirements
 - If the current stage is request_phone, ask for the buyer's phone number and include Alpha's dealership phone as an immediate call option
 - If the current stage is urgent_vehicle_request_phone, ask for the buyer's phone number immediately, include Alpha's dealership phone, and do not mention financing requirements
+- If the current stage is store_phone_requested, give only Alpha's dealership phone and a brief polite closing; do not ask a question
 - NEVER say: guaranteed approval, everyone approved, bad credit, denied, rejected, disqualified
 - NEVER promise a loan or specific rate
 - NEVER invent price, down payment, vehicle history, or financing terms
@@ -1013,6 +1038,7 @@ export async function generateAiReply(
     availability: availabilityQuickReplyAccepted
       ? "Greet as Alpha Motorsports, state that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number."
       : "Greet as Alpha Motorsports, explicitly confirm that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number.",
+    store_phone_requested: `The buyer requested Alpha Motorsports' phone number. Reply immediately with exactly the supplied dealership phone: ${storePhone}. Start with \"Con gusto, nuestro número es\" / \"Of course, our number is\", add a short polite closing, and do not ask a question, request buyer information, or mention financing requirements.`,
     price_inquiry: "The buyer is asking for price. Do not provide a number, do not ask for requirements, and do not ask for a phone number. Say Alpha Motorsports can confirm that detail, then ask whether they are still interested.",
     financing_intro: "The buyer is interested in financing. Do not ask for a phone number yet. Explain the basic requirements: ID and an active bank account; passport or Tax ID works. Ask if they have those requirements.",
     financing_declined: "The buyer declined financing. Do not ask about financing again and do not explain financing requirements. Thank them, then ask whether they plan to purchase cash or would like to come see the vehicle.",
@@ -1037,7 +1063,7 @@ ${phoneContext}
 Current funnel stage: ${promptStage}
 Stage instruction: ${stageInstruction}
 Urgent-intent eligibility: ${persistentUnansweredBuyerTurns ? "The deterministic history check found at least three consecutive unanswered buyer messages. Evaluate urgency and concrete vehicle intent carefully; use urgent_vehicle_request_phone only if both are genuinely high/strong." : "Not eligible for urgent_vehicle_request_phone because fewer than three consecutive unanswered buyer messages were found. Keep urgency normal and do not choose the urgent stage."}
-First reply instruction: ${firstDealerReply ? "This is Alpha Motorsports' first reply in this conversation. Start with a warm greeting as Alpha Motorsports." : "This is not the first Alpha Motorsports reply; do not restart the greeting unless it sounds natural."}
+First reply instruction: ${firstDealerReply && stage !== "store_phone_requested" ? "This is Alpha Motorsports' first reply in this conversation. Start with a warm greeting as Alpha Motorsports." : firstDealerReply ? "This is a phone-number request. Give the phone immediately without adding the normal greeting." : "This is not the first Alpha Motorsports reply; do not restart the greeting unless it sounds natural."}
 
 Recent conversation:
 ${history}
@@ -1047,7 +1073,7 @@ Latest buyer message: "${currentMessage}"
 ${langNote}
 Respond with a single JSON object, no markdown, with exactly four keys:
 {"intent": "the sales funnel stage that best matches the conversation", "urgency": "high or normal", "vehicleIntent": "strong or unclear", "reply": "your reply"}
-Valid intent values: availability, price_inquiry, financing_intro, financing_declined, cash_visit_request_phone, urgent_vehicle_request_phone, request_phone, phone_received, address_request, inventory_options, document_requirements, clean_title, warranty_info, advisor_question, general.
+Valid intent values: availability, store_phone_requested, price_inquiry, financing_intro, financing_declined, cash_visit_request_phone, urgent_vehicle_request_phone, request_phone, phone_received, address_request, inventory_options, document_requirements, clean_title, warranty_info, advisor_question, general.
 Choose urgent_vehicle_request_phone only when Urgent-intent eligibility allows it, urgency is high, and vehicleIntent is strong. Otherwise follow the supplied Current funnel stage and Stage instruction.
 The "reply" must be one short message that follows the stage instruction exactly, mentions the vehicle naturally, and mirrors the buyer's language.`;
 
@@ -1668,6 +1694,7 @@ router.post("/conversations/intake", async (req, res) => {
         suggestedReply: retryableReply,
         deliveryRetry: true,
         outboundJob,
+        closeConversationAfterDelivery: retryStage === "store_phone_requested",
         language,
         fallbackUsed: retryFallbackUsed,
         fallbackReason: retryFallbackReason,
@@ -1699,6 +1726,11 @@ router.post("/conversations/intake", async (req, res) => {
   let suggestedReply: string | null = null;
   let outboundJob = null;
   let aiReplyResult: AiReplyResult | null = null;
+  const currentStage = resolveSalesReplyStage(
+    formatConversationHistoryForAi(conversationHistoryForAi.length ? conversationHistoryForAi : incomingMsgs),
+    inbound,
+  );
+  const closeAfterDelivery = currentStage === "store_phone_requested";
   const latestExistingAssistant = existingMsgs.find((m) => m.role === "assistant");
   const shouldGenerateReply =
     !!inbound &&
@@ -1725,7 +1757,7 @@ router.post("/conversations/intake", async (req, res) => {
       role: "assistant",
       content: suggestedReply,
     }).returning({ id: conversationMessagesTable.id });
-    if (followUpEligible === true && !extractedPhone && assistantMessage?.id) {
+    if (followUpEligible === true && !extractedPhone && !closeAfterDelivery && assistantMessage?.id) {
       outboundJob = await queueNormalReplyForFollowUp({
         conversationId,
         dealerId,
@@ -1869,6 +1901,7 @@ router.post("/conversations/intake", async (req, res) => {
     leadId,
     suggestedReply,
     outboundJob,
+    closeConversationAfterDelivery: closeAfterDelivery && !!suggestedReply,
     language,
     fallbackUsed: aiReplyResult?.fallbackUsed ?? false,
     fallbackReason: aiReplyResult?.fallbackReason ?? null,
@@ -1896,6 +1929,36 @@ router.post("/conversations/outbound/:jobId/delivered", async (req, res) => {
     req.log.warn({ error, jobId, dealerId }, "Messenger outbound delivery confirmation rejected");
     res.status(409).json({ error: error instanceof Error ? error.message : "outbound_delivery_confirmation_failed" });
   }
+});
+
+router.post("/conversations/:id/close-after-delivery", async (req, res) => {
+  const conversationId = Number(req.params.id);
+  const dealerId = Number(req.body?.dealerId) || DEALER_ID;
+  const externalThreadRef = String(req.body?.externalThreadRef || "").trim();
+  if (!Number.isInteger(conversationId) || conversationId <= 0 || !externalThreadRef) {
+    res.status(400).json({ error: "conversation id and externalThreadRef are required" });
+    return;
+  }
+  const [closedConversation] = await db
+    .update(conversationsTable)
+    .set({ status: "closed", updatedAt: new Date() })
+    .where(and(
+      eq(conversationsTable.id, conversationId),
+      eq(conversationsTable.dealerId, dealerId),
+      eq(conversationsTable.externalThreadRef, externalThreadRef),
+    ))
+    .returning({ id: conversationsTable.id, status: conversationsTable.status });
+  if (!closedConversation) {
+    res.status(404).json({ error: "Conversation not found for this Messenger thread" });
+    return;
+  }
+  const followUp = await cancelFollowUpsForBuyerActivity({
+    dealerId,
+    externalThreadRef,
+    reason: "conversation_closed",
+  });
+  req.log.info({ conversationId, dealerId, externalThreadRef }, "Conversation closed after dealership phone delivery");
+  res.json({ ok: true, conversation: closedConversation, followUp });
 });
 
 router.post("/conversations/follow-ups/claim", async (req, res) => {

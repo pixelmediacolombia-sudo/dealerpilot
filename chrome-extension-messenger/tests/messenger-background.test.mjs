@@ -8,9 +8,9 @@ const source = readFileSync(
   "utf8",
 );
 
-function createHarness({ apiPost, initialStorage = {} } = {}) {
+function createHarness({ apiPost, initialStorage = {}, activeTab = null, activeTabResponse = null } = {}) {
   const storage = { extensionId: "msg-ext-test", ...initialStorage };
-  const calls = { apiPost: [], debugger: [] };
+  const calls = { apiPost: [], debugger: [], tabs: [] };
   let runtimeComposerText = "";
   const chrome = {
     storage: {
@@ -29,6 +29,16 @@ function createHarness({ apiPost, initialStorage = {} } = {}) {
     runtime: {
       onInstalled: { addListener() {} },
       onMessage: { addListener() {} },
+    },
+    tabs: {
+      async query(query) {
+        calls.tabs.push({ type: "query", query });
+        return activeTab ? [activeTab] : [];
+      },
+      async sendMessage(tabId, message) {
+        calls.tabs.push({ type: "sendMessage", tabId, message });
+        return activeTabResponse;
+      },
     },
     debugger: {
       async attach(target, version) {
@@ -271,6 +281,42 @@ test("backend JSON errors are preserved for the popup debugger", async () => {
   assert.equal(storage.lastConversationIntake.error.raw.message, "POST /api/conversations/intake failed: 422");
 });
 
+test("background closes a phone-request conversation only after the extension confirms delivery", async () => {
+  const { handlers, calls, storage } = createHarness({
+    apiPost(path, body) {
+      assert.equal(path, "/api/conversations/91/close-after-delivery");
+      assert.equal(body.externalThreadRef, "marketplace-thread::facebook-messages-thread-91");
+      return { conversation: { id: 91, status: "closed" }, followUp: { status: "closed", nextDueAt: null } };
+    },
+  });
+
+  const result = await handlers.CLOSE_MESSENGER_CONVERSATION({
+    conversationId: 91,
+    externalThreadRef: "marketplace-thread::facebook-messages-thread-91",
+  });
+
+  assert.equal(result.conversation.status, "closed");
+  assert.equal(calls.apiPost.length, 1);
+  assert.equal(storage.lastMessengerFollowUp.status, "closed");
+});
+
+test("background reloads the active Facebook conversation without reloading the whole tab", async () => {
+  const { handlers, calls } = createHarness({
+    activeTab: { id: 31, url: "https://www.facebook.com/messages/t/999999" },
+    activeTabResponse: { ok: true, data: { reason: "auto_reply_disabled" } },
+  });
+
+  const result = await handlers.REFRESH_ACTIVE_MESSENGER_CONVERSATION();
+
+  assert.equal(result.ok, true);
+  assert.equal(calls.tabs[0].type, "query");
+  assert.equal(calls.tabs[0].query.active, true);
+  assert.equal(calls.tabs[0].query.currentWindow, true);
+  assert.equal(calls.tabs[1].type, "sendMessage");
+  assert.equal(calls.tabs[1].tabId, 31);
+  assert.equal(calls.tabs[1].message.type, "REFRESH_ACTIVE_MESSENGER_CONVERSATION");
+});
+
 test("two installations keep dealer and browser session identity in the intake contract", async () => {
   const calls = [];
   const makeApiPost = (name) => async (path, body) => {
@@ -292,7 +338,9 @@ test("two installations keep dealer and browser session identity in the intake c
   await second.handlers.CONVERSATION_INTAKE({ ...intakePayload, messageHash: "session-b", idempotencyKey: "session-b" });
 
   assert.deepEqual(
-    calls.map(({ name, body }) => ({ name, dealerId: body.dealerId, sessionId: body.sessionId })),
+    calls
+      .filter(({ path }) => path === "/api/conversations/intake")
+      .map(({ name, body }) => ({ name, dealerId: body.dealerId, sessionId: body.sessionId })),
     [
       { name: "dealer-1", dealerId: 1, sessionId: "dealer-1" },
       { name: "lucky-mazda", dealerId: 2, sessionId: "lucky-mazda" },

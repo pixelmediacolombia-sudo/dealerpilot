@@ -361,6 +361,18 @@ button.secondary-action:not(:disabled):hover { color: var(--dp-violet); backgrou
 }
 .debug-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .debug-actions button { min-height: 36px; font-size: 10px; }
+.debug-actions .refresh-action {
+  grid-column: 1 / -1;
+  margin-top: 0;
+  color: var(--dp-violet);
+  background: var(--dp-violet-soft);
+  border-color: color-mix(in srgb, var(--dp-violet) 38%, var(--dp-border));
+}
+.debug-actions .refresh-action:not(:disabled):hover {
+  color: #fff;
+  background: var(--dp-violet);
+  border-color: var(--dp-violet);
+}
 .diagnostic-note {
   max-height: 112px;
   overflow: auto;

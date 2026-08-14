@@ -892,6 +892,27 @@
     return lastFollowUpState;
   }
 
+  async function closeConversationAfterDelivery(intake, externalThreadRef) {
+    if (intake?.closeConversationAfterDelivery !== true || !intake?.conversationId || !externalThreadRef) {
+      return { closed: false, skipped: true };
+    }
+    const response = await send({
+      type: "CLOSE_MESSENGER_CONVERSATION",
+      conversationId: intake.conversationId,
+      externalThreadRef,
+    });
+    if (!response?.ok) {
+      return { closed: false, error: response?.error || "conversation_close_failed" };
+    }
+    const data = response.data || {};
+    lastFollowUpState = {
+      ...(data.followUp || lastFollowUpState),
+      status: "closed",
+      nextDueAt: null,
+    };
+    return { closed: true, followUp: lastFollowUpState };
+  }
+
   async function cancelFollowUpJob(job, externalThreadRef, reason) {
     if (!job?.id || !externalThreadRef) return lastFollowUpState;
     const response = await send({
@@ -1169,7 +1190,7 @@
     };
   }
 
-  async function processSnapshot({ automatic, detectedAtMs, settings, snapshot, snapshots, winnerIndex, followUpJob, followUpEligible }) {
+  async function processSnapshot({ automatic, detectedAtMs, settings, snapshot, snapshots, winnerIndex, followUpJob, followUpEligible, forceRefresh = false }) {
     const validation = validateSnapshot(snapshot);
     const debug = buildDebugBase({ automatic, settings, snapshot, validation, snapshots, winnerIndex });
 
@@ -1276,22 +1297,24 @@
         });
         return { ok: false, suggestedReply: "", autoSent: false, reason: "reply_repeats_conversation" };
       }
-      const now = Date.now();
-      const pending = getPendingBuyer(threadKey);
-      if (autoActionKey !== pending.hash) {
-        setPendingBuyer(threadKey, {
-          hash: autoActionKey,
-          since: now,
-          detectedAt: detectedAtMs,
-        });
-        await sendDebug("waiting_quiet_window", debug);
-        return { skipped: true, reason: "waiting_quiet_window" };
+      if (!forceRefresh) {
+        const now = Date.now();
+        const pending = getPendingBuyer(threadKey);
+        if (autoActionKey !== pending.hash) {
+          setPendingBuyer(threadKey, {
+            hash: autoActionKey,
+            since: now,
+            detectedAt: detectedAtMs,
+          });
+          await sendDebug("waiting_quiet_window", debug);
+          return { skipped: true, reason: "waiting_quiet_window" };
+        }
+        if (now - pending.since < REPLY_QUIET_MS) {
+          await sendDebug("waiting_quiet_window", debug);
+          return { skipped: true, reason: "waiting_quiet_window" };
+        }
+        payload.messageDetectedAt = new Date(pending.detectedAt || detectedAtMs).toISOString();
       }
-      if (now - pending.since < REPLY_QUIET_MS) {
-        await sendDebug("waiting_quiet_window", debug);
-        return { skipped: true, reason: "waiting_quiet_window" };
-      }
-      payload.messageDetectedAt = new Date(pending.detectedAt || detectedAtMs).toISOString();
     }
 
     if (settings.dryRun) {
@@ -1372,6 +1395,7 @@
       lastBlockedReplyKeyByThread.delete(threadKey);
       lastAutoReplyByThread.set(threadKey, { text: cleanText(lastSuggestedReply), at: Date.now() });
       const followUp = await confirmOutboundDelivery(response.data?.outboundJob, payload.externalThreadRef);
+      const conversationClose = await closeConversationAfterDelivery(response.data, payload.externalThreadRef);
       await sendDebug("intake_ok", {
         ...debug,
         aiReplyReceived: true,
@@ -1381,6 +1405,8 @@
         reason: "reply_already_delivered",
         deliveryConfirmed: true,
         followUp,
+        conversationClosed: conversationClose.closed === true,
+        conversationCloseError: conversationClose.error || null,
       });
       return { ok: true, suggestedReply: lastSuggestedReply, autoSent: true, reason: "reply_already_delivered", deliveryConfirmed: true };
     }
@@ -1422,6 +1448,9 @@
     const followUp = sendResult.autoSent
       ? await confirmOutboundDelivery(response.data?.outboundJob, payload.externalThreadRef)
       : lastFollowUpState;
+    const conversationClose = sendResult.autoSent
+      ? await closeConversationAfterDelivery(response.data, payload.externalThreadRef)
+      : { closed: false, skipped: true };
     await sendDebug(sendResult.autoSent ? "intake_ok" : "auto_send_blocked", {
       ...debug,
       ...sendResult,
@@ -1429,8 +1458,10 @@
       backendIntakeSent: true,
       backendIntakeReceived: true,
       followUp,
+      conversationClosed: conversationClose.closed === true,
+      conversationCloseError: conversationClose.error || null,
     });
-    return { ok: true, suggestedReply: lastSuggestedReply, followUp, ...sendResult };
+    return { ok: true, suggestedReply: lastSuggestedReply, followUp, conversationClose, ...sendResult };
   }
 
   async function captureConversationOnce(options = {}) {
@@ -1466,6 +1497,7 @@
       winnerIndex: winning.index,
       followUpJob: options.followUpJob || null,
       followUpEligible: options.followUpEligible === true,
+      forceRefresh: options.forceRefresh === true,
     });
     return {
       ...result,
@@ -1598,6 +1630,14 @@
       pendingBuyerByThread: Object.fromEntries(pendingBuyerByThread),
       lastSuggestedReplyByThread: Object.fromEntries(lastSuggestedReplyByThread),
     }),
+  });
+
+  chrome.runtime.onMessage?.addListener((message, _sender, sendResponse) => {
+    if (message?.type !== "REFRESH_ACTIVE_MESSENGER_CONVERSATION") return false;
+    captureConversation({ automatic: true, followUpEligible: true, forceRefresh: true })
+      .then((result) => sendResponse({ ok: true, data: result }))
+      .catch((error) => sendResponse({ ok: false, error: error?.message || String(error) }));
+    return true;
   });
 
   if (!globalThis.__DEALERPILOT_MESSENGER_AI_TEST__) {

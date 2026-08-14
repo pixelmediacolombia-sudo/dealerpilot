@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 const source = readFileSync(new URL("./followUpQueue.ts", import.meta.url), "utf8");
+const conversationsSource = readFileSync(
+  new URL("../routes/conversations.ts", import.meta.url),
+  "utf8",
+);
 const migration = readFileSync(
   new URL("../../../../lib/db/migrations/0006_messenger_follow_up_queue.sql", import.meta.url),
   "utf8",
@@ -26,4 +30,15 @@ test("migration owns the queue schema and the indexes needed by the extension cl
   assert.match(migration, /CREATE TABLE IF NOT EXISTS messenger_outbound_jobs/i);
   assert.match(migration, /messenger_outbound_jobs_due_idx/i);
   assert.match(migration, /messenger_outbound_jobs_thread_idx/i);
+});
+
+test("a dealership phone request closes only after its reply is delivered and never starts a follow-up", () => {
+  assert.match(conversationsSource, /buyerRequestedStorePhone/);
+  assert.match(conversationsSource, /store_phone_requested/);
+  assert.match(conversationsSource, /Con gusto, nuestro número es/);
+  assert.match(conversationsSource, /closeConversationAfterDelivery/);
+  assert.match(conversationsSource, /!closeAfterDelivery/);
+  assert.match(conversationsSource, /close-after-delivery/);
+  assert.match(conversationsSource, /status: "closed"/);
+  assert.match(conversationsSource, /reason: "conversation_closed"/);
 });

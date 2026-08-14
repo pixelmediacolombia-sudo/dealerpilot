@@ -176,6 +176,26 @@
     await loadDebug();
   }
 
+  async function refreshConversation() {
+    const button = $("refresh-conversation");
+    button.disabled = true;
+    button.textContent = "Recargando conversación…";
+    try {
+      const response = await send({ type: "REFRESH_ACTIVE_MESSENGER_CONVERSATION" });
+      const result = response?.data?.data || response?.data || response;
+      if (!response?.ok || result?.ok === false) {
+        throw new Error(result?.error || response?.error || "No se pudo recargar la conversación activa.");
+      }
+      $("diagnostics").textContent = result?.reason
+        ? `Conversación recargada: ${result.reason}.`
+        : "Conversación activa recargada.";
+      await loadDebug();
+    } finally {
+      button.disabled = false;
+      button.textContent = "Recargar conversación activa";
+    }
+  }
+
   $("save").addEventListener("click", () => {
     save().catch((err) => {
       $("diagnostics").textContent = String(err?.message || err);
@@ -184,6 +204,12 @@
 
   $("reload-debug").addEventListener("click", () => {
     loadDebug().catch((err) => {
+      $("diagnostics").textContent = String(err?.message || err);
+    });
+  });
+
+  $("refresh-conversation").addEventListener("click", () => {
+    refreshConversation().catch((err) => {
       $("diagnostics").textContent = String(err?.message || err);
     });
   });

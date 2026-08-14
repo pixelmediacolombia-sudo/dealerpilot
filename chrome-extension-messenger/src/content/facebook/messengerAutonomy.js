@@ -377,7 +377,10 @@
           ...target,
           reason,
           observedAt: Date.now(),
-          followUpEligible: reason !== "initial_unread" && reason !== "restored_queue",
+          // Every newly processed buyer turn needs the durable follow-up cycle.
+          // The backend still cancels it when the buyer replies, gives a phone,
+          // or asks for Alpha's number and that reply is delivered.
+          followUpEligible: true,
         });
       }
     }
@@ -407,7 +410,7 @@
         syntheticActiveThread,
         reason,
         observedAt: Date.now(),
-        followUpEligible: reason === "active_buyer_message_mutation",
+        followUpEligible: true,
       });
     }
 
@@ -433,7 +436,7 @@
               explicitUnread: false,
             }
           : null);
-      if (target) queue.enqueue({ ...target, reason: "restored_queue" });
+      if (target) queue.enqueue({ ...target, reason: "restored_queue", followUpEligible: true });
     }
     const initialQueueState = queue.getState();
     if (

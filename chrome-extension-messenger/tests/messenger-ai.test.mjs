@@ -107,7 +107,7 @@ function createHarness({
   sessionStorageRef = null,
   onIntake = null,
 } = {}) {
-  const calls = { messages: [], debug: [], intake: [] };
+  const calls = { messages: [], debug: [], intake: [], contentMessageListener: null };
   let currentNowMs = nowMs;
   class FakeDate extends Date {
     constructor(...args) {
@@ -189,6 +189,7 @@ function createHarness({
   const chrome = {
     runtime: {
       lastError: null,
+      onMessage: { addListener(listener) { calls.contentMessageListener = listener; } },
       sendMessage(message, callback) {
         calls.messages.push(message);
         if (message.type === "GET_SETTINGS") {
@@ -204,6 +205,10 @@ function createHarness({
           calls.intake.push(message);
           onIntake?.(message);
           callback(intakeResponse || { ok: true, data: { suggestedReply: "Yes, it is available." } });
+          return;
+        }
+        if (message.type === "CLOSE_MESSENGER_CONVERSATION") {
+          callback({ ok: true, data: { followUp: { status: "closed", nextDueAt: null } } });
           return;
         }
         if (message.type === "DEBUGGER_COMPOSER_WRITE") {
@@ -352,6 +357,24 @@ test("autoReply never sends a backend reply that echoes the buyer question verba
   assert.equal(composerElement.textContent, "");
   assert.deepEqual(sendButton.events, []);
   assert.equal(calls.debug.at(-1).reason, "reply_repeats_conversation");
+});
+
+test("explicit conversation refresh bypasses the quiet window and keeps follow-up eligibility", async () => {
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [{ speaker: "Buyer A", text: "Is this available?" }],
+    intakeResponse: { ok: true, data: { suggestedReply: "Hello, this is Alpha Motorsports. Yes, it is available." } },
+  });
+
+  const result = await ai.captureConversation({
+    automatic: true,
+    forceRefresh: true,
+    followUpEligible: true,
+  });
+
+  assert.equal(result.reason, "auto_reply_disabled");
+  assert.equal(calls.intake.length, 1);
+  assert.equal(calls.intake[0].followUpEligible, true);
 });
 
 test("a rejected repeated reply is not mislabeled as duplicate_auto_send_hash", async () => {
