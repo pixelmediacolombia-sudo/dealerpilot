@@ -17,4 +17,8 @@ test("stalled buyer conversations deterministically request a phone number", () 
   assert.match(source, /if \(hasStalledConversation\(visibleMessages, currentMessage\)\) return "stalled_conversation_request_phone"/);
   assert.match(source, /Skip the normal funnel and ask once for the buyer's best phone number/);
   assert.match(source, /Do not repeat a financing-interest question, financing requirements, or a vehicle-detail question/);
+  assert.match(source, /"salesperson_request_phone"/);
+  assert.match(source, /historyRequestedPhone\(history\)/);
+  assert.match(source, /Our salesperson can give you more information/);
+  assert.match(source, /Do not reuse the previous phone-request wording/);
 });
