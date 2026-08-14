@@ -439,10 +439,19 @@ function buyerMovesConversationForward(value: string): boolean {
   const normalized = cleanConversationText(value);
   return hasPhoneNumber(normalized) ||
     buyerRequestedStorePhone(normalized) ||
-    buyerAcceptedFinancingStep(normalized) ||
-    buyerConfirmedRequirements(normalized) ||
     buyerRequestedVisitOrTestDrive(normalized) ||
-    buyerAcceptedCashOrVisitStep(normalized);
+    buyerAcceptedCashOrVisitStep(normalized) ||
+    buyerClearlyAdvancesFinancing(normalized);
+}
+
+function buyerClearlyAdvancesFinancing(value: string): boolean {
+  const normalized = normalizeIntentText(value);
+  if (!normalized || /[?¿]/.test(value)) return false;
+  return /^(?:yes|yeah|yep|sure|okay|ok|si|claro|perfecto|listo)\b/.test(normalized) ||
+    /\b(?:i am|im|i'm|estoy|me encuentro)\s+(?:interested|ready|listo|interesad[oa])\b/.test(normalized) ||
+    /\b(?:want|quiero|deseo)\s+(?:to )?(?:finance|apply|financiar|aplicar)\b/.test(normalized) ||
+    /\b(?:ready to apply|listo para aplicar|next step|siguiente paso|how can we make this work|como hacemos para hacerlo)\b/.test(normalized) ||
+    /\b(?:i have|tengo|cuento con)\b[\s\S]{0,80}\b(?:id|passport|tax id|bank account|cuenta bancaria)\b/.test(normalized);
 }
 
 function buyerExplicitlyDisengages(value: string): boolean {

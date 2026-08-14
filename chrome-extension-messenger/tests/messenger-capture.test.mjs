@@ -150,6 +150,78 @@ test("floating Marketplace chat extracts buyer header and incoming visual bubble
   );
 });
 
+test("right-aligned Dealer bubble corrects an ambiguous semantic sender", () => {
+  const dealerReply = "We will be happy to confirm that detail. Are you still interested?";
+  const ambiguousOutgoingBubble = new FakeElement({
+    attributes: {
+      dir: "auto",
+      "aria-label": `Message sent at 10:30 AM by John: ${dealerReply}`,
+    },
+    text: dealerReply,
+    rect: { left: 250, right: 410, top: 520, width: 160, height: 60 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [ambiguousOutgoingBubble],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "John · 2021 Toyota Tacoma",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $25,000 - 2021 Toyota Tacoma" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(capture.messages)),
+    [{ speaker: "Dealer", text: dealerReply }],
+  );
+});
+
+test("known Alpha prompts never re-enter history as buyer messages", () => {
+  const dealerPrompt = "We will be happy to confirm that detail for the Tacoma. Are you still interested?";
+  const ambiguousDescriptor = new FakeElement({
+    attributes: { "aria-label": `Message sent at 10:30 AM by John: ${dealerPrompt}` },
+    text: dealerPrompt,
+    rect: { left: 30, right: 260, top: 520, width: 230, height: 60 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [ambiguousDescriptor],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "John · 2021 Toyota Tacoma" }),
+      new FakeElement({ text: "Marketplace $25,000 - 2021 Toyota Tacoma" }),
+      scope,
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" } }),
+    ],
+  });
+
+  const capture = runCapture(root);
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(capture.messages)),
+    [{ speaker: "Dealer", text: dealerPrompt }],
+  );
+});
+
 test("floating Marketplace chat ignores Facebook rating cards and keeps requirements question latest", () => {
   const ratingCard = new FakeElement({
     attributes: {

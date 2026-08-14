@@ -433,7 +433,6 @@
       const data = response?.data || response || {};
       const nextState = data.followUp || {};
       const previousIsActive =
-        previous.externalThreadRef === externalThreadRef &&
         previous.nextDueAt &&
         new Date(previous.nextDueAt).getTime() > Date.now() &&
         !["idle", "canceled", "buyer_message_missing", "closed"].includes(String(previous.status || "").toLowerCase());
@@ -445,7 +444,8 @@
           ...(shouldKeepActiveState ? previous : nextState),
           jobId: data.job?.id || null,
           status: data.job ? "claimed" : shouldKeepActiveState ? previous.status : nextState.status || "idle",
-          externalThreadRef: externalThreadRef || previous.externalThreadRef || null,
+          externalThreadRef: data.job?.externalThreadRef ||
+            (shouldKeepActiveState ? previous.externalThreadRef : externalThreadRef || previous.externalThreadRef || null),
           updatedAt: new Date().toISOString(),
         },
         lastError: null,

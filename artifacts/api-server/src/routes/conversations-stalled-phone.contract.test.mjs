@@ -9,8 +9,8 @@ test("stalled buyer conversations deterministically request a phone number", () 
   assert.match(source, /function hasStalledConversation\(/);
   assert.match(source, /stalledBuyerTurns >= 2/);
   assert.match(source, /function buyerMovesConversationForward\(/);
-  assert.match(source, /buyerAcceptedFinancingStep\(normalized\)/);
-  assert.match(source, /buyerConfirmedRequirements\(normalized\)/);
+  assert.match(source, /function buyerClearlyAdvancesFinancing\(/);
+  assert.match(source, /buyerClearlyAdvancesFinancing[\s\S]*?\[?¿\]/);
   assert.match(source, /buyerRequestedVisitOrTestDrive\(normalized\)/);
   assert.match(source, /buyerAcceptedCashOrVisitStep\(normalized\)/);
   assert.match(source, /!buyerExplicitlyDisengages\(currentMessage\)/);

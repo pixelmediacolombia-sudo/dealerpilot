@@ -183,6 +183,32 @@ test("an empty follow-up claim does not erase a still-active timer for the open 
   assert.equal(storage.lastMessengerFollowUp.externalThreadRef, externalThreadRef);
 });
 
+test("switching chats does not reset an active follow-up countdown", async () => {
+  const scheduledThread = "marketplace-thread::facebook-messages-thread-101::buyer-a::rav4";
+  const currentThread = "marketplace-thread::facebook-messages-thread-202::buyer-b::tundra";
+  const { handlers, storage } = createHarness({
+    initialStorage: {
+      lastMessengerFollowUp: {
+        externalThreadRef: scheduledThread,
+        cycleNumber: 4,
+        followUpsSent: 1,
+        maxFollowUps: 3,
+        status: "Active",
+        nextDueAt: "2099-08-14T01:30:00.000Z",
+      },
+    },
+    apiPost() {
+      return { ok: true, job: null, followUp: { status: "idle", followUpsSent: 0, maxFollowUps: 3, nextDueAt: null } };
+    },
+  });
+
+  await handlers.CLAIM_DUE_MESSENGER_FOLLOW_UP({ externalThreadRef: currentThread });
+
+  assert.equal(storage.lastMessengerFollowUp.status, "Active");
+  assert.equal(storage.lastMessengerFollowUp.nextDueAt, "2099-08-14T01:30:00.000Z");
+  assert.equal(storage.lastMessengerFollowUp.externalThreadRef, scheduledThread);
+});
+
 test("background keeps the latest 20 Messenger diagnostics", async () => {
   const { handlers, storage } = createHarness();
   for (let index = 0; index < 22; index += 1) {

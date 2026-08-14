@@ -422,7 +422,10 @@
     const isDealer = senderIsDealer(sender, sellerNameCandidates) || /\b(?:by\s+you|por\s+t[iú])\b/i.test(descriptor);
     const text = cleanMessageText(senderMatch?.[2] || sentMatch?.[1] || textOf(element));
     if (!text || UI_TEXT.test(text) || text.length > 500 || isUntrustedMessageText(text)) return null;
-    const ownAutoReply = sentWithoutNamedSender || isLikelyAutoReplyText(text) || isStaleQuickReplyText(text);
+    const ownAutoReply = sentWithoutNamedSender ||
+      isLikelyAutoReplyText(text) ||
+      isLikelyDealerPromptText(text) ||
+      isStaleQuickReplyText(text);
     return { speaker: isDealer || ownAutoReply ? "Dealer" : "Buyer", text, __top: rectOf(element).top || 0 };
   }
 
@@ -472,6 +475,15 @@
       /\b(?:id|tax id|passport|pasaporte).{0,120}\b(?:bank account|cuenta bancaria|cuenta de banco)\b/.test(normalized) ||
       /^perfect\b[\s\S]{0,80}\b(?:we will contact|contact you)\b/.test(normalized) ||
       /^good morning\b[\s\S]{0,120}\b(?:includes vin|all the info)\b/.test(normalized);
+  }
+
+  function isLikelyDealerPromptText(value) {
+    const normalized = normalizeForMatch(cleanMessageText(value));
+    return /^hello,? this is alpha motorsports\b/.test(normalized) ||
+      /^we will be happy to confirm that detail\b/.test(normalized) ||
+      /^we(?:'|â€™)?ll be happy to confirm that detail\b/.test(normalized) ||
+      /^hello\s+[\p{L}'-]{2,80},?\s+are you (?:still )?interested\??$/u.test(normalized) ||
+      /^(?:are you|todavia estas|todav[ií]a est[aá]s)\s+(?:still )?(?:interested|interesad[oa])\??$/.test(normalized);
   }
 
   function isStaleQuickReplyText(value) {
@@ -604,6 +616,7 @@
       }))
       .filter((candidate) => {
         if (candidate.ownSide) return false;
+        if (isLikelyDealerPromptText(candidate.text)) return false;
         if (!candidate.text || candidate.text.length < 4) return false;
         if (candidate.bubbleScore < 25 && candidate.top < scopeTop - 10) return false;
         if (UI_TEXT.test(candidate.text)) return false;
@@ -645,7 +658,7 @@
       if (!text || text.length < 2 || isUntrustedMessageText(text)) continue;
       if (isParticipantLabelText(normalizedText)) continue;
       if (/^[\p{L}][\p{L}\s.'’\-]{1,80}\s*(?:[\u00b7\u2022|]|Â·|â€¢)\s*buyer$/u.test(normalizedText)) continue;
-      if (isLikelyAutoReplyText(text) && !clearlyRightAligned) continue;
+      if ((isLikelyAutoReplyText(text) || isLikelyDealerPromptText(text)) && !clearlyRightAligned) continue;
       rows.push({ top: rect.top, speaker: clearlyRightAligned ? "Dealer" : (buyerName || "Buyer"), text });
     }
     return rows.sort((a, b) => a.top - b.top).map(({ speaker, text, top }) => ({ speaker, text, __top: top }));
@@ -723,12 +736,22 @@
       })
       : [];
     const visualMessages = mergeVisualMessageLists(scopedVisualMessages, rootVisualMessages);
-    const missingVisualMessages = semantic.length
+    // Facebook can expose a semantic descriptor with a stale/wrong sender while
+    // the bubble geometry still clearly identifies an outgoing Dealer message.
+    // Preserve the semantic text but trust an unambiguous right-aligned bubble
+    // for direction so Dealer prompts never re-enter the buyer history.
+    const reconciledSemantic = semantic.map((message) => {
+      const matchingVisual = visualMessages.find((visualMessage) =>
+        visualMessage.speaker === "Dealer" &&
+        normalizeForMatch(visualMessage.text) === normalizeForMatch(message.text));
+      return matchingVisual ? { ...message, speaker: "Dealer" } : message;
+    });
+    const missingVisualMessages = reconciledSemantic.length
       ? visualMessages.filter((message) =>
-        !semantic.some((semanticMessage) =>
+        !reconciledSemantic.some((semanticMessage) =>
           normalizeForMatch(semanticMessage.text) === normalizeForMatch(message.text)))
       : [];
-    const rawMessages = semantic.length ? [...semantic, ...missingVisualMessages] : visualMessages;
+    const rawMessages = reconciledSemantic.length ? [...reconciledSemantic, ...missingVisualMessages] : visualMessages;
     const messages = rawMessages
       .map((message) =>
         message.speaker === "Buyer" && buyerName ? { ...message, speaker: buyerName } : message,

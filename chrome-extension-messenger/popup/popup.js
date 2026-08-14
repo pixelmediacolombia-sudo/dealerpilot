@@ -179,20 +179,20 @@
   async function refreshConversation() {
     const button = $("refresh-conversation");
     button.disabled = true;
-    button.textContent = "Recargando conversación…";
+    button.textContent = "Refreshing conversation…";
     try {
       const response = await send({ type: "REFRESH_ACTIVE_MESSENGER_CONVERSATION" });
       const result = response?.data?.data || response?.data || response;
       if (!response?.ok || result?.ok === false) {
-        throw new Error(result?.error || response?.error || "No se pudo recargar la conversación activa.");
+        throw new Error(result?.error || response?.error || "Could not refresh the active conversation.");
       }
       $("diagnostics").textContent = result?.reason
-        ? `Conversación recargada: ${result.reason}.`
-        : "Conversación activa recargada.";
+        ? `Conversation refreshed: ${result.reason}.`
+        : "Active conversation refreshed.";
       await loadDebug();
     } finally {
       button.disabled = false;
-      button.textContent = "Recargar conversación activa";
+      button.textContent = "Refresh active conversation";
     }
   }
 
