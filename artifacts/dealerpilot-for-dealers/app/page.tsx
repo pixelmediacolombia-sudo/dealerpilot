@@ -14,13 +14,14 @@ const copy = {
   es: {
     language: "ES",
     otherLanguage: "EN",
-    nav: ["Inicio", "Cómo funciona", "Secciones", "Extensiones", "Precios"],
+    nav: ["Inicio", "Cómo funciona", "Secciones", "Herramientas", "Precios"],
     title: "Tu operación de ventas, en un solo lugar.",
     intro:
-      "DealerPilot convierte el inventario, las publicaciones y las conversaciones en una operación ordenada para que tu equipo sepa qué sigue.",
+      "Ordena inventario, publicaciones y conversaciones para que tu equipo sepa exactamente qué hacer después.",
     primaryCta: "Ver cómo funciona",
     secondaryCta: "Conocer los planes",
     welcome: "Una operación más clara",
+    commandCenter: "Centro de mando",
     ready: "Operación lista",
     attention: "3 oportunidades requieren atención",
     attentionText: "DealerPilot ordena el trabajo y te muestra el siguiente paso.",
@@ -29,18 +30,17 @@ const copy = {
     nextText: "Fotos, precio y descripción ya preparados",
     view: "Abrir centro de mando",
     metrics: ["Listos", "Publicados", "Compradores", "Alertas"],
-    activity: "Actividad de la operación",
-    activityText: "Rendimiento de publicaciones y conversaciones",
-    marketplace: "Marketplace",
-    marketplaceText: "Estado de publicación",
-    published: "Publicado",
-    scheduled: "Programado",
-    review: "En revisión",
-    actionTitle: "Acciones próximas",
-    actionItems: ["Publicar 3 vehículos recomendados", "Responder 7 compradores activos", "Retirar 1 anuncio de vehículo vendido"],
+    previewLabel: "HOY EN TU DEALER",
+    sold: "Vehículo vendido detectado",
+    soldText: "Retira su publicación para mantener el inventario al día.",
     workflowEyebrow: "Un flujo conectado",
     workflowTitle: "La operación se siente como un tablero, no como diez pestañas.",
     workflowText: "Cada módulo responde una pregunta concreta del día: qué está listo, qué necesita atención y qué puede avanzar ahora.",
+    workflowSteps: [
+      ["01", "Organiza", "Deja cada vehículo completo antes de convertirlo en una tarea."],
+      ["02", "Publica", "Mueve el inventario listo por el canal que corresponde."],
+      ["03", "Da seguimiento", "Mantén cada conversación conectada con la venta."],
+    ],
     modulesTitle: "Todo el trabajo del dealer, con la misma lógica visual.",
     modulesText: "Inventario, publicación, compradores y marca viven dentro de un mismo sistema operativo.",
     modules: [
@@ -51,12 +51,12 @@ const copy = {
       ["05", "Estudio de fotos", "Prepara galerías consistentes y portadas que venden."],
       ["06", "Dealer DNA", "Mantén el tono, las reglas y los datos propios de tu negocio."],
     ],
-    extensionsEyebrow: "Extensiones de DealerPilot",
-    extensionsTitle: "Automatización con contexto y control.",
+    extensionsEyebrow: "Herramientas de DealerPilot",
+    extensionsTitle: "Automatización con el contexto de tu operación.",
+    exploreTools: "Ver herramientas",
     extensions: [
       ["01", "Publisher", "Publica inventario en Facebook Marketplace con fotos y datos preparados."],
       ["02", "Messenger AI", "Prepara respuestas usando el vehículo real, el dealer y la intención del comprador."],
-      ["03", "Pages", "Publica inventario directamente en la página comercial mediante Meta."],
     ],
     trustTitle: "Ayuda donde sirve. Decisión humana donde importa.",
     trust: ["Tu inventario es la referencia", "El equipo conserva el control", "Cada canal tiene su función"],
@@ -73,13 +73,14 @@ const copy = {
   en: {
     language: "EN",
     otherLanguage: "ES",
-    nav: ["Overview", "How it works", "Sections", "Extensions", "Pricing"],
+    nav: ["Overview", "How it works", "Sections", "Tools", "Pricing"],
     title: "Your sales operation, in one place.",
     intro:
-      "DealerPilot turns inventory, listings, and buyer conversations into a clear operating system for your team.",
+      "Organize inventory, listings, and buyer conversations so your team always knows what to do next.",
     primaryCta: "See how it works",
     secondaryCta: "View plans",
     welcome: "A clearer operation",
+    commandCenter: "Command center",
     ready: "Operation ready",
     attention: "3 opportunities need attention",
     attentionText: "DealerPilot sorts the work and shows your next move.",
@@ -88,24 +89,20 @@ const copy = {
     nextText: "Photos, price, and description are ready",
     view: "Open command center",
     metrics: ["Ready", "Published", "Buyers", "Alerts"],
-    activity: "Operation activity",
-    activityText: "Listing and conversation performance",
-    marketplace: "Marketplace",
-    marketplaceText: "Publishing status",
-    published: "Published",
-    scheduled: "Scheduled",
-    review: "In review",
-    actionTitle: "Upcoming actions",
-    actionItems: ["Publish 3 recommended vehicles", "Reply to 7 active buyers", "Remove 1 sold vehicle listing"],
+    previewLabel: "TODAY AT YOUR DEALER",
+    sold: "Sold vehicle detected",
+    soldText: "Remove its listing to keep inventory up to date.",
     workflowEyebrow: "One connected workflow",
     workflowTitle: "Your operation feels like a command center, not ten browser tabs.",
     workflowText: "Every module answers a concrete daily question: what is ready, what needs attention, and what can move forward now.",
+    workflowSteps: [["01", "Organize", "Complete every vehicle before it becomes a task."], ["02", "Publish", "Move ready inventory through the right channel."], ["03", "Follow up", "Keep buyer conversations connected to the sale."]],
     modulesTitle: "Every dealer workflow, with the same visual logic.",
     modulesText: "Inventory, publishing, buyers, and brand live inside one operating system.",
     modules: [["01", "Command center", "Start the day with priorities, alerts, and the next move."], ["02", "Inventory", "Price, mileage, photos, and unit health in context."], ["03", "Marketplace", "Move from ready to publish to active listing with fewer steps."], ["04", "Messages", "Reply to buyers with the vehicle in context."], ["05", "Photo studio", "Prepare consistent galleries and selling cover photos."], ["06", "Dealer DNA", "Keep your business tone, rules, and data consistent."]],
-    extensionsEyebrow: "DealerPilot extensions",
+    extensionsEyebrow: "DealerPilot tools",
     extensionsTitle: "Context-aware automation with control.",
-    extensions: [["01", "Publisher", "Publish inventory to Facebook Marketplace with prepared photos and data."], ["02", "Messenger AI", "Prepare replies using the real vehicle, dealer, and buyer intent."], ["03", "Pages", "Publish inventory directly to the business Page through Meta."]],
+    exploreTools: "Explore tools",
+    extensions: [["01", "Publisher", "Publish inventory to Facebook Marketplace with prepared photos and data."], ["02", "Messenger AI", "Prepare replies using the real vehicle, dealer, and buyer intent."]],
     trustTitle: "Help where it matters. Human decisions where they count.",
     trust: ["Your inventory is the source of truth", "Your team stays in control", "Every channel has a job"],
     pricingEyebrow: "Plans built for operations",
@@ -117,17 +114,6 @@ const copy = {
   },
 } as const;
 
-function MiniChart() {
-  return (
-    <svg className="landingChart" viewBox="0 0 620 170" role="img" aria-label="Activity trend">
-      <defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#7658d6" stopOpacity=".28" /><stop offset="1" stopColor="#7658d6" stopOpacity="0" /></linearGradient></defs>
-      <path d="M0 145 C55 145 72 123 112 130 S164 99 208 110 S259 66 300 88 S347 103 382 72 S430 77 466 50 S528 82 563 36 S599 40 620 18 V170 H0 Z" fill="url(#chartFill)" />
-      <path d="M0 145 C55 145 72 123 112 130 S164 99 208 110 S259 66 300 88 S347 103 382 72 S430 77 466 50 S528 82 563 36 S599 40 620 18" fill="none" stroke="#7658d6" strokeWidth="4" strokeLinecap="round" />
-      {[0, 1, 2, 3].map((line) => <path key={line} d={`M0 ${35 + line * 35} H620`} stroke="#e8eaf3" strokeWidth="1" />)}
-    </svg>
-  );
-}
-
 function Brand() { return <a className="landingBrand" href="#inicio"><span className="landingBrandMark">DP</span><span>DealerPilot</span></a>; }
 
 export function DealerLanding({ locale = "es" }: { locale?: Locale }) {
@@ -138,7 +124,7 @@ export function DealerLanding({ locale = "es" }: { locale?: Locale }) {
         <header className="landingTopbar">
           <Brand />
           <nav className="topbarSections" aria-label="Landing page sections">
-            {t.nav.map((item, index) => <a className={index === 0 ? "active" : ""} href={index === 0 ? "#inicio" : index === 1 ? "#flujo" : index === 2 ? "#modulos" : index === 3 ? "#extensiones" : "#precios"} key={item}>{item}</a>)}
+            {t.nav.map((item, index) => <a className={index === 0 ? "active" : ""} href={index === 0 ? "#inicio" : index === 1 ? "#flujo" : index === 2 ? "#modulos" : index === 3 ? "#herramientas" : "#precios"} key={item}>{item}</a>)}
           </nav>
           <div className="topbarActions"><a href={locale === "es" ? "/en" : "/"}>{t.otherLanguage}</a><span>/</span><a className="current" href={locale === "es" ? "/" : "/en"}>{t.language}</a><span className="topbarAvatar">OP</span></div>
         </header>
@@ -153,30 +139,16 @@ export function DealerLanding({ locale = "es" }: { locale?: Locale }) {
               <div className="landingActions"><a className="landingPrimary" href="#flujo">{t.primaryCta}<span>→</span></a><a className="landingSecondary" href="#precios">{t.secondaryCta}<span>↗</span></a></div>
             </div>
             <div className="heroPreview">
-              <div className="previewTop"><div><span className="previewLogo">DP</span><strong>Command center</strong></div><span className="previewReady"><i /> {t.ready}</span></div>
-              <div className="previewBody"><p className="previewKicker">TODAY AT YOUR DEALER</p><h2>{t.attention}</h2><p>{t.attentionText}</p><div className="previewMetrics">{["5", "18", "7", "2"].map((value, index) => <div key={value}><strong className={index === 0 ? "violetNumber" : ""}>{value}</strong><span>{t.metrics[index]}</span></div>)}</div><div className="previewNext"><span className="numberBadge">1</span><div><strong>{t.nextTitle}</strong><small>{t.nextText}</small></div><span className="nextTag">{t.next}</span></div><div className="previewAlert"><span>✓</span><div><strong>Vehicle sold detected</strong><small>Remember to remove its Marketplace listing.</small></div></div></div>
+              <div className="previewTop"><div><span className="previewLogo">DP</span><strong>{t.commandCenter}</strong></div><span className="previewReady"><i /> {t.ready}</span></div>
+              <div className="previewBody"><p className="previewKicker">{t.previewLabel}</p><h2>{t.attention}</h2><p>{t.attentionText}</p><div className="previewMetrics">{["5", "18", "7", "2"].map((value, index) => <div key={value}><strong className={index === 0 ? "violetNumber" : ""}>{value}</strong><span>{t.metrics[index]}</span></div>)}</div><div className="previewNext"><span className="numberBadge">1</span><div><strong>{t.nextTitle}</strong><small>{t.nextText}</small></div><span className="nextTag">{t.next}</span></div><div className="previewAlert"><span>✓</span><div><strong>{t.sold}</strong><small>{t.soldText}</small></div></div></div>
             </div>
           </section>
 
-          <section className="kpiGrid motion-reveal" aria-label="DealerPilot metrics">
-            <article className="kpiCard kpiPurple"><span className="kpiIcon">↗</span><div><strong>94</strong><span>Eligible vehicles</span></div><small>+12% this month</small></article>
-            <article className="kpiCard kpiBlue"><span className="kpiIcon">▣</span><div><strong>30</strong><span>Live listings</span></div><small>+8 published today</small></article>
-            <article className="kpiCard kpiPink"><span className="kpiIcon">♡</span><div><strong>27</strong><span>Active buyers</span></div><small>7 need a reply</small></article>
-            <article className="kpiCard kpiGreen"><span className="kpiIcon">✓</span><div><strong>98%</strong><span>Operation health</span></div><small>All systems ready</small></article>
-          </section>
+          <section className="contentSection workflowSection motion-reveal" id="flujo"><div className="sectionIntro"><p className="landingEyebrow"><span /> {t.workflowEyebrow}</p><h2>{t.workflowTitle}</h2><p>{t.workflowText}</p></div><div className="workflowSteps">{t.workflowSteps.map(([number, title, text]) => <article key={number}><span>{number}</span><h3>{title}</h3><p>{text}</p><i>→</i></article>)}</div></section>
 
-          <section className="dashboardGrid motion-reveal" id="flujo">
-            <article className="landingPanel chartPanel"><div className="panelHeading"><div><p className="panelEyebrow">{t.activity}</p><h2>{t.activityText}</h2></div><select aria-label="Activity range" defaultValue="week"><option value="week">This week</option><option value="month">This month</option></select></div><MiniChart /><div className="chartLegend"><span><i className="legendViolet" />Listings</span><span><i className="legendBlue" />Buyer conversations</span><strong>+24.8%</strong></div></article>
-            <article className="landingPanel statusPanel"><div className="panelHeading"><div><p className="panelEyebrow">{t.marketplace}</p><h2>{t.marketplaceText}</h2></div><span className="panelMore">···</span></div><div className="statusRows"><div><span className="statusBullet publishedBullet" /><div><strong>{t.published}</strong><small>30 vehicles live</small></div><b>70%</b></div><div><span className="statusBullet scheduledBullet" /><div><strong>{t.scheduled}</strong><small>12 vehicles queued</small></div><b>20%</b></div><div><span className="statusBullet reviewBullet" /><div><strong>{t.review}</strong><small>4 need a final check</small></div><b>10%</b></div></div><a className="panelLink" href="#precios">{t.view} <span>→</span></a></article>
-          </section>
+          <section className="contentSection motion-reveal" id="modulos"><div className="sectionIntro centered"><p className="landingEyebrow"><span /> {t.modulesTitle}</p><h2>{t.modulesTitle}</h2><p>{t.modulesText}</p></div><div className="moduleGrid">{t.modules.map(([number, title, text], index) => <article className="moduleCard" key={number}><span className={`moduleIcon moduleIcon-${index}`}>{["⌘", "▦", "↗", "◌", "▧", "✦"][index]}</span><small>{number}</small><h3>{title}</h3><p>{text}</p><a href="#herramientas">{t.exploreTools} <span>→</span></a></article>)}</div></section>
 
-          <section className="actionStrip motion-reveal"><div><span className="actionBolt">✦</span><div><strong>{t.actionTitle}</strong><p>{t.actionItems[0]}</p></div></div><div className="actionList">{t.actionItems.slice(1).map((item, index) => <span key={item}><b>{index + 2}</b>{item}</span>)}</div><a href="#modulos">View all <span>→</span></a></section>
-
-          <section className="contentSection workflowSection motion-reveal"><div className="sectionIntro"><p className="landingEyebrow"><span /> {t.workflowEyebrow}</p><h2>{t.workflowTitle}</h2><p>{t.workflowText}</p></div><div className="workflowSteps">{[["01", "Inventory", "Organize every vehicle before it becomes a task."], ["02", "Publish", "Move ready inventory through the right channel."], ["03", "Follow up", "Keep buyer conversations connected to the sale."]].map(([number, title, text]) => <article key={number}><span>{number}</span><h3>{title}</h3><p>{text}</p><i>→</i></article>)}</div></section>
-
-          <section className="contentSection motion-reveal" id="modulos"><div className="sectionIntro centered"><p className="landingEyebrow"><span /> {t.modulesTitle}</p><h2>{t.modulesTitle}</h2><p>{t.modulesText}</p></div><div className="moduleGrid">{t.modules.map(([number, title, text], index) => <article className="moduleCard" key={number}><span className={`moduleIcon moduleIcon-${index}`}>{["⌘", "▦", "↗", "◌", "▧", "✦"][index]}</span><small>{number}</small><h3>{title}</h3><p>{text}</p><a href="#extensiones">Explore module <span>→</span></a></article>)}</div></section>
-
-          <section className="contentSection extensionSection motion-reveal" id="extensiones"><div className="sectionIntro"><p className="landingEyebrow"><span /> {t.extensionsEyebrow}</p><h2>{t.extensionsTitle}</h2></div><div className="extensionGrid">{t.extensions.map(([number, title, text]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div><b>↗</b></article>)}</div></section>
+          <section className="contentSection extensionSection motion-reveal" id="herramientas"><div className="sectionIntro"><p className="landingEyebrow"><span /> {t.extensionsEyebrow}</p><h2>{t.extensionsTitle}</h2></div><div className="extensionGrid">{t.extensions.map(([number, title, text]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div><b>↗</b></article>)}</div></section>
 
           <section className="trustBanner motion-reveal"><div><p className="landingEyebrow"><span /> {t.trustTitle}</p><h2>{t.trustTitle}</h2></div><div className="trustItems">{t.trust.map((item, index) => <div key={item}><span>0{index + 1}</span><strong>{item}</strong><p>Built into every DealerPilot workflow.</p></div>)}</div></section>
 
