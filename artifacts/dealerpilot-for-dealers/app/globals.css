@@ -30,7 +30,7 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid
 .onlineDot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #44c98b; box-shadow: 0 0 0 4px rgb(68 201 139 / .12); }
 .landingMain { width: 100%; margin-left: 0; }
 .landingTopbar { display: flex; align-items: center; gap: 20px; height: 76px; padding: 0 46px; background: #fff; border-bottom: 1px solid var(--line); }
-.topbarActions { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.topbarActions { display: flex; align-items: center; gap: 8px; margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 600; }
 .topbarActions .current { color: var(--violet); }
 .topbarAvatar { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin-left: 15px; color: #fff; background: var(--navy-2); border-radius: 50%; font-size: 10px; }
 .landingContent { max-width: 1520px; margin: 0 auto; padding: 42px 46px 0; }
@@ -78,7 +78,7 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid
 /* Shared landing navigation and motion refinements. */
 .landingMain { width: 100%; margin-left: 0; }
 .landingTopbar { position: sticky; top: 0; z-index: 5; background: rgb(255 255 255 / .94); backdrop-filter: blur(16px); }
-.topbarSections { display: flex; align-items: center; gap: 24px; margin-left: 34px; }
+.topbarSections { display: flex; flex: 1; align-items: center; gap: 24px; margin-left: 0; }
 .topbarSections a { position: relative; color: var(--muted); font-size: 12px; font-weight: 600; transition: color .18s ease; }
 .topbarSections a:hover, .topbarSections a.active { color: var(--violet); }
 .topbarSections a.active::after { position: absolute; right: 0; bottom: -29px; left: 0; height: 2px; content: ""; background: var(--violet); border-radius: 4px; }

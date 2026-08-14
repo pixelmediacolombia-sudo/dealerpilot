@@ -57,6 +57,7 @@ const copy = {
     extensions: [
       ["01", "Publisher", "Publica inventario en Facebook Marketplace con fotos y datos preparados."],
       ["02", "Messenger AI", "Prepara respuestas usando el vehículo real, el dealer y la intención del comprador."],
+      ["03", "Pages", "Publica vehículos directamente desde la página de Facebook de tu dealer."],
     ],
     trustTitle: "Ayuda donde sirve. Decisión humana donde importa.",
     trust: ["Tu inventario es la referencia", "El equipo conserva el control", "Cada canal tiene su función"],
@@ -102,7 +103,7 @@ const copy = {
     extensionsEyebrow: "DealerPilot tools",
     extensionsTitle: "Context-aware automation with control.",
     exploreTools: "Explore tools",
-    extensions: [["01", "Publisher", "Publish inventory to Facebook Marketplace with prepared photos and data."], ["02", "Messenger AI", "Prepare replies using the real vehicle, dealer, and buyer intent."]],
+    extensions: [["01", "Publisher", "Publish inventory to Facebook Marketplace with prepared photos and data."], ["02", "Messenger AI", "Prepare replies using the real vehicle, dealer, and buyer intent."], ["03", "Pages", "Publish vehicles directly from your dealership's Facebook Page."]],
     trustTitle: "Help where it matters. Human decisions where they count.",
     trust: ["Your inventory is the source of truth", "Your team stays in control", "Every channel has a job"],
     pricingEyebrow: "Plans built for operations",
