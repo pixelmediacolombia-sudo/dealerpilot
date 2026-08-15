@@ -19,6 +19,7 @@
   const pendingBuyerByThread = new Map();
   const lastAutoReplyByThread = new Map();
   const lastSuggestedReplyByThread = new Map();
+  const closedThreadKeys = new Set();
   let lastFollowUpState = {
     followUpsSent: 0,
     maxFollowUps: 3,
@@ -910,6 +911,7 @@
       status: "closed",
       nextDueAt: null,
     };
+    closedThreadKeys.add(externalThreadRef);
     return { closed: true, followUp: lastFollowUpState };
   }
 
@@ -1237,6 +1239,12 @@
     };
     const threadKey = payload.externalThreadRef;
     const latestText = cleanText(snapshot.lastMessage?.text || "");
+    if (closedThreadKeys.has(threadKey)) {
+      lastCaptureHashByThread.set(threadKey, payload.messageHash);
+      clearPendingBuyer(threadKey);
+      await sendDebug("blocked", { ...debug, reason: "conversation_closed" });
+      return { skipped: true, reason: "conversation_closed" };
+    }
     const lastAutoReply = lastAutoReplyByThread.get(threadKey) || {};
     const recentlySentOwnReply =
       !!latestText &&
@@ -1358,6 +1366,7 @@
       return { ok: false, error: errorDetails.message, errorDetails };
     }
     if (response.data?.skipped) {
+      if (response.data.reason === "conversation_closed") closedThreadKeys.add(threadKey);
       lastCaptureHashByThread.set(threadKey, payload.messageHash);
       await sendDebug("intake_skipped", {
         ...debug,

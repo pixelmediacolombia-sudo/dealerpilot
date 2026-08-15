@@ -889,6 +889,32 @@ test("terminal Spanish acknowledgement is not sent to AI and receives no automat
   assert.equal(calls.debug.at(-1).stage, "blocked");
 });
 
+test("a delivered phone confirmation permanently blocks later acknowledgements in the same thread", async () => {
+  const messages = [{ speaker: "Adot", text: "703-763-4675" }];
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages,
+    intakeResponse: {
+      ok: true,
+      data: {
+        conversationId: 91,
+        suggestedReply: "Thank you. We received your number and will contact you shortly.",
+        closeConversationAfterDelivery: true,
+      },
+    },
+    sendSucceeds: true,
+  });
+
+  const sent = await ai.captureConversation({ automatic: false });
+  assert.equal(sent.autoSent, true);
+  assert.equal(calls.messages.filter((message) => message.type === "CLOSE_MESSENGER_CONVERSATION").length, 1);
+
+  messages.push({ speaker: "Adot", text: "Ok" });
+  const blocked = await ai.captureConversation({ automatic: false });
+  assert.equal(blocked.reason, "conversation_closed");
+  assert.equal(calls.intake.length, 1);
+});
+
 test("group system event message is not sent to AI and receives no automatic reply", async () => {
   const { ai, calls, composerElement, sendButton } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },

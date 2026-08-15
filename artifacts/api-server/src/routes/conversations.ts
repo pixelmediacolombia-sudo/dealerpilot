@@ -534,6 +534,11 @@ function isConversationClosingBuyerAcknowledgement(value: string): boolean {
     /\b(?:no me interesa|ya no estoy interesado|no gracias|no me contacten|deja de escribir|adios|chao)\b/.test(normalized);
 }
 
+function isTerminalConversationStatus(status: string | null | undefined): boolean {
+  const normalized = cleanConversationText(status || "").toLowerCase();
+  return new Set(["closed", "bdc assigned", "sold", "lost"]).has(normalized);
+}
+
 function historyHasDealerReply(visibleMessages: string[]): boolean {
   return visibleMessages.some((message) =>
     /^(?:Dealer|DealerPilot AI|Assistant):/i.test(cleanConversationText(message)),
@@ -1710,6 +1715,31 @@ router.post("/conversations/intake", async (req, res) => {
     if (msg.role === "user") hasNewBuyerMessage = true;
   }
 
+  // A BDC handoff may still need a delivery retry for its final confirmation.
+  // Once a new buyer message arrives, however, terminal conversations must not
+  // be reopened by the automated intake path.
+  if (existingConv && hasNewBuyerMessage && isTerminalConversationStatus(existingConv.status)) {
+    await cancelFollowUpsForBuyerActivity({
+      dealerId,
+      externalThreadRef,
+      reason: "conversation_closed",
+    }).catch((error) => req.log.warn({ error, externalThreadRef }, "Terminal conversation follow-up cancel skipped"));
+    req.log.info(
+      { conversationId: existingConv.id, externalThreadRef, status: existingConv.status },
+      "Conversation intake skipped - conversation is already terminal",
+    );
+    res.json({
+      skipped: true,
+      reason: "conversation_closed",
+      timings: {
+        messageDetectedAt: messageDetectedAt.toISOString(),
+        backendReceivedAt: backendReceivedAt.toISOString(),
+        totalResponseMs: Date.now() - messageDetectedAt.getTime(),
+      },
+    });
+    return;
+  }
+
   if (hasNewBuyerMessage) {
     await cancelFollowUpsForBuyerActivity({
       dealerId,
@@ -1825,7 +1855,7 @@ router.post("/conversations/intake", async (req, res) => {
     formatConversationHistoryForAi(conversationHistoryForAi.length ? conversationHistoryForAi : incomingMsgs),
     inbound,
   );
-  const closeAfterDelivery = currentStage === "store_phone_requested";
+  const closeAfterDelivery = currentStage === "store_phone_requested" || currentStage === "phone_received";
   const latestExistingAssistant = existingMsgs.find((m) => m.role === "assistant");
   const shouldGenerateReply =
     !!inbound &&

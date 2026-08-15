@@ -39,6 +39,14 @@ test("a dealership phone request closes only after its reply is delivered and ne
   assert.match(conversationsSource, /closeConversationAfterDelivery/);
   assert.match(conversationsSource, /!closeAfterDelivery/);
   assert.match(conversationsSource, /close-after-delivery/);
+  assert.match(conversationsSource, /currentStage === "phone_received"/);
   assert.match(conversationsSource, /status: "closed"/);
+  assert.match(conversationsSource, /reason: "conversation_closed"/);
+});
+
+test("terminal conversations ignore later buyer acknowledgements", () => {
+  assert.match(conversationsSource, /function isTerminalConversationStatus/);
+  assert.match(conversationsSource, /\["closed", "bdc assigned", "sold", "lost"\]/);
+  assert.match(conversationsSource, /Conversation intake skipped - conversation is already terminal/);
   assert.match(conversationsSource, /reason: "conversation_closed"/);
 });
