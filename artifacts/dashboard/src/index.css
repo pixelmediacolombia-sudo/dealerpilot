@@ -38,7 +38,7 @@
   --color-sidebar-accent: hsl(var(--sidebar-accent));
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
-  --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-sans: "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   --radius-sm: 0.25rem;
@@ -134,6 +134,13 @@
     @apply bg-background font-sans text-foreground antialiased;
     min-width: 320px;
     letter-spacing: -0.005em;
+  }
+
+  [data-kpi-value="true"],
+  [data-vehicle-id="true"],
+  [data-vin="true"] {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 
   h1,
