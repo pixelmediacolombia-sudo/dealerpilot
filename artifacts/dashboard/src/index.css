@@ -242,6 +242,43 @@
   background: hsl(145 58% 46% / 0.8);
 }
 
+.gymove-work-queue {
+  box-shadow: var(--shadow-raised);
+}
+
+.gymove-list-row-selected {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 8px 18px hsl(var(--primary) / 0.18);
+}
+
+.gymove-list-row-selected .gymove-row-title,
+.gymove-list-row-selected .gymove-row-meta,
+.gymove-list-row-selected .gymove-row-icon,
+.gymove-list-row-selected .gymove-row-language {
+  color: hsl(var(--primary-foreground) / 0.86);
+}
+
+.gymove-list-row-selected .gymove-row-title {
+  color: hsl(var(--primary-foreground));
+}
+
+.gymove-list-row-selected .gymove-row-status {
+  border-color: hsl(var(--primary-foreground) / 0.35);
+  background: hsl(var(--primary-foreground) / 0.14);
+  color: hsl(var(--primary-foreground));
+}
+
+.gymove-row-cta-active {
+  background: hsl(43 96% 62%);
+  color: hsl(36 70% 18%);
+}
+
+.gymove-row-cta-active:hover {
+  background: hsl(43 98% 68%);
+}
+
 .theme-kpi-primary {
   border-color: hsl(var(--primary));
   background: hsl(var(--primary));
