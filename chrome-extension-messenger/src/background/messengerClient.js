@@ -8,6 +8,13 @@
     sessionId: "",
     sellerProfileNames: ["Alpha Manassas", "Alpha Motorsport", "Andres Ibanez"],
   });
+  const FOLLOW_UP_INBOX_URL = "https://www.facebook.com/marketplace/inbox";
+  const FOLLOW_UP_INBOX_PATTERNS = Object.freeze([
+    "https://www.facebook.com/marketplace/inbox*",
+    "https://web.facebook.com/marketplace/inbox*",
+    "https://facebook.com/marketplace/inbox*",
+  ]);
+  const FOLLOW_UP_INBOX_ALARM = "dealerpilot-messenger-follow-up-inbox";
 
   const conversationIntakeInFlight = new Set();
   const recentConversationIntakes = new Map();
@@ -60,6 +67,35 @@
         ? stored.sellerProfileNames.filter(Boolean)
         : DEFAULT_SETTINGS.sellerProfileNames,
     };
+  }
+
+  function isMarketplaceInboxTab(tab) {
+    return /^https:\/\/(?:www\.|web\.)?facebook\.com\/marketplace\/inbox(?:[/?#]|$)/i.test(String(tab?.url || ""));
+  }
+
+  /**
+   * Follow-ups are physically delivered through Messenger's DOM, so an enabled
+   * sender needs one durable inbox tab. Keep it inactive and reuse it to avoid
+   * interrupting the operator or creating duplicate Facebook tabs.
+   */
+  async function ensureFollowUpInboxTab() {
+    const settings = await getSettings();
+    if (settings.dryRun || !settings.autoReplyEnabled) {
+      return { skipped: true, reason: settings.dryRun ? "dry_run_enabled" : "auto_reply_disabled" };
+    }
+    const tabs = await chrome.tabs.query({ url: [...FOLLOW_UP_INBOX_PATTERNS] });
+    const existing = tabs.find(isMarketplaceInboxTab);
+    if (existing?.id) return { tabId: existing.id, reused: true };
+    const created = await chrome.tabs.create({ url: FOLLOW_UP_INBOX_URL, active: false });
+    return { tabId: created?.id ?? null, reused: false };
+  }
+
+  async function preserveMissingDefaultSettings() {
+    const stored = await chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS));
+    const missing = Object.fromEntries(
+      Object.entries(DEFAULT_SETTINGS).filter(([key]) => stored[key] === undefined),
+    );
+    if (Object.keys(missing).length > 0) await chrome.storage.local.set(missing);
   }
 
   async function saveLastError(err) {
@@ -546,24 +582,28 @@
       });
       return data;
     },
+
+    async ENSURE_MESSENGER_FOLLOW_UP_INBOX() {
+      return ensureFollowUpInboxTab();
+    },
   };
 
-  chrome.runtime.onInstalled?.addListener(() => {
-    chrome.storage.local.set({
-      dryRun: true,
-      autoReplyEnabled: false,
-      backendUrl: DEFAULT_SETTINGS.backendUrl,
-      sellerProfileNames: DEFAULT_SETTINGS.sellerProfileNames,
-    }).catch(() => {});
+  chrome.runtime.onInstalled?.addListener(async () => {
+    await preserveMissingDefaultSettings().catch(() => {});
     chrome.alarms?.create?.("dealerpilot-messenger-heartbeat", { periodInMinutes: 1 });
+    chrome.alarms?.create?.(FOLLOW_UP_INBOX_ALARM, { periodInMinutes: 1 });
+    await ensureFollowUpInboxTab().catch(() => {});
   });
 
   chrome.runtime.onStartup?.addListener(() => {
     chrome.alarms?.create?.("dealerpilot-messenger-heartbeat", { periodInMinutes: 1 });
+    chrome.alarms?.create?.(FOLLOW_UP_INBOX_ALARM, { periodInMinutes: 1 });
     reportSessionStatus().catch(() => {});
+    ensureFollowUpInboxTab().catch(() => {});
   });
   chrome.alarms?.onAlarm?.addListener((alarm) => {
     if (alarm?.name === "dealerpilot-messenger-heartbeat") reportSessionStatus().catch(() => {});
+    if (alarm?.name === FOLLOW_UP_INBOX_ALARM) ensureFollowUpInboxTab().catch(() => {});
   });
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

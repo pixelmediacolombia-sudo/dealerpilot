@@ -8,9 +8,10 @@ const source = readFileSync(
   "utf8",
 );
 
-function createHarness({ apiPost, initialStorage = {}, activeTab = null, activeTabResponse = null } = {}) {
+function createHarness({ apiPost, initialStorage = {}, activeTab = null, activeTabResponse = null, inboxTabs = [] } = {}) {
   const storage = { extensionId: "msg-ext-test", ...initialStorage };
-  const calls = { apiPost: [], debugger: [], tabs: [] };
+  const calls = { apiPost: [], debugger: [], tabs: [], alarms: [] };
+  const listeners = {};
   let runtimeComposerText = "";
   const chrome = {
     storage: {
@@ -27,18 +28,28 @@ function createHarness({ apiPost, initialStorage = {}, activeTab = null, activeT
       },
     },
     runtime: {
-      onInstalled: { addListener() {} },
+      onInstalled: { addListener(listener) { listeners.installed = listener; } },
+      onStartup: { addListener(listener) { listeners.startup = listener; } },
       onMessage: { addListener() {} },
     },
     tabs: {
       async query(query) {
         calls.tabs.push({ type: "query", query });
+        if (Array.isArray(query?.url)) return inboxTabs;
         return activeTab ? [activeTab] : [];
+      },
+      async create(options) {
+        calls.tabs.push({ type: "create", options });
+        return { id: 901, ...options };
       },
       async sendMessage(tabId, message) {
         calls.tabs.push({ type: "sendMessage", tabId, message });
         return activeTabResponse;
       },
+    },
+    alarms: {
+      create(name, options) { calls.alarms.push({ name, options }); },
+      onAlarm: { addListener(listener) { listeners.alarm = listener; } },
     },
     debugger: {
       async attach(target, version) {
@@ -84,7 +95,7 @@ function createHarness({ apiPost, initialStorage = {}, activeTab = null, activeT
     console: { warn() {}, log() {}, error() {} },
   });
   vm.runInContext(source, context, { filename: "messengerClient.js" });
-  return { handlers: context.DealerPilotMessengerHandlers, calls, storage };
+  return { handlers: context.DealerPilotMessengerHandlers, calls, storage, listeners };
 }
 
 const intakePayload = {
@@ -116,6 +127,55 @@ test("background sends only the existing conversations intake contract", async (
   assert.equal(calls.apiPost[0].body.availabilityQuickReplyAccepted, false);
   assert.equal(storage.lastConversationIntake.suggestedReply, "reply for marketplace-thread::buyer-a::rav4");
   assert.equal(storage.lastConversationIntake.suggestedReplyPreview, "reply for marketplace-thread::buyer-a::rav4");
+});
+
+test("extension updates preserve an operator-approved automatic messaging setting", async () => {
+  const { storage, listeners, calls } = createHarness({
+    initialStorage: {
+      dryRun: false,
+      autoReplyEnabled: true,
+      backendUrl: "https://dealer.example",
+      sellerProfileNames: ["Andres Ibanez"],
+    },
+    inboxTabs: [{ id: 77, url: "https://www.facebook.com/marketplace/inbox" }],
+  });
+
+  await listeners.installed();
+
+  assert.equal(storage.dryRun, false);
+  assert.equal(storage.autoReplyEnabled, true);
+  assert.equal(storage.backendUrl, "https://dealer.example");
+  assert.deepEqual(storage.sellerProfileNames, ["Andres Ibanez"]);
+  assert.equal(calls.tabs.some((call) => call.type === "create"), false);
+  assert.deepEqual(calls.alarms.map((alarm) => alarm.name).sort(), [
+    "dealerpilot-messenger-follow-up-inbox",
+    "dealerpilot-messenger-heartbeat",
+  ]);
+});
+
+test("enabled automatic messaging opens one inactive Marketplace inbox for due follow-ups", async () => {
+  const { handlers, calls } = createHarness({
+    initialStorage: { dryRun: false, autoReplyEnabled: true },
+  });
+
+  const result = await handlers.ENSURE_MESSENGER_FOLLOW_UP_INBOX();
+
+  assert.equal(result.tabId, 901);
+  assert.equal(result.reused, false);
+  assert.equal(JSON.stringify(calls.tabs[0]), JSON.stringify({
+    type: "query",
+    query: {
+      url: [
+        "https://www.facebook.com/marketplace/inbox*",
+        "https://web.facebook.com/marketplace/inbox*",
+        "https://facebook.com/marketplace/inbox*",
+      ],
+    },
+  }));
+  assert.equal(JSON.stringify(calls.tabs[1]), JSON.stringify({
+    type: "create",
+    options: { url: "https://www.facebook.com/marketplace/inbox", active: false },
+  }));
 });
 
 test("background deduplicates identical intakes inside the extension", async () => {
