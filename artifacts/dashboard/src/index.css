@@ -271,6 +271,12 @@
   color: hsl(var(--primary-foreground));
 }
 
+.gymove-list-row-selected .gymove-row-chip {
+  border-color: hsl(var(--primary-foreground) / 0.35);
+  background: hsl(var(--primary-foreground) / 0.14);
+  color: hsl(var(--primary-foreground));
+}
+
 .gymove-list-row-selected .gymove-row-anchor {
   background: hsl(var(--primary-foreground) / 0.16);
   color: hsl(var(--primary-foreground));
