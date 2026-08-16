@@ -14,6 +14,11 @@ export function formatMileage(mileage: number | null | undefined): string {
   }).format(mileage) + " mi";
 }
 
+export function formatNumber(value: number | null | undefined): string {
+  if (value == null) return "N/A";
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
 export function formatDate(dateString: string | null | undefined): string {
   if (!dateString) return "N/A";
   const date = new Date(dateString);

@@ -1,3 +1,5 @@
+import { formatCurrency, formatMileage } from "./format";
+
 /**
  * dailyPlan.ts — DealerPilot AI Publishing Decision Engine
  *
@@ -264,7 +266,7 @@ export function buildDailyMarketplacePlan(
     if (imageCount >= 15) reasons.push(`${imageCount} photos available`);
     else if (imageCount > 0) reasons.push(`${imageCount} photos`);
     if (actualPrice != null) {
-      reasons.push(`Marketplace price: $${actualPrice.toLocaleString()} total`);
+      reasons.push(`Marketplace price: ${formatCurrency(actualPrice)} total`);
       if (actualPrice < 28_000) reasons.push("High-click Marketplace price range");
     }
     if (["toyota", "honda"].includes(w.make.toLowerCase())) reasons.push("High-trust Marketplace make");
@@ -712,7 +714,7 @@ export function generateReasoning(rec: DailyVehicleRec, duplicateGroups: Duplica
   }
   const parts = [`I selected this ${rec.year ?? ""} ${rec.make} ${rec.model} based on its opportunity score (${rec.opportunityScore ?? "—"})`];
   if (rec.imageCount > 0) parts.push(`${rec.imageCount} photos ready`);
-  if (rec.mileage != null && rec.mileage < 40_000) parts.push(`low mileage (${rec.mileage.toLocaleString()} mi)`);
+  if (rec.mileage != null && rec.mileage < 40_000) parts.push(`low mileage (${formatMileage(rec.mileage)})`);
   if (rec.primarySegment !== "General") parts.push(`strong ${rec.primarySegment} buyer segment match`);
   return parts.join(", ") + ".";
 }

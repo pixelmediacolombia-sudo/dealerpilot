@@ -28,11 +28,10 @@ import { cn } from "@/lib/utils";
 import { PublishNowModal } from "@/features/publishing/components/PublishNowModal";
 import { GmCoachModal } from "@/components/GmCoachModal";
 import { GmDecisionLogPanel } from "@/components/GmDecisionLogPanel";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatNumber } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import {
   buildDailyMarketplacePlan,
-  generateReason,
   generateReasoning,
   generateMorningBrief,
   computeConfidence,
@@ -65,9 +64,11 @@ import {
 
 function scoreColor(score: number | null) {
   if (score == null) return { pill: "bg-muted border-border text-muted-foreground", label: "" };
-  if (score >= 80) return { pill: "bg-success/15 border-success/25 text-success", label: "HOT" };
-  if (score >= 70) return { pill: "bg-warning/15 border-warning/25 text-warning", label: "WARM" };
-  return { pill: "bg-muted border-border text-muted-foreground", label: "WATCH" };
+  // Opportunity ranking is not an operational alert. Keep its chip in the
+  // soft lavender navigation accent; reserve amber for real attention states.
+  if (score >= 80) return { pill: "bg-primary/10 border-primary/20 text-primary", label: "HOT" };
+  if (score >= 70) return { pill: "bg-primary/10 border-primary/20 text-primary", label: "WARM" };
+  return { pill: "bg-primary/10 border-primary/20 text-primary", label: "WATCH" };
 }
 
 function langBadgeClass(lang: string) {
@@ -223,18 +224,21 @@ function StrategyRow({
   duplicateGroups,
   onPublish,
   onAddToBatch,
+  selected,
+  onSelect,
 }: {
   rec: DailyVehicleRec;
   rank: number;
   duplicateGroups: DuplicateGroup[];
   onPublish: (id: number) => void;
   onAddToBatch: (id: number) => void;
+  selected: boolean;
+  onSelect: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [, setLocation] = useLocation();
   const sc = scoreColor(rec.opportunityScore);
   const isTopMove = rank <= 3;
-  const reason = generateReason(rec);
   const hasSegment = rec.primarySegment && rec.primarySegment !== "General";
 
   // Pre-compute all GM intelligence (only needed when expanded)
@@ -256,26 +260,36 @@ function StrategyRow({
     <div>
       {/* ── Row ────────────────────────────────────────────────────────────── */}
       <div
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected}
+        onClick={onSelect}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect();
+          }
+        }}
         className={cn(
-          "flex items-center gap-0 border-b border-border hover:bg-muted transition-colors group",
-          isTopMove && "border-l-[2px] border-l-blue-500/25",
+          "gymove-list-row group m-1 flex items-center gap-0 rounded-lg border border-border/70 bg-card transition-[background-color,border-color,box-shadow,transform] hover:border-primary/20 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          selected && "gymove-list-row-selected",
         )}
       >
         {/* Rank + Score */}
-        <div className="w-[58px] shrink-0 py-3.5 pl-4 flex flex-col items-center gap-1.5">
-          <span className={cn("text-[12px] font-semibold leading-none", isTopMove ? "text-primary" : "text-muted-foreground")}>
+        <div className="w-[66px] shrink-0 py-3.5 pl-3 flex flex-col items-center gap-1.5">
+          <span className={cn("gymove-row-anchor flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-[12px] font-bold leading-none text-primary", selected && "bg-primary-foreground/20 text-primary-foreground")}>
             #{rank}
           </span>
           {rec.opportunityScore != null && (
-            <span className={cn("text-[11px] font-semibold px-1.5 rounded border leading-[18px]", sc.pill)}>
+            <span className={cn("gymove-row-status text-[11px] font-semibold px-1.5 rounded border leading-[18px]", sc.pill)}>
               {rec.opportunityScore}
             </span>
           )}
         </div>
 
         {/* Photo + Vehicle */}
-        <div className="flex items-center gap-3 py-3 pr-5 flex-[2.2] min-w-0">
-          <div className="w-[58px] h-[44px] rounded-lg overflow-hidden shrink-0 bg-muted border border-border">
+        <div className="flex min-w-0 flex-1 items-center gap-3 py-3 pr-5">
+          <div className="h-[40px] w-[50px] shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
             {rec.primaryImageUrl ? (
               <img src={rec.primaryImageUrl} alt={rec.label} className="w-full h-full object-cover" />
             ) : (
@@ -285,15 +299,15 @@ function StrategyRow({
             )}
           </div>
           <div className="min-w-0">
-            <p className="text-[13px] font-bold text-foreground truncate leading-snug">{rec.label}</p>
-            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+            <p className="gymove-row-title text-[13px] font-bold text-foreground truncate leading-snug">{rec.label}</p>
+            <p className="gymove-row-meta mt-0.5 flex items-center gap-x-2 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground">
               {rec.priceMode === "DOWN_PAYMENT" && rec.marketplacePrice != null ? (
-                <span className="text-warning/70">{formatCurrency(rec.marketplacePrice)} down</span>
+                <span className="shrink-0 text-warning/70">{formatCurrency(rec.marketplacePrice)} down</span>
               ) : rec.actualPrice != null ? (
-                <span>{formatCurrency(rec.actualPrice)}</span>
+                <span className="shrink-0">{formatCurrency(rec.actualPrice)}</span>
               ) : null}
               {rec.imageCount > 0 && (
-                <span className="flex items-center gap-0.5 text-muted-foreground">
+                <span className="flex shrink-0 items-center gap-0.5 text-muted-foreground">
                   <ImageIcon className="w-2.5 h-2.5" />{rec.imageCount}
                 </span>
               )}
@@ -302,29 +316,24 @@ function StrategyRow({
         </div>
 
         {/* Audience */}
-        <div className="py-3 pr-5 w-[148px] shrink-0">
+        <div className="w-[132px] shrink-0 py-3 pr-4">
           {hasSegment ? (
             <>
-              <p className="text-[11px] font-semibold text-muted-foreground leading-tight truncate">{rec.primarySegment}</p>
-              <p className={cn("text-[11px] font-bold mt-0.5  tracking-wide", langBadgeClass(rec.suggestedLanguage))}>
+              <p className="gymove-row-meta text-[11px] font-semibold text-muted-foreground leading-tight truncate">{rec.primarySegment}</p>
+              <p className={cn("gymove-row-language mt-0.5 text-[11px] font-bold tracking-wide", langBadgeClass(rec.suggestedLanguage))}>
                 {rec.suggestedLanguage}
               </p>
             </>
           ) : (
-            <p className="text-[11px] text-muted-foreground">General</p>
+            <p className="gymove-row-meta text-[11px] text-muted-foreground">General</p>
           )}
-        </div>
-
-        {/* Reason */}
-        <div className="py-3 pr-5 flex-[1.8] min-w-0 hidden lg:block">
-          <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">{reason}</p>
         </div>
 
         {/* Actions */}
         <div className="py-3 pr-4 shrink-0 flex items-center gap-1.5">
           <button
-            className="text-muted-foreground hover:text-muted-foreground p-1 transition-colors"
-            onClick={() => setExpanded(v => !v)}
+            className="gymove-row-icon p-1 text-muted-foreground transition-colors hover:text-foreground"
+            onClick={(event) => { event.stopPropagation(); setExpanded(v => !v); }}
             title="DealerPilot Analysis"
           >
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -332,12 +341,14 @@ function StrategyRow({
           <Button
             size="sm"
             className={cn(
-              "h-7 gap-1.5 text-[11px] font-bold px-3.5 rounded-lg",
-              isTopMove
-                ? "bg-primary hover:bg-primary text-foreground shadow-lg shadow-blue-500/20"
-                : "bg-muted hover:bg-muted text-muted-foreground border border-border",
+              "h-8 gap-1.5 rounded-md px-3.5 text-[11px] font-bold",
+              selected
+                ? "gymove-row-cta-active shadow-sm"
+                : isTopMove
+                  ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                  : "border border-border bg-muted text-muted-foreground hover:bg-muted/80",
             )}
-            onClick={() => onPublish(rec.vehicleId)}
+            onClick={(event) => { event.stopPropagation(); onPublish(rec.vehicleId); }}
           >
             <UploadCloud className="w-3 h-3" />
             {isTopMove ? "Publish" : "Queue"}
@@ -347,7 +358,8 @@ function StrategyRow({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-muted rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                className="gymove-row-icon h-8 w-8 rounded-md p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                onClick={(event) => event.stopPropagation()}
               >
                 <MoreHorizontal className="w-3.5 h-3.5" />
               </Button>
@@ -451,7 +463,7 @@ function StrategyRow({
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <div className="text-[18px] font-semibold text-destructive/50 leading-none tabular-nums">
-                    {intelligence.cost.reachLoss.toLocaleString()}
+                    {formatNumber(intelligence.cost.reachLoss)}
                   </div>
                   <div className="text-[11px] text-muted-foreground mt-1">Buyers missed</div>
                 </div>
@@ -463,7 +475,7 @@ function StrategyRow({
                 </div>
                 <div>
                   <div className="text-[18px] font-semibold text-destructive/50 leading-none tabular-nums">
-                    ${intelligence.cost.revenueLoss.toLocaleString()}
+                    {formatCurrency(intelligence.cost.revenueLoss)}
                   </div>
                   <div className="text-[11px] text-muted-foreground mt-1">Revenue opportunity</div>
                 </div>
@@ -548,14 +560,14 @@ function StrategyTable({
   onAddToBatch: (id: number) => void;
 }) {
   const all10 = [...plan.recommendedToday, ...plan.nextBest];
+  const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(all10[0]?.vehicleId ?? null);
   return (
-    <div className="rounded-xl border border-border overflow-hidden">
+    <div className="gymove-work-queue rounded-xl border border-border bg-muted/45 p-2">
       {/* Table header */}
-      <div className="flex items-center gap-0 border-b border-border bg-muted">
-        <div className="w-[58px] shrink-0" />
-        <div className="flex-[2.2] pr-5 py-2.5 text-[11px] font-semibold text-muted-foreground  tracking-wide">Vehicle</div>
-        <div className="w-[148px] shrink-0 pr-5 py-2.5 text-[11px] font-semibold text-muted-foreground  tracking-wide">Audience</div>
-        <div className="flex-[1.8] pr-5 py-2.5 text-[11px] font-semibold text-muted-foreground  tracking-wide hidden lg:block">Reason</div>
+      <div className="flex items-center gap-0 rounded-lg bg-muted/80 px-1">
+        <div className="w-[66px] shrink-0" />
+        <div className="min-w-0 flex-1 pr-5 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide">Vehicle</div>
+        <div className="w-[132px] shrink-0 pr-4 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide">Audience</div>
         <div className="w-[130px] shrink-0 pr-4 py-2.5 text-[11px] font-semibold text-muted-foreground  tracking-wide text-right">Action</div>
       </div>
 
@@ -568,12 +580,14 @@ function StrategyTable({
           duplicateGroups={plan.duplicateGroups}
           onPublish={onPublish}
           onAddToBatch={onAddToBatch}
+          selected={selectedVehicleId === rec.vehicleId}
+          onSelect={() => setSelectedVehicleId(rec.vehicleId)}
         />
       ))}
 
       {/* Divider: Next Best */}
       {plan.nextBest.length > 0 && (
-        <div className="flex items-center gap-3 px-5 py-2 border-y border-border bg-muted">
+        <div className="flex items-center gap-3 px-3 py-2">
           <div className="h-px flex-1 bg-muted" />
           <span className="text-[11px] font-semibold text-muted-foreground  tracking-wide">
             Next Best · Positions 4–{3 + plan.nextBest.length}
@@ -591,6 +605,8 @@ function StrategyTable({
           duplicateGroups={plan.duplicateGroups}
           onPublish={onPublish}
           onAddToBatch={onAddToBatch}
+          selected={selectedVehicleId === rec.vehicleId}
+          onSelect={() => setSelectedVehicleId(rec.vehicleId)}
         />
       ))}
 
@@ -752,17 +768,17 @@ export function SalesHub() {
       <div className="flex h-full min-w-0 overflow-hidden">
 
         {/* ── MAIN COLUMN ────────────────────────────────────────────────────── */}
-        <div className="min-w-0 flex-1 overflow-y-auto">
-          <div className="max-w-[1180px] p-4 sm:p-6 lg:p-8">
+        <div className="min-w-0 flex-1 overflow-y-auto bg-background">
+          <div className="max-w-[1240px] p-4 sm:p-6 lg:p-7">
 
             {/* Mission Header */}
-            <div className="mb-8 pt-1">
+            <div className="mb-6 rounded-xl border border-border bg-card p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)] sm:p-6">
               <p className="text-[11px] font-semibold text-primary/32  tracking-wide mb-5">
                 Command · {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
               </p>
               <div className="flex flex-col items-stretch gap-5 sm:flex-row sm:items-end sm:gap-6">
                 <div className="flex-1">
-                  <h1 className="mb-3 text-[42px] font-semibold leading-[0.95] tracking-tight text-foreground sm:text-[52px]">
+                  <h1 className="gymove-hero-title mb-3 text-[clamp(2.25rem,5vw,3.25rem)] font-semibold leading-[0.95] tracking-tight text-foreground">
                     {isLoading ? (
                       <span className="text-muted-foreground">Loading…</span>
                     ) : top10Count > 0 ? (
@@ -787,17 +803,17 @@ export function SalesHub() {
             </div>
 
             {/* Gymove-style KPI row: same live values, denser operational presentation */}
-            <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
               {[
-                { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? top10Count), label: "Ready", path: "/listings" },
-                { value: isLoading ? "—" : String(listingsLive), label: "Live", path: "/listings?tab=published" },
-                { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", path: "/sales-ai" },
-                { value: "0", label: "Appts", path: "/sales-ai" },
-                { value: isLoading ? "—" : String(issueCount), label: "Issues", path: "/listings?tab=failed" },
+                { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? top10Count), label: "Ready", path: "/listings", tone: "purple" },
+                { value: isLoading ? "—" : String(listingsLive), label: "Live", path: "/listings?tab=published", tone: "green" },
+                { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", path: "/sales-ai", tone: "blue" },
+                { value: "0", label: "Appts", path: "/sales-ai", tone: "amber" },
+                { value: isLoading ? "—" : String(issueCount), label: "Issues", path: "/listings?tab=failed", tone: "pink" },
               ].map(m => (
-                <button key={m.label} onClick={() => setLocation(m.path)} className="theme-kpi-primary min-h-[112px] rounded-2xl border px-4 py-4 text-left shadow-[0_5px_16px_rgb(15_23_42/0.045)] transition-[box-shadow,transform] hover:-translate-y-px hover:shadow-md">
-                  <div className="mb-2 text-[34px] font-semibold leading-none tracking-tighter tabular-nums text-primary-foreground">{m.value}</div>
-                  <div className="text-[11px] font-semibold text-primary-foreground/78">{m.label}</div>
+                <button key={m.label} onClick={() => setLocation(m.path)} data-kpi-tone={m.tone} className={cn("gymove-kpi-card min-h-[104px] rounded-lg border px-4 py-4 text-left shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)] transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md", m.tone === "purple" ? "gymove-kpi-purple" : m.tone === "green" ? "gymove-kpi-green" : m.tone === "blue" ? "gymove-kpi-blue" : m.tone === "amber" ? "gymove-kpi-amber" : "gymove-kpi-pink") }>
+                  <div className="mb-2 text-[30px] font-bold leading-none tracking-tighter tabular-nums text-foreground">{m.value}</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">{m.label}</div>
                 </button>
               ))}
             </div>
@@ -823,9 +839,9 @@ export function SalesHub() {
             {!isLoading && plan && top10Count > 0 && <MorningBrief plan={plan} />}
 
             {/* Today's Publishing Strategy */}
-            <div className="mb-8">
+            <div className="mb-8 rounded-xl border border-border bg-card p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)] sm:p-4">
               <div className="flex items-center gap-3 mb-4">
-                <p className="text-[11px] font-semibold text-muted-foreground  tracking-wide">
+                <p className="text-[11px] font-semibold text-muted-foreground tracking-wide">
                   Today's Publishing Strategy
                 </p>
                 {plan && (

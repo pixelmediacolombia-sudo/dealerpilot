@@ -156,7 +156,7 @@ function ratingClass(rating: string | null | undefined) {
     case "Good":
       return "bg-primary/10 text-primary border-primary/20";
     case "Needs Improvement":
-      return "bg-warning/10 text-warning border-warning/20";
+      return "bg-primary/10 text-primary border-primary/20";
     default:
       return "bg-secondary text-muted-foreground border-border";
   }
@@ -474,7 +474,7 @@ export function ListingsWorkspace() {
     ["ready", "scheduled", "failed", "all"].includes(activeTab);
 
   const tabClass =
-    "text-xs font-semibold px-3 py-1.5 rounded-none border-0 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground gap-1.5 transition-colors bg-transparent data-[state=active]:bg-transparent shadow-none";
+    "gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold transition-colors data-[state=active]:border-primary/15 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-card data-[state=inactive]:hover:text-foreground";
 
   const countBadge = (n: number) =>
     n > 0 ? (
@@ -515,7 +515,7 @@ export function ListingsWorkspace() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-[1600px] mx-auto animate-in fade-in duration-400">
+        <div className="mx-auto max-w-[1240px] p-4 animate-in fade-in duration-400 sm:p-6 lg:p-7">
           <PageHeader
             eyebrow="Marketplace"
             module="marketplace"
@@ -529,12 +529,12 @@ export function ListingsWorkspace() {
                 </Button>
               </Link>
             }
-            className="mb-0"
+            className="mb-5 rounded-xl border border-border bg-card p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)] sm:p-6"
           />
 
           {/* Tab rail */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-0">
-            <TabsList className="bg-transparent border-0 border-b border-border gap-0 flex-nowrap overflow-x-auto whitespace-nowrap w-full rounded-none h-auto px-0 pb-0 justify-start">
+            <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-xl border border-border bg-muted/60 p-1">
               <TabsTrigger value="ready" className={tabClass}>
                 Ready {countBadge(readyCount)}
               </TabsTrigger>
@@ -657,7 +657,7 @@ export function ListingsWorkspace() {
           {isCardTab && (
             <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
               {/* Toolbar */}
-              <div className="flex flex-col sm:flex-row gap-3 items-center py-3 border-y border-border">
+              <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-[0_1px_2px_rgb(15_23_42/0.03)] sm:flex-row">
                 <div className="relative flex-1 w-full max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input
@@ -696,12 +696,12 @@ export function ListingsWorkspace() {
                   <div className="flex items-center rounded-lg border border-border overflow-hidden shrink-0">
                     <button
                       onClick={() => setViewMode("list")}
-                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors", viewMode === "list" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground")}
+                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors", viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
                     ><List className="w-3 h-3" /> List</button>
                     <div className="w-px h-4 bg-muted" />
                     <button
                       onClick={() => setViewMode("grid")}
-                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors", viewMode === "grid" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground")}
+                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors", viewMode === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
                     ><LayoutGrid className="w-3 h-3" /> Grid</button>
                   </div>
                 </div>
@@ -858,20 +858,21 @@ export function ListingsWorkspace() {
                 />
               ) : viewMode === "list" ? (
                 /* ── Compact List View ── */
-                <div className="rounded-xl border border-border/40 overflow-hidden">
+                <div className="gymove-work-queue rounded-xl border border-border bg-muted/45 p-2 pb-24">
                   {/* List header */}
-                  <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border text-[11px] font-semibold  tracking-wide text-muted-foreground">
+                  <div className="flex items-center gap-3 rounded-lg bg-muted/80 px-3 py-2.5 text-[11px] font-semibold tracking-wide text-muted-foreground">
                     <div className="w-5 flex-shrink-0">
                       <Checkbox
                         checked={selectionCount === filteredSortedWorkspaces.length && filteredSortedWorkspaces.length > 0}
                         onCheckedChange={(checked) => checked ? selectAll() : clearSelection()}
                       />
                     </div>
-                    <div className="w-[72px] flex-shrink-0">Photo</div>
+                    <div className="w-9 flex-shrink-0">Year</div>
+                    <div className="w-[60px] flex-shrink-0">Photo</div>
                     <div className="flex-1 min-w-0">Vehicle</div>
-                    <div className="w-[90px] text-center flex-shrink-0 hidden lg:block">Score</div>
-                    <div className="w-[120px] flex-shrink-0 hidden md:block">Price</div>
-                    <div className="w-[150px] flex-shrink-0 hidden xl:block">Strategy</div>
+                    <div className="w-[78px] flex-shrink-0 text-center hidden lg:block">Score</div>
+                    <div className="w-[110px] flex-shrink-0 hidden md:block">Price</div>
+                    <div className="w-[150px] flex-shrink-0 hidden 2xl:block">Strategy</div>
                     <div className="w-[120px] flex-shrink-0 text-right">Action</div>
                   </div>
                   {filteredSortedWorkspaces.map((w) => {
@@ -896,15 +897,18 @@ export function ListingsWorkspace() {
                       <div
                         key={w.vehicleId}
                         className={cn(
-                          "flex items-center gap-3 px-4 py-2.5 min-h-[72px] border-b border-border last:border-b-0 transition-colors hover:bg-muted",
-                          isSelected && "bg-success/[0.04] border-l-2 border-l-green-500/40"
+                          "gymove-list-row group m-1 flex min-h-[72px] items-center gap-3 rounded-lg border border-border/70 bg-card px-3 py-2.5 transition-[background-color,border-color,box-shadow,transform] hover:border-primary/20 hover:shadow-sm",
+                          isSelected && "gymove-list-row-selected"
                         )}
                       >
                         <div className="w-5 flex-shrink-0">
                           <Checkbox checked={isSelected} onCheckedChange={() => toggleSelected(w.vehicleId)} />
                         </div>
                         {/* Thumbnail */}
-                        <div className="relative w-[72px] h-[52px] flex-shrink-0 rounded-lg overflow-hidden bg-secondary/50">
+                        <div className="gymove-row-anchor flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold leading-none text-primary">
+                          {w.year ?? "—"}
+                        </div>
+                        <div className="relative h-[44px] w-[60px] shrink-0 overflow-hidden rounded-lg border border-border bg-secondary/50">
                           {w.primaryImageUrl ? (
                             <img src={w.primaryImageUrl} alt="" className="w-full h-full object-cover" />
                           ) : (
@@ -913,7 +917,7 @@ export function ListingsWorkspace() {
                             </div>
                           )}
                           {(w.imageCount ?? 0) > 0 && (
-                            <div className="absolute bottom-0.5 right-0.5 flex items-center gap-0.5 bg-black/70 text-white text-[11px] font-bold px-1 py-0.5 rounded">
+                              <div className="absolute bottom-0.5 right-0.5 flex items-center gap-0.5 rounded bg-black/70 px-1 py-0.5 text-[11px] font-bold text-white">
                               <ImageIcon className="w-2 h-2" />{w.imageCount}
                             </div>
                           )}
@@ -921,17 +925,18 @@ export function ListingsWorkspace() {
                         {/* Vehicle info */}
                         <div className="flex-1 min-w-0">
                           <Link href={`/listings/${w.vehicleId}`}>
-                            <div className="font-semibold text-sm text-foreground hover:text-primary truncate transition-colors cursor-pointer">
+                            <div className="gymove-row-title cursor-pointer truncate text-sm font-bold text-foreground transition-colors hover:text-primary">
                               {w.label}
                             </div>
                           </Link>
-                          <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <div className="gymove-row-meta mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                             {w.vin && <span className="font-mono">{w.vin.slice(-6)}</span>}
                             {w.bodyStyle && <><span className="text-border/80">·</span><span>{w.bodyStyle}</span></>}
                             {w.publishStatus && (
                               <span className={cn(
-                                "px-1.5 py-0.5 rounded text-[11px] font-bold  tracking-wide",
-                                w.publishStatus === "Approved" || w.publishStatus === "Queued" ? "bg-success/10 text-success" :
+                                "gymove-row-status rounded border px-1.5 py-0.5 text-[11px] font-bold tracking-wide",
+                                w.publishStatus === "Approved" ? "bg-success/10 text-success" :
+                                w.publishStatus === "Queued" ? "bg-primary/10 text-primary" :
                                 w.publishStatus === "Needs Review" ? "bg-destructive/10 text-destructive" :
                                 w.publishStatus === "Published" ? "bg-primary/10 text-primary" :
                                 "bg-muted text-muted-foreground"
@@ -941,18 +946,18 @@ export function ListingsWorkspace() {
                             )}
                           </div>
                           {recLabel && (
-                            <span className={cn("inline-flex items-center text-[11px] font-bold  tracking-wide px-1.5 py-0.5 rounded mt-0.5", recColor)}>
+                            <span className={cn("gymove-row-chip mt-0.5 inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-bold tracking-wide", recColor)}>
                               {recLabel}
                             </span>
                           )}
                         </div>
                         {/* AI score */}
-                        <div className="w-[90px] flex-shrink-0 text-center hidden lg:block">
+                        <div className="w-[78px] flex-shrink-0 text-center hidden lg:block">
                           {photoScore != null ? (
                             <div className={cn(
-                              "inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold",
+                              "gymove-row-status inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-bold",
                               photoScore >= 88 ? "bg-success/15 text-success" :
-                              photoScore >= 65 ? "bg-warning/15 text-warning" :
+                              photoScore >= 65 ? "bg-primary/10 text-primary" :
                               "bg-destructive/15 text-destructive"
                             )}>
                               <Gauge className="w-3 h-3" />{photoScore}
@@ -960,8 +965,8 @@ export function ListingsWorkspace() {
                           ) : <span className="text-muted-foreground text-xs">—</span>}
                         </div>
                         {/* Prices */}
-                        <div className="w-[120px] flex-shrink-0 hidden md:block">
-                          <div className={cn("font-bold text-sm", mpPrice && "text-muted-foreground line-through text-xs leading-tight")}>
+                        <div className="w-[110px] flex-shrink-0 hidden md:block">
+                            <div className={cn("gymove-row-meta font-bold text-sm", mpPrice && "text-muted-foreground line-through text-xs leading-tight")}>
                             {w.price ? formatCurrency(w.price) : "—"}
                           </div>
                           {mpPrice && (
@@ -971,18 +976,18 @@ export function ListingsWorkspace() {
                           )}
                         </div>
                         {/* Strategy */}
-                        <div className="w-[150px] flex-shrink-0 hidden xl:block">
+                        <div className="w-[150px] flex-shrink-0 hidden 2xl:block">
                           {intel?.strategyName ? (
-                            <span className="inline-block px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs font-semibold truncate max-w-full">
+                            <span className="gymove-row-chip inline-block max-w-full truncate rounded border bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
                               {intel.strategyName}
                             </span>
                           ) : (
-                            <span className={cn("text-xs font-semibold px-1.5 py-0.5 rounded inline-block", statusCfg.bg, statusCfg.color)}>
+                            <span className={cn("gymove-row-chip inline-block rounded border px-1.5 py-0.5 text-xs font-semibold", statusCfg.bg, statusCfg.color)}>
                               {strategyStatus === "needs_strategy_review" ? "Needs Review" : "Not Prioritized"}
                             </span>
                           )}
                           {w.priorityScore > 0 && (
-                            <div className={cn("text-[11px] mt-0.5 font-semibold", w.priorityScore >= 70 ? "text-primary" : "text-muted-foreground")}>
+                            <div className={cn("gymove-row-meta mt-0.5 text-[11px] font-semibold", w.priorityScore >= 70 ? "text-primary" : "text-muted-foreground")}>
                               Priority {w.priorityScore}
                             </div>
                           )}
@@ -991,14 +996,17 @@ export function ListingsWorkspace() {
                         <div className="w-[140px] flex-shrink-0 flex items-center justify-end gap-1.5">
                           <Button
                             size="sm"
-                            className="h-8 px-3 text-xs gap-1 premium-gradient-btn text-primary-foreground whitespace-nowrap font-bold tracking-wide"
+                            className={cn(
+                              "h-8 gap-1 whitespace-nowrap rounded-md px-3 text-xs font-bold tracking-wide",
+                              isSelected ? "gymove-row-cta-active" : "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
+                            )}
                             onClick={(e) => { e.stopPropagation(); setPublishNowVehicleId(w.vehicleId); }}
                           >
                             <UploadCloud className="w-3 h-3" />
                             Publish Now
                           </Button>
                           <Link href={`/listings/${w.vehicleId}`}>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" title="Review Listing">
+                            <Button size="sm" variant="ghost" className="gymove-row-icon h-7 w-7 p-0 text-muted-foreground hover:text-foreground" title="Review Listing">
                               <Eye className="w-3.5 h-3.5" />
                             </Button>
                           </Link>
@@ -1052,7 +1060,7 @@ export function ListingsWorkspace() {
                     </div>
                   );
                 })()}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-24">
                   {filteredSortedWorkspaces.map((w, i) => {
                     const photoScore = photoScoreByVehicle.get(w.vehicleId);
                     const isReady = activeTab === "ready" || w.publishStatus === "Approved" || w.publishStatus === "Queued";
@@ -1213,7 +1221,7 @@ export function ListingsWorkspace() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="gap-1.5 px-4 font-bold text-[11px]  tracking-wide whitespace-nowrap border-success/40 text-success hover:bg-success/10"
+                        className="gymove-row-cta-active gap-1.5 border-transparent px-4 font-bold text-[11px] tracking-wide whitespace-nowrap hover:border-transparent"
                         disabled={bulkSchedule.isPending}
                         onClick={() => {
                           const readyIds = filteredSortedWorkspaces

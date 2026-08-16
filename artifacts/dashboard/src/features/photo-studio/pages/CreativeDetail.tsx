@@ -116,7 +116,7 @@ export function CreativeDetail() {
             </div>
           </div>
 
-          <div className="p-8 max-w-7xl mx-auto space-y-8">
+          <div className="gymove-surface-shell p-8 max-w-7xl mx-auto space-y-8">
 
             {/* ── Main panel: photo viewer + info ── */}
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
@@ -135,7 +135,7 @@ export function CreativeDetail() {
                 </div>
 
                 {/* Main photo */}
-                <div className="aspect-[4/3] bg-secondary/30 rounded-xl overflow-hidden relative">
+                <div className="gymove-surface-panel aspect-[4/3] overflow-hidden relative">
                   {activePhoto?.url ? (
                     <img
                       src={activePhoto.url}
@@ -204,7 +204,7 @@ export function CreativeDetail() {
               </div>
 
               {/* Right: vehicle info + AI review placeholder */}
-              <div className="space-y-4">
+              <div className="gymove-surface-panel space-y-4 p-5">
 
                 {/* Vehicle info */}
                 <div className="rounded-xl border border-border/40 bg-card/50 overflow-hidden">

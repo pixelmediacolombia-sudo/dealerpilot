@@ -76,8 +76,8 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="relative z-20 hidden h-[100dvh] w-[260px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[4px_0_18px_rgb(15_23_42/0.035)] lg:flex">
-        <Link href="/" className="flex h-[82px] items-center gap-3 border-b border-sidebar-border px-6" aria-label="DealerPilot home">
+      <aside className="relative z-20 hidden h-[100dvh] w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[4px_0_18px_rgb(15_23_42/0.035)] lg:flex">
+        <Link href="/" className="flex h-[72px] items-center gap-3 border-b border-sidebar-border px-5" aria-label="DealerPilot home">
           <BrandMark />
           <span className="min-w-0">
             <span className="block text-[16px] font-bold tracking-[-0.02em] text-sidebar-foreground">DealerPilot</span>
@@ -85,33 +85,33 @@ export function Sidebar() {
           </span>
         </Link>
 
-        <div className="px-5 pb-4 pt-5">
-          <div className="flex items-center gap-2 rounded-xl border border-sidebar-border bg-sidebar px-3.5 py-3 shadow-[0_3px_12px_rgb(15_23_42/0.035)]">
+        <div className="px-4 pb-3 pt-4">
+          <div className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2.5 shadow-[0_3px_12px_rgb(15_23_42/0.035)]">
             <span className={cn("h-1.5 w-1.5 rounded-full", dealer?.status === "active" ? "bg-success" : "bg-muted-foreground/40")} />
             <span className="min-w-0 truncate text-xs font-semibold text-sidebar-foreground/75">
               {dealer?.name ?? "Alpha MotorSports"}
             </span>
           </div>
-          <Link href="/inventory" className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-[0_8px_18px_rgb(15_23_42/0.12)] transition-[background-color,transform] hover:bg-primary/90 hover:-translate-y-px">
+          <Link href="/inventory" className="mt-3 flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-[0_8px_18px_rgb(15_23_42/0.12)] transition-[background-color,transform] hover:bg-primary/90 hover:-translate-y-px">
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add vehicle
           </Link>
         </div>
 
-        <nav aria-label="Main navigation" className="flex-1 space-y-1 overflow-y-auto px-4 py-2 overscroll-contain">
+        <nav aria-label="Main navigation" className="flex-1 space-y-1 overflow-y-auto px-3 py-2 overscroll-contain">
           {visibleNavItems.map((item, index) => {
             const active = isActive(item);
             return (
               <div key={item.path}>
                 {index === 0 || visibleNavItems[index - 1].group !== item.group ? (
-                <p className="px-3 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[0.16em] text-sidebar-foreground/40 first:pt-2">{item.group}</p>
+                <p className="px-3 pb-2 pt-5 text-[11px] font-semibold tracking-[0.02em] text-sidebar-foreground/45 first:pt-2">{item.group}</p>
                 ) : null}
                 <Link
                   href={item.path}
                   aria-current={active ? "page" : undefined}
                   title={item.name}
                   className={cn(
-                    "group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] transition-[background-color,color,box-shadow]",
+                    "group relative flex min-h-10 items-center gap-3 rounded-lg px-3 text-[13px] transition-[background-color,color,box-shadow]",
                     active
                       ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
                       : "text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
@@ -126,10 +126,10 @@ export function Sidebar() {
           })}
         </nav>
 
-        <div className="border-t border-sidebar-border p-4">
+        <div className="border-t border-sidebar-border p-3">
           <DropdownMenu>
           <DropdownMenuTrigger asChild>
-              <button className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground" aria-label="Open operator menu">
+              <button className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground" aria-label="Open operator menu">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sidebar-border bg-sidebar-accent text-[10px] font-semibold text-sidebar-accent-foreground">OP</span>
                 <span className="flex-1 text-left text-sm font-medium">Operator</span>
                 <ChevronUp className="h-4 w-4" aria-hidden="true" />
@@ -154,7 +154,7 @@ export function Sidebar() {
         </div>
       </aside>
 
-      <nav aria-label="Mobile navigation" className={cn("fixed inset-x-0 bottom-0 z-40 grid h-[68px] border-t border-sidebar-border bg-sidebar px-1 pb-[env(safe-area-inset-bottom)] text-sidebar-foreground shadow-[0_-8px_24px_rgb(15_23_42/0.18)] lg:hidden", isBasicPlan ? "grid-cols-6" : "grid-cols-7")}>
+      <nav aria-label="Mobile navigation" className={cn("fixed inset-x-0 bottom-0 z-40 grid h-[68px] border-t border-sidebar-border bg-sidebar px-2 pb-[env(safe-area-inset-bottom)] text-sidebar-foreground shadow-[0_-8px_24px_rgb(15_23_42/0.18)] lg:hidden", isBasicPlan ? "grid-cols-6" : "grid-cols-7")}>
         {visibleNavItems.map((item) => {
           const active = isActive(item);
           return (
@@ -162,7 +162,7 @@ export function Sidebar() {
               key={item.path}
               href={item.path}
               aria-current={active ? "page" : undefined}
-              className={cn("flex min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-medium", active ? "text-sidebar-primary" : "text-sidebar-foreground/60")}
+              className={cn("relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg text-[10px] font-medium", active ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground/60")}
             >
               <item.icon className="h-[18px] w-[18px]" aria-hidden="true" />
               <span className="max-w-full truncate">{item.shortName}</span>

@@ -138,7 +138,7 @@ export function Settings() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-5xl mx-auto space-y-8 pb-20 fade-in slide-in-from-bottom-4 duration-500 animate-in">
+        <div className="gymove-surface-shell p-8 max-w-5xl mx-auto space-y-8 pb-20 fade-in slide-in-from-bottom-4 duration-500 animate-in">
           
           <PageHeader
             eyebrow="Configuration"
@@ -162,7 +162,7 @@ export function Settings() {
                       id="name" 
                       value={name} 
                       onChange={(e) => setName(e.target.value)} 
-                      className="bg-black/20 border-border"
+                      className="bg-muted/45 border-border"
                     />
                   </div>
                   <div className="space-y-3">
@@ -172,7 +172,7 @@ export function Settings() {
                       value={websiteUrl} 
                       onChange={(e) => setWebsiteUrl(e.target.value)}
                       placeholder="https://"
-                      className="bg-black/20 border-border"
+                      className="bg-muted/45 border-border"
                     />
                   </div>
                 </div>
@@ -204,7 +204,7 @@ export function Settings() {
                       value={xmlFeedUrl} 
                       onChange={(e) => setXmlFeedUrl(e.target.value)}
                       placeholder="https://..."
-                      className="flex-1 font-mono text-sm bg-black/20 border-border"
+                      className="flex-1 font-mono text-sm bg-muted/45 border-border"
                     />
                     <Button 
                       variant="secondary"
@@ -217,7 +217,7 @@ export function Settings() {
                   </div>
                 </div>
 
-                <div className="bg-black/20 rounded-xl p-6 border border-border relative overflow-hidden">
+                  <div className="bg-muted/45 rounded-xl p-6 border border-border relative overflow-hidden">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 relative z-10">
                     <div>
                       <h4 className="font-medium text-foreground text-sm  tracking-wider">Manual Sync Trigger</h4>
@@ -265,7 +265,7 @@ export function Settings() {
                     <Alert variant="destructive" className="mt-6 bg-destructive/10 border-destructive/20 text-destructive relative z-10">
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>Last Sync Encountered Issues</AlertTitle>
-                      <AlertDescription className="text-xs mt-2 opacity-90 font-mono break-all bg-black/40 p-2 rounded">
+                      <AlertDescription className="text-xs mt-2 opacity-90 font-mono break-all bg-muted p-2 rounded">
                         {dealer.lastError}
                       </AlertDescription>
                     </Alert>
@@ -291,7 +291,7 @@ export function Settings() {
                   const config = getStatusConfig(svc?.status || "unknown");
 
                   return (
-                    <div key={key} className="flex flex-col justify-between p-4 rounded-xl bg-black/20 border border-border hover:border-border transition-colors">
+                    <div key={key} className="gymove-box-row flex flex-col justify-between p-4 hover:border-border transition-colors">
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <Icon className="w-5 h-5 text-muted-foreground" />
@@ -326,12 +326,12 @@ export function Settings() {
             >
               <div className="space-y-3">
                 {(!feedRunsData?.feedRuns || feedRunsData.feedRuns.length === 0) ? (
-                  <div className="text-center p-6 bg-black/20 rounded-xl border border-border border-dashed">
+                  <div className="text-center p-6 bg-muted/45 rounded-xl border border-border border-dashed">
                     <p className="text-sm text-muted-foreground">No sync history available.</p>
                   </div>
                 ) : (
                   feedRunsData.feedRuns.slice(0, 5).map((run) => (
-                    <div key={run.id} className="flex items-center justify-between p-4 rounded-xl bg-black/20 border border-border">
+                    <div key={run.id} className="gymove-box-row flex items-center justify-between p-4">
                       <div className="flex items-center gap-4">
                         {run.status === "success" ? (
                           <div className="p-2 bg-success/10 text-success rounded-lg">

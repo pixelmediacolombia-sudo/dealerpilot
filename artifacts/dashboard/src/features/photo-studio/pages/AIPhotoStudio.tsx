@@ -193,7 +193,7 @@ function toCount(value: number | string | undefined): number {
 const AI_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   Ready:      { label: "AI Enhanced",  color: "text-success bg-success/10 border-success/20" },
   Processing: { label: "Processing",   color: "text-primary bg-primary/10 border-primary/20" },
-  Queued:     { label: "In Queue",     color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
+  Queued:     { label: "In Queue",     color: "text-primary bg-primary/10 border-primary/20" },
   Failed:     { label: "Needs Attention",  color: "text-destructive bg-destructive/10 border-destructive/20" },
   Pending:    { label: "Ready to Enhance",  color: "text-muted-foreground bg-muted border-border" },
 };
@@ -230,7 +230,7 @@ function VehicleCard({
 
   return (
     <div className={cn(
-      "flex items-center gap-5 px-5 py-3.5 border-b border-border last:border-0 transition-colors hover:bg-muted",
+      "gymove-box-row flex items-center gap-5 px-4 py-3.5 transition-colors",
       isFailed && "border-l-2 border-l-red-500/30",
       isProcessing && "border-l-2 border-l-blue-500/30",
       isDone && aiStatus === "Ready" && "border-l-2 border-l-amber-500/25",
@@ -356,7 +356,7 @@ function InventoryBrowser({
   }, [data?.vehicles, search]);
 
   return (
-    <div className="border border-border rounded-xl overflow-hidden">
+    <div className="gymove-surface-panel overflow-hidden">
       {/* Section header */}
       <button
         onClick={() => setExpanded((e) => !e)}
@@ -414,7 +414,7 @@ function InventoryBrowser({
               return (
                 <div
                   key={vehicle.id}
-                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted transition-colors"
+                  className="gymove-box-row flex items-center gap-4 px-4 py-3.5 hover:bg-muted transition-colors"
                 >
                   {/* Thumbnail */}
                   <div className="w-14 h-10 rounded-lg overflow-hidden bg-muted border border-border shrink-0">
@@ -568,9 +568,9 @@ export function AIPhotoStudio() {
   const displayFailedCount = statsFailedCount || failedCount;
 
   const kpis = [
-    { label: "Enhanced", value: displayReadyCount, icon: Sparkles, color: "text-warning" },
+    { label: "Enhanced", value: displayReadyCount, icon: Sparkles, color: "text-success" },
     { label: "In Progress", value: displayProcessingCount, icon: Loader2, color: displayProcessingCount > 0 ? "text-primary" : "text-muted-foreground", spin: displayProcessingCount > 0 },
-    { label: "Needs Attention", value: displayFailedCount, icon: Clock, color: displayFailedCount > 0 ? "text-destructive" : "text-muted-foreground" },
+    { label: "Needs Attention", value: displayFailedCount, icon: Clock, color: displayFailedCount > 0 ? "text-destructive" : "text-warning" },
   ];
 
   if (openVehicleId !== null) {
@@ -585,7 +585,7 @@ export function AIPhotoStudio() {
 
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto px-6 py-6 space-y-8">
+      <div className="gymove-surface-shell max-w-5xl mx-auto px-6 py-6 space-y-8">
         <PageHeader
           eyebrow="AI Photo Studio"
           module="photo-studio"
@@ -614,7 +614,7 @@ export function AIPhotoStudio() {
           {kpis.map((kpi) => {
             const Icon = kpi.icon;
             return (
-              <div key={kpi.label} className="bg-card border border-border rounded-xl p-4">
+              <div key={kpi.label} className="gymove-kpi-card gymove-surface-panel p-4" data-kpi-tone={kpi.label === "Enhanced" ? "green" : kpi.label === "In Progress" ? "blue" : "amber"}>
                 <Icon className={cn("w-4 h-4 mb-2", kpi.color, (kpi as { spin?: boolean }).spin && "animate-spin")} />
                 <div className={cn("text-2xl font-bold", kpi.color)}>{kpi.value}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">{kpi.label}</div>
@@ -625,7 +625,7 @@ export function AIPhotoStudio() {
 
         {stats?.providers?.enhancement && (
           <div className={cn(
-            "flex items-center justify-between gap-4 rounded-xl border p-4",
+            "gymove-surface-panel flex items-center justify-between gap-4 p-4",
             stats.providers.restoration?.enabled
               ? "border-success/20 bg-success/[0.04]"
               : "border-warning/20 bg-warning/[0.04]",
@@ -653,14 +653,14 @@ export function AIPhotoStudio() {
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card/40 p-3">
+        <div className="gymove-surface-panel flex items-center justify-between gap-3 p-3">
           <div className="min-w-0">
             <div className="text-xs font-semibold text-foreground">Processing mode</div>
             <div className="text-[11px] text-muted-foreground">
               Cost is confirmed before OpenAI restoration starts.
             </div>
           </div>
-          <div className="flex rounded-lg border border-border bg-muted p-1">
+          <div className="gymove-segmented">
             {([
               ["fidelity-first", "Fidelity First"],
               ["balanced", "Balanced"],
@@ -669,12 +669,13 @@ export function AIPhotoStudio() {
               <button
                 key={mode}
                 type="button"
+                aria-pressed={processingMode === mode}
                 onClick={() => setProcessingMode(mode)}
                 className={cn(
-                  "px-3 py-1.5 text-[11px] font-semibold rounded-md transition-colors",
+                  "text-[11px] font-semibold",
                   processingMode === mode
-                    ? "bg-primary/20 text-primary border border-primary/25"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? ""
+                    : "hover:text-foreground",
                 )}
               >
                 {label}
@@ -706,7 +707,7 @@ export function AIPhotoStudio() {
               </div>
             </div>
             {/* Queue header */}
-            <div className="flex items-center gap-5 px-5 py-2 text-[11px] font-semibold  tracking-wide text-muted-foreground border border-border rounded-t-xl">
+            <div className="gymove-surface-panel-muted flex items-center gap-5 px-5 py-2 text-[11px] font-semibold tracking-wide text-muted-foreground">
               <div className="w-[72px] shrink-0">Frame</div>
               <div className="flex-1 min-w-0">Vehicle</div>
               <div className="shrink-0 hidden md:block w-28">Status</div>

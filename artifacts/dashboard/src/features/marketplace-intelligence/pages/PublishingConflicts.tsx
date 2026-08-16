@@ -8,7 +8,7 @@ import {
 } from "@workspace/api-client-react";
 import { useDealerLocation } from "@/context/LocationContext";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatMileage } from "@/lib/format";
 import {
   buildDailyMarketplacePlan,
   buildPublishReasons,
@@ -91,7 +91,7 @@ function VehicleDecisionCard({
             </span>
           )}
           {vehicle.mileage != null && (
-            <span>{vehicle.mileage.toLocaleString()} mi</span>
+            <span>{formatMileage(vehicle.mileage)}</span>
           )}
         </p>
 
@@ -137,7 +137,7 @@ function DuplicateGroupCard({ group }: { group: DuplicateGroup }) {
   const totalVehicles = 1 + group.holdOthers.length;
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden mb-4">
+    <div className="gymove-surface-panel overflow-hidden mb-4">
       {/* Group header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted">
         <div>
@@ -203,7 +203,7 @@ export function PublishingConflictsPage() {
   return (
     <AppLayout>
       <div className="overflow-y-auto h-full">
-        <div className="p-8 max-w-[860px]">
+        <div className="gymove-surface-shell p-8 max-w-[860px]">
 
           {/* ── Header ───────────────────────────────────────────────────────── */}
           <div className="mb-8">
@@ -250,7 +250,7 @@ export function PublishingConflictsPage() {
             ].map(s => (
               <div
                 key={s.label}
-                className="rounded-xl border border-border bg-muted p-5"
+                className="gymove-surface-panel-muted p-5"
               >
                 <div className={cn("text-[32px] font-semibold leading-none mb-1.5 tabular-nums", s.accent)}>
                   {isLoading ? "—" : s.value}

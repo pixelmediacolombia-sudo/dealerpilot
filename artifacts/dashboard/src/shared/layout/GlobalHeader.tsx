@@ -102,7 +102,7 @@ function LocationSelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="group flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-border/70 bg-card px-3 text-left shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-colors hover:bg-muted">
+        <button className="group flex min-h-9 shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-card px-3 text-left shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-colors hover:bg-muted">
           <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span className="hidden text-sm font-medium text-foreground lg:inline">
             Alpha Motorsport
@@ -295,7 +295,7 @@ export function GlobalHeader() {
                   : "Dealer operations";
 
   return (
-    <header className="relative z-30 flex min-h-[78px] shrink-0 items-center gap-3 overflow-hidden border-b border-border bg-card px-4 py-3 shadow-[0_1px_0_rgb(15_23_42/0.02)] sm:gap-4 sm:px-6 2xl:gap-5">
+    <header className="relative z-30 flex min-h-[56px] shrink-0 items-center gap-3 overflow-hidden border-b border-border bg-card px-4 py-2 shadow-[0_1px_0_rgb(15_23_42/0.02)] sm:gap-4 sm:px-6 2xl:gap-5">
 
       <div className="hidden w-[142px] shrink-0 items-center gap-3 lg:flex">
         <div className="min-w-0 max-w-full">

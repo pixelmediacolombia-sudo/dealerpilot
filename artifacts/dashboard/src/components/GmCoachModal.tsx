@@ -7,6 +7,7 @@ import {
 } from "@/shared/ui/sheet";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/format";
 import {
   Brain,
   ShieldAlert,
@@ -379,7 +380,7 @@ export function GmCoachModal({
                   <div>
                     <p className="text-[11px] text-muted-foreground  tracking-wider mb-0.5">Current</p>
                     <p className="text-[15px] font-semibold text-muted-foreground">
-                      ${vehiclePrice != null ? vehiclePrice.toLocaleString() : "—"}
+                      {vehiclePrice != null ? formatCurrency(vehiclePrice) : "—"}
                     </p>
                   </div>
                   {priceDelta !== 0 && hypoPrice != null && (
@@ -391,7 +392,7 @@ export function GmCoachModal({
                           "text-[15px] font-semibold",
                           priceDelta < 0 ? "text-success/70" : "text-destructive/70",
                         )}>
-                          ${hypoPrice.toLocaleString()}
+                          {formatCurrency(hypoPrice)}
                         </p>
                       </div>
                     </>

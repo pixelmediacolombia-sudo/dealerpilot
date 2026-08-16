@@ -22,6 +22,7 @@ import {
   Send, UserCheck,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency, formatMileage } from "@/lib/format";
 
 const API_BASE = "/api";
 const DEALER_ID = 1;
@@ -126,8 +127,7 @@ function fmtRelative(iso: string | null): string {
 }
 
 function fmtPrice(p: number | null): string {
-  if (!p) return "—";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(p);
+  return p == null ? "—" : formatCurrency(p);
 }
 
 function vehicleLabel(v: VehicleInfo | null, fallback: string | null): string {
@@ -165,10 +165,10 @@ function ConvRow({ conv, selected, onClick }: {
     <button
       onClick={onClick}
       className={cn(
-        "sales-row-enter w-full text-left px-4 py-4 border-b border-border transition-[background-color,transform] group relative",
+        "sales-row-enter gymove-list-row gymove-box-row w-full text-left px-4 py-4 transition-[background-color,transform] group relative",
         selected
-          ? "bg-primary/[0.10] border-l-[3px] border-l-primary"
-          : "hover:bg-muted border-l-[3px] border-l-transparent",
+          ? "gymove-list-row-selected"
+          : "hover:bg-muted",
       )}
     >
       {needsReply && (
@@ -203,7 +203,7 @@ function ConvRow({ conv, selected, onClick }: {
             </div>
           )}
           {conv.vehicle?.price && (
-            <div className="text-xs text-muted-foreground mt-1">{fmtPrice(conv.vehicle.price)}{conv.vehicle.mileage ? ` · ${conv.vehicle.mileage.toLocaleString()} mi` : ""}</div>
+            <div className="text-xs text-muted-foreground mt-1">{fmtPrice(conv.vehicle.price)}{conv.vehicle.mileage != null ? ` · ${formatMileage(conv.vehicle.mileage)}` : ""}</div>
           )}
         </div>
       </div>
@@ -491,7 +491,7 @@ function LeadPanel({ convId }: { convId: number }) {
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-success font-bold">{fmtPrice(vehicle.price)}</span>
-                  <span className="text-muted-foreground">{vehicle.mileage?.toLocaleString()} mi</span>
+                  <span className="text-muted-foreground">{vehicle.mileage != null ? formatMileage(vehicle.mileage) : "—"}</span>
                 </div>
                 {vehicle.stockNumber && (
                   <div className="text-xs text-muted-foreground mt-1">Stock #{vehicle.stockNumber}</div>
@@ -529,7 +529,7 @@ function LeadPanel({ convId }: { convId: number }) {
         <div>
           <div className="text-[15px] font-bold text-foreground">{lead?.buyerName ?? "Unknown Buyer"}</div>
           {lead?.phone ? (
-            <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-[12px] text-success/80 hover:text-success mt-1 transition-colors">
+            <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-[12px] text-primary/85 hover:text-primary mt-1 transition-colors">
               <Phone className="w-3 h-3" />
               {lead.phone}
             </a>
@@ -766,10 +766,10 @@ export function SalesAIWorkspace() {
 
   return (
     <AppLayout>
-      <div className="flex h-full overflow-hidden">
+      <div className="gymove-surface-shell flex h-full overflow-hidden">
 
         {/* ── LEFT: Conversation list ──────────────────────────────────── */}
-        <div className="w-[280px] flex flex-col border-r border-border overflow-hidden shrink-0 bg-card">
+        <div className="gymove-surface-panel w-[280px] flex flex-col overflow-hidden shrink-0">
 
           {/* Panel header */}
           <div className="border-b border-primary/15 bg-primary/[0.05] px-4 pb-4 pt-5">
@@ -853,7 +853,7 @@ export function SalesAIWorkspace() {
         </div>
 
         {/* ── CENTER: Thread ───────────────────────────────────────────── */}
-        <div className="flex-1 flex overflow-hidden bg-card">
+        <div className="gymove-surface-panel flex-1 flex overflow-hidden">
           {selectedId
             ? <ThreadPanel convId={selectedId} />
             : conversations.length === 0 && !isLoading
@@ -871,7 +871,7 @@ export function SalesAIWorkspace() {
 
         {/* ── RIGHT: Lead + vehicle panel ──────────────────────────────── */}
         {selectedId && (
-          <div className="w-[256px] border-l border-border overflow-hidden shrink-0 bg-card">
+          <div className="gymove-surface-panel w-[256px] overflow-hidden shrink-0">
             <LeadPanel convId={selectedId} />
           </div>
         )}

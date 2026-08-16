@@ -37,16 +37,16 @@ export function KpiCard({ title, label, value, formatValue, trend, delta, icon, 
       data-kpi-tone={tone}
       onClick={onClick}
       className={cn(
-        "theme-kpi-primary gymove-kpi-card flex min-w-0 flex-col rounded-2xl border px-5 py-4 text-left shadow-[0_5px_16px_rgb(15_23_42/0.045)]",
+        "gymove-kpi-card flex min-w-0 flex-col rounded-lg border bg-card px-4 py-4 text-left text-foreground shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)]",
         onClick && "cursor-pointer transition-[border-color,box-shadow] hover:border-primary/25 hover:shadow-md",
         className,
       )}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="text-xs font-medium text-primary-foreground/78">{heading}</div>
-        {icon ? <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary-foreground/20 bg-primary-foreground/15 text-primary-foreground shadow-sm">{icon}</span> : null}
+        <div className="text-xs font-semibold text-muted-foreground">{heading}</div>
+        {icon ? <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-primary/10 text-primary shadow-sm">{icon}</span> : null}
       </div>
-      <div data-kpi-value="true" className="text-[30px] font-semibold leading-none tracking-[-0.025em] tabular-nums text-primary-foreground">
+      <div data-kpi-value="true" className="text-[30px] font-bold leading-none tracking-[-0.025em] tabular-nums text-foreground">
         {isLoading ? (
           <div className="h-8 w-16 animate-pulse rounded-md bg-primary-foreground/20" />
         ) : typeof value === "number" ? (
@@ -56,7 +56,7 @@ export function KpiCard({ title, label, value, formatValue, trend, delta, icon, 
         )}
       </div>
       {movement ? (
-        <div className="mt-2 text-xs text-primary-foreground/78">
+        <div className="mt-2 text-xs text-muted-foreground">
           <span className="tabular-nums">{movement.isPositive ? "+" : ""}{movement.value}%</span>
           {movement.label ? <span className="ml-1">{movement.label}</span> : null}
         </div>

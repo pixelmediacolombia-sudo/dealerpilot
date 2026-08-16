@@ -2,7 +2,7 @@
 
 - Style: restrained operational dashboard
 - Theme: light by default, intentional dark token mapping retained
-- Accent: Gymove violet with restrained supporting KPI colors; never decorative gradients
+- Accent: Gymove violet with semantic supporting colors; never decorative gradients
 - Density: 7/10
 - Variance: 4/10
 - Motion: 2/10; color, opacity, and short state transitions only
@@ -17,12 +17,12 @@
 - Border: `hsl(220 13% 88%)`
 - Accent: Gymove violet, `hsl(256 58% 58%)`
 - Accent soft: `hsl(256 65% 96%)`
-- Supporting accents: blue `hsl(211 78% 53%)`, pink `hsl(337 76% 63%)`; use only for distinct KPI states
+- Supporting semantic accents: blue `hsl(211 78% 53%)`, pink `hsl(337 76% 63%)`, green, amber and orange; each maps to a business state or object, never decoration
 - Success, warning, and destructive colors are semantic only
 
 ## Typography
 
-- Body/display: `"Segoe UI Variable", "Segoe UI", system-ui, sans-serif`
+- Body/display: `"Poppins", system-ui, -apple-system, "Segoe UI", sans-serif` (self-hosted)
 - Data: `"Cascadia Code", "SFMono-Regular", Consolas, monospace`
 - Page title: 30px/1.15, 600, -0.025em
 - Section title: 16px/1.3, 600

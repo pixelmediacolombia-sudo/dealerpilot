@@ -760,7 +760,7 @@ export function ConnectionCenter() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-4xl mx-auto animate-in fade-in duration-400 pb-16">
+      <div className="gymove-surface-shell p-8 max-w-4xl mx-auto animate-in fade-in duration-400 pb-16">
 
           <PageHeader
             eyebrow="System"

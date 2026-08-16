@@ -21,6 +21,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/format";
 
 function temperatureBadge(temp: string | null | undefined) {
   if (temp === "Hot") return "bg-destructive/10 text-destructive border-destructive/20";
@@ -84,7 +85,7 @@ export function LeadDetail() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto animate-in fade-in duration-500">
-        <div className="p-8 max-w-4xl mx-auto space-y-8">
+        <div className="gymove-surface-shell p-8 max-w-4xl mx-auto space-y-8">
           <PageHeader
             eyebrow="LEADS CRM"
             title={lead.buyerName ?? "Lead"}
@@ -163,7 +164,7 @@ export function LeadDetail() {
 
                 <div className="pt-3 border-t border-border space-y-2">
                   {[
-                    { label: "Phone", value: lead.phone, icon: Phone, accent: "text-success" },
+                    { label: "Phone", value: lead.phone, icon: Phone, accent: "text-primary" },
                     { label: "Language", value: lead.language === "es" ? "Spanish" : "English", icon: MessageSquare },
                     { label: "Timeline", value: lead.buyerTimeline?.replace(/_/g, " "), icon: Calendar },
                     { label: "Source", value: lead.sourceUrl, icon: FileText },
@@ -191,7 +192,7 @@ export function LeadDetail() {
                     </div>
                     <div className="text-xl font-bold text-foreground">
                       {lead.publishedDownPayment
-                        ? `$${lead.publishedDownPayment.toLocaleString()}`
+                        ? formatCurrency(lead.publishedDownPayment)
                         : "—"}
                     </div>
                   </div>
@@ -201,7 +202,7 @@ export function LeadDetail() {
                     </div>
                     <div className="text-xl font-bold text-primary">
                       {lead.buyerAvailableDownPayment
-                        ? `$${lead.buyerAvailableDownPayment.toLocaleString()}`
+                        ? formatCurrency(lead.buyerAvailableDownPayment)
                         : "—"}
                     </div>
                   </div>
@@ -219,7 +220,7 @@ export function LeadDetail() {
                     >
                       {lead.buyerAvailableDownPayment >= lead.publishedDownPayment
                         ? "✓ Down payment requirement met"
-                        : `$${(lead.publishedDownPayment - lead.buyerAvailableDownPayment).toLocaleString()} short of requirement`}
+                        : `${formatCurrency(lead.publishedDownPayment - lead.buyerAvailableDownPayment)} short of requirement`}
                     </div>
                   )}
               </div>

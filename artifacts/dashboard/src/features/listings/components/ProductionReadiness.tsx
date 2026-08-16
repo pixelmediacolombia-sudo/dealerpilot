@@ -45,7 +45,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { PageHeader, SectionCard } from "@/shared/ui";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 const DEALER_ID = 1;
 
@@ -248,7 +248,7 @@ function FeedQualitySection() {
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span className="font-medium">Last sync:</span>
-                  <span>{new Date(q.lastFeedRunAt).toLocaleString()}</span>
+                  <span>{formatDate(q.lastFeedRunAt)}</span>
                   {q.lastFeedStatus && (
                     <Badge
                       variant="outline"
@@ -679,7 +679,7 @@ function ExtensionDiagnosticsSection() {
                 {diag.lastJobClaimAt ? (
                   <>
                     <div className="font-semibold text-sm">
-                      {new Date(diag.lastJobClaimAt).toLocaleString()}
+                      {formatDate(diag.lastJobClaimAt)}
                     </div>
                     {diag.lastJobClaimExtensionId && (
                       <div className="text-xs text-muted-foreground font-mono mt-1">
@@ -698,7 +698,7 @@ function ExtensionDiagnosticsSection() {
                 {diag.lastEventAt ? (
                   <>
                     <div className="font-semibold text-sm">
-                      {new Date(diag.lastEventAt).toLocaleString()}
+                      {formatDate(diag.lastEventAt)}
                     </div>
                     {diag.lastEventType && (
                       <Badge variant="secondary" className="text-xs mt-1">
@@ -812,7 +812,7 @@ function FieldValidationSection() {
             {agg && (
               <div className="space-y-3">
                 <div className="text-xs font-bold  tracking-wide text-muted-foreground">
-                  Latest validation ({agg.lastTestedAt ? new Date(agg.lastTestedAt).toLocaleString() : "—"})
+                  Latest validation ({agg.lastTestedAt ? formatDate(agg.lastTestedAt) : "—"})
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {fields.map(({ key, label }) => (
@@ -844,7 +844,7 @@ function FieldValidationSection() {
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Vehicle #{r.vehicleId}</span>
-                        <span className="text-muted-foreground">{new Date(r.testedAt).toLocaleString()}</span>
+                        <span className="text-muted-foreground">{formatDate(r.testedAt)}</span>
                       </div>
                       <div className="flex flex-wrap gap-2 mt-2">
                         {fields.map(({ key, label }) => (
