@@ -362,7 +362,7 @@ export function PagesWorkspace() {
 
   return (
     <AppLayout>
-      <div className="min-h-full bg-background px-4 py-5 sm:px-6 lg:px-8">
+      <div className="gymove-surface-shell min-h-full px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1440px] space-y-5">
         <header className="flex flex-col justify-between gap-4 border-b border-border pb-5 lg:flex-row lg:items-end">
           <div>
@@ -393,7 +393,7 @@ export function PagesWorkspace() {
         {success ? <div role="status" className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"><Check className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{success}</div> : null}
 
         <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
-          <div className="rounded-[10px] border border-border bg-card shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)]">
+          <div className="gymove-surface-panel">
             <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-primary/10 text-primary"><CalendarClock className="h-5 w-5" aria-hidden="true" /></span>
@@ -417,7 +417,7 @@ export function PagesWorkspace() {
             </div>
           </div>
 
-          <aside className="rounded-[10px] border border-border bg-card p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)]">
+          <aside className="gymove-surface-panel p-5">
             <div className="flex items-start gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#1877F2]/10 text-[#1877F2]"><Facebook className="h-5 w-5" aria-hidden="true" /></span><div><h2 className="text-base font-semibold text-foreground">Page connection</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Credentials stay on the backend; this check confirms the Page and publish permission with Meta.</p></div></div>
             <div className="mt-5 flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2.5"><div><p className="text-sm font-semibold text-foreground">{connection?.pageName || "Meta Page not validated"}</p><p className="mt-0.5 text-xs text-muted-foreground">{connection?.pageId || "No Page connection found"}</p></div><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", connection?.status === "active" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : connection?.status === "error" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-border bg-muted/40 text-muted-foreground")}>{connection?.status === "active" ? "Validated" : connection?.status === "error" ? "Needs attention" : "Not validated"}</span></div>
             <button type="button" onClick={() => void validateConnection()} disabled={validating} className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50">{validating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-4 w-4" aria-hidden="true" />}{validating ? "Validating with Meta…" : "Validate connection"}</button>
@@ -436,7 +436,7 @@ export function PagesWorkspace() {
           {preview.vehicles.length ? <div className="divide-y divide-primary/10 border-t border-primary/10">{preview.vehicles.map((vehicle) => <div key={vehicle.id} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-foreground">{vehicle.year} {vehicle.make} {vehicle.model}{vehicle.trim ? ` ${vehicle.trim}` : ""}</p><p className="mt-1 text-xs text-muted-foreground">{formatPrice(vehicle.price)}{vehicle.stockNumber ? ` · Stock ${vehicle.stockNumber}` : ""} · Inventory status: {vehicle.status} · Photos: {vehicle.publicPhotoCount}/{vehicle.photoCount} public</p>{vehicle.photoError ? <p className="mt-1 text-xs text-destructive">{vehicle.photoError}</p> : null}</div><span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", vehicle.photosReady ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}>{vehicle.photosReady ? "Ready" : "Needs review"}</span></div>)}</div> : <p className="border-t border-primary/10 px-5 py-4 text-sm text-muted-foreground">{preview.reason ?? "No eligible vehicles found"}</p>}
         </section> : null}
 
-        <section className="rounded-[10px] border border-border bg-card shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)]">
+        <section className="gymove-surface-panel">
           <div className="flex flex-col justify-between gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">NEXT BATCH</div>
