@@ -47,6 +47,8 @@ and a contrasting CTA. A thin border alone is not an active state.
 - Status chips and compact labels stay on one line (`white-space: nowrap`).
 - Segmented controls share one selected treatment: a lavender filled button
   inside a muted segmented container, with `aria-pressed` or Radix active state.
+- Navigation tabs are distinct from mode selectors: navigation uses a solid
+  violet active tab, while mode selectors use the lavender treatment above.
 - Hero titles use balanced wrapping at intermediate widths; primary CTAs remain
   visible at 375px, 768px, 1280px and 1440px.
 
