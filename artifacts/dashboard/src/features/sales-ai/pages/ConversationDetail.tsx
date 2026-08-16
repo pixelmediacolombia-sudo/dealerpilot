@@ -187,7 +187,7 @@ export function ConversationDetail() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto animate-in fade-in duration-500">
-        <div className="p-8 max-w-5xl mx-auto space-y-8">
+        <div className="gymove-surface-shell p-8 max-w-5xl mx-auto space-y-8">
           <PageHeader
             eyebrow="SALES AI"
             title={conv.buyerName ?? "Conversation"}

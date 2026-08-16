@@ -52,7 +52,7 @@ export function LeadsCRM() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto animate-in fade-in duration-500">
-        <div className="p-8 max-w-7xl mx-auto space-y-8">
+        <div className="gymove-surface-shell p-8 max-w-7xl mx-auto space-y-8">
           <PageHeader
             eyebrow="SALES AI"
             title="Leads CRM"
@@ -114,7 +114,7 @@ export function LeadsCRM() {
                           colLeads.map((lead) => (
                             <div
                               key={lead.id}
-                              className="p-4 rounded-xl border border-border bg-card/40 hover:bg-card/70 hover:border-primary/20 transition cursor-pointer group"
+                              className="gymove-box-row p-4 hover:bg-card/70 hover:border-primary/20 transition cursor-pointer group"
                               onClick={() => navigate(`/leads/${lead.id}`)}
                             >
                               <div className="flex items-start justify-between gap-2 mb-3">

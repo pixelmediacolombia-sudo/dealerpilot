@@ -85,7 +85,7 @@ export function LeadDetail() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto animate-in fade-in duration-500">
-        <div className="p-8 max-w-4xl mx-auto space-y-8">
+        <div className="gymove-surface-shell p-8 max-w-4xl mx-auto space-y-8">
           <PageHeader
             eyebrow="LEADS CRM"
             title={lead.buyerName ?? "Lead"}

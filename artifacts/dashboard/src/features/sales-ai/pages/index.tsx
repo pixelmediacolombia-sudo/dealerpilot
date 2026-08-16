@@ -165,10 +165,10 @@ function ConvRow({ conv, selected, onClick }: {
     <button
       onClick={onClick}
       className={cn(
-        "sales-row-enter w-full text-left px-4 py-4 border-b border-border transition-[background-color,transform] group relative",
+        "sales-row-enter gymove-list-row gymove-box-row w-full text-left px-4 py-4 transition-[background-color,transform] group relative",
         selected
-          ? "bg-primary/[0.10] border-l-[3px] border-l-primary"
-          : "hover:bg-muted border-l-[3px] border-l-transparent",
+          ? "gymove-list-row-selected"
+          : "hover:bg-muted",
       )}
     >
       {needsReply && (
@@ -766,10 +766,10 @@ export function SalesAIWorkspace() {
 
   return (
     <AppLayout>
-      <div className="flex h-full overflow-hidden">
+      <div className="gymove-surface-shell flex h-full overflow-hidden">
 
         {/* ── LEFT: Conversation list ──────────────────────────────────── */}
-        <div className="w-[280px] flex flex-col border-r border-border overflow-hidden shrink-0 bg-card">
+        <div className="gymove-surface-panel w-[280px] flex flex-col overflow-hidden shrink-0">
 
           {/* Panel header */}
           <div className="border-b border-primary/15 bg-primary/[0.05] px-4 pb-4 pt-5">
@@ -853,7 +853,7 @@ export function SalesAIWorkspace() {
         </div>
 
         {/* ── CENTER: Thread ───────────────────────────────────────────── */}
-        <div className="flex-1 flex overflow-hidden bg-card">
+        <div className="gymove-surface-panel flex-1 flex overflow-hidden">
           {selectedId
             ? <ThreadPanel convId={selectedId} />
             : conversations.length === 0 && !isLoading
@@ -871,7 +871,7 @@ export function SalesAIWorkspace() {
 
         {/* ── RIGHT: Lead + vehicle panel ──────────────────────────────── */}
         {selectedId && (
-          <div className="w-[256px] border-l border-border overflow-hidden shrink-0 bg-card">
+          <div className="gymove-surface-panel w-[256px] overflow-hidden shrink-0">
             <LeadPanel convId={selectedId} />
           </div>
         )}
