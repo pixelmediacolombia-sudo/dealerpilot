@@ -301,6 +301,60 @@
   background: hsl(43 98% 68%);
 }
 
+/* Fase 5 surfaces: the same physical box grammar used by Inventory/Listings. */
+.gymove-surface-shell {
+  background: hsl(var(--background));
+}
+
+.gymove-surface-panel {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--card));
+  box-shadow: var(--shadow-raised);
+}
+
+.gymove-surface-panel-muted {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--muted) / 0.45);
+}
+
+.gymove-box-row {
+  margin: 0.35rem;
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: 0.625rem;
+  background: hsl(var(--card));
+  transition: background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.gymove-box-row:hover {
+  border-color: hsl(var(--primary) / 0.25);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.05);
+}
+
+.gymove-anchor-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.45rem;
+  background: hsl(256 65% 96%);
+  color: hsl(256 55% 39%);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.gymove-surface-panel .text-muted-foreground,
+.gymove-surface-shell .text-muted-foreground {
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .gymove-anchor-chip {
+  background: hsl(var(--primary) / 0.16);
+  color: hsl(var(--primary));
+}
+
 .theme-kpi-primary {
   border-color: hsl(var(--primary));
   background: hsl(var(--primary));
