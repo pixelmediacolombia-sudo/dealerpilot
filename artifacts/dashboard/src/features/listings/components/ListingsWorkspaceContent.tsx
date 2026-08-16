@@ -935,7 +935,8 @@ export function ListingsWorkspace() {
                             {w.publishStatus && (
                               <span className={cn(
                                 "gymove-row-status rounded border px-1.5 py-0.5 text-[11px] font-bold tracking-wide",
-                                w.publishStatus === "Approved" || w.publishStatus === "Queued" ? "bg-success/10 text-success" :
+                                w.publishStatus === "Approved" ? "bg-success/10 text-success" :
+                                w.publishStatus === "Queued" ? "bg-primary/10 text-primary" :
                                 w.publishStatus === "Needs Review" ? "bg-destructive/10 text-destructive" :
                                 w.publishStatus === "Published" ? "bg-primary/10 text-primary" :
                                 "bg-muted text-muted-foreground"

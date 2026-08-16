@@ -16,7 +16,8 @@ outside the design system.
   navigation state.
 - Supporting colors are semantic: green for published/sold/connected, amber
   for pending/attention, red/pink for conflicts or unfinished work, blue for
-  Marketplace/info, orange for hot leads or daily priority.
+  Marketplace/info, and fire-red for Hot leads. Orange is reserved for daily
+  priority or secondary attention, never used accidentally as a lead state.
 - No gradients, decorative glows or color assigned only by module.
 
 ## Physical hierarchy
@@ -43,6 +44,11 @@ and a contrasting CTA. A thin border alone is not an active state.
 - Motion budget: color, opacity and short state transitions only. Respect
   `prefers-reduced-motion`; no bounce, glow or idle float.
 - Tables keep a minimum 44px row height and visible keyboard focus.
+- Status chips and compact labels stay on one line (`white-space: nowrap`).
+- Segmented controls share one selected treatment: a lavender filled button
+  inside a muted segmented container, with `aria-pressed` or Radix active state.
+- Hero titles use balanced wrapping at intermediate widths; primary CTAs remain
+  visible at 375px, 768px, 1280px and 1440px.
 
 ## Component ownership
 

@@ -529,7 +529,7 @@ function LeadPanel({ convId }: { convId: number }) {
         <div>
           <div className="text-[15px] font-bold text-foreground">{lead?.buyerName ?? "Unknown Buyer"}</div>
           {lead?.phone ? (
-            <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-[12px] text-success/80 hover:text-success mt-1 transition-colors">
+            <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-[12px] text-primary/85 hover:text-primary mt-1 transition-colors">
               <Phone className="w-3 h-3" />
               {lead.phone}
             </a>

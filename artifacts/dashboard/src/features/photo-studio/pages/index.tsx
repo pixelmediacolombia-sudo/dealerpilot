@@ -150,22 +150,23 @@ export function CreativeStudio() {
               </SelectContent>
             </Select>
 
-            <div className="flex items-center rounded-lg border border-border/50 overflow-hidden flex-shrink-0 h-10">
+            <div className="gymove-segmented flex-shrink-0">
               <button
                 onClick={() => setViewMode("list")}
+                aria-pressed={viewMode === "list"}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 h-full text-xs font-semibold transition-colors",
-                  viewMode === "list" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
+                  "flex items-center gap-1.5 text-xs font-semibold",
+                  viewMode === "list" ? "" : "hover:text-foreground"
                 )}
               >
                 <List className="w-3.5 h-3.5" /> List
               </button>
-              <div className="w-px h-5 bg-border/60" />
               <button
                 onClick={() => setViewMode("grid")}
+                aria-pressed={viewMode === "grid"}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 h-full text-xs font-semibold transition-colors",
-                  viewMode === "grid" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
+                  "flex items-center gap-1.5 text-xs font-semibold",
+                  viewMode === "grid" ? "" : "hover:text-foreground"
                 )}
               >
                 <LayoutGrid className="w-3.5 h-3.5" /> Grid

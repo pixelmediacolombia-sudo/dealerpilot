@@ -193,7 +193,7 @@ function toCount(value: number | string | undefined): number {
 const AI_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   Ready:      { label: "AI Enhanced",  color: "text-success bg-success/10 border-success/20" },
   Processing: { label: "Processing",   color: "text-primary bg-primary/10 border-primary/20" },
-  Queued:     { label: "In Queue",     color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
+  Queued:     { label: "In Queue",     color: "text-primary bg-primary/10 border-primary/20" },
   Failed:     { label: "Needs Attention",  color: "text-destructive bg-destructive/10 border-destructive/20" },
   Pending:    { label: "Ready to Enhance",  color: "text-muted-foreground bg-muted border-border" },
 };
@@ -568,9 +568,9 @@ export function AIPhotoStudio() {
   const displayFailedCount = statsFailedCount || failedCount;
 
   const kpis = [
-    { label: "Enhanced", value: displayReadyCount, icon: Sparkles, color: "text-warning" },
+    { label: "Enhanced", value: displayReadyCount, icon: Sparkles, color: "text-success" },
     { label: "In Progress", value: displayProcessingCount, icon: Loader2, color: displayProcessingCount > 0 ? "text-primary" : "text-muted-foreground", spin: displayProcessingCount > 0 },
-    { label: "Needs Attention", value: displayFailedCount, icon: Clock, color: displayFailedCount > 0 ? "text-destructive" : "text-muted-foreground" },
+    { label: "Needs Attention", value: displayFailedCount, icon: Clock, color: displayFailedCount > 0 ? "text-destructive" : "text-warning" },
   ];
 
   if (openVehicleId !== null) {
@@ -614,7 +614,7 @@ export function AIPhotoStudio() {
           {kpis.map((kpi) => {
             const Icon = kpi.icon;
             return (
-              <div key={kpi.label} className="gymove-kpi-card gymove-surface-panel p-4" data-kpi-tone={kpi.label === "Enhanced" ? "pink" : kpi.label === "In Progress" ? "blue" : "green"}>
+              <div key={kpi.label} className="gymove-kpi-card gymove-surface-panel p-4" data-kpi-tone={kpi.label === "Enhanced" ? "green" : kpi.label === "In Progress" ? "blue" : "amber"}>
                 <Icon className={cn("w-4 h-4 mb-2", kpi.color, (kpi as { spin?: boolean }).spin && "animate-spin")} />
                 <div className={cn("text-2xl font-bold", kpi.color)}>{kpi.value}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">{kpi.label}</div>
@@ -660,7 +660,7 @@ export function AIPhotoStudio() {
               Cost is confirmed before OpenAI restoration starts.
             </div>
           </div>
-          <div className="flex rounded-lg border border-border bg-muted p-1">
+          <div className="gymove-segmented">
             {([
               ["fidelity-first", "Fidelity First"],
               ["balanced", "Balanced"],
@@ -669,12 +669,13 @@ export function AIPhotoStudio() {
               <button
                 key={mode}
                 type="button"
+                aria-pressed={processingMode === mode}
                 onClick={() => setProcessingMode(mode)}
                 className={cn(
-                  "px-3 py-1.5 text-[11px] font-semibold rounded-md transition-colors",
+                  "text-[11px] font-semibold",
                   processingMode === mode
-                    ? "bg-primary/20 text-primary border border-primary/25"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? ""
+                    : "hover:text-foreground",
                 )}
               >
                 {label}

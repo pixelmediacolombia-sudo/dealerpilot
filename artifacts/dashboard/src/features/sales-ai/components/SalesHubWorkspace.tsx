@@ -778,7 +778,7 @@ export function SalesHub() {
               </p>
               <div className="flex flex-col items-stretch gap-5 sm:flex-row sm:items-end sm:gap-6">
                 <div className="flex-1">
-                  <h1 className="mb-3 text-[42px] font-semibold leading-[0.95] tracking-tight text-foreground sm:text-[52px]">
+                  <h1 className="gymove-hero-title mb-3 text-[clamp(2.25rem,5vw,3.25rem)] font-semibold leading-[0.95] tracking-tight text-foreground">
                     {isLoading ? (
                       <span className="text-muted-foreground">Loading…</span>
                     ) : top10Count > 0 ? (
@@ -808,10 +808,10 @@ export function SalesHub() {
                 { value: isLoading ? "—" : String(vehicleStats?.readyToPublish ?? top10Count), label: "Ready", path: "/listings", tone: "purple" },
                 { value: isLoading ? "—" : String(listingsLive), label: "Live", path: "/listings?tab=published", tone: "green" },
                 { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", path: "/sales-ai", tone: "blue" },
-                { value: "0", label: "Appts", path: "/sales-ai", tone: "pink" },
-                { value: isLoading ? "—" : String(issueCount), label: "Issues", path: "/listings?tab=failed", tone: "amber" },
+                { value: "0", label: "Appts", path: "/sales-ai", tone: "amber" },
+                { value: isLoading ? "—" : String(issueCount), label: "Issues", path: "/listings?tab=failed", tone: "pink" },
               ].map(m => (
-                <button key={m.label} onClick={() => setLocation(m.path)} data-kpi-tone={m.tone} className={cn("gymove-kpi-card min-h-[104px] rounded-lg border px-4 py-4 text-left shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)] transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md", m.tone === "purple" ? "gymove-kpi-purple" : m.tone === "green" ? "gymove-kpi-green" : m.tone === "blue" ? "gymove-kpi-blue" : "gymove-kpi-pink") }>
+                <button key={m.label} onClick={() => setLocation(m.path)} data-kpi-tone={m.tone} className={cn("gymove-kpi-card min-h-[104px] rounded-lg border px-4 py-4 text-left shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)] transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md", m.tone === "purple" ? "gymove-kpi-purple" : m.tone === "green" ? "gymove-kpi-green" : m.tone === "blue" ? "gymove-kpi-blue" : m.tone === "amber" ? "gymove-kpi-amber" : "gymove-kpi-pink") }>
                   <div className="mb-2 text-[30px] font-bold leading-none tracking-tighter tabular-nums text-foreground">{m.value}</div>
                   <div className="text-[11px] font-semibold text-muted-foreground">{m.label}</div>
                 </button>

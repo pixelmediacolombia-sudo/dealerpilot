@@ -164,7 +164,7 @@ export function LeadDetail() {
 
                 <div className="pt-3 border-t border-border space-y-2">
                   {[
-                    { label: "Phone", value: lead.phone, icon: Phone, accent: "text-success" },
+                    { label: "Phone", value: lead.phone, icon: Phone, accent: "text-primary" },
                     { label: "Language", value: lead.language === "es" ? "Spanish" : "English", icon: MessageSquare },
                     { label: "Timeline", value: lead.buyerTimeline?.replace(/_/g, " "), icon: Calendar },
                     { label: "Source", value: lead.sourceUrl, icon: FileText },

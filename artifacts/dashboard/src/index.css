@@ -216,6 +216,11 @@
   border-color: hsl(150 48% 86%);
 }
 
+.gymove-kpi-amber {
+  background: hsl(36 92% 96%);
+  border-color: hsl(36 80% 86%);
+}
+
 .gymove-kpi-card {
   position: relative;
   overflow: hidden;
@@ -240,6 +245,10 @@
 
 .gymove-kpi-card[data-kpi-tone="green"]::after {
   background: hsl(145 58% 46% / 0.8);
+}
+
+.gymove-kpi-card[data-kpi-tone="amber"]::after {
+  background: hsl(36 92% 48% / 0.85);
 }
 
 .gymove-work-queue {
@@ -290,6 +299,45 @@
 .gymove-list-row-selected .gymove-row-control:hover {
   background: hsl(var(--primary-foreground) / 0.12);
   color: hsl(var(--primary-foreground));
+}
+
+.gymove-row-status,
+.gymove-row-chip {
+  white-space: nowrap;
+}
+
+.gymove-list-row-selected .text-warning,
+.gymove-list-row-selected .text-warning\/70,
+.gymove-list-row-selected .text-warning\/80 {
+  color: hsl(var(--primary-foreground));
+  font-weight: 700;
+}
+
+.gymove-segmented {
+  display: inline-flex;
+  gap: 0.25rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.625rem;
+  background: hsl(var(--muted) / 0.7);
+  padding: 0.25rem;
+}
+
+.gymove-segmented > button {
+  border-radius: 0.45rem;
+  padding: 0.375rem 0.75rem;
+  color: hsl(var(--muted-foreground));
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+.gymove-segmented > button[aria-pressed="true"],
+.gymove-segmented > button[data-state="active"] {
+  background: hsl(256 65% 96%);
+  color: hsl(256 55% 39%);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+.gymove-hero-title {
+  text-wrap: balance;
 }
 
 .gymove-row-cta-active {

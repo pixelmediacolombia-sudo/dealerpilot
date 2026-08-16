@@ -411,7 +411,7 @@ export function ConversationDetail() {
                         <span className="text-muted-foreground flex items-center gap-1">
                           <Phone className="w-3 h-3" /> Phone
                         </span>
-                        <span className={lead.phone ? "text-success" : "text-muted-foreground"}>
+                        <span className={lead.phone ? "text-primary" : "text-muted-foreground"}>
                           {lead.phone ?? "—"}
                         </span>
                       </div>

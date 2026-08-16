@@ -146,7 +146,7 @@ export function LeadsCRM() {
                                   </div>
                                 )}
                                 {lead.phone && (
-                                  <div className="flex items-center gap-1 text-[11px] text-success">
+                                  <div className="flex items-center gap-1 text-[11px] text-primary">
                                     <Phone className="w-3 h-3" />
                                     {lead.phone}
                                   </div>
