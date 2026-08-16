@@ -38,7 +38,14 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
   const { selectedLocation } = useDealerLocation();
 
   const { data, isLoading } = useGetAutoPublishSettings(dealerId, {
-    query: { queryKey: getGetAutoPublishSettingsQueryKey(dealerId) },
+    query: {
+      queryKey: getGetAutoPublishSettingsQueryKey(dealerId),
+      // This setting controls autonomous publishing. Never let the global
+      // five-minute cache display a stale value after an external DB change.
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: true,
+    },
   });
 
   const { mutateAsync: updateSettings, isPending: isSaving } = useUpdateAutoPublishSettings();
@@ -48,13 +55,21 @@ export function AutoPublishPlan({ dealerId, onBatchCreated }: AutoPublishPlanPro
 
   async function toggleEnabled() {
     if (!settings) return;
-    await updateSettings({ dealerId, data: { enabled: !settings.enabled } });
-    qc.invalidateQueries({ queryKey: getGetAutoPublishSettingsQueryKey(dealerId) });
+    const response = await updateSettings({ dealerId, data: { enabled: !settings.enabled } });
+    qc.setQueryData(getGetAutoPublishSettingsQueryKey(dealerId), response);
+    await qc.refetchQueries({
+      queryKey: getGetAutoPublishSettingsQueryKey(dealerId),
+      type: "active",
+    });
   }
 
   async function saveSetting(patch: Record<string, unknown>) {
-    await updateSettings({ dealerId, data: patch });
-    qc.invalidateQueries({ queryKey: getGetAutoPublishSettingsQueryKey(dealerId) });
+    const response = await updateSettings({ dealerId, data: patch });
+    qc.setQueryData(getGetAutoPublishSettingsQueryKey(dealerId), response);
+    await qc.refetchQueries({
+      queryKey: getGetAutoPublishSettingsQueryKey(dealerId),
+      type: "active",
+    });
   }
 
   async function scheduleBatch() {
