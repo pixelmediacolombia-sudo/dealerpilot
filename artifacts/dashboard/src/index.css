@@ -436,15 +436,6 @@
   box-shadow: 0 0 0 3px hsl(var(--primary) / 0.12);
 }
 
-[data-kpi-card="true"]:first-child {
-  border-color: hsl(var(--primary) / 0.16);
-  background: hsl(var(--accent));
-}
-
-[data-kpi-card="true"]:first-child [data-kpi-value="true"] {
-  color: hsl(var(--primary));
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
