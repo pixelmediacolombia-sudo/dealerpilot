@@ -76,7 +76,7 @@ export function CreativeStudio() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto animate-in fade-in duration-500">
-        <div className="p-8 max-w-7xl mx-auto space-y-6">
+        <div className="gymove-surface-shell p-8 max-w-7xl mx-auto space-y-6">
           <PageHeader
             eyebrow="AI VEHICLE STUDIO"
             title="AI Vehicle Studio"
@@ -196,7 +196,7 @@ export function CreativeStudio() {
           ) : viewMode === "list" ? (
 
             /* ── List View ── */
-            <div className="rounded-xl border border-border/40 overflow-hidden">
+            <div className="gymove-surface-panel overflow-hidden">
               <div className="flex items-center gap-3 px-4 py-2.5 bg-muted/30 border-b border-border/30 text-xs font-bold  tracking-wide text-muted-foreground">
                 <div className="w-5 flex-shrink-0">
                   <Checkbox
@@ -217,8 +217,8 @@ export function CreativeStudio() {
                   <div
                     key={v.vehicleId}
                     className={cn(
-                      "flex items-center gap-3 px-4 py-2 min-h-[72px] border-b border-border/20 last:border-b-0 transition-colors hover:bg-muted/10",
-                      isSelected && "bg-primary/5 border-l-2 border-l-primary"
+                      "gymove-box-row flex items-center gap-3 px-4 py-2 min-h-[72px] transition-colors hover:bg-muted/10",
+                      isSelected && "gymove-list-row-selected"
                     )}
                   >
                     <div className="w-5 flex-shrink-0">
@@ -238,8 +238,8 @@ export function CreativeStudio() {
 
                     {/* Vehicle info */}
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm text-foreground truncate">{v.label}</div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                      <div className="gymove-row-title font-semibold text-sm text-foreground truncate">{v.label}</div>
+                      <div className="gymove-row-meta text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
                         <span className="font-mono">{v.vin.slice(-6)}</span>
                       </div>
                       <Badge className="mt-1 text-[11px] font-bold  tracking-wide bg-muted/40 text-muted-foreground border-border/30 gap-1">
@@ -298,7 +298,7 @@ export function CreativeStudio() {
 
                     <Link href={`/creative-studio/${v.vehicleId}`}>
                       <div
-                        className="group glass-panel rounded-xl overflow-hidden hover-lift cursor-pointer flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 shadow-sm hover:shadow-primary/5 border border-border hover:border-primary/30 transition duration-500 relative"
+                        className="group gymove-surface-panel overflow-hidden hover-lift cursor-pointer flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 hover:shadow-primary/5 transition duration-500 relative"
                         style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}
                       >
                         {/* Image area */}
