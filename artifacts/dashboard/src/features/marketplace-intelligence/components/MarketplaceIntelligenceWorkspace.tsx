@@ -903,7 +903,7 @@ export default function MarketIntelligencePage() {
 
                   {/* Publishing Conflicts panel */}
                   {duplicateGroups.length > 0 && (
-                    <div className="rounded-xl border border-warning/15 overflow-hidden">
+          <div className="gymove-surface-panel overflow-hidden">
                       <button
                         onClick={() => setConflictsExpanded(v => !v)}
                         className="w-full flex items-center gap-4 px-5 py-4 hover:bg-warning/[0.04] transition-colors"
