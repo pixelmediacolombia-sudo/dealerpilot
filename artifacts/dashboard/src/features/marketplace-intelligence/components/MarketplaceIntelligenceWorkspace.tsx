@@ -4,7 +4,7 @@ import { AppLayout } from "@/shared/layout/AppLayout";
 import { useDealerLocation } from "@/context/LocationContext";
 import { PageHeader } from "@/shared/ui";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatMileage } from "@/lib/format";
 import { PublishNowModal } from "@/features/publishing/components/PublishNowModal";
 import {
   useListListingWorkspaces,
@@ -449,7 +449,7 @@ function VehicleRow({
           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
             <span className="text-[11px] text-muted-foreground font-mono">
               {vehicle.price != null ? formatCurrency(vehicle.price) : "—"}
-              {vehicle.mileage != null ? ` · ${vehicle.mileage.toLocaleString()} mi` : ""}
+              {vehicle.mileage != null ? ` · ${formatMileage(vehicle.mileage)}` : ""}
               {` · ${vehicle.daysOnLot}d lot`}
             </span>
             {vehicle.photoCount > 0 && (

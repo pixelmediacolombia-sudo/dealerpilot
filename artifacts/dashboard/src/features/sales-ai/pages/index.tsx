@@ -22,6 +22,7 @@ import {
   Send, UserCheck,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency, formatMileage } from "@/lib/format";
 
 const API_BASE = "/api";
 const DEALER_ID = 1;
@@ -126,8 +127,7 @@ function fmtRelative(iso: string | null): string {
 }
 
 function fmtPrice(p: number | null): string {
-  if (!p) return "—";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(p);
+  return p == null ? "—" : formatCurrency(p);
 }
 
 function vehicleLabel(v: VehicleInfo | null, fallback: string | null): string {
@@ -203,7 +203,7 @@ function ConvRow({ conv, selected, onClick }: {
             </div>
           )}
           {conv.vehicle?.price && (
-            <div className="text-xs text-muted-foreground mt-1">{fmtPrice(conv.vehicle.price)}{conv.vehicle.mileage ? ` · ${conv.vehicle.mileage.toLocaleString()} mi` : ""}</div>
+            <div className="text-xs text-muted-foreground mt-1">{fmtPrice(conv.vehicle.price)}{conv.vehicle.mileage != null ? ` · ${formatMileage(conv.vehicle.mileage)}` : ""}</div>
           )}
         </div>
       </div>
@@ -491,7 +491,7 @@ function LeadPanel({ convId }: { convId: number }) {
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-success font-bold">{fmtPrice(vehicle.price)}</span>
-                  <span className="text-muted-foreground">{vehicle.mileage?.toLocaleString()} mi</span>
+                  <span className="text-muted-foreground">{vehicle.mileage != null ? formatMileage(vehicle.mileage) : "—"}</span>
                 </div>
                 {vehicle.stockNumber && (
                   <div className="text-xs text-muted-foreground mt-1">Stock #{vehicle.stockNumber}</div>

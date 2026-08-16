@@ -6,6 +6,7 @@ import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
 import { CheckCircle2, Car, Send } from "lucide-react";
 import { Skeleton } from "@/shared/ui/skeleton";
+import { formatCurrency, formatNumber } from "@/lib/format";
 
 export function TestVehicleCard() {
   const queryClient = useQueryClient();
@@ -32,14 +33,6 @@ export function TestVehicleCard() {
     } finally {
       setIsSending(false);
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(amount);
-  };
-
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat("en-US").format(num);
   };
 
   return (

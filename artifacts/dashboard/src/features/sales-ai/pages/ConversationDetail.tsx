@@ -33,6 +33,7 @@ import { Switch } from "@/shared/ui/switch";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/format";
 
 function temperatureBadge(temp: string | null | undefined) {
   if (temp === "Hot") return "bg-destructive/10 text-destructive border-destructive/20";
@@ -387,7 +388,7 @@ export function ConversationDetail() {
                         </span>
                         <span className="font-medium text-foreground">
                           {lead.publishedDownPayment
-                            ? `$${lead.publishedDownPayment.toLocaleString()}`
+                            ? formatCurrency(lead.publishedDownPayment)
                             : "—"}
                         </span>
                       </div>
@@ -402,7 +403,7 @@ export function ConversationDetail() {
                           )}
                         >
                           {lead.buyerAvailableDownPayment
-                            ? `$${lead.buyerAvailableDownPayment.toLocaleString()}`
+                            ? formatCurrency(lead.buyerAvailableDownPayment)
                             : "—"}
                         </span>
                       </div>
@@ -482,7 +483,7 @@ export function ConversationDetail() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Listed down</span>
                         <span className="text-primary font-medium">
-                          ${conv.marketplaceDownPayment.toLocaleString()}
+                          {formatCurrency(conv.marketplaceDownPayment)}
                         </span>
                       </div>
                     )}

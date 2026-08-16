@@ -33,6 +33,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatDate } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 
 function batchStatusClass(status: string) {
@@ -90,14 +91,7 @@ function BatchCard({ batch, onCancel, onDismiss, isMutating }: BatchCardProps) {
     ? Math.max(terminalProgress, Math.round(((doneCount * 100) + liveVehicleProgress) / batch.totalVehicles))
     : 0;
 
-  const scheduledTime = batch.scheduledAt
-    ? new Date(batch.scheduledAt).toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : null;
+  const scheduledTime = batch.scheduledAt ? formatDate(batch.scheduledAt) : null;
 
   const isActive = ["Active", "Preparing", "Scheduled"].includes(batch.status);
   const isDone = ["Completed", "Failed", "Cancelled"].includes(batch.status);

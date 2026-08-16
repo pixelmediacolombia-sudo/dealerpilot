@@ -156,7 +156,7 @@ function ratingClass(rating: string | null | undefined) {
     case "Good":
       return "bg-primary/10 text-primary border-primary/20";
     case "Needs Improvement":
-      return "bg-warning/10 text-warning border-warning/20";
+      return "bg-primary/10 text-primary border-primary/20";
     default:
       return "bg-secondary text-muted-foreground border-border";
   }
@@ -696,12 +696,12 @@ export function ListingsWorkspace() {
                   <div className="flex items-center rounded-lg border border-border overflow-hidden shrink-0">
                     <button
                       onClick={() => setViewMode("list")}
-                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors", viewMode === "list" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground")}
+                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors", viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
                     ><List className="w-3 h-3" /> List</button>
                     <div className="w-px h-4 bg-muted" />
                     <button
                       onClick={() => setViewMode("grid")}
-                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors", viewMode === "grid" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground")}
+                      className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors", viewMode === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
                     ><LayoutGrid className="w-3 h-3" /> Grid</button>
                   </div>
                 </div>
@@ -858,7 +858,7 @@ export function ListingsWorkspace() {
                 />
               ) : viewMode === "list" ? (
                 /* ── Compact List View ── */
-                <div className="gymove-work-queue rounded-xl border border-border bg-muted/45 p-2">
+                <div className="gymove-work-queue rounded-xl border border-border bg-muted/45 p-2 pb-24">
                   {/* List header */}
                   <div className="flex items-center gap-3 rounded-lg bg-muted/80 px-3 py-2.5 text-[11px] font-semibold tracking-wide text-muted-foreground">
                     <div className="w-5 flex-shrink-0">
@@ -956,7 +956,7 @@ export function ListingsWorkspace() {
                             <div className={cn(
                               "gymove-row-status inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-bold",
                               photoScore >= 88 ? "bg-success/15 text-success" :
-                              photoScore >= 65 ? "bg-warning/15 text-warning" :
+                              photoScore >= 65 ? "bg-primary/10 text-primary" :
                               "bg-destructive/15 text-destructive"
                             )}>
                               <Gauge className="w-3 h-3" />{photoScore}
@@ -1059,7 +1059,7 @@ export function ListingsWorkspace() {
                     </div>
                   );
                 })()}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-24">
                   {filteredSortedWorkspaces.map((w, i) => {
                     const photoScore = photoScoreByVehicle.get(w.vehicleId);
                     const isReady = activeTab === "ready" || w.publishStatus === "Approved" || w.publishStatus === "Queued";
@@ -1220,7 +1220,7 @@ export function ListingsWorkspace() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="gap-1.5 px-4 font-bold text-[11px]  tracking-wide whitespace-nowrap border-success/40 text-success hover:bg-success/10"
+                        className="gymove-row-cta-active gap-1.5 border-transparent px-4 font-bold text-[11px] tracking-wide whitespace-nowrap hover:border-transparent"
                         disabled={bulkSchedule.isPending}
                         onClick={() => {
                           const readyIds = filteredSortedWorkspaces

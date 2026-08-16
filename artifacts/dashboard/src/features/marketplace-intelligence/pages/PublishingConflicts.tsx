@@ -8,7 +8,7 @@ import {
 } from "@workspace/api-client-react";
 import { useDealerLocation } from "@/context/LocationContext";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatMileage } from "@/lib/format";
 import {
   buildDailyMarketplacePlan,
   buildPublishReasons,
@@ -91,7 +91,7 @@ function VehicleDecisionCard({
             </span>
           )}
           {vehicle.mileage != null && (
-            <span>{vehicle.mileage.toLocaleString()} mi</span>
+            <span>{formatMileage(vehicle.mileage)}</span>
           )}
         </p>
 

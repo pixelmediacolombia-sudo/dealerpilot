@@ -21,6 +21,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/format";
 
 function temperatureBadge(temp: string | null | undefined) {
   if (temp === "Hot") return "bg-destructive/10 text-destructive border-destructive/20";
@@ -191,7 +192,7 @@ export function LeadDetail() {
                     </div>
                     <div className="text-xl font-bold text-foreground">
                       {lead.publishedDownPayment
-                        ? `$${lead.publishedDownPayment.toLocaleString()}`
+                        ? formatCurrency(lead.publishedDownPayment)
                         : "—"}
                     </div>
                   </div>
@@ -201,7 +202,7 @@ export function LeadDetail() {
                     </div>
                     <div className="text-xl font-bold text-primary">
                       {lead.buyerAvailableDownPayment
-                        ? `$${lead.buyerAvailableDownPayment.toLocaleString()}`
+                        ? formatCurrency(lead.buyerAvailableDownPayment)
                         : "—"}
                     </div>
                   </div>
@@ -219,7 +220,7 @@ export function LeadDetail() {
                     >
                       {lead.buyerAvailableDownPayment >= lead.publishedDownPayment
                         ? "✓ Down payment requirement met"
-                        : `$${(lead.publishedDownPayment - lead.buyerAvailableDownPayment).toLocaleString()} short of requirement`}
+                        : `${formatCurrency(lead.publishedDownPayment - lead.buyerAvailableDownPayment)} short of requirement`}
                     </div>
                   )}
               </div>

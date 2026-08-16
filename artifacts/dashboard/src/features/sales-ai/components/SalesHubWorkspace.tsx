@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 import { PublishNowModal } from "@/features/publishing/components/PublishNowModal";
 import { GmCoachModal } from "@/components/GmCoachModal";
 import { GmDecisionLogPanel } from "@/components/GmDecisionLogPanel";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatNumber } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import {
   buildDailyMarketplacePlan,
@@ -463,7 +463,7 @@ function StrategyRow({
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <div className="text-[18px] font-semibold text-destructive/50 leading-none tabular-nums">
-                    {intelligence.cost.reachLoss.toLocaleString()}
+                    {formatNumber(intelligence.cost.reachLoss)}
                   </div>
                   <div className="text-[11px] text-muted-foreground mt-1">Buyers missed</div>
                 </div>
@@ -475,7 +475,7 @@ function StrategyRow({
                 </div>
                 <div>
                   <div className="text-[18px] font-semibold text-destructive/50 leading-none tabular-nums">
-                    ${intelligence.cost.revenueLoss.toLocaleString()}
+                    {formatCurrency(intelligence.cost.revenueLoss)}
                   </div>
                   <div className="text-[11px] text-muted-foreground mt-1">Revenue opportunity</div>
                 </div>

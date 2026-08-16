@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/format";
 
 const DEALER_ID = 1;
 
@@ -135,13 +136,13 @@ export function LeadsCRM() {
                                 {lead.publishedDownPayment && (
                                   <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                                     <DollarSign className="w-3 h-3" />
-                                    Listed: ${lead.publishedDownPayment.toLocaleString()}
+                                    Listed: {formatCurrency(lead.publishedDownPayment)}
                                   </div>
                                 )}
                                 {lead.buyerAvailableDownPayment && (
                                   <div className="flex items-center gap-1 text-[11px] text-primary font-medium">
                                     <DollarSign className="w-3 h-3" />
-                                    Has: ${lead.buyerAvailableDownPayment.toLocaleString()}
+                                    Has: {formatCurrency(lead.buyerAvailableDownPayment)}
                                   </div>
                                 )}
                                 {lead.phone && (

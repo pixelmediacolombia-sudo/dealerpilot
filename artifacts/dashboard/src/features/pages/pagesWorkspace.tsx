@@ -3,6 +3,7 @@ import { CalendarClock, Check, Facebook, Loader2, RefreshCw, Send, Settings2, Sp
 import { cn } from "@/lib/utils";
 import { getAuthToken, useAccount } from "@/app/AuthGate";
 import { AppLayout } from "@/shared/layout/AppLayout";
+import { formatCurrency } from "@/lib/format";
 
 type PageSettings = {
   enabled: boolean;
@@ -141,7 +142,7 @@ function formatDate(value: string | null): string {
 
 function formatPrice(value: number | null): string {
   if (value == null) return "Price pending";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+  return formatCurrency(value);
 }
 
 function statusTone(status: string): string {

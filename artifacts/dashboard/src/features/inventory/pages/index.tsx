@@ -23,6 +23,7 @@ import { FloatingBulkBar } from "@/features/inventory/components/FloatingBulkBar
 import { ScheduleModal, type ScheduleOpts } from "@/features/inventory/components/ScheduleModal";
 import { useVehicleSelection } from "@/hooks/useVehicleSelection";
 import { toast } from "@/hooks/use-toast";
+import { formatCurrency, formatMileage } from "@/lib/format";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -226,7 +227,7 @@ export function InventoryDashboard() {
               value={stats?.published || 0}
               module="marketplace"
               isLoading={statsLoading}
-              className="gymove-kpi-pink"
+              className="gymove-kpi-green"
             />
           </div>
 
@@ -382,12 +383,12 @@ export function InventoryDashboard() {
                     </div>
                     <div className="w-[100px] shrink-0 hidden lg:block">
                       <span className="gymove-row-meta text-[13px] font-bold text-muted-foreground">
-                        {vehicle.price ? `$${vehicle.price.toLocaleString()}` : "—"}
+                        {vehicle.price != null ? formatCurrency(vehicle.price) : "—"}
                       </span>
                     </div>
                     <div className="w-[90px] shrink-0 hidden xl:block">
                       <span className="gymove-row-meta text-[12px] text-muted-foreground">
-                        {vehicle.mileage ? `${vehicle.mileage.toLocaleString()} mi` : "—"}
+                        {vehicle.mileage != null ? formatMileage(vehicle.mileage) : "—"}
                       </span>
                     </div>
                     <div className="w-[120px] shrink-0 flex justify-end">

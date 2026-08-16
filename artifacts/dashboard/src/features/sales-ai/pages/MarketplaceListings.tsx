@@ -25,6 +25,7 @@ import {
   Radio,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency, formatMileage } from "@/lib/format";
 
 const API_BASE = "/api";
 const DEALER_ID = 1;
@@ -95,7 +96,7 @@ async function patchListing(
 
 function formatPrice(p: number | null) {
   if (!p) return "—";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(p);
+  return formatCurrency(p);
 }
 
 function formatRelativeTime(iso: string | null): string {
@@ -244,7 +245,7 @@ function ListingCard({
           <div>
             <div className="font-semibold text-foreground text-sm leading-tight">{vehicleName}</div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
-              {vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : ""}
+              {vehicle.mileage != null ? formatMileage(vehicle.mileage) : ""}
               {vehicle.stockNumber ? ` · #${vehicle.stockNumber}` : ""}
             </div>
           </div>
