@@ -256,7 +256,8 @@
 .gymove-list-row-selected .gymove-row-title,
 .gymove-list-row-selected .gymove-row-meta,
 .gymove-list-row-selected .gymove-row-icon,
-.gymove-list-row-selected .gymove-row-language {
+.gymove-list-row-selected .gymove-row-language,
+.gymove-list-row-selected .gymove-row-control {
   color: hsl(var(--primary-foreground) / 0.86);
 }
 
@@ -267,6 +268,21 @@
 .gymove-list-row-selected .gymove-row-status {
   border-color: hsl(var(--primary-foreground) / 0.35);
   background: hsl(var(--primary-foreground) / 0.14);
+  color: hsl(var(--primary-foreground));
+}
+
+.gymove-list-row-selected .gymove-row-anchor {
+  background: hsl(var(--primary-foreground) / 0.16);
+  color: hsl(var(--primary-foreground));
+}
+
+.gymove-list-row-selected .gymove-row-control {
+  border-color: hsl(var(--primary-foreground) / 0.4);
+  color: hsl(var(--primary-foreground));
+}
+
+.gymove-list-row-selected .gymove-row-control:hover {
+  background: hsl(var(--primary-foreground) / 0.12);
   color: hsl(var(--primary-foreground));
 }
 
