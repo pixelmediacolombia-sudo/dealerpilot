@@ -122,11 +122,10 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, user: AuthUser) => 
         className="w-full max-w-md rounded-xl border border-border bg-card p-7 shadow-lg sm:p-8"
       >
         <div className="mb-7 flex items-center gap-3">
-          <img
-            src="/dealerpilot-p-dark-tight-transparent.png"
-            alt="DealerPilot"
-            className="h-10 w-10 object-contain outline-none"
-          />
+          <span className="relative block h-10 w-10 shrink-0" aria-hidden="true">
+            <img src="/dealerpilot-p-dark-tight-transparent.png" alt="" className="block h-full w-full object-contain outline-none dark:hidden" />
+            <img src="/dealerpilot-p-transparent.png" alt="" className="hidden h-full w-full object-contain outline-none dark:block" />
+          </span>
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-foreground">DealerPilot</h1>
           </div>
