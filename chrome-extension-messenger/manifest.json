@@ -14,8 +14,7 @@
     "https://*.replit.dev/*",
     "https://*.replit.app/*",
     "https://*.onrender.com/*",
-    "https://1987dealerpilot.com/*",
-    "https://www.1987dealerpilot.com/*",
+    "https://app.1987dealerpilot.com/*",
     "http://localhost/*"
   ],
   "background": {

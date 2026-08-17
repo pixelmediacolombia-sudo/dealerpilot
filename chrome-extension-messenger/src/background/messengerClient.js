@@ -3,7 +3,7 @@
   const DEFAULT_SETTINGS = Object.freeze({
     dryRun: true,
     autoReplyEnabled: false,
-    backendUrl: "https://1987dealerpilot.com",
+    backendUrl: "https://app.1987dealerpilot.com",
     dealerId: 1,
     sessionId: "",
     sellerProfileNames: ["Alpha Manassas", "Alpha Motorsport", "Andres Ibanez"],

@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const DEFAULT_BACKEND_URL = "https://1987dealerpilot.com";
+  const DEFAULT_BACKEND_URL = "https://app.1987dealerpilot.com";
   const DEFAULT_THEME = {
     primaryColors: ["#7658d6"],
     secondaryColors: ["#20243b"],
