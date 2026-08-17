@@ -19,6 +19,7 @@ import { generateListing } from "../listings/generator";
 import { scoreListing } from "../listings/scoring";
 import { priorityScore } from "../listings/rules";
 import { ACTIVE_PUBLISHING_JOB_STATUSES } from "../publishing/controlledMode";
+import { compactFutureAutoPublishQueue } from "../publishing/autoPublishQueueCompaction";
 
 const DEALER_ID = 1;
 
@@ -495,6 +496,18 @@ router.post("/listings/:vehicleId/mark-published", async (req, res) => {
       .update(publishingJobsTable)
       .set({ status: "Published", completedAt: now })
       .where(eq(publishingJobsTable.id, latestJob.id));
+
+    try {
+      await compactFutureAutoPublishQueue({
+        dealerId: latestJob.dealerId,
+        completedBatchId: latestJob.batchId,
+        now,
+      });
+    } catch (err) {
+      // The operator's confirmed listing remains successful even if queue
+      // maintenance needs a later retry.
+      req.log.error({ err, vehicleId, jobId: latestJob.id }, "mark-published: failed to compact future auto-publish queue");
+    }
   }
 
   req.log.info({ vehicleId, marketplaceUrl }, "Listing manually marked as published");

@@ -32,6 +32,7 @@ import {
   reconcileBatchProgress,
 } from "../features/publishing/infrastructure/publishingRepository";
 import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
+import { compactFutureAutoPublishQueue } from "../publishing/autoPublishQueueCompaction";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
 // Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
@@ -817,6 +818,21 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
     });
 
   await reconcileBatchProgress(updated.batchId);
+
+  try {
+    const compaction = await compactFutureAutoPublishQueue({
+      dealerId: updated.dealerId,
+      completedBatchId: updated.batchId,
+      now,
+    });
+    if (compaction.shiftedBatches > 0) {
+      req.log.info({ jobId: id, ...compaction }, "complete: compacted future auto-publish queue");
+    }
+  } catch (err) {
+    // The Facebook publication is already confirmed. Queue compaction must
+    // never turn a successful publish response into a false failure.
+    req.log.error({ err, jobId: id, batchId: updated.batchId }, "complete: failed to compact future auto-publish queue");
+  }
 
   req.log.info({ jobId: id, listingUrl, previousStatus: job.status }, "complete: job Published successfully");
   const [enriched] = await enrich([updated]);

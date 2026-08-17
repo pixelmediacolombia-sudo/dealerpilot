@@ -9,6 +9,7 @@ import {
   publishingJobsTable,
 } from "@workspace/db";
 import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { compactFutureAutoPublishQueue } from "../publishing/autoPublishQueueCompaction";
 
 const router: IRouter = Router();
 
@@ -34,6 +35,14 @@ router.post("/marketplace-listings/reconcile-published", async (req: Request, re
       .from(marketplaceListingsTable)
       .where(and(eq(marketplaceListingsTable.dealerId, dealerId), eq(marketplaceListingsTable.status, "Live")));
     const demoteIds = liveRows.map((row) => row.vehicleId).filter((vehicleId) => !keepIds.includes(vehicleId));
+    const jobsToCompact = await db
+      .select({ batchId: publishingJobsTable.batchId, scheduledAt: publishingJobsTable.scheduledAt })
+      .from(publishingJobsTable)
+      .where(and(
+        eq(publishingJobsTable.dealerId, dealerId),
+        inArray(publishingJobsTable.vehicleId, keepIds),
+        ne(publishingJobsTable.status, "Published"),
+      ));
 
     await db.transaction(async (tx) => {
       await tx
@@ -120,6 +129,20 @@ router.post("/marketplace-listings/reconcile-published", async (req: Request, re
           .where(and(eq(publishingJobsTable.dealerId, dealerId), inArray(publishingJobsTable.vehicleId, demoteIds)));
       }
     });
+
+    const batchIdsToCompact = [...new Set(
+      jobsToCompact
+        .filter((job): job is typeof job & { batchId: number } => job.batchId !== null)
+        .sort((a, b) => (a.scheduledAt?.getTime() ?? 0) - (b.scheduledAt?.getTime() ?? 0))
+        .map((job) => job.batchId),
+    )];
+    for (const batchId of batchIdsToCompact) {
+      try {
+        await compactFutureAutoPublishQueue({ dealerId, completedBatchId: batchId, now });
+      } catch (err) {
+        req.log.error({ err, dealerId, batchId }, "reconcile-published: failed to compact future auto-publish queue");
+      }
+    }
 
     res.json({ ok: true, keptLiveVehicleIds: keepIds, demotedVehicleIds: demoteIds });
   } catch (err) {

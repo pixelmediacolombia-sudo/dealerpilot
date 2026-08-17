@@ -4,6 +4,10 @@ import { test } from "node:test";
 import vm from "node:vm";
 
 const routeSource = readFileSync(new URL("./publishing.ts", import.meta.url), "utf8");
+const queueCompactionSource = readFileSync(
+  new URL("../publishing/autoPublishQueueCompaction.ts", import.meta.url),
+  "utf8",
+);
 const autoPublishSource = readFileSync(new URL("./autoPublish.ts", import.meta.url), "utf8");
 const workerSource = readFileSync(new URL("../workers/publishing.worker.ts", import.meta.url), "utf8");
 const staleCleanerSource = readFileSync(new URL("../publishing/staleCleaner.ts", import.meta.url), "utf8");
@@ -790,6 +794,19 @@ test("Marketplace vehicle category selector prefers the broad Vehicles option", 
   assert.match(publisherFlowSource, /"suv": "Car\/Truck"/);
   assert.match(publisherFlowSource, /"vehicles"/);
   assert.match(publisherFlowSource, /CAR_ALIASES\.some/);
+});
+
+test("publishing an automatic batch early compacts later batches without touching terminal jobs", () => {
+  assert.match(queueCompactionSource, /completedBatch\.scheduledAt\.getTime\(\) <= now\.getTime\(\)/);
+  assert.match(queueCompactionSource, /completedJobs\.some\(\(job\) => job\.status !== "Published"\)/);
+  assert.match(queueCompactionSource, /inArray\(publishingBatchesTable\.status, \[\.\.\.ACTIVE_BATCH_STATUSES\]\)/);
+  assert.match(queueCompactionSource, /gt\(publishingBatchesTable\.scheduledAt, now\)/);
+  assert.match(queueCompactionSource, /tx\s*\.update\(publishingBatchesTable\)[\s\S]*set\(\{ scheduledAt: targetBatchAt \}\)/);
+  assert.match(queueCompactionSource, /ACTIVE_PUBLISHING_JOB_STATUSES\.includes/);
+  assert.match(queueCompactionSource, /tx\s*\.update\(publishingJobsTable\)[\s\S]*set\(\{ scheduledAt:/);
+  assert.match(routeSource, /compactFutureAutoPublishQueue\(\{[\s\S]*completedBatchId: updated\.batchId/);
+  assert.match(listingsRouteSource, /compactFutureAutoPublishQueue\(\{[\s\S]*completedBatchId: latestJob\.batchId/);
+  assert.match(marketplaceListingsSource, /compactFutureAutoPublishQueue\(\{[\s\S]*completedBatchId: batchId/);
 });
 
 test("Alpha Pages scheduling and dashboard display use New York time", () => {
