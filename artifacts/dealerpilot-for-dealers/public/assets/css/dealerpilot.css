@@ -1,0 +1,25 @@
+/* DealerPilot overrides */
+.dp-hero-sub{color:rgba(255,255,255,.85);font-size:19px;line-height:1.7;max-width:720px;margin:22px auto 30px;}
+.dp-hero-btns .main-btn{margin:6px 8px;}
+.bordered-white{border:2px solid rgba(255,255,255,.6)!important;color:#fff!important;background:transparent!important;}
+.bordered-white:hover{background:#fff!important;color:#7756D2!important;}
+.dp-shot{border-radius:14px;border:1px solid rgba(10,20,38,.08);box-shadow:0 30px 70px rgba(10,20,38,.18);}
+.dp-shot-hero{max-width:920px;width:100%;}
+.dp-shot-sm{max-width:46%;}
+.dp-cta-sub{color:rgba(255,255,255,.8);margin:-10px 0 24px;}
+.hero-area .hero-content h1{text-transform:none;}
+
+.dp-demo-form .form_group{margin-bottom:14px;}
+.dp-demo-form .form_control{width:100%;padding-right:24px;}
+.dp-demo-form button{width:auto;min-width:200px;}
+/* Login: visible en movil sin romper la alineacion del template */
+@media (max-width: 767px){
+  .header-navigation .header-right-nav ul li.nav-button{display:list-item!important;}
+  .header-navigation .header-right-nav ul li{margin-left:14px;}
+  .header-navigation .header-right-nav ul li.nav-button .main-btn{padding:5px 16px;font-size:14px;margin-top:3px;}
+}
+/* Logo DealerPilot: alturas controladas */
+.header-navigation .brand-logo img{max-height:44px;width:auto;}
+.footer-widget img{max-height:40px;width:auto;}
+.sidebar-logo img{max-height:38px;width:auto;}
+@media (max-width: 767px){ .header-navigation .brand-logo img{max-height:40px;} }

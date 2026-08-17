@@ -85,7 +85,7 @@ function createHarness(payload, options = {}) {
 
   const DealerPilotApiClient = {
     async getBackendUrl() {
-      return "https://1987dealerpilot.com";
+      return "https://app.1987dealerpilot.com";
     },
     async apiGet(path) {
       calls.apiGet.push(path);
@@ -293,7 +293,7 @@ test("assigned queue poll uses the Chrome runtime id while claiming with storage
   await handlers.POLL_ASSIGNED_JOB();
 
   assert.equal(calls.heartbeats.length, 1);
-  assert.equal(calls.heartbeats[0].backendUrl, "https://1987dealerpilot.com");
+  assert.equal(calls.heartbeats[0].backendUrl, "https://app.1987dealerpilot.com");
   assert.equal(calls.heartbeats[0].chromeExtensionId, "chrome-runtime-e2e");
   assert.ok(
     calls.apiGet.includes("/api/publishing/jobs/assigned?extensionId=chrome-runtime-e2e"),

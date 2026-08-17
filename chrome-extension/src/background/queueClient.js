@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_URL = "https://1987dealerpilot.com";
+const DEFAULT_BACKEND_URL = "https://app.1987dealerpilot.com";
 const LEGACY_RENDER_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
 const REPLIT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 

@@ -1,5 +1,5 @@
 (function () {
-  const DEFAULT_BACKEND_URL = "https://1987dealerpilot.com";
+  const DEFAULT_BACKEND_URL = "https://app.1987dealerpilot.com";
 
   async function getBackendUrl() {
     const { backendUrl } = await chrome.storage.local.get("backendUrl");
