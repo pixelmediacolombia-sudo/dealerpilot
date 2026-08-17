@@ -51,18 +51,18 @@ body {
 }
 
 .header-logo {
-  width: 38px !important;
-  height: 38px !important;
-  color: var(--dp-violet-foreground) !important;
-  background: var(--dp-violet) !important;
-  border-radius: 10px !important;
-  box-shadow: 0 6px 14px color-mix(in srgb, var(--dp-violet) 28%, transparent);
+  width: 42px !important;
+  height: 25px !important;
+  color: inherit !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   font-size: 15px !important;
 }
 
 .header-logo img {
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: auto;
   object-fit: contain;
 }
 

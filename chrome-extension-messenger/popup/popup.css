@@ -79,22 +79,18 @@ summary:focus-visible {
 
 .brand-mark {
   display: grid;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
+  width: 48px;
+  height: 28px;
+  flex: 0 0 48px;
   place-items: center;
-  color: var(--dp-violet-foreground);
-  background: var(--dp-violet);
-  border-radius: 11px;
-  box-shadow: 0 7px 15px color-mix(in srgb, var(--dp-violet) 28%, transparent);
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -.05em;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .brand-mark img {
-  width: 36px;
-  height: 36px;
+  width: 48px;
+  height: auto;
   object-fit: contain;
 }
 
