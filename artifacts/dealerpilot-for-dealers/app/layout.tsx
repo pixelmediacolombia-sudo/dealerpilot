@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(origin),
     title: "DealerPilot para dealers",
     description,
-    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+    icons: { icon: "/assets/images/favicon.png", shortcut: "/assets/images/favicon.png" },
     openGraph: {
       title: "DealerPilot | Más ventas. Menos trabajo manual.",
       description,

@@ -123,7 +123,11 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, user: AuthUser) => 
       >
         <div className="mb-7 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-primary text-xs font-bold tracking-tight text-primary-foreground shadow-sm">
-            DP
+            <img
+              src="/dealerpilot-p-transparent.png"
+              alt="DealerPilot"
+              className="h-8 w-8 object-contain outline-none"
+            />
           </div>
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-foreground">DealerPilot</h1>

@@ -92,6 +92,12 @@ summary:focus-visible {
   letter-spacing: -.05em;
 }
 
+.brand-mark img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
 .brand-copy { min-width: 0; }
 .brand-copy h1 {
   margin: 0;

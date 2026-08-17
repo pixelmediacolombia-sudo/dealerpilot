@@ -6,6 +6,7 @@
 .dp-shot{border-radius:14px;border:1px solid rgba(10,20,38,.08);box-shadow:0 30px 70px rgba(10,20,38,.18);}
 .dp-shot-hero{max-width:920px;width:100%;}
 .dp-shot-sm{max-width:46%;}
+.dp-cta-shot{display:block;width:100%;max-width:100%;height:auto;}
 .dp-cta-sub{color:rgba(255,255,255,.8);margin:-10px 0 24px;}
 .hero-area .hero-content h1{text-transform:none;}
 
