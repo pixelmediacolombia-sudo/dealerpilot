@@ -221,6 +221,15 @@
   border-color: hsl(36 80% 86%);
 }
 
+/* These KPI cards intentionally keep their soft light tints in dark mode.
+   Restore the light-card text tokens so the values do not inherit the dark
+   page's near-white foreground and disappear against the pale surfaces. */
+.dark :is(.gymove-kpi-purple, .gymove-kpi-blue, .gymove-kpi-pink, .gymove-kpi-green, .gymove-kpi-amber) {
+  --foreground: 220 18% 14%;
+  --muted-foreground: 215 12% 43%;
+  color: hsl(var(--foreground));
+}
+
 .gymove-kpi-card {
   position: relative;
   overflow: hidden;

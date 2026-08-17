@@ -52,7 +52,10 @@ const ACTIVE_PATHS: Record<string, string[]> = {
 
 function BrandMark() {
   return (
-    <img src="/dealerpilot-p-dark-tight-transparent.png" alt="" className="h-8 w-8 shrink-0 object-contain outline-none" />
+    <span className="relative block h-8 w-8 shrink-0" aria-hidden="true">
+      <img src="/dealerpilot-p-dark-tight-transparent.png" alt="" className="block h-full w-full object-contain outline-none dark:hidden" />
+      <img src="/dealerpilot-p-transparent.png" alt="" className="hidden h-full w-full object-contain outline-none dark:block" />
+    </span>
   );
 }
 
