@@ -218,7 +218,7 @@ async function maybeCreateAutomaticBatch(
   }
 
   const activeJobs = await db
-    .select()
+    .select({ vehicleId: publishingJobsTable.vehicleId })
     .from(publishingJobsTable)
     .where(
       and(
@@ -226,8 +226,12 @@ async function maybeCreateAutomaticBatch(
         inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
       ),
     );
+  const activeVehicleIds = new Set(activeJobs.map((job) => job.vehicleId));
   if (activeJobs.length > 0) {
-    return { created: 0, summary: `${activeJobs.length} active publishing job(s) already in queue` };
+    log.info(
+      { activeJobCount: activeJobs.length, activeVehicleIds: [...activeVehicleIds] },
+      "Publishing worker found active jobs; isolating those vehicles so the next candidates can continue",
+    );
   }
 
   const allScheduledJobs = await db
@@ -311,6 +315,9 @@ async function maybeCreateAutomaticBatch(
   const selectedCandidates = vehicles
     .map((vehicle) => {
       if (needsReviewVehicleIds.has(vehicle.id)) return null;
+      // An active job blocks only its own vehicle. It must never prevent the
+      // automatic planner from creating a batch for other eligible vehicles.
+      if (activeVehicleIds.has(vehicle.id)) return null;
       const images = imagesByVehicle.get(vehicle.id) ?? [];
       const listing = listingByVehicle.get(vehicle.id);
       const gm = getCachedGmDecision(vehicle.id);

@@ -235,6 +235,14 @@ test("publishing worker repairs legacy stale assignments before selecting the ne
   assert.match(workerSource, /Publishing worker repaired legacy stale assignments back to Retry/);
 });
 
+test("automatic batching isolates active vehicles instead of blocking the next candidates", () => {
+  assert.match(workerSource, /select\(\{ vehicleId: publishingJobsTable\.vehicleId \}\)/);
+  assert.match(workerSource, /const activeVehicleIds = new Set\(activeJobs\.map\(\(job\) => job\.vehicleId\)\);/);
+  assert.match(workerSource, /isolating those vehicles so the next candidates can continue/);
+  assert.match(workerSource, /if \(activeVehicleIds\.has\(vehicle\.id\)\) return null;/);
+  assert.doesNotMatch(workerSource, /if \(activeJobs\.length > 0\) \{\s*return \{ created: 0, summary:/);
+});
+
 test("automatic selection excludes vehicles whose latest publishing job is Needs Review", () => {
   assert.match(autoPublishSource, /findLatestNeedsReviewVehicleIds/);
   assert.match(autoPublishSource, /needsReviewVehicleIds\.has\(v\.id\)/);
