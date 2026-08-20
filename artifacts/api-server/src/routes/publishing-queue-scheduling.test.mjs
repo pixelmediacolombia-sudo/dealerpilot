@@ -23,6 +23,7 @@ const authSource = readFileSync(new URL("./auth.ts", import.meta.url), "utf8");
 const extensionRouteSource = readFileSync(new URL("./extension.ts", import.meta.url), "utf8");
 const marketplaceListingsSource = readFileSync(new URL("./marketplaceListings.ts", import.meta.url), "utf8");
 const vehiclesRouteSource = readFileSync(new URL("./vehicles.ts", import.meta.url), "utf8");
+const soldStateSource = readFileSync(new URL("../marketplace/soldState.ts", import.meta.url), "utf8");
 const controlledModeSource = readFileSync(new URL("../publishing/controlledMode.ts", import.meta.url), "utf8");
 const listingsRouteSource = readFileSync(new URL("./listings.ts", import.meta.url), "utf8");
 const queueClientSource = readFileSync(
@@ -482,12 +483,13 @@ test("listing workspace does not show stale published jobs as live without Marke
 });
 
 test("sold inventory feeds Marketplace and extension state so vehicles cannot be republished", () => {
-  assert.match(vehiclesRouteSource, /async function syncSoldMarketplaceState\(vehicleIds: number\[\]\)/);
-  assert.match(vehiclesRouteSource, /marketplaceListingsTable[\s\S]*\.set\(\{ status: "Sold", notes: note, updatedAt: now \}\)/);
-  assert.match(vehiclesRouteSource, /listingsTable[\s\S]*\.set\(\{ status: "Sold", updatedAt: now \}\)/);
-  assert.match(vehiclesRouteSource, /publishingJobsTable[\s\S]*status: "Cancelled"[\s\S]*Vehicle marked Sold\/Removed in DealerPilot inventory/);
-  assert.match(vehiclesRouteSource, /action === "mark_sold"[\s\S]*syncSoldMarketplaceState\(updated\.map\(\(v\) => v\.id\)\)/);
-  assert.match(vehiclesRouteSource, /parsed\.data\.status === "Sold\/Removed"[\s\S]*syncSoldMarketplaceState\(\[id\]\)/);
+  assert.match(soldStateSource, /export async function syncSoldMarketplaceState/);
+  assert.match(soldStateSource, /marketplaceListingsTable[\s\S]*\.set\(\{ status: "Sold", notes: note, updatedAt: now \}\)/);
+  assert.match(soldStateSource, /listingsTable[\s\S]*\.set\(\{ status: "Sold", updatedAt: now \}\)/);
+  assert.match(soldStateSource, /publishingJobsTable[\s\S]*status: "Cancelled"[\s\S]*Vehicle marked Sold\/Removed in DealerPilot inventory/);
+  assert.match(vehiclesRouteSource, /syncSoldMarketplaceState/);
+  assert.match(vehiclesRouteSource, /const soldSync = action === "mark_sold"[\s\S]*syncSoldMarketplaceState\(updated\.map\(\(v\) => v\.id\), "manual"\)/);
+  assert.match(vehiclesRouteSource, /const soldSync = parsed\.data\.status === "Sold\/Removed"[\s\S]*syncSoldMarketplaceState\(\[id\], "manual"\)/);
   assert.match(extensionRouteSource, /\/extension\/marketplace-sold-actions/);
   assert.match(extensionRouteSource, /eq\(marketplaceListingsTable\.status, "Sold"\)/);
   assert.match(extensionRouteSource, /eq\(vehiclesTable\.status, "Sold\/Removed"\)/);
@@ -505,7 +507,9 @@ test("sold inventory feeds Marketplace and extension state so vehicles cannot be
 });
 
 test("publishing cockpit shows only the primary owner-requested tabs and compact live cards", () => {
-  assert.match(listingsWorkspaceSource, /PRIMARY_TABS = new Set\(\["ready", "scheduled", "published", "failed", "all"\]\)/);
+  assert.match(listingsWorkspaceSource, /PRIMARY_TABS = new Set\(\["ready", "scheduled", "published", "failed", "to-remove", "all"\]\)/);
+  assert.match(listingsWorkspaceSource, /<TabsTrigger value="to-remove"/);
+  assert.match(listingsWorkspaceSource, /ToRemovePanel/);
   assert.match(listingsWorkspaceSource, /"needs-update": "published"/);
   assert.match(listingsWorkspaceSource, /Live \{countBadge\(publishedWorkspacesCount\)\}/);
   assert.match(listingsWorkspaceSource, /Schedule \{countBadge\(scheduledCount\)\}/);
@@ -672,7 +676,18 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.equal(spanishWords.test("claro que sí, ¿cómo podemos ayudarte?"), true);
   assert.equal(spanishWords.test("I am interested"), false);
   assert.match(conversationsSource, /Hello, this is Alpha Motorsports/);
-  assert.match(conversationsSource, /Are you interested in financing/);
+  assert.match(conversationsSource, /interested in buying/);
+  assert.match(conversationsSource, /QUALIFICATION FUNNEL FOR ALPHA MANASSAS/);
+  assert.match(conversationsSource, /plans starting at \$1,000, \$2,000, and \$3,000 down/);
+  assert.match(conversationsSource, /currently requires more than \$1,000 down/);
+  assert.match(conversationsSource, /this week or this month/);
+  assert.match(conversationsSource, /in 15 days/);
+  assert.match(conversationsSource, /en 15 dias/);
+  assert.match(conversationsSource, /next month/);
+  assert.match(conversationsSource, /el otro mes/);
+  assert.match(conversationsSource, /valid ID and proof of income/);
+  assert.match(conversationsSource, /qualified_exit/);
+  assert.doesNotMatch(conversationsSource, /Fredericksburg/);
   assert.match(conversationsSource, /inventory_options/);
   assert.match(conversationsSource, /buyerAskedInventoryOptions/);
   assert.match(conversationsSource, /tenemos más vehículos disponibles/);
@@ -680,7 +695,6 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /price_inquiry/);
   assert.match(conversationsSource, /buyerAskedPriceInquiry/);
   assert.match(conversationsSource, /Do not provide a number/);
-  assert.match(conversationsSource, /do not jump to requirements/);
   assert.match(conversationsSource, /isFirstDealerReply/);
   assert.match(conversationsSource, /withFirstReplyGreeting/);
   assert.match(conversationsSource, /First reply instruction/);
@@ -695,34 +709,26 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /consecutiveBuyerMessages\.length >= 3/);
   assert.match(conversationsSource, /structured\.urgency === "high"/);
   assert.match(conversationsSource, /structured\.vehicleIntent === "strong"/);
-  assert.match(conversationsSource, /Mere repetition, impatience, curiosity/);
+  assert.match(conversationsSource, /any clear natural time expression/);
   assert.match(conversationsSource, /Skip the normal funnel/);
-  assert.match(conversationsSource, /buyerDeclinedFinancing/);
-  assert.match(conversationsSource, /do not ask about financing again/);
-  assert.match(conversationsSource, /purchase cash or would like to come see/);
-  assert.match(conversationsSource, /historyGaveFinancingRequirements/);
-  assert.match(conversationsSource, /buyerConfirmedRequirements/);
   assert.match(conversationsSource, /best phone number/);
   assert.match(conversationsSource, /historyRequestedPhone/);
-  assert.match(conversationsSource, /do not restart the financing question/);
   assert.match(conversationsSource, /formatConversationHistoryForAi/);
   assert.match(conversationsSource, /const conversationHistoryForAi = \[\.\.\.existingChronological, \.\.\.newMessages\]/);
   assert.match(conversationsSource, /formatConversationHistoryForAi\(conversationHistoryForAi\.length \? conversationHistoryForAi : incomingMsgs\)/);
   assert.match(conversationsSource, /document_requirements/);
   assert.match(conversationsSource, /buyerAskedDocumentRequirements/);
-  assert.match(conversationsSource, /ID and active bank account/);
-  assert.match(conversationsSource, /passport or Tax ID works/);
-  assert.match(conversationsSource, /Do you have those requirements/);
-  assert.match(conversationsSource, /Do not ask for a phone number in this same reply/);
-  assert.match(conversationsSource, /Solo necesitas tu ID y una cuenta bancaria activa/);
-  assert.match(conversationsSource, /Cuentas con esos requisitos/);
+  assert.match(conversationsSource, /proof of income/);
+  assert.doesNotMatch(conversationsSource, /active bank account/);
+  assert.match(conversationsSource, /Do not ask for a phone number in the same reply/);
+  assert.match(conversationsSource, /identificación vigente y comprobante de ingresos/);
   assert.match(conversationsSource, /warranty_info/);
   assert.match(conversationsSource, /advisor_question/);
   assert.match(conversationsSource, /buyerAskedWarrantyInfo/);
   assert.match(conversationsSource, /buyerAskedAdvisorQuestion/);
   assert.match(conversationsSource, /Do not use the words "advisor" or "asesor"/);
   assert.match(conversationsSource, /Use "our team" \/ "nuestro equipo"/);
-  assert.match(conversationsSource, /do not provide those values/);
+  assert.match(conversationsSource, /Do not provide a number/);
   assert.match(conversationsSource, /stageRequiresStorePhone/);
   assert.match(conversationsSource, /replyIncludesStorePhone/);
   assert.match(conversationsSource, /replyGivesRestrictedVehicleDetails/);

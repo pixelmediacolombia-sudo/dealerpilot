@@ -22,6 +22,7 @@ import gmRouter from "./gm";
 import workersRouter from "./workers";
 import orchestratorRouter from "./orchestrator";
 import pagesRouter from "./pages";
+import commandCenterRouter from "./commandCenter";
 
 const router: IRouter = Router();
 
@@ -50,5 +51,6 @@ router.use(channelsRouter);
 router.use(photoStudioRouter);
 router.use(marketplaceListingsRouter);
 router.use(pagesRouter);
+router.use(commandCenterRouter);
 
 export default router;

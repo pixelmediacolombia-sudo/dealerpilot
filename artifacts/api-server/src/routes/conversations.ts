@@ -296,8 +296,19 @@ function parseTimestamp(value: unknown): Date | null {
 
 type SalesReplyStage =
   | "availability"
+  | "interest_confirmation"
+  | "interest_declined"
   | "store_phone_requested"
   | "price_inquiry"
+  | "down_payment_request"
+  | "down_payment_low"
+  | "down_payment_declined"
+  | "timeline_request"
+  | "timeline_received"
+  | "timeline_declined"
+  | "documents_request"
+  | "documents_declined"
+  | "qualified_exit"
   | "financing_intro"
   | "financing_declined"
   | "cash_visit_request_phone"
@@ -324,6 +335,98 @@ function extractPhoneNumber(text: string): string | null {
 
 function hasPhoneNumber(text: string): boolean {
   return extractPhoneNumber(text) !== null;
+}
+
+const MINIMUM_DOWN_PAYMENT = 1000;
+
+function extractDownPaymentAmount(text: string): number | null {
+  const normalized = normalizeIntentText(text);
+  const hasDownContext = /down|enganche|inicial|cash|contado|efectivo|available|disponible|have|tengo|cuento|can put|puedo dar|puedo poner/.test(normalized);
+  if (!hasDownContext) return null;
+  const withoutPhoneNumber = normalized.replace(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, " ");
+  const numericMatch = withoutPhoneNumber.match(/(?:\$|usd\s*)?\s*(\d{1,2}(?:[,.]\d{3})?|\d{3,5})(?:\s*(?:k|mil|thousand))?/i);
+  if (numericMatch?.[1]) {
+    const raw = numericMatch[1].replace(/,/g, "");
+    const amount = Number(raw);
+    if (Number.isFinite(amount)) {
+      const suffix = numericMatch[0].toLowerCase();
+      return Math.round(suffix.includes("k") || suffix.includes("thousand") ? amount * 1000 : amount);
+    }
+  }
+  const wordAmounts: Array<[RegExp, number]> = [
+    [/one thousand|mil/, 1000],
+    [/two thousand|dos mil/, 2000],
+    [/three thousand|tres mil/, 3000],
+  ];
+  return wordAmounts.find(([pattern]) => pattern.test(normalized))?.[1] ?? null;
+}
+
+function historyHasBuyerPhone(visibleMessages: string[]): boolean {
+  return visibleMessages
+    .map(parseConversationMessage)
+    .some((message) => message?.role === "user" && hasPhoneNumber(message.content));
+}
+
+function historyContainsDealerPrompt(visibleMessages: string[], pattern: RegExp): boolean {
+  return visibleMessages
+    .map(parseConversationMessage)
+    .some((message) => message?.role === "assistant" && pattern.test(normalizeIntentText(message.content)));
+}
+
+function buyerAcceptedInterest(value: string): boolean {
+  return /\b(?:yes|yeah|yep|sure|okay|ok|interested|i am interested|me interesa|estoy interesado|estoy interesada|si|s[ií]|claro|por supuesto)\b/i.test(normalizeIntentText(value));
+}
+
+function buyerAcceptedMinimumDown(value: string): boolean {
+  return buyerAcceptedInterest(value) || /\b(?:puedo|tengo|cuento|conseguir[eé]|reach|can do|i have)\b/i.test(normalizeIntentText(value));
+}
+
+function buyerAcceptedCashPurchase(value: string): boolean {
+  const normalized = normalizeIntentText(value);
+  if (/\b(?:no cash|not cash|don't have cash|do not have cash|no tengo efectivo|no cuento con efectivo|no puedo pagar en efectivo|no puedo pagar de contado)\b/i.test(normalized)) {
+    return false;
+  }
+  return /\b(?:cash|cash buyer|pay cash|paying cash|buy cash|pay in cash|contado|de contado|pagar(?:[eé])? en efectivo|pago en efectivo|efectivo)\b/i.test(normalized);
+}
+
+function buyerDeclinedCurrentStep(value: string): boolean {
+  return /\b(?:no|nope|nah|not interested|don't|do not|no tengo|no cuento|me falta|todavia no|aun no|no puedo|no puedo contar|not yet|cannot|can't)\b/i.test(normalizeIntentText(value));
+}
+
+function buyerAcceptedTimeline(value: string): "this_week" | "this_month" | null {
+  const normalized = normalizeIntentText(value);
+  if (/\b(?:this week|esta semana|ahora|ahorita|immediately|right away|today|tomorrow|hoy|manana|next few days|within a week|in a week|in 1 week|en una semana|en 1 semana|dentro de una semana|esta quincena)\b/.test(normalized)) return "this_week";
+  if (/\b(?:this month|este mes|within the month|en el mes|later this month|by month end|in 10 days|in 14 days|in 15 days|in 20 days|in 21 days|in 30 days|in two weeks|in 2 weeks|in three weeks|in 3 weeks|in a couple of weeks|in a few weeks|in a month|in one month|next month|following month|the other month|another month|el otro mes|otro mes|el mes que viene|el mes siguiente|el proximo mes|el próximo mes|dentro de un mes|en un mes|en un par de semanas|en unas semanas|en 15 dias|en 15 días|en dos semanas|en 2 semanas|en tres semanas|en 3 semanas|dentro de 15 dias|dentro de 15 días|soon|as soon as possible|asap|later|when i get paid|after payday|pronto|lo antes posible|cuando cobre|cuando me paguen)\b/.test(normalized)) return "this_month";
+  if (/\b(?:january|february|march|april|may|june|july|august|september|october|november|december|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b/.test(normalized)) return "this_month";
+  if (/\b(?:in|en|within|dentro de|para|by|next|coming|following|otro|proximo|pr[oó]ximo|que viene)\b[\s\w,.-]{0,32}\b(?:day|days|dia|dias|d[ií]a|d[ií]as|week|weeks|semana|semanas|month|months|mes|meses)\b/.test(normalized)) return "this_month";
+  return null;
+}
+
+function buyerDocumentStatus(value: string): { hasId: boolean; hasProofOfIncome: boolean } | null {
+  const normalized = normalizeIntentText(value);
+  const negative = /\b(?:no|no tengo|no cuento|me falta|todavia no|aun no|don't have|do not have|not yet)\b/.test(normalized);
+  const mentionsId = /\b(?:id|identificacion|identification|tax id|itin|passport|pasaporte)\b/.test(normalized);
+  const mentionsIncome = /\b(?:proof of income|income proof|comprobante de ingresos|prueba de ingresos|talones|pay stubs|paystubs|ingresos)\b/.test(normalized);
+  if (!mentionsId && !mentionsIncome && !/\b(?:yes|si|sí|tengo|cuento|i have|i do)\b/.test(normalized)) return null;
+  if (negative) return { hasId: false, hasProofOfIncome: false };
+  return { hasId: mentionsId || /\b(?:yes|si|sí|tengo|cuento|i have|i do)\b/.test(normalized), hasProofOfIncome: mentionsIncome || /\b(?:yes|si|sí|tengo|cuento|i have|i do)\b/.test(normalized) };
+}
+
+function extractBuyerQualification(messages: ParsedConversationMessage[]): {
+  downPayment: number | null;
+  timeline: "this_week" | "this_month" | null;
+  documents: { hasId: boolean; hasProofOfIncome: boolean } | null;
+} {
+  let downPayment: number | null = null;
+  let timeline: "this_week" | "this_month" | null = null;
+  let documents: { hasId: boolean; hasProofOfIncome: boolean } | null = null;
+  for (const message of [...messages].reverse()) {
+    if (message.role !== "user") continue;
+    if (downPayment === null) downPayment = extractDownPaymentAmount(message.content);
+    if (timeline === null) timeline = buyerAcceptedTimeline(message.content);
+    if (documents === null) documents = buyerDocumentStatus(message.content);
+  }
+  return { downPayment, timeline, documents };
 }
 
 function buyerRequestedStorePhone(text: string): boolean {
@@ -515,7 +618,6 @@ function replyIncludesStorePhone(reply: string, storePhone: string): boolean {
 
 function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
   return stage === "store_phone_requested" ||
-    stage === "request_phone" ||
     stage === "cash_visit_request_phone" ||
     stage === "urgent_vehicle_request_phone" ||
     stage === "stalled_conversation_request_phone" ||
@@ -574,8 +676,34 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   const latest = cleanConversationText(currentMessage).toLowerCase();
   const latestIntent = normalizeIntentText(currentMessage);
   const history = visibleMessages.slice(-8).map(cleanConversationText).join(" ").toLowerCase();
+  const buyerPhoneAlreadyKnown = historyHasBuyerPhone(visibleMessages);
+  const askedForBuyerPhone = historyContainsDealerPrompt(visibleMessages, /best phone number|phone number|numero de telefono|n[uú]mero de tel[eé]fono/);
+  const askedForDownPayment = historyContainsDealerPrompt(visibleMessages, /down payment|down|enganche|inicial/);
+  const askedForTimeline = historyContainsDealerPrompt(visibleMessages, /this week|this month|esta semana|este mes|when.*buy|cuando.*compr/);
+  const askedForDocuments = historyContainsDealerPrompt(visibleMessages, /proof of income|income proof|prueba de ingresos|comprobante de ingresos|identification|identificacion|tax id|pasaporte|bank account|cuenta bancaria/);
   if (buyerRequestedStorePhone(latest)) return "store_phone_requested";
-  if (hasPhoneNumber(latest)) return "phone_received";
+  if (hasPhoneNumber(latest) && !buyerPhoneAlreadyKnown) return "phone_received";
+  if (askedForDocuments) {
+    const documentStatus = buyerDocumentStatus(latest);
+    if (documentStatus && (!documentStatus.hasId || !documentStatus.hasProofOfIncome)) return "documents_declined";
+    if (buyerDeclinedCurrentStep(latest)) return "documents_declined";
+    if (documentStatus) return "qualified_exit";
+    return "documents_request";
+  }
+  if (askedForTimeline) {
+    if (buyerAcceptedTimeline(latest)) return "timeline_received";
+    if (buyerDeclinedCurrentStep(latest)) return "timeline_declined";
+    return "timeline_request";
+  }
+  if (askedForDownPayment) {
+    if (buyerAcceptedCashPurchase(latest)) return "timeline_request";
+    const amount = extractDownPaymentAmount(latest);
+    if (amount !== null) return amount < MINIMUM_DOWN_PAYMENT ? "down_payment_low" : "timeline_request";
+    if (buyerDeclinedCurrentStep(latest)) return "down_payment_declined";
+    if (buyerAcceptedMinimumDown(latest) && historyContainsDealerPrompt(visibleMessages, /minimum.*1,?000|at least.*1,?000|al menos.*1,?000|more than.*1,?000/)) return "timeline_request";
+    return "down_payment_request";
+  }
+  if (buyerPhoneAlreadyKnown && (askedForBuyerPhone || historyContainsDealerPrompt(visibleMessages, /interested|interesado|interesada/))) return "down_payment_request";
   if (
     historyRequestedPhone(history) &&
     (buyerAskedPriceInquiry(latest) || buyerAskedDetailedVehicleInfo(latest) || buyerAskedWarrantyInfo(latest) || buyerAskedAdvisorQuestion(latest))
@@ -589,24 +717,11 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   if (historyAskedCashOrVisit(history) && buyerAcceptedCashOrVisitStep(latest)) {
     return "cash_visit_request_phone";
   }
-  if (historyGaveFinancingRequirements(history) && buyerLacksRequirements(latest)) {
-    return "document_requirements";
-  }
-  if (buyerDeclinedFinancing(latest, history)) return "financing_declined";
-  if (historyGaveFinancingRequirements(history) && buyerConfirmedRequirements(latest)) {
-    return "request_phone";
-  }
   if (buyerAskedDocumentRequirements(latest)) return "document_requirements";
   if (buyerAskedPriceInquiry(latest)) return "price_inquiry";
   if (buyerAskedInventoryOptions(latestIntent)) return "inventory_options";
-  if (historyAskedAboutFinancing(history) && buyerAcceptedFinancingStep(latest)) {
-    return "financing_intro";
-  }
-  if (/\b(application|apply|financ(?:e|ing)|loan|monthly payment|payment plan|solicitud|aplicar|financiamiento|financiar|credito|crédito|cuota mensual)\b/i.test(latest)) {
-    return historyGaveFinancingRequirements(history) || historyRequestedPhone(history)
-      ? "request_phone"
-      : "financing_intro";
-  }
+  if (historyContainsDealerPrompt(visibleMessages, /interested|interesado|interesada/) && buyerAcceptedInterest(latest)) return "request_phone";
+  if (historyContainsDealerPrompt(visibleMessages, /interested|interesado|interesada/) && buyerDeclinedCurrentStep(latest)) return "interest_declined";
   if (/\b(is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|esta disponible|está disponible|esta(?:n)? (?:a la venta|en venta)|lo tiene disponible|lo tienen disponible|lo tienes disponible|tienen este|tienen esa|tienen ese (?:vehiculo|carro|auto|car|suv|camioneta)|tienen este (?:vehiculo|carro|auto|car|suv|camioneta)|hay alguno disponible|lo venden aun|lo siguen vendiendo|aun lo tienen|a[uú]n lo tienen)\b/i.test(latest)) {
     return "availability";
   }
@@ -646,10 +761,43 @@ function buildSafeFallbackReply(
       return `Con gusto, nuestro número es ${storePhone}. Quedamos atentos.`;
     }
     if (stage === "phone_received") {
-      return `¡Gracias! Recibimos tu número y te contactaremos pronto para ayudarte con el ${vehicle}. Si prefieres, también puedes llamarnos al ${storePhone}.`;
+      return "¡Gracias! Ya tengo tu número. Tenemos planes desde $1,000, $2,000 y $3,000 de down payment. ¿Con cuánto cuentas para el down?";
+    }
+    if (stage === "interest_confirmation") {
+      return `Sí, el ${vehicle} está disponible. ¿Sigues interesado en comprarlo?`;
+    }
+    if (stage === "interest_declined") {
+      return "Entiendo, gracias por tu tiempo. Si cambias de opinión, aquí estaremos para ayudarte. ¡Que tengas un buen día!";
+    }
+    if (stage === "down_payment_request") {
+      return "Tenemos planes desde $1,000, $2,000 y $3,000 de down payment. ¿Con cuánto cuentas para el down?";
+    }
+    if (stage === "down_payment_low") {
+      return "Gracias por decírmelo. Actualmente estamos pidiendo más de $1,000 de down payment. ¿Podrías contar con $1,000 o más?";
+    }
+    if (stage === "down_payment_declined") {
+      return "Entiendo, gracias por tu interés. Actualmente necesitamos más de $1,000 de down payment para avanzar. Cuando cuentes con esa cantidad, estaremos aquí para ayudarte. ¡Que tengas un buen día!";
+    }
+    if (stage === "timeline_request") {
+      return "Perfecto. ¿Cuándo planeas comprar el vehículo: esta semana o este mes?";
+    }
+    if (stage === "timeline_received") {
+      return "Perfecto, gracias. ¿Tienes una identificación vigente y comprobante de ingresos?";
+    }
+    if (stage === "timeline_declined") {
+      return "Entiendo. En este momento estamos atendiendo a quienes planean comprar esta semana o este mes. Cuando estés listo, con gusto te ayudamos. ¡Que tengas un buen día!";
+    }
+    if (stage === "documents_request") {
+      return "Para avanzar necesitamos una identificación vigente y comprobante de ingresos. ¿Cuentas con ambos?";
+    }
+    if (stage === "documents_declined") {
+      return "Entiendo. Actualmente estamos pidiendo identificación y comprobante de ingresos para avanzar. Cuando los tengas, con gusto te ayudamos. ¡Que tengas un buen día!";
+    }
+    if (stage === "qualified_exit") {
+      return `Perfecto ✅ Ya tengo toda tu información y cumples con los requisitos. Puedes llamarnos al ${storePhone} y nuestro equipo continuará contigo. ¡Gracias por tu interés!`;
     }
     if (stage === "request_phone") {
-      return `Perfecto. ¿Cuál es el mejor número de teléfono para ayudarte con el financiamiento del ${vehicle}? También puedes llamarnos al ${storePhone}.`;
+      return `Perfecto. ¿Cuál es el mejor número de teléfono para comunicarnos contigo sobre el ${vehicle}?`;
     }
     if (stage === "cash_visit_request_phone") {
       return `Perfecto. Cual es el mejor numero de telefono para coordinar la visita o la compra del ${vehicle}? Tambien puedes llamarnos al ${storePhone}.`;
@@ -665,49 +813,82 @@ function buildSafeFallbackReply(
     }
     if (stage === "availability") {
       return availabilityQuickReplyAccepted
-        ? `Hola, somos Alpha Motorsports. Tenemos el ${vehicle} disponible. ¿Estás interesado en financiarlo?`
-        : `Hola, somos Alpha Motorsports. Sí, el ${vehicle} está disponible. ¿Estás interesado en financiarlo?`;
+        ? `Hola, somos Alpha Motorsports. Tenemos el ${vehicle} disponible. ¿Estás interesado en comprarlo?`
+        : `Hola, somos Alpha Motorsports. Sí, el ${vehicle} está disponible. ¿Estás interesado en comprarlo?`;
     }
     if (stage === "price_inquiry") {
       return `Con gusto podemos confirmar ese detalle del ${vehicle}. Te encuentras interesado?`;
     }
     if (stage === "financing_intro") {
-      return "Perfecto. Para aplicar solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuentas con esos requisitos?";
+      return "Perfecto. Para avanzar necesitamos una identificación vigente y comprobante de ingresos. ¿Cuentas con ambos?";
     }
     if (stage === "financing_declined") {
       return `No hay problema, gracias por avisarnos. Planeas comprar de contado o te gustaria venir a ver el ${vehicle}?`;
     }
     if (stage === "address_request") {
-      return `Nuestra dirección es: ${storeAddress}. ¿Te gustaría venir a ver el ${vehicle} o te interesa financiarlo?`;
+      return `Nuestra dirección es: ${storeAddress}. ¿Te gustaría venir a ver el ${vehicle} y continuar con tu compra?`;
     }
     if (stage === "inventory_options") {
-      return `Sí, tenemos más vehículos disponibles además del ${vehicle}. ¿Te interesa financiar este vehículo o quieres ver opciones similares?`;
+      return `Sí, tenemos más vehículos disponibles además del ${vehicle}. ¿Te interesa comprar este vehículo o quieres ver opciones similares?`;
     }
     if (stage === "document_requirements") {
       const detailBridge = buyerAskedDetailedVehicleInfo(currentMessage)
         ? " Con gusto podemos confirmar esos detalles contigo."
         : "";
-      return `Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID.${detailBridge} ¿Cuentas con esos requisitos?`;
+      return `Para avanzar necesitamos una identificación vigente y comprobante de ingresos.${detailBridge} ¿Cuentas con ambos?`;
     }
     if (stage === "clean_title") {
-      return "Sí, este vehículo tiene título limpio. ¿Te interesa financiarlo?";
+      return "Sí, este vehículo tiene título limpio. ¿Te interesa comprarlo?";
     }
     if (stage === "warranty_info") {
-      return `Buena pregunta. Con gusto podemos confirmar los detalles exactos de garantía y cobertura del ${vehicle}. ¿Te interesa financiarlo?`;
+      return `Buena pregunta. Con gusto podemos confirmar los detalles exactos de garantía y cobertura del ${vehicle}. ¿Te interesa comprarlo?`;
     }
     if (stage === "advisor_question") {
-      return `Buena pregunta. Con gusto podemos confirmar ese detalle del ${vehicle}. ¿Te interesa financiarlo?`;
+      return `Buena pregunta. Con gusto podemos confirmar ese detalle del ${vehicle}. ¿Te interesa comprarlo?`;
     }
-    return `Con gusto te ayudo con el ${vehicle}. ¿Te interesa financiarlo?`;
+    return `Con gusto te ayudo con el ${vehicle}. ¿Te interesa comprarlo?`;
   }
-  if (stage === "store_phone_requested") {
-    return `Of course, our number is ${storePhone}. We are here if you need anything else.`;
-  }
-  if (stage === "phone_received") {
-    return `Thank you! We received your number and will contact you shortly to help with the ${vehicle}. You can also call us at ${storePhone} if you prefer.`;
-  }
+    if (stage === "store_phone_requested") {
+      return `Of course, our number is ${storePhone}. We are here if you need anything else.`;
+    }
+    if (stage === "phone_received") {
+      return "Thanks! I have your number. We have plans starting at $1,000, $2,000, and $3,000 down. How much do you have available for the down payment?";
+    }
+    if (stage === "interest_confirmation") {
+      return `Yes, the ${vehicle} is available. Are you still interested in buying it?`;
+    }
+    if (stage === "interest_declined") {
+      return "I understand, and I appreciate your time. If you change your mind, we will be here to help. Have a great day!";
+    }
+    if (stage === "down_payment_request") {
+      return "We have plans starting at $1,000, $2,000, and $3,000 down. How much do you have available for the down payment?";
+    }
+    if (stage === "down_payment_low") {
+      return "Thanks for letting me know. We currently require more than $1,000 down. Would you be able to have $1,000 or more?";
+    }
+    if (stage === "down_payment_declined") {
+      return "I understand, and I appreciate your interest. We currently need more than $1,000 down to move forward. Please reach out when you have that amount. Have a great day!";
+    }
+    if (stage === "timeline_request") {
+      return "Perfect. When are you planning to buy the vehicle: this week or this month?";
+    }
+    if (stage === "timeline_received") {
+      return "Perfect, thank you. Do you have a valid ID and proof of income?";
+    }
+    if (stage === "timeline_declined") {
+      return "I understand. Right now we are prioritizing buyers planning to purchase this week or this month. When you are ready, we will be happy to help. Have a great day!";
+    }
+    if (stage === "documents_request") {
+      return "To move forward, we need a valid ID and proof of income. Do you have both?";
+    }
+    if (stage === "documents_declined") {
+      return "I understand. We currently require a valid ID and proof of income to move forward. Please reach out when you have both. Have a great day!";
+    }
+    if (stage === "qualified_exit") {
+      return `Perfect ✅ I have all your information and you meet the requirements. You can call us at ${storePhone}, and our team will continue with you. Thanks for your interest!`;
+    }
   if (stage === "request_phone") {
-    return `Great. What's the best phone number to help you with financing for the ${vehicle}? You can also call us at ${storePhone}.`;
+    return `Great. What's the best phone number to reach you about the ${vehicle}?`;
   }
   if (stage === "cash_visit_request_phone") {
     return `Great. What's the best phone number to coordinate a visit or cash purchase for the ${vehicle}? You can also call us at ${storePhone}.`;
@@ -723,40 +904,40 @@ function buildSafeFallbackReply(
   }
   if (stage === "availability") {
     return availabilityQuickReplyAccepted
-      ? `Hello, this is Alpha Motorsports. We have the ${vehicle} available. Are you interested in financing it?`
-      : `Hello, this is Alpha Motorsports. Yes, the ${vehicle} is available. Are you interested in financing it?`;
+      ? `Hello, this is Alpha Motorsports. We have the ${vehicle} available. Are you interested in buying it?`
+      : `Hello, this is Alpha Motorsports. Yes, the ${vehicle} is available. Are you interested in buying it?`;
   }
   if (stage === "price_inquiry") {
     return `We will be happy to confirm that detail for the ${vehicle}. Are you still interested?`;
   }
   if (stage === "financing_intro") {
-    return "Perfect. To apply, you only need your ID and an active bank account; a passport or Tax ID works. Do you have those requirements?";
+    return "Perfect. To move forward, we need a valid ID and proof of income. Do you have both?";
   }
   if (stage === "financing_declined") {
     return `No problem, thanks for letting us know. Are you planning to purchase cash or would you like to come see the ${vehicle}?`;
   }
   if (stage === "address_request") {
-    return `Our address is: ${storeAddress}. Would you like to come see the ${vehicle} or are you interested in financing it?`;
+    return `Our address is: ${storeAddress}. Would you like to come see the ${vehicle} and continue with your purchase?`;
   }
   if (stage === "inventory_options") {
-    return `Yes, we have more vehicles available besides the ${vehicle}. Are you interested in financing this vehicle or would you like to see similar options?`;
+    return `Yes, we have more vehicles available besides the ${vehicle}. Are you interested in buying this vehicle or would you like to see similar options?`;
   }
-  if (stage === "document_requirements") {
-    const detailBridge = buyerAskedDetailedVehicleInfo(currentMessage)
-      ? " We will be happy to confirm those details with you."
-      : "";
-    return `You only need your ID and an active bank account; a passport or Tax ID works.${detailBridge} Do you have those requirements?`;
+    if (stage === "document_requirements") {
+      const detailBridge = buyerAskedDetailedVehicleInfo(currentMessage)
+        ? " We will be happy to confirm those details with you."
+        : "";
+      return `To move forward, we need a valid ID and proof of income.${detailBridge} Do you have both?`;
   }
   if (stage === "clean_title") {
-    return "Yes, this vehicle has a clean title. Are you interested in financing it?";
+    return "Yes, this vehicle has a clean title. Are you interested in buying it?";
   }
   if (stage === "warranty_info") {
-    return `Great question. We will be happy to confirm the exact warranty and coverage details for the ${vehicle}. Are you interested in financing it?`;
+    return `Great question. We will be happy to confirm the exact warranty and coverage details for the ${vehicle}. Are you interested in buying it?`;
   }
   if (stage === "advisor_question") {
-    return `Great question. We will be happy to confirm that detail for the ${vehicle}. Are you interested in financing it?`;
+    return `Great question. We will be happy to confirm that detail for the ${vehicle}. Are you interested in buying it?`;
   }
-  return `I'd be happy to help with the ${vehicle}. Are you interested in financing it?`;
+  return `I'd be happy to help with the ${vehicle}. Are you interested in buying it?`;
 }
 
 function isAiReplyAligned(
@@ -775,12 +956,42 @@ function isAiReplyAligned(
   if (firstDealerReply && stage !== "store_phone_requested" && !replyHasFirstGreeting(reply)) return false;
   if (stageRequiresStorePhone(stage) && !replyIncludesStorePhone(reply, storePhone)) return false;
   if (/\badvisor\b|\basesor\b/i.test(normalized)) return false;
-  if (replyGivesRestrictedVehicleDetails(reply)) return false;
+  if (replyGivesRestrictedVehicleDetails(reply) && !["phone_received", "down_payment_request", "down_payment_low", "down_payment_declined"].includes(stage)) return false;
   if (stage === "availability") {
     return /alpha/.test(normalized) &&
-      /financ|financiar|financiamiento/.test(normalized) &&
+      /interested|interesad[oa]|interesa/.test(normalized) &&
       !/phone|number|tel[eé]fono|n[uú]mero/.test(normalized) &&
       !normalized.includes(storePhone.toLowerCase());
+  }
+  if (stage === "interest_confirmation") {
+    return /available|disponible/.test(normalized) && /interested|interesad[oa]|interesa/.test(normalized);
+  }
+  if (stage === "interest_declined") {
+    return /thank|gracias|understand|entiendo/.test(normalized) && !/\?/.test(normalized);
+  }
+  if (stage === "phone_received" || stage === "down_payment_request") {
+    return /down|down payment|enganche|inicial/.test(normalized) && /\$\s*1,?000|\$\s*2,?000|\$\s*3,?000|1000|2000|3000/.test(normalized) && /\?/.test(normalized);
+  }
+  if (stage === "down_payment_low") {
+    return /1,?000|1000/.test(normalized) && /down|enganche|inicial/.test(normalized) && /\?/.test(normalized);
+  }
+  if (stage === "down_payment_declined") {
+    return /1,?000|1000/.test(normalized) && /down|enganche|inicial/.test(normalized) && !/\?/.test(normalized);
+  }
+  if (stage === "timeline_request") {
+    return /this week|this month|esta semana|este mes|in \d+ days?|in \w+ days?|en \d+ d[ií]as?|en \w+ d[ií]as?|in \d+ weeks?|in \w+ weeks?|en \d+ semanas?|en \w+ semanas?|next month|following month|the other month|el otro mes|el mes que viene|next week|la proxima semana|la pr[oó]xima semana|january|february|march|april|may|june|july|august|september|october|november|december|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre/.test(normalized) && /\?/.test(normalized);
+  }
+  if (stage === "timeline_received") {
+    return /id|identification|identificaci[oó]n/.test(normalized) && /proof of income|comprobante de ingresos|prueba de ingresos|income/.test(normalized) && /\?/.test(normalized);
+  }
+  if (stage === "timeline_declined" || stage === "documents_declined") {
+    return !/\?/.test(normalized) && /thank|gracias|understand|entiendo/.test(normalized);
+  }
+  if (stage === "documents_request") {
+    return /id|identification|identificaci[oó]n/.test(normalized) && /proof of income|comprobante de ingresos|prueba de ingresos|income/.test(normalized) && /\?/.test(normalized);
+  }
+  if (stage === "qualified_exit") {
+    return /information|informaci[oó]n/.test(normalized) && /requirement|requisit/.test(normalized) && replyIncludesStorePhone(reply, storePhone) && !/\?/.test(normalized);
   }
   if (stage === "price_inquiry") {
     return /confirm|confirmar/.test(normalized) &&
@@ -794,8 +1005,8 @@ function isAiReplyAligned(
       !/id|tax\s*id|passport|pasaporte|bank account|cuenta bancaria|requirements|requisitos/.test(normalized);
   }
   if (stage === "financing_intro") {
-    return /\b(id|tax\s*id|passport|pasaporte)\b/.test(normalized) &&
-      /bank account|cuenta bancaria|cuenta de banco/.test(normalized) &&
+    return /\b(id|tax\s*id|passport|pasaporte|identification|identificaci[oó]n)\b/.test(normalized) &&
+      /proof of income|comprobante de ingresos|prueba de ingresos|income/.test(normalized) &&
       /requirements|requisitos|cuentas|tienes|have/.test(normalized) &&
       !/phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
   }
@@ -825,9 +1036,6 @@ function isAiReplyAligned(
       /visit|cash|compra|visita/.test(normalized) &&
       !/financing|finance|financiar|financiamiento|requirements|requisitos/.test(normalized);
   }
-  if (stage === "phone_received") {
-    return /call|contact|llam|comunicar/.test(normalized);
-  }
   if (stage === "inventory_options") {
     const normalizedIntent = normalizeIntentText(reply);
     return /\b(?:more vehicles|more options|similar options|mas vehiculos|mas opciones|opciones similares)\b/.test(normalizedIntent) &&
@@ -835,9 +1043,9 @@ function isAiReplyAligned(
       !/id|tax id|passport|pasaporte|bank account|cuenta bancaria|requisitos|requirements|phone|number|telefono|numero/.test(normalizedIntent);
   }
   if (stage === "document_requirements") {
-    return /\b(id|tax\s*id|passport|pasaporte)\b/.test(normalized) &&
-      /bank account|cuenta bancaria|cuenta de banco/.test(normalized) &&
-      /requirements|requisitos|cuentas|tienes|have/.test(normalized) &&
+    return /\b(id|tax\s*id|passport|pasaporte|identification|identificaci[oó]n)\b/.test(normalized) &&
+      /proof of income|comprobante de ingresos|prueba de ingresos|income/.test(normalized) &&
+      /requisitos|cuentas|tienes|have|both|ambos/.test(normalized) &&
       !/phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
   }
   if (stage === "clean_title") {
@@ -1003,28 +1211,21 @@ You are a warm, helpful, and professional sales representative speaking directly
 
 LOCATION RULE: Alpha Motorsports serves customers from Manassas only. Use only the supplied Manassas address. Never mention any former branch or any other address or location.
 
-CONVERSATION FUNNEL:
-1. Initial availability inquiry: greet with "Hello, this is Alpha Motorsports" / "Hola, somos Alpha Motorsports", explicitly confirm that the specific vehicle from the Vehicle field is available, then ask whether the buyer is interested in financing it. Always name the year, make, and model. Do not ask for a phone number.
-1c. If the buyer asks for Alpha Motorsports' phone number, give the supplied dealership phone immediately. Say "Con gusto, nuestro número es..." / "Of course, our number is..." and close the conversation politely. Do not ask another question, request buyer information, or mention financing requirements. This exception also applies to a first reply.
-1a. If the buyer asks whether there are more vehicles, other options, similar vehicles, or "only that one", confirm that Alpha Motorsports has more vehicles available, then continue the flow by asking whether they are interested in financing this vehicle or seeing similar options. Do not ask for requirements yet.
-1b. Urgent vehicle-intent exception: read the full recent conversation with careful human judgment. Use urgent_vehicle_request_phone only when the buyer has sent several consecutive unanswered messages, shows unmistakably high urgency, and shows strong concrete intent to acquire or act on this vehicle, such as buying it, coming today or tomorrow, scheduling, visiting, or test driving. Mere repetition, impatience, curiosity, a price question, or one emotional phrase is not enough. When all signals are present, skip the normal funnel and ask for the best phone number immediately; include Alpha's dealership phone. Do not mention financing requirements.
-1d. Stalled-conversation exception: use stalled_conversation_request_phone only when the deterministic history check finds at least two recent buyer turns after Alpha has replied and neither turn advances the sale (no buyer phone, financing acceptance, requirements confirmation, visit/test-drive request, or cash-purchase acceptance). This is not a first-message shortcut and must not apply when the buyer clearly declines or ends the conversation. When eligible, skip the normal funnel and ask once for the buyer's best phone number, including Alpha's dealership phone. Do not repeat financing-interest questions or requirements.
-1e. Repeated-detail exception: if Alpha already asked for the buyer's phone number and the buyer keeps asking price, condition, seats, warranty, or other vehicle details instead of giving it, use salesperson_request_phone. Say that our salesperson can provide more information about the vehicle, then ask for the best phone number and include Alpha's dealership phone. Do not reuse the previous phone-request wording or restart the financing funnel.
-2. If the buyer says they are interested in financing, do not ask for the phone number yet. Explain the basic requirements: ID and active bank account; passport or Tax ID works. Ask if they have those requirements.
-2a. If the buyer declines financing or says they do not need financing, do not ask about financing again and do not explain requirements. Thank them, ask whether they plan to purchase cash or would like to come see the vehicle, then continue by collecting a phone number if they say yes.
-3. If the buyer asks what requirements/documents are needed to apply, answer the requirements first: ID and active bank account; passport or Tax ID works. Ask if they have those requirements. Do not ask for a phone number in this same reply.
-4. Only after the buyer confirms they have the requirements or explicitly wants to continue with the application, ask for the buyer's best phone number and include Alpha's dealership phone as an immediate call option.
-5. If the buyer asks a detailed question about the vehicle, payment, warranty, coverage, deductible, inspection, or anything else not answered by the supplied context, do not invent details. Kindly say that Alpha Motorsports will be happy to confirm that detail, then ask whether they are interested in financing. Do not ask for a phone number or address in this reply.
-5a. Clean-title confirmation: if the buyer asks whether the vehicle has a clean title, confirm that it does (do not defer), then ask whether they are interested in financing. Do not ask for a phone number in this reply.
-6. If the conversation already asked for the buyer's phone number and the buyer replies without a number, do not restart the financing question. Continue by asking for the best phone number.
-7. Once the buyer provides a phone number, thank them warmly and say "we will contact you shortly." You may also offer the store phone as an immediate option.
-8. Send exactly one short reply for the latest buyer turn. Never repeat a previous reply.
-8a. Read the recent conversation before replying. Never reuse the exact wording of a recent Dealer message; vary the wording while remaining in the same funnel stage.
-9. Do not give price, mileage, approval, history, warranty, or financing details in Messenger, except that you must confirm a clean title when explicitly asked.
-9a. If the buyer asks for price, do not provide a number and do not jump to requirements. Say that Alpha Motorsports can confirm that detail, then ask whether they are still interested.
+QUALIFICATION FUNNEL FOR ALPHA MANASSAS:
+1. Start with a warm greeting as Alpha Motorsports, confirm that the exact vehicle from the Vehicle field is available, and ask whether the buyer is interested in buying it. Always use the supplied Manassas context. Do not ask for a phone number in this first reply.
+2. When the buyer confirms interest, ask for the buyer's phone number. Ask only one question and do not give the dealership phone yet.
+3. After receiving the buyer's phone number, ask how much they have available for the down payment. Explain that Alpha Manassas has plans starting at $1,000, $2,000, and $3,000 down. Verify a clear down-payment amount and never mistake the buyer's phone number for a down payment. If the buyer says they are paying cash, contado, or in cash, accept that as passing this step and continue to the purchase-timeline question. Use only Alpha Manassas' plans.
+4. If the buyer has less than $1,000 down, explain that Alpha Manassas currently requires more than $1,000 down. Ask whether they can reach $1,000 or more. If they say no, thank them and close politely without asking another question.
+5. Once the buyer confirms at least $1,000 down, ask when they plan to buy. Accept any clear natural time expression in Spanish or English, including this week, this month, in 15 days, in one week, next month, the other month, or a named month. If the buyer gives no usable purchase timeframe, thank them and close politely.
+6. Ask whether the buyer has both a valid ID and proof of income. Do not substitute a bank account requirement for proof of income. If either document is missing, explain that both are currently required and close politely.
+7. When the buyer has provided interest, phone number, at least $1,000 down, any accepted purchase timeline, valid ID, and proof of income, use the Qualified Exit: confirm that all information was received, say that the buyer meets the requirements, and suggest the Alpha Manassas dealership phone at the end. Do not ask another question.
+8. If the buyer asks whether the vehicle is available, answer yes, greet naturally if this is the first reply, and continue with the interest question.
+9. If the buyer asks for Alpha Motorsports' phone number directly, give the supplied dealership phone and close politely. Do not restart qualification in that reply.
+10. Keep exactly one short reply for the latest buyer turn. Never repeat a question already answered in the history. If the conversation history already contains a required field, move to the next missing field.
+11. Detailed vehicle questions: answer only from supplied context; never invent price, mileage, approval, history, warranty, or financing terms. Acknowledge the question naturally, answer when safe, then return to the next missing qualification field.
 
 ADDRESS / DIRECTIONS HANDLING:
-- If the buyer asks for the address, directions, or location, provide the store address directly and invite them to visit, then ask whether they are interested in financing.
+- If the buyer asks for the address, directions, or location, provide the store address directly and invite them to visit, then ask whether they are interested in buying.
 - Never ask a clarifying question about which vehicle or location they mean.
 - Always provide the address from the supplied Dealership address field.
 
@@ -1034,26 +1235,30 @@ Language rules:
 - If the latest buyer message is English, reply ONLY in English.
 - Never write a bilingual reply, translation, second version, or mixed-language sentence.
 - Be friendly, conversational, and concise. The first Alpha Motorsports reply in any conversation must start with a warm greeting as Alpha Motorsports. Thank the buyer naturally when appropriate.
+- Start from what the buyer just said. Acknowledge or answer that message naturally before moving to the next funnel step whenever the safety rules allow it.
+- Use natural variation in wording and sentence rhythm. Do not sound like a checklist, do not repeat the same opening, and do not force a qualification question when the buyer is asking a different allowed question.
+- Treat the conversation history as memory: never ask again for information the buyer already supplied, and do not restart a stage that was already completed.
 - Speak directly as Alpha Motorsports using "we" / "nosotros". Never say "our sales team will take care of it", "our team will handle it", "nuestro equipo de ventas se encargará", or similar handoff language.
-- Use "easy financing options" / "opciones de financiamiento fáciles"
-- Use "approval based on qualification" / "aprobación basada en calificación"
+- Use "plans starting at $1,000, $2,000, and $3,000 down" / "planes desde $1,000, $2,000 y $3,000 de down payment"
+- Use "approval based on qualification" / "aprobación basada en calificación" only if the buyer asks; never promise approval.
 - Do not use the words "advisor" or "asesor". Use "our team" / "nuestro equipo".
-- Do not push a call, ask for a phone number, or include the store phone in the first reply, except when the confirmed stage is urgent_vehicle_request_phone or store_phone_requested
-- If the current stage is stalled_conversation_request_phone, ask for the buyer's phone number directly, include Alpha's dealership phone, and do not repeat financing-interest questions or requirements
+- Do not push a call, ask for a phone number, or include the store phone in the first reply, except when the buyer explicitly requests the dealership phone
+- If the current stage is stalled_conversation_request_phone, ask for the buyer's phone number directly, include Alpha's dealership phone, and do not repeat purchase-interest questions or requirements
 - If the current stage is salesperson_request_phone, say that our salesperson can provide more information about the vehicle, then ask for the buyer's phone number and include Alpha's dealership phone
 - Never ask for the "best phone number so we can help you" in response to a vehicle-detail or warranty question; return to the next sequential funnel step instead
 - Do not ask for a phone number in the same reply that first explains the financing requirements
-- If the current stage is request_phone, ask for the buyer's phone number and include Alpha's dealership phone as an immediate call option
-- If the current stage is urgent_vehicle_request_phone, ask for the buyer's phone number immediately, include Alpha's dealership phone, and do not mention financing requirements
+- If the current stage is request_phone, ask only for the buyer's phone number
+- If the current stage is phone_received, move directly to the down-payment question
+- If the current stage is qualified_exit, include the Alpha Manassas dealership phone at the end and do not ask a question
 - If the current stage is store_phone_requested, give only Alpha's dealership phone and a brief polite closing; do not ask a question
 - NEVER say: guaranteed approval, everyone approved, bad credit, denied, rejected, disqualified
 - NEVER promise a loan or specific rate
-- NEVER invent price, down payment, vehicle history, or financing terms
+- NEVER invent price, vehicle history, or financing terms. The only down-payment figures you may mention are Alpha Manassas' $1,000, $2,000, and $3,000 plans and the $1,000 minimum rule above.
 
 Reply format:
 - Keep it SHORT — one or two sentences
 - Ask only one question at a time
-- Follow the current funnel stage exactly and do not add extra steps
+- Respect the current qualification stage and all safety conditions, but express it like a human conversation rather than copying a script
 - Never refer to the vehicle as "your vehicle", "your car", "tu vehículo", or "tu carro". Always say "the vehicle" / "el vehículo" or use the specific make/model.
 `;
 
@@ -1134,24 +1339,35 @@ export async function generateAiReply(
   const promptStage = stage === "advisor_question" ? "detailed_question" : stage;
   const stageInstruction = {
     availability: availabilityQuickReplyAccepted
-      ? "Greet as Alpha Motorsports, state that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number."
-      : "Greet as Alpha Motorsports, explicitly confirm that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in financing it. Do not ask for a phone number.",
+      ? "Greet as Alpha Motorsports, state that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in buying it. Do not ask for a phone number."
+      : "Greet as Alpha Motorsports, explicitly confirm that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in buying it. Do not ask for a phone number.",
+    interest_confirmation: "Confirm the exact vehicle is available and ask whether the buyer is still interested in buying it. Do not ask for a phone number yet.",
+    interest_declined: "Thank the buyer for their time and close politely. Do not ask another question.",
     store_phone_requested: `The buyer requested Alpha Motorsports' phone number. Reply immediately with exactly the supplied dealership phone: ${storePhone}. Start with \"Con gusto, nuestro número es\" / \"Of course, our number is\", add a short polite closing, and do not ask a question, request buyer information, or mention financing requirements.`,
     price_inquiry: "The buyer is asking for price. Do not provide a number, do not ask for requirements, and do not ask for a phone number. Say Alpha Motorsports can confirm that detail, then ask whether they are still interested.",
-    financing_intro: "The buyer is interested in financing. Do not ask for a phone number yet. Explain the basic requirements: ID and an active bank account; passport or Tax ID works. Ask if they have those requirements.",
+    financing_intro: "The buyer is ready to continue. Do not ask for a phone number yet. Explain that a valid ID and proof of income are required, then ask if they have both.",
     financing_declined: "The buyer declined financing. Do not ask about financing again and do not explain financing requirements. Thank them, then ask whether they plan to purchase cash or would like to come see the vehicle.",
     cash_visit_request_phone: `The buyer is continuing without financing. Ask for the buyer's best phone number to coordinate a visit or cash purchase. Include Alpha's dealership phone as an immediate call option: ${storePhone}. Do not mention financing.`,
     urgent_vehicle_request_phone: `The buyer has sent several consecutive messages, is explicitly pressing for an answer, and has shown strong intent to buy, visit, schedule, or test drive. Skip the normal funnel. Ask for the buyer's best phone number immediately and include Alpha's dealership phone: ${storePhone}. Do not mention financing requirements.`,
     stalled_conversation_request_phone: `The deterministic history check found at least two recent buyer turns that did not advance the sale. Skip the normal funnel and ask once for the buyer's best phone number, including Alpha's dealership phone: ${storePhone}. Do not repeat a financing-interest question, financing requirements, or a vehicle-detail question.`,
     salesperson_request_phone: `Alpha already requested the buyer's phone number and the buyer is still asking vehicle-detail questions. Do not repeat the prior phone-request wording. Say that our salesperson can provide more information about the vehicle, then ask for the buyer's best phone number and include Alpha's dealership phone: ${storePhone}. Do not restart financing requirements.`,
-    request_phone: `Ask for the buyer's best phone number so we can help them. End with Alpha's dealership phone as an immediate call option: ${storePhone}.`,
-    phone_received: `A phone number was provided. Thank the buyer warmly, say "we will contact you shortly," and optionally offer ${storePhone} as an immediate call option. Do not transfer them to or mention a separate sales team.`,
-    address_request: `The buyer is asking for the address or directions. Provide the dealership address and invite them to visit, then ask whether they are interested in financing. Do NOT ask clarifying questions.`,
-    inventory_options: "The buyer is asking whether more vehicles or similar options are available. Confirm that more vehicles are available, then ask whether they are interested in financing this vehicle or seeing similar options. Do not ask for requirements yet.",
-    document_requirements: "The buyer is asking what is needed to apply. Reply warmly with the requirements: ID and an active bank account; passport or Tax ID works. If they also ask price, miles, or other details, do not provide those values; kindly say we will be happy to confirm them. Ask if they have those requirements. Do not ask for a phone number yet.",
-    clean_title: "Confirm that the vehicle has a clean title, then ask whether the buyer is interested in financing it. Do not ask for a phone number.",
-    warranty_info: "The buyer is asking detailed warranty questions. Respond warmly and do not invent warranty terms. Say we will be happy to confirm the exact warranty or coverage details; then continue the funnel by asking whether they are interested in financing. Do not mention a separate team or ask for a phone number.",
-    advisor_question: "The buyer is asking a detailed question. Respond warmly and do not invent details. Say we will be happy to confirm that detail; then continue the funnel by asking whether they are interested in financing. Do not mention a separate team or ask for a phone number.",
+    request_phone: "Ask only for the buyer's best phone number. Do not include the dealership phone yet.",
+    phone_received: "Thank the buyer for the phone number, then ask how much they have available for the down payment. Mention Alpha Manassas plans starting at $1,000, $2,000, and $3,000 down.",
+    down_payment_request: "Ask how much the buyer has available for the down payment and mention Alpha Manassas plans starting at $1,000, $2,000, and $3,000 down.",
+    down_payment_low: "Explain that Alpha Manassas currently requires more than $1,000 down and ask whether the buyer can reach $1,000 or more.",
+    down_payment_declined: "Thank the buyer and close politely because more than $1,000 down is currently required. Do not ask another question.",
+    timeline_request: "Ask when the buyer plans to purchase. Accept any clear Spanish or English timeframe, such as this week, this month, in 15 days, in one week, next month, the other month, or a named month. Ask only that one question.",
+    timeline_received: "Thank the buyer and ask whether they have both a valid ID and proof of income.",
+    timeline_declined: "Thank the buyer and close politely because a clear purchase timeframe is required. Do not ask another question.",
+    documents_request: "Ask whether the buyer has both a valid ID and proof of income. Both are required; do not substitute a bank account question.",
+    documents_declined: "Explain that both a valid ID and proof of income are currently required, then close politely without asking another question.",
+    qualified_exit: `Confirm that all required information was received and that the buyer meets the requirements. Suggest the Alpha Manassas dealership phone ${storePhone} at the end and do not ask a question.`,
+    address_request: `The buyer is asking for the address or directions. Provide the dealership address and invite them to visit, then ask whether they are interested in buying. Do NOT ask clarifying questions.`,
+    inventory_options: "The buyer is asking whether more vehicles or similar options are available. Confirm that more vehicles are available, then ask whether they are interested in buying this vehicle or seeing similar options. Do not ask for requirements yet.",
+    document_requirements: "The buyer is asking what is needed. Reply warmly with the requirements: valid ID and proof of income. Ask if they have both. Do not ask for a phone number yet.",
+    clean_title: "Confirm that the vehicle has a clean title, then ask whether the buyer is interested in buying it. Do not ask for a phone number.",
+    warranty_info: "The buyer is asking detailed warranty questions. Respond warmly and do not invent warranty terms. Say we will be happy to confirm the exact warranty or coverage details; then continue the funnel by asking whether they are interested in buying. Do not mention a separate team or ask for a phone number.",
+    advisor_question: "The buyer is asking a detailed question. Respond warmly and do not invent details. Say we will be happy to confirm that detail; then continue the funnel by asking whether they are interested in buying. Do not mention a separate team or ask for a phone number.",
     general: "Answer safely using only supplied facts, then move the conversation forward with one short question.",
   }[stage];
 
@@ -1173,7 +1389,7 @@ Latest buyer message: "${currentMessage}"
 ${langNote}
 Respond with a single JSON object, no markdown, with exactly four keys:
 {"intent": "the sales funnel stage that best matches the conversation", "urgency": "high or normal", "vehicleIntent": "strong or unclear", "reply": "your reply"}
-Valid intent values: availability, store_phone_requested, price_inquiry, financing_intro, financing_declined, cash_visit_request_phone, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, address_request, inventory_options, document_requirements, clean_title, warranty_info, advisor_question, general.
+Valid intent values: availability, interest_confirmation, interest_declined, store_phone_requested, price_inquiry, down_payment_request, down_payment_low, down_payment_declined, timeline_request, timeline_received, timeline_declined, documents_request, documents_declined, qualified_exit, financing_intro, financing_declined, cash_visit_request_phone, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, address_request, inventory_options, document_requirements, clean_title, warranty_info, advisor_question, general.
 Choose urgent_vehicle_request_phone only when Urgent-intent eligibility allows it, urgency is high, and vehicleIntent is strong. Otherwise follow the supplied Current funnel stage and Stage instruction.
 The "reply" must be one short message that follows the stage instruction exactly, mentions the vehicle naturally, and mirrors the buyer's language.`;
 
@@ -1468,6 +1684,7 @@ router.post("/conversations/intake", async (req, res) => {
   const parsedMsgs = rawMsgs.map(parseConversationMessage).filter((msg): msg is ParsedConversationMessage => !!msg);
   const currentParsed = parseConversationMessage(currentMessage);
   const incomingMsgs = mergeCurrentConversationMessage(parsedMsgs, currentParsed);
+  const buyerQualification = extractBuyerQualification(incomingMsgs);
   // The extension validates currentMessage against the live Messenger bubble.
   // Preserve it as the source of truth even if Facebook momentarily returns
   // stale or reordered history rows around a DOM rerender.
@@ -1855,7 +2072,14 @@ router.post("/conversations/intake", async (req, res) => {
     formatConversationHistoryForAi(conversationHistoryForAi.length ? conversationHistoryForAi : incomingMsgs),
     inbound,
   );
-  const closeAfterDelivery = currentStage === "store_phone_requested" || currentStage === "phone_received";
+  const closeAfterDelivery = [
+    "store_phone_requested",
+    "interest_declined",
+    "down_payment_declined",
+    "timeline_declined",
+    "documents_declined",
+    "qualified_exit",
+  ].includes(currentStage);
   const latestExistingAssistant = existingMsgs.find((m) => m.role === "assistant");
   const shouldGenerateReply =
     !!inbound &&
@@ -1908,6 +2132,9 @@ router.post("/conversations/intake", async (req, res) => {
   if (existingLead) {
     leadId = existingLead.id;
     const resolvedPhone = extractedPhone ?? existingLead.phone;
+    const resolvedDownPayment = buyerQualification.downPayment ?? existingLead.buyerAvailableDownPayment;
+    const resolvedTimeline = buyerQualification.timeline ?? existingLead.buyerTimeline;
+    const resolvedDocuments = buyerQualification.documents;
     const { score, temperature } = computeLeadScore({
       buyerTimeline: existingLead.buyerTimeline,
       buyerAvailableDownPayment: existingLead.buyerAvailableDownPayment,
@@ -1923,7 +2150,7 @@ router.post("/conversations/intake", async (req, res) => {
     await db
       .update(leadsTable)
       .set({
-        buyerName: buyerName ?? existingLead.buyerName,
+      buyerName: buyerName ?? existingLead.buyerName,
         language,
         vehicleId: vehicleId ?? existingLead.vehicleId,
         listingId: listingId ?? existingLead.listingId,
@@ -1932,6 +2159,10 @@ router.post("/conversations/intake", async (req, res) => {
           parsedDownPayment ?? existingLead.publishedDownPayment,
         suggestedReply: suggestedReply ?? existingLead.suggestedReply,
         phone: resolvedPhone,
+        buyerAvailableDownPayment: resolvedDownPayment,
+        buyerTimeline: resolvedTimeline,
+        hasId: resolvedDocuments?.hasId ?? existingLead.hasId,
+        hasProofOfIncome: resolvedDocuments?.hasProofOfIncome ?? existingLead.hasProofOfIncome,
         leadScore: extractedPhone ? Math.max(score, 70) : score,
         temperature: finalTemperature,
         status: extractedPhone ? "BDC Assigned" : existingLead.status,
@@ -1958,6 +2189,10 @@ router.post("/conversations/intake", async (req, res) => {
         publishedDownPayment: parsedDownPayment,
         suggestedReply,
         phone: extractedPhone,
+        buyerAvailableDownPayment: buyerQualification.downPayment,
+        buyerTimeline: buyerQualification.timeline,
+        hasId: buyerQualification.documents?.hasId ?? null,
+        hasProofOfIncome: buyerQualification.documents?.hasProofOfIncome ?? null,
         leadScore: extractedPhone ? Math.max(score, 70) : score,
         temperature: finalTemperature,
         status: extractedPhone ? "BDC Assigned" : "New",
@@ -1976,6 +2211,8 @@ router.post("/conversations/intake", async (req, res) => {
         listingId,
         vehicleType,
         publishedDownPayment: parsedDownPayment,
+        buyerAvailableDownPayment: buyerQualification.downPayment,
+        buyerTimeline: buyerQualification.timeline,
         outcome: "pending",
       })
       .onConflictDoNothing(),

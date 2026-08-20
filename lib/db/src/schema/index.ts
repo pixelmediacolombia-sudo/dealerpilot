@@ -5,6 +5,7 @@ export * from "./dealers";
 export * from "./dealerUsers";
 export * from "./feeds";
 export * from "./feedRuns";
+export * from "./feedIngestions";
 export * from "./vehicles";
 export * from "./vehicleImages";
 export * from "./vehicleChanges";

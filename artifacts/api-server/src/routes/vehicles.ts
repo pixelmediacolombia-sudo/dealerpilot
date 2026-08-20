@@ -11,7 +11,7 @@ import {
   type Vehicle,
 } from "@workspace/db";
 import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
-import { ACTIVE_PUBLISHING_JOB_STATUSES } from "../publishing/controlledMode";
+import { syncSoldMarketplaceState } from "../marketplace/soldState";
 
 const router: IRouter = Router();
 
@@ -239,51 +239,6 @@ const STATUS_MAP: Record<string, string> = {
   mark_new: "New",
 };
 
-async function syncSoldMarketplaceState(vehicleIds: number[]) {
-  if (vehicleIds.length === 0) {
-    return { marketplaceUpdated: 0, listingsUpdated: 0, jobsCancelled: 0 };
-  }
-
-  const now = new Date();
-  const note = "DealerPilot inventory marked this vehicle sold; extension should mark the Facebook Marketplace listing as Sold.";
-
-  const marketplaceRows = await db
-    .update(marketplaceListingsTable)
-    .set({ status: "Sold", notes: note, updatedAt: now })
-    .where(inArray(marketplaceListingsTable.vehicleId, vehicleIds))
-    .returning({ id: marketplaceListingsTable.id });
-
-  const listingRows = await db
-    .update(listingsTable)
-    .set({ status: "Sold", updatedAt: now })
-    .where(and(eq(listingsTable.channel, "marketplace"), inArray(listingsTable.vehicleId, vehicleIds)))
-    .returning({ id: listingsTable.id });
-
-  const cancelledJobs = await db
-    .update(publishingJobsTable)
-    .set({
-      status: "Cancelled",
-      failedReason: "Vehicle marked Sold/Removed in DealerPilot inventory.",
-      currentStep: "Cancelled - vehicle sold",
-      claimedByExtension: null,
-      assignedExtensionId: null,
-      assignedAt: null,
-    })
-    .where(
-      and(
-        inArray(publishingJobsTable.vehicleId, vehicleIds),
-        inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
-      ),
-    )
-    .returning({ id: publishingJobsTable.id });
-
-  return {
-    marketplaceUpdated: marketplaceRows.length,
-    listingsUpdated: listingRows.length,
-    jobsCancelled: cancelledJobs.length,
-  };
-}
-
 router.post("/vehicles/bulk", async (req, res) => {
   const parsed = BulkActionBody.safeParse(req.body ?? {});
   if (!parsed.success) {
@@ -311,7 +266,7 @@ router.post("/vehicles/bulk", async (req, res) => {
     );
   }
   const soldSync = action === "mark_sold"
-    ? await syncSoldMarketplaceState(updated.map((v) => v.id))
+    ? await syncSoldMarketplaceState(updated.map((v) => v.id), "manual")
     : null;
 
   req.log.info({ vehicleIds, action, status, updated: updated.length, soldSync }, "Bulk vehicle action");
@@ -343,7 +298,7 @@ router.patch("/vehicles/:id/status", async (req, res) => {
     oldValue: null,
     newValue: parsed.data.status,
   });
-  const soldSync = parsed.data.status === "Sold/Removed" ? await syncSoldMarketplaceState([id]) : null;
+  const soldSync = parsed.data.status === "Sold/Removed" ? await syncSoldMarketplaceState([id], "manual") : null;
   req.log.info({ vehicleId: id, status: parsed.data.status, soldSync }, "Updated vehicle status");
   const [withImages] = await attachImages([updated]);
   res.json({ ...withImages, soldSync });

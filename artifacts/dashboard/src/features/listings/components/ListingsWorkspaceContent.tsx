@@ -86,13 +86,14 @@ import { MarkPublishedModal } from "./MarkPublishedModal";
 import { BatchReviewPanel } from "./BatchReviewPanel";
 import { DailyOperatorPanel } from "./DailyOperatorPanel";
 import { BatchTodayPanel, type BatchVehicle } from "./BatchTodayPanel";
+import { ToRemovePanel } from "./ToRemovePanel";
 import { PublishNowModal } from "@/features/publishing/components/PublishNowModal";
 import { toast } from "@/hooks/use-toast";
 
 type StrategyStatus = "recommended" | "not_prioritized" | "needs_strategy_review";
 
 const DEALER_ID = 1;
-const PRIMARY_TABS = new Set(["ready", "scheduled", "published", "failed", "all"]);
+const PRIMARY_TABS = new Set(["ready", "scheduled", "published", "failed", "to-remove", "all"]);
 const LEGACY_TAB_MAP: Record<string, string> = {
   generating: "all",
   publishing: "all",
@@ -470,7 +471,8 @@ export function ListingsWorkspace() {
   }, [filteredWorkspaces, sortBy, photoFilter, photoScoreByVehicle]);
 
   const isPublishedTab = activeTab === "published";
-  const isCardTab = !isPublishedTab &&
+  const isToRemoveTab = activeTab === "to-remove";
+  const isCardTab = !isPublishedTab && !isToRemoveTab &&
     ["ready", "scheduled", "failed", "all"].includes(activeTab);
 
   const tabClass =
@@ -547,13 +549,16 @@ export function ListingsWorkspace() {
               <TabsTrigger value="failed" className={cn(tabClass, failedCount > 0 && "data-[state=inactive]:text-destructive/60")}>
                 Failed {countBadge(failedCount)}
               </TabsTrigger>
+              <TabsTrigger value="to-remove" className={cn(tabClass, "data-[state=inactive]:text-warning/80")}>
+                To Remove
+              </TabsTrigger>
               <TabsTrigger value="all" className={tabClass}>
                 All {countBadge(allCount)}
               </TabsTrigger>
             </TabsList>
           </Tabs>
 
-          <div className="space-y-6 mt-6">
+          {isToRemoveTab ? <div className="mt-6"><ToRemovePanel /></div> : <div className="space-y-6 mt-6">
 
           {/* AI Daily Operator Panel */}
           {activeTab !== "published" && (
@@ -1567,7 +1572,7 @@ export function ListingsWorkspace() {
             </div>
           )}
 
-          </div>{/* /space-y-6 */}
+          </div>}{/* /space-y-6 */}
         </div>
       </div>
 

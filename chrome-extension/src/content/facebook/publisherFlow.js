@@ -4143,6 +4143,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         soldActionLastError: reason,
         soldActionLastErrorAt: new Date().toISOString(),
       });
+      await send({ type: "REPORT_SOLD_ACTION", listingId: activeSoldAction.listingId, status: "failed", error: reason });
       setStatus(reason, "err");
       return;
     }
@@ -4155,6 +4156,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       soldActionCompletedId: activeSoldAction.listingId,
       soldActionCompletedAt: new Date().toISOString(),
     });
+    await send({ type: "REPORT_SOLD_ACTION", listingId: activeSoldAction.listingId, status: "completed" });
     await chrome.storage.local.remove("activeSoldAction");
     setStatus("Marketplace listing marked sold. DealerPilot will not republish this vehicle.", "ok");
   }

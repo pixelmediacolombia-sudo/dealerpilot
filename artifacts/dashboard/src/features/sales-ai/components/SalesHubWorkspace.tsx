@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { PublishNowModal } from "@/features/publishing/components/PublishNowModal";
 import { GmCoachModal } from "@/components/GmCoachModal";
 import { GmDecisionLogPanel } from "@/components/GmDecisionLogPanel";
+import { CommandCenterAlerts, useCommandCenterAlerts } from "./CommandCenterAlerts";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -676,6 +677,7 @@ export function SalesHub() {
   const { data: feedRuns } = useListFeedRuns(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getListFeedRunsQueryKey(dealerId!) },
   });
+  const { data: operationalAlerts, error: operationalAlertsError } = useCommandCenterAlerts(dealerId, locationFilter);
 
   const bulkSchedule = useBulkSchedulePublishing({
     mutation: {
@@ -738,7 +740,8 @@ export function SalesHub() {
     w => w.publishStatus === "published" || w.publishStatus === "published_with_changes",
   ).length;
   const failedJobs = (jobsData?.jobs ?? []).filter(j => j.status === "Failed").length;
-  const issueCount = failedJobs + (priceChanges > 0 ? 1 : 0);
+  const operationalAlertCount = operationalAlerts?.alerts.length ?? 0;
+  const issueCount = failedJobs + (priceChanges > 0 ? 1 : 0) + operationalAlertCount;
   const duplicateGroupCount = plan?.duplicateGroups.length ?? 0;
 
   const activityItems = useMemo(() => {
@@ -809,7 +812,7 @@ export function SalesHub() {
                 { value: isLoading ? "—" : String(listingsLive), label: "Live", path: "/listings?tab=published", tone: "green" },
                 { value: isLoading ? "—" : String(pendingLeads), label: "Buyers", path: "/sales-ai", tone: "blue" },
                 { value: "0", label: "Appts", path: "/sales-ai", tone: "amber" },
-                { value: isLoading ? "—" : String(issueCount), label: "Issues", path: "/listings?tab=failed", tone: "pink" },
+                { value: isLoading ? "—" : String(issueCount), label: "Issues", path: operationalAlertCount > 0 ? "/listings?tab=to-remove" : "/listings?tab=failed", tone: "pink" },
               ].map(m => (
                 <button key={m.label} onClick={() => setLocation(m.path)} data-kpi-tone={m.tone} className={cn("gymove-kpi-card min-h-[104px] rounded-lg border px-4 py-4 text-left shadow-[0_1px_2px_rgb(15_23_42/0.04),0_4px_12px_rgb(15_23_42/0.035)] transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md", m.tone === "purple" ? "gymove-kpi-purple" : m.tone === "green" ? "gymove-kpi-green" : m.tone === "blue" ? "gymove-kpi-blue" : m.tone === "amber" ? "gymove-kpi-amber" : "gymove-kpi-pink") }>
                   <div className="mb-2 text-[30px] font-bold leading-none tracking-tighter tabular-nums text-foreground">{m.value}</div>
@@ -817,6 +820,12 @@ export function SalesHub() {
                 </button>
               ))}
             </div>
+
+            <CommandCenterAlerts
+              alerts={operationalAlerts?.alerts ?? []}
+              error={operationalAlertsError}
+              onNavigate={setLocation}
+            />
 
             {/* Publishing Conflicts notice */}
             {!isLoading && duplicateGroupCount > 0 && (

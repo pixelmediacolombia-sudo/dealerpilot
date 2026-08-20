@@ -434,6 +434,15 @@ const handlers = {
     });
   },
 
+  async REPORT_SOLD_ACTION(message) {
+    const extensionId = await getExtensionId();
+    return apiPost(`/api/extension/marketplace-sold-actions/${message.listingId}/report`, {
+      extensionId,
+      status: message.status,
+      error: message.error || undefined,
+    });
+  },
+
   async RETRY_JOB(message) {
     return apiPost(`/api/publishing/jobs/${message.jobId}/retry`, {});
   },

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
 import { db, pool, leadsTable, extensionConnectionsTable, marketplaceListingsTable, vehiclesTable } from "@workspace/db";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { recordMarketplaceSoldAction } from "../marketplace/soldAction";
 
 const EXTENSION_NAME = "Chrome Extension";
 
@@ -329,6 +330,43 @@ router.get("/extension/marketplace-sold-actions", async (_req, res) => {
       updatedAt: row.updatedAt.toISOString(),
     })),
   });
+});
+
+const MarketplaceSoldActionReportBody = z.object({
+  extensionId: z.string().min(1).optional(),
+  status: z.enum(["completed", "failed"]),
+  error: z.string().trim().max(500).optional(),
+});
+
+router.post("/extension/marketplace-sold-actions/:listingId/report", async (req, res) => {
+  const listingId = Number(req.params.listingId);
+  const parsed = MarketplaceSoldActionReportBody.safeParse(req.body ?? {});
+  if (!Number.isInteger(listingId) || listingId <= 0 || !parsed.success) {
+    res.status(400).json({ error: "Invalid Marketplace sold action report" });
+    return;
+  }
+
+  const [row] = await db
+    .select({ vehicle: vehiclesTable })
+    .from(marketplaceListingsTable)
+    .innerJoin(vehiclesTable, eq(vehiclesTable.id, marketplaceListingsTable.vehicleId))
+    .where(eq(marketplaceListingsTable.id, listingId))
+    .limit(1);
+  if (!row || row.vehicle.status !== "Sold/Removed") {
+    res.status(404).json({ error: "Sold Marketplace listing not found" });
+    return;
+  }
+
+  const now = new Date();
+  const result = await recordMarketplaceSoldAction({
+    listingId,
+    status: parsed.data.status === "completed" ? "success" : "failed",
+    error: parsed.data.error,
+    extensionId: parsed.data.extensionId,
+  });
+
+  req.log.info({ listingId, vehicleId: row.vehicle.id, status: parsed.data.status }, "Marketplace sold action reported");
+  res.json({ ok: true, listingId, status: parsed.data.status, reportedAt: now.toISOString(), result });
 });
 
 // ── Session Report (from extension after visiting Facebook) ────────────────────

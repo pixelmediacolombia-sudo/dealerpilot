@@ -12,6 +12,8 @@ import {
   marketplaceListingsTable,
   autoPublishSettingsTable,
   pool,
+  vehicleImagesTable,
+  systemTimelineEventsTable,
 } from "@workspace/db";
 import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { getMarketplacePricing } from "../listings/pricing";
@@ -33,12 +35,111 @@ import {
 } from "../features/publishing/infrastructure/publishingRepository";
 import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 import { compactFutureAutoPublishQueue } from "../publishing/autoPublishQueueCompaction";
+import { recordMarketplaceSoldAction } from "../marketplace/soldAction";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
 // Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
 const DEALER_ID = 1;
 
 const router: IRouter = Router();
+
+// GET /publishing/to-remove — sold inventory that still has a Marketplace listing.
+router.get("/publishing/to-remove", async (req, res) => {
+  try {
+    const dealerId = Number(req.query.dealer_id ?? req.query.dealerId ?? DEALER_ID);
+    if (!Number.isInteger(dealerId) || dealerId <= 0) {
+      res.status(400).json({ error: "Invalid dealer_id" });
+      return;
+    }
+    const rows = await db
+      .select({ listing: marketplaceListingsTable, vehicle: vehiclesTable })
+      .from(marketplaceListingsTable)
+      .innerJoin(vehiclesTable, eq(vehiclesTable.id, marketplaceListingsTable.vehicleId))
+      .where(and(
+        eq(marketplaceListingsTable.dealerId, dealerId),
+        eq(vehiclesTable.status, "Sold/Removed"),
+        inArray(marketplaceListingsTable.status, ["Live", "Sold"]),
+      ))
+      .orderBy(desc(vehiclesTable.soldAt), desc(marketplaceListingsTable.updatedAt));
+    const vehicleIds = rows.map((row) => row.vehicle.id);
+    const images = vehicleIds.length > 0
+      ? await db
+          .select({ vehicleId: vehicleImagesTable.vehicleId, url: vehicleImagesTable.url, position: vehicleImagesTable.position })
+          .from(vehicleImagesTable)
+          .where(inArray(vehicleImagesTable.vehicleId, vehicleIds))
+      : [];
+    const imageByVehicle = new Map<number, string>();
+    for (const image of images.sort((a, b) => a.position - b.position)) {
+      if (!imageByVehicle.has(image.vehicleId)) imageByVehicle.set(image.vehicleId, image.url);
+    }
+    const events = await db
+      .select({ detailJson: systemTimelineEventsTable.detailJson, createdAt: systemTimelineEventsTable.createdAt })
+      .from(systemTimelineEventsTable)
+      .where(eq(systemTimelineEventsTable.category, "marketplace_cleanup"))
+      .orderBy(desc(systemTimelineEventsTable.createdAt))
+      .limit(1000);
+    const latestByListing = new Map<number, { action?: string; error?: string | null; createdAt: Date }>();
+    for (const event of events) {
+      if (!event.detailJson) continue;
+      try {
+        const detail = JSON.parse(event.detailJson) as { listingId?: number; action?: string; error?: string | null };
+        if (detail.listingId && !latestByListing.has(detail.listingId)) latestByListing.set(detail.listingId, { action: detail.action, error: detail.error, createdAt: event.createdAt });
+      } catch {
+        // Ignore malformed historical audit rows.
+      }
+    }
+    res.json({
+      dealerId,
+      items: rows.map(({ listing, vehicle }) => {
+        const latest = latestByListing.get(listing.id);
+        const state = latest?.action === "completed" ? "ready" : latest?.action === "failed" ? "failed" : "pending";
+        return {
+          id: listing.id,
+          listingId: listing.id,
+          vehicleId: vehicle.id,
+          photoUrl: imageByVehicle.get(vehicle.id) ?? null,
+          vehicleLabel: `${vehicle.year ?? ""} ${vehicle.make} ${vehicle.model}${vehicle.trim ? ` ${vehicle.trim}` : ""}`.trim(),
+          vin: vehicle.vin,
+          price: vehicle.price,
+          detectedAt: (vehicle.soldAt ?? vehicle.updatedAt).toISOString(),
+          listingUrl: listing.listingUrl,
+          state,
+          error: latest?.error ?? null,
+          lastActionAt: latest?.createdAt.toISOString() ?? null,
+        };
+      }),
+      count: rows.length,
+    });
+  } catch (err) {
+    req.log.error({ err }, "GET /publishing/to-remove failed");
+    res.status(500).json({ error: "Failed to load Marketplace cleanup queue" });
+  }
+});
+
+// POST /publishing/listings/:id/mark-sold — operator or extension reports the Facebook action.
+router.post("/publishing/listings/:id/mark-sold", async (req, res) => {
+  const listingId = Number(req.params.id);
+  const parsed = z.object({
+    status: z.enum(["success", "failed"]),
+    error: z.string().max(500).optional(),
+    extensionId: z.string().max(200).optional(),
+  }).safeParse(req.body ?? {});
+  if (!Number.isInteger(listingId) || !parsed.success) {
+    res.status(400).json({ error: "listing id and status=success|failed are required" });
+    return;
+  }
+  const result = await recordMarketplaceSoldAction({
+    listingId,
+    status: parsed.data.status,
+    error: parsed.data.error,
+    extensionId: parsed.data.extensionId,
+  });
+  if (!result) {
+    res.status(404).json({ error: "Marketplace listing not found" });
+    return;
+  }
+  res.json({ ok: true, ...result });
+});
 
 async function deferPublishingJobForPhotoDirector(
   jobId: number,

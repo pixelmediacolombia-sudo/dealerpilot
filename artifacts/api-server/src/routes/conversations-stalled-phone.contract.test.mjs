@@ -4,21 +4,31 @@ import { test } from "node:test";
 
 const source = readFileSync(new URL("./conversations.ts", import.meta.url), "utf8");
 
-test("stalled buyer conversations deterministically request a phone number", () => {
-  assert.match(source, /"stalled_conversation_request_phone"/);
-  assert.match(source, /function hasStalledConversation\(/);
-  assert.match(source, /stalledBuyerTurns >= 2/);
-  assert.match(source, /function buyerMovesConversationForward\(/);
-  assert.match(source, /function buyerClearlyAdvancesFinancing\(/);
-  assert.match(source, /buyerClearlyAdvancesFinancing[\s\S]*?\[?¿\]/);
-  assert.match(source, /buyerRequestedVisitOrTestDrive\(normalized\)/);
-  assert.match(source, /buyerAcceptedCashOrVisitStep\(normalized\)/);
-  assert.match(source, /!buyerExplicitlyDisengages\(currentMessage\)/);
-  assert.match(source, /if \(hasStalledConversation\(visibleMessages, currentMessage\)\) return "stalled_conversation_request_phone"/);
-  assert.match(source, /Skip the normal funnel and ask once for the buyer's best phone number/);
-  assert.match(source, /Do not repeat a financing-interest question, financing requirements, or a vehicle-detail question/);
-  assert.match(source, /"salesperson_request_phone"/);
-  assert.match(source, /historyRequestedPhone\(history\)/);
-  assert.match(source, /Our salesperson can give you more information/);
-  assert.match(source, /Do not reuse the previous phone-request wording/);
+test("Alpha Manassas qualification follows the new required order", () => {
+  assert.match(source, /QUALIFICATION FUNNEL FOR ALPHA MANASSAS/);
+  assert.match(source, /function historyHasBuyerPhone\(/);
+  assert.match(source, /function extractBuyerQualification\(/);
+  assert.match(source, /MINIMUM_DOWN_PAYMENT = 1000/);
+  assert.match(source, /function buyerAcceptedCashPurchase/);
+  assert.match(source, /never mistake the buyer's phone number for a down payment/i);
+  assert.match(source, /cash, contado, or in cash/);
+  assert.match(source, /plans starting at \$1,000, \$2,000, and \$3,000 down/);
+  assert.match(source, /planes desde \$1,000, \$2,000 y \$3,000 de down payment/);
+  assert.match(source, /currently requires more than \$1,000 down/);
+  assert.match(source, /this week or this month/);
+  assert.match(source, /in 15 days/);
+  assert.match(source, /en 15 dias/);
+  assert.match(source, /next month/);
+  assert.match(source, /el otro mes/);
+  assert.match(source, /named month/);
+  assert.match(source, /valid ID and proof of income/);
+  assert.match(source, /qualified_exit/);
+  assert.match(source, /Alpha Manassas dealership phone/);
+  assert.doesNotMatch(source, /Fredericksburg/);
+  assert.doesNotMatch(source, /active bank account/);
+  assert.match(source, /buyerPhoneAlreadyKnown/);
+  assert.match(source, /if \(buyerPhoneAlreadyKnown/);
+  assert.match(source, /buyerQualification\.downPayment/);
+  assert.match(source, /buyerQualification\.timeline/);
+  assert.match(source, /buyerQualification\.documents/);
 });

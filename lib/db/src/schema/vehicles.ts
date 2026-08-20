@@ -44,9 +44,13 @@ export const vehiclesTable = pgTable(
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+    lastSeenInFeedAt: timestamp("last_seen_in_feed_at", { withTimezone: true }),
+    missingFeedCount: integer("missing_feed_count").notNull().default(0),
+    soldAt: timestamp("sold_at", { withTimezone: true }),
+    soldDetectionSource: text("sold_detection_source"),
     lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })

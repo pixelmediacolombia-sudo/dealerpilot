@@ -1,16 +1,18 @@
 import {
   db,
+  feedIngestionsTable,
   feedRunsTable,
   vehiclesTable,
   vehicleImagesTable,
   vehicleChangesTable,
   type Vehicle,
 } from "@workspace/db";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import type { Logger } from "pino";
 import { parseInventoryXml, type FeedImage } from "./xmlEngine";
 import { scrapeAlphaLocationMapping } from "./locationScraper";
 import { ALPHA_DEALER_ID, ALPHA_LOT_MANASSAS } from "../lib/dealer";
+import { syncSoldMarketplaceState } from "../marketplace/soldState";
 
 const ACTIVE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish", "Published"];
 
@@ -86,23 +88,46 @@ export async function importFeed(
     .returning();
   const feedRunId = run!.id;
 
+  const [ingestion] = await db
+    .insert(feedIngestionsTable)
+    .values({ dealerId, vehicleCount: parsed.length, status: "running" })
+    .returning();
+
+  const abortIngestion = async (status: "aborted_empty" | "aborted_threshold", reason: string): Promise<never> => {
+    await db
+      .update(feedIngestionsTable)
+      .set({ status, abortReason: reason })
+      .where(eq(feedIngestionsTable.id, ingestion!.id));
+    await db
+      .update(feedRunsTable)
+      .set({ status, finishedAt: new Date(), vehiclesImported: 0, errorCount: parseErrors + 1, errorMessage: reason })
+      .where(eq(feedRunsTable.id, feedRunId));
+    log.warn({ dealerId, feedRunId, ingestionId: ingestion!.id, rawCount, parsed: parsed.length, status }, reason);
+    throw new Error(reason);
+  };
+
   if (parsed.length === 0) {
     const message =
       rawCount > 0
         ? `Feed parsed 0 vehicles from ${rawCount} raw entries — aborting to protect inventory`
         : "Feed contained no vehicles — aborting to protect inventory";
-    log.warn({ dealerId, feedRunId, rawCount }, message);
-    await db
-      .update(feedRunsTable)
-      .set({
-        status: "error",
-        finishedAt: new Date(),
-        vehiclesImported: 0,
-        errorCount: parseErrors + 1,
-        errorMessage: message,
-      })
-      .where(eq(feedRunsTable.id, feedRunId));
-    throw new Error(message);
+    await abortIngestion("aborted_empty", message);
+  }
+
+  const previousIngestions = await db
+    .select({ vehicleCount: feedIngestionsTable.vehicleCount })
+    .from(feedIngestionsTable)
+    .where(and(eq(feedIngestionsTable.dealerId, dealerId), eq(feedIngestionsTable.status, "ok")))
+    .orderBy(desc(feedIngestionsTable.ingestedAt))
+    .limit(7);
+  const averageVehicleCount = previousIngestions.length > 0
+    ? previousIngestions.reduce((sum, row) => sum + row.vehicleCount, 0) / previousIngestions.length
+    : null;
+  if (averageVehicleCount !== null && parsed.length < averageVehicleCount * 0.8) {
+    await abortIngestion(
+      "aborted_threshold",
+      `Feed count ${parsed.length} is below 80% of the recent average ${averageVehicleCount.toFixed(1)}; no inventory changes were applied`,
+    );
   }
 
   const existing = await db
@@ -153,6 +178,8 @@ export async function importFeed(
           status: "New",
           firstSeenAt: now,
           lastSeenAt: now,
+          lastSeenInFeedAt: now,
+          missingFeedCount: 0,
           lastSyncAt: now,
         })
         .returning();
@@ -198,7 +225,7 @@ export async function importFeed(
     if (prior.status === "Archived") {
       nextStatus = "Archived";
     } else {
-      if (prior.status === "Sold/Removed") {
+      if (prior.status === "Sold/Removed" && prior.soldAt) {
         nextStatus = "Active";
         drafts.push({
           changeType: "reactivated",
@@ -235,6 +262,10 @@ export async function importFeed(
         sourceRaw: n.sourceRaw,
         status: nextStatus,
         lastSeenAt: now,
+        lastSeenInFeedAt: now,
+        missingFeedCount: 0,
+        soldAt: prior.soldAt ? null : prior.soldAt,
+        soldDetectionSource: prior.soldAt ? null : prior.soldDetectionSource,
         lastSyncAt: now,
       })
       .where(eq(vehiclesTable.id, prior.id));
@@ -261,17 +292,32 @@ export async function importFeed(
     }
   }
 
-  // Vehicles missing from this feed → Sold/Removed.
-  const missing = existing.filter(
+  // Vehicles missing from this feed receive a grace run before they are marked sold.
+  const missingCandidates = existing.filter(
     (v) =>
       !seenVins.has(v.vin) &&
       v.status !== "Sold/Removed" &&
       v.status !== "Archived",
   );
-  for (const v of missing) {
+  const newlySold: Vehicle[] = [];
+  for (const v of missingCandidates) {
+    const missingFeedCount = v.missingFeedCount + 1;
+    if (missingFeedCount < 2) {
+      await db
+        .update(vehiclesTable)
+        .set({ missingFeedCount, lastSyncAt: now })
+        .where(eq(vehiclesTable.id, v.id));
+      continue;
+    }
     await db
       .update(vehiclesTable)
-      .set({ status: "Sold/Removed", lastSyncAt: now })
+      .set({
+        status: "Sold/Removed",
+        missingFeedCount,
+        soldAt: now,
+        soldDetectionSource: "feed_absence",
+        lastSyncAt: now,
+      })
       .where(eq(vehiclesTable.id, v.id));
     await db.insert(vehicleChangesTable).values({
       vehicleId: v.id,
@@ -281,7 +327,12 @@ export async function importFeed(
       oldValue: v.status,
       newValue: "Sold/Removed",
     });
+    newlySold.push(v);
     removed++;
+  }
+
+  if (newlySold.length > 0) {
+    await syncSoldMarketplaceState(newlySold.map((vehicle) => vehicle.id), "inventory_sync");
   }
 
   const allForDealer = await db
@@ -303,6 +354,10 @@ export async function importFeed(
       errorCount: parseErrors,
     })
     .where(eq(feedRunsTable.id, feedRunId));
+  await db
+    .update(feedIngestionsTable)
+    .set({ status: "ok", abortReason: null })
+    .where(eq(feedIngestionsTable.id, ingestion!.id));
 
   // For Alpha Motorsport: the combined XML feed does NOT contain VehicleLocationID.
   // Scrape the website's location-filtered pages to determine which lot each vehicle
