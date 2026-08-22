@@ -341,7 +341,11 @@ const MINIMUM_DOWN_PAYMENT = 1000;
 
 function extractDownPaymentAmount(text: string): number | null {
   const normalized = normalizeIntentText(text);
-  const hasDownContext = /down|enganche|inicial|cash|contado|efectivo|available|disponible|have|tengo|cuento|can put|puedo dar|puedo poner/.test(normalized);
+  // Buyers commonly answer the down-payment question with only "$3k", "2K", etc.
+  // The preceding dealer turn supplies the context, so do not require a keyword
+  // in the buyer's short amount-only reply.
+  const standaloneKAmount = /^\s*\$?\d{1,2}(?:\.\d+)?\s*k\s*$/i.test(normalized);
+  const hasDownContext = standaloneKAmount || /down|enganche|inicial|cash|contado|efectivo|available|disponible|have|tengo|cuento|can put|puedo dar|puedo poner/.test(normalized);
   if (!hasDownContext) return null;
   const withoutPhoneNumber = normalized.replace(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, " ");
   const numericMatch = withoutPhoneNumber.match(/(?:\$|usd\s*)?\s*(\d{1,2}(?:[,.]\d{3})?|\d{3,5})(?:\s*(?:k|mil|thousand))?/i);
@@ -638,7 +642,9 @@ function isConversationClosingBuyerAcknowledgement(value: string): boolean {
 
 function isTerminalConversationStatus(status: string | null | undefined): boolean {
   const normalized = cleanConversationText(status || "").toLowerCase();
-  return new Set(["closed", "bdc assigned", "sold", "lost"]).has(normalized);
+  // BDC Assigned is a lead handoff state, not a completed conversation. The
+  // buyer must still be able to answer the remaining qualification questions.
+  return new Set(["closed", "sold", "lost"]).has(normalized);
 }
 
 function historyHasDealerReply(visibleMessages: string[]): boolean {
@@ -1965,7 +1971,7 @@ router.post("/conversations/intake", async (req, res) => {
     }).catch((error) => req.log.warn({ error, externalThreadRef }, "Buyer activity follow-up cancel skipped"));
     await db
       .update(conversationsTable)
-      .set({ status: extractedPhone ? "BDC Assigned" : "active", updatedAt: new Date() })
+      .set({ status: "active", updatedAt: new Date() })
       .where(eq(conversationsTable.id, conversationId));
   }
 
