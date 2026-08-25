@@ -8,6 +8,7 @@ import { registerFeedAuditRoutes } from "./static/feedAuditRoutes";
 import { registerPublicFeeds } from "./static/publicFeeds";
 import { registerSpaFallback } from "./spaFallback";
 import dealerThemeRouter from "../routes/dealerTheme";
+import sofiaMarketplaceRouter from "../routes/sofiaMarketplace";
 
 export function createApp(): Express {
   const app = express();
@@ -15,6 +16,7 @@ export function createApp(): Express {
   app.use(createHttpLogger());
   app.use(cors());
   registerBodyParsers(app);
+  app.use(sofiaMarketplaceRouter);
   registerPublicFeeds(app);
   registerFeedAuditRoutes(app);
   registerAiPhotoStaticFiles(app);

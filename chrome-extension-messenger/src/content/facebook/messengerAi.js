@@ -9,7 +9,6 @@
   const SEND_EVIDENCE_TIMEOUT_MS = 8000;
   const SEND_EVIDENCE_INTERVAL_MS = 300;
   const MAX_IDENTICAL_BUYER_QUESTION_OCCURRENCES = 10;
-  const DEFAULT_STORE_PHONE = "+1 703-763-4675";
   const PENDING_BUYER_STORE_KEY = "dealerpilotMessengerPendingBuyerByThreadV1";
 
   let captureInFlight = false;
@@ -258,8 +257,8 @@
       .toLowerCase();
     const spanish = /\b(?:q|que|necesit|aplicar|requisit|documentos?|pasaporte|cuenta bancaria|cuenta de banco)\b/.test(normalized);
     return spanish
-      ? `Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuál es el mejor número de teléfono para ayudarte con la aplicación? También puedes llamarnos al ${DEFAULT_STORE_PHONE}.`
-      : `You only need your ID and an active bank account; a passport or Tax ID works. What's the best phone number to help with the application? You can also call us at ${DEFAULT_STORE_PHONE}.`;
+      ? `Para avanzar necesitamos pasaporte o una identificación vigente y comprobante de ingresos. ¿Cuentas con ambos?`
+      : `To move forward, we need a passport or valid ID and proof of income. Do you have both?`;
   }
 
   function repairSuggestedReplyForBuyerIntent(reply, payload) {

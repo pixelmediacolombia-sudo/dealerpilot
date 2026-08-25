@@ -763,7 +763,7 @@ test("autoReply never marks an empty composer as delivered when CDP writing fail
 
 test("autoReply confirms delivery from visible Dealer bubble when composer does not clear", async () => {
   const suggestedReply =
-    "Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuál es el mejor número de teléfono para ayudarte con la aplicación? También puedes llamarnos al +1 703-763-4675.";
+    "Para avanzar necesitamos pasaporte o una identificación vigente y comprobante de ingresos. ¿Cuentas con ambos?";
   let captureCount = 0;
   const { ai, calls, composerElement, sendButton } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
@@ -967,7 +967,7 @@ test("autoReply replaces stale ratings draft with requirements answer and sends"
   assert.equal(calls.intake[0].currentMessage, "Q se necesita para aplicar?");
   assert.equal(
     result.suggestedReply,
-    "Solo necesitas tu ID y una cuenta bancaria activa; puede ser pasaporte o Tax ID. ¿Cuál es el mejor número de teléfono para ayudarte con la aplicación? También puedes llamarnos al +1 703-763-4675.",
+    "Para avanzar necesitamos pasaporte o una identificación vigente y comprobante de ingresos. ¿Cuentas con ambos?",
   );
   assert.equal(result.autoSent, true);
   assert.equal(result.composerDraftReplaced, true);

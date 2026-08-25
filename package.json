@@ -14,7 +14,9 @@
     "test:publishing-flow": "node --test chrome-extension/tests/marketplace-spanish-auto-publish.test.mjs chrome-extension/tests/queue-preflight-flow.e2e.test.mjs artifacts/api-server/src/routes/publishing-queue-scheduling.test.mjs",
     "test:extension:messenger": "node --test chrome-extension-messenger/tests/messenger-capture.test.mjs chrome-extension-messenger/tests/messenger-capture-regression.test.mjs chrome-extension-messenger/tests/messenger-autonomy.test.mjs chrome-extension-messenger/tests/messenger-ai.test.mjs chrome-extension-messenger/tests/messenger-background.test.mjs",
     "test:extension:messenger:e2e": "node --test chrome-extension-messenger/tests/messenger-capture.test.mjs chrome-extension-messenger/tests/messenger-capture-regression.test.mjs chrome-extension-messenger/tests/messenger-autonomy.test.mjs chrome-extension-messenger/tests/messenger-ai.test.mjs chrome-extension-messenger/tests/messenger-background.test.mjs",
-    "test:extensions:isolation": "node --test chrome-extension-messenger/tests/isolation.test.mjs"
+    "test:extensions:isolation": "node --test chrome-extension-messenger/tests/isolation.test.mjs",
+    "test:sofia:unit": "node --experimental-strip-types --test artifacts/api-server/src/sofia/marketplaceTurn.test.mjs",
+    "test:sofia:e2e": "node --experimental-strip-types --test artifacts/api-server/src/routes/sofiaMarketplace.e2e.test.mjs"
   },
   "private": true,
   "devDependencies": {
