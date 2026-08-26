@@ -32,6 +32,9 @@ function toVehicle(
     trim: v.trim ?? null,
     mileage: v.mileage ?? null,
     price: v.price ?? null,
+    downPaymentOverride: v.downPaymentOverride ?? null,
+    downPaymentOverrideEffectiveFrom: v.downPaymentOverrideEffectiveFrom?.toISOString() ?? null,
+    downPaymentOverrideEffectiveTo: v.downPaymentOverrideEffectiveTo?.toISOString() ?? null,
     exteriorColor: v.exteriorColor ?? null,
     interiorColor: v.interiorColor ?? null,
     bodyStyle: v.bodyStyle ?? null,
@@ -274,6 +277,46 @@ router.post("/vehicles/bulk", async (req, res) => {
 });
 
 const StatusBody = z.object({ status: z.string().min(1) });
+
+const DownPaymentOverrideBody = z.object({
+  downPayment: z.number().int().positive().nullable(),
+  effectiveFrom: z.string().optional(),
+  effectiveTo: z.string().nullable().optional(),
+});
+
+router.patch("/vehicles/:id/down-payment", async (req, res) => {
+  const id = Number(req.params.id);
+  const parsed = DownPaymentOverrideBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid vehicle down-payment override", issues: parsed.error.issues });
+    return;
+  }
+  const effectiveFrom = parsed.data.effectiveFrom === undefined
+    ? (parsed.data.downPayment == null ? null : new Date())
+    : new Date(parsed.data.effectiveFrom);
+  const effectiveTo = parsed.data.effectiveTo === undefined || parsed.data.effectiveTo === null
+    ? null
+    : new Date(parsed.data.effectiveTo);
+  if ((effectiveFrom && Number.isNaN(effectiveFrom.getTime())) || (effectiveTo && Number.isNaN(effectiveTo.getTime())) || (effectiveFrom && effectiveTo && effectiveTo <= effectiveFrom)) {
+    res.status(400).json({ error: "Invalid effective date window" });
+    return;
+  }
+  const [updated] = await db
+    .update(vehiclesTable)
+    .set({
+      downPaymentOverride: parsed.data.downPayment,
+      downPaymentOverrideEffectiveFrom: effectiveFrom,
+      downPaymentOverrideEffectiveTo: effectiveTo,
+    })
+    .where(eq(vehiclesTable.id, id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "Vehicle not found" });
+    return;
+  }
+  const [withImages] = await attachImages([updated]);
+  res.json(withImages);
+});
 
 router.patch("/vehicles/:id/status", async (req, res) => {
   const id = Number(req.params.id);

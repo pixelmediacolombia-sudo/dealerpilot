@@ -1,7 +1,7 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
 import type { Vehicle } from "@workspace/db";
 import { z } from "zod/v4";
-import { suggestDownPayment, type DownPaymentSuggestion } from "./rules";
+import { buildDownPaymentInstruction, type DownPaymentPolicy } from "../downPayment/policy";
 
 export interface GeneratedListing {
   title: string;
@@ -12,9 +12,9 @@ export interface GeneratedListing {
   copyAngle: string;
   language: string;
   priority: string;
-  downPayment: number;
+  downPayment: number | null;
   askingPrice: number | null;
-  category: DownPaymentSuggestion["category"];
+  category: VehicleCategory;
 }
 
 // ─── Emoji sanitizer ─────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ Your listings maximize: Click Through Rate, Message Rate, Save Rate, Marketplace
 - Lead with ONE emoji: 🔥 or 🚗
 - Mention year, make, model once. Use • as a separator.
 - Include the single most compelling hook for THIS vehicle category.
-- Example: 🔥 2019 Toyota Camry • Clean Title • $2,500 Down
+- Example: 🔥 2019 Toyota Camry • Clean Title • Approved Down Payment (when supplied)
 - Example: 🚗 2021 Ford F-150 XLT • Low Miles • Tow Ready
 
 === DESCRIPTION STRUCTURE ===
@@ -246,8 +246,16 @@ Return a single JSON object with exactly these keys:
 
 // ─── Main generator ───────────────────────────────────────────────────────────
 
-export async function generateListing(vehicle: Vehicle): Promise<GeneratedListing> {
-  const suggestion = suggestDownPayment(vehicle);
+export async function generateListing(
+  vehicle: Vehicle,
+  downPaymentPolicy: DownPaymentPolicy = {
+    configId: null,
+    planAmounts: [],
+    minimumAmount: null,
+    vehicleOverride: null,
+    source: "none",
+  },
+): Promise<GeneratedListing> {
   const facts = buildVehicleFacts(vehicle);
   const category = detectCategory(vehicle);
   const strategyBlock = CATEGORY_STRATEGIES[category];
@@ -258,10 +266,12 @@ export async function generateListing(vehicle: Vehicle): Promise<GeneratedListin
   const hookVariation = HOOK_VARIATIONS[variationIndex(vehicle.id, HOOK_VARIATIONS.length)];
   const ctaVariation = CTA_VARIATIONS[variationIndex(vehicle.id, CTA_VARIATIONS.length)];
 
+  const approvedDownPayment = downPaymentPolicy.vehicleOverride ?? downPaymentPolicy.minimumAmount;
   const pricingBlock = `priceMode: FULL_PRICE
 - Full asking price: $${price}
 - Marketplace display price: $${price}
-- Internal down-payment context only: $${suggestion.downPayment} (${suggestion.category}, typical range ${suggestion.rangeLabel})
+- Approved down-payment configuration: ${buildDownPaymentInstruction(downPaymentPolicy, "en")}
+- Internal down-payment context only: ${approvedDownPayment == null ? "none" : `$${approvedDownPayment}`}
 - Mention financing only as available for qualified buyers; never post the down payment as the vehicle price`;
 
   const userMessage = `Vehicle facts (only use what is provided — never invent anything):
@@ -319,8 +329,8 @@ Generate the listing now.`;
     copyAngle: parsed.data.copyAngle.trim(),
     language: "en",
     priority,
-    downPayment: suggestion.downPayment,
+    downPayment: approvedDownPayment,
     askingPrice: vehicle.price ?? null,
-    category: suggestion.category,
+    category,
   };
 }

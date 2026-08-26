@@ -71,7 +71,6 @@ export type TurnDecision = {
 
 const PHONE_RE = /(?:^|\D)((?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})(?=$|\D)/;
 const MONEY_RE = /(?:\$\s*)?(\d{1,3}(?:[,.]\d{3})?|\d{1,2}(?:\.\d+)?)\s*(k|thousand|mil)?\b/i;
-const DOWN_PAYMENT_PLANS = "$1,000, $2,000, and $3,000 down";
 
 function clean(value: unknown): string {
   return String(value ?? "").replace(/\s+/g, " ").trim();
@@ -203,6 +202,32 @@ function currency(value: number): string {
   return `$${Math.round(value).toLocaleString("en-US")}`;
 }
 
+function configuredDownPaymentPlans(envelope: MarketplaceEnvelope): number[] {
+  const raw = envelope.known_facts?.down_payment_plans;
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw
+    .map((value) => typeof value === "number" ? Math.round(value) : Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0))].sort((a, b) => a - b);
+}
+
+function configuredDownPaymentText(envelope: MarketplaceEnvelope, language: "en" | "es"): string {
+  const plans = configuredDownPaymentPlans(envelope);
+  if (!plans.length) {
+    return language === "es"
+      ? "Podemos revisar las opciones vigentes de enganche según tu perfil"
+      : "We can review the current down-payment options based on your profile";
+  }
+  const formatted = plans.map(currency);
+  const list = formatted.length === 1
+    ? formatted[0]
+    : formatted.length === 2
+      ? `${formatted[0]} ${language === "es" ? "y" : "and"} ${formatted[1]}`
+      : `${formatted.slice(0, -1).join(", ")} ${language === "es" ? "y" : "and"} ${formatted.at(-1)}`;
+  return language === "es"
+    ? `tenemos planes desde ${list} de enganche`
+    : `plans start at ${list} down`;
+}
+
 function addLink(reply: string, envelope: MarketplaceEnvelope): string {
   if (!hasDealerReply(envelope) || hasExistingLink(envelope) || !envelope.vehicle.vdp_url) return reply;
   return `${reply} Aquí tienes la ficha completa: ${envelope.vehicle.vdp_url}`;
@@ -227,6 +252,7 @@ export function buildMarketplaceTurnDecision(envelope: MarketplaceEnvelope): Tur
   const vehicle = vehicleLabel(envelope);
   const intent = detectMarketplaceIntent(latest);
   const cash = facts.payment_type === "cash";
+  const downPaymentText = configuredDownPaymentText(envelope, language);
   let reply = "";
   let nextStep = "ask_visit_window";
   let handoff = false;
@@ -274,8 +300,8 @@ export function buildMarketplaceTurnDecision(envelope: MarketplaceEnvelope): Tur
     answered = true;
   } else if (intent === "financiamiento") {
     reply = language === "es"
-      ? `Sí, podemos revisar opciones de financiamiento según tu perfil; los planes empiezan desde $1.000, $2.000 y $3.000 de down. ¿Quieres venir a verlo o prefieres que coordinemos una visita?`
-      : `Yes, we can review financing options based on your profile; plans start at ${DOWN_PAYMENT_PLANS}. Would you like to come see it or coordinate a visit?`;
+      ? `Sí, podemos revisar opciones de financiamiento según tu perfil; ${downPaymentText}. ¿Quieres venir a verlo o prefieres que coordinemos una visita?`
+      : `Yes, we can review financing options based on your profile; ${downPaymentText}. Would you like to come see it or coordinate a visit?`;
     answered = true;
   } else if (intent === "requisitos") {
     reply = language === "es"
@@ -284,8 +310,8 @@ export function buildMarketplaceTurnDecision(envelope: MarketplaceEnvelope): Tur
     answered = true;
   } else if (facts.down_payment_available !== null || intent === "enganche") {
     reply = language === "es"
-      ? `Perfecto, anoto ${facts.down_payment_available ? currency(facts.down_payment_available) : "tu enganche"} como disponible; tenemos planes desde $1.000, $2.000 y $3.000 de down. ¿Qué número usamos para confirmar tu visita?`
-      : `Great, I noted ${facts.down_payment_available ? currency(facts.down_payment_available) : "your down payment"} as available; plans start at ${DOWN_PAYMENT_PLANS}. What number should we use to confirm your visit?`;
+      ? `Perfecto, anoto tu enganche disponible; ${downPaymentText}. ¿Qué número usamos para confirmar tu visita?`
+      : `Great, I noted your available down payment; ${downPaymentText}. What number should we use to confirm your visit?`;
     nextStep = "request_phone";
     answered = true;
   } else if (facts.visit_window || intent === "senal_visita") {

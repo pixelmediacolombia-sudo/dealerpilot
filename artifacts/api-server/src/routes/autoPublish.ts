@@ -448,6 +448,7 @@ router.post("/auto-publish/batches", async (req, res) => {
         ne(vehiclesTable.status, "Published"),
         ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
+        ne(vehiclesTable.status, "Archived"),
         lotLocation ? eq(vehiclesTable.lotLocation, lotLocation) : undefined,
       ),
     );
@@ -1207,6 +1208,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
         ne(vehiclesTable.status, "Published"),
         ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
+        ne(vehiclesTable.status, "Archived"),
       ),
     );
 
@@ -1529,6 +1531,7 @@ router.get("/auto-publish/launch-checklist", async (req, res) => {
         ne(vehiclesTable.status, "Published"),
         ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
+        ne(vehiclesTable.status, "Archived"),
       ),
     );
   const vIds = vehicles.map((v) => v.id);

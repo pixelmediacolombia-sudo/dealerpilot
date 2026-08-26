@@ -1,5 +1,4 @@
 import type { ListingVersion, Vehicle } from "@workspace/db";
-import { categorize, suggestDownPayment } from "./rules";
 
 export interface ListingScoreBreakdown {
   titleQuality: number;
@@ -83,20 +82,13 @@ export function scoreListing(
   }
   priceStrategy = clamp(priceStrategy, 0, 100);
 
-  // Down payment strategy: within the rule-engine band for the category.
-  const suggestion = suggestDownPayment(vehicle);
+  // Down payment strategy: score only whether an approved value was persisted.
+  // Amount selection belongs to effective-dated dealer configuration, not this scorer.
   const dp = version.downPayment ?? 0;
-  const category = categorize(vehicle);
-  const floor =
-    category === "Sedan" ? 1000 : category === "SUV" ? 2000 : category === "Truck" ? 2500 : 3000;
-  const ceil = category === "Sedan" ? 1500 : floor * 2.5;
   let downPaymentStrategy = 0;
   if (dp > 0) {
-    downPaymentStrategy += 40;
-    if (dp >= floor && dp <= ceil) downPaymentStrategy += 60;
-    else if (dp >= floor * 0.8) downPaymentStrategy += 30;
+    downPaymentStrategy = 100;
   }
-  void suggestion;
   downPaymentStrategy = clamp(downPaymentStrategy, 0, 100);
 
   // Photos: Marketplace listings perform best with a full set of images.

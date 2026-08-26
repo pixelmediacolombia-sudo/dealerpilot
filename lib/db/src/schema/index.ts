@@ -2,6 +2,7 @@
 
 export * from "./leads";
 export * from "./dealers";
+export * from "./dealerDownPaymentConfigs";
 export * from "./dealerUsers";
 export * from "./feeds";
 export * from "./feedRuns";

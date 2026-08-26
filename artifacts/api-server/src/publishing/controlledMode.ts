@@ -64,7 +64,7 @@ export const ACTIVE_PUBLISHING_JOB_STATUSES = [
   "Waiting For Thumbnails",
 ] as const;
 
-const NOT_ELIGIBLE_STATUSES = new Set(["Published", "Sold/Removed", "Sold", "Removed", "Archived"]);
+export const NOT_ELIGIBLE_STATUSES = new Set(["Published", "Sold/Removed", "Sold", "Removed", "Archived"]);
 
 export function isControlledModeEnabled(): boolean {
   return (

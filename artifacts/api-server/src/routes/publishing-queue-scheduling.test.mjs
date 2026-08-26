@@ -685,8 +685,10 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /Hello, this is Alpha Motorsports/);
   assert.match(conversationsSource, /interested in buying/);
   assert.match(conversationsSource, /QUALIFICATION FUNNEL FOR ALPHA MANASSAS/);
-  assert.match(conversationsSource, /plans starting at \$1,000, \$2,000, and \$3,000 down/);
-  assert.match(conversationsSource, /currently requires more than \$1,000 down/);
+  assert.match(conversationsSource, /Approved Down-Payment Configuration/);
+  assert.match(conversationsSource, /conversation history is never a source/);
+  assert.match(conversationsSource, /buildDownPaymentInstruction/);
+  assert.doesNotMatch(conversationsSource, /\$1,000|\$2,000|\$3,000/);
   assert.match(conversationsSource, /this week or this month/);
   assert.match(conversationsSource, /in 15 days/);
   assert.match(conversationsSource, /en 15 dias/);

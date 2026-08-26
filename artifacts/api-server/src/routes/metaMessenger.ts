@@ -15,6 +15,7 @@ import {
   detectLanguage,
   generateAiReply,
 } from "./conversations";
+import { getDownPaymentPolicy, type DownPaymentPolicy } from "../downPayment/policy";
 
 const router = Router();
 
@@ -102,6 +103,7 @@ async function matchVehicleFromMessage(message: string): Promise<{
   title?: string;
   vehicleType?: string;
   downPayment?: number;
+  downPaymentPolicy?: DownPaymentPolicy;
 }> {
   const vehicles = await db
     .select()
@@ -126,6 +128,8 @@ async function matchVehicleFromMessage(message: string): Promise<{
 
   if (!match) return {};
 
+  const downPaymentPolicy = await getDownPaymentPolicy(DEALER_ID, match.id);
+
   const [listing] = await db
     .select()
     .from(listingsTable)
@@ -137,6 +141,8 @@ async function matchVehicleFromMessage(message: string): Promise<{
     listingId: listing?.id,
     title: vehicleLabel(match),
     vehicleType: match.bodyStyle ?? undefined,
+    downPayment: downPaymentPolicy.minimumAmount ?? undefined,
+    downPaymentPolicy,
   };
 }
 
@@ -362,6 +368,10 @@ async function processMessengerEvent(event: MetaMessagingEvent): Promise<{
     vehicleMatch.title ?? conversation.detectedVehicleTitle ?? undefined,
     vehicleMatch.vehicleType ?? conversation.vehicleType ?? undefined,
     vehicleMatch.downPayment ?? conversation.marketplaceDownPayment ?? undefined,
+    undefined,
+    false,
+    undefined,
+    vehicleMatch.downPaymentPolicy,
   );
 
   await db.insert(conversationMessagesTable).values({

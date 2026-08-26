@@ -3,12 +3,13 @@ import { z } from "zod/v4";
 import {
   db,
   dealersTable,
+  dealerDownPaymentConfigsTable,
   feedRunsTable,
   vehiclesTable,
   type Dealer,
   type FeedRun,
 } from "@workspace/db";
-import { and, count, desc, eq, ilike, isNull, or } from "drizzle-orm";
+import { and, count, desc, eq, ilike, isNull, lt, or } from "drizzle-orm";
 import { runInventorySync } from "../inventory/scheduler";
 
 
@@ -108,6 +109,94 @@ router.patch("/dealers/:id", async (req, res) => {
     .returning();
   req.log.info({ dealerId: id }, "Updated dealer");
   res.json(await toDealer(updated!));
+});
+
+const DownPaymentConfigBody = z.object({
+  planAmounts: z.array(z.number().int().positive()).min(1).max(12),
+  effectiveFrom: z.string().optional(),
+  effectiveTo: z.string().nullable().optional(),
+});
+
+function parseConfigDate(value: string | undefined, fallback: Date | null): Date | null {
+  if (value === undefined) return fallback;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+router.get("/dealers/:id/down-payment-config", async (req, res) => {
+  const id = Number(req.params.id);
+  const [dealer] = await db.select({ id: dealersTable.id }).from(dealersTable).where(eq(dealersTable.id, id));
+  if (!dealer) {
+    res.status(404).json({ error: "Dealer not found" });
+    return;
+  }
+  const configs = await db
+    .select()
+    .from(dealerDownPaymentConfigsTable)
+    .where(eq(dealerDownPaymentConfigsTable.dealerId, id))
+    .orderBy(desc(dealerDownPaymentConfigsTable.effectiveFrom));
+  const now = new Date();
+  const active = configs.find((config) =>
+    config.effectiveFrom <= now && (config.effectiveTo == null || config.effectiveTo > now),
+  ) ?? null;
+  res.json({
+    active: active ? {
+      id: active.id,
+      dealerId: active.dealerId,
+      planAmounts: active.planAmounts,
+      effectiveFrom: active.effectiveFrom.toISOString(),
+      effectiveTo: active.effectiveTo?.toISOString() ?? null,
+    } : null,
+    history: configs.map((config) => ({
+      id: config.id,
+      dealerId: config.dealerId,
+      planAmounts: config.planAmounts,
+      effectiveFrom: config.effectiveFrom.toISOString(),
+      effectiveTo: config.effectiveTo?.toISOString() ?? null,
+    })),
+  });
+});
+
+router.put("/dealers/:id/down-payment-config", async (req, res) => {
+  const id = Number(req.params.id);
+  const parsed = DownPaymentConfigBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid down-payment configuration", issues: parsed.error.issues });
+    return;
+  }
+  const [dealer] = await db.select({ id: dealersTable.id }).from(dealersTable).where(eq(dealersTable.id, id));
+  if (!dealer) {
+    res.status(404).json({ error: "Dealer not found" });
+    return;
+  }
+  const effectiveFrom = parseConfigDate(parsed.data.effectiveFrom, new Date());
+  const effectiveTo = parseConfigDate(parsed.data.effectiveTo ?? undefined, null);
+  if (!effectiveFrom || (parsed.data.effectiveTo !== undefined && !effectiveTo) || (effectiveTo && effectiveTo <= effectiveFrom)) {
+    res.status(400).json({ error: "Invalid effective date window" });
+    return;
+  }
+  const planAmounts = [...new Set(parsed.data.planAmounts)].sort((a, b) => a - b);
+  const [created] = await db.transaction(async (tx) => {
+    await tx
+      .update(dealerDownPaymentConfigsTable)
+      .set({ effectiveTo: effectiveFrom, updatedAt: new Date() })
+      .where(and(
+        eq(dealerDownPaymentConfigsTable.dealerId, id),
+        lt(dealerDownPaymentConfigsTable.effectiveFrom, effectiveFrom),
+        isNull(dealerDownPaymentConfigsTable.effectiveTo),
+      ));
+    return tx
+      .insert(dealerDownPaymentConfigsTable)
+      .values({ dealerId: id, planAmounts, effectiveFrom, effectiveTo })
+      .returning();
+  });
+  res.status(201).json({
+    id: created!.id,
+    dealerId: created!.dealerId,
+    planAmounts: created!.planAmounts,
+    effectiveFrom: created!.effectiveFrom.toISOString(),
+    effectiveTo: created!.effectiveTo?.toISOString() ?? null,
+  });
 });
 
 router.post("/dealers/:id/sync", async (req, res) => {

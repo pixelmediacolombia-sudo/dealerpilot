@@ -20,6 +20,7 @@ import { scoreListing } from "../listings/scoring";
 import { priorityScore } from "../listings/rules";
 import { ACTIVE_PUBLISHING_JOB_STATUSES } from "../publishing/controlledMode";
 import { compactFutureAutoPublishQueue } from "../publishing/autoPublishQueueCompaction";
+import { getDownPaymentPolicy } from "../downPayment/policy";
 
 const DEALER_ID = 1;
 
@@ -528,7 +529,7 @@ router.post("/listings/:id/generate", async (req, res) => {
 
   let generated;
   try {
-    generated = await generateListing(vehicle);
+    generated = await generateListing(vehicle, await getDownPaymentPolicy(vehicle.dealerId, vehicle.id));
   } catch (err) {
     req.log.error({ err, vehicleId }, "AI listing generation failed");
     res.status(502).json({ error: "AI generation failed. Please try again." });

@@ -52,46 +52,6 @@ export function categorize(vehicle: Vehicle): VehicleCategory {
   return "Sedan";
 }
 
-export interface DownPaymentSuggestion {
-  category: VehicleCategory;
-  downPayment: number;
-  rangeLabel: string;
-}
-
-/**
- * Deterministic down-payment rule engine (NOT AI).
- *   Sedan  $1,000 - $1,500
- *   SUV    $2,000+
- *   Truck  $2,500+
- *   Luxury $3,000+
- * Within each band the figure scales with vehicle price and is rounded to the
- * nearest $50 so the output is stable and human-friendly.
- */
-export function suggestDownPayment(vehicle: Vehicle): DownPaymentSuggestion {
-  const category = categorize(vehicle);
-  const price = vehicle.price ?? 0;
-  const round50 = (n: number) => Math.round(n / 50) * 50;
-
-  switch (category) {
-    case "Sedan": {
-      const dp = clamp(round50(price * 0.06), 1000, 1500);
-      return { category, downPayment: dp, rangeLabel: "$1,000 - $1,500" };
-    }
-    case "SUV": {
-      const dp = clamp(round50(price * 0.07), 2000, 3500);
-      return { category, downPayment: dp, rangeLabel: "$2,000+" };
-    }
-    case "Truck": {
-      const dp = clamp(round50(price * 0.07), 2500, 4000);
-      return { category, downPayment: dp, rangeLabel: "$2,500+" };
-    }
-    case "Luxury": {
-      const dp = clamp(round50(price * 0.08), 3000, 6000);
-      return { category, downPayment: dp, rangeLabel: "$3,000+" };
-    }
-  }
-}
-
 /**
  * Workspace-level priority score (0-100). Deterministic, derived from inventory
  * signals only: status urgency, photo completeness, price presence, and how

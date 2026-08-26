@@ -1,5 +1,5 @@
 import type { Vehicle } from "@workspace/db";
-import { categorize, suggestDownPayment } from "./rules";
+import { categorize } from "./rules";
 
 export type PriceMode = "FULL_PRICE" | "DOWN_PAYMENT";
 
@@ -33,14 +33,17 @@ export function getMarketplacePricing(
   storedDownPayment?: number | null,
 ): MarketplacePricing {
   const actualVehiclePrice = vehicle.price ?? 0;
-  const recommendedDownPayment = storedDownPayment ?? suggestDownPayment(vehicle).downPayment;
+  const recommendedDownPayment = storedDownPayment ?? null;
   const category = categorize(vehicle);
+  const downPaymentContext = recommendedDownPayment == null
+    ? "no approved down-payment amount is configured"
+    : `${fmt(recommendedDownPayment)} is the approved down-payment context for Sales AI`;
 
   return {
     actualVehiclePrice,
     marketplaceDisplayedPrice: actualVehiclePrice,
     priceMode: "FULL_PRICE",
     recommendedDownPayment,
-    pricingReason: `${category} priced at ${fmt(actualVehiclePrice)} - full asking price is posted on Marketplace; ${fmt(recommendedDownPayment)} stays as internal down-payment context for Sales AI.`,
+    pricingReason: `${category} priced at ${fmt(actualVehiclePrice)} - full asking price is posted on Marketplace; ${downPaymentContext}.`,
   };
 }

@@ -8,7 +8,6 @@ import {
   listingsTable,
   listingVersionsTable,
   publishingJobsTable,
-  vehicleIntelligenceTable,
   marketplaceListingsTable,
   autoPublishSettingsTable,
   pool,
@@ -25,6 +24,7 @@ import {
   normalizeAlphaLotLocation,
   resolveAlphaLotCity,
   ACTIVE_PUBLISHING_JOB_STATUSES,
+  NOT_ELIGIBLE_STATUSES,
 } from "../publishing/controlledMode";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
 import {
@@ -36,6 +36,7 @@ import {
 import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 import { compactFutureAutoPublishQueue } from "../publishing/autoPublishQueueCompaction";
 import { recordMarketplaceSoldAction } from "../marketplace/soldAction";
+import { getDownPaymentPolicy } from "../downPayment/policy";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1.
 // Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
@@ -428,20 +429,6 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
     const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, job.dealerId));
 
-    // vehicleIntelligence is optional — missing table or row is not fatal.
-    let intel: { recommendedDownPayment: number | null } | undefined;
-    try {
-      const [row] = await db
-        .select()
-        .from(vehicleIntelligenceTable)
-        .where(eq(vehicleIntelligenceTable.vehicleId, job.vehicleId))
-        .orderBy(desc(vehicleIntelligenceTable.generatedAt))
-        .limit(1);
-      intel = row;
-    } catch {
-      req.log.warn({ jobId: id, vehicleId: job.vehicleId }, "vehicle_intelligence unavailable — using null pricing intel");
-    }
-
     if (!vehicle) {
       res.status(404).json({
         error: "Vehicle not found for job",
@@ -500,7 +487,8 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     const images = await getVehiclePhotos(vehicle.id, vehicle.aiPhotoSetId, vehicle.aiPhotoStatus);
     const usingAiPhotos = images.some((image) => image.source === "ai");
 
-    const pricing = getMarketplacePricing(vehicle, intel?.recommendedDownPayment ?? null);
+    const downPaymentPolicy = await getDownPaymentPolicy(job.dealerId, vehicle.id);
+    const pricing = getMarketplacePricing(vehicle, downPaymentPolicy.minimumAmount);
 
     // "Real prose" test: non-empty after trim, ≥ 15 chars, has a space, not all-digits.
     function isProseText(s: string | null | undefined): s is string {
@@ -523,7 +511,7 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     const yr = vehicle.year ?? "";
     const trimStr = vehicle.trim ? ` ${vehicle.trim}` : "";
     const autoTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
-    const publicationDownPayment = version?.downPayment ?? null;
+    const publicationDownPayment = downPaymentPolicy.minimumAmount;
     const publicationTitle = buildMarketplaceTitle(vehicle, publicationDownPayment);
 
     function buildEnglishSalesCopy(): string {
@@ -872,10 +860,22 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
     return;
   }
 
-  await db
-    .update(vehiclesTable)
-    .set({ status: "Published" })
-    .where(eq(vehiclesTable.id, updated.vehicleId));
+  const [currentVehicle] = await db
+    .select({ status: vehiclesTable.status })
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.id, updated.vehicleId))
+    .limit(1);
+  if (currentVehicle && !NOT_ELIGIBLE_STATUSES.has(currentVehicle.status)) {
+    await db
+      .update(vehiclesTable)
+      .set({ status: "Published" })
+      .where(eq(vehiclesTable.id, updated.vehicleId));
+  } else {
+    req.log.warn(
+      { jobId: id, vehicleId: updated.vehicleId, vehicleStatus: currentVehicle?.status ?? null },
+      "complete: preserved terminal vehicle status instead of overwriting it with Published",
+    );
+  }
 
   // Upsert listing record. Keyed by (vehicle_id, channel) so concurrent
   // completions cannot create duplicates.

@@ -19,6 +19,12 @@ import {
   findOutboundJobForAssistantMessage,
   queueNormalReply,
 } from "../conversations/messengerOutboundQueue";
+import {
+  buildDownPaymentInstruction,
+  formatDownPaymentAmounts,
+  getDownPaymentPolicy,
+  type DownPaymentPolicy,
+} from "../downPayment/policy";
 
 
 const router = Router();
@@ -32,6 +38,13 @@ const SALES_AI_REPLY_TIMEOUT_MS = 12000;
 // this does not create duplicate AI replies; it only removes the old 2-minute
 // dead time between delivery attempts.
 const MESSENGER_DELIVERY_RETRY_DELAY_MS = 15000;
+const NO_DOWN_PAYMENT_POLICY: DownPaymentPolicy = {
+  configId: null,
+  planAmounts: [],
+  minimumAmount: null,
+  vehicleOverride: null,
+  source: "none",
+};
 
 function resolveStorePhone(lotLocation?: string | null): string {
   void lotLocation;
@@ -293,6 +306,7 @@ function parseTimestamp(value: unknown): Date | null {
 }
 
 type SalesReplyStage =
+  | "open_question"
   | "availability"
   | "interest_confirmation"
   | "interest_declined"
@@ -334,8 +348,6 @@ function extractPhoneNumber(text: string): string | null {
 function hasPhoneNumber(text: string): boolean {
   return extractPhoneNumber(text) !== null;
 }
-
-const MINIMUM_DOWN_PAYMENT = 1000;
 
 function extractDownPaymentAmount(text: string): number | null {
   const normalized = normalizeIntentText(text);
@@ -514,7 +526,7 @@ function buyerAskedCleanTitle(latest: string): boolean {
 }
 
 function buyerAskedWarrantyInfo(latest: string): boolean {
-  return /\b(?:warranty|garant[ií]a|deductible|deducible|engine|motor|transmission|transmisi[oó]n|mechanic|mec[aá]nico|repair|reparaci[oó]n|third-party|dealership|included|cover|days|miles|mill?as)\b/i.test(latest);
+  return /\b(?:warranty|garant[ií]a|deductible|deducible|certif(?:ied|ication)|certificad[oa]|engine|motor|transmission|transmisi[oó]n|mechanic|mec[aá]nico|repair|reparaci[oó]n|third-party|dealership|included|cover|days|miles|mill?as)\b/i.test(latest);
 }
 
 function buyerAskedAdvisorQuestion(latest: string): boolean {
@@ -539,6 +551,15 @@ function hasPersistentUnansweredBuyerTurns(
     consecutiveBuyerMessages.unshift(message);
   }
   return consecutiveBuyerMessages.length >= 3;
+}
+
+function buyerHasOpenQuestion(latest: string): boolean {
+  if (!buyerAskedAdvisorQuestion(latest)) return false;
+  if (buyerRequestedStorePhone(latest)) return false;
+  if (/\b(?:is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|esta disponible|est[aá] (?:a la venta|en venta)|lo tiene disponible|lo tienen disponible|tienen este|hay alguno disponible|lo venden aun|lo siguen vendiendo|a[uú]n lo tienen)\b/i.test(latest)) return false;
+  if (buyerAskedDocumentRequirements(latest)) return false;
+  if (/\b(?:address|location|directions|direccion|ubicacion|donde queda|como llegar|visitar|visit the lot|come see|stop by|come by|maps?)\b/i.test(latest)) return false;
+  return true;
 }
 
 function buyerMovesConversationForward(value: string): boolean {
@@ -669,6 +690,41 @@ function withFirstReplyGreeting(reply: string, language: string, firstDealerRepl
     : `Hello, this is Alpha Motorsports. ${cleaned}`;
 }
 
+function configuredDownPaymentLabel(policy: DownPaymentPolicy, language: "en" | "es"): string {
+  if (policy.vehicleOverride != null) return `$${policy.vehicleOverride.toLocaleString("en-US")}`;
+  return formatDownPaymentAmounts(policy.planAmounts, language);
+}
+
+function downPaymentRequestReply(language: "en" | "es", policy: DownPaymentPolicy): string {
+  const label = configuredDownPaymentLabel(policy, language);
+  if (!label) {
+    return language === "es"
+      ? "¿Con cuánto cuentas para el enganche?"
+      : "How much do you have available for the down payment?";
+  }
+  return language === "es"
+    ? `Tenemos planes desde ${label} de down payment. ¿Con cuánto cuentas para el enganche?`
+    : `We have plans starting at ${label} down. How much do you have available for the down payment?`;
+}
+
+function downPaymentLowReply(language: "en" | "es", policy: DownPaymentPolicy): string {
+  if (policy.minimumAmount == null) return downPaymentRequestReply(language, policy);
+  const minimum = `$${policy.minimumAmount.toLocaleString("en-US")}`;
+  return language === "es"
+    ? `Gracias por decírmelo. Actualmente necesitamos al menos ${minimum} de down payment. ¿Podrías contar con ${minimum} o más?`
+    : `Thanks for letting me know. We currently require at least ${minimum} down. Would you be able to have ${minimum} or more?`;
+}
+
+function downPaymentDeclinedReply(language: "en" | "es", policy: DownPaymentPolicy): string {
+  if (policy.minimumAmount == null) return language === "es"
+    ? "Entiendo, gracias por tu interés. Cuando estés listo para continuar, aquí estaremos para ayudarte. ¡Que tengas un buen día!"
+    : "I understand, and I appreciate your interest. When you are ready to continue, we will be here to help. Have a great day!";
+  const minimum = `$${policy.minimumAmount.toLocaleString("en-US")}`;
+  return language === "es"
+    ? `Entiendo, gracias por tu interés. Actualmente necesitamos al menos ${minimum} de down payment para avanzar. Cuando cuentes con esa cantidad, estaremos aquí para ayudarte. ¡Que tengas un buen día!`
+    : `I understand, and I appreciate your interest. We currently need at least ${minimum} down to move forward. Please reach out when you have that amount. Have a great day!`;
+}
+
 function replyGivesRestrictedVehicleDetails(reply: string): boolean {
   const normalized = cleanConversationText(reply).toLowerCase();
   return /\$\s*\d/.test(normalized) ||
@@ -676,7 +732,35 @@ function replyGivesRestrictedVehicleDetails(reply: string): boolean {
     /\b\d[\d,]*\s*(?:mi|miles|millas)\b/i.test(normalized);
 }
 
-function resolveSalesReplyStage(visibleMessages: string[], currentMessage: string): SalesReplyStage {
+function downPaymentAmountsMentioned(reply: string): number[] {
+  const withoutPhones = reply.replace(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, " ");
+  const values: number[] = [];
+  for (const match of withoutPhones.matchAll(/\$?\s*(\d{1,3}(?:,\d{3})?|\d{1,5}(?:\.\d+)?)\s*(k|thousand|mil)?/gi)) {
+    const amount = Number(match[1]?.replace(/,/g, ""));
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const suffix = (match[2] ?? "").toLowerCase();
+    values.push(Math.round(amount * (suffix === "k" || suffix === "thousand" || suffix === "mil" ? 1000 : 1)));
+  }
+  return values;
+}
+
+function replyUsesOnlyConfiguredDownPayments(reply: string, policy: DownPaymentPolicy): boolean {
+  const normalized = cleanConversationText(reply).toLowerCase();
+  const allowed = new Set(
+    (policy.vehicleOverride != null ? [policy.vehicleOverride] : policy.planAmounts)
+      .filter((amount) => Number.isInteger(amount) && amount > 0),
+  );
+  const downPaymentMatch = /\b(?:down|down payment|plans?|planes?|enganche|inicial|minimum|at least|more than|al menos|m[aá]s de)\b/i;
+  if (!downPaymentMatch.test(normalized)) return true;
+  const values = downPaymentAmountsMentioned(normalized);
+  return values.every((amount) => allowed.has(amount));
+}
+
+function resolveSalesReplyStage(
+  visibleMessages: string[],
+  currentMessage: string,
+  downPaymentPolicy: DownPaymentPolicy = NO_DOWN_PAYMENT_POLICY,
+): SalesReplyStage {
   const latest = cleanConversationText(currentMessage).toLowerCase();
   const latestIntent = normalizeIntentText(currentMessage);
   const history = visibleMessages.slice(-8).map(cleanConversationText).join(" ").toLowerCase();
@@ -685,6 +769,7 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   const askedForDownPayment = historyContainsDealerPrompt(visibleMessages, /down payment|down|enganche|inicial/);
   const askedForTimeline = historyContainsDealerPrompt(visibleMessages, /this week|this month|esta semana|este mes|when.*buy|cuando.*compr/);
   const askedForDocuments = historyContainsDealerPrompt(visibleMessages, /proof of income|income proof|prueba de ingresos|comprobante de ingresos|identification|identificacion|tax id|pasaporte|bank account|cuenta bancaria/);
+  if (buyerHasOpenQuestion(latest)) return "open_question";
   if (buyerRequestedStorePhone(latest)) return "store_phone_requested";
   if (hasPhoneNumber(latest) && !buyerPhoneAlreadyKnown) return "phone_received";
   if (askedForDocuments) {
@@ -702,9 +787,10 @@ function resolveSalesReplyStage(visibleMessages: string[], currentMessage: strin
   if (askedForDownPayment) {
     if (buyerAcceptedCashPurchase(latest)) return "timeline_request";
     const amount = extractDownPaymentAmount(latest);
-    if (amount !== null) return amount < MINIMUM_DOWN_PAYMENT ? "down_payment_low" : "timeline_request";
+    if (amount !== null && downPaymentPolicy.minimumAmount != null) {
+      return amount < downPaymentPolicy.minimumAmount ? "down_payment_low" : "timeline_request";
+    }
     if (buyerDeclinedCurrentStep(latest)) return "down_payment_declined";
-    if (buyerAcceptedMinimumDown(latest) && historyContainsDealerPrompt(visibleMessages, /minimum.*1,?000|at least.*1,?000|al menos.*1,?000|more than.*1,?000/)) return "timeline_request";
     return "down_payment_request";
   }
   if (buyerPhoneAlreadyKnown && (askedForBuyerPhone || historyContainsDealerPrompt(visibleMessages, /interested|interesado|interesada/))) return "down_payment_request";
@@ -756,16 +842,20 @@ function buildSafeFallbackReply(
   currentMessage: string = "",
   availabilityQuickReplyAccepted: boolean = false,
   lotLocation?: string | null,
+  downPaymentPolicy: DownPaymentPolicy = NO_DOWN_PAYMENT_POLICY,
 ): string {
   const vehicle = vehicleTitle ?? (language === "es" ? "el vehículo" : "the vehicle");
-  const stage = resolveSalesReplyStage(visibleMessages, currentMessage);
+  const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
   const storeAddress = resolveStoreAddress(lotLocation);
   if (language === "es") {
+    if (stage === "open_question") {
+      return `Buena pregunta. No tengo ese detalle confirmado en la información disponible sobre el ${vehicle}; puedo verificarlo. ¿Te interesa seguir con este vehículo?`;
+    }
     if (stage === "store_phone_requested") {
       return `Con gusto, nuestro número es ${storePhone}. Quedamos atentos.`;
     }
     if (stage === "phone_received") {
-      return "¡Gracias! Ya tengo tu número. Tenemos planes desde $1,000, $2,000 y $3,000 de down payment. ¿Con cuánto cuentas para el down?";
+      return `¡Gracias! Ya tengo tu número. ${downPaymentRequestReply("es", downPaymentPolicy)}`;
     }
     if (stage === "interest_confirmation") {
       return `Sí, el ${vehicle} está disponible. ¿Sigues interesado en comprarlo?`;
@@ -774,13 +864,13 @@ function buildSafeFallbackReply(
       return "Entiendo, gracias por tu tiempo. Si cambias de opinión, aquí estaremos para ayudarte. ¡Que tengas un buen día!";
     }
     if (stage === "down_payment_request") {
-      return "Tenemos planes desde $1,000, $2,000 y $3,000 de down payment. ¿Con cuánto cuentas para el down?";
+      return downPaymentRequestReply("es", downPaymentPolicy);
     }
     if (stage === "down_payment_low") {
-      return "Gracias por decírmelo. Actualmente estamos pidiendo más de $1,000 de down payment. ¿Podrías contar con $1,000 o más?";
+      return downPaymentLowReply("es", downPaymentPolicy);
     }
     if (stage === "down_payment_declined") {
-      return "Entiendo, gracias por tu interés. Actualmente necesitamos más de $1,000 de down payment para avanzar. Cuando cuentes con esa cantidad, estaremos aquí para ayudarte. ¡Que tengas un buen día!";
+      return downPaymentDeclinedReply("es", downPaymentPolicy);
     }
     if (stage === "timeline_request") {
       return "Perfecto. ¿Cuándo planeas comprar el vehículo: esta semana o este mes?";
@@ -852,11 +942,14 @@ function buildSafeFallbackReply(
     }
     return `Con gusto te ayudo con el ${vehicle}. ¿Te interesa comprarlo?`;
   }
+  if (stage === "open_question") {
+    return `Great question. I do not have that detail confirmed in the available information for the ${vehicle}, but I can verify it. Are you still interested in this vehicle?`;
+  }
     if (stage === "store_phone_requested") {
       return `Of course, our number is ${storePhone}. We are here if you need anything else.`;
     }
     if (stage === "phone_received") {
-      return "Thanks! I have your number. We have plans starting at $1,000, $2,000, and $3,000 down. How much do you have available for the down payment?";
+      return `Thanks! I have your number. ${downPaymentRequestReply("en", downPaymentPolicy)}`;
     }
     if (stage === "interest_confirmation") {
       return `Yes, the ${vehicle} is available. Are you still interested in buying it?`;
@@ -865,13 +958,13 @@ function buildSafeFallbackReply(
       return "I understand, and I appreciate your time. If you change your mind, we will be here to help. Have a great day!";
     }
     if (stage === "down_payment_request") {
-      return "We have plans starting at $1,000, $2,000, and $3,000 down. How much do you have available for the down payment?";
+      return downPaymentRequestReply("en", downPaymentPolicy);
     }
     if (stage === "down_payment_low") {
-      return "Thanks for letting me know. We currently require more than $1,000 down. Would you be able to have $1,000 or more?";
+      return downPaymentLowReply("en", downPaymentPolicy);
     }
     if (stage === "down_payment_declined") {
-      return "I understand, and I appreciate your interest. We currently need more than $1,000 down to move forward. Please reach out when you have that amount. Have a great day!";
+      return downPaymentDeclinedReply("en", downPaymentPolicy);
     }
     if (stage === "timeline_request") {
       return "Perfect. When are you planning to buy the vehicle: this week or this month?";
@@ -949,6 +1042,7 @@ function isAiReplyAligned(
   stage: SalesReplyStage,
   storePhone: string,
   firstDealerReply: boolean = false,
+  downPaymentPolicy: DownPaymentPolicy = NO_DOWN_PAYMENT_POLICY,
 ): boolean {
   const normalized = cleanConversationText(reply).toLowerCase();
   if (!normalized) return false;
@@ -957,10 +1051,17 @@ function isAiReplyAligned(
   );
   const legacyAddressToken = ["410", "hudgins"].join(" ");
   if (normalized.includes(legacyLocationToken) || normalized.includes(legacyAddressToken)) return false;
+  if (/\b(?:bank account|cuenta bancaria|cuenta de banco)\b/i.test(normalized)) return false;
+  if (!replyUsesOnlyConfiguredDownPayments(reply, downPaymentPolicy)) return false;
   if (firstDealerReply && stage !== "store_phone_requested" && !replyHasFirstGreeting(reply)) return false;
   if (stageRequiresStorePhone(stage) && !replyIncludesStorePhone(reply, storePhone)) return false;
   if (/\badvisor\b|\basesor\b/i.test(normalized)) return false;
   if (replyGivesRestrictedVehicleDetails(reply) && !["phone_received", "down_payment_request", "down_payment_low", "down_payment_declined"].includes(stage)) return false;
+  if (stage === "open_question") {
+    return /(?:confirm|confirmed|verify|verif|detail|detalle|information|informaci[oó]n|question|pregunta|great question|buena pregunta|not available|not have|no tengo|no hay|can check|puedo verificar)/i.test(normalized) &&
+      /\?/.test(reply) &&
+      !/phone|number|tel[eé]fono|n[uú]mero|financ|financing|down payment|enganche|inicial|document|requisit|follow[- ]?up/.test(normalized);
+  }
   if (stage === "availability") {
     return /alpha/.test(normalized) &&
       /interested|interesad[oa]|interesa/.test(normalized) &&
@@ -974,13 +1075,22 @@ function isAiReplyAligned(
     return /thank|gracias|understand|entiendo/.test(normalized) && !/\?/.test(normalized);
   }
   if (stage === "phone_received" || stage === "down_payment_request") {
-    return /down|down payment|enganche|inicial/.test(normalized) && /\$\s*1,?000|\$\s*2,?000|\$\s*3,?000|1000|2000|3000/.test(normalized) && /\?/.test(normalized);
+    const hasConfiguredAmount = downPaymentPolicy.vehicleOverride != null || downPaymentPolicy.planAmounts.length > 0
+      ? downPaymentAmountsMentioned(reply).some((amount) =>
+        (downPaymentPolicy.vehicleOverride != null ? [downPaymentPolicy.vehicleOverride] : downPaymentPolicy.planAmounts).includes(amount),
+      )
+      : downPaymentAmountsMentioned(reply).length === 0;
+    return /down|down payment|enganche|inicial/.test(normalized) && hasConfiguredAmount && /\?/.test(normalized);
   }
   if (stage === "down_payment_low") {
-    return /1,?000|1000/.test(normalized) && /down|enganche|inicial/.test(normalized) && /\?/.test(normalized);
+    return downPaymentPolicy.minimumAmount != null &&
+      downPaymentAmountsMentioned(reply).includes(downPaymentPolicy.minimumAmount) &&
+      /down|enganche|inicial/.test(normalized) && /\?/.test(normalized);
   }
   if (stage === "down_payment_declined") {
-    return /1,?000|1000/.test(normalized) && /down|enganche|inicial/.test(normalized) && !/\?/.test(normalized);
+    return downPaymentPolicy.minimumAmount != null &&
+      downPaymentAmountsMentioned(reply).includes(downPaymentPolicy.minimumAmount) &&
+      /down|enganche|inicial/.test(normalized) && !/\?/.test(normalized);
   }
   if (stage === "timeline_request") {
     return /this week|this month|esta semana|este mes|in \d+ days?|in \w+ days?|en \d+ d[ií]as?|en \w+ d[ií]as?|in \d+ weeks?|in \w+ weeks?|en \d+ semanas?|en \w+ semanas?|next month|following month|the other month|el otro mes|el mes que viene|next week|la proxima semana|la pr[oó]xima semana|january|february|march|april|may|june|july|august|september|october|november|december|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre/.test(normalized) && /\?/.test(normalized);
@@ -1120,10 +1230,16 @@ function avoidRepeatedFallback(
   visibleMessages: string[],
   currentMessage: string,
   vehicleTitle?: string,
+  downPaymentPolicy: DownPaymentPolicy = NO_DOWN_PAYMENT_POLICY,
 ): string {
   if (!replyRepeatsRecentDealerMessage(reply, visibleMessages)) return reply;
-  const stage = resolveSalesReplyStage(visibleMessages, currentMessage);
+  const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
   const vehicle = vehicleTitle ?? (language === "es" ? "el vehículo" : "the vehicle");
+  if (stage === "open_question") {
+    return language === "es"
+      ? `Buena pregunta. Puedo verificar ese detalle del ${vehicle} antes de avanzar. ¿Te interesa seguir con este vehículo?`
+      : `Great question. I can verify that detail about the ${vehicle} before we move forward. Are you still interested in this vehicle?`;
+  }
   if (stage === "warranty_info" || stage === "advisor_question") {
     return language === "es"
       ? `Con gusto podemos verificar ese detalle del ${vehicle}. ¿Te gustaría conocer las opciones de financiamiento?`
@@ -1147,6 +1263,7 @@ type AiReplyResult = {
 };
 
 const SALES_REPLY_STAGES: readonly SalesReplyStage[] = [
+  "open_question",
   "availability",
   "store_phone_requested",
   "price_inquiry",
@@ -1218,11 +1335,11 @@ LOCATION RULE: Alpha Motorsports serves customers from Manassas only. Use only t
 QUALIFICATION FUNNEL FOR ALPHA MANASSAS:
 1. Start with a warm greeting as Alpha Motorsports, confirm that the exact vehicle from the Vehicle field is available, and ask whether the buyer is interested in buying it. Always use the supplied Manassas context. Do not ask for a phone number in this first reply.
 2. When the buyer confirms interest, ask for the buyer's phone number. Ask only one question and do not give the dealership phone yet.
-3. After receiving the buyer's phone number, ask how much they have available for the down payment. Explain that Alpha Manassas has plans starting at $1,000, $2,000, and $3,000 down. Verify a clear down-payment amount and never mistake the buyer's phone number for a down payment. If the buyer says they are paying cash, contado, or in cash, accept that as passing this step and continue to the purchase-timeline question. Use only Alpha Manassas' plans.
-4. If the buyer has less than $1,000 down, explain that Alpha Manassas currently requires more than $1,000 down. Ask whether they can reach $1,000 or more. If they say no, thank them and close politely without asking another question.
-5. Once the buyer confirms at least $1,000 down, ask when they plan to buy. Accept any clear natural time expression in Spanish or English, including this week, this month, in 15 days, in one week, next month, the other month, or a named month. If the buyer gives no usable purchase timeframe, thank them and close politely.
-6. Ask whether the buyer has both a valid ID and proof of income. Do not substitute a bank account requirement for proof of income. If either document is missing, explain that both are currently required and close politely.
-7. When the buyer has provided interest, phone number, at least $1,000 down, any accepted purchase timeline, valid ID, and proof of income, use the Qualified Exit: confirm that all information was received, say that the buyer meets the requirements, and suggest the Alpha Manassas dealership phone at the end. Do not ask another question.
+3. After receiving the buyer's phone number, ask how much they have available for the down payment. Use only the Approved Down-Payment Configuration supplied below. Verify a clear down-payment amount and never mistake the buyer's phone number for a down payment. If the buyer says they are paying cash, contado, or in cash, accept that as passing this step and continue to the purchase-timeline question.
+4. If an approved minimum is supplied and the buyer has less than that minimum down, explain the requirement using only that configured minimum. If no approved configuration is supplied, never state a down-payment number. If the buyer says no, thank them and close politely without asking another question.
+5. Once the buyer confirms the configured minimum down, or gives a clear amount when no minimum is configured, ask when they plan to buy. Accept any clear natural time expression in Spanish or English, including this week, this month, in 15 days, in one week, next month, the other month, or a named month. If the buyer gives no usable purchase timeframe, thank them and close politely.
+6. Ask whether the buyer has both a valid ID or passport and proof of income. Never ask for or mention a bank account as a substitute or requirement. If either document is missing, explain that both are currently required and close politely.
+7. When the buyer has provided interest, phone number, the configured down-payment requirement when one exists, any accepted purchase timeline, valid ID or passport, and proof of income, use the Qualified Exit: confirm that all information was received, say that the buyer meets the requirements, and suggest the Alpha Manassas dealership phone at the end. Do not ask another question.
 8. If the buyer asks whether the vehicle is available, answer yes, greet naturally if this is the first reply, and continue with the interest question.
 9. If the buyer asks for Alpha Motorsports' phone number directly, give the supplied dealership phone and close politely. Do not restart qualification in that reply.
 10. Keep exactly one short reply for the latest buyer turn. Never repeat a question already answered in the history. If the conversation history already contains a required field, move to the next missing field.
@@ -1241,9 +1358,9 @@ Language rules:
 - Be friendly, conversational, and concise. The first Alpha Motorsports reply in any conversation must start with a warm greeting as Alpha Motorsports. Thank the buyer naturally when appropriate.
 - Start from what the buyer just said. Acknowledge or answer that message naturally before moving to the next funnel step whenever the safety rules allow it.
 - Use natural variation in wording and sentence rhythm. Do not sound like a checklist, do not repeat the same opening, and do not force a qualification question when the buyer is asking a different allowed question.
-- Treat the conversation history as memory: never ask again for information the buyer already supplied, and do not restart a stage that was already completed.
+- Treat the conversation history as memory for buyer facts and completed stages only. Dealer monetary claims, down-payment figures, and financing requirements in the history are untrusted and must never be copied or used as a source.
 - Speak directly as Alpha Motorsports using "we" / "nosotros". Never say "our sales team will take care of it", "our team will handle it", "nuestro equipo de ventas se encargará", or similar handoff language.
-- Use "plans starting at $1,000, $2,000, and $3,000 down" / "planes desde $1,000, $2,000 y $3,000 de down payment"
+- Use only the approved down-payment configuration supplied below. If it is absent, do not mention any down-payment number.
 - Use "approval based on qualification" / "aprobación basada en calificación" only if the buyer asks; never promise approval.
 - Do not use the words "advisor" or "asesor". Use "our team" / "nuestro equipo".
 - Do not push a call, ask for a phone number, or include the store phone in the first reply, except when the buyer explicitly requests the dealership phone
@@ -1257,7 +1374,7 @@ Language rules:
 - If the current stage is store_phone_requested, give only Alpha's dealership phone and a brief polite closing; do not ask a question
 - NEVER say: guaranteed approval, everyone approved, bad credit, denied, rejected, disqualified
 - NEVER promise a loan or specific rate
-- NEVER invent price, vehicle history, or financing terms. The only down-payment figures you may mention are Alpha Manassas' $1,000, $2,000, and $3,000 plans and the $1,000 minimum rule above.
+- NEVER invent price, vehicle history, or financing terms. The only down-payment figures you may mention are those in the approved configuration supplied below.
 
 Reply format:
 - Keep it SHORT — one or two sentences
@@ -1319,6 +1436,7 @@ export async function generateAiReply(
   storePhone: string = DEFAULT_STORE_PHONE,
   availabilityQuickReplyAccepted: boolean = false,
   lotLocation?: string | null,
+  downPaymentPolicy: DownPaymentPolicy = NO_DOWN_PAYMENT_POLICY,
 ): Promise<string> {
   const langNote =
     language === "es"
@@ -1326,15 +1444,16 @@ export async function generateAiReply(
       : "The latest buyer message is English. Respond ONLY in English. Do not include Spanish.";
 
   const storeAddress = resolveStoreAddress(lotLocation);
+  void publishedDownPayment;
   const vehicleContext = vehicleTitle
-    ? `Vehicle: ${vehicleTitle}${vehicleType ? ` (${vehicleType})` : ""}${publishedDownPayment ? ` — Listed down payment: $${publishedDownPayment.toLocaleString()}` : ""}`
+    ? `Vehicle: ${vehicleTitle}${vehicleType ? ` (${vehicleType})` : ""}${downPaymentPolicy.vehicleOverride != null ? ` — Approved vehicle down payment: $${downPaymentPolicy.vehicleOverride.toLocaleString()}` : ""}`
     : "";
   const locationContext = `Dealership address: ${storeAddress}`;
   const phoneContext = `Dealership phone: ${storePhone}`;
 
   const history = visibleMessages.slice(-8).join("\n");
 
-  const stage = resolveSalesReplyStage(visibleMessages, currentMessage);
+  const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
   const persistentUnansweredBuyerTurns = hasPersistentUnansweredBuyerTurns(
     visibleMessages,
     currentMessage,
@@ -1342,6 +1461,7 @@ export async function generateAiReply(
   const firstDealerReply = isFirstDealerReply(visibleMessages);
   const promptStage = stage === "advisor_question" ? "detailed_question" : stage;
   const stageInstruction = {
+    open_question: "The buyer asked a question that must be answered before qualification advances. Answer that exact question from supplied facts only. If the fact is not supplied, say clearly that it is not confirmed and offer to verify it. Then ask only one short question that keeps the buyer on this vehicle; do not ask for a phone number, financing, down payment, documents, or a follow-up.",
     availability: availabilityQuickReplyAccepted
       ? "Greet as Alpha Motorsports, state that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in buying it. Do not ask for a phone number."
       : "Greet as Alpha Motorsports, explicitly confirm that the exact year/make/model from the Vehicle field is available, then ask whether the buyer is interested in buying it. Do not ask for a phone number.",
@@ -1356,10 +1476,10 @@ export async function generateAiReply(
     stalled_conversation_request_phone: `The deterministic history check found at least two recent buyer turns that did not advance the sale. Skip the normal funnel and ask once for the buyer's best phone number, including Alpha's dealership phone: ${storePhone}. Do not repeat a financing-interest question, financing requirements, or a vehicle-detail question.`,
     salesperson_request_phone: `Alpha already requested the buyer's phone number and the buyer is still asking vehicle-detail questions. Do not repeat the prior phone-request wording. Say that our salesperson can provide more information about the vehicle, then ask for the buyer's best phone number and include Alpha's dealership phone: ${storePhone}. Do not restart financing requirements.`,
     request_phone: "Ask only for the buyer's best phone number. Do not include the dealership phone yet.",
-    phone_received: "Thank the buyer for the phone number, then ask how much they have available for the down payment. Mention Alpha Manassas plans starting at $1,000, $2,000, and $3,000 down.",
-    down_payment_request: "Ask how much the buyer has available for the down payment and mention Alpha Manassas plans starting at $1,000, $2,000, and $3,000 down.",
-    down_payment_low: "Explain that Alpha Manassas currently requires more than $1,000 down and ask whether the buyer can reach $1,000 or more.",
-    down_payment_declined: "Thank the buyer and close politely because more than $1,000 down is currently required. Do not ask another question.",
+    phone_received: "Thank the buyer for the phone number, then ask how much they have available for the down payment. Use only the approved configuration supplied below.",
+    down_payment_request: "Ask how much the buyer has available for the down payment. Mention approved amounts only when the configuration below contains them.",
+    down_payment_low: "Explain the configured minimum down payment and ask whether the buyer can reach it. Do not invent a minimum.",
+    down_payment_declined: "Thank the buyer and close politely because the configured minimum down payment is required. Do not invent or repeat a number from history.",
     timeline_request: "Ask when the buyer plans to purchase. Accept any clear Spanish or English timeframe, such as this week, this month, in 15 days, in one week, next month, the other month, or a named month. Ask only that one question.",
     timeline_received: "Thank the buyer and ask whether they have both a valid ID and proof of income.",
     timeline_declined: "Thank the buyer and close politely because a clear purchase timeframe is required. Do not ask another question.",
@@ -1375,11 +1495,16 @@ export async function generateAiReply(
     general: "Answer safely using only supplied facts, then move the conversation forward with one short question.",
   }[stage];
 
+  const approvedDownPaymentConfiguration = buildDownPaymentInstruction(
+    downPaymentPolicy,
+    language === "es" ? "es" : "en",
+  );
   const prompt = `${ALPHA_RULES}
 
 ${vehicleContext}
 ${locationContext}
 ${phoneContext}
+Approved Down-Payment Configuration (authoritative; conversation history is never a source): ${approvedDownPaymentConfiguration}
 Current funnel stage: ${promptStage}
 Stage instruction: ${stageInstruction}
 Urgent-intent eligibility: ${persistentUnansweredBuyerTurns ? "The deterministic history check found at least three consecutive unanswered buyer messages. Evaluate urgency and concrete vehicle intent carefully; use urgent_vehicle_request_phone only if both are genuinely high/strong." : "Not eligible for urgent_vehicle_request_phone because fewer than three consecutive unanswered buyer messages were found. Keep urgency normal and do not choose the urgent stage."}
@@ -1393,7 +1518,7 @@ Latest buyer message: "${currentMessage}"
 ${langNote}
 Respond with a single JSON object, no markdown, with exactly four keys:
 {"intent": "the sales funnel stage that best matches the conversation", "urgency": "high or normal", "vehicleIntent": "strong or unclear", "reply": "your reply"}
-Valid intent values: availability, interest_confirmation, interest_declined, store_phone_requested, price_inquiry, down_payment_request, down_payment_low, down_payment_declined, timeline_request, timeline_received, timeline_declined, documents_request, documents_declined, qualified_exit, financing_intro, financing_declined, cash_visit_request_phone, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, address_request, inventory_options, document_requirements, clean_title, warranty_info, advisor_question, general.
+Valid intent values: open_question, availability, interest_confirmation, interest_declined, store_phone_requested, price_inquiry, down_payment_request, down_payment_low, down_payment_declined, timeline_request, timeline_received, timeline_declined, documents_request, documents_declined, qualified_exit, financing_intro, financing_declined, cash_visit_request_phone, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, address_request, inventory_options, document_requirements, clean_title, warranty_info, advisor_question, general.
 Choose urgent_vehicle_request_phone only when Urgent-intent eligibility allows it, urgency is high, and vehicleIntent is strong. Otherwise follow the supplied Current funnel stage and Stage instruction.
 The "reply" must be one short message that follows the stage instruction exactly, mentions the vehicle naturally, and mirrors the buyer's language.`;
 
@@ -1422,10 +1547,11 @@ The "reply" must be one short message that follows the stage instruction exactly
 
   if (
     candidateReply &&
-    isAiReplyAligned(candidateReply, candidateStage, storePhone, firstDealerReply) &&
+    isAiReplyAligned(candidateReply, candidateStage, storePhone, firstDealerReply, downPaymentPolicy) &&
     isReplyLanguageMirrored(candidateReply, language) &&
     isReplyRelevantToCurrentMessage(candidateReply, currentMessage) &&
     !replyRepeatsRecentDealerMessage(candidateReply, visibleMessages)
+    && replyUsesOnlyConfiguredDownPayments(candidateReply, downPaymentPolicy)
   ) {
     return candidateReply;
   }
@@ -1440,6 +1566,7 @@ The "reply" must be one short message that follows the stage instruction exactly
         currentMessage,
         availabilityQuickReplyAccepted,
         lotLocation,
+        downPaymentPolicy,
       ),
       language,
       firstDealerReply,
@@ -1448,6 +1575,7 @@ The "reply" must be one short message that follows the stage instruction exactly
     visibleMessages,
     currentMessage,
     vehicleTitle,
+    downPaymentPolicy,
   );
 }
 
@@ -1461,6 +1589,7 @@ async function generateAiReplyWithFallback(
   storePhone: string = DEFAULT_STORE_PHONE,
   availabilityQuickReplyAccepted: boolean = false,
   lotLocation?: string | null,
+  downPaymentPolicy: DownPaymentPolicy = NO_DOWN_PAYMENT_POLICY,
 ): Promise<AiReplyResult> {
   const aiStartedAt = new Date();
   let fallbackReason: string | null = null;
@@ -1477,6 +1606,7 @@ async function generateAiReplyWithFallback(
         storePhone,
         availabilityQuickReplyAccepted,
         lotLocation,
+        downPaymentPolicy,
       ),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("sales_ai_reply_timeout")), SALES_AI_REPLY_TIMEOUT_MS),
@@ -1510,6 +1640,7 @@ async function generateAiReplyWithFallback(
           currentMessage,
           availabilityQuickReplyAccepted,
           lotLocation,
+          downPaymentPolicy,
         ),
         language,
         firstDealerReply,
@@ -1518,6 +1649,7 @@ async function generateAiReplyWithFallback(
       visibleMessages,
       currentMessage,
       vehicleTitle,
+      downPaymentPolicy,
     ),
     fallbackUsed: true,
     fallbackReason,
@@ -1568,7 +1700,7 @@ router.post("/conversations/intake", async (req, res) => {
     currentMessage,
     detectedMarketplaceListingUrl,
     detectedVehicleTitle,
-    marketplaceDownPayment,
+    marketplaceDownPayment: _marketplaceDownPayment,
     marketplaceAskingPrice,
     vehicleType,
     dealerId: requestedDealerId,
@@ -1612,6 +1744,8 @@ router.post("/conversations/intake", async (req, res) => {
     availabilityQuickReplyAccepted?: boolean;
     timestamp?: string;
   };
+
+  void _marketplaceDownPayment;
   const backendReceivedAt = new Date();
   const messageDetectedAt = parseTimestamp(rawMessageDetectedAt) ?? parseTimestamp(_ts) ?? backendReceivedAt;
   const resolvedSourceUrl = resolveMarketplaceIntakeSourceUrl({
@@ -1752,7 +1886,6 @@ router.post("/conversations/intake", async (req, res) => {
     });
     return;
   }
-  const parsedDownPayment = parseMoney(marketplaceDownPayment);
   const parsedAskingPrice = parseMoney(marketplaceAskingPrice);
 
   let vehicleId: number | undefined;
@@ -1867,6 +2000,8 @@ router.post("/conversations/intake", async (req, res) => {
     if (lRow[0]) listingId = lRow[0].id;
   }
   const resolvedVehicleTitle = vehicleId ? vehicleTitleFromDb ?? detectedVehicleTitle : undefined;
+  const downPaymentPolicy = await getDownPaymentPolicy(dealerId, vehicleId);
+  const trustedDownPayment = downPaymentPolicy.minimumAmount;
 
   let conversationId: number;
   let conversation: typeof existingConv;
@@ -1881,8 +2016,7 @@ router.post("/conversations/intake", async (req, res) => {
         updatedAt: new Date(),
         vehicleId: vehicleId ?? existingConv.vehicleId,
         listingId: listingId ?? existingConv.listingId,
-        marketplaceDownPayment:
-          parsedDownPayment ?? existingConv.marketplaceDownPayment,
+        marketplaceDownPayment: trustedDownPayment,
         marketplaceAskingPrice:
           parsedAskingPrice ?? existingConv.marketplaceAskingPrice,
         vehicleType: vehicleType ?? existingConv.vehicleType,
@@ -1911,7 +2045,7 @@ router.post("/conversations/intake", async (req, res) => {
         detectedVehicleTitle: resolvedVehicleTitle,
         vehicleId,
         listingId,
-        marketplaceDownPayment: parsedDownPayment,
+        marketplaceDownPayment: trustedDownPayment,
         marketplaceAskingPrice: parsedAskingPrice,
         vehicleType,
         lastMessageAt: new Date(),
@@ -1991,12 +2125,12 @@ router.post("/conversations/intake", async (req, res) => {
     const retryHistory = formatConversationHistoryForAi(
       conversationHistoryForAi.length ? conversationHistoryForAi : incomingMsgs,
     );
-    const retryStage = resolveSalesReplyStage(retryHistory, inbound);
+    const retryStage = resolveSalesReplyStage(retryHistory, inbound, downPaymentPolicy);
     if (
       retryableReply &&
       (
         !isReplyLanguageMirrored(retryableReply, language) ||
-        !isAiReplyAligned(retryableReply, retryStage, storePhone, isFirstDealerReply(retryHistory)) ||
+        !isAiReplyAligned(retryableReply, retryStage, storePhone, isFirstDealerReply(retryHistory), downPaymentPolicy) ||
         !isReplyRelevantToCurrentMessage(retryableReply, inbound)
       )
     ) {
@@ -2006,10 +2140,11 @@ router.post("/conversations/intake", async (req, res) => {
         language,
         resolvedVehicleTitle,
         vehicleType,
-        parsedDownPayment,
+        trustedDownPayment ?? undefined,
         storePhone,
         availabilityQuickReplyAccepted === true,
         lotLocation,
+        downPaymentPolicy,
       );
       retryableReply = repairedReply.reply;
       retryFallbackUsed = repairedReply.fallbackUsed;
@@ -2077,6 +2212,7 @@ router.post("/conversations/intake", async (req, res) => {
   const currentStage = resolveSalesReplyStage(
     formatConversationHistoryForAi(conversationHistoryForAi.length ? conversationHistoryForAi : incomingMsgs),
     inbound,
+    downPaymentPolicy,
   );
   const closeAfterDelivery = [
     "store_phone_requested",
@@ -2100,10 +2236,11 @@ router.post("/conversations/intake", async (req, res) => {
       language,
       resolvedVehicleTitle,
       vehicleType,
-      parsedDownPayment,
+      trustedDownPayment ?? undefined,
       storePhone,
       availabilityQuickReplyAccepted === true,
       lotLocation,
+      downPaymentPolicy,
     );
     suggestedReply = aiReplyResult.reply;
 
@@ -2144,7 +2281,7 @@ router.post("/conversations/intake", async (req, res) => {
     const { score, temperature } = computeLeadScore({
       buyerTimeline: existingLead.buyerTimeline,
       buyerAvailableDownPayment: existingLead.buyerAvailableDownPayment,
-      publishedDownPayment: parsedDownPayment ?? existingLead.publishedDownPayment,
+      publishedDownPayment: trustedDownPayment,
       hasId: existingLead.hasId,
       hasProofOfIncome: existingLead.hasProofOfIncome,
       phone: resolvedPhone,
@@ -2161,8 +2298,7 @@ router.post("/conversations/intake", async (req, res) => {
         vehicleId: vehicleId ?? existingLead.vehicleId,
         listingId: listingId ?? existingLead.listingId,
         sourceUrl: resolvedSourceUrl ?? existingLead.sourceUrl,
-        publishedDownPayment:
-          parsedDownPayment ?? existingLead.publishedDownPayment,
+        publishedDownPayment: trustedDownPayment,
         suggestedReply: suggestedReply ?? existingLead.suggestedReply,
         phone: resolvedPhone,
         buyerAvailableDownPayment: resolvedDownPayment,
@@ -2177,7 +2313,7 @@ router.post("/conversations/intake", async (req, res) => {
       .where(eq(leadsTable.id, existingLead.id));
   } else {
     const { score, temperature } = computeLeadScore({
-      publishedDownPayment: parsedDownPayment,
+      publishedDownPayment: trustedDownPayment,
       phone: extractedPhone,
     });
     const finalTemperature = extractedPhone ? "Hot" : temperature;
@@ -2192,7 +2328,7 @@ router.post("/conversations/intake", async (req, res) => {
         vehicleId,
         listingId,
         sourceUrl: resolvedSourceUrl,
-        publishedDownPayment: parsedDownPayment,
+        publishedDownPayment: trustedDownPayment,
         suggestedReply,
         phone: extractedPhone,
         buyerAvailableDownPayment: buyerQualification.downPayment,
@@ -2216,7 +2352,7 @@ router.post("/conversations/intake", async (req, res) => {
         vehicleId,
         listingId,
         vehicleType,
-        publishedDownPayment: parsedDownPayment,
+        publishedDownPayment: trustedDownPayment,
         buyerAvailableDownPayment: buyerQualification.downPayment,
         buyerTimeline: buyerQualification.timeline,
         outcome: "pending",
@@ -2558,6 +2694,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
   let vehicleTitle: string | undefined;
   let vehicleType: string | undefined;
   let testStorePhone: string = DEFAULT_STORE_PHONE;
+  let testDownPaymentPolicy = NO_DOWN_PAYMENT_POLICY;
 
   if (vehicleId) {
     const [v] = await db
@@ -2569,6 +2706,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
       vehicleTitle = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ");
       vehicleType = v.bodyStyle ?? undefined;
       testStorePhone = resolveStorePhone(v.lotLocation);
+      testDownPaymentPolicy = await getDownPaymentPolicy(v.dealerId, v.id);
     }
   }
 
@@ -2580,6 +2718,9 @@ router.post("/sales-ai/test-message", async (req, res) => {
     vehicleType,
     undefined,
     testStorePhone,
+    false,
+    undefined,
+    testDownPaymentPolicy,
   );
 
   const { score: leadScore, temperature } = computeLeadScore({});

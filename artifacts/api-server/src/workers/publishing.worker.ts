@@ -44,12 +44,14 @@ import { findLatestNeedsReviewVehicleIds } from "../publishing/needsReviewGuard"
 import type { WorkerDefinition, WorkerRunOutcome } from "./types";
 import {
   ACTIVE_PUBLISHING_JOB_STATUSES,
+  NOT_ELIGIBLE_STATUSES,
   normalizeAlphaLotLocation,
   resolveAlphaLotCity,
   resolvePublishMode,
 } from "../publishing/controlledMode";
 import { getInitialBatchTiming } from "../publishing/batchProgress";
 import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
+import { reconcileBatchProgress } from "../features/publishing/infrastructure/publishingRepository";
 
 const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const DEALER_ID = 1;
@@ -279,6 +281,7 @@ async function maybeCreateAutomaticBatch(
         ne(vehiclesTable.status, "Published"),
         ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
+        ne(vehiclesTable.status, "Archived"),
       ),
     );
   if (vehicles.length === 0) return { created: 0, summary: "No active vehicles available for auto-publish" };
@@ -608,6 +611,39 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
 
   for (const { job, vehicle } of candidates) {
     if (assigned >= MAX_ASSIGNMENTS_PER_RUN) break;
+
+    // Last-moment inventory guard: the joined candidate can be stale if an
+    // inventory sync or operator action changed the vehicle after selection.
+    const [currentVehicle] = await db
+      .select({ status: vehiclesTable.status })
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.id, vehicle.id))
+      .limit(1);
+    if (!currentVehicle || NOT_ELIGIBLE_STATUSES.has(currentVehicle.status)) {
+      const reason = currentVehicle
+        ? `Vehicle status is "${currentVehicle.status}" — publishing job cancelled.`
+        : "Vehicle no longer exists — publishing job cancelled.";
+      const [cancelled] = await db
+        .update(publishingJobsTable)
+        .set({
+          status: "Cancelled",
+          failedReason: reason,
+          currentStep: "Cancelled - vehicle not eligible",
+          claimedByExtension: null,
+          assignedExtensionId: null,
+          assignedAt: null,
+        })
+        .where(
+          and(
+            eq(publishingJobsTable.id, job.id),
+            inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
+          ),
+        )
+        .returning({ id: publishingJobsTable.id });
+      if (cancelled) await reconcileBatchProgress(job.batchId);
+      log.warn({ jobId: job.id, vehicleId: vehicle.id, status: currentVehicle?.status ?? null }, "Publishing worker blocked terminal vehicle at final guardrail");
+      continue;
+    }
 
     if (!vehicle.lotLocation) {
       skippedUnknownLot++;
