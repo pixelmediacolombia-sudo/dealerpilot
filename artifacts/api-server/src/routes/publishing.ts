@@ -16,7 +16,7 @@ import {
   systemTimelineEventsTable,
 } from "@workspace/db";
 import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
-import { getMarketplacePricing } from "../listings/pricing";
+import { buildMarketplaceTitle, getMarketplacePricing } from "../listings/pricing";
 import {
   checkPublishGuardrails,
   isExtensionOnline,
@@ -523,6 +523,8 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     const yr = vehicle.year ?? "";
     const trimStr = vehicle.trim ? ` ${vehicle.trim}` : "";
     const autoTitle = `${yr} ${vehicle.make} ${vehicle.model}${trimStr}`.trim();
+    const publicationDownPayment = version?.downPayment ?? null;
+    const publicationTitle = buildMarketplaceTitle(vehicle, publicationDownPayment);
 
     function buildEnglishSalesCopy(): string {
       const priceText = pricing.actualVehiclePrice > 0
@@ -577,12 +579,12 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     if (version) {
       const rawEn  = version.descriptionEn?.trim() ?? "";
       const rawCta = version.callToAction?.trim()  ?? "";
-      fillTitle         = version.title;
+      fillTitle         = publicationTitle;
       fillDescriptionEs = version.descriptionEs ?? null;
       fillDownPayment   = version.downPayment ?? null;
       fillDescription   = buildBilingualMarketplaceDescription(rawEn, fillDescriptionEs, rawCta);
     } else {
-      fillTitle       = autoTitle;
+      fillTitle       = publicationTitle;
       fillDescription = buildBilingualMarketplaceDescription();
     }
 

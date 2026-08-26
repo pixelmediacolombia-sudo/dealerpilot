@@ -388,6 +388,13 @@ test("Marketplace pricing always posts the full vehicle price", () => {
   assert.doesNotMatch(pricingSource, /marketplaceDisplayedPrice:\s*(recommendedDownPayment|dp)/);
 });
 
+test("Marketplace publishing puts persisted down payment in the title", () => {
+  assert.match(pricingSource, /export function buildMarketplaceTitle/);
+  assert.match(pricingSource, /DE ENGANCHE/);
+  assert.match(routeSource, /buildMarketplaceTitle\(vehicle, publicationDownPayment\)/);
+  assert.match(routeSource, /price: pricing\.marketplaceDisplayedPrice/);
+});
+
 test("publishing payload sends friendly bilingual Marketplace descriptions", () => {
   assert.match(routeSource, /buildBilingualMarketplaceDescription/);
   assert.match(routeSource, /English/);

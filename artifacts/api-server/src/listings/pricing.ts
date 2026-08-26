@@ -15,6 +15,19 @@ function fmt(n: number): string {
   return `$${n.toLocaleString("en-US")}`;
 }
 
+export function buildMarketplaceTitle(
+  vehicle: Pick<Vehicle, "year" | "make" | "model" | "trim">,
+  downPayment?: number | null,
+): string {
+  const baseTitle = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim]
+    .filter((value) => value != null && String(value).trim() !== "")
+    .map((value) => String(value).trim())
+    .join(" ");
+
+  if (downPayment == null || downPayment <= 0) return baseTitle;
+  return `${baseTitle} — ${fmt(downPayment)} DE ENGANCHE`;
+}
+
 export function getMarketplacePricing(
   vehicle: Vehicle,
   storedDownPayment?: number | null,
