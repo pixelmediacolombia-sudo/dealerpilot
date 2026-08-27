@@ -33,10 +33,7 @@ test("listings domain rules keep deterministic category, down-payment, and prior
   assert.match(listingRules, /LUXURY_MAKES\.has\(make\) \|\| price >= LUXURY_PRICE_FLOOR/);
   assert.match(listingRules, /truck\|pickup\|crew cab\|super duty\|cab/);
   assert.match(listingRules, /suv\|crossover\|cuv\|sport utility\|wagon\|van\|minivan/);
-  assert.match(listingRules, /case "Sedan"[\s\S]*clamp\(round50\(price \* 0\.06\), 1000, 1500\)/);
-  assert.match(listingRules, /case "SUV"[\s\S]*clamp\(round50\(price \* 0\.07\), 2000, 3500\)/);
-  assert.match(listingRules, /case "Truck"[\s\S]*clamp\(round50\(price \* 0\.07\), 2500, 4000\)/);
-  assert.match(listingRules, /case "Luxury"[\s\S]*clamp\(round50\(price \* 0\.08\), 3000, 6000\)/);
+  assert.doesNotMatch(listingRules, /suggestDownPayment|DOWN_PAYMENT/);
   assert.match(listingRules, /case "Ready to Publish"[\s\S]*score \+= 30/);
   assert.match(listingRules, /case "Sold\/Removed"[\s\S]*score -= 40/);
 });
@@ -56,7 +53,7 @@ test("publishing application guardrails keep Alpha Flow safe", () => {
   assert.match(controlledMode, /MARKETPLACE_CONTROLLED_MODE_ENABLED/);
   assert.match(controlledMode, /MARKETPLACE_PUBLISH_MODE === "full_auto"/);
   assert.match(controlledMode, /NOT_ELIGIBLE_STATUSES = new Set\(\["Published", "Sold\/Removed", "Sold", "Removed", "Archived"\]\)/);
-  assert.match(controlledMode, /UNKNOWN_LOT/);
+  assert.match(controlledMode, /NON_MANASSAS_LOT/);
   assert.match(controlledMode, /GM_BLOCKED/);
   assert.match(controlledMode, /DUPLICATE_ACTIVE_JOB/);
   assert.match(controlledMode, /DUPLICATE_LISTING_CONFLICT/);
@@ -100,9 +97,9 @@ test("sales-ai intake protects lead handoff and conversation continuity", () => 
   assert.match(conversations, /status: immediateHandoffReason \? "BDC Assigned" : "New"/);
   assert.match(conversations, /router\.patch\("\/conversations\/:id\/auto-reply"/);
   assert.match(conversations, /router\.post\("\/sales-ai\/test-message"/);
-  assert.match(conversations, /historyAskedAboutFinancing/);
-  assert.match(conversations, /buyerAcceptedFinancingStep/);
-  assert.match(conversations, /historyAskedAboutFinancing\(history\) && buyerAcceptedFinancingStep\(latest\)[\s\S]*return "request_phone"/);
+  assert.match(conversations, /historyContainsDealerPrompt/);
+  assert.match(conversations, /buyerAcceptedInterest/);
+  assert.match(conversations, /historyContainsDealerPrompt\(visibleMessages, \/interested/);
 });
 
 test("backend-extension sacred endpoints are centralized and shape-compatible", () => {
@@ -189,7 +186,7 @@ test("Meta Pages is dealer-scoped and never exposes tokens to the dashboard", ()
 
 test("extensions resolve Dealer DNA and Messenger intake by installation dealer ID", () => {
   for (const theme of [publisherTheme, messengerTheme]) {
-    assert.match(theme, /chrome\.storage\.local\.get\("dealerId"\)/);
+    assert.match(theme, /storage\.get\("dealerId"\)/);
     assert.match(theme, /\/api\/dealers\/\" \+ encodeURIComponent\(id\) \+ \"\/theme/);
     assert.match(theme, /refreshInFlight/);
   }

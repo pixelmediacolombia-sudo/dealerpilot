@@ -21,7 +21,6 @@ import {
   isExtensionOnline,
   isFullAutoMode,
   resolvePublishMode,
-  normalizeAlphaLotLocation,
   resolveAlphaLotCity,
   ACTIVE_PUBLISHING_JOB_STATUSES,
   NOT_ELIGIBLE_STATUSES,
@@ -37,9 +36,10 @@ import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 import { compactFutureAutoPublishQueue } from "../publishing/autoPublishQueueCompaction";
 import { recordMarketplaceSoldAction } from "../marketplace/soldAction";
 import { getDownPaymentPolicy } from "../downPayment/policy";
+import { isAlphaManassasVehicle } from "../lib/dealer";
 
-// Dealer scope: Alpha Motorsport = dealer_id 1.
-// Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
+// Dealer scope: Alpha Motorsport = dealer_id 1. Marketplace publishing is
+// restricted to inventory verified at the Manassas lot.
 const DEALER_ID = 1;
 
 const router: IRouter = Router();
@@ -213,6 +213,11 @@ router.post("/publishing/jobs/:id/assign", async (req, res) => {
     res.status(404).json({ error: "Job not found" });
     return;
   }
+  const [assignVehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
+  if (!assignVehicle || !isAlphaManassasVehicle(assignVehicle)) {
+    res.status(422).json({ error: "Only verified Alpha Manassas inventory can be assigned", code: "NON_MANASSAS_LOT" });
+    return;
+  }
   if (!["Queued", "Retry"].includes(job.status)) {
     res.status(409).json({ error: `Job is not assignable (status: ${job.status})` });
     return;
@@ -307,6 +312,19 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
     res.status(404).json({ error: "Vehicle not found for assigned job", code: "VEHICLE_NOT_FOUND" });
     return;
   }
+  if (!isAlphaManassasVehicle(vehicle)) {
+    await db.update(publishingJobsTable).set({
+      status: "Needs Review",
+      failedReason: "Vehicle is not verified as Alpha Manassas inventory",
+      reviewReason: "NON_MANASSAS_LOT",
+      currentStep: "Blocked - non-Manassas inventory",
+      claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
+    }).where(eq(publishingJobsTable.id, row.id));
+    res.json({ job: null, blocked: true, code: "NON_MANASSAS_LOT" });
+    return;
+  }
   const photoReadiness = await ensurePhotoDirectorReadyForPublish(vehicle, req.log);
   if (!photoReadiness.ready) {
     await deferPublishingJobForPhotoDirector(row.id, photoReadiness.reason);
@@ -356,6 +374,19 @@ router.get("/publishing/jobs/next", async (req, res) => {
   const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, row.vehicleId));
   if (!vehicle) {
     res.status(404).json({ error: "Vehicle not found for job", code: "VEHICLE_NOT_FOUND" });
+    return;
+  }
+  if (!isAlphaManassasVehicle(vehicle)) {
+    await db.update(publishingJobsTable).set({
+      status: "Needs Review",
+      failedReason: "Vehicle is not verified as Alpha Manassas inventory",
+      reviewReason: "NON_MANASSAS_LOT",
+      currentStep: "Blocked - non-Manassas inventory",
+      claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
+    }).where(eq(publishingJobsTable.id, row.id));
+    res.json({ job: null, blocked: true, code: "NON_MANASSAS_LOT" });
     return;
   }
   const photoReadiness = await ensurePhotoDirectorReadyForPublish(vehicle, req.log);
@@ -457,26 +488,15 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       return;
     }
 
-    const normalizedLotLocation = normalizeAlphaLotLocation(vehicle.lotLocation);
-    if (normalizedLotLocation && vehicle.lotLocation !== normalizedLotLocation) {
-      await db
-        .update(vehiclesTable)
-        .set({ lotLocation: normalizedLotLocation })
-        .where(eq(vehiclesTable.id, vehicle.id));
-      req.log.info(
-        { vehicleId: vehicle.id, previousLotLocation: vehicle.lotLocation, normalizedLotLocation },
-        "Publishing payload normalized stale Alpha lot location",
-      );
-    }
-    const lotCity = resolveAlphaLotCity(normalizedLotLocation);
-    if (!lotCity) {
+    const lotCity = resolveAlphaLotCity(vehicle.lotLocation);
+    if (!lotCity || !isAlphaManassasVehicle(vehicle)) {
       req.log.warn(
         { jobId: job.id, vehicleId: vehicle.id, lotLocation: vehicle.lotLocation },
         "Publishing blocked: unknown or unmapped lot location",
       );
       res.status(422).json({
-        error: `Cannot publish: vehicle lot location "${vehicle.lotLocation ?? "unknown"}" is not mapped to Manassas before publishing.`,
-        code: "UNKNOWN_LOT",
+        error: "Cannot publish: vehicle is not verified as Alpha's Manassas inventory.",
+        code: "NON_MANASSAS_LOT",
         jobId: id,
         vehicleId: vehicle.id,
         lotLocation: vehicle.lotLocation ?? null,
@@ -1285,8 +1305,8 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
       return false;
     }
     const lotCity = resolveAlphaLotCity(v.lotLocation);
-    if (!lotCity) {
-      otherBlocked.push({ vehicleId: v.id, code: "UNKNOWN_LOT", reason: `Unmapped lot location "${v.lotLocation ?? "unknown"}"` });
+    if (!lotCity || !isAlphaManassasVehicle(v)) {
+      otherBlocked.push({ vehicleId: v.id, code: "NON_MANASSAS_LOT", reason: `Vehicle is not verified as Alpha's Manassas inventory (lot: "${v.lotLocation ?? "unknown"}")` });
       return false;
     }
 
@@ -1504,7 +1524,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
   }
 
   const guardrail = await checkPublishGuardrails({
-    vehicle: { id: vehicle.id, status: vehicle.status, lotLocation: vehicle.lotLocation },
+    vehicle: { id: vehicle.id, dealerId: vehicle.dealerId, status: vehicle.status, lotLocation: vehicle.lotLocation, sourceRaw: vehicle.sourceRaw },
     gmOverride,
     requireExtensionOnline: mode === "Controlled",
   });

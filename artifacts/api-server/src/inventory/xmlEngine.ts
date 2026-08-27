@@ -21,9 +21,11 @@ export type NormalizedVehicle = {
   fuelType: string | null;
   description: string | null;
   vdpUrl: string | null;
-  // Active dealer lot location parsed from the feed (Manassas only).
-  // null = not provided by this feed format.
+  // Physical dealer lot location parsed from the feed. The feed's dealer_id
+  // is dealership-level, so branch assignment may be refined by importFeed's
+  // VehicleLocationID stock crosswalk.
   lotLocation: string | null;
+  feedDealerId: string | null;
   images: FeedImage[];
   sourceRaw: string;
 };
@@ -264,6 +266,14 @@ function extractAddressCity(node: Record<string, unknown>): string | null {
   return null;
 }
 
+function canonicalizeLotLocation(value: string | null): string | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized.includes("manassas")) return "Manassas";
+  if (normalized.includes("fredericksburg")) return "Fredericksburg";
+  return null;
+}
+
 function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null {
   const lookup = buildLookup(node);
 
@@ -284,6 +294,8 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
   }
 
   const vdpUrl = firstString(lookup, ["vdpurl", "vdp", "detailurl", "detailspageurl", "link", "url"]);
+
+  const feedDealerId = firstString(lookup, ["dealerid", "dealercode", "dealeridentifier"]);
 
   // Parse dealer branch/lot location.
   // Priority order:
@@ -306,7 +318,7 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
     const urlLower = vdpUrl.toLowerCase();
     if (urlLower.includes("manassas")) lotLocation = "Manassas";
   }
-  if (lotLocation && !lotLocation.toLowerCase().includes("manassas")) lotLocation = null;
+  lotLocation = canonicalizeLotLocation(lotLocation);
 
   return {
     vin,
@@ -331,6 +343,7 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
     ]),
     vdpUrl,
     lotLocation,
+    feedDealerId,
     images: extractImages(node),
     sourceRaw: JSON.stringify(node),
   };

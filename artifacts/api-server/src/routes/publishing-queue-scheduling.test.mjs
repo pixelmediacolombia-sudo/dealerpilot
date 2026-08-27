@@ -257,12 +257,14 @@ test("marking a job Published clears stale review metadata", () => {
   assert.match(routeSource, /already Published[\s\S]*set\(\{ needsReview: false, reviewReason: null \}\)/);
 });
 
-test("Alpha inventory normalizes every non-empty legacy lot to Manassas", () => {
+test("Alpha publishing fails closed for unverified or non-Manassas inventory", () => {
   assert.match(controlledModeSource, /function normalizeAlphaLotLocation\(lotLocation: string \| null\)/);
-  assert.match(controlledModeSource, /return lotLocation && lotLocation\.trim\(\) \? "Manassas" : null/);
-  assert.match(workerSource, /normalizeAlphaInventoryAndRequeueLotReviews/);
-  assert.match(workerSource, /set\(\{ lotLocation: "Manassas" \}\)/);
-  assert.match(workerSource, /payload failed: 422/);
+  assert.match(controlledModeSource, /normalized === "manassas"/);
+  assert.match(controlledModeSource, /normalized === "fredericksburg"/);
+  assert.match(controlledModeSource, /isAlphaManassasVehicle/);
+  assert.match(workerSource, /isAlphaManassasVehicle\(currentVehicle\)/);
+  assert.doesNotMatch(workerSource, /set\(\{ lotLocation: "Manassas" \}\)/);
+  assert.match(routeSource, /code: "NON_MANASSAS_LOT"/);
 });
 
 test("extension records the next queue vehicle and clears terminal local jobs", () => {

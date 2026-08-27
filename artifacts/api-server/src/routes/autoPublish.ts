@@ -47,9 +47,9 @@ import {
   photoDirectorPublishBlockReason,
 } from "../photo/publishReadiness";
 import { getNextAutoPublishForecast } from "../publishing/autoPublishForecast";
+import { ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
 
-// Dealer scope: Alpha Motorsport = dealer_id 1.
-// Do NOT filter by lot_location — the feed stores the dealer name there, not a city.
+// Dealer scope: Alpha Motorsport = dealer_id 1. Auto-publish is Manassas-only.
 const DEALER_ID = 1;
 const DEALER_FILTER = eq(vehiclesTable.dealerId, DEALER_ID);
 
@@ -416,6 +416,10 @@ router.post("/auto-publish/batches", async (req, res) => {
     return;
   }
   const { dealerId, count, scheduledAt, lotLocation, gmOverrides } = parsed.data;
+  if (lotLocation && lotLocation !== ALPHA_LOT_MANASSAS) {
+    res.status(422).json({ error: "Only Alpha Manassas inventory can be auto-published", code: "NON_MANASSAS_LOT" });
+    return;
+  }
   const gmOverrideSet = new Set(gmOverrides);
 
   // The client-sent `mode` is advisory only — the server is authoritative.
@@ -449,6 +453,7 @@ router.post("/auto-publish/batches", async (req, res) => {
         ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
         ne(vehiclesTable.status, "Archived"),
+        eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
         lotLocation ? eq(vehiclesTable.lotLocation, lotLocation) : undefined,
       ),
     );
@@ -537,8 +542,8 @@ router.post("/auto-publish/batches", async (req, res) => {
     let validation = validateVehicleForPublish(v, imgs.length);
 
     // Lot location must exist and be the active Manassas destination.
-    if (validation.eligible && (!v.lotLocation || !LOT_CITY_MAP[v.lotLocation])) {
-      validation = { eligible: false, reason: `Unmapped lot location "${v.lotLocation ?? "unknown"}"` };
+    if (validation.eligible && (!LOT_CITY_MAP[v.lotLocation ?? ""] || !isAlphaManassasVehicle(v))) {
+      validation = { eligible: false, reason: `Vehicle is not verified as Alpha's Manassas inventory (lot: "${v.lotLocation ?? "unknown"}")` };
     }
     // Market Agent duplicate-listing conflict — blocked unless explicitly overridden.
     if (validation.eligible && duplicateConflictIds.has(v.id) && !gmOverrideSet.has(v.id)) {
@@ -1209,6 +1214,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
         ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
         ne(vehiclesTable.status, "Archived"),
+        eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
       ),
     );
 
@@ -1297,8 +1303,8 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     const photoAnalysis = analyzePhotos(imgs);
     let validation = validateVehicleForPublish(v, imgs.length);
 
-    if (validation.eligible && (!v.lotLocation || !LOT_CITY_MAP[v.lotLocation])) {
-      validation = { eligible: false, reason: `Unmapped lot location "${v.lotLocation ?? "unknown"}"` };
+    if (validation.eligible && (!LOT_CITY_MAP[v.lotLocation ?? ""] || !isAlphaManassasVehicle(v))) {
+      validation = { eligible: false, reason: `Vehicle is not verified as Alpha's Manassas inventory (lot: "${v.lotLocation ?? "unknown"}")` };
     }
     if (validation.eligible && duplicateConflictIds.has(v.id)) {
       validation = { eligible: false, reason: "Market Agent flagged a duplicate-listing conflict" };

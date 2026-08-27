@@ -14,16 +14,20 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, extensionConnectionsTable, publishingJobsTable } from "@workspace/db";
 import { getCachedGmDecision } from "../routes/gm";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
+import { isAlphaManassasVehicle } from "../lib/dealer";
 
 export const LOT_CITY_MAP: Record<string, string> = {
   Manassas: "Manassas, VA",
 };
 
-// Alpha Motorsports is now a single-location operation. Existing feed rows may
-// still carry a retired non-empty location; normalize those rows to the only
-// active destination instead of allowing stale data to strand a publish job.
+// Normalize only known canonical values. Never turn a Fredericksburg or other
+// non-empty value into Manassas.
 export function normalizeAlphaLotLocation(lotLocation: string | null): string | null {
-  return lotLocation && lotLocation.trim() ? "Manassas" : null;
+  if (!lotLocation || !lotLocation.trim()) return null;
+  const normalized = lotLocation.trim().toLowerCase();
+  if (normalized === "manassas") return "Manassas";
+  if (normalized === "fredericksburg") return "Fredericksburg";
+  return null;
 }
 
 export function resolveAlphaLotCity(lotLocation: string | null): string | undefined {
@@ -114,7 +118,7 @@ export type GuardrailResult =
  * decision cache (which is itself grounded in a real model call).
  */
 export async function checkPublishGuardrails(params: {
-  vehicle: { id: number; status: string; lotLocation: string | null };
+  vehicle: { id: number; dealerId: number; status: string; lotLocation: string | null; sourceRaw?: string | null };
   gmOverride: boolean;
   requireExtensionOnline: boolean;
   duplicateConflictIds?: Set<number>;
@@ -132,11 +136,15 @@ export async function checkPublishGuardrails(params: {
 
   // 2. Lot location must be the active Alpha Motorsports destination.
   const lotCity = resolveAlphaLotCity(vehicle.lotLocation);
-  if (!lotCity) {
+  if (!lotCity || !isAlphaManassasVehicle({
+    dealerId: vehicle.dealerId,
+    lotLocation: vehicle.lotLocation,
+    sourceRaw: vehicle.sourceRaw,
+  })) {
     return {
       ok: false,
-      code: "UNKNOWN_LOT",
-      reason: `Vehicle lot location "${vehicle.lotLocation ?? "unknown"}" is not mapped to Manassas.`,
+      code: "NON_MANASSAS_LOT",
+      reason: `Vehicle is not verified as Alpha's Manassas inventory (lot: "${vehicle.lotLocation ?? "unknown"}").`,
     };
   }
 

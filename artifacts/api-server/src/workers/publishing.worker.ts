@@ -45,10 +45,10 @@ import type { WorkerDefinition, WorkerRunOutcome } from "./types";
 import {
   ACTIVE_PUBLISHING_JOB_STATUSES,
   NOT_ELIGIBLE_STATUSES,
-  normalizeAlphaLotLocation,
   resolveAlphaLotCity,
   resolvePublishMode,
 } from "../publishing/controlledMode";
+import { isAlphaManassasVehicle } from "../lib/dealer";
 import { getInitialBatchTiming } from "../publishing/batchProgress";
 import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 import { reconcileBatchProgress } from "../features/publishing/infrastructure/publishingRepository";
@@ -334,6 +334,7 @@ async function maybeCreateAutomaticBatch(
         images.length < 5 ||
         listing?.status === "Published" ||
         !lotCity ||
+        !isAlphaManassasVehicle(vehicle) ||
         duplicateConflictIds.has(vehicle.id) ||
         (gm && (gm.recommendation === "HOLD" || gm.recommendation === "RECONSIDER"));
       if (invalid) return null;
@@ -501,50 +502,6 @@ async function repairLegacyStaleAssignedJobs(log: import("pino").Logger): Promis
   return stale.length;
 }
 
-async function normalizeAlphaInventoryAndRequeueLotReviews(log: import("pino").Logger): Promise<{ normalizedVehicles: number; requeuedJobs: number }> {
-  const normalized = await db
-    .update(vehiclesTable)
-    .set({ lotLocation: "Manassas" })
-    .where(
-      and(
-        eq(vehiclesTable.dealerId, DEALER_ID),
-        sql`${vehiclesTable.lotLocation} is not null`,
-        ne(vehiclesTable.lotLocation, "Manassas"),
-      ),
-    )
-    .returning({ id: vehiclesTable.id });
-
-  const requeued = await db
-    .update(publishingJobsTable)
-    .set({
-      status: "Retry",
-      currentStep: null,
-      progressPercent: 0,
-      failedReason: null,
-      reviewReason: null,
-      needsReview: false,
-      claimedByExtension: null,
-      assignedExtensionId: null,
-      assignedAt: null,
-    })
-    .where(
-      and(
-        eq(publishingJobsTable.dealerId, DEALER_ID),
-        eq(publishingJobsTable.status, "Needs Review"),
-        sql`${publishingJobsTable.reviewReason} like '%payload failed: 422%'`,
-      ),
-    )
-    .returning({ id: publishingJobsTable.id });
-
-  if (normalized.length > 0 || requeued.length > 0) {
-    log.warn(
-      { normalizedVehicles: normalized.length, requeuedJobs: requeued.map((job) => job.id) },
-      "Publishing worker normalized Alpha inventory to Manassas and requeued lot preflight reviews",
-    );
-  }
-  return { normalizedVehicles: normalized.length, requeuedJobs: requeued.length };
-}
-
 async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOutcome> {
   const extension = await findOnlineExtension();
   if (!extension) {
@@ -552,7 +509,6 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
   }
 
   const duplicateConflictIds = await getDuplicateConflictVehicleIds();
-  const lotRepair = await normalizeAlphaInventoryAndRequeueLotReviews(log);
   const autoBatch = await maybeCreateAutomaticBatch(log, duplicateConflictIds);
   const repairedStaleAssignments = await repairLegacyStaleAssignedJobs(log);
   const reboundAssignments = await rebindDueAssignedJobsToOnlineExtension(extension.id);
@@ -615,7 +571,7 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
     // Last-moment inventory guard: the joined candidate can be stale if an
     // inventory sync or operator action changed the vehicle after selection.
     const [currentVehicle] = await db
-      .select({ status: vehiclesTable.status })
+      .select({ status: vehiclesTable.status, dealerId: vehiclesTable.dealerId, lotLocation: vehiclesTable.lotLocation, sourceRaw: vehiclesTable.sourceRaw })
       .from(vehiclesTable)
       .where(eq(vehiclesTable.id, vehicle.id))
       .limit(1);
@@ -645,8 +601,20 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
       continue;
     }
 
-    if (!vehicle.lotLocation) {
+    if (!isAlphaManassasVehicle(currentVehicle)) {
       skippedUnknownLot++;
+      await db
+        .update(publishingJobsTable)
+        .set({
+          status: "Needs Review",
+          failedReason: "Vehicle is not verified as Alpha Manassas inventory",
+          reviewReason: "NON_MANASSAS_LOT",
+          currentStep: "Blocked - non-Manassas inventory",
+          claimedByExtension: null,
+          assignedExtensionId: null,
+          assignedAt: null,
+        })
+        .where(eq(publishingJobsTable.id, job.id));
       continue;
     }
     if (duplicateConflictIds.has(job.vehicleId)) {
@@ -702,13 +670,13 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
     return {
       summary: `${autoSummary}No jobs assigned - ${skippedUnknownLot} unknown lot, ${skippedDuplicate} duplicate conflicts, ${skippedGm} GM held, ${skippedPhotoDirector} waiting for Photo Director`,
       skipped: true,
-      detail: { autoCreated: autoBatch.created, lotRepair, repairedStaleAssignments, reboundAssignments, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
+      detail: { autoCreated: autoBatch.created, repairedStaleAssignments, reboundAssignments, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
     };
   }
 
   return {
     summary: `${autoBatch.summary ? `${autoBatch.summary}; ` : ""}Assigned ${assigned} publishing job${assigned === 1 ? "" : "s"} to extension "${extension.id}"`,
-    detail: { autoCreated: autoBatch.created, lotRepair, repairedStaleAssignments, reboundAssignments, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
+    detail: { autoCreated: autoBatch.created, repairedStaleAssignments, reboundAssignments, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
   };
 }
 

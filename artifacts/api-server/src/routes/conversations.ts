@@ -37,6 +37,7 @@ import {
   vehicleValueFact,
   type MarketplaceVehicleFacts,
 } from "../sofia/marketplaceTone";
+import { ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
 
 
 const router = Router();
@@ -2070,9 +2071,16 @@ router.post("/conversations/intake", async (req, res) => {
         vehicleId: marketplaceListingsTable.vehicleId,
         listingUrl: marketplaceListingsTable.listingUrl,
         facebookListingId: marketplaceListingsTable.facebookListingId,
+        dealerId: vehiclesTable.dealerId,
+        lotLocation: vehiclesTable.lotLocation,
+        sourceRaw: vehiclesTable.sourceRaw,
       })
       .from(marketplaceListingsTable)
-      .where(eq(marketplaceListingsTable.dealerId, dealerId));
+      .innerJoin(vehiclesTable, eq(vehiclesTable.id, marketplaceListingsTable.vehicleId))
+      .where(and(
+        eq(marketplaceListingsTable.dealerId, dealerId),
+        eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
+      ));
     const marketplaceListing = marketplaceListings.find((listing) => {
       if (!detectedMarketplaceItemId) return listing.listingUrl === detectedMarketplaceListingUrl;
       return (
@@ -2080,7 +2088,7 @@ router.post("/conversations/intake", async (req, res) => {
         extractMarketplaceItemId(listing.listingUrl) === detectedMarketplaceItemId
       );
     });
-    if (marketplaceListing) {
+    if (marketplaceListing && isAlphaManassasVehicle(marketplaceListing)) {
       vehicleId = marketplaceListing.vehicleId;
       vehicleMatchSource = "marketplace_listing_url";
     }
@@ -2091,7 +2099,10 @@ router.post("/conversations/intake", async (req, res) => {
     const vRow = await db
       .select()
       .from(vehiclesTable)
-      .where(eq(vehiclesTable.dealerId, dealerId));
+      .where(and(
+        eq(vehiclesTable.dealerId, dealerId),
+        eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
+      ));
 
     const match = vRow.find((v) => {
       if (!detectedVehicleTitle) return false;
@@ -2101,7 +2112,7 @@ router.post("/conversations/intake", async (req, res) => {
       ].map(normalizeVehicleTitle);
       return exactTitles.includes(normalizedDetectedTitle);
     });
-    if (match) {
+    if (match && isAlphaManassasVehicle(match)) {
       vehicleId = match.id;
       lotLocation = match.lotLocation ?? null;
       vehicleMatchSource = "detected_vehicle_title";
