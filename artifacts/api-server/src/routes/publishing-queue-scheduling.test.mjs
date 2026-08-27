@@ -634,7 +634,7 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /parseConversationMessage/);
   assert.match(conversationsSource, /function normalizeIntentText/);
   assert.match(conversationsSource, /ubicad\[oa\]s\?/);
-  assert.match(conversationsSource, /Nuestra dirección es: \$\{storeAddress\}/);
+  assert.match(conversationsSource, /Estamos en \$\{storeAddress\}/);
   assert.match(conversationsSource, /9120 Euclid Ave, Manassas, VA 20110/);
   assert.match(conversationsSource, /Alpha Motorsports serves customers from Manassas only/);
   assert.match(conversationsSource, /legacyLocationToken/);
@@ -683,7 +683,7 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.equal(spanishWords.test("claro que sí, ¿cómo podemos ayudarte?"), true);
   assert.equal(spanishWords.test("I am interested"), false);
   assert.match(conversationsSource, /Hello, this is Alpha Motorsports/);
-  assert.match(conversationsSource, /interested in buying/);
+  assert.match(conversationsSource, /What would you like to know/);
   assert.match(conversationsSource, /QUALIFICATION FUNNEL FOR ALPHA MANASSAS/);
   assert.match(conversationsSource, /Approved Down-Payment Configuration/);
   assert.match(conversationsSource, /conversation history is never a source/);
@@ -718,7 +718,7 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /consecutiveBuyerMessages\.length >= 3/);
   assert.match(conversationsSource, /structured\.urgency === "high"/);
   assert.match(conversationsSource, /structured\.vehicleIntent === "strong"/);
-  assert.match(conversationsSource, /any clear natural time expression/);
+  assert.match(conversationsSource, /weekday or the weekend|entre semana|fin de semana/);
   assert.match(conversationsSource, /Skip the normal funnel/);
   assert.match(conversationsSource, /best phone number/);
   assert.match(conversationsSource, /historyRequestedPhone/);

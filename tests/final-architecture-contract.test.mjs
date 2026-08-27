@@ -97,7 +97,7 @@ test("sales-ai intake protects lead handoff and conversation continuity", () => 
   assert.match(conversations, /externalThreadRef required/);
   assert.match(conversations, /eq\(conversationsTable\.dealerId, dealerId\)[\s\S]*eq\(conversationsTable\.externalThreadRef, externalThreadRef\)/);
   assert.match(conversations, /\.values\(\{[\s\S]*externalThreadRef,/);
-  assert.match(conversations, /status: extractedPhone \? "BDC Assigned" : "New"/);
+  assert.match(conversations, /status: immediateHandoffReason \? "BDC Assigned" : "New"/);
   assert.match(conversations, /router\.patch\("\/conversations\/:id\/auto-reply"/);
   assert.match(conversations, /router\.post\("\/sales-ai\/test-message"/);
   assert.match(conversations, /historyAskedAboutFinancing/);
