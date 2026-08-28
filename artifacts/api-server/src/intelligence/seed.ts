@@ -484,10 +484,12 @@ export async function seedOpportunityScores(
   logger.info("Computing Opportunity Scores for all vehicles…");
 
   // Fetch all active vehicles
-  const vehicles = await db
-    .select()
+  // The scoring engine only consumes operational fields; do not request the
+  // optional down-payment override columns that are absent in production.
+  const vehicles = (await db
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
-    .where(eq(vehiclesTable.dealerId, DEALER_ID));
+    .where(eq(vehiclesTable.dealerId, DEALER_ID))) as unknown as Vehicle[];
 
   if (vehicles.length === 0) return;
 

@@ -474,6 +474,7 @@ test("Photo Director fallback cannot block the batch or Messenger intake", () =>
 test("Marketplace intelligence startup does not request missing vehicle columns", () => {
   assert.match(intelligenceSeedSource, /import \{ vehicleOperationalColumns, type VehicleOperationalRow \}/);
   assert.match(intelligenceSeedSource, /const vehicles = await db[\s\S]*?\.select\(vehicleOperationalColumns\)[\s\S]*?\.from\(vehiclesTable\)/);
+  assert.doesNotMatch(intelligenceSeedSource, /\.select\(\)\r?\n\s*\.from\(vehiclesTable\)/);
 });
 
 test("inventory worker is anchored to the daily 10 AM dealer-local sync window", () => {
