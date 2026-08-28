@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 import { db, pool, leadsTable, extensionConnectionsTable, marketplaceListingsTable, vehiclesTable } from "@workspace/db";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { recordMarketplaceSoldAction } from "../marketplace/soldAction";
+import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 
 const EXTENSION_NAME = "Chrome Extension";
 
@@ -347,7 +348,7 @@ router.post("/extension/marketplace-sold-actions/:listingId/report", async (req,
   }
 
   const [row] = await db
-    .select({ vehicle: vehiclesTable })
+    .select({ vehicle: vehicleOperationalColumns })
     .from(marketplaceListingsTable)
     .innerJoin(vehiclesTable, eq(vehiclesTable.id, marketplaceListingsTable.vehicleId))
     .where(eq(marketplaceListingsTable.id, listingId))

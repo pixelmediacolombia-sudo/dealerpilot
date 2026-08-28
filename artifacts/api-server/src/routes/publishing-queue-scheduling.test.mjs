@@ -461,6 +461,15 @@ test("publishing jobs wait for Photo Director before reaching Marketplace", () =
   assert.match(photoWorkerRuntimeSource, /runWorkerOnce\(publishingWorker/);
 });
 
+test("Photo Director fallback cannot block the batch or Messenger intake", () => {
+  assert.match(photoPublishReadinessSource, /ORIGINAL_PHOTOS_FALLBACK/);
+  assert.match(photoPublishReadinessSource, /Photo Director is an enhancement, not a prerequisite/);
+  assert.match(photoPublishReadinessSource, /return \{ ready: true, code: "ORIGINAL_PHOTOS_FALLBACK" \}/);
+  assert.match(workerSource, /vehicle: vehicleOperationalColumns/);
+  assert.match(conversationsSource, /\.select\(vehicleOperationalColumns\)/);
+  assert.match(extensionRouteSource, /\.select\(\{ vehicle: vehicleOperationalColumns \}\)/);
+});
+
 test("inventory worker is anchored to the daily 10 AM dealer-local sync window", () => {
   assert.match(orchestratorSource, /const INVENTORY_SYNC_TIME_ZONE = "America\/New_York"/);
   assert.match(orchestratorSource, /const INVENTORY_SYNC_HOUR = 10/);

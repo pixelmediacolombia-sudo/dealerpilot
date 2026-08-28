@@ -13,6 +13,7 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { ACTIVE_PUBLISHING_JOB_STATUSES } from "../publishing/controlledMode";
+import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 
 const router: IRouter = Router();
 const DEFAULT_DEALER_ID = 1;
@@ -56,9 +57,9 @@ router.get("/command-center/alerts", async (req: Request, res: Response) => {
 
     const [vehicles, marketplaceRows, cleanupEvents, jobs, publishedJobs, publishedListings, extensionRows, settings, ingestions] =
       await Promise.all([
-        db.select().from(vehiclesTable).where(and(...vehicleConditions)),
+        db.select(vehicleOperationalColumns).from(vehiclesTable).where(and(...vehicleConditions)),
         db
-          .select({ listing: marketplaceListingsTable, vehicle: vehiclesTable })
+          .select({ listing: marketplaceListingsTable, vehicle: vehicleOperationalColumns })
           .from(marketplaceListingsTable)
           .innerJoin(vehiclesTable, eq(vehiclesTable.id, marketplaceListingsTable.vehicleId))
           .where(eq(marketplaceListingsTable.dealerId, dealerId)),

@@ -39,6 +39,7 @@
 
 import { db, vehiclesTable, vehicleImagesTable, dealersTable, feedRunsTable } from "@workspace/db";
 import { and, eq, count, desc, ilike, isNull, or } from "drizzle-orm";
+import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 
 
 export type FeedVersion = "v1" | "v2";
@@ -365,7 +366,7 @@ async function loadMetaVehicles(
   const dealerName = dealer?.name ?? "Unknown Dealer";
 
   const rows = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.dealerId, dealerId));
 
@@ -1073,7 +1074,7 @@ export async function computeFeedHealth(
   const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, dealerId));
 
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.dealerId, dealerId));
 

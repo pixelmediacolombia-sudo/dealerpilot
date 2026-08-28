@@ -1156,15 +1156,15 @@ router.get("/auto-publish/feed-quality", async (req, res) => {
     if (hasListing) listingGenerated++;
     if (photoScoreByVehicle.has(v.id)) photoAnalyzed++;
 
-    // Ready for batch: not published, has VIN/price/mileage/year, 5+ photos, has listing, not already queued
+    // Ready for batch: the Marketplace publisher builds the form directly
+    // from inventory fields, so an AI listing version is optional.
     if (
       !isPublished &&
       v.vin &&
       v.price &&
       v.mileage &&
       v.year &&
-      photoCount >= 5 &&
-      hasListing
+      photoCount >= 5
     ) {
       readyForBatch++;
     }

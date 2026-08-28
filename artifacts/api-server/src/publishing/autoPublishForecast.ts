@@ -181,6 +181,7 @@ export async function previewAutoPublishVehicles(
       ne(vehiclesTable.status, "Published"),
       ne(vehiclesTable.status, "Sold/Removed"),
       ne(vehiclesTable.status, "Removed"),
+      ne(vehiclesTable.status, "Archived"),
       eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
     ));
   if (vehicles.length === 0) return { selected: [], totalEligible: 0 };

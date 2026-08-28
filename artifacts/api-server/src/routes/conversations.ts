@@ -38,6 +38,7 @@ import {
   type MarketplaceVehicleFacts,
 } from "../sofia/marketplaceTone";
 import { ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
+import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 
 
 const router = Router();
@@ -2113,7 +2114,7 @@ router.post("/conversations/intake", async (req, res) => {
   if (!vehicleId && detectedVehicleTitle && !verifiedInventoryLookupFailed) {
     const normalizedDetectedTitle = normalizeVehicleTitle(detectedVehicleTitle);
     const vRow = await db
-      .select()
+      .select(vehicleOperationalColumns)
       .from(vehiclesTable)
       .where(and(
         eq(vehiclesTable.dealerId, dealerId),
@@ -2915,7 +2916,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
 
   if (vehicleId) {
     const [v] = await db
-      .select()
+      .select(vehicleOperationalColumns)
       .from(vehiclesTable)
       .where(eq(vehiclesTable.id, vehicleId))
       .limit(1);

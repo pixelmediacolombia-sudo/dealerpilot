@@ -16,6 +16,7 @@ import {
   generateAiReply,
 } from "./conversations";
 import { getDownPaymentPolicy, type DownPaymentPolicy } from "../downPayment/policy";
+import { vehicleOperationalColumns, type VehicleOperationalRow } from "../lib/vehicleColumns";
 
 const router = Router();
 
@@ -91,7 +92,7 @@ function getMessageDate(event: MetaMessagingEvent): Date {
   return event.timestamp ? new Date(event.timestamp) : new Date();
 }
 
-function vehicleLabel(vehicle: typeof vehiclesTable.$inferSelect): string {
+function vehicleLabel(vehicle: VehicleOperationalRow): string {
   return [vehicle.year, vehicle.make, vehicle.model, vehicle.trim]
     .filter(Boolean)
     .join(" ");
@@ -106,7 +107,7 @@ async function matchVehicleFromMessage(message: string): Promise<{
   downPaymentPolicy?: DownPaymentPolicy;
 }> {
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.dealerId, DEALER_ID))
     .limit(100);

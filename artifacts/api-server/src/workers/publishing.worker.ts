@@ -523,7 +523,7 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
   const candidates = await db
     .select({
       job: publishingJobsTable,
-      vehicle: vehiclesTable,
+      vehicle: vehicleOperationalColumns,
     })
     .from(publishingJobsTable)
     .innerJoin(vehiclesTable, eq(vehiclesTable.id, publishingJobsTable.vehicleId))

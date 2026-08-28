@@ -20,7 +20,7 @@ export const PHOTO_DIRECTOR_WAITING_REASON =
   "Photo Director is preparing the approved Marketplace photo set. Publish again when AI photos are Ready.";
 
 export type PhotoDirectorPublishReadiness =
-  | { ready: true; code: "PHOTO_DIRECTOR_READY" }
+  | { ready: true; code: "PHOTO_DIRECTOR_READY" | "ORIGINAL_PHOTOS_FALLBACK" }
   | { ready: false; code: "PHOTO_DIRECTOR_PENDING" | "PHOTO_DIRECTOR_QUEUED" | "PHOTO_DIRECTOR_UNAVAILABLE"; reason: string; photoJobId?: number };
 
 export function isPhotoDirectorReadyForPublish(vehicle: {
@@ -34,7 +34,10 @@ export function photoDirectorPublishBlockReason(vehicle: {
   aiPhotoStatus: string | null;
   aiPhotoSetId: number | null;
 }): string | null {
-  return isPhotoDirectorReadyForPublish(vehicle) ? null : PHOTO_DIRECTOR_WAITING_REASON;
+  // Photo Director is an enhancement, not a prerequisite for Marketplace.
+  // The extension can publish the approved original inventory photos while
+  // an AI set is pending or unavailable, as it did before this guardrail.
+  return null;
 }
 
 export async function ensurePhotoDirectorReadyForPublish(
@@ -45,9 +48,17 @@ export async function ensurePhotoDirectorReadyForPublish(
     aiPhotoSetId: number | null;
   },
   log: Logger,
+  options?: { allowOriginalPhotosFallback?: boolean },
 ): Promise<PhotoDirectorPublishReadiness> {
   if (isPhotoDirectorReadyForPublish(vehicle)) {
     return { ready: true, code: "PHOTO_DIRECTOR_READY" };
+  }
+
+  // Preserve the original Marketplace path by default: AI photo processing
+  // must not stop an otherwise valid inventory vehicle from reaching the
+  // extension. The caller still validates the vehicle and source-photo count.
+  if (options?.allowOriginalPhotosFallback !== false) {
+    return { ready: true, code: "ORIGINAL_PHOTOS_FALLBACK" };
   }
 
   const [latestReadySet] = await db

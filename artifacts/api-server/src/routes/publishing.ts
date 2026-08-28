@@ -54,7 +54,7 @@ router.get("/publishing/to-remove", async (req, res) => {
       return;
     }
     const rows = await db
-      .select({ listing: marketplaceListingsTable, vehicle: vehiclesTable })
+      .select({ listing: marketplaceListingsTable, vehicle: vehicleOperationalColumns })
       .from(marketplaceListingsTable)
       .innerJoin(vehiclesTable, eq(vehiclesTable.id, marketplaceListingsTable.vehicleId))
       .where(and(
