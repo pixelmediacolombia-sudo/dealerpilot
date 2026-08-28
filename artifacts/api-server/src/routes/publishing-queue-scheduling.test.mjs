@@ -868,6 +868,9 @@ test("Alpha inventory reconciliation is fail-closed and separates both physical 
   assert.match(locationScraperSource, /Failed to verify Alpha/);
   assert.match(locationScraperSource, /appears in both/);
   assert.match(locationReconcileSource, /await db\.transaction/);
+  assert.match(locationReconcileSource, /lotReconciliationColumns/);
+  assert.match(locationReconcileSource, /stockNumber: vehiclesTable\.stockNumber/);
+  assert.doesNotMatch(locationReconcileSource, /vehicleOperationalColumns/);
   assert.match(locationReconcileSource, /location\s*\?\s*markVerifiedFeedLotLocation/);
   assert.match(locationReconcileSource, /clearVerifiedFeedLotLocation/);
   assert.match(locationReconcileSource, /vehicle\.sourceRaw/);

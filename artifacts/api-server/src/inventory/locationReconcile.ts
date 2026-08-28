@@ -2,8 +2,17 @@ import { db, vehiclesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import type { Logger } from "pino";
 import { clearVerifiedFeedLotLocation, ALPHA_DEALER_ID, markVerifiedFeedLotLocation } from "../lib/dealer";
-import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 import { scrapeAlphaLocationMapping } from "./locationScraper";
+
+// Keep this projection deliberately narrow. Some production databases predate
+// optional vehicle columns such as down_payment_override; lot reconciliation
+// must not fail because an unrelated optional column is missing.
+const lotReconciliationColumns = {
+  id: vehiclesTable.id,
+  stockNumber: vehiclesTable.stockNumber,
+  sourceRaw: vehiclesTable.sourceRaw,
+  lotLocation: vehiclesTable.lotLocation,
+};
 
 export type AlphaLocationReconciliation = {
   scrapedStocks: number;
@@ -36,7 +45,7 @@ export async function reconcileAlphaLotLocations(
   log.info({ dealerId, scrapedStocks: mapping.size, scrapedByLocation }, "Alpha location crosswalk ready");
 
   const vehicles = await db
-    .select(vehicleOperationalColumns)
+    .select(lotReconciliationColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.dealerId, dealerId));
 
