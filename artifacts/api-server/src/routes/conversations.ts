@@ -2054,6 +2054,7 @@ router.post("/conversations/intake", async (req, res) => {
   let vehicleTitleFromDb: string | undefined;
   let vehicleFacts: MarketplaceVehicleFacts = {};
   let vehicleMatchSource: "marketplace_listing_url" | "detected_vehicle_title" | null = null;
+  let verifiedInventoryLookupFailed = false;
 
   const [existingConv] = await db
     .select()
@@ -2066,35 +2067,50 @@ router.post("/conversations/intake", async (req, res) => {
 
   if (detectedMarketplaceListingUrl) {
     const detectedMarketplaceItemId = extractMarketplaceItemId(detectedMarketplaceListingUrl);
-    const marketplaceListings = await db
-      .select({
-        vehicleId: marketplaceListingsTable.vehicleId,
-        listingUrl: marketplaceListingsTable.listingUrl,
-        facebookListingId: marketplaceListingsTable.facebookListingId,
-        dealerId: vehiclesTable.dealerId,
-        lotLocation: vehiclesTable.lotLocation,
-        sourceRaw: vehiclesTable.sourceRaw,
-      })
-      .from(marketplaceListingsTable)
-      .innerJoin(vehiclesTable, eq(vehiclesTable.id, marketplaceListingsTable.vehicleId))
-      .where(and(
-        eq(marketplaceListingsTable.dealerId, dealerId),
-        eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
-      ));
-    const marketplaceListing = marketplaceListings.find((listing) => {
-      if (!detectedMarketplaceItemId) return listing.listingUrl === detectedMarketplaceListingUrl;
-      return (
-        listing.facebookListingId === detectedMarketplaceItemId ||
-        extractMarketplaceItemId(listing.listingUrl) === detectedMarketplaceItemId
+    try {
+      const marketplaceListings = await db
+        .select({
+          vehicleId: marketplaceListingsTable.vehicleId,
+          listingUrl: marketplaceListingsTable.listingUrl,
+          facebookListingId: marketplaceListingsTable.facebookListingId,
+          dealerId: vehiclesTable.dealerId,
+          lotLocation: vehiclesTable.lotLocation,
+          sourceRaw: vehiclesTable.sourceRaw,
+        })
+        .from(marketplaceListingsTable)
+        .innerJoin(vehiclesTable, eq(vehiclesTable.id, marketplaceListingsTable.vehicleId))
+        .where(and(
+          eq(marketplaceListingsTable.dealerId, dealerId),
+          eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
+        ));
+      const marketplaceListing = marketplaceListings.find((listing) => {
+        if (!detectedMarketplaceItemId) return listing.listingUrl === detectedMarketplaceListingUrl;
+        return (
+          listing.facebookListingId === detectedMarketplaceItemId ||
+          extractMarketplaceItemId(listing.listingUrl) === detectedMarketplaceItemId
+        );
+      });
+      if (marketplaceListing && isAlphaManassasVehicle(marketplaceListing)) {
+        vehicleId = marketplaceListing.vehicleId;
+        vehicleMatchSource = "marketplace_listing_url";
+      }
+    } catch (error) {
+      // The verified-lot lookup was added for the Alpha safety gate. A stale
+      // production schema or a transient catalog read must not turn Messenger
+      // intake into an HTTP 500 or prevent a generic reply from being prepared.
+      verifiedInventoryLookupFailed = true;
+      req.log.error(
+        { error, dealerId, externalThreadRef, detectedMarketplaceListingUrl },
+        "Conversation intake verified inventory lookup failed; continuing without new vehicle binding",
       );
-    });
-    if (marketplaceListing && isAlphaManassasVehicle(marketplaceListing)) {
-      vehicleId = marketplaceListing.vehicleId;
-      vehicleMatchSource = "marketplace_listing_url";
+      if (existingConv?.vehicleId) {
+        vehicleId = existingConv.vehicleId;
+        listingId = existingConv.listingId ?? undefined;
+      }
     }
   }
 
-  if (!vehicleId && detectedVehicleTitle) {
+  if (!vehicleId && detectedVehicleTitle && !verifiedInventoryLookupFailed) {
     const normalizedDetectedTitle = normalizeVehicleTitle(detectedVehicleTitle);
     const vRow = await db
       .select()
