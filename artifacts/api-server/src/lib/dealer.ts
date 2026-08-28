@@ -32,7 +32,10 @@ export function getFeedDealerId(sourceRaw: string | null | undefined): string | 
   try {
     const parsed = JSON.parse(sourceRaw) as Record<string, unknown>;
     const raw = Object.entries(parsed).find(
-      ([key]) => key.toLowerCase().replace(/[^a-z0-9]/g, "") === "dealerid",
+      ([key]) => {
+        const localKey = key.includes(":") ? key.slice(key.lastIndexOf(":") + 1) : key;
+        return localKey.toLowerCase().replace(/[^a-z0-9]/g, "") === "dealerid";
+      },
     )?.[1];
     return raw === null || raw === undefined || String(raw).trim() === "" ? null : String(raw).trim();
   } catch {

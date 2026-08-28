@@ -10,6 +10,7 @@ import { seedPhotoQualityProfiles } from "./photo/seedProfiles";
 import { startPhotoWorker } from "./photo/worker";
 import { startWorkers } from "./workers";
 import { startPagesPublishingWorker } from "./pages/pagesPublishing.worker";
+import { runSchemaMigrations } from "./db/migrate";
 
 const rawPort = process.env["PORT"];
 
@@ -25,25 +26,36 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
+async function startServer(): Promise<void> {
+  try {
+    await runSchemaMigrations(logger);
+  } catch (error) {
+    logger.fatal({ err: error }, "Database schema is not ready; refusing to start workers");
     process.exit(1);
   }
 
-  logger.info({ port }, "Server listening");
+  app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
 
-  void seedDealerAndInventory(logger)
-    .then(() => seedCreative(logger))
-    .then(() => startCreativeWorker(logger))
-    .then(() => seedMarketplaceIntelligence(logger))
-    .then(() => startStaleJobCleaner(logger))
-    .then(() => seedAiStudio(logger))
-    .then(() => seedPhotoQualityProfiles(logger))
-    .then(() => startPhotoWorker(logger))
-    .then(() => startWorkers(logger))
-    .then(() => startPagesPublishingWorker(logger))
-    .catch((seedErr) => {
-      logger.error({ err: seedErr }, "Failed to seed/start engines");
-    });
-});
+    logger.info({ port }, "Server listening");
+
+    void seedDealerAndInventory(logger)
+      .then(() => seedCreative(logger))
+      .then(() => startCreativeWorker(logger))
+      .then(() => seedMarketplaceIntelligence(logger))
+      .then(() => startStaleJobCleaner(logger))
+      .then(() => seedAiStudio(logger))
+      .then(() => seedPhotoQualityProfiles(logger))
+      .then(() => startPhotoWorker(logger))
+      .then(() => startWorkers(logger))
+      .then(() => startPagesPublishingWorker(logger))
+      .catch((seedErr) => {
+        logger.error({ err: seedErr }, "Failed to seed/start engines");
+      });
+  });
+}
+
+void startServer();
