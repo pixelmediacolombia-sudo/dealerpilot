@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 import { fetchFeedXml } from "./feedSource";
 import { importFeed, type ImportSummary } from "./importFeed";
+import { reconcileAlphaLotLocations } from "./locationReconcile";
 import { autoEnqueueAfterImport } from "../photo/autoEnqueue";
 import { seedOpportunityScores } from "../intelligence/seed";
 import { ALPHA_DEALER_ID } from "../lib/dealer";
@@ -45,6 +46,29 @@ async function syncDealer(
 ): Promise<ImportSummary> {
   const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, dealerId));
   if (!dealer?.xmlFeedUrl) {
+    if (dealerId === ALPHA_DEALER_ID) {
+      const startedAt = new Date();
+      log.info({ dealerId, trigger, startedAt }, "Alpha has no XML URL; starting official website location reconciliation");
+      const reconciliation = await reconcileAlphaLotLocations(log, dealerId);
+      const summary: ImportSummary = {
+        feedRunId: 0,
+        rawCount: 0,
+        imported: 0,
+        errors: 0,
+        created: 0,
+        updated: reconciliation.verifiedManassas + reconciliation.verifiedFredericksburg,
+        removed: reconciliation.clearedStaleLocations,
+        active: 0,
+        totalImages: 0,
+        locationBreakdown: {
+          Manassas: reconciliation.verifiedManassas,
+          Fredericksburg: reconciliation.verifiedFredericksburg,
+          unknown: reconciliation.clearedStaleLocations,
+        },
+      };
+      log.info({ dealerId, trigger, startedAt, reconciliation }, "Alpha lot reconciliation complete without XML feed");
+      return summary;
+    }
     throw new Error(`No inventory feed URL configured for dealer ${dealerId}`);
   }
 

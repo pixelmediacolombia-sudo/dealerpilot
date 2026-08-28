@@ -11,6 +11,10 @@ const queueCompactionSource = readFileSync(
 const autoPublishSource = readFileSync(new URL("./autoPublish.ts", import.meta.url), "utf8");
 const workerSource = readFileSync(new URL("../workers/publishing.worker.ts", import.meta.url), "utf8");
 const intelligenceSeedSource = readFileSync(new URL("../intelligence/seed.ts", import.meta.url), "utf8");
+const dealerSource = readFileSync(new URL("../lib/dealer.ts", import.meta.url), "utf8");
+const locationScraperSource = readFileSync(new URL("../inventory/locationScraper.ts", import.meta.url), "utf8");
+const locationReconcileSource = readFileSync(new URL("../inventory/locationReconcile.ts", import.meta.url), "utf8");
+const inventorySchedulerSource = readFileSync(new URL("../inventory/scheduler.ts", import.meta.url), "utf8");
 const staleCleanerSource = readFileSync(new URL("../publishing/staleCleaner.ts", import.meta.url), "utf8");
 const publishingRepositorySource = readFileSync(
   new URL("../features/publishing/infrastructure/publishingRepository.ts", import.meta.url),
@@ -854,6 +858,22 @@ test("Alpha Pages scheduling and dashboard display use New York time", () => {
   assert.match(pagesWorkerSource, /META_PAGE_TIME_ZONE\?\.trim\(\) \|\| "America\/New_York"/);
   assert.match(pagesWorkspaceSource, /const PAGE_TIME_ZONE = "America\/New_York"/);
   assert.doesNotMatch(pagesWorkspaceSource, /timeZone: "America\/Bogota"/);
+});
+
+test("Alpha inventory reconciliation is fail-closed and separates both physical lots", () => {
+  assert.match(dealerSource, /"3004268": ALPHA_LOT_MANASSAS/);
+  assert.match(dealerSource, /"3004265": "Fredericksburg"/);
+  assert.match(locationScraperSource, /seenStocksForLocation/);
+  assert.match(locationScraperSource, /newStocks\.length === 0/);
+  assert.match(locationScraperSource, /Failed to verify Alpha/);
+  assert.match(locationScraperSource, /appears in both/);
+  assert.match(locationReconcileSource, /await db\.transaction/);
+  assert.match(locationReconcileSource, /location\s*\?\s*markVerifiedFeedLotLocation/);
+  assert.match(locationReconcileSource, /clearVerifiedFeedLotLocation/);
+  assert.match(locationReconcileSource, /vehicle\.sourceRaw/);
+  assert.match(locationReconcileSource, /mapping\.get\(stock\)/);
+  assert.match(inventorySchedulerSource, /reconcileAlphaLotLocations\(log, dealerId\)/);
+  assert.match(inventorySchedulerSource, /No inventory feed URL configured/);
 });
 
 test("Alpha Pages exposes an administrator-only immediate publish action", () => {

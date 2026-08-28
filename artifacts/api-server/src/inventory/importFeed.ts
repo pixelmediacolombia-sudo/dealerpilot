@@ -9,8 +9,8 @@ import {
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Logger } from "pino";
 import { parseInventoryXml, type FeedImage } from "./xmlEngine";
-import { scrapeAlphaLocationMapping } from "./locationScraper";
-import { ALPHA_DEALER_ID, ALPHA_LOT_MANASSAS, markVerifiedFeedLotLocation } from "../lib/dealer";
+import { reconcileAlphaLotLocations } from "./locationReconcile";
+import { ALPHA_DEALER_ID } from "../lib/dealer";
 import { syncSoldMarketplaceState } from "../marketplace/soldState";
 import { vehicleOperationalColumns, type VehicleOperationalRow } from "../lib/vehicleColumns";
 
@@ -146,9 +146,9 @@ export async function importFeed(
   const locationBreakdown: Record<string, number> = {};
 
   for (const n of parsed) {
-    const persistedSourceRaw = n.lotLocation === ALPHA_LOT_MANASSAS
-      ? markVerifiedFeedLotLocation(n.sourceRaw, ALPHA_LOT_MANASSAS)
-      : n.sourceRaw;
+    // Branch provenance is added only by the authoritative location
+    // crosswalk below; the combined XML feed does not identify a physical lot.
+    const persistedSourceRaw = n.sourceRaw;
     // Track location counts for logging
     const locationKey = n.lotLocation ?? "unknown";
     locationBreakdown[locationKey] = (locationBreakdown[locationKey] ?? 0) + 1;
@@ -367,40 +367,9 @@ export async function importFeed(
   // is physically parked at the active Manassas location and write it to lot_location.
   if (dealerId === ALPHA_DEALER_ID) {
     try {
-      const locationMap = await scrapeAlphaLocationMapping(log);
-      if (locationMap.size === 0) {
-        throw new Error("Manassas location scrape returned no vehicles");
-      }
-      const byLocation = new Map<string, string[]>();
-      for (const [stock, loc] of locationMap) {
-        const list = byLocation.get(loc) ?? [];
-        list.push(stock);
-        byLocation.set(loc, list);
-      }
-      for (const [loc, stocks] of byLocation) {
-        if (stocks.length === 0) continue;
-        await db
-          .update(vehiclesTable)
-          .set({ lotLocation: loc })
-          .where(and(eq(vehiclesTable.dealerId, dealerId), inArray(vehiclesTable.stockNumber, stocks)));
-        // Keep branch provenance with the raw feed payload. This makes old
-        // rows produced by the previous "all non-empty lots are Manassas"
-        // behavior fail closed until a fresh authoritative sync verifies them.
-        for (const stock of stocks) {
-          const parsedVehicle = parsed.find((vehicle) => vehicle.stockNumber === stock);
-          if (!parsedVehicle) continue;
-          await db
-            .update(vehiclesTable)
-            .set({ sourceRaw: markVerifiedFeedLotLocation(parsedVehicle.sourceRaw, loc) })
-            .where(and(eq(vehiclesTable.dealerId, dealerId), eq(vehiclesTable.stockNumber, stock)));
-        }
-      }
-      log.info(
-        { dealerId, locationMap: Object.fromEntries([...byLocation].map(([k, v]) => [k, v.length])) },
-        "Alpha Motorsport lot_location refined from website location scrape",
-      );
+      await reconcileAlphaLotLocations(log, dealerId);
     } catch (err) {
-      log.warn({ dealerId, err }, "Location scrape failed — feed physical city remains authoritative and unknown rows stay blocked");
+      log.warn({ dealerId, err }, "Location scrape failed — feed import succeeded but unknown rows stay blocked");
     }
   }
 

@@ -23,6 +23,7 @@ export const ALPHA_LOT_MANASSAS = "Manassas";
 /** DealerCentric VehicleLocationID → city name (used by locationScraper.ts) */
 export const ALPHA_VEHICLE_LOCATION_IDS: Record<string, string> = {
   "3004268": ALPHA_LOT_MANASSAS,
+  "3004265": "Fredericksburg",
 };
 
 /** Read the raw catalog dealer_id retained in vehicles.source_raw. */
@@ -55,6 +56,16 @@ export function markVerifiedFeedLotLocation(sourceRaw: string, lotLocation: stri
   try {
     const parsed = JSON.parse(sourceRaw) as Record<string, unknown>;
     parsed.dealerpilot_lot_location = lotLocation;
+    return JSON.stringify(parsed);
+  } catch {
+    return sourceRaw;
+  }
+}
+
+export function clearVerifiedFeedLotLocation(sourceRaw: string): string {
+  try {
+    const parsed = JSON.parse(sourceRaw) as Record<string, unknown>;
+    delete parsed.dealerpilot_lot_location;
     return JSON.stringify(parsed);
   } catch {
     return sourceRaw;

@@ -6,8 +6,9 @@
  * The split is managed entirely in the DealerCentric DMS and is exposed only
  * through the website's ?VehicleLocationID= filter parameter.
  *
- * This module scrapes the active Manassas page to produce a stock number to
- * city mapping so that lot_location in our DB reflects the active destination.
+ * This module scrapes Alpha's location-filtered pages to produce a stock
+ * number-to-city mapping so that lot_location in our DB reflects the actual
+ * physical destination.
  */
 
 import type { Logger } from "pino";
@@ -45,6 +46,7 @@ export async function scrapeAlphaLocationMapping(
 
   for (const [locationId, locationName] of Object.entries(ALPHA_VEHICLE_LOCATION_IDS)) {
     let locationCount = 0;
+    const seenStocksForLocation = new Set<string>();
 
     for (let page = 1; page <= MAX_PAGES; page++) {
       let html: string;
@@ -55,7 +57,7 @@ export async function scrapeAlphaLocationMapping(
           { locationId, locationName, page, err },
           "Failed to fetch location page — stopping pagination for this location",
         );
-        break;
+        throw new Error(`Failed to verify Alpha ${locationName} inventory page ${page}`);
       }
 
       const stocks = new Set<string>();
@@ -67,11 +69,34 @@ export async function scrapeAlphaLocationMapping(
 
       if (stocks.size === 0) {
         // Empty page = past end of inventory for this location
+        log.info({ locationId, locationName, page }, "Alpha location pagination reached an empty page");
         break;
       }
 
+      const newStocks = [...stocks].filter((stock) => !seenStocksForLocation.has(stock));
+      if (newStocks.length === 0) {
+        // Some inventory sites repeat the first page after the last page
+        // instead of returning an empty page. Treat that as end-of-feed so a
+        // production sync cannot loop over duplicate listings.
+        log.info(
+          { locationId, locationName, page, repeatedStocks: stocks.size },
+          "Alpha location pagination reached a repeated page",
+        );
+        break;
+      }
+
+      log.info(
+        { locationId, locationName, page, pageStocks: stocks.size, newStocks: newStocks.length },
+        "Alpha location page verified",
+      );
+
       for (const s of stocks) {
+        const previousLocation = mapping.get(s);
+        if (previousLocation && previousLocation !== locationName) {
+          throw new Error(`Stock ${s} appears in both ${previousLocation} and ${locationName}`);
+        }
         mapping.set(s, locationName);
+        seenStocksForLocation.add(s);
         locationCount++;
       }
     }
