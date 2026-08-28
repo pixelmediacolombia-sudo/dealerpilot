@@ -10,6 +10,7 @@ const queueCompactionSource = readFileSync(
 );
 const autoPublishSource = readFileSync(new URL("./autoPublish.ts", import.meta.url), "utf8");
 const workerSource = readFileSync(new URL("../workers/publishing.worker.ts", import.meta.url), "utf8");
+const intelligenceSeedSource = readFileSync(new URL("../intelligence/seed.ts", import.meta.url), "utf8");
 const staleCleanerSource = readFileSync(new URL("../publishing/staleCleaner.ts", import.meta.url), "utf8");
 const publishingRepositorySource = readFileSync(
   new URL("../features/publishing/infrastructure/publishingRepository.ts", import.meta.url),
@@ -468,6 +469,11 @@ test("Photo Director fallback cannot block the batch or Messenger intake", () =>
   assert.match(workerSource, /vehicle: vehicleOperationalColumns/);
   assert.match(conversationsSource, /\.select\(vehicleOperationalColumns\)/);
   assert.match(extensionRouteSource, /\.select\(\{ vehicle: vehicleOperationalColumns \}\)/);
+});
+
+test("Marketplace intelligence startup does not request missing vehicle columns", () => {
+  assert.match(intelligenceSeedSource, /import \{ vehicleOperationalColumns, type VehicleOperationalRow \}/);
+  assert.match(intelligenceSeedSource, /const vehicles = await db[\s\S]*?\.select\(vehicleOperationalColumns\)[\s\S]*?\.from\(vehiclesTable\)/);
 });
 
 test("inventory worker is anchored to the daily 10 AM dealer-local sync window", () => {

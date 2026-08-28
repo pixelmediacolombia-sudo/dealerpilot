@@ -15,6 +15,7 @@ import {
   workerStateTable,
   type Vehicle,
 } from "@workspace/db";
+import { vehicleOperationalColumns, type VehicleOperationalRow } from "../lib/vehicleColumns";
 import {
   computeOpportunityScores,
   computePriceMedians,
@@ -186,7 +187,7 @@ type StrategyName =
   | "Performance Positioning";
 
 function getStrategyName(
-  vehicle: Vehicle,
+  vehicle: VehicleOperationalRow,
   truckSUV: boolean,
   luxury: boolean,
   performance: boolean,
@@ -225,7 +226,7 @@ interface V2Explanation {
 
 function buildV2Explanation(params: {
   strategyName: StrategyName;
-  vehicle: Vehicle;
+  vehicle: VehicleOperationalRow;
   truckSUV: boolean;
   luxury: boolean;
   performance: boolean;
@@ -329,7 +330,7 @@ function avg(nums: number[]): number {
 }
 
 function generateVehicleStrategy(
-  vehicle: Vehicle,
+  vehicle: VehicleOperationalRow,
   vehiclePerf: VehiclePerfRecord[],
   globalStats: {
     bestDayOfWeek: number;
@@ -788,7 +789,7 @@ export async function seedMarketplaceIntelligence(logger: Logger): Promise<void>
   }
 
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.dealerId, DEALER_ID));
 
