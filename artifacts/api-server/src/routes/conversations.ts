@@ -2429,7 +2429,8 @@ router.post("/conversations/intake", async (req, res) => {
     downPaymentPolicy,
   );
   const closeAfterDelivery = [
-    "store_phone_requested",
+    // Sharing the dealership phone is an informational reply. The buyer may
+    // still need to provide their phone and complete the qualification flow.
     "interest_declined",
     "down_payment_declined",
     "timeline_declined",
@@ -2441,8 +2442,7 @@ router.post("/conversations/intake", async (req, res) => {
     !!inbound &&
     !!hasNewBuyerMessage &&
     latestParsed?.role === "user" &&
-    latestExistingAssistant?.content.trim() !== inbound.trim() &&
-    !immediateHandoffReason;
+    latestExistingAssistant?.content.trim() !== inbound.trim();
 
   if (shouldGenerateReply) {
     aiReplyResult = await generateAiReplyWithFallback(

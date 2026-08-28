@@ -31,4 +31,14 @@ test("Alpha Manassas qualification follows the new required order", () => {
   assert.match(source, /buyerQualification\.downPayment/);
   assert.match(source, /buyerQualification\.timeline/);
   assert.match(source, /buyerQualification\.documents/);
+  assert.doesNotMatch(
+    source,
+    /const closeAfterDelivery = \[\s*"store_phone_requested"/,
+    "sharing the dealership phone must not close qualification",
+  );
+  assert.doesNotMatch(
+    source,
+    /latestExistingAssistant\?\.content\.trim\(\) !== inbound\.trim\(\) &&\s*!immediateHandoffReason/,
+    "receiving the buyer phone must still generate the next qualification question",
+  );
 });
