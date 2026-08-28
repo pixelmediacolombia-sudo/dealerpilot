@@ -881,7 +881,16 @@ router.get("/auto-publish/batches/:id", async (req, res) => {
   const vehicleIds = [...new Set(jobs.map((j) => j.vehicleId))];
   const vehicleRows =
     vehicleIds.length > 0
-      ? await db.select().from(vehiclesTable).where(inArray(vehiclesTable.id, vehicleIds))
+      ? await db
+          .select({
+            id: vehiclesTable.id,
+            year: vehiclesTable.year,
+            make: vehiclesTable.make,
+            model: vehiclesTable.model,
+            trim: vehiclesTable.trim,
+          })
+          .from(vehiclesTable)
+          .where(inArray(vehiclesTable.id, vehicleIds))
       : [];
   const vMap = new Map(vehicleRows.map((v) => [v.id, v]));
 

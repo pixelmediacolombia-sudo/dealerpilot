@@ -193,11 +193,26 @@ export async function enrich(jobs: PublishingJob[]) {
   const dealerIds = [...new Set(jobs.map((j) => j.dealerId))];
   const versionIds = [...new Set(jobs.map((j) => j.listingVersionId).filter((id): id is number => id !== null))];
 
-  const vehicles = await db.select().from(vehiclesTable).where(inArray(vehiclesTable.id, vehicleIds));
-  const dealers = await db.select().from(dealersTable).where(inArray(dealersTable.id, dealerIds));
+  const vehicles = await db
+    .select({
+      id: vehiclesTable.id,
+      year: vehiclesTable.year,
+      make: vehiclesTable.make,
+      model: vehiclesTable.model,
+      trim: vehiclesTable.trim,
+    })
+    .from(vehiclesTable)
+    .where(inArray(vehiclesTable.id, vehicleIds));
+  const dealers = await db
+    .select({ id: dealersTable.id, name: dealersTable.name })
+    .from(dealersTable)
+    .where(inArray(dealersTable.id, dealerIds));
   const versions =
     versionIds.length > 0
-      ? await db.select().from(listingVersionsTable).where(inArray(listingVersionsTable.id, versionIds))
+      ? await db
+          .select({ id: listingVersionsTable.id, title: listingVersionsTable.title })
+          .from(listingVersionsTable)
+          .where(inArray(listingVersionsTable.id, versionIds))
       : [];
 
   const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));

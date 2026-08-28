@@ -15,8 +15,39 @@ import { syncSoldMarketplaceState } from "../marketplace/soldState";
 
 const router: IRouter = Router();
 
+// List/detail responses do not need the newest optional vehicle columns.
+// Keeping this projection explicit lets the inventory UI remain readable while
+// production databases complete the latest schema migration.
+const vehicleResponseColumns = {
+  id: vehiclesTable.id,
+  dealerId: vehiclesTable.dealerId,
+  vin: vehiclesTable.vin,
+  stockNumber: vehiclesTable.stockNumber,
+  year: vehiclesTable.year,
+  make: vehiclesTable.make,
+  model: vehiclesTable.model,
+  trim: vehiclesTable.trim,
+  mileage: vehiclesTable.mileage,
+  price: vehiclesTable.price,
+  exteriorColor: vehiclesTable.exteriorColor,
+  interiorColor: vehiclesTable.interiorColor,
+  bodyStyle: vehiclesTable.bodyStyle,
+  transmission: vehiclesTable.transmission,
+  fuelType: vehiclesTable.fuelType,
+  description: vehiclesTable.description,
+  vdpUrl: vehiclesTable.vdpUrl,
+  sourceRaw: vehiclesTable.sourceRaw,
+  lotLocation: vehiclesTable.lotLocation,
+  status: vehiclesTable.status,
+  lastSyncAt: vehiclesTable.lastSyncAt,
+  createdAt: vehiclesTable.createdAt,
+  updatedAt: vehiclesTable.updatedAt,
+} as const;
+
+type VehicleResponseRow = Pick<Vehicle, keyof typeof vehicleResponseColumns>;
+
 function toVehicle(
-  v: Vehicle,
+  v: VehicleResponseRow,
   primaryImageUrl: string | null,
   imageCount: number,
   marketplaceListing?: { listingUrl: string | null; status: string } | null,
@@ -32,9 +63,9 @@ function toVehicle(
     trim: v.trim ?? null,
     mileage: v.mileage ?? null,
     price: v.price ?? null,
-    downPaymentOverride: v.downPaymentOverride ?? null,
-    downPaymentOverrideEffectiveFrom: v.downPaymentOverrideEffectiveFrom?.toISOString() ?? null,
-    downPaymentOverrideEffectiveTo: v.downPaymentOverrideEffectiveTo?.toISOString() ?? null,
+    downPaymentOverride: null,
+    downPaymentOverrideEffectiveFrom: null,
+    downPaymentOverrideEffectiveTo: null,
     exteriorColor: v.exteriorColor ?? null,
     interiorColor: v.interiorColor ?? null,
     bodyStyle: v.bodyStyle ?? null,
@@ -58,7 +89,7 @@ function toVehicle(
   };
 }
 
-async function attachImages(vehicles: Vehicle[]) {
+async function attachImages(vehicles: VehicleResponseRow[]) {
   if (vehicles.length === 0) return [];
   const ids = vehicles.map((v) => v.id);
   const [images, marketplaceListings] = await Promise.all([
@@ -175,7 +206,7 @@ router.get("/vehicles", async (req, res) => {
   }
 
   const rows = await db
-    .select()
+    .select(vehicleResponseColumns)
     .from(vehiclesTable)
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(orderBy);
@@ -187,7 +218,7 @@ router.get("/vehicles", async (req, res) => {
 router.get("/vehicles/:id", async (req, res) => {
   const id = Number(req.params.id);
   const [vehicle] = await db
-    .select()
+    .select(vehicleResponseColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.id, id));
   if (!vehicle) {
