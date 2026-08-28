@@ -26,6 +26,7 @@ import {
 import { ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
 import { findLatestNeedsReviewVehicleIds } from "./needsReviewGuard";
 import { photoDirectorPublishBlockReason } from "../photo/publishReadiness";
+import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 
 const PLAN_TIME_ZONE = "America/New_York";
 const DISPLAY_TIME_ZONE = "America/Bogota";
@@ -173,7 +174,7 @@ export async function previewAutoPublishVehicles(
   count: number,
 ): Promise<{ selected: AutoPublishForecastVehicle[]; totalEligible: number }> {
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(and(
       eq(vehiclesTable.dealerId, dealerId),
@@ -248,7 +249,7 @@ export async function getNextAutoPublishForecast(params: {
     const activeVehicleIds = [...new Set(activeJobs.map((job) => job.vehicleId))];
     const [batches, activeVehicles] = await Promise.all([
       batchIds.length > 0 ? db.select().from(publishingBatchesTable).where(inArray(publishingBatchesTable.id, batchIds)) : Promise.resolve([]),
-      db.select().from(vehiclesTable).where(inArray(vehiclesTable.id, activeVehicleIds)),
+      db.select(vehicleOperationalColumns).from(vehiclesTable).where(inArray(vehiclesTable.id, activeVehicleIds)),
     ]);
     const vehicleById = new Map(activeVehicles.map((vehicle) => [vehicle.id, vehicle]));
     return {

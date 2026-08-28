@@ -37,6 +37,7 @@ import { compactFutureAutoPublishQueue } from "../publishing/autoPublishQueueCom
 import { recordMarketplaceSoldAction } from "../marketplace/soldAction";
 import { getDownPaymentPolicy } from "../downPayment/policy";
 import { isAlphaManassasVehicle } from "../lib/dealer";
+import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1. Marketplace publishing is
 // restricted to inventory verified at the Manassas lot.
@@ -213,7 +214,7 @@ router.post("/publishing/jobs/:id/assign", async (req, res) => {
     res.status(404).json({ error: "Job not found" });
     return;
   }
-  const [assignVehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
+  const [assignVehicle] = await db.select(vehicleOperationalColumns).from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
   if (!assignVehicle || !isAlphaManassasVehicle(assignVehicle)) {
     res.status(422).json({ error: "Only verified Alpha Manassas inventory can be assigned", code: "NON_MANASSAS_LOT" });
     return;
@@ -307,7 +308,7 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
     res.json({ job: null });
     return;
   }
-  const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, row.vehicleId));
+  const [vehicle] = await db.select(vehicleOperationalColumns).from(vehiclesTable).where(eq(vehiclesTable.id, row.vehicleId));
   if (!vehicle) {
     res.status(404).json({ error: "Vehicle not found for assigned job", code: "VEHICLE_NOT_FOUND" });
     return;
@@ -371,7 +372,7 @@ router.get("/publishing/jobs/next", async (req, res) => {
     res.json({ job: null });
     return;
   }
-  const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, row.vehicleId));
+  const [vehicle] = await db.select(vehicleOperationalColumns).from(vehiclesTable).where(eq(vehiclesTable.id, row.vehicleId));
   if (!vehicle) {
     res.status(404).json({ error: "Vehicle not found for job", code: "VEHICLE_NOT_FOUND" });
     return;
@@ -457,7 +458,7 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
           .from(listingVersionsTable)
           .where(eq(listingVersionsTable.id, job.listingVersionId))
       : [];
-    const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
+    const [vehicle] = await db.select(vehicleOperationalColumns).from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
     const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, job.dealerId));
 
     if (!vehicle) {
@@ -508,7 +509,7 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
     const usingAiPhotos = images.some((image) => image.source === "ai");
 
     const downPaymentPolicy = await getDownPaymentPolicy(job.dealerId, vehicle.id);
-    const pricing = getMarketplacePricing(vehicle, downPaymentPolicy.minimumAmount);
+    const pricing = getMarketplacePricing(vehicle as typeof vehiclesTable.$inferSelect, downPaymentPolicy.minimumAmount);
 
     // "Real prose" test: non-empty after trim, ≥ 15 chars, has a space, not all-digits.
     function isProseText(s: string | null | undefined): s is string {
@@ -1249,7 +1250,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
 
   const vehicleOrder = new Map(vehicleIds.map((id, index) => [id, index]));
   const vehicles = (await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(inArray(vehiclesTable.id, vehicleIds)))
     .sort(
@@ -1470,7 +1471,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
   const DEALER_ID = 1;
 
   const [vehicle] = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, DEALER_ID)));
   if (!vehicle) {
@@ -1670,7 +1671,7 @@ router.get("/publishing/jobs/:id/progress", async (req, res) => {
     return;
   }
   const [vehicle] = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.id, job.vehicleId));
   const vehicleLabel = vehicle

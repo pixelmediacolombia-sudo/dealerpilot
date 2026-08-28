@@ -13,6 +13,7 @@ import {
   type ListingPerformance,
 } from "@workspace/db";
 import { ensureVehicleIntelligenceSchema, seedMarketplaceIntelligence } from "../intelligence/seed";
+import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 
 const router = Router();
 
@@ -274,7 +275,7 @@ router.get("/marketplace-intelligence/dashboard", async (req, res) => {
     .orderBy(desc(vehicleIntelligenceTable.confidenceScore));
 
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.dealerId, DEALER_ID));
 
@@ -512,7 +513,7 @@ router.get("/marketplace-intelligence/recommendations", async (req, res) => {
   ];
   if (location) vehicleConditions.push(eq(vehiclesTable.lotLocation, location));
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(and(...vehicleConditions));
 
@@ -622,7 +623,7 @@ router.get("/marketplace-intelligence/vehicles/:vehicleId", async (req, res) => 
   if (!vehicleId) { res.status(400).json({ error: "Invalid vehicleId" }); return; }
 
   const [vehicle] = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, DEALER_ID)));
 
@@ -717,7 +718,7 @@ router.get("/marketplace-intelligence/opportunity", async (req, res) => {
 
   // Fetch available vehicles: Active + Price Changed (price updated but still in lot)
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(and(
       eq(vehiclesTable.dealerId, DEALER_ID),

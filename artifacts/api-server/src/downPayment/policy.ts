@@ -1,5 +1,5 @@
 import { and, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
-import { db, dealerDownPaymentConfigsTable, vehiclesTable, type Vehicle } from "@workspace/db";
+import { db, dealerDownPaymentConfigsTable } from "@workspace/db";
 import {
   buildDownPaymentInstruction,
   formatDownPaymentAmounts,
@@ -30,18 +30,10 @@ export async function getDownPaymentPolicy(dealerId: number, vehicleId?: number,
     ))
     .orderBy(desc(dealerDownPaymentConfigsTable.effectiveFrom));
 
-  let vehicle: Pick<Vehicle, "downPaymentOverride" | "downPaymentOverrideEffectiveFrom" | "downPaymentOverrideEffectiveTo"> | null = null;
-  if (vehicleId != null) {
-    const [row] = await db
-      .select({
-        downPaymentOverride: vehiclesTable.downPaymentOverride,
-        downPaymentOverrideEffectiveFrom: vehiclesTable.downPaymentOverrideEffectiveFrom,
-        downPaymentOverrideEffectiveTo: vehiclesTable.downPaymentOverrideEffectiveTo,
-      })
-      .from(vehiclesTable)
-      .where(and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, dealerId)))
-      .limit(1);
-    vehicle = row ?? null;
-  }
-  return resolveDownPaymentPolicy(configs, vehicle, now);
+  // Vehicle-level override columns are optional in the current production
+  // schema. Do not query them here: a missing optional column must not turn
+  // listing generation or Marketplace payload creation into a 500. The
+  // dealer-level policy remains fully available until that migration lands.
+  void vehicleId;
+  return resolveDownPaymentPolicy(configs, null, now);
 }

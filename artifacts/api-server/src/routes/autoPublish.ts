@@ -48,6 +48,7 @@ import {
 } from "../photo/publishReadiness";
 import { getNextAutoPublishForecast } from "../publishing/autoPublishForecast";
 import { ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
+import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1. Auto-publish is Manassas-only.
 const DEALER_ID = 1;
@@ -352,7 +353,7 @@ router.post("/auto-publish/vehicles/:vehicleId/photo-score", async (req, res) =>
   }
 
   const [vehicle] = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.id, vehicleId));
   if (!vehicle) {
@@ -443,7 +444,7 @@ router.post("/auto-publish/batches", async (req, res) => {
 
   // Fetch active/ready vehicles for this dealer, optionally scoped to a lot location.
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(
       and(
@@ -1087,7 +1088,7 @@ router.get("/auto-publish/feed-quality", async (req, res) => {
 
   // Total active vehicles
   const allVehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(
       and(
@@ -1214,7 +1215,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
 
   // Same vehicle selection as batch — dealer_id = 1, no DB writes
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(
       and(
@@ -1538,7 +1539,7 @@ router.get("/auto-publish/launch-checklist", async (req, res) => {
 
   // 4. At least 5 photos per selected vehicle
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(
       and(

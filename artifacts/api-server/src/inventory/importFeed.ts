@@ -5,7 +5,6 @@ import {
   vehiclesTable,
   vehicleImagesTable,
   vehicleChangesTable,
-  type Vehicle,
 } from "@workspace/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Logger } from "pino";
@@ -13,6 +12,7 @@ import { parseInventoryXml, type FeedImage } from "./xmlEngine";
 import { scrapeAlphaLocationMapping } from "./locationScraper";
 import { ALPHA_DEALER_ID, ALPHA_LOT_MANASSAS, markVerifiedFeedLotLocation } from "../lib/dealer";
 import { syncSoldMarketplaceState } from "../marketplace/soldState";
+import { vehicleOperationalColumns, type VehicleOperationalRow } from "../lib/vehicleColumns";
 
 const ACTIVE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish", "Published"];
 
@@ -131,10 +131,10 @@ export async function importFeed(
   }
 
   const existing = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.dealerId, dealerId));
-  const existingByVin = new Map<string, Vehicle>();
+  const existingByVin = new Map<string, VehicleOperationalRow>();
   for (const v of existing) existingByVin.set(v.vin, v);
 
   const now = new Date();
@@ -302,7 +302,7 @@ export async function importFeed(
       v.status !== "Sold/Removed" &&
       v.status !== "Archived",
   );
-  const newlySold: Vehicle[] = [];
+  const newlySold: VehicleOperationalRow[] = [];
   for (const v of missingCandidates) {
     const missingFeedCount = v.missingFeedCount + 1;
     if (missingFeedCount < 2) {

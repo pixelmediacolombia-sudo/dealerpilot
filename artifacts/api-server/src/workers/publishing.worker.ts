@@ -49,6 +49,7 @@ import {
   resolvePublishMode,
 } from "../publishing/controlledMode";
 import { isAlphaManassasVehicle } from "../lib/dealer";
+import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 import { getInitialBatchTiming } from "../publishing/batchProgress";
 import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 import { reconcileBatchProgress } from "../features/publishing/infrastructure/publishingRepository";
@@ -273,7 +274,7 @@ async function maybeCreateAutomaticBatch(
   }
 
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(
       and(

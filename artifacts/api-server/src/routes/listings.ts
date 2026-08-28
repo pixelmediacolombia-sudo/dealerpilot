@@ -21,6 +21,7 @@ import { priorityScore } from "../listings/rules";
 import { ACTIVE_PUBLISHING_JOB_STATUSES } from "../publishing/controlledMode";
 import { compactFutureAutoPublishQueue } from "../publishing/autoPublishQueueCompaction";
 import { getDownPaymentPolicy } from "../downPayment/policy";
+import { vehicleOperationalColumns, type VehicleOperationalRow } from "../lib/vehicleColumns";
 
 const DEALER_ID = 1;
 
@@ -66,7 +67,7 @@ function toVersion(v: ListingVersion, score: ListingScore | null) {
   };
 }
 
-function toVehicleSummary(v: Vehicle, primaryImageUrl: string | null, imageCount: number) {
+function toVehicleSummary(v: VehicleOperationalRow, primaryImageUrl: string | null, imageCount: number) {
   return {
     id: v.id,
     dealerId: v.dealerId,
@@ -185,7 +186,7 @@ router.get("/listings", async (req, res) => {
   }
 
   const vehicles = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(and(...conditions))
     .orderBy(desc(vehiclesTable.createdAt));
@@ -320,7 +321,7 @@ router.get("/listings", async (req, res) => {
       currentVersion: current?.version ?? null,
       aiStatus,
       publishStatus,
-      priorityScore: priorityScore(v, img.count),
+      priorityScore: priorityScore(v as Vehicle, img.count),
       listingScore: score?.overall ?? null,
       listingRating: score?.rating ?? null,
       updatedAt: current ? current.updatedAt.toISOString() : v.updatedAt.toISOString(),
@@ -354,7 +355,7 @@ router.get("/listings", async (req, res) => {
 router.get("/listings/:id", async (req, res) => {
   const vehicleId = Number(req.params.id);
   const [vehicle] = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.id, vehicleId));
   if (!vehicle) {
@@ -410,7 +411,7 @@ router.get("/listings/:id", async (req, res) => {
       dealerName: null,
       listingTitle: null,
     })),
-    priorityScore: priorityScore(vehicle, imageCount),
+    priorityScore: priorityScore(vehicle as Vehicle, imageCount),
   });
 });
 
@@ -442,7 +443,7 @@ router.post("/listings/:vehicleId/mark-published", async (req, res) => {
   }
 
   const [vehicle] = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.id, vehicleId));
   if (!vehicle) {
@@ -519,7 +520,7 @@ router.post("/listings/:vehicleId/mark-published", async (req, res) => {
 router.post("/listings/:id/generate", async (req, res) => {
   const vehicleId = Number(req.params.id);
   const [vehicle] = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.id, vehicleId));
   if (!vehicle) {
@@ -529,7 +530,7 @@ router.post("/listings/:id/generate", async (req, res) => {
 
   let generated;
   try {
-    generated = await generateListing(vehicle, await getDownPaymentPolicy(vehicle.dealerId, vehicle.id));
+    generated = await generateListing(vehicle as Vehicle, await getDownPaymentPolicy(vehicle.dealerId, vehicle.id));
   } catch (err) {
     req.log.error({ err, vehicleId }, "AI listing generation failed");
     res.status(502).json({ error: "AI generation failed. Please try again." });
@@ -580,7 +581,7 @@ router.post("/listings/:id/generate", async (req, res) => {
     return row;
   });
 
-  const breakdown = scoreListing(inserted, vehicle, imageCount);
+  const breakdown = scoreListing(inserted, vehicle as Vehicle, imageCount);
   const [scoreRow] = await db
     .insert(listingScoresTable)
     .values({
@@ -635,7 +636,7 @@ router.patch("/listing-versions/:id", async (req, res) => {
   }
 
   const [vehicle] = await db
-    .select()
+    .select(vehicleOperationalColumns)
     .from(vehiclesTable)
     .where(eq(vehiclesTable.id, updated.vehicleId));
   if (!vehicle) {
@@ -646,7 +647,7 @@ router.patch("/listing-versions/:id", async (req, res) => {
     .select({ id: vehicleImagesTable.id })
     .from(vehicleImagesTable)
     .where(eq(vehicleImagesTable.vehicleId, updated.vehicleId));
-  const breakdown = scoreListing(updated, vehicle, imgRows.length);
+  const breakdown = scoreListing(updated, vehicle as Vehicle, imgRows.length);
   const [scoreRow] = await db
     .insert(listingScoresTable)
     .values({
