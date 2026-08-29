@@ -349,6 +349,7 @@ type SalesReplyStage =
   | "inventory_options"
   | "document_requirements"
   | "clean_title"
+  | "clean_title_and_warranty"
   | "warranty_info"
   | "advisor_question"
   | "general";
@@ -539,6 +540,10 @@ function buyerAskedDetailedVehicleInfo(latest: string): boolean {
 
 function buyerAskedCleanTitle(latest: string): boolean {
   return /\b(?:clean\s+title|clear\s+title|titulo\s+limpio|t[ií]tulo\s+limpio)\b/i.test(latest);
+}
+
+function buyerAskedCleanTitleAndWarranty(latest: string): boolean {
+  return buyerAskedCleanTitle(latest) && buyerAskedWarrantyInfo(latest);
 }
 
 function buyerAskedWarrantyInfo(latest: string): boolean {
@@ -789,6 +794,7 @@ function resolveSalesReplyStage(
   const vehicleRequest = detectVehicleRequestKind(latest);
   if (vehicleRequest === "photos") return "vehicle_link_request";
   if (vehicleRequest === "carfax") return "carfax_request";
+  if (buyerAskedCleanTitleAndWarranty(latest)) return "clean_title_and_warranty";
   if (buyerHasOpenQuestion(latest)) return "open_question";
   if (buyerRequestedStorePhone(latest)) return "store_phone_requested";
   if (hasPhoneNumber(latest) && !buyerPhoneAlreadyKnown) return "phone_received";
@@ -959,10 +965,13 @@ function buildBaseSafeFallbackReply(
       return `Para avanzar necesitamos una identificación vigente y comprobante de ingresos.${detailBridge} ¿Cuentas con ambos?`;
     }
     if (stage === "clean_title") {
-      return `Buena pregunta. No tengo la certificación del ${vehicle} confirmada aquí; puedo verificarla. ¿Qué te gustaría saber?`;
+      return `Buena pregunta. Podemos verificar si el ${vehicle} tiene título limpio. ¿Qué detalle te gustaría que confirmemos?`;
+    }
+    if (stage === "clean_title_and_warranty") {
+      return `Buena pregunta. Podemos verificar el título limpio y la cobertura exacta de garantía del ${vehicle}, incluyendo lo que aplica si compras de contado. ¿Qué detalle te gustaría que confirmemos primero?`;
     }
     if (stage === "warranty_info") {
-      return `Buena pregunta. Podemos confirmar los detalles exactos de garantía y cobertura del ${vehicle}. ¿Qué te gustaría saber?`;
+      return `Buena pregunta. Podemos verificar la cobertura exacta de garantía del ${vehicle}. ¿Qué detalle te gustaría que confirmemos?`;
     }
     if (stage === "advisor_question") {
       return `Buena pregunta. Podemos confirmar ese detalle del ${vehicle}. ¿Qué te gustaría saber?`;
@@ -1059,10 +1068,13 @@ function buildBaseSafeFallbackReply(
       return `To move forward, we need a valid ID and proof of income.${detailBridge} Do you have both?`;
   }
   if (stage === "clean_title") {
-    return `Good question. I do not have the ${vehicle}'s certification confirmed here, but I can verify it. What would you like to know?`;
+    return `Good question. We can verify whether the ${vehicle} has a clean title. What would you like us to confirm?`;
+  }
+  if (stage === "clean_title_and_warranty") {
+    return `Great question. We can verify the clean-title status and exact warranty coverage for the ${vehicle}, including what applies if you pay cash. Which detail would you like us to confirm first?`;
   }
   if (stage === "warranty_info") {
-    return `Great question. We can confirm the exact warranty and coverage details for the ${vehicle}. What would you like to know?`;
+    return `Great question. We can verify the exact warranty coverage for the ${vehicle}. What would you like us to confirm?`;
   }
   if (stage === "advisor_question") {
     return `Great question. We can confirm that detail for the ${vehicle}. What would you like to know?`;
@@ -1290,12 +1302,18 @@ function isAiReplyAligned(
   }
   if (stage === "clean_title") {
     return /clean title|clear title|titulo limpio|t[ií]tulo limpio|certification|certificaci[oó]n/.test(normalized) &&
-      /what would you like to know|qué te gustaría saber|que te gustaria saber|verify|verificar|confirm/.test(normalized) &&
+      /what would you like us to confirm|qué detalle te gustaría que confirmemos|que detalle te gustaria que confirmemos|verify|verificar|confirm/.test(normalized) &&
+      !/phone|number|tel[eé]fono|n[uú]mero|financ|financing/.test(normalized);
+  }
+  if (stage === "clean_title_and_warranty") {
+    return /clean title|clean-title|titulo limpio|t[ií]tulo limpio/.test(normalized) &&
+      /warranty|coverage|garantia|cobertura/.test(normalized) &&
+      /what would you like us to confirm|which detail would you like us to confirm|qué detalle te gustaría que confirmemos|que detalle te gustaria que confirmemos|verify|verificar|confirm/.test(normalized) &&
       !/phone|number|tel[eé]fono|n[uú]mero|financ|financing/.test(normalized);
   }
   if (stage === "warranty_info") {
     return /warranty|coverage|garantia|cobertura|confirm|confirmar/.test(normalized) &&
-      /what would you like to know|qué te gustaría saber|que te gustaria saber|verify|verificar|confirm/.test(normalized) &&
+      /what would you like us to confirm|qué detalle te gustaría que confirmemos|que detalle te gustaria que confirmemos|verify|verificar|confirm/.test(normalized) &&
       !/phone|number|tel[eé]fono|n[uú]mero|financ|financing/.test(normalized);
   }
   if (stage === "advisor_question") {
@@ -1373,8 +1391,13 @@ function avoidRepeatedFallback(
   }
   if (stage === "clean_title") {
     return language === "es"
-      ? addMarketplaceValueFact(`No tengo la certificación del ${vehicle} confirmada aquí; puedo verificarla. ¿Qué te gustaría saber?`, language, vehicleFacts)
-      : addMarketplaceValueFact(`I do not have the ${vehicle}'s certification confirmed here, but I can verify it. What would you like to know?`, language, vehicleFacts);
+      ? addMarketplaceValueFact(`Podemos verificar si el ${vehicle} tiene título limpio. ¿Qué detalle te gustaría que confirmemos?`, language, vehicleFacts)
+      : addMarketplaceValueFact(`We can verify whether the ${vehicle} has a clean title. What would you like us to confirm?`, language, vehicleFacts);
+  }
+  if (stage === "clean_title_and_warranty") {
+    return language === "es"
+      ? addMarketplaceValueFact(`Podemos verificar el título limpio y la cobertura exacta de garantía del ${vehicle}, incluyendo lo que aplica si compras de contado. ¿Qué detalle te gustaría que confirmemos primero?`, language, vehicleFacts)
+      : addMarketplaceValueFact(`We can verify the clean-title status and exact warranty coverage for the ${vehicle}, including what applies if you pay cash. Which detail would you like us to confirm first?`, language, vehicleFacts);
   }
   return reply;
 }
@@ -1407,6 +1430,7 @@ const SALES_REPLY_STAGES: readonly SalesReplyStage[] = [
   "inventory_options",
   "document_requirements",
   "clean_title",
+  "clean_title_and_warranty",
   "warranty_info",
   "advisor_question",
   "general",
@@ -1636,8 +1660,9 @@ export async function generateAiReply(
       : "No VIN-specific Carfax URL is available. Say the salesperson can send the report; do not promise that a report exists and do not invent a link.",
     inventory_options: "The buyer is asking whether more vehicles or similar options are available. Confirm that more vehicles are available, then ask which option they would like to explore. Do not ask for requirements yet.",
     document_requirements: "The buyer is asking what is needed. Reply warmly with the requirements: valid ID and proof of income. Ask if they have both. Do not ask for a phone number yet.",
-    clean_title: "Answer the clean-title or certification question from supplied facts only. If it is not confirmed, say so and offer to verify it; close by asking what the buyer would like to know next. Do not provide a number or ask for a phone number.",
-    warranty_info: "The buyer is asking detailed warranty questions. Respond warmly and do not invent warranty terms. Say we will be happy to confirm the exact warranty or coverage details, then ask what the buyer would like to know next. Do not ask for a phone number.",
+    clean_title: "Answer the clean-title or certification question from supplied facts only. Do not invent the title status; say we can verify whether the vehicle has a clean title, then ask what detail the buyer would like us to confirm. Do not provide a number or ask for a phone number.",
+    clean_title_and_warranty: "The buyer asked about both clean title and warranty while mentioning cash. Acknowledge both questions, say we can verify the clean-title status and exact warranty coverage that applies to a cash purchase, and ask which detail the buyer would like us to confirm first. Do not invent either fact, provide a number, ask for a phone number, or restart financing.",
+    warranty_info: "The buyer is asking detailed warranty questions. Do not invent warranty terms; say we can verify the exact warranty coverage, then ask what detail the buyer would like us to confirm. Do not ask for a phone number.",
     advisor_question: "The buyer is asking a detailed question. Respond warmly and do not invent details. Say we will be happy to confirm that detail, then ask what the buyer would like to know next. Do not ask for a phone number.",
     general: "Answer safely using only supplied facts, then move the conversation forward with one short question.",
   }[stage];
@@ -1665,7 +1690,7 @@ Latest buyer message: "${currentMessage}"
 ${langNote}
 Respond with a single JSON object, no markdown, with exactly four keys:
 {"intent": "the sales funnel stage that best matches the conversation", "urgency": "high or normal", "vehicleIntent": "strong or unclear", "reply": "your reply"}
-Valid intent values: open_question, availability, interest_confirmation, interest_declined, store_phone_requested, vehicle_link_request, carfax_request, price_inquiry, down_payment_request, down_payment_low, down_payment_declined, timeline_request, timeline_received, timeline_declined, documents_request, documents_declined, qualified_exit, financing_intro, financing_declined, cash_visit_request_phone, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, address_request, inventory_options, document_requirements, clean_title, warranty_info, advisor_question, general.
+Valid intent values: open_question, availability, interest_confirmation, interest_declined, store_phone_requested, vehicle_link_request, carfax_request, price_inquiry, down_payment_request, down_payment_low, down_payment_declined, timeline_request, timeline_received, timeline_declined, documents_request, documents_declined, qualified_exit, financing_intro, financing_declined, cash_visit_request_phone, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, address_request, inventory_options, document_requirements, clean_title, clean_title_and_warranty, warranty_info, advisor_question, general.
 Choose urgent_vehicle_request_phone only when Urgent-intent eligibility allows it, urgency is high, and vehicleIntent is strong. Otherwise follow the supplied Current funnel stage and Stage instruction.
 The "reply" must be one short message that follows the stage instruction exactly, mentions the vehicle naturally, and mirrors the buyer's language.`;
 

@@ -754,6 +754,14 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /Do not ask for a phone number in the same reply/);
   assert.match(conversationsSource, /identificación vigente y comprobante de ingresos/);
   assert.match(conversationsSource, /warranty_info/);
+  assert.match(conversationsSource, /function buyerAskedCleanTitleAndWarranty/);
+  assert.match(conversationsSource, /clean_title_and_warranty/);
+  assert.match(conversationsSource, /Which detail would you like us to confirm first/);
+  assert.match(conversationsSource, /including what applies if you pay cash/);
+  assert.match(conversationsSource, /Do not invent either fact, provide a number, ask for a phone number, or restart financing/);
+  const combinedDetailStage = conversationsSource.indexOf('if (buyerAskedCleanTitleAndWarranty(latest)) return "clean_title_and_warranty";');
+  const genericQuestionStage = conversationsSource.indexOf('if (buyerHasOpenQuestion(latest)) return "open_question";');
+  assert.ok(combinedDetailStage >= 0 && combinedDetailStage < genericQuestionStage);
   assert.match(conversationsSource, /advisor_question/);
   assert.match(conversationsSource, /buyerAskedWarrantyInfo/);
   assert.match(conversationsSource, /buyerAskedAdvisorQuestion/);
