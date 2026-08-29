@@ -1,5 +1,6 @@
 export type MarketplaceVehicleFacts = {
   title?: string | null;
+  vin?: string | null;
   mileage?: number | null;
   price?: number | null;
   exteriorColor?: string | null;
@@ -46,7 +47,7 @@ export function hasConcreteCashOffer(value: unknown): boolean {
 export function detectVehicleRequestKind(value: unknown): VehicleRequestKind {
   const text = normalized(value);
   if (!text) return null;
-  if (/\b(?:carfax|vehicle history|reporte del carro|reporte del vehiculo|historial del carro|historial del vehiculo)\b/.test(text)) return "carfax";
+  if (/\b(?:carfax|vehicle history|history report|accident|accidents|reporte del carro|reporte del vehiculo|historial del carro|historial del vehiculo|accidente|accidentes)\b/.test(text)) return "carfax";
   if (/\b(?:photo|photos|picture|pictures|images|fotos|fotografias|imagenes|mas fotos|more photos)\b/.test(text)) return "photos";
   return null;
 }
@@ -82,6 +83,8 @@ export function hasVehicleValueFact(
     const digits = String(Math.round(Number(facts.mileage)));
     if (text.replace(/\D/g, "").includes(digits)) return true;
   }
+  if (facts.price != null && text.replace(/\D/g, "").includes(String(Math.round(Number(facts.price))))) return true;
+  if (facts.vin?.trim() && text.includes(normalized(facts.vin))) return true;
   return !!facts.exteriorColor?.trim() && text.includes(normalized(facts.exteriorColor));
 }
 

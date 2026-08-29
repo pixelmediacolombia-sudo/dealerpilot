@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -10,6 +10,7 @@ export const dealersTable = pgTable("dealers", {
   plan: text("plan").notNull().default("complete"),
   status: text("status").notNull().default("Active"),
   notes: text("notes"),
+  hasCleanTitleInventory: boolean("has_clean_title_inventory").notNull().default(false),
   addressLine1: text("address_line1"),
   city: text("city"),
   state: text("state"),

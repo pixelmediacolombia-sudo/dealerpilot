@@ -39,6 +39,7 @@ export async function seedDealerAndInventory(log: Logger): Promise<void> {
         websiteUrl: "https://www.alphamotorsport.net",
         xmlFeedUrl: REAL_FEED_URL,
         status: "Active",
+        hasCleanTitleInventory: true,
         notes: "Primary launch dealer — inventory synced from the real Alpha Motorsport XML feed.",
         ...ALPHA_ADDRESS,
       })
@@ -48,20 +49,24 @@ export async function seedDealerAndInventory(log: Logger): Promise<void> {
   } else {
     const needsFeedUpdate = dealer.xmlFeedUrl !== REAL_FEED_URL;
     const needsAddressUpdate = !dealer.addressLine1 || !dealer.latitude;
-    if (needsFeedUpdate || needsAddressUpdate) {
+    const needsTitlePolicyUpdate = dealer.hasCleanTitleInventory !== true;
+    if (needsFeedUpdate || needsAddressUpdate || needsTitlePolicyUpdate) {
       await db
         .update(dealersTable)
         .set({
           xmlFeedUrl: REAL_FEED_URL,
           websiteUrl: "https://www.alphamotorsport.net",
+          hasCleanTitleInventory: true,
           notes: "Primary launch dealer — inventory synced from the real Alpha Motorsport XML feed.",
           ...ALPHA_ADDRESS,
         })
         .where(eq(dealersTable.id, dealer.id));
-      dealer = { ...dealer, xmlFeedUrl: REAL_FEED_URL, ...ALPHA_ADDRESS };
+      dealer = { ...dealer, xmlFeedUrl: REAL_FEED_URL, hasCleanTitleInventory: true, ...ALPHA_ADDRESS };
       log.info({ dealerId: dealer.id }, "Updated Alpha Motorsport dealer record");
     }
   }
+
+  if (!dealer) throw new Error("Alpha Motorsport dealer could not be initialized");
 
   // Keep the feeds table in sync with the dealer's canonical URL.
   const feeds = await db.select().from(feedsTable).where(eq(feedsTable.dealerId, dealer.id));
