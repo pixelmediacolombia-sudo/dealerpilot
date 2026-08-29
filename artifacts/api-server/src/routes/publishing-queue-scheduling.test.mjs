@@ -725,7 +725,6 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /Do not ask for requirements yet/);
   assert.match(conversationsSource, /price_inquiry/);
   assert.match(conversationsSource, /buyerAskedPriceInquiry/);
-  assert.match(conversationsSource, /Do not provide a number/);
   assert.match(conversationsSource, /isFirstDealerReply/);
   assert.match(conversationsSource, /withFirstReplyGreeting/);
   assert.match(conversationsSource, /First reply instruction/);
@@ -756,9 +755,16 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /warranty_info/);
   assert.match(conversationsSource, /function buyerAskedCleanTitleAndWarranty/);
   assert.match(conversationsSource, /clean_title_and_warranty/);
-  assert.match(conversationsSource, /Which detail would you like us to confirm first/);
+  assert.match(conversationsSource, /What number should we send the report to/);
   assert.match(conversationsSource, /including what applies if you pay cash/);
-  assert.match(conversationsSource, /Do not invent either fact, provide a number, ask for a phone number, or restart financing/);
+  assert.match(conversationsSource, /Our sales agents have the vehicle report/);
+  assert.match(conversationsSource, /Nuestros agentes de ventas tienen el reporte del vehículo/);
+  assert.match(conversationsSource, /Assign BDC only when the complete qualification reaches qualified_exit/);
+  assert.match(conversationsSource, /qualificationHandoffReason/);
+  assert.match(conversationsSource, /currentStage === "qualified_exit"/);
+  assert.match(conversationsSource, /if \(!closeAfterDelivery && assistantMessage\?\.id\)/);
+  assert.match(conversationsSource, /phone_received: "Thank the buyer for providing a phone number/);
+  assert.doesNotMatch(conversationsSource, /phone_received: "Do not generate a reply/);
   const combinedDetailStage = conversationsSource.indexOf('if (buyerAskedCleanTitleAndWarranty(latest)) return "clean_title_and_warranty";');
   const genericQuestionStage = conversationsSource.indexOf('if (buyerHasOpenQuestion(latest)) return "open_question";');
   assert.ok(combinedDetailStage >= 0 && combinedDetailStage < genericQuestionStage);
@@ -767,7 +773,6 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /buyerAskedAdvisorQuestion/);
   assert.match(conversationsSource, /Do not use the words "advisor" or "asesor"/);
   assert.match(conversationsSource, /Use "our team" \/ "nuestro equipo"/);
-  assert.match(conversationsSource, /Do not provide a number/);
   assert.match(conversationsSource, /stageRequiresStorePhone/);
   assert.match(conversationsSource, /replyIncludesStorePhone/);
   assert.match(conversationsSource, /replyGivesRestrictedVehicleDetails/);
@@ -775,7 +780,7 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /Dealership phone: \$\{storePhone\}/);
   assert.match(conversationsSource, /detailed_question/);
   assert.match(conversationsSource, /confirm that detail/);
-  assert.match(conversationsSource, /best phone number so we can help you/);
+  assert.match(conversationsSource, /For a clean-title or warranty question, state that the vehicle has a clean title/);
   assert.match(conversationsSource, /generateAiReplyWithFallback/);
   assert.match(conversationsSource, /buildSafeFallbackReply/);
   assert.match(conversationsSource, /duplicate_buyer_message/);

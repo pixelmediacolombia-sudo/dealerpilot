@@ -29,7 +29,6 @@ import {
 import {
   detectVehicleRequestKind,
   extractCarfaxUrlFromSourceRaw,
-  hasConcreteCashOffer,
   hasDownPaymentAmount,
   hasVisitDaySignal,
   hasVehicleValueFact,
@@ -965,13 +964,13 @@ function buildBaseSafeFallbackReply(
       return `Para avanzar necesitamos una identificación vigente y comprobante de ingresos.${detailBridge} ¿Cuentas con ambos?`;
     }
     if (stage === "clean_title") {
-      return `Buena pregunta. Podemos verificar si el ${vehicle} tiene título limpio. ¿Qué detalle te gustaría que confirmemos?`;
+      return `Sí, el ${vehicle} tiene título limpio. Nuestros agentes de ventas tienen el reporte del vehículo y pueden darte los detalles de la garantía. ¿A qué número te enviamos el reporte?`;
     }
     if (stage === "clean_title_and_warranty") {
-      return `Buena pregunta. Podemos verificar el título limpio y la cobertura exacta de garantía del ${vehicle}, incluyendo lo que aplica si compras de contado. ¿Qué detalle te gustaría que confirmemos primero?`;
+      return `Sí, el ${vehicle} tiene título limpio. Nuestros agentes de ventas tienen el reporte del vehículo y pueden darte los detalles de la garantía, incluso para una compra de contado. ¿A qué número te enviamos el reporte?`;
     }
     if (stage === "warranty_info") {
-      return `Buena pregunta. Podemos verificar la cobertura exacta de garantía del ${vehicle}. ¿Qué detalle te gustaría que confirmemos?`;
+      return `Sí, el ${vehicle} tiene título limpio. Nuestros agentes de ventas tienen el reporte del vehículo y pueden darte los detalles de la garantía. ¿A qué número te enviamos el reporte?`;
     }
     if (stage === "advisor_question") {
       return `Buena pregunta. Podemos confirmar ese detalle del ${vehicle}. ¿Qué te gustaría saber?`;
@@ -1068,13 +1067,13 @@ function buildBaseSafeFallbackReply(
       return `To move forward, we need a valid ID and proof of income.${detailBridge} Do you have both?`;
   }
   if (stage === "clean_title") {
-    return `Good question. We can verify whether the ${vehicle} has a clean title. What would you like us to confirm?`;
+    return `Yes, the ${vehicle} has a clean title. Our sales agents have the vehicle report and can provide the warranty details. What number should we send the report to?`;
   }
   if (stage === "clean_title_and_warranty") {
-    return `Great question. We can verify the clean-title status and exact warranty coverage for the ${vehicle}, including what applies if you pay cash. Which detail would you like us to confirm first?`;
+    return `Yes, the ${vehicle} has a clean title. Our sales agents have the vehicle report and can provide the warranty details, including what applies if you pay cash. What number should we send the report to?`;
   }
   if (stage === "warranty_info") {
-    return `Great question. We can verify the exact warranty coverage for the ${vehicle}. What would you like us to confirm?`;
+    return `Yes, the ${vehicle} has a clean title. Our sales agents have the vehicle report and can provide the warranty details. What number should we send the report to?`;
   }
   if (stage === "advisor_question") {
     return `Great question. We can confirm that detail for the ${vehicle}. What would you like to know?`;
@@ -1302,19 +1301,25 @@ function isAiReplyAligned(
   }
   if (stage === "clean_title") {
     return /clean title|clear title|titulo limpio|t[ií]tulo limpio|certification|certificaci[oó]n/.test(normalized) &&
-      /what would you like us to confirm|qué detalle te gustaría que confirmemos|que detalle te gustaria que confirmemos|verify|verificar|confirm/.test(normalized) &&
-      !/phone|number|tel[eé]fono|n[uú]mero|financ|financing/.test(normalized);
+      /(?:yes|s[ií]|has a clean title|tiene t[ií]tulo limpio)/.test(normalized) &&
+      /vehicle report|reporte del veh[ií]culo|sales agent|salesperson|agentes de ventas|vendedor/.test(normalized) &&
+      /phone|number|tel[eé]fono|n[uú]mero/.test(normalized) &&
+      !/financ|financing/.test(normalized);
   }
   if (stage === "clean_title_and_warranty") {
     return /clean title|clean-title|titulo limpio|t[ií]tulo limpio/.test(normalized) &&
       /warranty|coverage|garantia|cobertura/.test(normalized) &&
-      /what would you like us to confirm|which detail would you like us to confirm|qué detalle te gustaría que confirmemos|que detalle te gustaria que confirmemos|verify|verificar|confirm/.test(normalized) &&
-      !/phone|number|tel[eé]fono|n[uú]mero|financ|financing/.test(normalized);
+      /(?:yes|s[ií]|has a clean title|tiene t[ií]tulo limpio)/.test(normalized) &&
+      /vehicle report|reporte del veh[ií]culo|sales agent|salesperson|agentes de ventas|vendedor/.test(normalized) &&
+      /phone|number|tel[eé]fono|n[uú]mero/.test(normalized) &&
+      !/financ|financing/.test(normalized);
   }
   if (stage === "warranty_info") {
-    return /warranty|coverage|garantia|cobertura|confirm|confirmar/.test(normalized) &&
-      /what would you like us to confirm|qué detalle te gustaría que confirmemos|que detalle te gustaria que confirmemos|verify|verificar|confirm/.test(normalized) &&
-      !/phone|number|tel[eé]fono|n[uú]mero|financ|financing/.test(normalized);
+    return /clean title|clean-title|titulo limpio|t[ií]tulo limpio/.test(normalized) &&
+      /warranty|coverage|garantia|cobertura/.test(normalized) &&
+      /vehicle report|reporte del veh[ií]culo|sales agent|salesperson|agentes de ventas|vendedor/.test(normalized) &&
+      /phone|number|tel[eé]fono|n[uú]mero/.test(normalized) &&
+      !/financ|financing/.test(normalized);
   }
   if (stage === "advisor_question") {
     return /detail|detalle|confirm|confirmar|verify|verificar/.test(normalized) &&
@@ -1385,19 +1390,24 @@ function avoidRepeatedFallback(
       : addMarketplaceValueFact(`Great question. I can verify that detail about the ${vehicle}. What would you like to know?`, language, vehicleFacts);
   }
   if (stage === "warranty_info" || stage === "advisor_question") {
+    if (stage === "advisor_question") {
+      return language === "es"
+        ? addMarketplaceValueFact(`Podemos verificar ese detalle del ${vehicle}. ¿Qué te gustaría saber?`, language, vehicleFacts)
+        : addMarketplaceValueFact(`We can verify that detail for the ${vehicle}. What would you like to know?`, language, vehicleFacts);
+    }
     return language === "es"
-      ? addMarketplaceValueFact(`Podemos verificar ese detalle del ${vehicle}. ¿Qué te gustaría saber?`, language, vehicleFacts)
-      : addMarketplaceValueFact(`We can verify that detail for the ${vehicle}. What would you like to know?`, language, vehicleFacts);
+      ? addMarketplaceValueFact(`Sí, el ${vehicle} tiene título limpio. Nuestros agentes de ventas tienen el reporte del vehículo y pueden darte los detalles de la garantía. ¿A qué número te enviamos el reporte?`, language, vehicleFacts)
+      : addMarketplaceValueFact(`Yes, the ${vehicle} has a clean title. Our sales agents have the vehicle report and can provide the warranty details. What number should we send the report to?`, language, vehicleFacts);
   }
   if (stage === "clean_title") {
     return language === "es"
-      ? addMarketplaceValueFact(`Podemos verificar si el ${vehicle} tiene título limpio. ¿Qué detalle te gustaría que confirmemos?`, language, vehicleFacts)
-      : addMarketplaceValueFact(`We can verify whether the ${vehicle} has a clean title. What would you like us to confirm?`, language, vehicleFacts);
+      ? addMarketplaceValueFact(`Sí, el ${vehicle} tiene título limpio. Nuestros agentes de ventas tienen el reporte del vehículo y pueden darte los detalles de la garantía. ¿A qué número te enviamos el reporte?`, language, vehicleFacts)
+      : addMarketplaceValueFact(`Yes, the ${vehicle} has a clean title. Our sales agents have the vehicle report and can provide the warranty details. What number should we send the report to?`, language, vehicleFacts);
   }
   if (stage === "clean_title_and_warranty") {
     return language === "es"
-      ? addMarketplaceValueFact(`Podemos verificar el título limpio y la cobertura exacta de garantía del ${vehicle}, incluyendo lo que aplica si compras de contado. ¿Qué detalle te gustaría que confirmemos primero?`, language, vehicleFacts)
-      : addMarketplaceValueFact(`We can verify the clean-title status and exact warranty coverage for the ${vehicle}, including what applies if you pay cash. Which detail would you like us to confirm first?`, language, vehicleFacts);
+      ? addMarketplaceValueFact(`Sí, el ${vehicle} tiene título limpio. Nuestros agentes de ventas tienen el reporte del vehículo y pueden darte los detalles de la garantía, incluso para una compra de contado. ¿A qué número te enviamos el reporte?`, language, vehicleFacts)
+      : addMarketplaceValueFact(`Yes, the ${vehicle} has a clean title. Our sales agents have the vehicle report and can provide the warranty details, including what applies if you pay cash. What number should we send the report to?`, language, vehicleFacts);
   }
   return reply;
 }
@@ -1488,7 +1498,7 @@ QUALIFICATION FUNNEL FOR ALPHA MANASSAS:
 1. Start with a warm greeting as Alpha Motorsports, confirm that the exact vehicle from the Vehicle field is available, include exactly one useful vehicle fact from the Feed-backed Vehicle facts, and ask what the buyer would like to know. Never ask about financing in the first reply.
 2. Answer the buyer's latest question first. Keep one useful vehicle fact in every reply when one is available. If the buyer confirms interest, ask whether this week or the weekend works better; do not ask for a phone number yet.
 3. Once the buyer gives a visit day or proposes coming to the lot, ask for the buyer's phone number to confirm the tentative visit. The seller calls to confirm the hour; never promise a confirmed appointment.
-4. A buyer phone number, a down-payment amount, or a concrete cash offer triggers immediate handoff. Do not ask another qualification question and do not send a bot reply after that signal.
+4. Capture a buyer phone number for the lead, but do not treat it as the end of qualification or assign BDC yet. Continue with the remaining qualification questions. Assign BDC only when the complete qualification reaches qualified_exit.
 4. If an approved minimum is supplied and the buyer has less than that minimum down, explain the requirement using only that configured minimum. If no approved configuration is supplied, never state a down-payment number. If the buyer says no, thank them and close politely without asking another question.
 5. If financing is explicitly mentioned by the buyer, answer only from supplied policy and never invent approval, rate, or terms. Do not use financing to evade another question.
 6. If the buyer asks for photos, send the single dealer-domain VDP URL when available. Send at most one VDP link per conversation and never in the first message.
@@ -1497,7 +1507,7 @@ QUALIFICATION FUNNEL FOR ALPHA MANASSAS:
 9. If the buyer asks whether the vehicle is available, answer yes, include a feed-backed value fact, and close with 'What would you like to know?' / '¿Qué te gustaría saber?'.
 10. If the buyer asks for Alpha Motorsports' phone number directly, give the supplied dealership phone and close politely. Do not restart qualification in that reply.
 11. Keep exactly one short reply for the latest buyer turn. One idea, one question. Never repeat a question already answered in the history.
-12. Detailed vehicle questions: answer only from supplied context; never invent price, mileage, approval, history, warranty, range, certification, or financing terms. If the fact is absent, say that it is not confirmed and offer to verify it.
+12. Every Alpha Motorsports vehicle has a clean title. When asked about title, say directly that it has a clean title; never say that the title is unknown or needs verification. The vehicle report is held by our sales agents, who can provide the warranty details. Ask what number to send the report to. Do not invent specific warranty terms, price, mileage, approval, history, range, or financing terms.
 
 ADDRESS / DIRECTIONS HANDLING:
 - If the buyer asks for the address, directions, or location, provide the store address directly and ask whether today or tomorrow works.
@@ -1520,10 +1530,10 @@ Language rules:
 - Do not push a call, ask for a phone number, or include the store phone in the first reply, except when the buyer explicitly requests the dealership phone
 - If the current stage is stalled_conversation_request_phone, ask for the buyer's phone number directly, include Alpha's dealership phone, and do not repeat purchase-interest questions or requirements
 - If the current stage is salesperson_request_phone, say that our salesperson can provide more information about the vehicle, then ask for the buyer's phone number and include Alpha's dealership phone
-- Never ask for the "best phone number so we can help you" in response to a vehicle-detail or warranty question; return to the next sequential funnel step instead
+- For a clean-title or warranty question, state that the vehicle has a clean title, explain that our sales agents have the vehicle report and warranty details, and ask what number to send the report to
 - Do not ask for a phone number in the same reply that first explains the financing requirements
 - If the current stage is request_phone, ask only for the buyer's phone number
-- If the current stage is phone_received, do not generate a bot reply; the lead is handed off to the seller
+- If the current stage is phone_received, thank the buyer for the number and continue with the next required qualification question. Do not assign BDC yet.
 - If the current stage is qualified_exit, include the Alpha Manassas dealership phone at the end and do not ask a question
 - If the current stage is store_phone_requested, give only Alpha's dealership phone and a brief polite closing; do not ask a question
 - NEVER say: guaranteed approval, everyone approved, bad credit, denied, rejected, disqualified
@@ -1641,7 +1651,7 @@ export async function generateAiReply(
     stalled_conversation_request_phone: `The deterministic history check found at least two recent buyer turns that did not advance the sale. Skip the normal funnel and ask once for the buyer's best phone number, including Alpha's dealership phone: ${storePhone}. Do not repeat a financing-interest question, financing requirements, or a vehicle-detail question.`,
     salesperson_request_phone: `Alpha already requested the buyer's phone number and the buyer is still asking vehicle-detail questions. Do not repeat the prior phone-request wording. Say that our salesperson can provide more information about the vehicle, then ask for the buyer's best phone number and include Alpha's dealership phone: ${storePhone}. Do not restart financing requirements.`,
     request_phone: "Ask for the buyer's best phone number to confirm the tentative visit. Include one feed-backed value fact. Do not ask about financing or down payment.",
-    phone_received: "Do not generate a reply. The buyer has been handed off to the seller.",
+    phone_received: "Thank the buyer for providing a phone number for the vehicle report, then continue with the next required qualification question. Do not assign BDC yet; qualification is complete only at qualified_exit.",
     down_payment_request: "Ask how much the buyer has available for the down payment. Mention approved amounts only when the configuration below contains them.",
     down_payment_low: "Explain the configured minimum down payment and ask whether the buyer can reach it. Do not invent a minimum.",
     down_payment_declined: "Thank the buyer and close politely because the configured minimum down payment is required. Do not invent or repeat a number from history.",
@@ -1660,9 +1670,9 @@ export async function generateAiReply(
       : "No VIN-specific Carfax URL is available. Say the salesperson can send the report; do not promise that a report exists and do not invent a link.",
     inventory_options: "The buyer is asking whether more vehicles or similar options are available. Confirm that more vehicles are available, then ask which option they would like to explore. Do not ask for requirements yet.",
     document_requirements: "The buyer is asking what is needed. Reply warmly with the requirements: valid ID and proof of income. Ask if they have both. Do not ask for a phone number yet.",
-    clean_title: "Answer the clean-title or certification question from supplied facts only. Do not invent the title status; say we can verify whether the vehicle has a clean title, then ask what detail the buyer would like us to confirm. Do not provide a number or ask for a phone number.",
-    clean_title_and_warranty: "The buyer asked about both clean title and warranty while mentioning cash. Acknowledge both questions, say we can verify the clean-title status and exact warranty coverage that applies to a cash purchase, and ask which detail the buyer would like us to confirm first. Do not invent either fact, provide a number, ask for a phone number, or restart financing.",
-    warranty_info: "The buyer is asking detailed warranty questions. Do not invent warranty terms; say we can verify the exact warranty coverage, then ask what detail the buyer would like us to confirm. Do not ask for a phone number.",
+    clean_title: "State directly that the vehicle has a clean title. Explain that our sales agents have the vehicle report and can provide the warranty details, then ask what number to send the report to. Do not invent specific warranty terms or financing details.",
+    clean_title_and_warranty: "The buyer asked about clean title and warranty while mentioning cash. State directly that the vehicle has a clean title, explain that our sales agents have the vehicle report and can provide the warranty details, including what applies to a cash purchase, then ask what number to send the report to. Do not invent specific warranty terms or assign BDC before qualification is complete.",
+    warranty_info: "State directly that the vehicle has a clean title. Explain that our sales agents have the vehicle report and can provide the warranty details, then ask what number to send the report to. Do not invent specific warranty terms.",
     advisor_question: "The buyer is asking a detailed question. Respond warmly and do not invent details. Say we will be happy to confirm that detail, then ask what the buyer would like to know next. Do not ask for a phone number.",
     general: "Answer safely using only supplied facts, then move the conversation forward with one short question.",
   }[stage];
@@ -2047,14 +2057,6 @@ router.post("/conversations/intake", async (req, res) => {
   const language = detectLanguage(inbound);
   const buyerQualification = extractBuyerQualification(incomingMsgs);
   const extractedPhone = extractPhoneNumber(inbound);
-  const currentDownPaymentAmount = extractDownPaymentAmount(inbound);
-  const immediateHandoffReason = extractedPhone
-    ? "buyer_phone_received"
-    : currentDownPaymentAmount !== null
-      ? "down_payment_amount_received"
-      : hasConcreteCashOffer(inbound)
-        ? "concrete_cash_offer_received"
-        : null;
   if (isTerminalBuyerAcknowledgement(inbound) || isConversationClosingBuyerAcknowledgement(inbound)) {
     req.log.info(
       { externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
@@ -2453,6 +2455,9 @@ router.post("/conversations/intake", async (req, res) => {
     inbound,
     downPaymentPolicy,
   );
+  const qualificationHandoffReason = currentStage === "qualified_exit"
+    ? "qualification_completed"
+    : null;
   const closeAfterDelivery = [
     // Sharing the dealership phone is an informational reply. The buyer may
     // still need to provide their phone and complete the qualification flow.
@@ -2490,7 +2495,7 @@ router.post("/conversations/intake", async (req, res) => {
       role: "assistant",
       content: suggestedReply,
     }).returning({ id: conversationMessagesTable.id });
-    if (!extractedPhone && !closeAfterDelivery && assistantMessage?.id) {
+    if (!closeAfterDelivery && assistantMessage?.id) {
       outboundJob = await queueNormalReply({
         conversationId,
         dealerId,
@@ -2528,8 +2533,7 @@ router.post("/conversations/intake", async (req, res) => {
       phone: resolvedPhone,
       appointmentIntent: existingLead.appointmentIntent,
     });
-    // Buyer providing phone number → force HOT, assign to BDC
-    const finalTemperature = immediateHandoffReason ? "Hot" : temperature;
+    const finalTemperature = qualificationHandoffReason ? "Hot" : temperature;
     resolvedLeadQuality = finalTemperature;
     await db
       .update(leadsTable)
@@ -2546,9 +2550,9 @@ router.post("/conversations/intake", async (req, res) => {
         buyerTimeline: resolvedTimeline,
         hasId: resolvedDocuments?.hasId ?? existingLead.hasId,
         hasProofOfIncome: resolvedDocuments?.hasProofOfIncome ?? existingLead.hasProofOfIncome,
-        leadScore: immediateHandoffReason ? Math.max(score, 70) : score,
+        leadScore: qualificationHandoffReason ? Math.max(score, 70) : score,
         temperature: finalTemperature,
-        status: immediateHandoffReason ? "BDC Assigned" : existingLead.status,
+        status: qualificationHandoffReason ? "BDC Assigned" : existingLead.status,
         updatedAt: new Date(),
       })
       .where(eq(leadsTable.id, existingLead.id));
@@ -2557,7 +2561,7 @@ router.post("/conversations/intake", async (req, res) => {
       publishedDownPayment: trustedDownPayment,
       phone: extractedPhone,
     });
-    const finalTemperature = immediateHandoffReason ? "Hot" : temperature;
+    const finalTemperature = qualificationHandoffReason ? "Hot" : temperature;
     resolvedLeadQuality = finalTemperature;
     const [newLead] = await db
       .insert(leadsTable)
@@ -2576,9 +2580,9 @@ router.post("/conversations/intake", async (req, res) => {
         buyerTimeline: buyerQualification.timeline,
         hasId: buyerQualification.documents?.hasId ?? null,
         hasProofOfIncome: buyerQualification.documents?.hasProofOfIncome ?? null,
-        leadScore: immediateHandoffReason ? Math.max(score, 70) : score,
+        leadScore: qualificationHandoffReason ? Math.max(score, 70) : score,
         temperature: finalTemperature,
-        status: immediateHandoffReason ? "BDC Assigned" : "New",
+        status: qualificationHandoffReason ? "BDC Assigned" : "New",
       })
       .returning();
     leadId = newLead.id;
@@ -2646,8 +2650,8 @@ router.post("/conversations/intake", async (req, res) => {
     leadId,
     suggestedReply,
     outboundJob,
-    handoff: !!immediateHandoffReason,
-    handoffReason: immediateHandoffReason,
+    handoff: !!qualificationHandoffReason,
+    handoffReason: qualificationHandoffReason,
     closeConversationAfterDelivery: closeAfterDelivery && !!suggestedReply,
     language,
     fallbackUsed: aiReplyResult?.fallbackUsed ?? false,
