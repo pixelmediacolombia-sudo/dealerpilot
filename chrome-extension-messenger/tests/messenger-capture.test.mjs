@@ -71,6 +71,8 @@ class FakeElement {
     if (selector.includes('a[href*="/marketplace/item/"]')) {
       return this.tagName === "A" && /\/marketplace\/item\//.test(this.attributes.href || "");
     }
+    if (selector === 'a[href]') return this.tagName === "A" && !!this.attributes.href;
+    if (selector.includes('[role="link"]')) return this.attributes.role === "link";
     if (selector === "img[src]" || selector === "img[data-src]" || selector === "img[src], img[data-src]") {
       return this.tagName === "IMG";
     }
@@ -545,6 +547,49 @@ test("floating Marketplace chat merges visual outgoing replies when semantic mes
     "Q se necesita para aplicar",
     "cuales tienes?",
   ]);
+});
+
+test("outgoing human link remains Dealer and prevents an old buyer message from becoming latest", () => {
+  const oldBuyerMessage = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "I am interested in this truck and would want to buy under my business.",
+    rect: { left: 40, right: 300, top: 420, width: 260, height: 54 },
+  });
+  const humanLink = new FakeElement({
+    tagName: "a",
+    attributes: { href: "https://extranet.dealercentric.com/CreditPlus" },
+    text: "Get your pre approval today",
+    rect: { left: 220, right: 410, top: 600, width: 190, height: 44 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 620 },
+    children: [oldBuyerMessage, humanLink],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 850 },
+    children: [
+      new FakeElement({
+        tagName: "h2",
+        text: "Nabeel · 2022 Ford F150 Lightning",
+        rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+      }),
+      new FakeElement({ text: "Marketplace $2,500 - 2022 Ford F150 Lightning" }),
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 },
+      }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const messages = JSON.parse(JSON.stringify(capture.messages));
+
+  assert.equal(capture.evidence.latestMessageDirection, "dealer");
+  assert.equal(messages.at(-1).speaker, "Dealer");
+  assert.equal(messages.at(-1).text, "Get your pre approval today");
 });
 
 test("floating Marketplace chat cleans Write to buyer header and falls back to inbox preview", () => {

@@ -664,6 +664,25 @@
     return rows.sort((a, b) => a.top - b.top).map(({ speaker, text, top }) => ({ speaker, text, __top: top }));
   }
 
+  function readInteractiveMessages(scope, buyerName) {
+    if (!scope?.querySelectorAll) return [];
+    return Array.from(scope.querySelectorAll('a[href], [role="link"]') || [])
+      .filter(isVisible)
+      .map((element) => {
+        const text = cleanMessageText(
+          textOf(element) ||
+          element.getAttribute?.("aria-label") ||
+          element.getAttribute?.("title") ||
+          element.getAttribute?.("href") ||
+          "",
+        );
+        if (!text || text.length < 2 || text.length > 500 || isUntrustedMessageText(text)) return null;
+        const speaker = isClearlyOwnSide(element, scope) ? "Dealer" : (buyerName || "Buyer");
+        return { speaker, text, __top: rectOf(element).top || 0 };
+      })
+      .filter(Boolean);
+  }
+
   function mergeVisualMessageLists(primary = [], secondary = []) {
     const seen = new Set();
     return [...primary, ...secondary]
@@ -735,7 +754,10 @@
         return messageTop < scopeRect.top - 10 || messageTop > scopeRect.bottom + 10;
       })
       : [];
-    const visualMessages = mergeVisualMessageLists(scopedVisualMessages, rootVisualMessages);
+    const visualMessages = mergeVisualMessageLists(
+      mergeVisualMessageLists(scopedVisualMessages, rootVisualMessages),
+      readInteractiveMessages(scope, buyerName),
+    );
     // Facebook can expose a semantic descriptor with a stale/wrong sender while
     // the bubble geometry still clearly identifies an outgoing Dealer message.
     // Preserve the semantic text but trust an unambiguous right-aligned bubble
@@ -762,14 +784,24 @@
     const inboxPreview = !hasBuyerMessage && !visibleBuyerMessages.length
       ? extractInboxPreviewMessage(documentRef, buyerName)
       : null;
+    const semanticDealerTexts = new Set(
+      reconciledSemantic
+        .filter((message) => message.speaker === "Dealer")
+        .map((message) => normalizeForMatch(message.text)),
+    );
     const finalMessages = messages.filter((message) =>
-      message.speaker !== "Dealer" || !visibleBuyerMessages.some((buyerMessage) => buyerMessage.text === message.text),
+      message.speaker !== "Dealer" ||
+      !visibleBuyerMessages.some((buyerMessage) => buyerMessage.text === message.text) ||
+      semanticDealerTexts.has(normalizeForMatch(message.text)),
     );
     if (inboxPreview && !finalMessages.some((message) => message.speaker !== "Dealer" && message.text === inboxPreview.text)) {
       finalMessages.push(inboxPreview);
     }
     for (const visibleBuyerMessage of visibleBuyerMessages) {
-      if (!finalMessages.some((message) => message.speaker !== "Dealer" && message.text === visibleBuyerMessage.text)) {
+      if (
+        !semanticDealerTexts.has(normalizeForMatch(visibleBuyerMessage.text)) &&
+        !finalMessages.some((message) => message.speaker !== "Dealer" && message.text === visibleBuyerMessage.text)
+      ) {
         finalMessages.push(visibleBuyerMessage);
       }
     }
