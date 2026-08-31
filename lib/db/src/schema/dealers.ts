@@ -1,6 +1,25 @@
-import { boolean, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+
+export type DealerMarketplaceKnowledgeLocale = {
+  address?: string;
+  phone?: string;
+  hours?: string;
+  title?: string;
+  testDrive?: string;
+  tradeIn?: string;
+  payment?: string;
+  financingRequirements?: string;
+  citizenRequirements?: string;
+  carfax?: string;
+  warranty?: string;
+};
+
+export type DealerMarketplaceKnowledge = {
+  es?: DealerMarketplaceKnowledgeLocale;
+  en?: DealerMarketplaceKnowledgeLocale;
+};
 
 export const dealersTable = pgTable("dealers", {
   id: serial("id").primaryKey(),
@@ -11,6 +30,10 @@ export const dealersTable = pgTable("dealers", {
   status: text("status").notNull().default("Active"),
   notes: text("notes"),
   hasCleanTitleInventory: boolean("has_clean_title_inventory").notNull().default(false),
+  marketplaceKnowledge: jsonb("marketplace_knowledge")
+    .$type<DealerMarketplaceKnowledge>()
+    .notNull()
+    .default({}),
   addressLine1: text("address_line1"),
   city: text("city"),
   state: text("state"),

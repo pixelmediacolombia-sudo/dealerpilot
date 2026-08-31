@@ -58,6 +58,7 @@ async function toDealer(dealer: Dealer) {
     status: dealer.status,
     notes: dealer.notes ?? null,
     hasCleanTitleInventory: dealer.hasCleanTitleInventory === true,
+    marketplaceKnowledge: dealer.marketplaceKnowledge ?? {},
     lastSyncAt,
     lastSyncStatus: latest?.status ?? null,
     totalVehiclesImported: total ?? 0,
@@ -90,6 +91,10 @@ const DealerUpdateBody = z.object({
   status: z.string().optional(),
   notes: z.string().optional(),
   hasCleanTitleInventory: z.boolean().optional(),
+  marketplaceKnowledge: z.object({
+    es: z.record(z.string(), z.string()).optional(),
+    en: z.record(z.string(), z.string()).optional(),
+  }).optional(),
 });
 
 router.patch("/dealers/:id", async (req, res) => {

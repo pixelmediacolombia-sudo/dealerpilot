@@ -31,7 +31,10 @@ test("recognizes down-payment and concrete cash signals without treating phone a
 
 test("routes photo and Carfax requests independently", () => {
   assert.equal(detectVehicleRequestKind("Do you have more photos?"), "photos");
+  assert.equal(detectVehicleRequestKind("Can I get more information?"), "photos");
+  assert.equal(detectVehicleRequestKind("Me das más información?"), "photos");
   assert.equal(detectVehicleRequestKind("Can I see the Carfax?"), "carfax");
+  assert.equal(detectVehicleRequestKind("Any issues with it?"), "carfax");
   assert.equal(detectVehicleRequestKind("Is it available?"), null);
 });
 

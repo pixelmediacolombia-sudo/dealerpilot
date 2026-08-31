@@ -228,8 +228,9 @@ function configuredDownPaymentText(envelope: MarketplaceEnvelope, language: "en"
     : `plans start at ${list} down`;
 }
 
-function addLink(reply: string, envelope: MarketplaceEnvelope): string {
+function addLink(reply: string, envelope: MarketplaceEnvelope, buyerMessage: string): string {
   if (!hasDealerReply(envelope) || hasExistingLink(envelope) || !envelope.vehicle.vdp_url) return reply;
+  if (!/\b(?:photo|photos|picture|pictures|image|images|fotos|imagenes|informaci[oó]n|information|details|detalles|ficha)\b/i.test(normalize(buyerMessage))) return reply;
   return `${reply} Aquí tienes la ficha completa: ${envelope.vehicle.vdp_url}`;
 }
 
@@ -290,7 +291,7 @@ export function buildMarketplaceTurnDecision(envelope: MarketplaceEnvelope): Tur
     const range = clean(envelope.known_facts?.battery_range || envelope.known_facts?.range);
     reply = range
       ? (language === "es" ? `La autonomía indicada por el dealer es ${range}. ${visitQuestion(language, cash)}` : `The dealer's listed range is ${range}. ${visitQuestion(language, cash)}`)
-      : (language === "es" ? `No tengo la cifra exacta de ese detalle en el inventario. Podemos verificarlo en el lote. ${visitQuestion(language, cash)}` : `I do not have that exact detail in the inventory facts. We can verify it at the lot. ${visitQuestion(language, cash)}`);
+      : (language === "es" ? `Nuestros agentes de ventas pueden ayudarte con ese detalle. ¿A qué número te lo enviamos?` : `Our sales agents can help with that detail. What number should we use to reach you?`);
     answered = true;
   } else if (intent === "vehiculo_vendido" || envelope.vehicle.status && envelope.vehicle.status !== "available") {
     reply = language === "es"
@@ -321,13 +322,13 @@ export function buildMarketplaceTurnDecision(envelope: MarketplaceEnvelope): Tur
     reply = language === "es" ? `Sí, el ${vehicle} está disponible. ${visitQuestion(language, cash)}` : `Yes, the ${vehicle} is available. ${visitQuestion(language, cash)}`;
     answered = true;
   } else if (facts.open_question) {
-    reply = language === "es" ? `Quiero responderte con precisión, pero ese dato no está en los hechos vigentes del inventario. Podemos confirmarlo en el lote. ${visitQuestion(language, cash)}` : `I want to answer accurately, but that detail is not in the current inventory facts. We can confirm it at the lot. ${visitQuestion(language, cash)}`;
+    reply = language === "es" ? `Nuestros agentes de ventas pueden ayudarte con ese detalle. ¿A qué número te contactamos?` : `Our sales agents can help with that detail. What number should we use to reach you?`;
     answered = true;
   } else {
     reply = language === "es" ? `Con gusto te ayudo con el ${vehicle}. ${visitQuestion(language, cash)}` : `I would be happy to help with the ${vehicle}. ${visitQuestion(language, cash)}`;
   }
 
-  reply = addLink(reply, envelope);
+  reply = addLink(reply, envelope, latest);
   const level = classifyMarketplaceLevel(facts);
   const questionCount = (reply.replace(/https?:\/\/\S+/gi, "").match(/[?]/g) ?? []).length;
   const violation = !handoff && questionCount !== 1

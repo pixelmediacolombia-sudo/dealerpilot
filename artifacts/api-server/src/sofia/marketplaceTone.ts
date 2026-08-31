@@ -47,8 +47,8 @@ export function hasConcreteCashOffer(value: unknown): boolean {
 export function detectVehicleRequestKind(value: unknown): VehicleRequestKind {
   const text = normalized(value);
   if (!text) return null;
-  if (/\b(?:carfax|vehicle history|history report|accident|accidents|reporte del carro|reporte del vehiculo|historial del carro|historial del vehiculo|accidente|accidentes)\b/.test(text)) return "carfax";
-  if (/\b(?:photo|photos|picture|pictures|images|fotos|fotografias|imagenes|mas fotos|more photos)\b/.test(text)) return "photos";
+  if (/\b(?:carfax|vehicle history|history report|accident|accidents|any issues|issues with it|issue with it|problem with it|problems with it|reporte del carro|reporte del vehiculo|historial del carro|historial del vehiculo|accidente|accidentes|problemas con el|alg[uú]n problema)\b/.test(text)) return "carfax";
+  if (/\b(?:photo|photos|picture|pictures|images|fotos|fotografias|imagenes|mas fotos|more photos|more information|more info|additional information|additional info|more details|more detail|mas informacion|más información|mas info|más info|ficha|informacion|información)\b/.test(text)) return "photos";
   return null;
 }
 

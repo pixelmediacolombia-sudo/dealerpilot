@@ -50,7 +50,7 @@ test("standalone K down payment is captured and a new phone triggers immediate h
   assert.doesNotMatch(result.reply_text, /\?/);
 });
 
-test("an open vehicle question is answered without inventing a number or requesting a phone", () => {
+test("an open vehicle question is routed to the sales agents without inventing a number", () => {
   const result = buildMarketplaceTurnDecision(envelope({
     messages: [
       { role: "dealer", text: "Hello, this is Alpha Motorsports." },
@@ -58,10 +58,10 @@ test("an open vehicle question is answered without inventing a number or request
     ],
   }));
   assert.equal(result.answered_buyer_question, true);
-  assert.match(result.reply_text, /exact detail|inventario facts|inventory facts/i);
-  assert.doesNotMatch(result.reply_text, /phone|n[uú]mero/i);
+  assert.match(result.reply_text, /sales agents|agentes de ventas/i);
+  assert.match(result.reply_text, /phone|number|n[uú]mero/i);
   assert.equal((result.reply_text.match(/\?/g) ?? []).length, 1);
-  assert.match(result.reply_text, /https:\/\/alphamotorsport\.com/);
+  assert.doesNotMatch(result.reply_text, /https:\/\/alphamotorsport\.com/);
 });
 
 test("cash price answers use the supplied source and never offer financing", () => {

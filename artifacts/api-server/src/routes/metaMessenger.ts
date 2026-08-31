@@ -8,6 +8,8 @@ import {
   leadsTable,
   listingsTable,
   vehiclesTable,
+  dealersTable,
+  type DealerMarketplaceKnowledge,
   type Conversation,
 } from "@workspace/db";
 import {
@@ -17,6 +19,7 @@ import {
 } from "./conversations";
 import { getDownPaymentPolicy, type DownPaymentPolicy } from "../downPayment/policy";
 import { vehicleOperationalColumns, type VehicleOperationalRow } from "../lib/vehicleColumns";
+import { extractCarfaxUrlFromSourceRaw, type MarketplaceVehicleFacts } from "../sofia/marketplaceTone";
 
 const router = Router();
 
@@ -105,6 +108,7 @@ async function matchVehicleFromMessage(message: string): Promise<{
   vehicleType?: string;
   downPayment?: number;
   downPaymentPolicy?: DownPaymentPolicy;
+  vehicleFacts?: MarketplaceVehicleFacts;
 }> {
   const vehicles = await db
     .select(vehicleOperationalColumns)
@@ -144,6 +148,33 @@ async function matchVehicleFromMessage(message: string): Promise<{
     vehicleType: match.bodyStyle ?? undefined,
     downPayment: downPaymentPolicy.minimumAmount ?? undefined,
     downPaymentPolicy,
+    vehicleFacts: {
+      title: vehicleLabel(match),
+      vin: match.vin,
+      mileage: match.mileage,
+      exteriorColor: match.exteriorColor,
+      price: match.price,
+      vdpUrl: match.vdpUrl,
+      carfaxUrl: extractCarfaxUrlFromSourceRaw(match.sourceRaw),
+    },
+  };
+}
+
+async function loadDealerContext(): Promise<{
+  hasCleanTitleInventory: boolean;
+  marketplaceKnowledge: DealerMarketplaceKnowledge;
+}> {
+  const [dealer] = await db
+    .select({
+      hasCleanTitleInventory: dealersTable.hasCleanTitleInventory,
+      marketplaceKnowledge: dealersTable.marketplaceKnowledge,
+    })
+    .from(dealersTable)
+    .where(eq(dealersTable.id, DEALER_ID))
+    .limit(1);
+  return {
+    hasCleanTitleInventory: dealer?.hasCleanTitleInventory === true,
+    marketplaceKnowledge: dealer?.marketplaceKnowledge ?? {},
   };
 }
 
@@ -255,7 +286,9 @@ async function upsertConversation(params: {
 
   return {
     conversation,
-    visibleMessages: history.reverse().map((message) => message.content),
+    visibleMessages: history.reverse().map((message) =>
+      `${message.role === "assistant" ? "Dealer" : "Buyer"}: ${message.content}`,
+    ),
     vehicleMatch,
   };
 }
@@ -361,6 +394,13 @@ async function processMessengerEvent(event: MetaMessagingEvent): Promise<{
     buyerMessage,
     eventDate: getMessageDate(event),
   });
+  const dealerContext = await loadDealerContext();
+  const storePhone = dealerContext.marketplaceKnowledge.en?.phone ??
+    dealerContext.marketplaceKnowledge.es?.phone ??
+    "+1 703-763-4675";
+  const storeAddress = dealerContext.marketplaceKnowledge.en?.address ??
+    dealerContext.marketplaceKnowledge.es?.address ??
+    undefined;
 
   const suggestedReply = await generateAiReply(
     visibleMessages,
@@ -369,10 +409,13 @@ async function processMessengerEvent(event: MetaMessagingEvent): Promise<{
     vehicleMatch.title ?? conversation.detectedVehicleTitle ?? undefined,
     vehicleMatch.vehicleType ?? conversation.vehicleType ?? undefined,
     vehicleMatch.downPayment ?? conversation.marketplaceDownPayment ?? undefined,
-    undefined,
+    storePhone,
     false,
-    undefined,
+    storeAddress,
     vehicleMatch.downPaymentPolicy,
+    vehicleMatch.vehicleFacts ?? {},
+    dealerContext.hasCleanTitleInventory,
+    dealerContext.marketplaceKnowledge,
   );
 
   await db.insert(conversationMessagesTable).values({
