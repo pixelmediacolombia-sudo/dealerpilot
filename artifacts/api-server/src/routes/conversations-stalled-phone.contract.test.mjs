@@ -42,3 +42,15 @@ test("Alpha Manassas qualification follows the new required order", () => {
     "receiving the buyer phone must still generate the next qualification question",
   );
 });
+
+test("monthly payment targets are not treated as available down payments", () => {
+  const extractorStart = source.indexOf("function extractDownPaymentAmount");
+  const extractorEnd = source.indexOf("type ImmediateHandoffReason", extractorStart);
+  assert.ok(extractorStart >= 0);
+  assert.ok(extractorEnd > extractorStart);
+  const extractor = source.slice(extractorStart, extractorEnd);
+  assert.match(extractor, /monthlyTargetAmount/);
+  assert.match(extractor, /per\\s\+month\|monthly\|a\\s\+month/);
+  assert.match(extractor, /explicitlyLabeledDownPayment/);
+  assert.match(extractor, /monthlyTargetAmount\s+&&\s+!explicitlyLabeledDownPayment/);
+});

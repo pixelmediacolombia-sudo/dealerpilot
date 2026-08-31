@@ -402,6 +402,14 @@ function extractDownPaymentAmount(text: string): number | null {
   const hasDownContext = standaloneKAmount || /down|enganche|inicial|cash|contado|efectivo|available|disponible|have|tengo|cuento|can put|puedo dar|puedo poner/.test(normalized);
   if (!hasDownContext) return null;
   const withoutPhoneNumber = normalized.replace(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, " ");
+  // A buyer may ask for a down payment that supports a monthly target, e.g.
+  // "what's the lowest down payment for 500 monthly". The number in that
+  // question is the desired monthly payment, not money the buyer has ready.
+  // Only treat a nearby number as a down payment when it is explicitly
+  // labeled as down/enganche/inicial or is not labeled as a monthly target.
+  const monthlyTargetAmount = /(?:\$?\d[\d,.]*|one thousand|two thousand|three thousand)\s*(?:per\s+month|monthly|a\s+month|\/\s*mo(?:nth)?)\b/i.test(withoutPhoneNumber);
+  const explicitlyLabeledDownPayment = /(?:\$?\d[\d,.]*|one thousand|two thousand|three thousand)\s*(?:k|mil|thousand)?\s*(?:down(?:\s+payment)?|enganche|inicial)\b/i.test(withoutPhoneNumber);
+  if (monthlyTargetAmount && !explicitlyLabeledDownPayment) return null;
   const numericMatch = withoutPhoneNumber.match(/(?:\$|usd\s*)?\s*(\d{1,2}(?:[,.]\d{3})?|\d{3,5})(?:\s*(?:k|mil|thousand))?/i);
   if (numericMatch?.[1]) {
     const raw = numericMatch[1].replace(/,/g, "");
