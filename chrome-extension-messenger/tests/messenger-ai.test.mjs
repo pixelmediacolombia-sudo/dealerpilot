@@ -849,6 +849,24 @@ test("autoReply replaces a stale DealerPilot draft when the repaired suggestion 
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
 
+test("Elyse's English vehicle question accepts an English reply and sends it", async () => {
+  const question = "I'm interested in the 2020 Model Y with 98,566 miles. Can you confirm the exact trim, clean-title/CARFAX status, and full out-the-door price for a DC resident?";
+  const { ai, calls, composerElement } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [{ speaker: "Elyse", text: question }],
+    intakeResponse: {
+      ok: true,
+      data: { suggestedReply: "Our sales agents can confirm those details. What number should we use to reach you?" },
+    },
+    sendSucceeds: true,
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, true);
+  assert.equal(result.deliveryConfirmed, true);
+  assert.equal(composerElement.textContent, "");
+});
 test("Spanish roof question never sends an English backend reply", async () => {
   const { ai, calls, composerElement, sendButton } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
@@ -873,6 +891,49 @@ test("Spanish roof question never sends an English backend reply", async () => {
   assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
 });
 
+test("Spanish cash answer never sends an English backend reply", async () => {
+  const { ai, calls, composerElement, sendButton } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [
+      { speaker: "Miguel", text: "Cash" },
+      { speaker: "Miguel", text: "De un solo pago" },
+    ],
+    intakeResponse: {
+      ok: true,
+      data: { suggestedReply: "Perfect, our sales agent will reach out to you shortly." },
+    },
+    sendSucceeds: true,
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.reason, "suggested_reply_language_mismatch");
+  assert.equal(result.autoSent, false);
+  assert.equal(composerElement.textContent, "");
+  assert.deepEqual(sendButton.events, []);
+  assert.equal(calls.debug.at(-1).stage, "auto_send_blocked");
+});
+
+test("Spanish history keeps a phone-only buyer reply in Spanish", async () => {
+  const { ai, calls, composerElement } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [
+      { speaker: "Miguel", text: "De un solo pago" },
+      { speaker: "Miguel", text: "703-763-4675" },
+    ],
+    intakeResponse: {
+      ok: true,
+      data: { suggestedReply: "Perfecto, un agente de ventas te contactará en breve." },
+    },
+    sendSucceeds: true,
+  });
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, true);
+  assert.equal(result.deliveryConfirmed, true);
+  assert.equal(composerElement.textContent, "");
+});
 test("terminal Spanish acknowledgement is not sent to AI and receives no automatic reply", async () => {
   const { ai, calls, composerElement, sendButton } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },

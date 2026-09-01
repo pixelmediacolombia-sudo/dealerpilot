@@ -199,10 +199,14 @@
     if (!normalized) return "unknown";
     if (/[¿¡ñáéíóúü]/i.test(raw)) return "es";
 
-    const spanishTokens = normalized.match(/\b(?:esa|ese|eso|esta|este|tiene|tienen|techo|panoramico|precio|cuanto|cual|donde|cuando|puedo|quisiera|busco|necesito|aplicar|requisitos|documentos|pasaporte|cuenta|bancaria|hola|buenas|gracias|financiar|financiamiento|carro|vehiculo|asesor|numero|telefono)\b/g) || [];
-    const englishTokens = normalized.match(/\b(?:this|that|does|have|has|roof|panoramic|price|cash|what|where|when|could|would|need|apply|requirements|documents|passport|bank|account|hello|thanks|financing|car|vehicle|advisor|number|phone|reach|you|your)\b/g) || [];
-    if (spanishTokens.length >= 2 && spanishTokens.length > englishTokens.length) return "es";
-    if (englishTokens.length >= 2 && englishTokens.length > spanishTokens.length) return "en";
+    const spanishTokens = normalized.match(/\b(?:esa|ese|eso|esta|este|tiene|tienen|techo|panoramico|precio|cuanto|cual|donde|cuando|puedo|quisiera|busco|necesito|aplicar|requisitos|documentos|pasaporte|cuenta|bancaria|hola|buenas|gracias|financiar|financiamiento|carro|vehiculo|asesor|numero|telefono|pago|contado|efectivo|solo|enviamos|mandamos|ubicacion|direccion|interesado|interesada|quiero|tengo|comprar|disponible)\b/g) || [];
+    const englishTokens = normalized.match(/\b(?:this|that|does|have|has|roof|panoramic|price|cash|what|where|when|could|would|need|apply|requirements|documents|passport|bank|account|hello|thanks|financing|finance|car|vehicle|advisor|number|phone|reach|you|your|payment|pay|send|located|address|interested|buy)\b/g) || [];
+    const spanishPhrase = /\b(?:de un solo pago|de contado|en efectivo|me das|cual es|a que numero|donde estan|donde queda)\b/.test(normalized);
+    const englishPhrase = /\b(?:one payment|pay in cash|what number|where are you located)\b/.test(normalized);
+    const spanishScore = spanishTokens.length + (spanishPhrase ? 3 : 0);
+    const englishScore = englishTokens.length + (englishPhrase ? 3 : 0);
+    if (spanishScore > 0 && spanishScore > englishScore) return "es";
+    if (englishScore > 0 && englishScore > spanishScore) return "en";
     return "unknown";
   }
 
@@ -234,8 +238,19 @@
     return /to\s+the\s+group\b|from\s+the\s+group\b|the\s+group\b|(?:group|video|audio)\s+call\b|\bal\s+grupo\b|\bdel\s+grupo\b|\bel\s+grupo\b/.test(normalized);
   }
 
-  function replyMirrorsBuyerLanguage(reply, currentMessage) {
-    const buyerLanguage = detectLikelyLanguage(currentMessage);
+  function buyerLanguageForReply(currentMessage, messages = []) {
+    const currentLanguage = detectLikelyLanguage(currentMessage);
+    if (currentLanguage !== "unknown") return currentLanguage;
+    for (const message of [...messages].reverse()) {
+      if (message?.speaker === "Dealer") continue;
+      const language = detectLikelyLanguage(message?.text || "");
+      if (language !== "unknown") return language;
+    }
+    return "unknown";
+  }
+
+  function replyMirrorsBuyerLanguage(reply, currentMessage, messages = []) {
+    const buyerLanguage = buyerLanguageForReply(currentMessage, messages);
     const replyLanguage = detectLikelyLanguage(reply);
     return buyerLanguage === "unknown" || replyLanguage === "unknown" || buyerLanguage === replyLanguage;
   }
@@ -1379,7 +1394,7 @@
     lastCaptureHashByThread.set(threadKey, payload.messageHash);
     clearPendingBuyer(threadKey);
     const lastSuggestedReply = repairSuggestedReplyForBuyerIntent(extractSuggestedReply(response), payload);
-    if (lastSuggestedReply && !replyMirrorsBuyerLanguage(lastSuggestedReply, payload.currentMessage)) {
+    if (lastSuggestedReply && !replyMirrorsBuyerLanguage(lastSuggestedReply, payload.currentMessage, snapshot.messages)) {
       await sendDebug("auto_send_blocked", {
         ...debug,
         aiReplyReceived: true,

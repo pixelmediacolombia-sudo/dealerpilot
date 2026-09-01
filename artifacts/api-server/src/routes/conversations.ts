@@ -37,6 +37,7 @@ import {
 } from "../sofia/marketplaceTone";
 import { ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
+import { detectConversationLanguage, detectLanguage } from "../conversations/language";
 
 
 const router = Router();
@@ -70,7 +71,7 @@ function resolveStoreAddress(
   lotLocation?: string | null,
   dealerKnowledge?: DealerMarketplaceKnowledge,
 ): string {
-  void lotLocation;
+  if (lotLocation === ALPHA_LOT_MANASSAS) return "9120 Euclid Ave, Manassas, VA 20110";
   return dealerKnowledge?.en?.address?.trim() || dealerKnowledge?.es?.address?.trim() || "9120 Euclid Ave, Manassas, VA 20110";
 }
 
@@ -448,24 +449,6 @@ function historyContainsDealerPrompt(visibleMessages: string[], pattern: RegExp)
     .some((message) => message?.role === "assistant" && pattern.test(normalizeIntentText(message.content)));
 }
 
-function buyerAskedReportRequest(value: string): boolean {
-  return detectVehicleRequestKind(value) === "carfax";
-}
-
-function historyContainsBuyerReportRequest(visibleMessages: string[], currentMessage?: string): boolean {
-  const current = currentMessage ? normalizeIntentText(currentMessage) : "";
-  let skippedCurrent = false;
-  for (const message of visibleMessages.map(parseConversationMessage).reverse()) {
-    if (message?.role !== "user") continue;
-    if (current && !skippedCurrent && normalizeIntentText(message.content) === current) {
-      skippedCurrent = true;
-      continue;
-    }
-    if (buyerAskedReportRequest(message.content)) return true;
-  }
-  return false;
-}
-
 function buyerAcceptedInterest(value: string): boolean {
   return /\b(?:yes|yeah|yep|sure|okay|ok|interested|i am interested|me interesa|estoy interesado|estoy interesada|si|s[ií]|claro|por supuesto)\b/i.test(normalizeIntentText(value));
 }
@@ -750,6 +733,7 @@ function replyIncludesStorePhone(reply: string, storePhone: string): boolean {
 
 function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
   return stage === "store_phone_requested" ||
+    stage === "carfax_request" ||
     stage === "cash_visit_request_phone" ||
     stage === "urgent_vehicle_request_phone" ||
     stage === "stalled_conversation_request_phone" ||
@@ -1037,7 +1021,7 @@ function buildRedactedCopyBrief(params: {
       break;
     case "carfax_request":
       factsToDeliver.push("sales_agent_report");
-      if (historyContainsBuyerReportRequest(params.visibleMessages, params.currentMessage)) factsToDeliver.push(`dealer_phone=${params.storePhone}`);
+      factsToDeliver.push(`dealer_phone=${params.storePhone}`);
       break;
     case "address_request":
       factsToDeliver.push(`dealer_address=${params.storeAddress}`);
@@ -1137,7 +1121,6 @@ function buildBaseSafeFallbackReply(
       : vehicleNames.full)
     : (language === "es" ? "vehículo" : "vehicle");
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
-  const reportRequestedBefore = historyContainsBuyerReportRequest(visibleMessages, currentMessage);
   const storeAddress = resolveStoreAddress(lotLocation, dealerKnowledge);
   const knowledge = (key: keyof NonNullable<DealerMarketplaceKnowledge["en"]>, fallback: string) =>
     dealerKnowledgeValue(dealerKnowledge, language, key, fallback);
@@ -1149,9 +1132,7 @@ function buildBaseSafeFallbackReply(
       return `Nuestros agentes de ventas pueden compartirte la ficha. ¿A qué número te la enviamos?`;
     }
     if (stage === "carfax_request") {
-      return reportRequestedBefore
-        ? `Llámanos al ${storePhone} y nuestros agentes de ventas te envían el Carfax de una.`
-        : "El Carfax lo tienen nuestros agentes de ventas. ¿A qué número te lo enviamos?";
+      return `Nuestros agentes de ventas tienen el reporte Carfax. ¿A qué número te lo enviamos? También puedes llamar a Alpha Motorsports al ${storePhone}.`;
     }
     if (stage === "store_phone_requested") {
       return `Con gusto, nuestro número es ${storePhone}. Quedamos atentos.`;
@@ -1272,9 +1253,7 @@ function buildBaseSafeFallbackReply(
     return "Our sales agents can send the vehicle page. What number should we use to reach you?";
   }
   if (stage === "carfax_request") {
-    return reportRequestedBefore
-      ? `Call us at ${storePhone} and our sales agents will send the Carfax right over.`
-      : "Our sales agents have the Carfax report. What number should we send it to?";
+    return `Our sales agents have the Carfax report. What phone number should we send it to? You can also call Alpha Motorsports at ${storePhone}.`;
   }
     if (stage === "store_phone_requested") {
       return `Of course, our number is ${storePhone}. We are here if you need anything else.`;
@@ -1778,14 +1757,9 @@ function avoidRepeatedFallback(
       : `Our sales agents can help with that detail. What number should we use to reach you?`;
   }
   if (stage === "carfax_request") {
-    const repeated = historyContainsBuyerReportRequest(visibleMessages, currentMessage);
     return language === "es"
-      ? repeated
-        ? `Llámanos al ${configuredPhone} y nuestros agentes de ventas te envían el Carfax de una.`
-        : "El Carfax lo tienen nuestros agentes de ventas. ¿A qué número te lo enviamos?"
-      : repeated
-        ? `Call us at ${configuredPhone} and our sales agents will send the Carfax right over.`
-        : "Our sales agents have the Carfax report. What number should we send it to?";
+      ? `Nuestros agentes de ventas tienen el reporte Carfax. ¿A qué número te lo enviamos? También puedes llamar a Alpha Motorsports al ${configuredPhone}.`
+      : `Our sales agents have the Carfax report. What phone number should we send it to? You can also call Alpha Motorsports at ${configuredPhone}.`;
   }
   if (stage === "warranty_info" || stage === "advisor_question") {
     if (stage === "advisor_question") {
@@ -1971,15 +1945,7 @@ Reply format:
 - Never refer to the vehicle as "your vehicle", "your car", "tu vehículo", or "tu carro". Always say "the vehicle" / "el vehículo" or use the specific make/model.
 `;
 
-export function detectLanguage(text: string): "en" | "es" {
-  const normalized = cleanConversationText(text)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-  const spanishWords =
-    /\b(hola|buenas|gracias|disponible|tengo|quiero|estoy|interesad[oa]s?|claro|podemos|ayuda(?:r|rte)?|inicial|comprar|semana|numero|telefono|itin|ingresos|esta|esa|ese|eso|esto|este|tiene|tienen|techo|panoramico|precio|cuanto|cuánto|cual|donde|cuando|carro|auto|vehiculo|si|como|necesit[ao]|aplicar|requisitos?|documentos?|pasaporte|cuenta|bancaria|financiar|financiamiento|asesor|opciones?|disponibles?|tambien|puedo|puedes?|mira|dime|informa(?:ci[oó]n)?|diferencia|herramientas|paquete|alturas|precios?|millas|miles|kilometros?|garant[ií]a|motor|automatico|mecanico|manual|camioneta|sedan|historial|accidente|condici[oó]n|ped[oó]|ahora|listo|nuevo|viejo|gusta|encanta|necesitaria|estaria|alguno|alguna|otro|otra|mas|qu[eé]|talvez|tal ?vez|seguir)\b/i;
-  return /[¿¡ñáéíóúü]/i.test(cleanConversationText(text)) || spanishWords.test(normalized) ? "es" : "en";
-}
+export { detectLanguage } from "../conversations/language";
 
 export function computeLeadScore(params: {
   buyerTimeline?: string | null;
@@ -2037,8 +2003,6 @@ export async function generateAiReply(
   const storeAddress = resolveStoreAddress(lotLocation, dealerKnowledge);
   void publishedDownPayment;
   void vehicleType;
-  const reportRequestedBefore = historyContainsBuyerReportRequest(visibleMessages, currentMessage);
-
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
   const persistentUnansweredBuyerTurns = hasPersistentUnansweredBuyerTurns(
     visibleMessages,
@@ -2104,9 +2068,7 @@ export async function generateAiReply(
     vehicle_link_request: vehicleFacts.vdpUrl
       ? `Send exactly this dealer-domain VDP link once: ${vehicleFacts.vdpUrl}. Mention that it has the vehicle's photos and do not add another vehicle fact or ask for a phone number.`
       : "The buyer asked for photos or more information. Say that the sales agents can send the vehicle page and ask what number to use to reach the buyer. Do not invent a link or say that a detail is not confirmed.",
-    carfax_request: reportRequestedBefore
-      ? `The buyer asked for the report before without providing a phone number. Offer the dealership phone ${storePhone} and say the sales agents will send the Carfax. Do not ask another question or provide a link.`
-      : "Say the sales agents have the Carfax report and ask what number to send it to. Do not ask any qualification question or provide a link.",
+    carfax_request: `Say the sales agents have the Carfax report, ask what phone number to send it to, and give Alpha Motorsports' dealership phone ${storePhone} in the same message. Do not ask another qualification question or provide a link.`,
     inventory_options: "The buyer is asking whether more vehicles or similar options are available. Confirm that more vehicles are available, then ask which option they would like to explore. Do not ask for requirements yet.",
     document_requirements: `The buyer is asking what is needed. Use the exact financing requirements from the dealer knowledge block, including ID/Tax ID/Social Security or passport and the listed proof-of-income options. Ask if they have both. Do not ask for a phone number yet.`,
     clean_title: hasCleanTitleInventory
@@ -2517,7 +2479,12 @@ router.post("/conversations/intake", async (req, res) => {
   const inbound = media.context
     ? `${latestBuyerMessage}\n${media.context}`.slice(0, 4000)
     : latestBuyerMessage;
-  const language = detectLanguage(inbound);
+  const language = detectConversationLanguage(
+    latestBuyerMessage,
+    incomingMsgs
+      .filter((message) => message.role === "user")
+      .map((message) => message.content),
+  );
   const buyerQualification = extractBuyerQualification(incomingMsgs);
   const extractedPhone = extractPhoneNumber(inbound);
   const immediateHandoffReason = resolveImmediateHandoffReason(inbound);

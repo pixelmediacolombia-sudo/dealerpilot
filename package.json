@@ -15,7 +15,7 @@
     "test:extension:messenger": "node --test chrome-extension-messenger/tests/messenger-capture.test.mjs chrome-extension-messenger/tests/messenger-capture-regression.test.mjs chrome-extension-messenger/tests/messenger-autonomy.test.mjs chrome-extension-messenger/tests/messenger-ai.test.mjs chrome-extension-messenger/tests/messenger-background.test.mjs",
     "test:extension:messenger:e2e": "node --test chrome-extension-messenger/tests/messenger-capture.test.mjs chrome-extension-messenger/tests/messenger-capture-regression.test.mjs chrome-extension-messenger/tests/messenger-autonomy.test.mjs chrome-extension-messenger/tests/messenger-ai.test.mjs chrome-extension-messenger/tests/messenger-background.test.mjs",
     "test:extensions:isolation": "node --test chrome-extension-messenger/tests/isolation.test.mjs",
-    "test:sofia:unit": "node --experimental-strip-types --test artifacts/api-server/src/sofia/marketplaceTurn.test.mjs artifacts/api-server/src/sofia/marketplaceTone.test.mjs",
+    "test:sofia:unit": "node --experimental-strip-types --test artifacts/api-server/src/sofia/marketplaceTurn.test.mjs artifacts/api-server/src/sofia/marketplaceTone.test.mjs artifacts/api-server/src/conversations/language.test.mjs",
     "test:sofia:e2e": "node --experimental-strip-types --test artifacts/api-server/src/routes/sofiaMarketplace.e2e.test.mjs"
   },
   "private": true,

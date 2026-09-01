@@ -24,6 +24,7 @@ const pricingSource = readFileSync(new URL("../listings/pricing.ts", import.meta
 const listingGeneratorSource = readFileSync(new URL("../listings/generator.ts", import.meta.url), "utf8");
 const opportunityEngineSource = readFileSync(new URL("../intelligence/opportunityEngine.ts", import.meta.url), "utf8");
 const conversationsSource = readFileSync(new URL("./conversations.ts", import.meta.url), "utf8");
+const languageSource = readFileSync(new URL("../conversations/language.ts", import.meta.url), "utf8");
 const marketplaceToneSource = readFileSync(new URL("../sofia/marketplaceTone.ts", import.meta.url), "utf8");
 const dealerSchemaSource = readFileSync(new URL("../../../../lib/db/src/schema/dealers.ts", import.meta.url), "utf8");
 const dealerMigrationSource = readFileSync(new URL("../../../../lib/db/migrations/0009_dealer_title_policy.sql", import.meta.url), "utf8");
@@ -698,17 +699,24 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /isReplyLanguageMirrored/);
   assert.match(conversationsSource, /Mirror the latest buyer message language exactly/);
   assert.match(conversationsSource, /Never write a bilingual reply/);
-  assert.match(conversationsSource, /estoy\|interesad\[oa\]s\?/);
-  assert.match(conversationsSource, /const language = detectLanguage\(inbound\);/);
+  assert.match(languageSource, /interesad\[oa\]s\?/);
+  assert.match(conversationsSource, /const language = detectConversationLanguage\(/);
   assert.doesNotMatch(conversationsSource, /detectLanguage\(inbound \+ " " \+ \(buyerName/);
-  const spanishWordsLiteral = conversationsSource.match(
-    /const spanishWords\s*=\s*(\/[^\n]+\/i);/,
+  const spanishWordsLiteral = languageSource.match(
+    /const SPANISH_TOKENS\s*=\s*(\/[^\n]+\/g);/,
   )?.[1];
   assert.ok(spanishWordsLiteral);
   const spanishWords = vm.runInNewContext(spanishWordsLiteral);
+  spanishWords.lastIndex = 0;
   assert.equal(spanishWords.test("Estoy interesado"), true);
-  assert.equal(spanishWords.test("claro que sí, ¿cómo podemos ayudarte?"), true);
+  spanishWords.lastIndex = 0;
+  assert.equal(spanishWords.test("De un solo pago"), true);
+  spanishWords.lastIndex = 0;
   assert.equal(spanishWords.test("I am interested"), false);
+  assert.match(conversationsSource, /lotLocation === ALPHA_LOT_MANASSAS/);
+  assert.match(conversationsSource, /Nuestros agentes de ventas tienen el reporte Carfax/);
+  assert.match(conversationsSource, /¿A qué número te lo enviamos\? También puedes llamar a Alpha Motorsports al/);
+  assert.match(conversationsSource, /Alpha Motorsports al \$\{storePhone\}/);
   assert.match(conversationsSource, /Hello, this is Alpha Motorsports/);
   assert.match(conversationsSource, /What would you like to know/);
   assert.match(conversationsSource, /QUALIFICATION FUNNEL FOR ALPHA MANASSAS/);
@@ -821,7 +829,8 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /status: existingConv\.status/);
   assert.doesNotMatch(conversationsSource, /closeAfterDelivery[\s\S]{0,220}handoffReason/);
   assert.match(conversationsSource, /What number should we send it to/);
-  assert.match(conversationsSource, /Call us at \$\{storePhone\}/);
+  assert.match(conversationsSource, /What phone number should we send it to\? You can also call Alpha Motorsports at/);
+  assert.match(conversationsSource, /Alpha Motorsports at \$\{storePhone\}/);
   assert.match(conversationsSource, /generateAiReplyWithFallback/);
   assert.match(conversationsSource, /buildSafeFallbackReply/);
   assert.match(marketplaceToneSource, /more information\|more info/);
