@@ -10,8 +10,19 @@
     });
   }
 
+  async function currentWindowId() {
+    try {
+      const current = await chrome.windows?.getCurrent?.();
+      const id = Number(current?.id);
+      return Number.isInteger(id) && id >= 0 ? id : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function load() {
-    const response = await send({ type: "GET_SETTINGS" });
+    const windowId = await currentWindowId();
+    const response = await send({ type: "GET_SETTINGS", windowId });
     const settings = response.ok ? response.data : {};
     $("backendUrl").value = settings.backendUrl || "https://app.1987dealerpilot.com";
     $("dealerId").value = Number.isInteger(Number(settings.dealerId)) && Number(settings.dealerId) > 0 ? String(Number(settings.dealerId)) : "1";
@@ -20,7 +31,7 @@
     $("dryRun").checked = settings.dryRun !== false;
     $("autoReplyEnabled").checked = settings.autoReplyEnabled === true;
 
-    await loadDebug();
+    await loadDebug(windowId);
   }
 
   function setDebugValue(id, text, className = "") {
@@ -85,8 +96,9 @@
     }, 1200);
   }
 
-  async function loadDebug() {
-    const response = await send({ type: "GET_DEBUG_STATE" });
+  async function loadDebug(windowId = null) {
+    const resolvedWindowId = windowId ?? await currentWindowId();
+    const response = await send({ type: "GET_DEBUG_STATE", windowId: resolvedWindowId });
     const state = response.ok ? response.data : {};
     const settings = state.settings || {};
     const debug = state.lastMessengerCaptureDebug || {};
@@ -163,8 +175,10 @@
   }
 
   async function save() {
+    const windowId = await currentWindowId();
     const response = await send({
       type: "SAVE_SETTINGS",
+      windowId,
       backendUrl: $("backendUrl").value,
       dealerId: Number($("dealerId").value),
       sessionId: $("sessionId").value.trim(),
@@ -173,7 +187,7 @@
       autoReplyEnabled: $("autoReplyEnabled").checked,
     });
     $("diagnostics").textContent = JSON.stringify(response, null, 2);
-    await loadDebug();
+    await loadDebug(windowId);
   }
 
   async function refreshConversation() {
@@ -215,7 +229,7 @@
   });
 
   $("show-debug").addEventListener("click", async () => {
-    const response = await send({ type: "GET_DEBUG_STATE" });
+    const response = await send({ type: "GET_DEBUG_STATE", windowId: await currentWindowId() });
     console.log("[DealerPilot Messenger AI] Debug state:", response);
     $("diagnostics").textContent = JSON.stringify(response, null, 2);
   });
