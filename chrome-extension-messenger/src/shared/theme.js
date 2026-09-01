@@ -2,6 +2,7 @@
   "use strict";
 
   const DEFAULT_BACKEND_URL = "https://app.1987dealerpilot.com";
+  const LEGACY_BACKEND_URL = "https://1987dealerpilot.com";
   const DEFAULT_THEME = {
     primaryColors: ["#7658d6"],
     secondaryColors: ["#20243b"],
@@ -9,6 +10,20 @@
   };
   const THEME_STORAGE_KEY = "dealerTheme";
   const REFRESH_MS = 30 * 1000;
+
+  function storageArea() {
+    return globalThis.chrome?.storage?.local || null;
+  }
+
+  function themeStorageKey(settings = {}) {
+    const id = Number(settings.windowId);
+    return Number.isInteger(id) && id >= 0 ? `${THEME_STORAGE_KEY}:${id}` : THEME_STORAGE_KEY;
+  }
+
+  function normalizeBackendUrl(value) {
+    const normalized = String(value || "").trim().replace(/\/+$/, "");
+    return normalized === LEGACY_BACKEND_URL ? DEFAULT_BACKEND_URL : normalized;
+  }
 
   function normalizeHexColor(value) {
     if (typeof value !== "string") return null;
@@ -103,20 +118,36 @@
     return true;
   }
 
-  async function backendUrl() {
-    const stored = await chrome.storage.local.get("backendUrl");
-    return (stored.backendUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, "");
+  async function extensionSettings() {
+    const runtime = globalThis.chrome?.runtime;
+    if (runtime?.sendMessage) {
+      try {
+        const response = await new Promise((resolve) => {
+          runtime.sendMessage({ type: "GET_SETTINGS" }, (result) => resolve(result || null));
+        });
+        if (response?.ok && response.data) return response.data;
+      } catch {}
+    }
+    const storage = storageArea();
+    return storage ? storage.get(["backendUrl", "dealerId"]) : {};
   }
 
-  async function dealerId() {
-    const stored = await chrome.storage.local.get("dealerId");
-    const value = Number(stored.dealerId);
+  async function backendUrl(settings = null) {
+    const current = settings || await extensionSettings();
+    const value = normalizeBackendUrl(current.backendUrl) || DEFAULT_BACKEND_URL;
+    return value;
+  }
+
+  async function dealerId(settings = null) {
+    const current = settings || await extensionSettings();
+    const value = Number(current.dealerId);
     return Number.isInteger(value) && value > 0 ? value : 1;
   }
 
-  async function fetchTheme() {
-    const base = await backendUrl();
-    const id = await dealerId();
+  async function fetchTheme(settings = null) {
+    const current = settings || await extensionSettings();
+    const base = await backendUrl(current);
+    const id = await dealerId(current);
     const response = await fetch(base + "/api/dealers/" + encodeURIComponent(id) + "/theme", {
       method: "GET",
       headers: { Accept: "application/json" },
@@ -127,19 +158,22 @@
   }
 
   async function loadAndApply() {
-    const cached = await chrome.storage.local.get(THEME_STORAGE_KEY);
-    if (cached[THEME_STORAGE_KEY]) {
-      applyTheme(normalizeTheme(cached[THEME_STORAGE_KEY]));
+    const storage = storageArea();
+    const settings = await extensionSettings();
+    const themeKey = themeStorageKey(settings);
+    const cached = storage ? await storage.get(themeKey) : {};
+    if (cached[themeKey]) {
+      applyTheme(normalizeTheme(cached[themeKey]));
     }
     try {
-      const theme = await fetchTheme();
-      await chrome.storage.local.set({
-        [THEME_STORAGE_KEY]: Object.assign({}, theme, { fetchedAt: new Date().toISOString() }),
+      const theme = await fetchTheme(settings);
+      if (storage) await storage.set({
+        [themeKey]: Object.assign({}, theme, { fetchedAt: new Date().toISOString() }),
       });
       applyTheme(theme);
       return theme;
     } catch (error) {
-      return cached[THEME_STORAGE_KEY] ? normalizeTheme(cached[THEME_STORAGE_KEY]) : null;
+      return cached[themeKey] ? normalizeTheme(cached[themeKey]) : null;
     }
   }
 

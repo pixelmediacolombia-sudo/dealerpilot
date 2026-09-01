@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "DealerPilot Messenger AI",
-  "version": "0.1.76",
+  "version": "0.1.77",
   "description": "Detects Facebook Marketplace buyer conversations, requests DealerPilot AI suggestions, and replies only when explicitly enabled.",
   "permissions": [
     "storage",
     "activeTab",
     "tabs",
+    "windows",
     "debugger",
     "alarms"
   ],

@@ -15,33 +15,64 @@
     "https://facebook.com/marketplace/inbox*",
   ]);
   const FOLLOW_UP_INBOX_ALARM = "dealerpilot-messenger-follow-up-inbox";
+  const LEGACY_BACKEND_URL = "https://1987dealerpilot.com";
+  const WINDOW_SETTINGS_PREFIX = "messengerSettingsWindow:";
 
   const conversationIntakeInFlight = new Set();
   const recentConversationIntakes = new Map();
 
-  async function reportSessionStatus() {
-    const settings = await getSettings();
-    if (!settings.sessionId) return { skipped: true, reason: "session_id_missing" };
+  function validWindowId(value) {
+    const id = Number(value);
+    return Number.isInteger(id) && id >= 0 ? id : null;
+  }
+
+  async function resolveWindowId(message = {}, sender = {}) {
+    const explicit = validWindowId(message.windowId);
+    if (explicit !== null) return explicit;
+    const senderWindow = validWindowId(sender?.tab?.windowId);
+    if (senderWindow !== null) return senderWindow;
+    const current = await Promise.resolve(
+      chrome.windows?.getCurrent ? chrome.windows.getCurrent() : null,
+    ).catch(() => null);
+    return validWindowId(current?.id);
+  }
+
+  function windowSettingsKey(windowId) {
+    const id = validWindowId(windowId);
+    return id === null ? null : `${WINDOW_SETTINGS_PREFIX}${id}`;
+  }
+
+  async function reportSessionStatus(windowId = null) {
     const extensionId = await getExtensionId();
-    const tabs = await chrome.tabs.query({
-      url: [
-        "https://www.facebook.com/*",
-        "https://web.facebook.com/*",
-        "https://facebook.com/*",
-      ],
-    });
-    const facebookTabs = tabs.filter((tab) => typeof tab.url === "string");
-    const marketplaceConnected = facebookTabs.some((tab) =>
-      /facebook\.com\/(marketplace|messages)/i.test(tab.url || ""),
-    );
-    return DealerPilotMessengerApiClient.apiPost("/api/extension/heartbeat", {
-      extensionId,
-      dealerId: settings.dealerId,
-      sessionId: settings.sessionId,
-      status: "online",
-      fbLoggedIn: facebookTabs.length > 0,
-      marketplaceConnected,
-    });
+    const scopedWindowId = validWindowId(windowId);
+    const targets = scopedWindowId === null
+      ? await configuredWindowSettings()
+      : [[scopedWindowId, await getSettings(scopedWindowId)]];
+    const reports = await Promise.all(targets.map(async ([targetWindowId, settings]) => {
+      if (!settings.sessionId) return { skipped: true, reason: "session_id_missing" };
+      const query = {
+        url: [
+          "https://www.facebook.com/*",
+          "https://web.facebook.com/*",
+          "https://facebook.com/*",
+        ],
+      };
+      if (validWindowId(targetWindowId) !== null) query.windowId = targetWindowId;
+      const tabs = await chrome.tabs.query(query);
+      const facebookTabs = tabs.filter((tab) => typeof tab.url === "string");
+      const marketplaceConnected = facebookTabs.some((tab) =>
+        /facebook\.com\/(marketplace|messages)/i.test(tab.url || ""),
+      );
+      return DealerPilotMessengerApiClient.apiPost("/api/extension/heartbeat", {
+        extensionId,
+        dealerId: settings.dealerId,
+        sessionId: settings.sessionId,
+        status: "online",
+        fbLoggedIn: facebookTabs.length > 0,
+        marketplaceConnected,
+      });
+    }));
+    return reports.length === 1 ? reports[0] : reports;
   }
 
   async function getExtensionId() {
@@ -54,19 +85,55 @@
     return generated;
   }
 
-  async function getSettings() {
-    const stored = await chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS));
+  async function getSettings(windowId = null) {
+    const key = windowSettingsKey(windowId);
+    const keys = [...Object.keys(DEFAULT_SETTINGS), ...(key ? [key] : [])];
+    const stored = await chrome.storage.local.get(keys);
+    const scoped = key && stored[key] && typeof stored[key] === "object" ? stored[key] : {};
+    const values = { ...stored, ...scoped };
+    const backendUrl = normalizeBackendUrl(values.backendUrl) || DEFAULT_SETTINGS.backendUrl;
     return {
       ...DEFAULT_SETTINGS,
-      ...stored,
-      dryRun: stored.dryRun !== false,
-      autoReplyEnabled: stored.autoReplyEnabled === true,
-      dealerId: Number.isInteger(Number(stored.dealerId)) && Number(stored.dealerId) > 0 ? Number(stored.dealerId) : 1,
-      sessionId: typeof stored.sessionId === "string" ? stored.sessionId.trim() : "",
-      sellerProfileNames: Array.isArray(stored.sellerProfileNames)
-        ? stored.sellerProfileNames.filter(Boolean)
+      ...Object.fromEntries(Object.keys(DEFAULT_SETTINGS).map((setting) => [setting, values[setting]])),
+      backendUrl,
+      windowId: validWindowId(windowId),
+      dryRun: values.dryRun !== false,
+      autoReplyEnabled: values.autoReplyEnabled === true,
+      dealerId: Number.isInteger(Number(values.dealerId)) && Number(values.dealerId) > 0 ? Number(values.dealerId) : 1,
+      sessionId: typeof values.sessionId === "string" ? values.sessionId.trim() : "",
+      sellerProfileNames: Array.isArray(values.sellerProfileNames)
+        ? values.sellerProfileNames.filter(Boolean)
         : DEFAULT_SETTINGS.sellerProfileNames,
     };
+  }
+
+  async function configuredWindowSettings() {
+    const windows = await Promise.resolve(
+      chrome.windows?.getAll ? chrome.windows.getAll({ populate: false }) : [],
+    ).catch(() => []);
+    const targets = [];
+    for (const browserWindow of windows) {
+      const id = validWindowId(browserWindow?.id);
+      const key = windowSettingsKey(id);
+      if (key === null) continue;
+      const stored = await chrome.storage.local.get(key);
+      if (stored[key] && typeof stored[key] === "object") targets.push([id, await getSettings(id)]);
+    }
+    if (targets.length > 0) return targets;
+    const legacy = await getSettings();
+    return legacy.sessionId ? [[null, legacy]] : [];
+  }
+
+  async function saveSettings(windowId, patch) {
+    const key = windowSettingsKey(windowId);
+    if (key === null) {
+      await chrome.storage.local.set(patch);
+      return getSettings();
+    }
+    const current = await getSettings(windowId);
+    const next = { ...current, ...patch };
+    await chrome.storage.local.set({ [key]: next });
+    return getSettings(windowId);
   }
 
   function isMarketplaceInboxTab(tab) {
@@ -184,12 +251,12 @@
   }
 
   const handlers = {
-    async GET_SETTINGS() {
-      return getSettings();
+    async GET_SETTINGS(message, sender) {
+      return getSettings(await resolveWindowId(message, sender));
     },
 
-    async REPORT_SESSION_STATUS() {
-      return reportSessionStatus();
+    async REPORT_SESSION_STATUS(message, sender) {
+      return reportSessionStatus(await resolveWindowId(message, sender));
     },
 
     async LOAD_AUTO_SEND_STATE() {
@@ -204,8 +271,8 @@
       return { saved: true };
     },
 
-    async GET_DEBUG_STATE() {
-      const settings = await getSettings();
+    async GET_DEBUG_STATE(message, sender) {
+      const settings = await getSettings(await resolveWindowId(message, sender));
       const stored = await chrome.storage.local.get([
         "lastMessengerCaptureDebug",
         "lastMessengerCaptureDebugByTab",
@@ -248,19 +315,22 @@
       }
     },
 
-    async SAVE_SETTINGS(message) {
+    async SAVE_SETTINGS(message, sender) {
       const patch = {};
       if (typeof message.dryRun === "boolean") patch.dryRun = message.dryRun;
       if (typeof message.autoReplyEnabled === "boolean") patch.autoReplyEnabled = message.autoReplyEnabled;
-      if (typeof message.backendUrl === "string") patch.backendUrl = message.backendUrl.trim().replace(/\/+$/, "");
+      if (typeof message.backendUrl === "string") {
+        patch.backendUrl = normalizeBackendUrl(message.backendUrl) || DEFAULT_SETTINGS.backendUrl;
+      }
       if (Number.isInteger(Number(message.dealerId)) && Number(message.dealerId) > 0) patch.dealerId = Number(message.dealerId);
       if (typeof message.sessionId === "string") patch.sessionId = message.sessionId.trim();
       if (Array.isArray(message.sellerProfileNames)) {
         patch.sellerProfileNames = message.sellerProfileNames.map((name) => String(name).trim()).filter(Boolean);
       }
-      await chrome.storage.local.set(patch);
-      reportSessionStatus().catch(() => {});
-      return getSettings();
+      const windowId = await resolveWindowId(message, sender);
+      const settings = await saveSettings(windowId, patch);
+      reportSessionStatus(windowId).catch(() => {});
+      return settings;
     },
 
     async MESSENGER_CAPTURE_DEBUG(message, sender) {
@@ -357,7 +427,7 @@
       }
     },
 
-    async CONVERSATION_INTAKE(message) {
+    async CONVERSATION_INTAKE(message, sender) {
       const dedupeKey = message.idempotencyKey || message.messageHash || "";
       pruneRecentConversationIntakes();
       if (dedupeKey && conversationIntakeInFlight.has(dedupeKey)) {
@@ -371,7 +441,7 @@
       if (dedupeKey) conversationIntakeInFlight.add(dedupeKey);
       try {
         const extensionId = await getExtensionId();
-        const settings = await getSettings();
+        const settings = await getSettings(await resolveWindowId(message, sender));
         const response = await DealerPilotMessengerApiClient.apiPost("/api/conversations/intake", {
           extensionId,
           externalThreadRef: message.externalThreadRef,
@@ -453,9 +523,9 @@
       }
     },
 
-    async CLAIM_DUE_MESSENGER_FOLLOW_UP(message) {
+    async CLAIM_DUE_MESSENGER_FOLLOW_UP(message, sender) {
       const extensionId = await getExtensionId();
-      const settings = await getSettings();
+      const settings = await getSettings(await resolveWindowId(message, sender));
       const externalThreadRef = typeof message?.externalThreadRef === "string"
         ? message.externalThreadRef.trim()
         : "";
@@ -489,9 +559,9 @@
       return data;
     },
 
-    async CONFIRM_MESSENGER_OUTBOUND_DELIVERY(message) {
+    async CONFIRM_MESSENGER_OUTBOUND_DELIVERY(message, sender) {
       const extensionId = await getExtensionId();
-      const settings = await getSettings();
+      const settings = await getSettings(await resolveWindowId(message, sender));
       const response = await DealerPilotMessengerApiClient.apiPost(
         `/api/conversations/outbound/${encodeURIComponent(message.jobId)}/delivered`,
         {
@@ -513,7 +583,7 @@
       return data;
     },
 
-    async CLOSE_MESSENGER_CONVERSATION(message) {
+    async CLOSE_MESSENGER_CONVERSATION(message, sender) {
       const conversationId = Number(message.conversationId);
       const externalThreadRef = typeof message.externalThreadRef === "string"
         ? message.externalThreadRef.trim()
@@ -521,7 +591,7 @@
       if (!Number.isInteger(conversationId) || conversationId <= 0 || !externalThreadRef) {
         return { ok: false, error: "conversation_id_and_thread_required" };
       }
-      const settings = await getSettings();
+      const settings = await getSettings(await resolveWindowId(message, sender));
       const response = await DealerPilotMessengerApiClient.apiPost(
         `/api/conversations/${encodeURIComponent(conversationId)}/close-after-delivery`,
         {
@@ -541,8 +611,8 @@
       return data;
     },
 
-    async CANCEL_MESSENGER_FOLLOW_UP(message) {
-      const settings = await getSettings();
+    async CANCEL_MESSENGER_FOLLOW_UP(message, sender) {
+      const settings = await getSettings(await resolveWindowId(message, sender));
       const response = await DealerPilotMessengerApiClient.apiPost(
         `/api/conversations/follow-ups/${encodeURIComponent(message.jobId)}/cancel`,
         {
@@ -562,8 +632,8 @@
       return data;
     },
 
-    async CANCEL_MESSENGER_FOLLOW_UPS_FOR_BUYER(message) {
-      const settings = await getSettings();
+    async CANCEL_MESSENGER_FOLLOW_UPS_FOR_BUYER(message, sender) {
+      const settings = await getSettings(await resolveWindowId(message, sender));
       const response = await DealerPilotMessengerApiClient.apiPost(
         "/api/conversations/follow-ups/cancel-by-thread",
         {
