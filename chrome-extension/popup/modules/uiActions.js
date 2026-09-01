@@ -704,20 +704,28 @@ document.getElementById("btn-show-poll")?.addEventListener("click", async () => 
   setStatus("Poll diagnostics dumped to console.", "ok");
 });
 
-// ---- Save backend URL ----
-chrome.storage.local.get("backendUrl").then(({ backendUrl }) => {
-  urlInput.value = backendUrl || DEFAULT_BACKEND_URL;
-});
-chrome.storage.local.get("dealerId").then(({ dealerId }) => {
-  if (dealerIdInput) dealerIdInput.value = Number.isInteger(Number(dealerId)) && Number(dealerId) > 0 ? String(Number(dealerId)) : "1";
-});
+// ---- Save backend URL and dealer identity for this browser window ----
+(async () => {
+  const res = await send({ type: "GET_SETTINGS" });
+  const settings = res?.ok ? res.data : {};
+  urlInput.value = String(settings.backendUrl || DEFAULT_BACKEND_URL).trim().replace(/\/+$/, "");
+  if (dealerIdInput) {
+    dealerIdInput.value = Number.isInteger(Number(settings.dealerId)) && Number(settings.dealerId) > 0
+      ? String(Number(settings.dealerId))
+      : "1";
+  }
+})();
 
 document.getElementById("save").addEventListener("click", async () => {
   const value = urlInput.value.trim().replace(/\/+$/, "");
   if (!value) { setStatus("Please enter a URL.", "err"); return; }
   const dealerId = Number(dealerIdInput?.value);
   if (!Number.isInteger(dealerId) || dealerId < 1) { setStatus("Dealer ID must be a positive integer.", "err"); return; }
-  await chrome.storage.local.set({ backendUrl: value, dealerId });
+  const saved = await send({ type: "SAVE_SETTINGS", backendUrl: value, dealerId });
+  if (!saved?.ok) {
+    setStatus("Could not save window settings: " + (saved?.error || "unknown error"), "err");
+    return;
+  }
   setStatus("Saved. Testing connection…");
   await refresh();
 });
@@ -730,8 +738,9 @@ const switchBackendBtn = document.getElementById("switch-backend");
 async function loadBackendPresetsIntoUI() {
   const res = await send({ type: "GET_BACKEND_PRESETS" });
   const presets = res && res.ok ? res.data : {};
-  const { backendUrl } = await chrome.storage.local.get("backendUrl");
-  const current = (backendUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, "");
+  const settings = await send({ type: "GET_SETTINGS" });
+  const backendUrl = settings?.ok ? settings.data?.backendUrl : null;
+  const current = String(backendUrl || DEFAULT_BACKEND_URL).trim().replace(/\/+$/, "");
 
   let selected = "custom";
   if (current === (presets.replit || REPLIT_BACKEND_URL)) selected = "replit";

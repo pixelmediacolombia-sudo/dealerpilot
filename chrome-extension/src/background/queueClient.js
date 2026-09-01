@@ -1,6 +1,7 @@
 const DEFAULT_BACKEND_URL = "https://app.1987dealerpilot.com";
 const LEGACY_RENDER_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
 const REPLIT_BACKEND_URL = "https://dealerpilot1987.replit.app";
+const WINDOW_SETTINGS_PREFIX = "publisherSettingsWindow:";
 
 const MARKETPLACE_CREATE_URL = "https://www.facebook.com/marketplace/create/vehicle";
 const FACEBOOK_LOGIN_URL =
@@ -31,6 +32,79 @@ async function getExtensionId() {
     (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now());
   await chrome.storage.local.set({ extensionId: generated });
   return generated;
+}
+
+function validWindowId(value) {
+  const id = Number(value);
+  return Number.isInteger(id) && id >= 0 ? id : null;
+}
+
+async function resolveWindowId(message = {}, sender = {}) {
+  const explicit = validWindowId(message.windowId);
+  if (explicit !== null) return explicit;
+  const senderWindow = validWindowId(sender?.tab?.windowId);
+  if (senderWindow !== null) return senderWindow;
+  const current = await Promise.resolve(
+    chrome.windows?.getCurrent ? chrome.windows.getCurrent() : null,
+  ).catch(() => null);
+  return validWindowId(current?.id);
+}
+
+function windowSettingsKey(windowId) {
+  const id = validWindowId(windowId);
+  return id === null ? null : WINDOW_SETTINGS_PREFIX + id;
+}
+
+function normalizePublisherBackendUrl(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
+async function getPublisherSettings(windowId = null) {
+  const key = windowSettingsKey(windowId);
+  const stored = await chrome.storage.local.get([
+    "backendUrl",
+    "dealerId",
+    "sessionId",
+    ...(key ? [key] : []),
+  ]);
+  const scoped = key && stored[key] && typeof stored[key] === "object" ? stored[key] : {};
+  const values = { ...stored, ...scoped };
+  const dealerId = Number(values.dealerId);
+  return {
+    backendUrl: normalizePublisherBackendUrl(values.backendUrl) || DEFAULT_BACKEND_URL,
+    dealerId: Number.isInteger(dealerId) && dealerId > 0 ? dealerId : 1,
+    sessionId: typeof values.sessionId === "string" ? values.sessionId.trim() : "",
+    windowId: validWindowId(windowId),
+  };
+}
+
+async function savePublisherSettings(windowId, patch) {
+  const key = windowSettingsKey(windowId);
+  if (key === null) {
+    await chrome.storage.local.set(patch);
+    return getPublisherSettings();
+  }
+  const current = await getPublisherSettings(windowId);
+  const next = { ...current, ...patch };
+  await chrome.storage.local.set({ [key]: next });
+  return getPublisherSettings(windowId);
+}
+
+async function configuredPublisherSettings() {
+  const windows = await Promise.resolve(
+    chrome.windows?.getAll ? chrome.windows.getAll({ populate: false }) : [],
+  ).catch(() => []);
+  const targets = [];
+  for (const browserWindow of windows) {
+    const id = validWindowId(browserWindow?.id);
+    const key = windowSettingsKey(id);
+    if (key === null) continue;
+    const stored = await chrome.storage.local.get(key);
+    if (stored[key] && typeof stored[key] === "object") targets.push([id, await getPublisherSettings(id)]);
+  }
+  if (targets.length > 0) return targets;
+  const legacy = await getPublisherSettings();
+  return legacy.sessionId ? [[null, legacy]] : [];
 }
 
 async function apiGet(path) {
@@ -81,10 +155,8 @@ async function logAudit(event, details = {}) {
   } catch (_) { /* non-critical */ }
 }
 
-async function getDealerId() {
-  const stored = await chrome.storage.local.get("dealerId");
-  const value = Number(stored.dealerId);
-  return Number.isInteger(value) && value > 0 ? value : 1;
+async function getDealerId(windowId = null) {
+  return (await getPublisherSettings(windowId)).dealerId;
 }
 
 function getQueueDecision(job, extra = {}) {
@@ -213,15 +285,17 @@ async function removeFacebookPageState(tabId) {
   });
 }
 
-async function detectFacebookTabState() {
+async function detectFacebookTabState(windowId = null) {
   try {
-    const tabs = await chrome.tabs.query({
+    const query = {
       url: [
         "https://www.facebook.com/*",
         "https://web.facebook.com/*",
         "https://facebook.com/*",
       ],
-    });
+    };
+    if (validWindowId(windowId) !== null) query.windowId = validWindowId(windowId);
+    const tabs = await chrome.tabs.query(query);
     let best = null;
     for (const tab of tabs) {
       const state = detectFacebookTabStateFromUrl(tab.url || "");
@@ -276,9 +350,17 @@ async function closeMarketplaceTabs(sender, message = {}) {
   return { ok: true, closed: closed.length > 0, tabIds: closed };
 }
 
-async function sendHeartbeatSnapshot() {
-  const base = await getBackendUrl();
-  const detected = await detectFacebookTabState();
+async function sendHeartbeatSnapshot(windowId = null) {
+  if (validWindowId(windowId) === null) {
+    const targets = await configuredPublisherSettings();
+    if (targets.length > 0) {
+      const reports = await Promise.all(targets.map(([id]) => sendHeartbeatSnapshot(id)));
+      return reports.length === 1 ? reports[0] : reports;
+    }
+  }
+  const settings = await getPublisherSettings(windowId);
+  const base = settings.backendUrl;
+  const detected = await detectFacebookTabState(windowId);
   const { fbLoggedIn, marketplaceConnected } = await chrome.storage.local.get([
     "fbLoggedIn",
     "marketplaceConnected",
@@ -294,6 +376,8 @@ async function sendHeartbeatSnapshot() {
       backendUrl: base,
       status: "online",
       chromeExtensionId: chrome.runtime.id,
+      dealerId: settings.dealerId,
+      sessionId: settings.sessionId || "publisher-window-" + (settings.windowId ?? "legacy"),
       fbLoggedIn: resolvedFbLoggedIn,
       marketplaceConnected: resolvedMarketplaceConnected,
     });
@@ -323,10 +407,26 @@ async function sendHeartbeatSnapshot() {
 // ---- Message handlers ----
 
 const handlers = {
-  async PING() {
+  async PING(message, sender) {
     await apiGet("/api/healthz");
-    const heartbeat = await sendHeartbeatSnapshot();
+    const heartbeat = await sendHeartbeatSnapshot(await resolveWindowId(message, sender));
     return { backendUrl: heartbeat.backendUrl, environment: heartbeat.environment };
+  },
+
+  async GET_WINDOW_CONTEXT(message, sender) {
+    return { windowId: await resolveWindowId(message, sender) };
+  },
+
+  async GET_SETTINGS(message, sender) {
+    return getPublisherSettings(await resolveWindowId(message, sender));
+  },
+
+  async SAVE_SETTINGS(message, sender) {
+    const patch = {};
+    if (typeof message.backendUrl === "string") patch.backendUrl = normalizePublisherBackendUrl(message.backendUrl);
+    if (Number.isInteger(Number(message.dealerId)) && Number(message.dealerId) > 0) patch.dealerId = Number(message.dealerId);
+    if (typeof message.sessionId === "string") patch.sessionId = message.sessionId.trim();
+    return savePublisherSettings(await resolveWindowId(message, sender), patch);
   },
 
   async PAGE_STATE_REPORT(message, sender) {
@@ -657,13 +757,16 @@ const handlers = {
     return { ok: true, tabId: tab.id, action };
   },
 
-  async FB_SESSION_REPORT(message) {
+  async FB_SESSION_REPORT(message, sender) {
     const { fbLoggedIn, marketplaceConnected } = message;
     await chrome.storage.local.set({ fbLoggedIn, marketplaceConnected });
     const extensionId = await getExtensionId();
+    const settings = await getPublisherSettings(await resolveWindowId(message, sender));
     try {
       await DealerPilotApiClient.sendSessionReport({
         extensionId,
+        dealerId: settings.dealerId,
+        sessionId: settings.sessionId || "publisher-window-" + (settings.windowId ?? "legacy"),
         fbLoggedIn: !!fbLoggedIn,
         marketplaceConnected: !!marketplaceConnected,
       });
@@ -999,7 +1102,7 @@ const handlers = {
     return { ok: true };
   },
 
-  async GET_DEBUG_STATE() {
+  async GET_DEBUG_STATE(message, sender) {
     const keys = [
       "backendUrl",
       "extensionId",
@@ -1027,13 +1130,16 @@ const handlers = {
       "lastPayloadDebug",
     ];
     const stored = await chrome.storage.local.get(keys);
-    const base = await getBackendUrl();
-    const dealerId = await getDealerId();
+    const settings = await getPublisherSettings(await resolveWindowId(message, sender));
+    const base = settings.backendUrl;
+    const dealerId = settings.dealerId;
     const manifest = chrome.runtime.getManifest();
     return {
       version: manifest.version,
       extensionId: stored.extensionId || null,
       backendUrl: base,
+      windowId: settings.windowId,
+      sessionId: settings.sessionId,
       environment: detectEnvironment(base),
       dealerId,
       dealerName: dealerId === 1 ? "Alpha Motorsport" : `Dealer ${dealerId}`,
