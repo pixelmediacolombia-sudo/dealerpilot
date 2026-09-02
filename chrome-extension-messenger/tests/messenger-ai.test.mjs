@@ -193,7 +193,7 @@ function createHarness({
       sendMessage(message, callback) {
         calls.messages.push(message);
         if (message.type === "GET_SETTINGS") {
-          callback({ ok: true, data: settings || { dryRun: true, autoReplyEnabled: false } });
+          callback({ ok: true, data: settings || { autoReplyEnabled: true } });
           return;
         }
         if (message.type === "MESSENGER_CAPTURE_DEBUG") {
@@ -208,7 +208,7 @@ function createHarness({
           return;
         }
         if (message.type === "CLOSE_MESSENGER_CONVERSATION") {
-          callback({ ok: true, data: { followUp: { status: "closed", nextDueAt: null } } });
+          callback({ ok: true, data: { conversation: { status: "closed" } } });
           return;
         }
         if (message.type === "DEBUGGER_COMPOSER_WRITE") {
@@ -319,6 +319,18 @@ function createHarness({
   };
 }
 
+test("seller profile detection accepts Facebook account and profile label variants", () => {
+  const { ai } = createHarness();
+  const root = new FakeElement({
+    children: [new FakeElement({ attributes: { "aria-label": "Profile picture of Andres Ibanez" } })],
+  });
+
+  const profile = ai.validateSellerProfile(root, ["Andres Ibanez"]);
+
+  assert.equal(profile.currentProfileName, "Andres Ibanez");
+  assert.equal(profile.matched, true);
+});
+
 test("autoReply never sends a backend reply that repeats an existing conversation message", async () => {
   const { ai, calls, composerElement, sendButton } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
@@ -359,22 +371,13 @@ test("autoReply never sends a backend reply that echoes the buyer question verba
   assert.equal(calls.debug.at(-1).reason, "reply_repeats_conversation");
 });
 
-test("explicit conversation refresh bypasses the quiet window and keeps follow-up eligibility", async () => {
-  const { ai, calls } = createHarness({
-    settings: { dryRun: false, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
-    messages: [{ speaker: "Buyer A", text: "Is this available?" }],
-    intakeResponse: { ok: true, data: { suggestedReply: "Hello, this is Alpha Motorsports. Yes, it is available." } },
-  });
-
-  const result = await ai.captureConversation({
-    automatic: true,
-    forceRefresh: true,
-    followUpEligible: true,
-  });
-
-  assert.equal(result.reason, "auto_reply_disabled");
-  assert.equal(calls.intake.length, 1);
-  assert.equal(calls.intake[0].followUpEligible, true);
+test("repair removes a stale generic follow-up prefix before a fresh vehicle reply", () => {
+  const { ai } = createHarness();
+  const concatenated = "Hi, I just wanted to check whether you are still interested. Whenever you have a moment, hello, this is Alpha Motorsports. Yes, the 2018 ACURA TLX is available.";
+  assert.equal(
+    ai.repairConcatenatedFollowUp(concatenated),
+    "hello, this is Alpha Motorsports. Yes, the 2018 ACURA TLX is available.",
+  );
 });
 
 test("a rejected repeated reply is not mislabeled as duplicate_auto_send_hash", async () => {
@@ -413,17 +416,20 @@ test("autoReply still sends a fresh backend reply that does not repeat the conve
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
 
-test("dryRun captures a valid buyer message without backend intake or composer writes", async () => {
-  const { ai, calls, composerElement } = createHarness({
-    settings: { dryRun: true, autoReplyEnabled: false, sellerProfileNames: ["Andres Ibanez"] },
+test("auto reply is active by default and sends through the local Messenger harness", async () => {
+  const { ai, calls } = createHarness({
+    settings: { autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    intakeResponse: { ok: true, data: { suggestedReply: "Yes, it is available." } },
+    sendSucceeds: true,
   });
   const result = await ai.captureConversation({ automatic: false });
 
-  assert.equal(result.dryRun, true);
-  assert.equal(calls.intake.length, 0);
-  assert.equal(composerElement.textContent, "");
-  assert.equal(calls.debug.at(-1).stage, "dry_run_capture");
-  assert.equal(calls.debug.at(-1).backendIntakeSent, false);
+  assert.equal(result.autoSent, true);
+  assert.equal(result.deliveryConfirmed, true);
+  assert.equal(calls.intake.length, 1);
+  assert.ok(calls.messages.some((message) => message.type === "DEBUGGER_COMPOSER_WRITE"));
+  assert.ok(calls.messages.some((message) => message.type === "DEBUGGER_COMPOSER_SUBMIT"));
+  assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
 
 test("dynamic facebook messages routes use the route id as stable conversation identity", async () => {
@@ -465,6 +471,63 @@ test("dynamic facebook messages routes use the route id as stable conversation i
   assert.equal(calls.intake.length, 1);
   assert.match(calls.intake[0].externalThreadRef, /facebook-messages-thread-1060211123108393/);
   assert.equal(calls.intake[0].sourceUrl, route.href);
+});
+
+test("synthetic Marketplace conversation is recognized as Messenger and replies with the active dealer session", async () => {
+  const route = {
+    href: "https://www.facebook.com/messages/t/1695707675271107",
+    origin: "https://www.facebook.com",
+    pathname: "/messages/t/1695707675271107",
+    hostname: "www.facebook.com",
+  };
+  const root = new FakeElement({
+    attributes: { "aria-label": "Marketplace conversation" },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Danielle · 2016 Lexus NX" }),
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Message" },
+        rect: { left: 100, top: 400, width: 360, height: 40 },
+      }),
+    ],
+  });
+  const { ai, calls } = createHarness({
+    settings: {
+      autoReplyEnabled: true,
+      dealerId: 2,
+      sessionId: "lucky-mazda-window-63",
+      sellerProfileNames: ["Andres Ibanez"],
+    },
+    locationOverride: route,
+    captures: [{
+      root,
+      scope: root,
+      buyerName: "Danielle",
+      messages: [{ speaker: "Danielle", text: "Is the title clean?" }],
+      evidence: {
+        threadRootDetected: true,
+        messageScopeDetected: true,
+        extractionMode: "semantic",
+        selectedHeaderText: "Danielle · 2016 Lexus NX",
+        latestMessageDirection: "buyer",
+        composerDetected: true,
+      },
+    }],
+    intakeResponse: { ok: true, data: { suggestedReply: "Yes, the title is clean. Would you like to see it?" } },
+    sendSucceeds: true,
+  });
+
+  assert.equal(ai.isFacebookMessagesThreadRoute(route.pathname, route.hostname), true);
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(result.autoSent, true, JSON.stringify(result));
+  assert.equal(result.deliveryConfirmed, true);
+  assert.equal(calls.intake.length, 1);
+  assert.equal(calls.intake[0].buyerName, "Danielle");
+  assert.equal(calls.intake[0].currentMessage, "Is the title clean?");
+  assert.equal(calls.intake[0].dealerId, 2);
+  assert.equal(calls.intake[0].sessionId, "lucky-mazda-window-63");
+  assert.equal(calls.intake[0].autoReplyEnabled, true);
+  assert.ok(calls.messages.some((message) => message.type === "DEBUGGER_COMPOSER_WRITE"));
 });
 
 test("only Facebook messages thread routes are authorized", () => {
@@ -867,6 +930,7 @@ test("Elyse's English vehicle question accepts an English reply and sends it", a
   assert.equal(result.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, "");
 });
+
 test("Spanish roof question never sends an English backend reply", async () => {
   const { ai, calls, composerElement, sendButton } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
@@ -934,6 +998,7 @@ test("Spanish history keeps a phone-only buyer reply in Spanish", async () => {
   assert.equal(result.deliveryConfirmed, true);
   assert.equal(composerElement.textContent, "");
 });
+
 test("terminal Spanish acknowledgement is not sent to AI and receives no automatic reply", async () => {
   const { ai, calls, composerElement, sendButton } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },

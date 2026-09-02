@@ -1,27 +1,19 @@
 (function () {
   const CONVERSATION_INTAKE_DEDUPE_MS = 120000;
   const DEFAULT_SETTINGS = Object.freeze({
-    dryRun: true,
-    autoReplyEnabled: false,
+    autoReplyEnabled: true,
     backendUrl: "https://app.1987dealerpilot.com",
     dealerId: 1,
     sessionId: "",
     sellerProfileNames: ["Alpha Manassas", "Alpha Motorsport", "Andres Ibanez"],
   });
-  const FOLLOW_UP_INBOX_URL = "https://www.facebook.com/marketplace/inbox";
-  const FOLLOW_UP_INBOX_PATTERNS = Object.freeze([
-    "https://www.facebook.com/marketplace/inbox*",
-    "https://web.facebook.com/marketplace/inbox*",
-    "https://facebook.com/marketplace/inbox*",
-  ]);
-  const FOLLOW_UP_INBOX_ALARM = "dealerpilot-messenger-follow-up-inbox";
   const LEGACY_BACKEND_URL = "https://1987dealerpilot.com";
   const WINDOW_SETTINGS_PREFIX = "messengerSettingsWindow:";
-
   const conversationIntakeInFlight = new Set();
   const recentConversationIntakes = new Map();
 
   function validWindowId(value) {
+    if (value === null || value === undefined || value === "") return null;
     const id = Number(value);
     return Number.isInteger(id) && id >= 0 ? id : null;
   }
@@ -34,12 +26,22 @@
     const current = await Promise.resolve(
       chrome.windows?.getCurrent ? chrome.windows.getCurrent() : null,
     ).catch(() => null);
-    return validWindowId(current?.id);
+    const currentId = validWindowId(current?.id);
+    if (currentId !== null) return currentId;
+    const tabs = await Promise.resolve(
+      chrome.tabs?.query ? chrome.tabs.query({ active: true, lastFocusedWindow: true }) : [],
+    ).catch(() => []);
+    return validWindowId(tabs[0]?.windowId);
   }
 
   function windowSettingsKey(windowId) {
     const id = validWindowId(windowId);
     return id === null ? null : `${WINDOW_SETTINGS_PREFIX}${id}`;
+  }
+
+  function normalizeBackendUrl(value) {
+    const normalized = String(value || "").trim().replace(/\/+$/, "");
+    return normalized === LEGACY_BACKEND_URL ? DEFAULT_SETTINGS.backendUrl : normalized;
   }
 
   async function reportSessionStatus(windowId = null) {
@@ -90,15 +92,31 @@
     const keys = [...Object.keys(DEFAULT_SETTINGS), ...(key ? [key] : [])];
     const stored = await chrome.storage.local.get(keys);
     const scoped = key && stored[key] && typeof stored[key] === "object" ? stored[key] : {};
-    const values = { ...stored, ...scoped };
+    // A window with no scoped record starts from defaults; it must not inherit another dealer's mode.
+    let values = key ? { ...DEFAULT_SETTINGS, ...scoped } : stored;
+    if (key && !Object.keys(scoped).length) {
+      // Pre-window-isolation installs stored the active dealer/session globally. Keep that
+      // configuration usable once, until the first window saves its own scoped record.
+      // Once any scoped record exists, a new window must start from its own defaults.
+      const allStored = await chrome.storage.local.get(null);
+      const hasScopedRecord = Object.keys(allStored).some((storageKey) =>
+        storageKey.startsWith(WINDOW_SETTINGS_PREFIX) &&
+        allStored[storageKey] &&
+        typeof allStored[storageKey] === "object",
+      );
+      const legacySessionId = typeof allStored.sessionId === "string" && allStored.sessionId.trim();
+      const legacySellerNames = Array.isArray(allStored.sellerProfileNames) && allStored.sellerProfileNames.length > 0;
+      if (!hasScopedRecord && (legacySessionId || legacySellerNames)) {
+        values = { ...DEFAULT_SETTINGS, ...allStored };
+      }
+    }
     const backendUrl = normalizeBackendUrl(values.backendUrl) || DEFAULT_SETTINGS.backendUrl;
     return {
       ...DEFAULT_SETTINGS,
       ...Object.fromEntries(Object.keys(DEFAULT_SETTINGS).map((setting) => [setting, values[setting]])),
       backendUrl,
       windowId: validWindowId(windowId),
-      dryRun: values.dryRun !== false,
-      autoReplyEnabled: values.autoReplyEnabled === true,
+      autoReplyEnabled: values.autoReplyEnabled !== false,
       dealerId: Number.isInteger(Number(values.dealerId)) && Number(values.dealerId) > 0 ? Number(values.dealerId) : 1,
       sessionId: typeof values.sessionId === "string" ? values.sessionId.trim() : "",
       sellerProfileNames: Array.isArray(values.sellerProfileNames)
@@ -127,34 +145,12 @@
   async function saveSettings(windowId, patch) {
     const key = windowSettingsKey(windowId);
     if (key === null) {
-      await chrome.storage.local.set(patch);
-      return getSettings();
+      throw new Error("window_id_unavailable_settings_not_saved");
     }
     const current = await getSettings(windowId);
     const next = { ...current, ...patch };
     await chrome.storage.local.set({ [key]: next });
     return getSettings(windowId);
-  }
-
-  function isMarketplaceInboxTab(tab) {
-    return /^https:\/\/(?:www\.|web\.)?facebook\.com\/marketplace\/inbox(?:[/?#]|$)/i.test(String(tab?.url || ""));
-  }
-
-  /**
-   * Follow-ups are physically delivered through Messenger's DOM, so an enabled
-   * sender needs one durable inbox tab. Keep it inactive and reuse it to avoid
-   * interrupting the operator or creating duplicate Facebook tabs.
-   */
-  async function ensureFollowUpInboxTab() {
-    const settings = await getSettings();
-    if (settings.dryRun || !settings.autoReplyEnabled) {
-      return { skipped: true, reason: settings.dryRun ? "dry_run_enabled" : "auto_reply_disabled" };
-    }
-    const tabs = await chrome.tabs.query({ url: [...FOLLOW_UP_INBOX_PATTERNS] });
-    const existing = tabs.find(isMarketplaceInboxTab);
-    if (existing?.id) return { tabId: existing.id, reused: true };
-    const created = await chrome.tabs.create({ url: FOLLOW_UP_INBOX_URL, active: false });
-    return { tabId: created?.id ?? null, reused: false };
   }
 
   async function preserveMissingDefaultSettings() {
@@ -278,7 +274,6 @@
         "lastMessengerCaptureDebugByTab",
         "messengerCaptureDebugHistory",
         "lastConversationIntake",
-        "lastMessengerFollowUp",
         "lastError",
         "extensionId",
       ]);
@@ -290,12 +285,6 @@
         lastMessengerCaptureDebugByTab: stored.lastMessengerCaptureDebugByTab || {},
         messengerCaptureDebugHistory: stored.messengerCaptureDebugHistory || [],
         lastConversationIntake: stored.lastConversationIntake || null,
-        lastMessengerFollowUp: stored.lastMessengerFollowUp || {
-          followUpsSent: 0,
-          maxFollowUps: 3,
-          status: "idle",
-          nextDueAt: null,
-        },
         lastError: stored.lastError || null,
       };
     },
@@ -317,7 +306,6 @@
 
     async SAVE_SETTINGS(message, sender) {
       const patch = {};
-      if (typeof message.dryRun === "boolean") patch.dryRun = message.dryRun;
       if (typeof message.autoReplyEnabled === "boolean") patch.autoReplyEnabled = message.autoReplyEnabled;
       if (typeof message.backendUrl === "string") {
         patch.backendUrl = normalizeBackendUrl(message.backendUrl) || DEFAULT_SETTINGS.backendUrl;
@@ -450,6 +438,7 @@
           visibleMessages: message.visibleMessages || [],
           currentMessage: message.currentMessage,
           visibleImages: message.visibleImages || [],
+          visibleAudios: message.visibleAudios || [],
           detectedMarketplaceListingUrl: message.detectedMarketplaceListingUrl,
           detectedVehicleTitle: message.detectedVehicleTitle,
           marketplaceDownPayment: message.marketplaceDownPayment,
@@ -457,6 +446,9 @@
           vehicleType: message.vehicleType,
           dealerId: settings.dealerId,
           sessionId: settings.sessionId,
+          // The window-scoped background setting is authoritative. Do not trust a
+          // stale content-script payload after the operator changes the popup.
+          autoReplyEnabled: settings.autoReplyEnabled === true,
           messageDetectedAt: message.messageDetectedAt,
           messageHash: message.messageHash,
           idempotencyKey: message.idempotencyKey,
@@ -466,7 +458,6 @@
           buyerNameDetected: message.buyerNameDetected,
           sellerIsCurrentUser: message.sellerIsCurrentUser,
           marketplaceContextDetected: message.marketplaceContextDetected,
-          followUpEligible: message.followUpEligible === true,
           availabilityQuickReplyAccepted: false,
           timestamp: new Date().toISOString(),
         });
@@ -523,42 +514,6 @@
       }
     },
 
-    async CLAIM_DUE_MESSENGER_FOLLOW_UP(message, sender) {
-      const extensionId = await getExtensionId();
-      const settings = await getSettings(await resolveWindowId(message, sender));
-      const externalThreadRef = typeof message?.externalThreadRef === "string"
-        ? message.externalThreadRef.trim()
-        : "";
-      const stored = await chrome.storage.local.get("lastMessengerFollowUp");
-      const previous = stored.lastMessengerFollowUp || {};
-      const response = await DealerPilotMessengerApiClient.apiPost("/api/conversations/follow-ups/claim", {
-        extensionId,
-        dealerId: settings.dealerId,
-        externalThreadRef,
-      });
-      const data = response?.data || response || {};
-      const nextState = data.followUp || {};
-      const previousIsActive =
-        previous.nextDueAt &&
-        new Date(previous.nextDueAt).getTime() > Date.now() &&
-        !["idle", "canceled", "buyer_message_missing", "closed"].includes(String(previous.status || "").toLowerCase());
-      const shouldKeepActiveState = !data.job &&
-        String(nextState.status || "idle").toLowerCase() === "idle" &&
-        previousIsActive;
-      await chrome.storage.local.set({
-        lastMessengerFollowUp: {
-          ...(shouldKeepActiveState ? previous : nextState),
-          jobId: data.job?.id || null,
-          status: data.job ? "claimed" : shouldKeepActiveState ? previous.status : nextState.status || "idle",
-          externalThreadRef: data.job?.externalThreadRef ||
-            (shouldKeepActiveState ? previous.externalThreadRef : externalThreadRef || previous.externalThreadRef || null),
-          updatedAt: new Date().toISOString(),
-        },
-        lastError: null,
-      });
-      return data;
-    },
-
     async CONFIRM_MESSENGER_OUTBOUND_DELIVERY(message, sender) {
       const extensionId = await getExtensionId();
       const settings = await getSettings(await resolveWindowId(message, sender));
@@ -571,15 +526,7 @@
         },
       );
       const data = response?.data || response || {};
-      await chrome.storage.local.set({
-        lastMessengerFollowUp: {
-          ...(data.followUp || {}),
-          jobId: data.job?.id || message.jobId || null,
-          externalThreadRef: message.externalThreadRef || null,
-          updatedAt: new Date().toISOString(),
-        },
-        lastError: null,
-      });
+      await chrome.storage.local.set({ lastError: null });
       return data;
     },
 
@@ -600,80 +547,21 @@
         },
       );
       const data = response?.data || response || {};
-      await chrome.storage.local.set({
-        lastMessengerFollowUp: {
-          ...(data.followUp || {}),
-          status: "closed",
-          externalThreadRef,
-          updatedAt: new Date().toISOString(),
-        },
-      });
       return data;
-    },
-
-    async CANCEL_MESSENGER_FOLLOW_UP(message, sender) {
-      const settings = await getSettings(await resolveWindowId(message, sender));
-      const response = await DealerPilotMessengerApiClient.apiPost(
-        `/api/conversations/follow-ups/${encodeURIComponent(message.jobId)}/cancel`,
-        {
-          dealerId: settings.dealerId,
-          externalThreadRef: message.externalThreadRef,
-          reason: message.reason,
-        },
-      );
-      const data = response?.data || response || {};
-      await chrome.storage.local.set({
-        lastMessengerFollowUp: {
-          ...(data.followUp || {}),
-          jobId: message.jobId || null,
-          updatedAt: new Date().toISOString(),
-        },
-      });
-      return data;
-    },
-
-    async CANCEL_MESSENGER_FOLLOW_UPS_FOR_BUYER(message, sender) {
-      const settings = await getSettings(await resolveWindowId(message, sender));
-      const response = await DealerPilotMessengerApiClient.apiPost(
-        "/api/conversations/follow-ups/cancel-by-thread",
-        {
-          dealerId: settings.dealerId,
-          externalThreadRef: message.externalThreadRef,
-          reason: message.reason,
-        },
-      );
-      const data = response?.data || response || {};
-      await chrome.storage.local.set({
-        lastMessengerFollowUp: {
-          ...(data.followUp || {}),
-          status: "canceled",
-          updatedAt: new Date().toISOString(),
-        },
-      });
-      return data;
-    },
-
-    async ENSURE_MESSENGER_FOLLOW_UP_INBOX() {
-      return ensureFollowUpInboxTab();
     },
   };
 
   chrome.runtime.onInstalled?.addListener(async () => {
     await preserveMissingDefaultSettings().catch(() => {});
     chrome.alarms?.create?.("dealerpilot-messenger-heartbeat", { periodInMinutes: 1 });
-    chrome.alarms?.create?.(FOLLOW_UP_INBOX_ALARM, { periodInMinutes: 1 });
-    await ensureFollowUpInboxTab().catch(() => {});
   });
 
   chrome.runtime.onStartup?.addListener(() => {
     chrome.alarms?.create?.("dealerpilot-messenger-heartbeat", { periodInMinutes: 1 });
-    chrome.alarms?.create?.(FOLLOW_UP_INBOX_ALARM, { periodInMinutes: 1 });
     reportSessionStatus().catch(() => {});
-    ensureFollowUpInboxTab().catch(() => {});
   });
   chrome.alarms?.onAlarm?.addListener((alarm) => {
     if (alarm?.name === "dealerpilot-messenger-heartbeat") reportSessionStatus().catch(() => {});
-    if (alarm?.name === FOLLOW_UP_INBOX_ALARM) ensureFollowUpInboxTab().catch(() => {});
   });
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

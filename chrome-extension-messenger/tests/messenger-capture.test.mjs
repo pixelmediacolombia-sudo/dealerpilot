@@ -76,17 +76,22 @@ class FakeElement {
     if (selector === "img[src]" || selector === "img[data-src]" || selector === "img[src], img[data-src]") {
       return this.tagName === "IMG";
     }
+    if (selector.includes("audio") || selector.includes("voice")) {
+      return this.tagName === "AUDIO";
+    }
     return false;
   }
 }
 
-function runCapture(root, extraElements = []) {
+function runCapture(root, extraElements = [], pathname = "/marketplace/inbox") {
+  const matchesQuery = (element, selector) =>
+    selector.split(",").some((part) => element.matches(part.trim()));
   const document = {
     documentElement: new FakeElement(),
     querySelectorAll(selector) {
-      const rootMatches = root.matches(selector) ? [root, ...root.querySelectorAll(selector)] : root.querySelectorAll(selector);
+      const rootMatches = matchesQuery(root, selector) ? [root, ...root.querySelectorAll(selector)] : root.querySelectorAll(selector);
       const extraMatches = extraElements.flatMap((element) =>
-        element.matches(selector) ? [element, ...element.querySelectorAll(selector)] : element.querySelectorAll(selector),
+        matchesQuery(element, selector) ? [element, ...element.querySelectorAll(selector)] : element.querySelectorAll(selector),
       );
       return [...rootMatches, ...extraMatches];
     },
@@ -94,7 +99,7 @@ function runCapture(root, extraElements = []) {
   const context = vm.createContext({
     document,
     location: {
-      pathname: "/marketplace/inbox",
+      pathname,
     },
     Element: FakeElement,
     window: {
@@ -106,10 +111,47 @@ function runCapture(root, extraElements = []) {
   vm.runInContext(source, context, { filename: "messengerCapture.js" });
   return context.DealerPilotMessengerCapture.capture({
     document,
-    location: { pathname: "/marketplace/inbox" },
+    location: { pathname },
     sellerNameCandidates: ["Alpha Motorsport"],
   });
 }
+
+test("messages route keeps capturing when Facebook separates the header from the composer tree", () => {
+  const buyerMessage = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "Is the title clean?",
+    rect: { left: 40, right: 260, top: 520, width: 220, height: 54 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [buyerMessage],
+  });
+  const composerRoot = new FakeElement({
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      scope,
+      new FakeElement({
+        attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" },
+        rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 },
+      }),
+    ],
+  });
+  const header = new FakeElement({
+    tagName: "h2",
+    text: "Danielle · 2016 Lexus NX",
+    rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 },
+  });
+
+  const capture = runCapture(composerRoot, [header], "/messages/t/1695707675271107");
+
+  assert.equal(capture.evidence.threadRootDetected, true);
+  assert.equal(capture.buyerName, "Danielle");
+  assert.equal(capture.evidence.latestMessageDirection, "buyer");
+  assert.deepEqual(JSON.parse(JSON.stringify(capture.messages)), [
+    { speaker: "Danielle", text: "Is the title clean?" },
+  ]);
+});
 
 test("floating Marketplace chat extracts buyer header and incoming visual bubble", () => {
   const incomingText = new FakeElement({
@@ -818,6 +860,36 @@ test("collectImageCandidates flags emoji and profile images so they are excluded
   assert.equal(capture.evidence.imageMessageCount, 0);
   assert.equal(candidates[0].emojiLike, true);
   assert.equal(candidates[1].profileLike, true);
+});
+
+test("captureFromRoot records buyer voice messages and preserves the media source", () => {
+  const audioBubble = new FakeElement({
+    tagName: "audio",
+    attributes: { src: "blob:https://www.facebook.com/voice-note-1" },
+    rect: { left: 70, right: 280, top: 560, width: 210, height: 42 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [audioBubble],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Hector · 2022 Ford F150 Lightning", rect: { left: 900, right: 1320, top: 130, width: 420, height: 30 } }),
+      scope,
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" }, rect: { left: 940, right: 1260, top: 850, width: 320, height: 44 } }),
+    ],
+  });
+
+  const capture = runCapture(root);
+
+  assert.equal(capture.evidence.audioCandidateCount, 1);
+  assert.equal(capture.evidence.audioMessageCount, 1);
+  assert.equal(capture.evidence.latestIsAudio, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(capture.messages)), [{ speaker: "Hector", text: "[Audio]" }]);
+  assert.equal(capture.audioMessages[0].audio.src, "blob:https://www.facebook.com/voice-note-1");
 });
 
 test("standalone Message sent timestamps never become the final message", () => {

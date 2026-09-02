@@ -71,6 +71,7 @@ const intake = {
   currentMessage: "Is this available?",
   detectedMarketplaceListingUrl: "https://www.facebook.com/marketplace/item/1/",
   detectedVehicleTitle: "2021 Toyota RAV4",
+  autoReplyEnabled: true,
   routeAllowed: true,
   conversationThreadDetected: true,
   buyerMessageDetected: true,
@@ -86,7 +87,7 @@ test("same extension keeps Alpha and another dealer isolated by browser window",
   const secondDealer = createHarness({ storage, windowId: 22, apiCalls });
 
   await alpha.SAVE_SETTINGS({ dealerId: 1, sessionId: "alpha" });
-  await secondDealer.SAVE_SETTINGS({ dealerId: 2, sessionId: "new-dealer" });
+  await secondDealer.SAVE_SETTINGS({ dealerId: 2, sessionId: "new-dealer", autoReplyEnabled: false });
 
   assert.equal((await alpha.GET_SETTINGS()).dealerId, 1);
   assert.equal((await alpha.GET_SETTINGS()).sessionId, "alpha");
@@ -99,10 +100,10 @@ test("same extension keeps Alpha and another dealer isolated by browser window",
   assert.deepEqual(
     apiCalls
       .filter(({ path }) => path === "/api/conversations/intake")
-      .map(({ body }) => ({ dealerId: body.dealerId, sessionId: body.sessionId })),
+      .map(({ body }) => ({ dealerId: body.dealerId, sessionId: body.sessionId, autoReplyEnabled: body.autoReplyEnabled })),
     [
-      { dealerId: 1, sessionId: "alpha" },
-      { dealerId: 2, sessionId: "new-dealer" },
+      { dealerId: 1, sessionId: "alpha", autoReplyEnabled: true },
+      { dealerId: 2, sessionId: "new-dealer", autoReplyEnabled: false },
     ],
   );
   assert.ok(storage["messengerSettingsWindow:11"]);

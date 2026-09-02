@@ -1,7 +1,6 @@
 (function () {
   const DEFAULT_SETTINGS = Object.freeze({
-    dryRun: true,
-    autoReplyEnabled: false,
+    autoReplyEnabled: true,
     sellerProfileNames: ["Alpha Manassas", "Alpha Motorsport", "Andres Ibanez"],
   });
   const REPLY_QUIET_MS = 7000;
@@ -19,13 +18,9 @@
   const lastAutoReplyByThread = new Map();
   const lastSuggestedReplyByThread = new Map();
   const closedThreadKeys = new Set();
-  let lastFollowUpState = {
-    followUpsSent: 0,
-    maxFollowUps: 3,
-    status: "idle",
-    nextDueAt: null,
-  };
   let lastDiagnostics = {};
+  let messengerRuntimeStarted = false;
+  let routeWatchInstalled = false;
 
   function cleanText(value) {
     return String(value || "")
@@ -77,26 +72,59 @@
       .toLowerCase();
   }
 
-  function extractCurrentProfileName(root = document) {
-    const labels = Array.from(root?.querySelectorAll?.("[aria-label]") || [])
-      .map((element) => element.getAttribute("aria-label") || "")
+  function extractCurrentProfileName(root = document, sellerProfileNames = DEFAULT_SETTINGS.sellerProfileNames) {
+    const expectedProfileNames = (Array.isArray(sellerProfileNames) && sellerProfileNames.length
+      ? sellerProfileNames
+      : DEFAULT_SETTINGS.sellerProfileNames)
+      .map((name) => cleanText(name))
       .filter(Boolean);
+    const expectedByNormalizedName = expectedProfileNames.map((name) => ({
+      name,
+      normalized: normalizeProfileName(name),
+    }));
+    const nodes = [
+      root,
+      ...["[aria-label]", "[title]", "[alt]", "[data-tooltip-content]"]
+        .flatMap((selector) => Array.from(root?.querySelectorAll?.(selector) || [])),
+    ].filter(Boolean);
+    const labels = [];
+    const seenLabels = new Set();
+    for (const element of nodes) {
+      for (const attribute of ["aria-label", "title", "alt", "data-tooltip-content"]) {
+        const value = cleanText(element.getAttribute?.(attribute) || "");
+        if (!value) continue;
+        const key = `${attribute}:${value}`;
+        if (seenLabels.has(key)) continue;
+        seenLabels.add(key);
+        labels.push({ value, normalized: normalizeProfileName(value) });
+      }
+    }
+    const profileContext = /\b(?:profile|perfil|account|cuenta|manage|administrar|avatar|picture|foto)\b/i;
+    for (const label of labels) {
+      const exact = expectedByNormalizedName.find((candidate) => candidate.normalized === label.normalized);
+      if (exact) return exact.name;
+      if (!profileContext.test(label.value)) continue;
+      const embedded = expectedByNormalizedName.find((candidate) => label.normalized.includes(candidate.normalized));
+      if (embedded) return embedded.name;
+    }
     const patterns = [
       /(?:manage|administrar)\s+(.+?)\s+(?:notification settings|configuraci[oó]n(?:es)? de notificaciones)/i,
       /(?:your profile|tu perfil)\s*[:\-]\s*(.+)$/i,
+      /(?:profile picture|foto de perfil|profile|perfil|account|cuenta)\s+(?:of|de|for|para)\s+(.+)$/i,
+      /^(.+?)(?:['’]s)?\s+(?:profile|perfil|account|cuenta)$/i,
     ];
     for (const label of labels) {
       for (const pattern of patterns) {
-        const match = label.match(pattern);
+        const match = label.value.match(pattern);
         const candidate = cleanText(match?.[1] || "");
-        if (candidate && candidate.length <= 80) return candidate;
+        if (candidate && candidate.length <= 80 && !profileContext.test(candidate)) return candidate;
       }
     }
     return "";
   }
 
   function validateSellerProfile(root = document, sellerProfileNames = DEFAULT_SETTINGS.sellerProfileNames) {
-    const currentProfileName = extractCurrentProfileName(root);
+    const currentProfileName = extractCurrentProfileName(root, sellerProfileNames);
     const current = normalizeProfileName(currentProfileName);
     const expectedProfileNames = sellerProfileNames.length ? sellerProfileNames : DEFAULT_SETTINGS.sellerProfileNames;
     const expected = expectedProfileNames.map(normalizeProfileName).filter(Boolean);
@@ -174,7 +202,8 @@
       /^i(?:'|’)d be happy to help\b[\s\S]{0,180}\b(?:are you interested|financing)\b/.test(normalized) ||
       /^great\b[\s\S]{0,120}\bbest phone number\b/.test(normalized) ||
       /^perfect\b[\s\S]{0,80}\b(?:we will contact|contact you)\b/.test(normalized) ||
-      /^good morning\b[\s\S]{0,120}\b(?:includes vin|all the info)\b/.test(normalized);
+      /^good morning\b[\s\S]{0,120}\b(?:includes vin|all the info)\b/.test(normalized) ||
+      /^(?:hi|hello|hola)\b[\s\S]{0,220}\b(?:just wanted to check|still interested|whenever you have a moment|cuando tengas un momento)\b/i.test(normalized);
   }
 
   function isRequirementsInquiry(value) {
@@ -276,11 +305,25 @@
       : `To move forward, we need a passport or valid ID and proof of income. Do you have both?`;
   }
 
+  function repairConcatenatedFollowUp(reply) {
+    const text = cleanText(reply);
+    if (!text) return "";
+    const greetingPattern = /(?:^|[.!?,]\s+)(?:hello|hi|hola),?\s+(?:this is|somos)\s+alpha\s+motorsports\b/gi;
+    const matches = [...text.matchAll(greetingPattern)];
+    if (matches.length === 0) return text;
+    const last = matches[matches.length - 1];
+    const lastIndex = (last.index ?? 0) + (last[0].search(/(?:hello|hi|hola)/i) || 0);
+    const stalePrefix = /^(?:hi|hello|hola),?\s+(?:i just wanted to check|just checking|solo quer[ií]a confirmar)[\s\S]{0,260}\b(?:whenever you have a moment|cuando tengas un momento)\b/i.test(text);
+    if (!stalePrefix || lastIndex <= 0) return text;
+    return text.slice(lastIndex).trim();
+  }
+
   function repairSuggestedReplyForBuyerIntent(reply, payload) {
+    const repaired = repairConcatenatedFollowUp(reply);
     if (isRequirementsInquiry(payload?.currentMessage || "")) {
       return requirementsReplyFor(payload.currentMessage);
     }
-    return reply;
+    return repaired;
   }
 
   function extractVehicleTitleFromHeader(value) {
@@ -304,6 +347,16 @@
     return {
       listingUrl: listingUrl ? new URL(listingUrl, location.origin).href : "",
       vehicleTitle: cleanText(titleFromSelectedHeader || titleFromText || headingText).slice(0, 160),
+    };
+  }
+
+  function detectCaptureContext(capture) {
+    const localContext = detectListingContext(capture.root || document, capture.evidence || {});
+    if (!capture.root || capture.root === document) return localContext;
+    const pageContext = detectListingContext(document, capture.evidence || {});
+    return {
+      listingUrl: localContext.listingUrl || pageContext.listingUrl || "",
+      vehicleTitle: localContext.vehicleTitle || pageContext.vehicleTitle || "",
     };
   }
 
@@ -641,7 +694,7 @@
         extractionMode: "none",
       },
     };
-    const context = detectListingContext(capture.root || document, capture.evidence || {});
+    const context = detectCaptureContext(capture);
     const sellerProfile = validateSellerProfile(document, settings.sellerProfileNames);
     const messages = Array.isArray(capture.messages) ? capture.messages : [];
     const lastMessage = messages[messages.length - 1] || null;
@@ -673,7 +726,7 @@
       sellerNameCandidates: settings.sellerProfileNames,
     });
     return captures.map((capture) => {
-      const context = detectListingContext(capture.root || document, capture.evidence || {});
+      const context = detectCaptureContext(capture);
       const sellerProfile = validateSellerProfile(document, settings.sellerProfileNames);
       const messages = Array.isArray(capture.messages) ? capture.messages : [];
       const lastMessage = messages[messages.length - 1] || null;
@@ -811,7 +864,49 @@
     return ranked[0] || null;
   }
 
-  function buildIntakePayload(snapshot, validation, detectedAtMs = Date.now(), settings = DEFAULT_SETTINGS) {
+  async function mediaDataUrl(source, maxBytes) {
+    const value = String(source || "").trim();
+    if (!value) return "";
+    if (/^data:/i.test(value)) return value;
+    try {
+      const response = await fetch(value, { credentials: "include" });
+      if (!response.ok) return "";
+      const blob = await response.blob();
+      if (blob.size <= 0 || blob.size > maxBytes) return "";
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let index = 0; index < bytes.length; index += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(index, Math.min(index + chunkSize, bytes.length)));
+      }
+      return `data:${blob.type || "application/octet-stream"};base64,${btoa(binary)}`;
+    } catch {
+      return "";
+    }
+  }
+
+  async function hydrateSnapshotMedia(snapshot) {
+    const images = Array.isArray(snapshot.imageMessages) ? snapshot.imageMessages : [];
+    const audios = Array.isArray(snapshot.audioMessages) ? snapshot.audioMessages : [];
+    const imageMessages = await Promise.all(images.slice(-3).map(async (message) => {
+      const image = message.image || {};
+      const source = image.src || image.dataSrc || "";
+      return {
+        ...message,
+        image: { ...image, dataUrl: await mediaDataUrl(source, 1_000_000) },
+      };
+    }));
+    const audioMessages = await Promise.all(audios.slice(-1).map(async (message) => {
+      const audio = message.audio || {};
+      return {
+        ...message,
+        audio: { ...audio, dataUrl: await mediaDataUrl(audio.src, 4_000_000) },
+      };
+    }));
+    return { imageMessages, audioMessages };
+  }
+
+  function buildIntakePayload(snapshot, validation, detectedAtMs = Date.now(), settings = DEFAULT_SETTINGS, media = {}) {
     const messages = snapshot.messages;
     const currentMessage = cleanText(snapshot.lastMessage?.text || "");
     const externalThreadRef = buildThreadRef({
@@ -824,17 +919,24 @@
         : snapshot.evidence.threadIdentity,
     });
     const visibleMessages = canonicalMessages(messages);
-    const visibleImages = Array.isArray(snapshot.imageMessages)
-      ? snapshot.imageMessages
+    const visibleImages = Array.isArray(media.imageMessages)
+      ? media.imageMessages
         .map((message) => message.image)
         .filter(Boolean)
         .slice(0, 12)
+      : [];
+    const visibleAudios = Array.isArray(media.audioMessages)
+      ? media.audioMessages
+        .map((message) => message.audio)
+        .filter(Boolean)
+        .slice(0, 4)
       : [];
     const captureHash = JSON.stringify({
       thread: externalThreadRef,
       currentMessage,
       visibleMessages,
       visibleImages: visibleImages.map((image) => image.src || image.dataSrc),
+      visibleAudios: visibleAudios.map((audio) => audio.src),
     });
     const buyerMessages = messages.filter((message) => message.speaker !== "Dealer");
     const normalizedCurrentMessage = cleanText(currentMessage);
@@ -855,6 +957,7 @@
       buyerName: snapshot.buyerName || undefined,
       dealerId: Number.isInteger(Number(settings.dealerId)) && Number(settings.dealerId) > 0 ? Number(settings.dealerId) : 1,
       sessionId: typeof settings.sessionId === "string" ? settings.sessionId.trim() : "",
+      autoReplyEnabled: settings.autoReplyEnabled === true,
       messageDetectedAt: new Date(detectedAtMs).toISOString(),
       routeAllowed: validation.routeAllowed,
       conversationThreadDetected: validation.conversationThreadDetected,
@@ -865,6 +968,7 @@
       currentMessage,
       visibleMessages,
       visibleImages,
+      visibleAudios,
       chatText: visibleMessages.join("\n").slice(-4000),
       detectedVehicleTitle: snapshot.context.vehicleTitle || undefined,
       detectedMarketplaceListingUrl: snapshot.context.listingUrl || undefined,
@@ -872,7 +976,6 @@
       autoActionKey,
       currentBuyerMessageOccurrence,
       idempotencyKey: captureHash,
-      followUpEligible: false,
     };
   }
 
@@ -885,26 +988,14 @@
       /\b(?:no me interesa|ya no estoy interesado|no gracias|no me contacten|deja de escribir|adios|chao)\b/.test(normalized);
   }
 
-  function threadIdFromExternalRef(externalThreadRef) {
-    const match = String(externalThreadRef || "").match(/facebook-messages-thread-([^\s:]+)/i);
-    return match?.[1] || "";
-  }
-
-  async function rememberFollowUpState(response) {
-    const state = response?.data?.followUp || response?.followUp || null;
-    if (state) lastFollowUpState = { ...lastFollowUpState, ...state };
-    return lastFollowUpState;
-  }
-
   async function confirmOutboundDelivery(job, externalThreadRef) {
-    if (!job?.id || !externalThreadRef) return lastFollowUpState;
+    if (!job?.id || !externalThreadRef) return null;
     const response = await send({
       type: "CONFIRM_MESSENGER_OUTBOUND_DELIVERY",
       jobId: job.id,
       externalThreadRef,
     });
-    if (response?.ok) return rememberFollowUpState(response);
-    return lastFollowUpState;
+    return response?.ok ? response.data || response : null;
   }
 
   async function closeConversationAfterDelivery(intake, externalThreadRef) {
@@ -919,37 +1010,8 @@
     if (!response?.ok) {
       return { closed: false, error: response?.error || "conversation_close_failed" };
     }
-    const data = response.data || {};
-    lastFollowUpState = {
-      ...(data.followUp || lastFollowUpState),
-      status: "closed",
-      nextDueAt: null,
-    };
     closedThreadKeys.add(externalThreadRef);
-    return { closed: true, followUp: lastFollowUpState };
-  }
-
-  async function cancelFollowUpJob(job, externalThreadRef, reason) {
-    if (!job?.id || !externalThreadRef) return lastFollowUpState;
-    const response = await send({
-      type: "CANCEL_MESSENGER_FOLLOW_UP",
-      jobId: job.id,
-      externalThreadRef,
-      reason,
-    });
-    if (response?.ok) return rememberFollowUpState(response);
-    return lastFollowUpState;
-  }
-
-  async function cancelFollowUpsForBuyer(payload, reason = "buyer_replied") {
-    if (!payload?.externalThreadRef) return lastFollowUpState;
-    const response = await send({
-      type: "CANCEL_MESSENGER_FOLLOW_UPS_FOR_BUYER",
-      externalThreadRef: payload.externalThreadRef,
-      reason,
-    });
-    if (response?.ok) return rememberFollowUpState(response);
-    return lastFollowUpState;
+    return { closed: true };
   }
 
   function extractSuggestedReply(response) {
@@ -1056,99 +1118,6 @@
     };
   }
 
-  function followUpSnapshotActionable(job, snapshot, settings) {
-    const currentThreadId = getCurrentThreadId();
-    const expectedThreadId = threadIdFromExternalRef(job?.externalThreadRef);
-    if (expectedThreadId && currentThreadId && expectedThreadId !== currentThreadId) {
-      return { ok: false, reason: "thread_changed" };
-    }
-    const latest = snapshot.messages[snapshot.messages.length - 1] || null;
-    if (latest?.speaker !== "Dealer") return { ok: false, reason: "buyer_replied" };
-    if (
-      job?.expectedPreviousReply &&
-      cleanText(latest?.text || "") !== cleanText(job.expectedPreviousReply)
-    ) {
-      return { ok: false, reason: "manual_reply_detected" };
-    }
-    const composer = findComposer(snapshot.root);
-    if (!composer) return { ok: false, reason: "composer_missing" };
-    const draft = cleanText(readComposerText(composer));
-    if (draft && draft !== cleanText(job.content) && !isLikelyOwnAiReply(draft)) {
-      return { ok: false, reason: "composer_not_empty" };
-    }
-    return { ok: true, composer };
-  }
-
-  async function processFollowUpJob({ job, settings, snapshot, debug, onBuyerReply }) {
-    const actionable = followUpSnapshotActionable(job, snapshot, settings);
-    if (!actionable.ok) {
-      const state = await cancelFollowUpJob(job, job.externalThreadRef, actionable.reason);
-      await sendDebug("follow_up_canceled", {
-        ...debug,
-        reason: actionable.reason,
-        followUp: state,
-        autoSent: false,
-      });
-      if (actionable.reason === "buyer_replied" && typeof onBuyerReply === "function") {
-        return onBuyerReply();
-      }
-      return { skipped: true, reason: actionable.reason, followUp: state };
-    }
-    if (settings.dryRun || !settings.autoReplyEnabled) {
-      await sendDebug("follow_up_waiting", {
-        ...debug,
-        reason: settings.dryRun ? "dry_run_enabled" : "auto_reply_disabled",
-        followUp: lastFollowUpState,
-        autoSent: false,
-      });
-      return { skipped: true, reason: settings.dryRun ? "dry_run_enabled" : "auto_reply_disabled" };
-    }
-    // This key is intentionally distinct from the normal-reply hash. It opens
-    // exactly one sending opportunity for this claimed job, then closes again.
-    const followUpActionKey = `follow_up_job:${job.id}`;
-    if (lastAutoSendHashByThread.get(job.externalThreadRef) === followUpActionKey) {
-      return { skipped: true, reason: "duplicate_follow_up_job" };
-    }
-    const inserted = insertReply(job.content, snapshot.root);
-    if (!inserted.ok) return { skipped: true, reason: inserted.reason };
-    const sendResult = await sendThroughComposer(inserted.box, job.content, inserted.needsWrite === true);
-    if (!sendResult.ok) return { skipped: true, reason: sendResult.reason || "send_dispatch_failed" };
-    const started = Date.now();
-    let delivered = false;
-    while (Date.now() - started <= SEND_EVIDENCE_TIMEOUT_MS) {
-      const liveCapture = globalThis.DealerPilotMessengerCapture?.captureFromRoot?.(
-        snapshot.root,
-        settings.sellerProfileNames,
-        document,
-      );
-      delivered = deliveryIsVisible(job.content, liveCapture?.messages || snapshot.messages, "") ||
-        !readComposerText(findComposer(snapshot.root) || inserted.box);
-      if (delivered) break;
-      await sleep(SEND_EVIDENCE_INTERVAL_MS);
-    }
-    if (!delivered) {
-      await sendDebug("follow_up_delivery_unconfirmed", {
-        ...debug,
-        reason: "delivery_unconfirmed",
-        followUp: lastFollowUpState,
-        autoSent: false,
-      });
-      return { skipped: true, reason: "delivery_unconfirmed" };
-    }
-    lastAutoSendHashByThread.set(job.externalThreadRef, followUpActionKey);
-    lastAutoReplyByThread.set(job.externalThreadRef, { text: cleanText(job.content), at: Date.now() });
-    const state = await confirmOutboundDelivery(job, job.externalThreadRef);
-    await sendDebug("follow_up_sent", {
-      ...debug,
-      followUp: state,
-      followUpJobId: job.id,
-      autoSent: true,
-      deliveryConfirmed: true,
-      sendMethod: sendResult.method,
-    });
-    return { ok: true, autoSent: true, followUp: state };
-  }
-
   function buildBuyersState(snapshots = [], winnerIndex = -1) {
     return snapshots.map((snapshot) => ({
       buyerName: snapshot.buyerName || "",
@@ -1168,7 +1137,6 @@
   function buildDebugBase({ automatic, settings, snapshot, validation, snapshots, winnerIndex }) {
     return {
       automatic,
-      dryRun: settings.dryRun === true,
       autoReplyEnabled: settings.autoReplyEnabled === true,
       activeConversationCount: snapshots.length,
       buyersDetected: buildBuyersState(snapshots, winnerIndex),
@@ -1183,11 +1151,14 @@
       latestMessageDirection: snapshot.evidence.latestMessageDirection || "none",
       imageCandidateCount: snapshot.evidence.imageCandidateCount || 0,
       imageMessageCount: snapshot.evidence.imageMessageCount || 0,
+      audioCandidateCount: snapshot.evidence.audioCandidateCount || 0,
+      audioMessageCount: snapshot.evidence.audioMessageCount || 0,
       metadataCandidateCount: snapshot.evidence.metadataCandidateCount || 0,
       metadataCandidateLabels: Array.isArray(snapshot.evidence.metadataCandidateLabels)
         ? snapshot.evidence.metadataCandidateLabels.slice(0, 12)
         : [],
       latestIsImage: snapshot.evidence.latestIsImage === true,
+      latestIsAudio: snapshot.evidence.latestIsAudio === true,
       imageCandidates: Array.isArray(snapshot.evidence.imageCandidates)
         ? snapshot.evidence.imageCandidates.slice(0, 12)
         : [],
@@ -1206,40 +1177,9 @@
     };
   }
 
-  async function processSnapshot({ automatic, detectedAtMs, settings, snapshot, snapshots, winnerIndex, followUpJob, followUpEligible, forceRefresh = false }) {
+  async function processSnapshot({ automatic, detectedAtMs, settings, snapshot, snapshots, winnerIndex, forceRefresh = false }) {
     const validation = validateSnapshot(snapshot);
     const debug = buildDebugBase({ automatic, settings, snapshot, validation, snapshots, winnerIndex });
-
-    if (followUpJob) {
-      const followUpContextSafe =
-        validation.routeAllowed === true &&
-        validation.conversationThreadDetected === true &&
-        validation.buyerNameDetected === true &&
-        validation.activeThreadHeaderDetected === true &&
-        validation.sellerIsCurrentUser === true &&
-        validation.marketplaceContextDetected === true;
-      if (!followUpContextSafe) {
-        await cancelFollowUpJob(followUpJob, followUpJob.externalThreadRef, "thread_changed");
-        await sendDebug("follow_up_canceled", { ...debug, reason: "follow_up_context_invalid", autoSent: false });
-        return { skipped: true, reason: "follow_up_context_invalid" };
-      }
-      return processFollowUpJob({
-        job: followUpJob,
-        settings,
-        snapshot,
-        debug,
-        onBuyerReply: () => processSnapshot({
-          automatic,
-          detectedAtMs,
-          settings,
-          snapshot,
-          snapshots,
-          winnerIndex,
-          followUpJob: null,
-          followUpEligible: true,
-        }),
-      });
-    }
 
     if (!validation.ok) {
       const reason = validation.missing[0] || "invalid_sales_context";
@@ -1247,10 +1187,8 @@
       return { skipped: true, reason, validation, debug };
     }
 
-    const payload = {
-      ...buildIntakePayload(snapshot, validation, detectedAtMs, settings),
-      followUpEligible: followUpEligible === true,
-    };
+    const media = await hydrateSnapshotMedia(snapshot);
+    const payload = buildIntakePayload(snapshot, validation, detectedAtMs, settings, media);
     const threadKey = payload.externalThreadRef;
     const latestText = cleanText(snapshot.lastMessage?.text || "");
     if (closedThreadKeys.has(threadKey)) {
@@ -1278,16 +1216,12 @@
 
     if (isTerminalAcknowledgement(payload.currentMessage) || isConversationClosingAcknowledgement(payload.currentMessage)) {
       const closing = isConversationClosingAcknowledgement(payload.currentMessage);
-      const followUp = await cancelFollowUpsForBuyer(
-        payload,
-        closing ? "conversation_closed" : "buyer_replied",
-      );
       lastCaptureHashByThread.set(threadKey, payload.messageHash);
       clearPendingBuyer(threadKey);
       const reason = closing
         ? "conversation_closed"
         : "terminal_acknowledgement";
-      await sendDebug("blocked", { ...debug, reason, followUp });
+      await sendDebug("blocked", { ...debug, reason });
       return { skipped: true, reason };
     }
 
@@ -1337,22 +1271,6 @@
         }
         payload.messageDetectedAt = new Date(pending.detectedAt || detectedAtMs).toISOString();
       }
-    }
-
-    if (settings.dryRun) {
-      lastCaptureHashByThread.set(threadKey, payload.messageHash);
-      await sendDebug("dry_run_capture", {
-        ...debug,
-        backendIntakeSent: false,
-        backendIntakeReceived: false,
-        reason: "dry_run_enabled",
-        payloadPreview: {
-          externalThreadRef: payload.externalThreadRef,
-          buyerName: payload.buyerName,
-          currentMessage: payload.currentMessage,
-        },
-      });
-      return { ok: true, dryRun: true, payload };
     }
 
     await sendDebug("intake_sending", {
@@ -1417,7 +1335,7 @@
       lastAutoSendHashByThread.set(threadKey, autoActionKey);
       lastBlockedReplyKeyByThread.delete(threadKey);
       lastAutoReplyByThread.set(threadKey, { text: cleanText(lastSuggestedReply), at: Date.now() });
-      const followUp = await confirmOutboundDelivery(response.data?.outboundJob, payload.externalThreadRef);
+      await confirmOutboundDelivery(response.data?.outboundJob, payload.externalThreadRef);
       const conversationClose = await closeConversationAfterDelivery(response.data, payload.externalThreadRef);
       await sendDebug("intake_ok", {
         ...debug,
@@ -1427,7 +1345,6 @@
         autoSent: true,
         reason: "reply_already_delivered",
         deliveryConfirmed: true,
-        followUp,
         conversationClosed: conversationClose.closed === true,
         conversationCloseError: conversationClose.error || null,
       });
@@ -1468,9 +1385,9 @@
     }
 
     const sendResult = await maybeSendReply(lastSuggestedReply, payload, snapshot, threadKey, settings);
-    const followUp = sendResult.autoSent
-      ? await confirmOutboundDelivery(response.data?.outboundJob, payload.externalThreadRef)
-      : lastFollowUpState;
+    if (sendResult.autoSent) {
+      await confirmOutboundDelivery(response.data?.outboundJob, payload.externalThreadRef);
+    }
     const conversationClose = sendResult.autoSent
       ? await closeConversationAfterDelivery(response.data, payload.externalThreadRef)
       : { closed: false, skipped: true };
@@ -1480,11 +1397,10 @@
       aiReplyReceived: !!lastSuggestedReply,
       backendIntakeSent: true,
       backendIntakeReceived: true,
-      followUp,
       conversationClosed: conversationClose.closed === true,
       conversationCloseError: conversationClose.error || null,
     });
-    return { ok: true, suggestedReply: lastSuggestedReply, followUp, conversationClose, ...sendResult };
+    return { ok: true, suggestedReply: lastSuggestedReply, conversationClose, ...sendResult };
   }
 
   async function captureConversationOnce(options = {}) {
@@ -1518,8 +1434,6 @@
       snapshot: winning.snapshot,
       snapshots,
       winnerIndex: winning.index,
-      followUpJob: options.followUpJob || null,
-      followUpEligible: options.followUpEligible === true,
       forceRefresh: options.forceRefresh === true,
     });
     return {
@@ -1542,54 +1456,6 @@
     }
   }
 
-  async function claimAndQueueFollowUp(controller) {
-    if (!controller?.enqueue) return { skipped: true, reason: "autonomy_missing" };
-    const activeThreadId = getCurrentThreadId();
-    const settings = await getSettings();
-    const activeSnapshot = activeThreadId
-      ? selectWinningSnapshot(deduplicateSnapshots(createCaptureSnapshots(settings)))?.snapshot
-      : null;
-    const activeThreadRef = activeSnapshot
-      ? buildThreadRef({
-          buyerName: activeSnapshot.buyerName,
-          vehicleTitle: activeSnapshot.context.vehicleTitle,
-          listingUrl: activeSnapshot.context.listingUrl || location.href,
-          messages: activeSnapshot.messages,
-          threadIdentity: `facebook-messages-thread-${activeThreadId}`,
-        })
-      : "";
-    const response = await send({
-      type: "CLAIM_DUE_MESSENGER_FOLLOW_UP",
-      externalThreadRef: activeThreadRef,
-    });
-    if (!response?.ok) return { skipped: true, reason: response?.error || "follow_up_claim_failed" };
-    const claim = response.data || {};
-    await rememberFollowUpState(response);
-    const job = claim.job;
-    if (!job?.id || !job.externalThreadRef) return { skipped: true, reason: "no_follow_up_due" };
-    const threadId = threadIdFromExternalRef(job.externalThreadRef);
-    if (!threadId) {
-      await cancelFollowUpJob(job, job.externalThreadRef, "thread_changed");
-      return { skipped: true, reason: "follow_up_thread_missing" };
-    }
-    const expectedThreadPath = `/messages/t/${encodeURIComponent(threadId)}`;
-    const sourceUrl = String(job.sourceUrl || "");
-    const url = sourceUrl.includes(expectedThreadPath)
-      ? sourceUrl
-      : new URL(expectedThreadPath, location.origin).href;
-    controller.enqueue({
-      threadId,
-      url,
-      signature: `follow-up:${job.id}`,
-      incomingPreview: false,
-      explicitUnread: false,
-      followUpJob: job,
-      reason: "scheduled_follow_up",
-      observedAt: Date.now(),
-    });
-    return { ok: true, jobId: job.id };
-  }
-
   async function restoreAutoSendState() {
     const response = await send({ type: "LOAD_AUTO_SEND_STATE" }).catch(() => ({}));
     if (response?.ok && response.data) {
@@ -1608,17 +1474,22 @@
   }
 
   function start() {
-    if (!isFacebookMessagesThreadRoute()) return;
+    if (messengerRuntimeStarted || !isFacebookMessagesThreadRoute()) return;
+    messengerRuntimeStarted = true;
     restoreAutoSendState().then(() => {
       getSettings().then((settings) => {
-        const controller = globalThis.DealerPilotMessengerAutonomy.start({
+        sendDebug("initialized", {
+          routeAllowed: true,
+          conversationThreadDetected: Boolean(getCurrentThreadId()),
+          buyerMessageDetected: false,
+          buyerNameDetected: false,
+          sellerIsCurrentUser: false,
+          marketplaceContextDetected: false,
+        });
+        globalThis.DealerPilotMessengerAutonomy.start({
           processThread: captureConversation,
           sellerProfileNames: settings.sellerProfileNames,
         });
-        setInterval(() => {
-          claimAndQueueFollowUp(controller).catch(() => {});
-        }, 30000);
-        claimAndQueueFollowUp(controller).catch(() => {});
       }).catch(console.warn);
     }).catch(console.warn);
     setInterval(() => {
@@ -1626,6 +1497,26 @@
       const replies = Object.fromEntries(lastAutoReplyByThread);
       send({ type: "SAVE_AUTO_SEND_STATE", sendHashes, replies }).catch(() => {});
     }, 30000);
+  }
+
+  function watchMessengerRoute() {
+    if (routeWatchInstalled) return;
+    routeWatchInstalled = true;
+    const notifyRouteChange = () => start();
+    const historyRef = globalThis.history;
+    for (const method of ["pushState", "replaceState"]) {
+      const original = historyRef?.[method];
+      if (typeof original !== "function") continue;
+      historyRef[method] = function (...args) {
+        const result = original.apply(this, args);
+        notifyRouteChange();
+        return result;
+      };
+    }
+    globalThis.addEventListener?.("popstate", notifyRouteChange);
+    globalThis.addEventListener?.("hashchange", notifyRouteChange);
+    // Facebook can update the URL from an internal router without emitting a browser event.
+    setInterval(notifyRouteChange, 1500);
   }
 
   globalThis.DealerPilotMessengerAi = Object.freeze({
@@ -1641,6 +1532,7 @@
     isFacebookRatingCard,
     isTerminalAcknowledgement,
     isConversationClosingAcknowledgement,
+    repairConcatenatedFollowUp,
     replyMirrorsBuyerLanguage,
     replyRepeatsConversation,
     selectWinningSnapshot,
@@ -1657,13 +1549,14 @@
 
   chrome.runtime.onMessage?.addListener((message, _sender, sendResponse) => {
     if (message?.type !== "REFRESH_ACTIVE_MESSENGER_CONVERSATION") return false;
-    captureConversation({ automatic: true, followUpEligible: true, forceRefresh: true })
+    captureConversation({ automatic: true, forceRefresh: true })
       .then((result) => sendResponse({ ok: true, data: result }))
       .catch((error) => sendResponse({ ok: false, error: error?.message || String(error) }));
     return true;
   });
 
   if (!globalThis.__DEALERPILOT_MESSENGER_AI_TEST__) {
+    watchMessengerRoute();
     start();
   }
 })();

@@ -1,6 +1,5 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  let followUpTimerId = null;
 
   function send(message) {
     return new Promise((resolve) => {
@@ -12,6 +11,9 @@
 
   async function currentWindowId() {
     try {
+      const tabs = await chrome.tabs?.query?.({ active: true, currentWindow: true });
+      const tabWindowId = Number(tabs?.[0]?.windowId);
+      if (Number.isInteger(tabWindowId) && tabWindowId >= 0) return tabWindowId;
       const current = await chrome.windows?.getCurrent?.();
       const id = Number(current?.id);
       return Number.isInteger(id) && id >= 0 ? id : null;
@@ -23,13 +25,17 @@
   async function load() {
     const windowId = await currentWindowId();
     const response = await send({ type: "GET_SETTINGS", windowId });
-    const settings = response.ok ? response.data : {};
+    if (!response?.ok) {
+      $("autoReplyEnabled").checked = true;
+      $("diagnostics").textContent = `Settings could not be loaded for window ${windowId ?? "unknown"}. ${response?.error || "Try again."}`;
+      return;
+    }
+    const settings = response.data || {};
     $("backendUrl").value = settings.backendUrl || "https://app.1987dealerpilot.com";
     $("dealerId").value = Number.isInteger(Number(settings.dealerId)) && Number(settings.dealerId) > 0 ? String(Number(settings.dealerId)) : "1";
     $("sessionId").value = settings.sessionId || "";
     $("sellerProfileNames").value = (settings.sellerProfileNames || []).join("\n");
-    $("dryRun").checked = settings.dryRun !== false;
-    $("autoReplyEnabled").checked = settings.autoReplyEnabled === true;
+    $("autoReplyEnabled").checked = settings.autoReplyEnabled !== false;
 
     await loadDebug(windowId);
   }
@@ -51,34 +57,6 @@
       debug.suggestedReplyPreview ||
       "",
     ).trim();
-  }
-
-  function followUpTimerLabel(followUp = {}) {
-    const nextDueAt = followUp.nextDueAt ? new Date(followUp.nextDueAt).getTime() : NaN;
-    const remaining = Number.isFinite(nextDueAt) ? Math.max(0, nextDueAt - Date.now()) : 0;
-    const seconds = Math.floor(remaining / 1000);
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  }
-
-  function renderFollowUpTimer(followUp = {}) {
-    const terminal = ["idle", "canceled", "buyer_message_missing", "closed"].includes(String(followUp.status || "idle").toLowerCase());
-    const active = !terminal && (!!followUp.nextDueAt || String(followUp.status || "").toLowerCase() === "claimed");
-    const count = Number(followUp.followUpsSent || 0);
-    const max = Number(followUp.maxFollowUps || 3);
-    setDebugValue(
-      "dbg-follow-up",
-      active ? `${count}/${max} · ${followUpTimerLabel(followUp)}` : `0/${max} · 00:00:00`,
-      active ? "ok" : "err",
-    );
-  }
-
-  function startFollowUpTimer(followUp = {}) {
-    if (followUpTimerId) clearInterval(followUpTimerId);
-    renderFollowUpTimer(followUp);
-    followUpTimerId = setInterval(() => renderFollowUpTimer(followUp), 1000);
   }
 
   async function copySuggestedReply() {
@@ -103,12 +81,7 @@
     const settings = state.settings || {};
     const debug = state.lastMessengerCaptureDebug || {};
     const intake = state.lastConversationIntake || {};
-    const followUp = debug.followUp || state.lastMessengerFollowUp || {};
-    const mode = settings.dryRun
-      ? "Dry run"
-      : settings.autoReplyEnabled
-        ? "Auto reply enabled"
-        : "Suggest only";
+    const mode = settings.autoReplyEnabled ? "Auto reply enabled" : "Suggest only";
 
     setDebugValue("dbg-mode", mode, settings.autoReplyEnabled ? "warn" : "ok");
     setDebugValue(
@@ -136,12 +109,21 @@
     );
     const imageCount = debug.imageCandidateCount ?? 0;
     const imageMessageCount = debug.imageMessageCount ?? 0;
+    const audioCount = debug.audioCandidateCount ?? 0;
+    const audioMessageCount = debug.audioMessageCount ?? 0;
     setDebugValue(
       "dbg-images",
       imageCount
         ? `Cand ${imageCount} | Msg ${imageMessageCount}${debug.latestIsImage ? " | latest" : ""}`
         : "None",
       imageMessageCount ? "warn" : imageCount ? "" : "ok",
+    );
+    setDebugValue(
+      "dbg-audio",
+      audioCount
+        ? `Cand ${audioCount} | Msg ${audioMessageCount}${debug.latestIsAudio ? " | latest" : ""}`
+        : "None",
+      audioMessageCount ? "warn" : audioCount ? "" : "ok",
     );
     setDebugValue(
       "dbg-backend",
@@ -153,7 +135,6 @@
       debug.autoSent ? `Sent ${debug.sendMethod || ""}` : debug.reason || "Blocked",
       debug.autoSent ? "ok" : "warn",
     );
-    startFollowUpTimer(followUp);
     const specificError = debug.rawError || debug.errorData || intake.error || state.lastError || null;
     const specificErrorText =
       debug.reason ||
@@ -183,9 +164,12 @@
       dealerId: Number($("dealerId").value),
       sessionId: $("sessionId").value.trim(),
       sellerProfileNames: $("sellerProfileNames").value.split(/\r?\n/),
-      dryRun: $("dryRun").checked,
       autoReplyEnabled: $("autoReplyEnabled").checked,
     });
+    if (!response?.ok) {
+      throw new Error(response?.error || "settings_not_saved");
+    }
+    $("autoReplyEnabled").checked = response.data?.autoReplyEnabled !== false;
     $("diagnostics").textContent = JSON.stringify(response, null, 2);
     await loadDebug(windowId);
   }

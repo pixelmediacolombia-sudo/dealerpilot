@@ -106,6 +106,7 @@ const intakePayload = {
   currentMessage: "Is this available?",
   detectedMarketplaceListingUrl: "https://www.facebook.com/marketplace/item/1/",
   detectedVehicleTitle: "2021 Toyota RAV4",
+  autoReplyEnabled: true,
   messageHash: "hash-a",
   idempotencyKey: "hash-a",
   routeAllowed: true,
@@ -124,6 +125,7 @@ test("background sends only the existing conversations intake contract", async (
   assert.equal(calls.apiPost.length, 1);
   assert.equal(calls.apiPost[0].path, "/api/conversations/intake");
   assert.equal(calls.apiPost[0].body.extensionId, "msg-ext-test");
+  assert.equal(calls.apiPost[0].body.autoReplyEnabled, true);
   assert.equal(calls.apiPost[0].body.availabilityQuickReplyAccepted, false);
   assert.equal(storage.lastConversationIntake.suggestedReply, "reply for marketplace-thread::buyer-a::rav4");
   assert.equal(storage.lastConversationIntake.suggestedReplyPreview, "reply for marketplace-thread::buyer-a::rav4");
@@ -132,7 +134,6 @@ test("background sends only the existing conversations intake contract", async (
 test("extension updates preserve an operator-approved automatic messaging setting", async () => {
   const { storage, listeners, calls } = createHarness({
     initialStorage: {
-      dryRun: false,
       autoReplyEnabled: true,
       backendUrl: "https://dealer.example",
       sellerProfileNames: ["Andres Ibanez"],
@@ -142,40 +143,11 @@ test("extension updates preserve an operator-approved automatic messaging settin
 
   await listeners.installed();
 
-  assert.equal(storage.dryRun, false);
   assert.equal(storage.autoReplyEnabled, true);
   assert.equal(storage.backendUrl, "https://dealer.example");
   assert.deepEqual(storage.sellerProfileNames, ["Andres Ibanez"]);
   assert.equal(calls.tabs.some((call) => call.type === "create"), false);
-  assert.deepEqual(calls.alarms.map((alarm) => alarm.name).sort(), [
-    "dealerpilot-messenger-follow-up-inbox",
-    "dealerpilot-messenger-heartbeat",
-  ]);
-});
-
-test("enabled automatic messaging opens one inactive Marketplace inbox for due follow-ups", async () => {
-  const { handlers, calls } = createHarness({
-    initialStorage: { dryRun: false, autoReplyEnabled: true },
-  });
-
-  const result = await handlers.ENSURE_MESSENGER_FOLLOW_UP_INBOX();
-
-  assert.equal(result.tabId, 901);
-  assert.equal(result.reused, false);
-  assert.equal(JSON.stringify(calls.tabs[0]), JSON.stringify({
-    type: "query",
-    query: {
-      url: [
-        "https://www.facebook.com/marketplace/inbox*",
-        "https://web.facebook.com/marketplace/inbox*",
-        "https://facebook.com/marketplace/inbox*",
-      ],
-    },
-  }));
-  assert.equal(JSON.stringify(calls.tabs[1]), JSON.stringify({
-    type: "create",
-    options: { url: "https://www.facebook.com/marketplace/inbox", active: false },
-  }));
+  assert.deepEqual(calls.alarms.map((alarm) => alarm.name).sort(), ["dealerpilot-messenger-heartbeat"]);
 });
 
 test("background deduplicates identical intakes inside the extension", async () => {
@@ -187,86 +159,6 @@ test("background deduplicates identical intakes inside the extension", async () 
   assert.equal(second.suggestedReply, "reply for marketplace-thread::buyer-a::rav4");
   assert.equal(second.duplicateExtensionIntake, true);
   assert.equal(calls.apiPost.length, 1);
-});
-
-test("background keeps the active thread reference when it claims follow-up state", async () => {
-  const { handlers, calls, storage } = createHarness({
-    apiPost(path) {
-      if (path === "/api/conversations/follow-ups/claim") {
-        return {
-          ok: true,
-          job: null,
-          followUp: {
-            cycleNumber: 8,
-            followUpsSent: 0,
-            maxFollowUps: 3,
-            status: "Active",
-            nextDueAt: "2026-08-14T01:30:00.000Z",
-          },
-        };
-      }
-      return {};
-    },
-  });
-
-  await handlers.CLAIM_DUE_MESSENGER_FOLLOW_UP({
-    externalThreadRef: "marketplace-thread::facebook-messages-thread-2007150843270449::vinay::2020-tesla-model-y",
-  });
-
-  assert.equal(calls.apiPost[0].body.externalThreadRef, "marketplace-thread::facebook-messages-thread-2007150843270449::vinay::2020-tesla-model-y");
-  assert.equal(storage.lastMessengerFollowUp.status, "Active");
-  assert.equal(storage.lastMessengerFollowUp.cycleNumber, 8);
-});
-
-test("an empty follow-up claim does not erase a still-active timer for the open thread", async () => {
-  const externalThreadRef = "marketplace-thread::facebook-messages-thread-2007150843270449::vinay::2020-tesla-model-y";
-  const { handlers, storage } = createHarness({
-    initialStorage: {
-      lastMessengerFollowUp: {
-        externalThreadRef,
-        cycleNumber: 8,
-        followUpsSent: 0,
-        maxFollowUps: 3,
-        status: "Active",
-        nextDueAt: "2099-08-14T01:30:00.000Z",
-      },
-    },
-    apiPost() {
-      return { ok: true, job: null, followUp: { status: "idle", followUpsSent: 0, maxFollowUps: 3, nextDueAt: null } };
-    },
-  });
-
-  await handlers.CLAIM_DUE_MESSENGER_FOLLOW_UP({ externalThreadRef });
-
-  assert.equal(storage.lastMessengerFollowUp.status, "Active");
-  assert.equal(storage.lastMessengerFollowUp.cycleNumber, 8);
-  assert.equal(storage.lastMessengerFollowUp.externalThreadRef, externalThreadRef);
-});
-
-test("switching chats does not reset an active follow-up countdown", async () => {
-  const scheduledThread = "marketplace-thread::facebook-messages-thread-101::buyer-a::rav4";
-  const currentThread = "marketplace-thread::facebook-messages-thread-202::buyer-b::tundra";
-  const { handlers, storage } = createHarness({
-    initialStorage: {
-      lastMessengerFollowUp: {
-        externalThreadRef: scheduledThread,
-        cycleNumber: 4,
-        followUpsSent: 1,
-        maxFollowUps: 3,
-        status: "Active",
-        nextDueAt: "2099-08-14T01:30:00.000Z",
-      },
-    },
-    apiPost() {
-      return { ok: true, job: null, followUp: { status: "idle", followUpsSent: 0, maxFollowUps: 3, nextDueAt: null } };
-    },
-  });
-
-  await handlers.CLAIM_DUE_MESSENGER_FOLLOW_UP({ externalThreadRef: currentThread });
-
-  assert.equal(storage.lastMessengerFollowUp.status, "Active");
-  assert.equal(storage.lastMessengerFollowUp.nextDueAt, "2099-08-14T01:30:00.000Z");
-  assert.equal(storage.lastMessengerFollowUp.externalThreadRef, scheduledThread);
 });
 
 test("background keeps the latest 20 Messenger diagnostics", async () => {
@@ -331,12 +223,11 @@ test("background writes and submits the Messenger composer through separate CDP 
   assert.equal(calls.debugger.at(-1).operation, "detach");
 });
 
-test("settings start in safe mode", async () => {
+test("settings start with automatic replies enabled", async () => {
   const { handlers } = createHarness();
   const settings = await handlers.GET_SETTINGS();
 
-  assert.equal(settings.dryRun, true);
-  assert.equal(settings.autoReplyEnabled, false);
+  assert.equal(settings.autoReplyEnabled, true);
   assert.deepEqual(
     JSON.parse(JSON.stringify(settings.sellerProfileNames)),
     ["Alpha Manassas", "Alpha Motorsport", "Andres Ibanez"],
@@ -372,7 +263,7 @@ test("background closes a phone-request conversation only after the extension co
     apiPost(path, body) {
       assert.equal(path, "/api/conversations/91/close-after-delivery");
       assert.equal(body.externalThreadRef, "marketplace-thread::facebook-messages-thread-91");
-      return { conversation: { id: 91, status: "closed" }, followUp: { status: "closed", nextDueAt: null } };
+      return { conversation: { id: 91, status: "closed" } };
     },
   });
 
@@ -383,7 +274,7 @@ test("background closes a phone-request conversation only after the extension co
 
   assert.equal(result.conversation.status, "closed");
   assert.equal(calls.apiPost.length, 1);
-  assert.equal(storage.lastMessengerFollowUp.status, "closed");
+  assert.equal(storage.lastConversationIntake, undefined);
 });
 
 test("background reloads the active Facebook conversation without reloading the whole tab", async () => {
@@ -418,10 +309,10 @@ test("two installations keep dealer and browser session identity in the intake c
     apiPost: makeApiPost("lucky-mazda"),
   });
 
-  await first.handlers.SAVE_SETTINGS({ dealerId: 1, sessionId: "dealer-1" });
-  await second.handlers.SAVE_SETTINGS({ dealerId: 2, sessionId: "lucky-mazda" });
-  await first.handlers.CONVERSATION_INTAKE({ ...intakePayload, messageHash: "session-a", idempotencyKey: "session-a" });
-  await second.handlers.CONVERSATION_INTAKE({ ...intakePayload, messageHash: "session-b", idempotencyKey: "session-b" });
+  await first.handlers.SAVE_SETTINGS({ dealerId: 1, sessionId: "dealer-1" }, { tab: { windowId: 11 } });
+  await second.handlers.SAVE_SETTINGS({ dealerId: 2, sessionId: "lucky-mazda" }, { tab: { windowId: 22 } });
+  await first.handlers.CONVERSATION_INTAKE({ ...intakePayload, messageHash: "session-a", idempotencyKey: "session-a" }, { tab: { windowId: 11 } });
+  await second.handlers.CONVERSATION_INTAKE({ ...intakePayload, messageHash: "session-b", idempotencyKey: "session-b" }, { tab: { windowId: 22 } });
 
   assert.deepEqual(
     calls
@@ -432,30 +323,4 @@ test("two installations keep dealer and browser session identity in the intake c
       { name: "lucky-mazda", dealerId: 2, sessionId: "lucky-mazda" },
     ],
   );
-});
-
-test("background claims follow-ups and retains the durable countdown state for the debugger", async () => {
-  const { handlers, calls, storage } = createHarness({
-    apiPost(path) {
-      assert.equal(path, "/api/conversations/follow-ups/claim");
-      return {
-        job: { id: 91, externalThreadRef: "marketplace-thread::facebook-messages-thread-991" },
-        followUp: {
-          cycleNumber: 2,
-          followUpsSent: 1,
-          maxFollowUps: 3,
-          status: "Active",
-          nextDueAt: "2026-08-14T17:00:00.000Z",
-        },
-      };
-    },
-  });
-
-  const claimed = await handlers.CLAIM_DUE_MESSENGER_FOLLOW_UP();
-
-  assert.equal(claimed.job.id, 91);
-  assert.equal(calls.apiPost[0].body.extensionId, "msg-ext-test");
-  assert.equal(storage.lastMessengerFollowUp.jobId, 91);
-  assert.equal(storage.lastMessengerFollowUp.followUpsSent, 1);
-  assert.equal(storage.lastMessengerFollowUp.maxFollowUps, 3);
 });

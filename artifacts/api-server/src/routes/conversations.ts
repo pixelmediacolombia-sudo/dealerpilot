@@ -2312,6 +2312,7 @@ router.post("/conversations/intake", async (req, res) => {
     vehicleType,
     dealerId: requestedDealerId,
     sessionId,
+    autoReplyEnabled,
     messageDetectedAt: rawMessageDetectedAt,
     messageHash,
     idempotencyKey,
@@ -2339,6 +2340,7 @@ router.post("/conversations/intake", async (req, res) => {
     vehicleType?: string;
     dealerId?: number | string;
     sessionId?: string;
+    autoReplyEnabled?: boolean;
     messageDetectedAt?: string;
     messageHash?: string;
     idempotencyKey?: string;
@@ -2694,6 +2696,7 @@ router.post("/conversations/intake", async (req, res) => {
           parsedAskingPrice ?? existingConv.marketplaceAskingPrice,
         vehicleType: vehicleType ?? existingConv.vehicleType,
         sessionId: sessionId ?? existingConv.sessionId,
+        ...(typeof autoReplyEnabled === "boolean" ? { autoReplyEnabled } : {}),
         detectedListingUrl:
           detectedMarketplaceListingUrl ?? existingConv.detectedListingUrl,
         detectedVehicleTitle:
@@ -2711,6 +2714,7 @@ router.post("/conversations/intake", async (req, res) => {
       .values({
         dealerId,
         sessionId: sessionId ?? null,
+        autoReplyEnabled: autoReplyEnabled === true,
         externalThreadRef,
         buyerName,
         language,
@@ -3090,6 +3094,7 @@ router.post("/conversations/intake", async (req, res) => {
     handoff: !!handoffReason,
     handoffReason,
     closeConversationAfterDelivery: closeAfterDelivery && !!suggestedReply,
+    autoReplyEnabled: conversation?.autoReplyEnabled === true,
     language,
     fallbackUsed: aiReplyResult?.fallbackUsed ?? false,
     fallbackReason: aiReplyResult?.fallbackReason ?? null,

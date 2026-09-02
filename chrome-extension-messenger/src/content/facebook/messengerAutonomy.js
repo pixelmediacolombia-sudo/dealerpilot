@@ -346,8 +346,6 @@
         result = await processThread({
           automatic: true,
           expectedThreadId: target.syntheticActiveThread ? "" : target.threadId,
-          followUpJob: target.followUpJob || null,
-          followUpEligible: target.followUpEligible === true,
         });
         const retryable = RETRYABLE_PROCESS_REASONS.has(result?.reason);
         if (!retryable) break;
@@ -377,10 +375,6 @@
           ...target,
           reason,
           observedAt: Date.now(),
-          // Every newly processed buyer turn needs the durable follow-up cycle.
-          // The backend still cancels it when the buyer replies, gives a phone,
-          // or asks for Alpha's number and that reply is delivered.
-          followUpEligible: true,
         });
       }
     }
@@ -410,7 +404,6 @@
         syntheticActiveThread,
         reason,
         observedAt: Date.now(),
-        followUpEligible: true,
       });
     }
 
@@ -436,7 +429,7 @@
               explicitUnread: false,
             }
           : null);
-      if (target) queue.enqueue({ ...target, reason: "restored_queue", followUpEligible: true });
+      if (target) queue.enqueue({ ...target, reason: "restored_queue" });
     }
     const initialQueueState = queue.getState();
     if (

@@ -249,6 +249,74 @@
     });
   }
 
+  function audioBubbleDescriptor(element) {
+    let node = element?.parentElement || null;
+    for (let depth = 0; node && depth < 8; depth += 1, node = node.parentElement) {
+      const ariaLabel = node.getAttribute?.("aria-label") || "";
+      const testId = node.getAttribute?.("data-testid") || "";
+      if (/(?:audio|voice|nota de voz|mensaje de voz|voice message)/i.test(`${ariaLabel} ${testId}`)) {
+        return {
+          element: node,
+          ariaLabel,
+          testId,
+          role: node.getAttribute?.("role") || "",
+        };
+      }
+    }
+    return null;
+  }
+
+  function collectAudioCandidates(scope, root) {
+    const source = scope || root || null;
+    if (!source?.querySelectorAll) return [];
+    const elements = Array.from(source.querySelectorAll?.(
+      'audio[src], audio source[src], video[src], [aria-label*="voice message" i], [aria-label*="nota de voz" i], [data-testid*="audio" i], [data-testid*="voice" i]',
+    ) || []);
+    const candidates = [];
+    const seen = new Set();
+    for (const element of elements) {
+      const media = element.matches?.("source") ? element.parentElement : element;
+      const src = media?.currentSrc || media?.src || element.getAttribute?.("src") || element.getAttribute?.("data-src") || "";
+      const ariaLabel = element.getAttribute?.("aria-label") || media?.getAttribute?.("aria-label") || "";
+      const testId = element.getAttribute?.("data-testid") || media?.getAttribute?.("data-testid") || "";
+      const bubble = audioBubbleDescriptor(element) || audioBubbleDescriptor(media);
+      const key = `${src}|${ariaLabel}|${testId}|${bubble?.testId || ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const rect = rectOf(media || element);
+      if (!src && !bubble && !/(?:audio|voice|nota de voz|mensaje de voz)/i.test(`${ariaLabel} ${testId}`)) continue;
+      if (src && !isVisible(media || element) && !bubble) continue;
+      candidates.push({
+        src: String(src).slice(0, 500),
+        mimeType: media?.getAttribute?.("type") || element.getAttribute?.("type") || "",
+        ariaLabel,
+        dataTestId: testId,
+        role: media?.getAttribute?.("role") || element.getAttribute?.("role") || "",
+        top: rect.top || 0,
+        inMessageBubble: !!bubble || !!src,
+        bubbleAriaLabel: bubble?.ariaLabel || "",
+        bubbleTestId: bubble?.testId || "",
+      });
+    }
+    return candidates.sort((left, right) => left.top - right.top);
+  }
+
+  function readAudioMessages(scope, buyerName, candidates) {
+    return (candidates || collectAudioCandidates(scope, scope))
+      .filter((audio) => audio.inMessageBubble)
+      .map((audio) => ({
+        speaker: buyerName || "Buyer",
+        text: "[Audio]",
+        __top: audio.top || 0,
+        audio: {
+          src: audio.src,
+          mimeType: audio.mimeType,
+          ariaLabel: audio.ariaLabel,
+          dataTestId: audio.dataTestId,
+        },
+      }));
+  }
+
   function isComposer(element) {
     if (!element || !isVisible(element)) return false;
     const descriptor = [
@@ -280,13 +348,13 @@
 
   function hasBuyerHeaderEvidence(root) {
     const text = textOf(root);
-    return /[\p{L}][\p{L}\s.'-]{1,80}\s*(?:[\u00b7\u2022|]|Â·|â€¢)\s*(?:\$?\d|19\d{2}|20\d{2}|Marketplace\b)/u.test(text) ||
+    return /[\p{L}][\p{L}\s.'’-]{1,80}\s*(?:[\u00b7\u2022|]|Â·|â€¢|[-–—])\s*(?:\$?\d|19\d{2}|20\d{2}|Marketplace\b)/u.test(text) ||
       /\b(?:view buyer|ver perfil del comprador)\b/i.test(text);
   }
 
   function hasActiveBuyerVehicleHeader(root) {
     const header = extractHeaderText(root);
-    return /^[\p{L}][\p{L}\s.'’\-]{1,80}\s*(?:[\u00b7\u2022|]|Â·|â€¢)\s*(?:19|20)\d{2}\s+\S/u.test(header);
+    return /^[\p{L}][\p{L}\s.'’\-]{1,80}\s*(?:[\u00b7\u2022|]|Â·|â€¢|[-–—])\s*(?:19|20)\d{2}\s+\S/u.test(header);
   }
 
   function hasThreadEvidence(root, marketplaceRoute, messagesThreadRoute) {
@@ -339,8 +407,35 @@
         parent = parent.parentElement;
       }
     }
+    // Facebook sometimes renders the active thread header in a sibling portal
+    // and no longer exposes a semantic dialog/region. Keep the messages route
+    // alive by selecting the smallest visible conversation-sized ancestor of
+    // the composer, even when the header evidence is temporarily unavailable.
+    const fallbackRoots = [];
+    if (messagesThreadRoute && !candidates.length && !composerRoots.length) {
+      for (const composer of Array.from(document?.querySelectorAll?.(COMPOSER_SELECTORS.join(", ")) || []).filter(isComposer)) {
+        let parent = composer.parentElement;
+        let firstLarge = null;
+        let evidenceRoot = null;
+        while (parent && parent !== document.documentElement) {
+          if (isVisible(parent) && hasComposer(parent)) {
+            const rect = rectOf(parent);
+            const area = rect.width * rect.height;
+            if (rect.width >= 260 && rect.height >= 260 && area >= 60000) {
+              firstLarge ||= parent;
+              if (hasBuyerHeaderEvidence(parent) || hasMarketplaceEvidence(parent, marketplaceRoute)) {
+                evidenceRoot = parent;
+                break;
+              }
+            }
+          }
+          parent = parent.parentElement;
+        }
+        if (evidenceRoot || firstLarge) fallbackRoots.push(evidenceRoot || firstLarge);
+      }
+    }
     const seen = new Set();
-    return [...candidates, ...composerRoots]
+    return [...candidates, ...composerRoots, ...fallbackRoots]
       .filter((candidate) => {
         if (seen.has(candidate)) return false;
         seen.add(candidate);
@@ -731,8 +826,8 @@
 
   function captureFromRoot(root, sellerNameCandidates = [], documentRef = null) {
     const scope = findMessageScope(root);
-    const headerText = extractHeaderText(root);
-    const buyerName = extractBuyerName(root);
+    const headerText = extractHeaderText(root) || extractHeaderText(documentRef);
+    const buyerName = extractBuyerName(root) || extractBuyerName(documentRef);
     const structuredElements = Array.from(scope?.querySelectorAll?.(STRUCTURED_MESSAGE_SELECTORS.join(", ")) || [])
       .filter(isVisible)
       .filter((element, index, all) => all.indexOf(element) === index);
@@ -809,9 +904,12 @@
     const sellerTokens = (sellerNameCandidates || []).map(normalizeForMatch).filter(Boolean);
     const imageCandidates = collectImageCandidates(scope, root);
     const imageMessages = scope ? readImageMessages(scope, buyerName, imageCandidates) : [];
+    const audioCandidates = collectAudioCandidates(scope, root);
+    const audioMessages = scope ? readAudioMessages(scope, buyerName, audioCandidates) : [];
     const mergedMessages = [
       ...finalMessages.map((message) => ({ ...message })),
       ...imageMessages,
+      ...audioMessages,
     ].sort((left, right) => (left.__top ?? Number.MAX_SAFE_INTEGER) - (right.__top ?? Number.MAX_SAFE_INTEGER));
     const orderedMessages = mergedMessages
       .map((message) => ({ speaker: message.speaker, text: message.text }))
@@ -829,6 +927,7 @@
       buyerName,
       messages: orderedMessages,
       imageMessages,
+      audioMessages,
       evidence: {
         threadRootDetected: !!root,
         messageScopeDetected: !!scope,
@@ -844,8 +943,11 @@
           .slice(0, 12),
         imageCandidateCount: imageCandidates.length,
         imageMessageCount: imageMessages.length,
+        audioCandidateCount: audioCandidates.length,
+        audioMessageCount: audioMessages.length,
         imageCandidates: imageCandidates.slice(0, 12),
         latestIsImage: !!latest && /^\[imagen/.test(normalizeForMatch(latest.text)),
+        latestIsAudio: !!latest && /^\[audio\]/.test(normalizeForMatch(latest.text)),
         inboxPreviewFallback: !!inboxPreview,
         extractionMode: semantic.length ? "semantic" : finalMessages.length ? inboxPreview ? "visual_bubbles_inbox_preview" : "visual_bubbles" : "none",
         latestMessageDirection: latest?.speaker === "Dealer" ? "dealer" : orderedMessages.length ? "buyer" : "none",
@@ -873,6 +975,8 @@
     readVisualMessages,
     collectImageCandidates,
     readImageMessages,
+    collectAudioCandidates,
+    readAudioMessages,
     imageBubbleDescriptor,
   });
 })();

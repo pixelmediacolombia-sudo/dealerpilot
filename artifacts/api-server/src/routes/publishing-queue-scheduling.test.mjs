@@ -647,9 +647,10 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.doesNotMatch(publisherFlowSource, /initMessengerAiControls|Read Chat|lastMessengerCaptureHash|findMessengerSendButton/);
   assert.match(messengerClientSource, /CONVERSATION_INTAKE/);
   assert.match(messengerClientSource, /\/api\/conversations\/intake/);
+  assert.match(messengerClientSource, /autoReplyEnabled/);
   assert.match(messengerClientSource, /lastConversationIntake/);
   assert.match(messengerClientSource, /lastError/);
-  assert.match(messengerAiSource, /dry_run_capture/);
+  assert.doesNotMatch(messengerAiSource, /dry_run_capture|dryRun/);
   assert.match(messengerAiSource, /auto_reply_disabled/);
   assert.match(messengerAiSource, /composer_missing/);
   assert.match(messengerAiSource, /rawError/);
@@ -661,6 +662,7 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(messengerAiSource, /manual_reply_after_buyer/);
   assert.match(messengerAiSource, /freshSnapshotStillPendingBuyer/);
   assert.match(conversationsSource, /parseConversationMessage/);
+  assert.match(conversationsSource, /autoReplyEnabled/);
   assert.match(conversationsSource, /function normalizeIntentText/);
   assert.match(conversationsSource, /ubicad\[oa\]s\?/);
   assert.match(conversationsSource, /9120 Euclid Ave, Manassas, VA 20110/);
