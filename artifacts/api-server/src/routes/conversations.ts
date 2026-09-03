@@ -29,6 +29,7 @@ import {
 } from "../downPayment/policy";
 import {
   detectVehicleRequestKind,
+  buildVehiclePhotoRequestReply,
   extractCarfaxUrlFromSourceRaw,
   hasConcreteCashOffer,
   hasVisitDaySignal,
@@ -733,6 +734,7 @@ function replyIncludesStorePhone(reply: string, storePhone: string): boolean {
 
 function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
   return stage === "store_phone_requested" ||
+    stage === "vehicle_link_request" ||
     stage === "carfax_request" ||
     stage === "cash_visit_request_phone" ||
     stage === "urgent_vehicle_request_phone" ||
@@ -1014,7 +1016,12 @@ function buildRedactedCopyBrief(params: {
         : "price=agent_help");
       break;
     case "vehicle_link_request":
-      if (params.vehicleFacts.vdpUrl) factsToDeliver.push(`vdp_url=${params.vehicleFacts.vdpUrl}`);
+      if (params.vehicleFacts.vdpUrl) {
+        factsToDeliver.push(`vdp_url=${params.vehicleFacts.vdpUrl}`);
+      } else {
+        factsToDeliver.push("sales_agent_vehicle_photos");
+        factsToDeliver.push(`dealer_phone=${params.storePhone}`);
+      }
       break;
     case "store_phone_requested":
       factsToDeliver.push(`dealer_phone=${params.storePhone}`);
@@ -1129,7 +1136,7 @@ function buildBaseSafeFallbackReply(
       return `Con gusto te ayudan nuestros agentes de ventas con ese detalle. ¿A qué número te contactamos?`;
     }
     if (stage === "vehicle_link_request") {
-      return `Nuestros agentes de ventas pueden compartirte la ficha. ¿A qué número te la enviamos?`;
+      return buildVehiclePhotoRequestReply("es", storePhone);
     }
     if (stage === "carfax_request") {
       return `Nuestros agentes de ventas tienen el reporte Carfax. ¿A qué número te lo enviamos? También puedes llamar a Alpha Motorsports al ${storePhone}.`;
@@ -1250,7 +1257,7 @@ function buildBaseSafeFallbackReply(
     return `Our sales agents can help with that detail. What number should we use to reach you?`;
   }
   if (stage === "vehicle_link_request") {
-    return "Our sales agents can send the vehicle page. What number should we use to reach you?";
+    return buildVehiclePhotoRequestReply("en", storePhone);
   }
   if (stage === "carfax_request") {
     return `Our sales agents have the Carfax report. What phone number should we send it to? You can also call Alpha Motorsports at ${storePhone}.`;
@@ -1388,6 +1395,7 @@ function buildSafeFallbackReply(
       ? `Aquí está la ficha completa con todas las fotos: ${vehicleFacts.vdpUrl}.`
       : `Here is the complete vehicle page with all the photos: ${vehicleFacts.vdpUrl}.`;
   }
+  if (requestKind === "photos") return buildVehiclePhotoRequestReply(language === "es" ? "es" : "en", storePhone);
   if (stage === "price_inquiry" && vehicleFacts?.price != null) {
     return language === "es"
       ? `El precio publicado es $${vehicleFacts.price.toLocaleString("en-US")}. ¿Qué te gustaría saber?`
@@ -1473,7 +1481,11 @@ function isAiReplyAligned(
   if (replyContainsUnauthorizedPromise(reply)) return false;
   if (replyClaimsConfirmedAppointment(reply)) return false;
   if (replyMentionsWrongVehicleYear(reply, vehicleFacts)) return false;
-  if (stageRequiresStorePhone(stage) && !replyIncludesStorePhone(reply, storePhone)) return false;
+  if (
+    stageRequiresStorePhone(stage) &&
+    !(stage === "vehicle_link_request" && vehicleFacts?.vdpUrl) &&
+    !replyIncludesStorePhone(reply, storePhone)
+  ) return false;
   if (/\badvisor\b|\basesor\b/i.test(normalized)) return false;
   if (stage === "open_question") {
     return /(?:detail|detalle|information|informaci[oó]n|question|pregunta|sales agent|agente de ventas|number|n[uú]mero)/i.test(normalized) &&
@@ -1481,13 +1493,17 @@ function isAiReplyAligned(
       !/financ|financing|down payment|enganche|inicial|document|requisit|follow[- ]?up/.test(normalized);
   }
   if (stage === "vehicle_link_request") {
-    if (vehicleFacts && !vehicleFacts.vdpUrl) {
-      return /(?:sales agent|sales agents|agente de ventas|phone|number|tel[eé]fono|n[uú]mero)/.test(normalized) &&
-        !/https?:\/\//.test(normalized) &&
+    if (vehicleFacts?.vdpUrl) {
+      return reply.includes(vehicleFacts.vdpUrl) &&
+        /(?:photo|photos|picture|pictures|image|images|foto|fotos|imagen|imagenes)/.test(normalized) &&
         !/phone|number|tel[eé]fono|n[uú]mero|financ|financing/.test(normalized);
     }
-    return /https?:\/\//.test(normalized) && /photo|foto|image|imagen|ficha|page|pagina/.test(normalized) &&
-      !/phone|number|tel[eé]fono|n[uú]mero|financ|financing/.test(normalized);
+    return /(?:sales agent|sales agents|agente de ventas|vendedor)/.test(normalized) &&
+      /(?:photo|photos|picture|pictures|image|images|foto|fotos|imagen|imagenes)/.test(normalized) &&
+      /phone|number|tel[eé]fono|n[uú]mero/.test(normalized) &&
+      /\?/.test(reply) &&
+      !/https?:\/\//.test(normalized) &&
+      !/financ|financing/.test(normalized);
   }
   if (stage === "carfax_request") {
     const hasAgent = /(?:sales agent|salesperson|sales representative|agente de ventas|vendedor)/.test(normalized);
@@ -1707,6 +1723,10 @@ function isReplyRelevantToCurrentMessage(reply: string, currentMessage: string):
     {
       reply: /\b(?:passport|tax id|bank account|pasaporte|cuenta bancaria|requisitos|documentos)\b/,
       buyer: /\b(?:passport|tax id|bank account|pasaporte|cuenta bancaria|requisitos|documentos|necesit|aplicar|apply|financ|interested|interesad|me interesa|si|s[ií]|yes|claro)\b/,
+    },
+    {
+      reply: /\b(?:photos?|pictures?|images?|fotos?|fotograf[ií]as?|im[aá]genes?)\b/,
+      buyer: /\b(?:photos?|pictures?|images?|fotos?|fotograf[ií]as?|im[aá]genes?|pics?)\b/,
     },
     {
       reply: /\b(?:clean title|titulo limpio)\b/,
@@ -2066,8 +2086,8 @@ export async function generateAiReply(
     trade_in_request: `Answer exactly from the dealer knowledge block that trade-ins are accepted. Do not ask for a phone number or financing.`,
     payment_methods_request: `Answer exactly from the dealer knowledge block with the available payment methods. Do not add rates, approvals, terms, or a phone request.`,
     vehicle_link_request: vehicleFacts.vdpUrl
-      ? `Send exactly this dealer-domain VDP link once: ${vehicleFacts.vdpUrl}. Mention that it has the vehicle's photos and do not add another vehicle fact or ask for a phone number.`
-      : "The buyer asked for photos or more information. Say that the sales agents can send the vehicle page and ask what number to use to reach the buyer. Do not invent a link or say that a detail is not confirmed.",
+      ? `The buyer asked for photos or more information. Send exactly this dealer-domain vehicle page once: ${vehicleFacts.vdpUrl}. Say that it contains the vehicle's photos and do not ask for a phone number, repeat "what would you like to know?", ask another qualification question, or mention financing.`
+      : `The buyer asked for photos or more information. Say that the sales agents can send the vehicle photos, ask for the buyer's best phone number, and include Alpha Motorsports' dealership phone ${storePhone}. Do not invent a link, repeat "what would you like to know?", ask another qualification question, or mention financing.`,
     carfax_request: `Say the sales agents have the Carfax report, ask what phone number to send it to, and give Alpha Motorsports' dealership phone ${storePhone} in the same message. Do not ask another qualification question or provide a link.`,
     inventory_options: "The buyer is asking whether more vehicles or similar options are available. Confirm that more vehicles are available, then ask which option they would like to explore. Do not ask for requirements yet.",
     document_requirements: `The buyer is asking what is needed. Use the exact financing requirements from the dealer knowledge block, including ID/Tax ID/Social Security or passport and the listed proof-of-income options. Ask if they have both. Do not ask for a phone number yet.`,

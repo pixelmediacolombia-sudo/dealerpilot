@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  buildVehiclePhotoRequestReply,
   detectVehicleRequestKind,
   extractCarfaxUrlFromSourceRaw,
   hasConcreteCashOffer,
@@ -36,6 +37,21 @@ test("routes photo and Carfax requests independently", () => {
   assert.equal(detectVehicleRequestKind("Can I see the Carfax?"), "carfax");
   assert.equal(detectVehicleRequestKind("Any issues with it?"), "carfax");
   assert.equal(detectVehicleRequestKind("Is it available?"), null);
+});
+
+test("photo requests without a ficha ask for the buyer phone and include Alpha's phone", () => {
+  const phone = "+1 703-763-4675";
+  const english = buildVehiclePhotoRequestReply("en", phone);
+  const spanish = buildVehiclePhotoRequestReply("es", phone);
+
+  assert.match(english, /vehicle photos/);
+  assert.match(english, /best phone number/);
+  assert.match(english, /\+1 703-763-4675/);
+  assert.doesNotMatch(english, /what would you like to know/i);
+  assert.match(spanish, /fotos del veh[ií]culo/);
+  assert.match(spanish, /mejor n[uú]mero/);
+  assert.match(spanish, /\+1 703-763-4675/);
+  assert.doesNotMatch(spanish, /qu[eé] te gustar[ií]a saber/i);
 });
 
 test("uses feed-backed mileage or color as the value fact", () => {

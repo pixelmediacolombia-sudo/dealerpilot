@@ -13,6 +13,12 @@ export type MarketplaceVehicleFacts = {
 
 export type VehicleRequestKind = "photos" | "carfax" | null;
 
+export function buildVehiclePhotoRequestReply(language: "en" | "es", storePhone: string): string {
+  return language === "es"
+    ? `Nuestros agentes de ventas pueden compartirte las fotos del vehículo. ¿Cuál es el mejor número para enviártelas? También puedes llamarnos al ${storePhone}.`
+    : `Our sales agents can send you the vehicle photos. What's the best phone number to send them to? You can also call us at ${storePhone}.`;
+}
+
 function normalized(value: unknown): string {
   return String(value ?? "")
     .normalize("NFD")
