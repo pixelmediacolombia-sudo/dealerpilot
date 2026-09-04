@@ -734,6 +734,7 @@ function replyIncludesStorePhone(reply: string, storePhone: string): boolean {
 
 function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
   return stage === "store_phone_requested" ||
+    stage === "address_request" ||
     stage === "vehicle_link_request" ||
     stage === "carfax_request" ||
     stage === "cash_visit_request_phone" ||
@@ -937,6 +938,11 @@ function resolveSalesReplyStage(
   ) {
     return "salesperson_request_phone";
   }
+  if (
+    /\b(direccion|address|ubicacion|location|donde esta(?:n|s)?|donde queda|donde se encuentra|ubicad[oa]s?|where are you|where (?:is|are).{0,40}located|where is (?:the )?(?:dealer|dealership|lot)|como llegar|how (?:do )?i get|esta en|store address|concesionario|lot location|physical address|visitar|visit the lot|come see|stop by|come by|directions|mapa|maps|google maps)\b/i.test(latestIntent)
+  ) {
+    return "address_request";
+  }
   if (hasStalledConversation(visibleMessages, currentMessage)) return "stalled_conversation_request_phone";
   if (buyerRequestedVisitOrTestDrive(latest) && (historyAskedCashOrVisit(history) || historyShowsFinancingDeclined(history))) {
     return "cash_visit_request_phone";
@@ -951,11 +957,6 @@ function resolveSalesReplyStage(
   if (historyContainsDealerPrompt(visibleMessages, /interested|interesado|interesada/) && buyerDeclinedCurrentStep(latest)) return "interest_declined";
   if (/\b(is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|esta disponible|está disponible|esta(?:n)? (?:a la venta|en venta)|lo tiene disponible|lo tienen disponible|lo tienes disponible|tienen este|tienen esa|tienen ese (?:vehiculo|carro|auto|car|suv|camioneta)|tienen este (?:vehiculo|carro|auto|car|suv|camioneta)|hay alguno disponible|lo venden aun|lo siguen vendiendo|aun lo tienen|a[uú]n lo tienen)\b/i.test(latest)) {
     return "availability";
-  }
-  if (
-    /\b(direccion|address|ubicacion|location|donde esta(?:n|s)?|donde queda|donde se encuentra|ubicad[oa]s?|where are you|where (?:is|are).{0,40}located|where is (?:the )?(?:dealer|dealership|lot)|como llegar|how (?:do )?i get|esta en|store address|concesionario|lot location|physical address|visitar|visit the lot|come see|stop by|come by|directions|mapa|maps|google maps)\b/i.test(latestIntent)
-  ) {
-    return "address_request";
   }
   if (buyerAskedAdvisorQuestion(latest)) return "advisor_question";
   if (historyAskedCashOrVisit(history)) return "cash_visit_request_phone";
@@ -1032,6 +1033,7 @@ function buildRedactedCopyBrief(params: {
       break;
     case "address_request":
       factsToDeliver.push(`dealer_address=${params.storeAddress}`);
+      factsToDeliver.push(`dealer_phone=${params.storePhone}`);
       break;
     case "test_drive_request":
       factsToDeliver.push(`dealer_address=${params.storeAddress}`);
@@ -1213,7 +1215,7 @@ function buildBaseSafeFallbackReply(
       return `No hay problema, gracias por avisarnos. Planeas comprar de contado o te gustaria venir a ver el ${vehicle}?`;
     }
     if (stage === "address_request") {
-      return `Estamos en ${knowledge("address", storeAddress)}. ¿Te gustaría venir a verlo? ¿Qué día te queda mejor?`;
+      return `Sí, todavía tenemos el ${vehicle} disponible. Estamos en ${knowledge("address", storeAddress)}. Nuestro número es ${storePhone}. ¿Cuál es el mejor número para comunicarnos contigo?`;
     }
     if (stage === "test_drive_request") {
       return `Puedes venir cuando quieras — estamos en ${knowledge("address", storeAddress)}, ${knowledge("hours", "lunes a sábado de 9am a 8pm")}. ¿Qué día te queda mejor?`;
@@ -1334,7 +1336,7 @@ function buildBaseSafeFallbackReply(
     return `No problem, thanks for letting us know. Are you planning to purchase cash or would you like to come see the ${vehicle}?`;
   }
   if (stage === "address_request") {
-    return `We’re at ${knowledge("address", storeAddress)}. Would you like to come see it? What day works for you?`;
+    return `Yes, we still have the ${vehicle} available. We’re at ${knowledge("address", storeAddress)}. Our number is ${storePhone}. What’s the best number to reach you?`;
   }
   if (stage === "test_drive_request") {
     return `You can come by anytime — we're at ${knowledge("address", storeAddress)}, ${knowledge("hours", "Monday-Saturday from 9am to 8pm")}. What day works best for you?`;
@@ -1620,6 +1622,13 @@ function isAiReplyAligned(
     return replyIncludesStorePhone(reply, storePhone) &&
       !/\?/.test(normalized) &&
       !/id|tax\s*id|passport|pasaporte|bank account|cuenta bancaria|requirements|requisitos/.test(normalized);
+  }
+  if (stage === "address_request") {
+    return /9120\s+euclid|manassas/.test(normalized) &&
+      /available|disponible/.test(normalized) &&
+      /\?/.test(reply) &&
+      /phone|number|tel[eé]fono|n[uú]mero/.test(normalized) &&
+      replyIncludesStorePhone(reply, storePhone);
   }
   if (stage === "financing_intro") {
     return /\b(id|tax\s*id|passport|pasaporte|identification|identificaci[oó]n)\b/.test(normalized) &&
@@ -1920,14 +1929,14 @@ QUALIFICATION FUNNEL FOR ALPHA MANASSAS:
 6. If financing is explicitly mentioned by the buyer, answer only from supplied policy and never invent approval, rate, or terms. Do not use financing to evade another question.
 7. If the buyer asks for photos or more information, send the single dealer-domain VDP URL when available. Never send a Carfax URL or another report link.
 8. If the buyer asks for Carfax, accidents, or vehicle history, use the report handoff. The first time, say the sales agents have the report and ask what number to send it to. If the buyer asked before and did not provide a number, offer the dealer phone from the knowledge block instead. Never invent report details or infer a report from the words 'clean Carfax' in a description.
-9. If the buyer asks for location, provide the complete Manassas address first, then ask whether they would like to come see the vehicle and what day works. Do not ask for the buyer's phone in that same reply.
+9. If the buyer asks for location, confirm that the vehicle is available, provide the complete Manassas address, give Alpha Motorsports' dealership phone, and ask for the buyer's best phone number in that same reply. Do not ask for a visit day in that reply.
 10. If the buyer asks whether the vehicle is available, answer only that it is available and close with 'What would you like to know?' / '¿Qué te gustaría saber?'.
 11. If the buyer asks for Alpha Motorsports' phone number directly, give the supplied dealership phone and close politely. Do not restart qualification in that reply.
 12. Keep exactly one short reply for the latest buyer turn. One idea, one question, except for an explicit handoff or closing reply that must not ask another question. Never repeat a question already answered in the history.
 13. Use the dealer configuration field hasCleanTitleInventory for title claims. When it is true, say directly that the vehicle has a clean title. When it is false, do not claim clean title. The vehicle report is held by our sales agents, who can provide warranty details. Do not invent specific warranty terms, price, mileage, approval, history, range, or financing terms.
 
 ADDRESS / DIRECTIONS HANDLING:
-- If the buyer asks for the address, directions, or location, provide the complete store address directly and ask whether they would like to come see the vehicle and what day works.
+- If the buyer asks for the address, directions, or location, confirm that the vehicle is available, provide the complete store address directly, give the dealership phone, and ask for the buyer's best phone number in the same reply.
 - Never ask a clarifying question about which vehicle or location they mean.
 - Always provide the address from the supplied Dealership address field.
 
@@ -2080,7 +2089,7 @@ export async function generateAiReply(
     documents_request: "Ask whether the buyer has both a valid ID and proof of income. Both are required; do not substitute a bank account question.",
     documents_declined: "Explain that both a valid ID and proof of income are currently required, then close politely without asking another question.",
     qualified_exit: `Confirm that all required information was received and that the buyer meets the requirements. Suggest the Alpha Manassas dealership phone ${storePhone} at the end and do not ask a question.`,
-    address_request: `The buyer is asking for the address or directions. Provide the complete dealership address first, then ask whether they would like to come see the vehicle and what day works. Do not add vehicle facts or ask for a phone number.`,
+    address_request: `The buyer is asking for the address or directions. Confirm that the exact vehicle is available, provide the complete dealership address, give Alpha Motorsports' dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Do not ask for a visit day or financing question.`,
     test_drive_request: `The buyer is asking when they can test drive the vehicle. Provide the supplied dealership address and hours, mention the supplied test-drive policy when useful, then ask what day works best. Do not claim an appointment is confirmed and do not ask for a phone number.`,
     dealer_hours: `Answer with the exact dealer hours from the dealer knowledge block. If the buyer asks about Sunday, answer the Sunday hours directly. Ask at most one short next question.`,
     trade_in_request: `Answer exactly from the dealer knowledge block that trade-ins are accepted. Do not ask for a phone number or financing.`,

@@ -54,3 +54,23 @@ test("monthly payment targets are not treated as available down payments", () =>
   assert.match(extractor, /explicitlyLabeledDownPayment/);
   assert.match(extractor, /monthlyTargetAmount\s+&&\s+!explicitlyLabeledDownPayment/);
 });
+
+test("an explicit address request takes priority over stalled phone recovery", () => {
+  const addressCheck = source.indexOf('return "address_request"');
+  const stalledCheck = source.indexOf('return "stalled_conversation_request_phone"');
+  assert.ok(addressCheck >= 0);
+  assert.ok(stalledCheck >= 0);
+  assert.ok(addressCheck < stalledCheck);
+});
+
+test("address replies must include the Manassas address and dealership phone before requesting the buyer phone", () => {
+  const guardStart = source.indexOf('if (stage === "address_request")', source.indexOf("function isAiReplyAligned"));
+  const guardEnd = source.indexOf('if (stage === "financing_intro")', guardStart);
+  assert.ok(guardStart >= 0);
+  assert.ok(guardEnd > guardStart);
+  const guard = source.slice(guardStart, guardEnd);
+  assert.match(guard, /9120\\s\+euclid\|manassas/);
+  assert.match(guard, /available\|disponible/);
+  assert.match(guard, /phone\|number\|tel/);
+  assert.match(guard, /replyIncludesStorePhone\(reply, storePhone\)/);
+});
