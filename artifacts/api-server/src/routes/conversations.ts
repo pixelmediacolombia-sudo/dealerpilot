@@ -734,6 +734,7 @@ function replyIncludesStorePhone(reply: string, storePhone: string): boolean {
 
 function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
   return stage === "store_phone_requested" ||
+    stage === "vin_inquiry" ||
     stage === "address_request" ||
     stage === "vehicle_link_request" ||
     stage === "carfax_request" ||
@@ -1000,6 +1001,7 @@ function buildRedactedCopyBrief(params: {
       break;
     case "vin_inquiry":
       factsToDeliver.push(params.vehicleFacts.vin ? `vin=${params.vehicleFacts.vin}` : "vin=agent_help");
+      factsToDeliver.push(`dealer_phone=${params.storePhone}`);
       break;
     case "mileage_inquiry":
       factsToDeliver.push(params.vehicleFacts.mileage != null
@@ -1405,8 +1407,8 @@ function buildSafeFallbackReply(
   }
   if (stage === "vin_inquiry" && vehicleFacts?.vin) {
     return language === "es"
-      ? `El VIN es ${vehicleFacts.vin}. ¿Qué más te gustaría saber?`
-      : `The VIN is ${vehicleFacts.vin}. What else would you like to know?`;
+      ? `El VIN es ${vehicleFacts.vin}. También puedes llamar a Alpha Motorsports al ${storePhone}. ¿Cuál es el mejor número para comunicarnos contigo?`
+      : `The VIN is ${vehicleFacts.vin}. You can also call Alpha Motorsports at ${storePhone}. What is the best number to reach you?`;
   }
   if (stage === "mileage_inquiry" && vehicleFacts?.mileage != null) {
     const mileage = Number(vehicleFacts.mileage).toLocaleString("en-US");
@@ -1421,8 +1423,8 @@ function buildSafeFallbackReply(
   }
   if (stage === "vin_inquiry") {
     return language === "es"
-      ? "Nuestros agentes de ventas pueden ayudarte con ese dato. ¿A qué número te contactamos?"
-      : "Our sales agents can help with that detail. What number should we use to reach you?";
+      ? `Nuestros agentes de ventas pueden ayudarte con ese dato. También puedes llamar a Alpha Motorsports al ${storePhone}. ¿A qué número te contactamos?`
+      : `Our sales agents can help with that detail. You can also call Alpha Motorsports at ${storePhone}. What number should we use to reach you?`;
   }
   if (stage === "mileage_inquiry") {
     return language === "es"
@@ -1519,8 +1521,9 @@ function isAiReplyAligned(
       !/financ|financing/.test(normalized);
   }
   if (stage === "vin_inquiry") {
+    const asksForBuyerPhone = /(?:what number should we use|best (?:phone )?number|what(?:'s| is) the best number|a que numero te contactamos|cual es el mejor numero|numero para comunicarnos|telefono.*contactamos)/.test(normalized);
     return (vehicleFacts?.vin ? normalized.includes(vehicleFacts.vin.toLowerCase()) : /\bvin\b/.test(normalized)) &&
-      /\?/.test(reply) && !/financ|financing/.test(normalized);
+      asksForBuyerPhone && replyIncludesStorePhone(reply, storePhone) && !/financ|financing/.test(normalized);
   }
   if (stage === "mileage_inquiry") {
     return (vehicleFacts?.mileage != null
@@ -1784,6 +1787,12 @@ function avoidRepeatedFallback(
       return language === "es"
       ? `Con gusto te ayudan nuestros agentes de ventas con ese detalle. ¿A qué número te contactamos?`
       : `Our sales agents can help with that detail. What number should we use to reach you?`;
+  }
+  if (stage === "vin_inquiry") {
+    const vin = vehicleFacts?.vin?.trim();
+    return language === "es"
+      ? `${vin ? `El VIN es ${vin}. ` : "Nuestros agentes de ventas pueden ayudarte con ese dato. "}También puedes llamar a Alpha Motorsports al ${configuredPhone}. ¿A qué número te contactamos?`
+      : `${vin ? `The VIN is ${vin}. ` : "Our sales agents can help with that detail. "}You can also call Alpha Motorsports at ${configuredPhone}. What number should we use to reach you?`;
   }
   if (stage === "carfax_request") {
     return language === "es"
@@ -2072,8 +2081,8 @@ export async function generateAiReply(
     phone_received: "The buyer provided a phone number. Thank them and say only that a sales agent will reach out shortly. Do not ask another question or continue qualification in the reply.",
     handoff_confirmation: "The buyer provided a down-payment amount or concrete cash offer. Thank them and say only that a sales agent will reach out shortly. Do not ask another question or continue qualification in the reply.",
     vin_inquiry: vehicleFacts.vin
-      ? `Answer directly with the feed-backed VIN ${vehicleFacts.vin}, then ask what else the buyer would like to know. Do not ask for a phone number or financing.`
-      : "The buyer asked for the VIN, but it is not in the available feed facts. Say that the sales agents can help with that detail and ask what number to use to reach the buyer. Do not invent a VIN.",
+      ? `Answer directly with the feed-backed VIN ${vehicleFacts.vin}. Give Alpha Motorsports' dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Do not ask what else they would like to know or mention financing.`
+      : `The buyer asked for the VIN, but it is not in the available feed facts. Say that the sales agents can help with that detail, give Alpha Motorsports' dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Do not invent a VIN.`,
     mileage_inquiry: vehicleFacts.mileage != null
       ? `Answer directly with the feed-backed mileage ${vehicleFacts.mileage.toLocaleString("en-US")} miles, then ask what else the buyer would like to know. Do not ask for a phone number or financing.`
       : "The buyer asked for mileage, but it is not in the available feed facts. Say that the sales agents can help with that detail and ask what number to use to reach the buyer. Do not invent mileage.",

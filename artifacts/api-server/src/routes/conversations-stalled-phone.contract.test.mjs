@@ -74,3 +74,16 @@ test("address replies must include the Manassas address and dealership phone bef
   assert.match(guard, /phone\|number\|tel/);
   assert.match(guard, /replyIncludesStorePhone\(reply, storePhone\)/);
 });
+
+test("VIN replies give the dealership phone and request the buyer phone", () => {
+  const guardStart = source.indexOf('if (stage === "vin_inquiry")', source.indexOf("function isAiReplyAligned"));
+  const guardEnd = source.indexOf('if (stage === "mileage_inquiry")', guardStart);
+  assert.ok(guardStart >= 0);
+  assert.ok(guardEnd > guardStart);
+  const guard = source.slice(guardStart, guardEnd);
+  assert.match(guard, /asksForBuyerPhone/);
+  assert.match(guard, /replyIncludesStorePhone\(reply, storePhone\)/);
+  assert.match(source, /case "vin_inquiry":[\s\S]{0,220}dealer_phone=/);
+  assert.match(source, /Give Alpha Motorsports' dealership phone/);
+  assert.match(source, /También puedes llamar a Alpha Motorsports al \$\{storePhone\}/);
+});
