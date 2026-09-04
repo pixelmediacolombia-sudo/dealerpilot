@@ -87,3 +87,16 @@ test("VIN replies give the dealership phone and request the buyer phone", () => 
   assert.match(source, /Give Alpha Motorsports' dealership phone/);
   assert.match(source, /También puedes llamar a Alpha Motorsports al \$\{storePhone\}/);
 });
+
+test("unresolved vehicle-detail replies give Alpha's phone and request the buyer phone", () => {
+  const phoneStageStart = source.indexOf("function stageRequiresStorePhone");
+  const phoneStageEnd = source.indexOf("function isConversationClosingBuyerAcknowledgement", phoneStageStart);
+  assert.ok(phoneStageStart >= 0);
+  assert.ok(phoneStageEnd > phoneStageStart);
+  const phoneStages = source.slice(phoneStageStart, phoneStageEnd);
+  assert.match(phoneStages, /stage === "open_question"/);
+  assert.match(phoneStages, /stage === "advisor_question"/);
+
+  assert.match(source, /También puedes llamar a Alpha Motorsports al \$\{storePhone\}\. ¿A qué número te contactamos\?/);
+  assert.match(source, /You can also call Alpha Motorsports at \$\{storePhone\}\. What number should we use to reach you\?/);
+});

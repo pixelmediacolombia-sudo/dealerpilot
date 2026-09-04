@@ -734,6 +734,8 @@ function replyIncludesStorePhone(reply: string, storePhone: string): boolean {
 
 function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
   return stage === "store_phone_requested" ||
+    stage === "open_question" ||
+    stage === "advisor_question" ||
     stage === "vin_inquiry" ||
     stage === "address_request" ||
     stage === "vehicle_link_request" ||
@@ -996,6 +998,10 @@ function buildRedactedCopyBrief(params: {
   const names = formatVehicleDisplayName(params.vehicleTitle);
   const factsToDeliver: string[] = [];
   switch (params.stage) {
+    case "open_question":
+    case "advisor_question":
+      factsToDeliver.push(`dealer_phone=${params.storePhone}`);
+      break;
     case "availability":
       factsToDeliver.push("available");
       break;
@@ -1137,7 +1143,7 @@ function buildBaseSafeFallbackReply(
     dealerKnowledgeValue(dealerKnowledge, language, key, fallback);
   if (language === "es") {
     if (stage === "open_question") {
-      return `Con gusto te ayudan nuestros agentes de ventas con ese detalle. ¿A qué número te contactamos?`;
+      return `Con gusto te ayudan nuestros agentes de ventas con ese detalle. También puedes llamar a Alpha Motorsports al ${storePhone}. ¿A qué número te contactamos?`;
     }
     if (stage === "vehicle_link_request") {
       return buildVehiclePhotoRequestReply("es", storePhone);
@@ -1253,12 +1259,12 @@ function buildBaseSafeFallbackReply(
         : `Nuestros agentes de ventas tienen el reporte del ${vehicle} y pueden confirmar el título y los detalles de la garantía. ¿A qué número te enviamos el reporte?`;
     }
     if (stage === "advisor_question") {
-      return `Buena pregunta. Podemos confirmar ese detalle del ${vehicle}. ¿Qué te gustaría saber?`;
+      return `Nuestros agentes de ventas pueden confirmar ese detalle del ${vehicle}. También puedes llamar a Alpha Motorsports al ${storePhone}. ¿A qué número te contactamos?`;
     }
     return `Con gusto te ayudo con el ${vehicle}. ¿Qué te gustaría saber?`;
   }
   if (stage === "open_question") {
-    return `Our sales agents can help with that detail. What number should we use to reach you?`;
+    return `Our sales agents can help with that detail. You can also call Alpha Motorsports at ${storePhone}. What number should we use to reach you?`;
   }
   if (stage === "vehicle_link_request") {
     return buildVehiclePhotoRequestReply("en", storePhone);
@@ -1710,8 +1716,10 @@ function isAiReplyAligned(
   }
   if (stage === "advisor_question") {
     return /detail|detalle|confirm|confirmar|verify|verificar/.test(normalized) &&
-      /what would you like to know|qué te gustaría saber|que te gustaria saber|verify|verificar|confirm/.test(normalized) &&
-      !/phone|number|tel[eé]fono|n[uú]mero|financ|financing/.test(normalized);
+      /(?:what would you like to know|qué te gustaría saber|que te gustaria saber|what number should we use|best (?:phone )?number|a que numero te contactamos|cual es el mejor numero|numero para comunicarnos|telefono.*contactamos)/.test(normalized) &&
+      /phone|number|tel[eé]fono|n[uú]mero/.test(normalized) &&
+      replyIncludesStorePhone(reply, storePhone) &&
+      !/financ|financing/.test(normalized);
   }
   return true;
 }
@@ -1785,8 +1793,8 @@ function avoidRepeatedFallback(
     : (language === "es" ? "vehículo" : "vehicle");
   if (stage === "open_question") {
       return language === "es"
-      ? `Con gusto te ayudan nuestros agentes de ventas con ese detalle. ¿A qué número te contactamos?`
-      : `Our sales agents can help with that detail. What number should we use to reach you?`;
+      ? `Con gusto te ayudan nuestros agentes de ventas con ese detalle. También puedes llamar a Alpha Motorsports al ${configuredPhone}. ¿A qué número te contactamos?`
+      : `Our sales agents can help with that detail. You can also call Alpha Motorsports at ${configuredPhone}. What number should we use to reach you?`;
   }
   if (stage === "vin_inquiry") {
     const vin = vehicleFacts?.vin?.trim();
@@ -1802,8 +1810,8 @@ function avoidRepeatedFallback(
   if (stage === "warranty_info" || stage === "advisor_question") {
     if (stage === "advisor_question") {
       return language === "es"
-        ? `Con gusto te ayudan nuestros agentes de ventas con ese detalle. ¿A qué número te contactamos?`
-        : `Our sales agents can help with that detail. What number should we use to reach you?`;
+        ? `Con gusto te ayudan nuestros agentes de ventas con ese detalle. También puedes llamar a Alpha Motorsports al ${configuredPhone}. ¿A qué número te contactamos?`
+        : `Our sales agents can help with that detail. You can also call Alpha Motorsports at ${configuredPhone}. What number should we use to reach you?`;
     }
     const reply = hasCleanTitleInventory
       ? language === "es"
@@ -2061,7 +2069,7 @@ export async function generateAiReply(
     dealerKnowledge,
   });
   const stageInstruction = {
-    open_question: "The buyer asked a question that must be answered before qualification advances. If the dealer knowledge block does not contain the answer, say that the sales agents can help and ask what number to use to reach the buyer. Never open with ignorance or say that a detail is not confirmed. Do not ask financing, down payment, or documents.",
+    open_question: `The buyer asked a question that must be answered before qualification advances. If the dealer knowledge block does not contain the answer, say that the sales agents can help, give Alpha Motorsports' dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Never open with ignorance or say that a detail is not confirmed. Do not ask financing, down payment, or documents.`,
     availability: availabilityQuickReplyAccepted
       ? "Greet as Alpha Motorsports, state only that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing."
       : "Greet as Alpha Motorsports, explicitly confirm only that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.",
@@ -2118,7 +2126,7 @@ export async function generateAiReply(
     warranty_info: hasCleanTitleInventory
       ? "State directly that the vehicle has a clean title. Explain that our sales agents have the vehicle report and can provide the warranty details, then ask what number to send the report to. Do not invent specific warranty terms."
       : "Do not claim the vehicle has a clean title. Explain that our sales agents have the vehicle report and can confirm the title and warranty details, then ask what number to send the report to.",
-    advisor_question: "The buyer is asking a detailed question. Use the dealer knowledge block or feed facts when available. If the answer is not supplied, say that the sales agents can help and ask what number to use to reach the buyer. Never claim an unprovided fact.",
+    advisor_question: `The buyer is asking a detailed question. Use the dealer knowledge block or feed facts when available. If the answer is not supplied, say that the sales agents can help, give Alpha Motorsports' dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Never claim an unprovided fact.`,
     general: "Answer safely using only supplied facts, then move the conversation forward with one short question.",
   }[stage];
 
