@@ -16,3 +16,10 @@ test("recognizes Elyse's detailed English question", () => {
     "en",
   );
 });
+
+test("follows a natural Spanish vehicle question after an English turn", () => {
+  assert.equal(
+    detectConversationLanguage("Es Honda Accord Sport o es regular es de cuatro cilindros o seis", ["Hello, is this still available?"]),
+    "es",
+  );
+});

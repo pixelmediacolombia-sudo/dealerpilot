@@ -1,0 +1,49 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+
+const source = readFileSync(new URL("./conversations.ts", import.meta.url), "utf8");
+
+test("location questions outrank generic open-question classification", () => {
+  const locationCheck = source.indexOf('if (buyerAskedLocation(latest)) return "address_request";');
+  const genericCheck = source.indexOf('if (buyerHasOpenQuestion(latest)) return "open_question";');
+  assert.ok(locationCheck >= 0);
+  assert.ok(genericCheck >= 0);
+  assert.ok(locationCheck < genericCheck);
+  assert.ok(source.includes("where are you(?: located)?"));
+  assert.ok(source.includes("where (?:is|are).{0,40}located"));
+  assert.ok(source.includes("where(?:'s| is)"));
+});
+
+test("a bare down-payment number uses the preceding dealer question context", () => {
+  assert.match(source, /standaloneNumericAmount/);
+  assert.match(source, /standaloneNumericAmount && downPaymentQuestionAsked/);
+  assert.match(source, /extractDownPaymentAmount\(latest, askedForDownPayment\)/);
+  assert.match(source, /if \(amount !== null\) return "request_phone"/);
+  assert.doesNotMatch(source, /down_payment_amount_received/);
+});
+
+test("phone capture closes with a neutral handoff and no follow-up question", () => {
+  assert.match(source, /phone_received: "The buyer provided a phone number[\s\S]*brief goodbye/);
+  assert.match(source, /Thanks for your number\. A sales agent will reach out to you shortly\. We are here if you need anything else\./);
+  assert.match(source, /Gracias por tu número\. Un agente de ventas te contactará en breve\. Quedamos atentos\./);
+  assert.match(source, /closeConversationAfterDelivery: retryStage === "store_phone_requested" \|\| retryStage === "qualified_exit" \|\| retryStage === "phone_received"/);
+  assert.doesNotMatch(source, /phone_received[\s\S]{0,100}Have a great day/);
+  assert.doesNotMatch(source, /phone_received[\s\S]{0,100}Que tengas un buen día/);
+  assert.doesNotMatch(source, /Have a great day|Que tengas un buen día|good day|great day/i);
+});
+
+test("buyer language detection includes natural Spanish vehicle questions", () => {
+  const languageSource = readFileSync(new URL("../conversations/language.ts", import.meta.url), "utf8");
+  assert.ok(languageSource.includes("|es|son|"));
+  assert.ok(languageSource.includes("cuatro"));
+  assert.ok(languageSource.includes("cilindros"));
+  assert.ok(languageSource.includes("seis"));
+});
+
+test("answer-repair stage prevents repeating the generic phone fallback", () => {
+  assert.match(source, /buyerRequestsAnswerToPendingQuestion/);
+  assert.match(source, /question_repair/);
+  assert.match(source, /Do not repeat the previous generic sales-agent or phone-number wording/);
+  assert.match(source, /buildQuestionRepairFallback/);
+});

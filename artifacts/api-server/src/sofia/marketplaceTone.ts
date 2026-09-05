@@ -47,7 +47,11 @@ export function hasDownPaymentAmount(value: unknown): boolean {
 
 export function hasConcreteCashOffer(value: unknown): boolean {
   const text = normalized(value);
-  return /\b(?:cash|cash buyer|pay(?:ing)? cash|contado|efectivo)\b/.test(text) && hasDownPaymentAmount(text);
+  const cashSignal = /\b(?:cash|cash buyer|pay(?:ing)? cash|contado|efectivo)\b/.test(text);
+  const offerSignal = /\b(?:offer|oferta|sell|vender|take|accept|aceptar|deal|trato|can you do|would you take|will you take)\b/.test(text);
+  const withoutPhone = text.replace(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, " ");
+  const bareOfferAmount = /\b\d{1,3}(?:,\d{3})?\b/.test(withoutPhone);
+  return (cashSignal || offerSignal) && (hasDownPaymentAmount(text) || bareOfferAmount);
 }
 
 export function detectVehicleRequestKind(value: unknown): VehicleRequestKind {

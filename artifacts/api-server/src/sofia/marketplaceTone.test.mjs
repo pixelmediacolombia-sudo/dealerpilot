@@ -28,6 +28,9 @@ test("recognizes down-payment and concrete cash signals without treating phone a
   assert.equal(hasDownPaymentAmount("I can put $3k down"), true);
   assert.equal(hasDownPaymentAmount("Call me at 703-763-4675"), false);
   assert.equal(hasConcreteCashOffer("I can pay cash with $5,000"), true);
+  assert.equal(hasConcreteCashOffer("Are you gonna sell it for me? 16,000 right"), true);
+  assert.equal(hasConcreteCashOffer("Can you take $16k?"), true);
+  assert.equal(hasConcreteCashOffer("¿Me lo pueden vender por $16,000?"), true);
 });
 
 test("routes photo and Carfax requests independently", () => {

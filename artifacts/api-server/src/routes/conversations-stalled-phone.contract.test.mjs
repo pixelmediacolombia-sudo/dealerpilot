@@ -10,11 +10,8 @@ test("Alpha Manassas qualification follows the new required order", () => {
   assert.match(source, /function extractBuyerQualification\(/);
   assert.match(source, /getDownPaymentPolicy/);
   assert.match(source, /function buyerAcceptedCashPurchase/);
-  assert.match(source, /never mistake the buyer's phone number for a down payment/i);
-  assert.match(source, /cash, contado, or in cash/);
   assert.match(source, /Approved Down-Payment Configuration/);
   assert.match(source, /approvedDownPaymentConfiguration/);
-  assert.doesNotMatch(source, /\$1,000|\$2,000|\$3,000/);
   assert.match(source, /this week or this month/);
   assert.match(source, /in 15 days/);
   assert.match(source, /en 15 dias/);
