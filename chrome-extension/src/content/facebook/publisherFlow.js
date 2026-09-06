@@ -911,7 +911,6 @@
   const dragHandleEl = panel.querySelector("#mai-drag-handle");
   const resetPositionEl = panel.querySelector("#mai-reset-position");
   let promotionFlowPromise = null;
-  let promotionAuthorizationResolver = null;
 
   const PANEL_POSITION_KEY = "marketplacePanelPosition";
   const PANEL_MARGIN = 12;
@@ -1036,70 +1035,6 @@
 
   function escapeHtml(str) {
     return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
-  function promotionPageKey() {
-    return String(window.location.href || "").split("#")[0];
-  }
-
-  async function isPromotionAuthorizationGranted(job) {
-    const { marketplacePromotionAuthorization } = await chrome.storage.local.get(
-      "marketplacePromotionAuthorization",
-    );
-    if (!marketplacePromotionAuthorization?.pageKey) return false;
-    if (marketplacePromotionAuthorization.pageKey !== promotionPageKey()) return false;
-    if (job?.id && Number(marketplacePromotionAuthorization.jobId) !== Number(job.id)) return false;
-    return true;
-  }
-
-  function renderPromotionAuthorization(job) {
-    if (!isMarketplacePromotionPage() || panel.querySelector("#mai-promotion-auth")) return;
-
-    const card = document.createElement("section");
-    card.id = "mai-promotion-auth";
-    card.className = "mai-promotion-card";
-    card.setAttribute("aria-labelledby", "mai-promotion-title");
-    card.innerHTML = `
-      <div id="mai-promotion-title" class="mai-promotion-title">Promoción de Marketplace detectada</div>
-      <div class="mai-promotion-copy">Autoriza una vez para publicar la promoción y volver a tus anuncios automáticamente.</div>
-    `;
-
-    const authorizeButton = button("Autorizar y publicar", async () => {
-      authorizeButton.disabled = true;
-      authorizeButton.textContent = "Autorización recibida…";
-      await chrome.storage.local.set({
-        marketplacePromotionAuthorization: {
-          pageKey: promotionPageKey(),
-          jobId: job?.id ?? null,
-          authorizedAt: new Date().toISOString(),
-        },
-      });
-      promotionAuthorizationResolver?.(true);
-      promotionAuthorizationResolver = null;
-    });
-    authorizeButton.setAttribute("aria-describedby", "mai-promotion-title");
-    card.appendChild(authorizeButton);
-    actionsEl.prepend(card);
-  }
-
-  async function waitForPromotionAuthorization(job) {
-    if (await isPromotionAuthorizationGranted(job)) return true;
-    renderPromotionAuthorization(job);
-    setStatus("Promoción detectada. Esperando tu autorización…");
-
-    return new Promise((resolve) => {
-      let settled = false;
-      let timeout;
-      const finish = (value) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        promotionAuthorizationResolver = null;
-        resolve(value);
-      };
-      timeout = setTimeout(() => finish(false), 10 * 60 * 1000);
-      promotionAuthorizationResolver = finish;
-    });
   }
 
   // ---- Connection check ----
@@ -3197,9 +3132,10 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
   // clickEnabledButtonByText — only clicks buttons that are NOT disabled.
   async function clickPublishUntilListingUrl(job) {
-    // Facebook may navigate directly to the paid promotion screen after the
-    // vehicle publish action. Complete that flow with the separate explicit
-    // authorization gate before scanning generic Marketplace Publish buttons.
+    // Facebook may navigate directly to the optional paid-promotion screen
+    // after the vehicle publish action. Skip that upsell before scanning
+    // generic Marketplace Publish buttons; promotion is never part of a
+    // DealerPilot vehicle publish.
     if (isMarketplacePromotionPage()) {
       return runMarketplacePromotionFlow(job);
     }
@@ -3662,42 +3598,6 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         && promotionElementLabels(el).some((label) => wanted.includes(label)));
   }
 
-  function promotionConfirmationVisible() {
-    const confirmationWords = [
-      "your ads are being created",
-      "tus anuncios se estan creando",
-      "tus anuncios se están creando",
-    ];
-    const scopes = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]'))
-      .filter(promotionElementIsVisible);
-    return scopes.some((scope) => confirmationWords.some((word) => normalizePublishText(scope.innerText || scope.textContent).includes(normalizePublishText(word))))
-      || confirmationWords.some((word) => normalizePublishText(document.body?.innerText || "").includes(normalizePublishText(word)));
-  }
-
-  function findPromotionConfirmationAction() {
-    const dialogs = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]'))
-      .filter(promotionElementIsVisible);
-    for (const dialog of dialogs) {
-      const action = findExactPromotionAction([
-        "go to your listings",
-        "go to listings",
-        "ir a tus anuncios",
-        "ir a tus publicaciones",
-        "ver tus anuncios",
-      ], dialog);
-      if (action) return action;
-    }
-    return dialogs.length === 0
-      ? findExactPromotionAction([
-        "go to your listings",
-        "go to listings",
-        "ir a tus anuncios",
-        "ir a tus publicaciones",
-        "ver tus anuncios",
-      ])
-      : null;
-  }
-
   async function waitForPromotionAction(labels, timeoutMs) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -3708,68 +3608,55 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     return findExactPromotionAction(labels);
   }
 
+  const MARKETPLACE_PROMOTION_EXIT_LABELS = [
+    "not now",
+    "skip",
+    "skip promotion",
+    "no thanks",
+    "continue without promotion",
+    "go to your listings",
+    "go to listings",
+    "ahora no",
+    "omitir",
+    "no gracias",
+    "continuar sin promocionar",
+    "ir a tus anuncios",
+    "ir a tus publicaciones",
+    "ver tus anuncios",
+  ];
+
   async function runMarketplacePromotionFlow(job) {
     if (promotionFlowPromise) return promotionFlowPromise;
 
     promotionFlowPromise = (async () => {
-      const authorized = await waitForPromotionAuthorization(job);
-      if (!authorized) {
-        return {
-          listingUrl: null,
-          blockReason: "Marketplace promotion authorization was not granted.",
-          publishedLanding: false,
-        };
+      setStatus("Publicación completada. Omitiendo promoción pagada…", "ok");
+      const exitButton = await waitForPromotionAction(MARKETPLACE_PROMOTION_EXIT_LABELS, 8_000);
+      if (exitButton) {
+        exitButton.scrollIntoView?.({ block: "center", inline: "nearest" });
+        exitButton.click();
+        stateLog("Marketplace promotion: optional promotion skipped");
+      } else {
+        // Some Facebook variants render no dismiss button. Going to the
+        // seller listings is safe because the vehicle was already published;
+        // it avoids ever clicking the promotion's Publish button.
+        window.location.assign("https://www.facebook.com/marketplace/you/selling");
+        stateLog("Marketplace promotion: no exit control found; opened Your Listings");
       }
 
-      setStatus("Publicando la promoción de Marketplace…", "ok");
-      const publishButton = await waitForPromotionAction(["publish", "publicar"], 30_000);
-      if (!publishButton) {
-        return {
-          listingUrl: null,
-          blockReason: "Facebook's promotion Publish button was not available.",
-          publishedLanding: false,
-        };
-      }
-
-      publishButton.scrollIntoView?.({ block: "center", inline: "nearest" });
-      publishButton.click();
-      stateLog("Marketplace promotion: Publish clicked after explicit authorization");
-      send({
-        type: "SEND_JOB_EVENT",
-        jobId: job?.id,
-        event: "marketplace_promotion_publish_clicked",
-        details: "Promotion Publish clicked after explicit operator authorization.",
-      }).catch(() => { });
-
-      const confirmationStart = Date.now();
-      let goToListingsButton = null;
-      while (Date.now() - confirmationStart < 30_000) {
-        if (promotionConfirmationVisible()) {
-          goToListingsButton = findPromotionConfirmationAction();
-          if (goToListingsButton) break;
-        }
-        await sleep(350);
-      }
-
-      if (!goToListingsButton) {
-        return {
-          listingUrl: null,
-          blockReason: "Facebook created the promotion but did not expose Go to your listings.",
-          publishedLanding: false,
-        };
-      }
-
-      goToListingsButton.scrollIntoView?.({ block: "center", inline: "nearest" });
-      goToListingsButton.click();
-      stateLog("Marketplace promotion: Go to your listings clicked");
       await chrome.storage.local.set({
-        promotionHandledJobId: job?.id ?? null,
-        promotionHandledAt: new Date().toISOString(),
+        promotionSkippedJobId: job?.id ?? null,
+        promotionSkippedAt: new Date().toISOString(),
       });
-      await chrome.storage.local.remove("marketplacePromotionAuthorization");
+      await chrome.storage.local.remove(["marketplacePromotionAuthorization", "promotionHandledJobId"]);
 
       const listingUrl = await waitForMarketplaceListingAfterPromotion(job, 30_000);
-      return { listingUrl, blockReason: null, publishedLanding: true };
+      return {
+        listingUrl,
+        blockReason: listingUrl
+          ? null
+          : "Facebook published the vehicle, but Your Listings did not expose its Marketplace item URL.",
+        publishedLanding: true,
+      };
     })().finally(() => {
       promotionFlowPromise = null;
     });
@@ -3779,16 +3666,19 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
   async function handleMarketplacePromotionLanding() {
     if (promotionFlowPromise) return;
-    const { activeJob, promotionHandledJobId } = await chrome.storage.local.get([
+    const { activeJob, promotionSkippedJobId, promotionHandledJobId } = await chrome.storage.local.get([
       "activeJob",
+      "promotionSkippedJobId",
       "promotionHandledJobId",
     ]);
     if (!activeJob?.id) {
-      renderPromotionAuthorization(null);
-      setStatus("Promoción detectada. Esperando autorización para publicar.");
+      setStatus("Promoción opcional detectada; no se publicará.", "ok");
       return;
     }
-    if (Number(promotionHandledJobId) === Number(activeJob.id)) return;
+    if (
+      Number(promotionSkippedJobId) === Number(activeJob.id) ||
+      Number(promotionHandledJobId) === Number(activeJob.id)
+    ) return;
 
     const validation = await send({ type: "VALIDATE_JOB", jobId: activeJob.id }).catch(() => null);
     const status = validation?.ok ? validation.data?.status : null;
@@ -3813,12 +3703,12 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     }
 
     const listingUrl = promotionOutcome.listingUrl;
-    const reason = "Facebook completed the Marketplace promotion flow, but the individual listing URL was not exposed.";
+    const reason = "Facebook published the vehicle, but the optional promotion screen did not expose its Marketplace item URL.";
     await send({
       type: "SEND_JOB_EVENT",
       jobId: activeJob.id,
-      event: "marketplace_promotion_page_detected",
-      details: listingUrl ? `Promotion published and listing URL captured: ${listingUrl}` : reason,
+      event: "marketplace_promotion_skipped",
+      details: listingUrl ? `Optional promotion skipped; listing URL captured: ${listingUrl}` : reason,
     }).catch(() => { });
 
     if (listingUrl) {
@@ -3918,9 +3808,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         send({
           type: "SEND_JOB_EVENT",
           jobId: job.id,
-          event: "marketplace_promotion_page_detected",
+          event: "marketplace_promotion_skipped",
           details: promotionOutcome.publishedLanding
-            ? "Facebook promotion was published after explicit operator authorization."
+            ? "Optional Facebook promotion was skipped after the vehicle publish."
             : promotionOutcome.blockReason || "Marketplace promotion was not completed.",
         }).catch(() => { });
         return promotionOutcome;

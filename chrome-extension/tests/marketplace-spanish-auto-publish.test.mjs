@@ -344,36 +344,32 @@ test("Facebook Your Listings landing captures item URL before completing", () =>
   assert.doesNotMatch(content, /Auto-publish failed and backend fail-sync failed/);
 });
 
-test("Marketplace promotion requires authorization, then publishes and returns to listings", () => {
+test("Marketplace promotion is skipped and the already-published vehicle returns to listings", () => {
   assert.match(content, /function isMarketplacePromotionPage\(\)/);
   assert.match(content, /function handleMarketplacePromotionLanding\(\)/);
   assert.match(content, /function runMarketplacePromotionFlow\(job\)/);
   assert.match(content, /promotionHeading/);
   assert.match(content, /promotionBudget/);
   assert.match(content, /promote marketplace listing/);
-  assert.match(content, /marketplace_promotion_page_detected/);
-  assert.match(content, /marketplacePromotionAuthorization/);
-  assert.match(content, /Autorizar y publicar/);
-  assert.match(content, /const authorized = await waitForPromotionAuthorization\(job\)/);
-  assert.match(content, /if \(!authorized\)/);
-  assert.match(content, /promotionConfirmationVisible/);
-  assert.match(content, /Go to your listings/);
-  assert.match(content, /marketplace_promotion_publish_clicked/);
+  assert.match(content, /MARKETPLACE_PROMOTION_EXIT_LABELS/);
+  assert.match(content, /marketplace_promotion_skipped/);
+  assert.match(content, /Omitiendo promoción pagada/);
+  assert.match(content, /window\.location\.assign\("https:\/\/www\.facebook\.com\/marketplace\/you\/selling"\)/);
   assert.match(content, /waitForMarketplaceListingAfterPromotion\(job, 30_000\)/);
   assert.match(content, /findMarketplaceListingUrlsOnPage\(job\)/);
   assert.match(content, /urls\.length === 1/);
-  assert.doesNotMatch(content, /paid promotion Publish was not clicked/);
+  assert.doesNotMatch(content, /waitForPromotionAuthorization|Autorizar y publicar|marketplace_promotion_publish_clicked/);
   assert.match(content, /if \(isMarketplacePromotionPage\(\)\)/);
 });
 
-test("Publish flow enters the authorized promotion handler before generic button scanning", () => {
+test("Publish flow enters the promotion-skip handler before generic button scanning", () => {
   const flowStart = content.indexOf("async function clickPublishUntilListingUrl(job)");
   const buttonScan = content.indexOf("waitForEnabledButtonByText(publishTexts", flowStart);
   const promotionGuard = content.indexOf("if (isMarketplacePromotionPage())", flowStart);
   const promotionFlow = content.indexOf("runMarketplacePromotionFlow(job)", flowStart);
   assert.ok(flowStart > -1, "publish flow is missing");
   assert.ok(promotionGuard > flowStart, "promotion guard is missing from publish flow");
-  assert.ok(promotionFlow > promotionGuard, "promotion flow must run on the promotion screen");
+  assert.ok(promotionFlow > promotionGuard, "promotion skip flow must run on the promotion screen");
   assert.ok(buttonScan > promotionGuard, "promotion guard must run before scanning Publish buttons");
 });
 

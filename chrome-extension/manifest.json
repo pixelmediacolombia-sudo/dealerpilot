@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "DealerPilot AI Publisher",
-  "version": "1.4.1",
-  "description": "Connects DealerPilot AI to Facebook Marketplace, fills listings, publishes controlled jobs, and handles authorized Marketplace promotions.",
+  "version": "1.4.3",
+  "description": "Connects DealerPilot AI to Facebook Marketplace, fills listings, publishes controlled jobs, and skips optional Marketplace promotions.",
   "permissions": [
     "storage",
     "scripting",
