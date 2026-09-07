@@ -7,16 +7,16 @@ import {
   useListVehiclePhotoScores,
 } from "../api/listingsApi";
 
-const DEALER_ID = 1;
-
 export function useListings({
   search,
   statusFilter,
   location,
+  dealerId,
 }: {
   search: string;
   statusFilter: string;
   location: string | undefined;
+  dealerId: number;
 }) {
   const workspacesQuery = useListListingWorkspaces({
     q: search || undefined,
@@ -30,8 +30,8 @@ export function useListings({
   );
 
   const photoScoresQuery = useListVehiclePhotoScores(
-    { dealerId: DEALER_ID },
-    { query: { queryKey: getListVehiclePhotoScoresQueryKey({ dealerId: DEALER_ID }) } },
+    { dealerId },
+    { query: { queryKey: getListVehiclePhotoScoresQueryKey({ dealerId }) } },
   );
 
   const intelligenceQuery = useListMarketplaceRecommendations({ location });

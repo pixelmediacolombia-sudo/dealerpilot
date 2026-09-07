@@ -11,6 +11,7 @@ import {
 } from "@workspace/db";
 import { and, count, desc, eq, ilike, isNull, lt, or } from "drizzle-orm";
 import { runInventorySync } from "../inventory/scheduler";
+import { getAuthenticatedDealerId } from "./auth";
 
 
 const router: IRouter = Router();
@@ -87,13 +88,23 @@ async function toDealer(dealer: Dealer) {
 }
 
 router.get("/dealers", async (req, res) => {
-  const rows = await db.select().from(dealersTable).orderBy(dealersTable.id);
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  const rows = await db
+    .select()
+    .from(dealersTable)
+    .where(authenticatedDealerId === null ? undefined : eq(dealersTable.id, authenticatedDealerId))
+    .orderBy(dealersTable.id);
   const dealers = await Promise.all(rows.map(toDealer));
   res.json({ dealers });
 });
 
 router.get("/dealers/:id", async (req, res) => {
   const id = Number(req.params.id);
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  if (authenticatedDealerId !== null && authenticatedDealerId !== id) {
+    res.status(404).json({ error: "Dealer not found" });
+    return;
+  }
   const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, id));
   if (!dealer) {
     res.status(404).json({ error: "Dealer not found" });
@@ -118,6 +129,11 @@ const DealerUpdateBody = z.object({
 
 router.patch("/dealers/:id", async (req, res) => {
   const id = Number(req.params.id);
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  if (authenticatedDealerId !== null && authenticatedDealerId !== id) {
+    res.status(404).json({ error: "Dealer not found" });
+    return;
+  }
   const parsed = DealerUpdateBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid dealer update" });
@@ -265,6 +281,11 @@ router.post("/dealers/:id/sync", async (req, res) => {
 
 router.get("/dealers/:id/feed-runs", async (req, res) => {
   const id = Number(req.params.id);
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  if (authenticatedDealerId !== null && authenticatedDealerId !== id) {
+    res.status(404).json({ error: "Dealer not found" });
+    return;
+  }
   const runs = await db
     .select()
     .from(feedRunsTable)

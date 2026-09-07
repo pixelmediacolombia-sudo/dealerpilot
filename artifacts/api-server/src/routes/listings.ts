@@ -22,8 +22,9 @@ import { ACTIVE_PUBLISHING_JOB_STATUSES } from "../publishing/controlledMode";
 import { compactFutureAutoPublishQueue } from "../publishing/autoPublishQueueCompaction";
 import { getDownPaymentPolicy } from "../downPayment/policy";
 import { vehicleOperationalColumns, type VehicleOperationalRow } from "../lib/vehicleColumns";
+import { resolveDealerId } from "./auth";
 
-const DEALER_ID = 1;
+const DEFAULT_DEALER_ID = 1;
 
 const router: IRouter = Router();
 
@@ -167,11 +168,12 @@ function deriveEngagement(
 
 // GET /listings — one workspace per vehicle.
 router.get("/listings", async (req, res) => {
+  const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status : "";
   const location = typeof req.query.location === "string" ? req.query.location : "";
 
-  const conditions: SQL[] = [eq(vehiclesTable.dealerId, DEALER_ID)];
+  const conditions: SQL[] = [eq(vehiclesTable.dealerId, dealerId)];
   if (location) conditions.push(eq(vehiclesTable.lotLocation, location));
   if (q) {
     const like = `%${q}%`;

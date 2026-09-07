@@ -371,6 +371,46 @@ export async function requireAuthenticatedUser(
   next();
 }
 
+/**
+ * Attaches the current dashboard user when a bearer session is present while
+ * keeping extension/public routes backwards-compatible when no session is
+ * supplied. Dashboard data routes use this context to scope every query to
+ * the authenticated dealer instead of defaulting to Alpha.
+ */
+export async function attachAuthenticatedUser(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const authContext = await authenticatedUser(req);
+    if (authContext) res.locals.authUser = safeUser(authContext.user);
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export function getAuthenticatedDealerId(res: Response): number | null {
+  const dealerId = (res.locals.authUser as { dealerId?: unknown } | undefined)?.dealerId;
+  return typeof dealerId === "number" && Number.isInteger(dealerId) && dealerId > 0 ? dealerId : null;
+}
+
+/** Prefer the authenticated dealer; allow an explicit query only for callers
+ * that do not have a dashboard session, such as the publisher extension. */
+export function resolveDealerId(req: Request, res: Response, fallback = ALPHA_DEALER_ID): number {
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  if (authenticatedDealerId !== null) return authenticatedDealerId;
+
+  const raw = req.query.dealerId ?? req.query.dealer_id;
+  const requested = typeof raw === "string"
+    ? Number(raw)
+    : Array.isArray(raw) && typeof raw[0] === "string"
+      ? Number(raw[0])
+      : Number.NaN;
+  return Number.isInteger(requested) && requested > 0 ? requested : fallback;
+}
+
 const LoginBody = z.object({
   username: z.string().min(1),
   password: z.string().min(1),

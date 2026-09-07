@@ -12,6 +12,7 @@ import {
 } from "@workspace/db";
 import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { syncSoldMarketplaceState } from "../marketplace/soldState";
+import { resolveDealerId } from "./auth";
 
 const router: IRouter = Router();
 
@@ -129,8 +130,9 @@ async function attachImages(vehicles: VehicleResponseRow[]) {
 const DEALER_ID = 1;
 
 router.get("/vehicles/stats", async (req, res) => {
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const location = typeof req.query.location === "string" ? req.query.location : "";
-  const conditions: SQL[] = [eq(vehiclesTable.dealerId, DEALER_ID)];
+  const conditions: SQL[] = [eq(vehiclesTable.dealerId, dealerId)];
   if (location) conditions.push(eq(vehiclesTable.lotLocation, location));
 
   // Two queries in parallel: filtered stats + global unknown-lot count.
@@ -144,7 +146,7 @@ router.get("/vehicles/stats", async (req, res) => {
     db
       .select({ lotLocation: vehiclesTable.lotLocation })
       .from(vehiclesTable)
-      .where(eq(vehiclesTable.dealerId, DEALER_ID)),
+      .where(eq(vehiclesTable.dealerId, dealerId)),
   ]);
 
   const by = (s: string) => rows.filter((r) => r.status === s).length;
@@ -165,17 +167,18 @@ router.get("/vehicles/stats", async (req, res) => {
     soldRemoved: by("Sold/Removed"),
     priceChanged: by("Price Changed"),
     noLot,
-    activeDealerLabel: `Alpha Motorsport${locationLabel}`,
+    activeDealerLabel: `Dealer ${dealerId}${locationLabel}`,
   });
 });
 
 router.get("/vehicles", async (req, res) => {
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status : "";
   const sort = typeof req.query.sort === "string" ? req.query.sort : "newest";
   const location = typeof req.query.location === "string" ? req.query.location : "";
 
-  const conditions: SQL[] = [eq(vehiclesTable.dealerId, DEALER_ID)];
+  const conditions: SQL[] = [eq(vehiclesTable.dealerId, dealerId)];
   if (status) conditions.push(eq(vehiclesTable.status, status));
   if (location) conditions.push(eq(vehiclesTable.lotLocation, location));
   if (q) {

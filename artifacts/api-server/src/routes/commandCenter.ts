@@ -14,6 +14,7 @@ import {
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { ACTIVE_PUBLISHING_JOB_STATUSES } from "../publishing/controlledMode";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
+import { resolveDealerId } from "./auth";
 
 const router: IRouter = Router();
 const DEFAULT_DEALER_ID = 1;
@@ -45,7 +46,7 @@ function maxDate(values: Array<Date | null | undefined>): Date | null {
 
 router.get("/command-center/alerts", async (req: Request, res: Response) => {
   try {
-    const dealerId = Number(req.query["dealerId"] ?? DEFAULT_DEALER_ID);
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
     const location = typeof req.query["location"] === "string" ? req.query["location"] : "";
     if (!Number.isInteger(dealerId) || dealerId <= 0) {
       res.status(400).json({ error: "Invalid dealerId" });

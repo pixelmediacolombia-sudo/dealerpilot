@@ -46,8 +46,7 @@ import {
 } from "lucide-react";
 import { PageHeader, SectionCard } from "@/shared/ui";
 import { formatCurrency, formatDate } from "@/lib/format";
-
-const DEALER_ID = 1;
+import { useAccount } from "@/app/AuthGate";
 
 function StatusDot({ online }: { online: boolean }) {
   return (
@@ -145,10 +144,10 @@ function FieldBadge({ value }: { value: boolean | null | undefined }) {
 }
 
 // ─── Section: Feed Quality ────────────────────────────────────────────────────
-function FeedQualitySection() {
+function FeedQualitySection({ dealerId }: { dealerId: number }) {
   const { data, isLoading, refetch } = useGetFeedQuality(
-    { dealerId: DEALER_ID },
-    { query: { queryKey: getGetFeedQualityQueryKey({ dealerId: DEALER_ID }) } },
+    { dealerId },
+    { query: { queryKey: getGetFeedQualityQueryKey({ dealerId }) } },
   );
   const q = data?.quality;
 
@@ -273,10 +272,10 @@ function FeedQualitySection() {
 }
 
 // ─── Section: Launch Checklist ────────────────────────────────────────────────
-function LaunchChecklistSection() {
+function LaunchChecklistSection({ dealerId }: { dealerId: number }) {
   const { data, isLoading, refetch } = useGetLaunchChecklist(
-    { dealerId: DEALER_ID },
-    { query: { queryKey: getGetLaunchChecklistQueryKey({ dealerId: DEALER_ID }) } },
+    { dealerId },
+    { query: { queryKey: getGetLaunchChecklistQueryKey({ dealerId }) } },
   );
   const checklist = data?.checklist;
 
@@ -299,7 +298,7 @@ function LaunchChecklistSection() {
             <ClipboardCheck className="w-4 h-4 text-success" />
           </div>
           <div>
-            <div className="font-bold">Alpha Launch Checklist</div>
+            <div className="font-bold">Launch Checklist</div>
             <div className="text-xs text-muted-foreground">Complete before first live run</div>
           </div>
         </div>
@@ -336,7 +335,7 @@ function LaunchChecklistSection() {
               <div className="flex items-center gap-3 p-4 rounded-xl bg-success/10 border border-success/20 mb-4">
                 <Zap className="w-5 h-5 text-success" />
                 <div>
-                  <div className="font-bold text-success">Ready for Alpha Launch!</div>
+                  <div className="font-bold text-success">Ready for Launch!</div>
                   <div className="text-xs text-success/70">All checks passed. You can start an Assisted Mode batch.</div>
                 </div>
               </div>
@@ -358,7 +357,7 @@ function LaunchChecklistSection() {
 }
 
 // ─── Section: Batch Dry Run ───────────────────────────────────────────────────
-function BatchDryRunSection() {
+function BatchDryRunSection({ dealerId }: { dealerId: number }) {
   const [count, setCount] = useState(4);
   const [result, setResult] = useState<{
     selected: {
@@ -396,7 +395,7 @@ function BatchDryRunSection() {
   });
 
   function runDryRun() {
-    mutate({ data: { dealerId: DEALER_ID, count } });
+    mutate({ data: { dealerId, count } });
   }
 
   const photoDecisionLabel: Record<string, { label: string; color: string }> = {
@@ -439,7 +438,7 @@ function BatchDryRunSection() {
             />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>1</span>
-              <span className="text-primary font-medium">Alpha: max 4</span>
+              <span className="text-primary font-medium">Recommended: max 4</span>
               <span>10</span>
             </div>
           </div>
@@ -573,12 +572,12 @@ function BatchDryRunSection() {
 }
 
 // ─── Section: Extension Diagnostics ──────────────────────────────────────────
-function ExtensionDiagnosticsSection() {
+function ExtensionDiagnosticsSection({ dealerId }: { dealerId: number }) {
   const { data, isLoading, refetch } = useGetExtensionDiagnostics(
-    { dealerId: DEALER_ID },
+    { dealerId },
     {
       query: {
-        queryKey: getGetExtensionDiagnosticsQueryKey({ dealerId: DEALER_ID }),
+        queryKey: getGetExtensionDiagnosticsQueryKey({ dealerId }),
         refetchInterval: 15000,
       },
     },
@@ -755,10 +754,10 @@ function ExtensionDiagnosticsSection() {
 }
 
 // ─── Section: Field Validation Report ────────────────────────────────────────
-function FieldValidationSection() {
+function FieldValidationSection({ dealerId }: { dealerId: number }) {
   const { data, isLoading, refetch } = useGetFieldValidation(
-    { dealerId: DEALER_ID },
-    { query: { queryKey: getGetFieldValidationQueryKey({ dealerId: DEALER_ID }) } },
+    { dealerId },
+    { query: { queryKey: getGetFieldValidationQueryKey({ dealerId }) } },
   );
 
   const agg = data?.aggregated;
@@ -866,11 +865,11 @@ function FieldValidationSection() {
   );
 }
 
-// ─── Section: Alpha Launch Mode ───────────────────────────────────────────────
-function AlphaLaunchModeSection() {
+// ─── Section: Launch Mode ─────────────────────────────────────────────────────
+function LaunchModeSection({ dealerId }: { dealerId: number }) {
   const { data: photoScoresData } = useListVehiclePhotoScores(
-    { dealerId: DEALER_ID },
-    { query: { queryKey: getListVehiclePhotoScoresQueryKey({ dealerId: DEALER_ID }) } },
+    { dealerId },
+    { query: { queryKey: getListVehiclePhotoScoresQueryKey({ dealerId }) } },
   );
   const scores = photoScoresData?.scores ?? [];
   const useOriginal = scores.filter((s) => s.photoDecision === "use_original").length;
@@ -886,7 +885,7 @@ function AlphaLaunchModeSection() {
             <Zap className="w-4 h-4 text-warning" />
           </div>
           <div>
-            <div className="font-bold">Alpha Launch Mode</div>
+            <div className="font-bold">Launch Mode</div>
             <div className="text-xs text-muted-foreground">
               Conservative settings for first real runs
             </div>
@@ -903,7 +902,7 @@ function AlphaLaunchModeSection() {
               <Badge className="bg-success/20 text-success border-success/20 border text-xs">Default</Badge>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Extension opens Marketplace, fills all fields, pauses, and waits for the operator to review and manually click Publish. Safe for alpha.
+              Extension opens Marketplace, fills all fields, pauses, and waits for the operator to review and manually click Publish.
             </p>
           </div>
           <div className="rounded-xl bg-secondary/30 border border-border/40 p-5 space-y-2 opacity-60">
@@ -913,7 +912,7 @@ function AlphaLaunchModeSection() {
               <Badge variant="secondary" className="text-xs">Locked</Badge>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Extension clicks Publish automatically. Requires explicit confirmation and higher confidence threshold. Not recommended for alpha.
+              Extension clicks Publish automatically. Requires explicit confirmation and higher confidence threshold.
             </p>
           </div>
         </div>
@@ -921,7 +920,7 @@ function AlphaLaunchModeSection() {
         {/* Default constraints */}
         <div className="space-y-3">
           <div className="text-xs font-bold  tracking-wide text-muted-foreground">
-            Alpha Default Constraints
+            Default Constraints
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
@@ -971,7 +970,7 @@ function AlphaLaunchModeSection() {
         <div className="rounded-xl bg-warning/10 border border-warning/20 p-4 flex items-start gap-3">
           <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
           <div className="text-sm text-warning/90">
-            <span className="font-bold">Alpha Safety Notice:</span>{" "}
+            <span className="font-bold">Publishing Safety Notice:</span>{" "}
             The extension will never click Publish automatically in Assisted Mode. Always have an operator at the browser during a publishing session. Controlled Auto Mode requires explicit unlock in Settings.
           </div>
         </div>
@@ -982,9 +981,10 @@ function AlphaLaunchModeSection() {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function ProductionReadiness() {
+  const { dealerId } = useAccount();
   const { data: checklistData } = useGetLaunchChecklist(
-    { dealerId: DEALER_ID },
-    { query: { queryKey: getGetLaunchChecklistQueryKey({ dealerId: DEALER_ID }) } },
+    { dealerId },
+    { query: { queryKey: getGetLaunchChecklistQueryKey({ dealerId }) } },
   );
   const checklist = checklistData?.checklist;
   const passedCount = checklist?.passedCount ?? 0;
@@ -1001,7 +1001,7 @@ export function ProductionReadiness() {
             description={
               <div className="flex flex-col gap-3">
                 <span className="text-muted-foreground text-sm">
-                  Alpha Motorsport pre-launch validation. Complete all checks before the first live publishing run.
+                  Dealer pre-launch validation. Complete all checks before the first live publishing run.
                 </span>
                 {checklist && (
                   <div className="flex items-center gap-3">
@@ -1036,12 +1036,12 @@ export function ProductionReadiness() {
             }
           />
 
-          <LaunchChecklistSection />
-          <FeedQualitySection />
-          <AlphaLaunchModeSection />
-          <BatchDryRunSection />
-          <ExtensionDiagnosticsSection />
-          <FieldValidationSection />
+          <LaunchChecklistSection dealerId={dealerId} />
+          <FeedQualitySection dealerId={dealerId} />
+          <LaunchModeSection dealerId={dealerId} />
+          <BatchDryRunSection dealerId={dealerId} />
+          <ExtensionDiagnosticsSection dealerId={dealerId} />
+          <FieldValidationSection dealerId={dealerId} />
         </div>
       </div>
     </AppLayout>

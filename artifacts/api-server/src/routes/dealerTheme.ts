@@ -49,8 +49,10 @@ router.get("/dealers/:dealerId/theme", async (req, res) => {
     dealerId,
     dealerName: dealer.name,
     primaryColors: safeColors(dna?.primaryColors, ["#7658d6"]),
-    secondaryColors: safeColors(dna?.secondaryColors, ["#20243b"]),
-    accentColors: safeColors(dna?.accentColors, ["#42b883"]),
+    // A missing dealer DNA row must still render the neutral light shell. The
+    // dealer primary is the accent; never use a dark fallback as the canvas.
+    secondaryColors: safeColors(dna?.secondaryColors, ["#f3f4f8"]),
+    accentColors: safeColors(dna?.accentColors, ["#7658d6"]),
     logoUrl: dna?.logoUrl ?? null,
     preferredFont: dna?.preferredFont ?? "Inter",
     updatedAt: dna?.updatedAt?.toISOString() ?? null,

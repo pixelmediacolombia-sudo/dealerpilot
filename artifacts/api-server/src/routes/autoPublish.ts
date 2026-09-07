@@ -47,19 +47,26 @@ import {
   photoDirectorPublishBlockReason,
 } from "../photo/publishReadiness";
 import { getNextAutoPublishForecast } from "../publishing/autoPublishForecast";
-import { ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
+import { ALPHA_DEALER_ID, ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
+import { getAuthenticatedDealerId, resolveDealerId } from "./auth";
 
-// Dealer scope: Alpha Motorsport = dealer_id 1. Auto-publish is Manassas-only.
-const DEALER_ID = 1;
-const DEALER_FILTER = eq(vehiclesTable.dealerId, DEALER_ID);
+const DEFAULT_DEALER_ID = 1;
+
+function isVerifiedDealerInventory(
+  dealerId: number,
+  vehicle: { dealerId: number; lotLocation: string | null; sourceRaw?: string | null },
+): boolean {
+  if (dealerId !== ALPHA_DEALER_ID) return true;
+  return Boolean(LOT_CITY_MAP[vehicle.lotLocation ?? ""] && isAlphaManassasVehicle(vehicle));
+}
 
 const router: IRouter = Router();
 
 // GET /auto-publish/next-batch — read-only Postman/API forecast.
 // This endpoint never creates a batch, job, photo job, or reservation.
 router.get("/auto-publish/next-batch", async (req, res) => {
-  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : DEALER_ID;
+  const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
   const count = typeof req.query.count === "string" ? Number(req.query.count) : 3;
   if (!Number.isInteger(dealerId) || dealerId < 1) {
     res.status(400).json({ error: "dealerId must be a positive integer" });
@@ -253,6 +260,11 @@ router.get("/auto-publish/settings/:dealerId", async (req, res) => {
     res.status(400).json({ error: "Invalid dealerId" });
     return;
   }
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  if (authenticatedDealerId !== null && authenticatedDealerId !== dealerId) {
+    res.status(404).json({ error: "Dealer not found" });
+    return;
+  }
   const [row] = await db
     .select()
     .from(autoPublishSettingsTable)
@@ -304,6 +316,11 @@ router.put("/auto-publish/settings/:dealerId", async (req, res) => {
   const dealerId = Number(req.params.dealerId);
   if (Number.isNaN(dealerId)) {
     res.status(400).json({ error: "Invalid dealerId" });
+    return;
+  }
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  if (authenticatedDealerId !== null && authenticatedDealerId !== dealerId) {
+    res.status(403).json({ error: "Dealer scope mismatch" });
     return;
   }
   const parsed = SettingsBody.safeParse(req.body ?? {});
@@ -416,8 +433,9 @@ router.post("/auto-publish/batches", async (req, res) => {
     res.status(400).json({ error: "Invalid batch request" });
     return;
   }
-  const { dealerId, count, scheduledAt, lotLocation, gmOverrides } = parsed.data;
-  if (lotLocation && lotLocation !== ALPHA_LOT_MANASSAS) {
+  const { count, scheduledAt, lotLocation, gmOverrides } = parsed.data;
+  const dealerId = getAuthenticatedDealerId(res) ?? parsed.data.dealerId;
+  if (dealerId === ALPHA_DEALER_ID && lotLocation && lotLocation !== ALPHA_LOT_MANASSAS) {
     res.status(422).json({ error: "Only Alpha Manassas inventory can be auto-published", code: "NON_MANASSAS_LOT" });
     return;
   }
@@ -543,8 +561,8 @@ router.post("/auto-publish/batches", async (req, res) => {
     let validation = validateVehicleForPublish(v, imgs.length);
 
     // Lot location must exist and be the active Manassas destination.
-    if (validation.eligible && (!LOT_CITY_MAP[v.lotLocation ?? ""] || !isAlphaManassasVehicle(v))) {
-      validation = { eligible: false, reason: `Vehicle is not verified as Alpha's Manassas inventory (lot: "${v.lotLocation ?? "unknown"}")` };
+    if (validation.eligible && !isVerifiedDealerInventory(dealerId, v)) {
+      validation = { eligible: false, reason: `Vehicle is not verified for this dealer's configured lot (lot: "${v.lotLocation ?? "unknown"}")` };
     }
     // Market Agent duplicate-listing conflict — blocked unless explicitly overridden.
     if (validation.eligible && duplicateConflictIds.has(v.id) && !gmOverrideSet.has(v.id)) {
@@ -766,7 +784,7 @@ router.post("/auto-publish/batches", async (req, res) => {
 
 // GET /auto-publish/batches — list batches for a dealer, optionally scoped to a lot location.
 router.get("/auto-publish/batches", async (req, res) => {
-  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : DEALER_ID;
+  const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
   const location = typeof req.query.location === "string" ? req.query.location : "";
   const rows = await db
     .select()
@@ -1056,7 +1074,7 @@ router.get("/publishing/jobs/:id/events", async (req, res) => {
 
 // GET /auto-publish/priority-scores — priority scores for dealer vehicles (always scoped to dealer_id=1)
 router.get("/auto-publish/priority-scores", async (req, res) => {
-  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : DEALER_ID;
+  const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
   const rows = await db
     .select()
     .from(publishPriorityScoresTable)
@@ -1067,7 +1085,7 @@ router.get("/auto-publish/priority-scores", async (req, res) => {
 
 // GET /auto-publish/photo-scores — photo scores for dealer vehicles (always scoped to dealer_id=1)
 router.get("/auto-publish/photo-scores", async (req, res) => {
-  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : DEALER_ID;
+  const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
   const rows = await db
     .select()
     .from(vehiclePhotoScoresTable)
@@ -1080,11 +1098,7 @@ router.get("/auto-publish/photo-scores", async (req, res) => {
 
 // GET /auto-publish/feed-quality?dealerId=1
 router.get("/auto-publish/feed-quality", async (req, res) => {
-  const dealerId = typeof req.query.dealerId === "string" ? Number(req.query.dealerId) : null;
-  if (!dealerId || Number.isNaN(dealerId)) {
-    res.status(400).json({ error: "dealerId required" });
-    return;
-  }
+  const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
 
   // Total active vehicles
   const allVehicles = await db
@@ -1313,8 +1327,8 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     const photoAnalysis = analyzePhotos(imgs);
     let validation = validateVehicleForPublish(v, imgs.length);
 
-    if (validation.eligible && (!LOT_CITY_MAP[v.lotLocation ?? ""] || !isAlphaManassasVehicle(v))) {
-      validation = { eligible: false, reason: `Vehicle is not verified as Alpha's Manassas inventory (lot: "${v.lotLocation ?? "unknown"}")` };
+    if (validation.eligible && !isVerifiedDealerInventory(dealerId, v)) {
+      validation = { eligible: false, reason: `Vehicle is not verified for this dealer's configured lot (lot: "${v.lotLocation ?? "unknown"}")` };
     }
     if (validation.eligible && duplicateConflictIds.has(v.id)) {
       validation = { eligible: false, reason: "Market Agent flagged a duplicate-listing conflict" };

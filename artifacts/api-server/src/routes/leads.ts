@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { eq, desc, and } from "drizzle-orm";
 import { db, leadsTable, downPaymentIntelligenceTable } from "@workspace/db";
+import { resolveDealerId } from "./auth";
 
 const router = Router();
 
 const DEALER_ID = 1;
 
 router.get("/leads", async (req, res) => {
-  const dealerId = Number(req.query.dealerId) || DEALER_ID;
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const temperature = req.query.temperature as string | undefined;
   const status = req.query.status as string | undefined;
 
@@ -54,7 +55,7 @@ router.patch("/leads/:id", async (req, res) => {
 });
 
 router.get("/down-payment-intelligence", async (req, res) => {
-  const dealerId = Number(req.query.dealerId) || DEALER_ID;
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
 
   const rows = await db
     .select()

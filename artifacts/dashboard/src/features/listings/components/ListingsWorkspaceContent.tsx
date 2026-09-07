@@ -89,10 +89,10 @@ import { BatchTodayPanel, type BatchVehicle } from "./BatchTodayPanel";
 import { ToRemovePanel } from "./ToRemovePanel";
 import { PublishNowModal } from "@/features/publishing/components/PublishNowModal";
 import { toast } from "@/hooks/use-toast";
+import { useAccount } from "@/app/AuthGate";
 
 type StrategyStatus = "recommended" | "not_prioritized" | "needs_strategy_review";
 
-const DEALER_ID = 1;
 const PRIMARY_TABS = new Set(["ready", "scheduled", "published", "failed", "to-remove", "all"]);
 const LEGACY_TAB_MAP: Record<string, string> = {
   generating: "all",
@@ -257,6 +257,7 @@ function PhotoBadge({
 }
 
 export function ListingsWorkspace() {
+  const { dealerId } = useAccount();
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window === "undefined") return "ready";
     const tab = new URLSearchParams(window.location.search).get("tab") ?? "ready";
@@ -327,7 +328,7 @@ export function ListingsWorkspace() {
     photoScoreByVehicle,
     intelligenceMap,
     recommendations,
-  } = useListings({ search, statusFilter: "all", location: locationFilter });
+  } = useListings({ search, statusFilter: "all", location: locationFilter, dealerId });
 
   const assignMutation = useAssignPublishingJob({
     mutation: { onSuccess: () => void invalidateWorkspaces() },
@@ -587,12 +588,12 @@ export function ListingsWorkspace() {
 
           {/* Auto Publish Plan */}
           <AutoPublishPlan
-            dealerId={DEALER_ID}
+            dealerId={dealerId}
             onBatchCreated={() => setBatchRefreshKey((k) => k + 1)}
           />
 
           {/* Batch Progress */}
-          <BatchProgressCard dealerId={DEALER_ID} refreshKey={batchRefreshKey} location={locationFilter} />
+          <BatchProgressCard dealerId={dealerId} refreshKey={batchRefreshKey} location={locationFilter} />
 
           {/* ── Live tab — engagement-rich cards ── */}
           {isPublishedTab && (

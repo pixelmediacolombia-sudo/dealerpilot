@@ -1,9 +1,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PropsWithChildren } from "react";
-import { ThemeProvider } from "next-themes";
+import type { PropsWithChildren, ReactElement } from "react";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { LocationProvider } from "@/context/LocationContext";
 import { TooltipProvider } from "@/shared/ui/tooltip";
 import { Toaster } from "@/shared/ui/toaster";
+
+const ThemeProvider = NextThemesProvider as unknown as (
+  props: PropsWithChildren<{
+    attribute: "class";
+    defaultTheme: string;
+    enableSystem: boolean;
+    storageKey: string;
+  }>,
+) => ReactElement;
 
 const queryClient = new QueryClient({
   defaultOptions: {

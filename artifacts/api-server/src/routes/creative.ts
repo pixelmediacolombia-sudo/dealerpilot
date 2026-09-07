@@ -18,6 +18,7 @@ import {
   type CreativeJob,
 } from "@workspace/db";
 import { and, asc, desc, eq, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
+import { getAuthenticatedDealerId, resolveDealerId } from "./auth";
 
 const DEALER_ID = 1;
 
@@ -174,10 +175,11 @@ async function imageInfo(vehicleIds: number[]) {
 
 // GET /creative/studio — one creative workspace per vehicle.
 router.get("/creative/studio", async (req, res) => {
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status : "";
 
-  const conditions: SQL[] = [eq(vehiclesTable.dealerId, DEALER_ID)];
+  const conditions: SQL[] = [eq(vehiclesTable.dealerId, dealerId)];
   if (q) {
     const like = `%${q}%`;
     const search = or(
@@ -443,10 +445,14 @@ router.post("/creative/vehicles/:id/generate", async (req, res) => {
 // GET /creative/jobs — the creative generation queue.
 router.get("/creative/jobs", async (req, res) => {
   const status = typeof req.query.status === "string" ? req.query.status : "";
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const jobs = await db
     .select()
     .from(creativeJobsTable)
-    .where(status ? eq(creativeJobsTable.status, status) : undefined)
+    .where(and(
+      eq(creativeJobsTable.dealerId, dealerId),
+      status ? eq(creativeJobsTable.status, status) : undefined,
+    ))
     .orderBy(desc(creativeJobsTable.createdAt));
 
   const vehicleIds = [...new Set(jobs.map((j) => j.vehicleId))];
@@ -532,6 +538,11 @@ router.get("/creative/dna/:dealerId", async (req, res) => {
     res.status(400).json({ error: "Invalid dealer id" });
     return;
   }
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  if (authenticatedDealerId !== null && authenticatedDealerId !== dealerId) {
+    res.status(404).json({ error: "Brand DNA not found" });
+    return;
+  }
   const [dna] = await db
     .select()
     .from(dealerBrandDnaTable)
@@ -560,6 +571,11 @@ router.put("/creative/dna/:dealerId", async (req, res) => {
   const dealerId = parseId(req.params.dealerId);
   if (dealerId === null) {
     res.status(400).json({ error: "Invalid dealer id" });
+    return;
+  }
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  if (authenticatedDealerId !== null && authenticatedDealerId !== dealerId) {
+    res.status(403).json({ error: "Dealer DNA is scoped to the authenticated dealer" });
     return;
   }
   const parsed = DnaBody.safeParse(req.body);

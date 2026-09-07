@@ -11,7 +11,6 @@ import {
 } from "@/shared/ui/dropdown-menu";
 import {
   useGetDealer,
-  useListDealers,
   getGetDealerQueryKey,
   useGetVehicleStats,
   useListListingWorkspaces,
@@ -24,6 +23,7 @@ import {
   useBulkSchedulePublishing,
 } from "@workspace/api-client-react";
 import { useDealerLocation } from "@/context/LocationContext";
+import { useAccount } from "@/app/AuthGate";
 import { cn } from "@/lib/utils";
 import { PublishNowModal } from "@/features/publishing/components/PublishNowModal";
 import { GmCoachModal } from "@/components/GmCoachModal";
@@ -659,8 +659,7 @@ export function SalesHub() {
   const [publishNowVehicleId, setPublishNowVehicleId] = useState<number | null>(null);
   const [showHold, setShowHold] = useState(false);
 
-  const { data: dealersData } = useListDealers();
-  const dealerId = dealersData?.dealers?.[0]?.id;
+  const { dealerId } = useAccount();
   const { data: dealer } = useGetDealer(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getGetDealerQueryKey(dealerId!) },
   });
@@ -791,7 +790,7 @@ export function SalesHub() {
                     )}
                   </h1>
                   <p className="text-[16px] text-muted-foreground leading-relaxed font-normal max-w-lg">
-                    {isLoading ? "" : plan?.summary ?? `${dealer?.name ?? "Alpha Motorsport"} — no action required right now.`}
+                    {isLoading ? "" : plan?.summary ?? `${dealer?.name ?? "Dealer"} — no action required right now.`}
                   </p>
                 </div>
                 <Button

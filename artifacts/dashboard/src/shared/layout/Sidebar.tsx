@@ -13,7 +13,8 @@ import {
   Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useGetDealer, useListDealers, getGetDealerQueryKey } from "@workspace/api-client-react";
+import { useGetDealer, getGetDealerQueryKey } from "@workspace/api-client-react";
+import { useAccount } from "@/app/AuthGate";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,13 +62,14 @@ function BrandMark() {
 
 export function Sidebar() {
   const [location, setLocation] = useLocation();
-  const { data: dealersData } = useListDealers();
-  const dealerId = dealersData?.dealers?.[0]?.id;
+  const { dealerId } = useAccount();
   const { data: dealer } = useGetDealer(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getGetDealerQueryKey(dealerId!) },
   });
   const isBasicPlan = dealer?.plan === "basic";
-  const visibleNavItems = NAV_ITEMS.filter((item) => !(isBasicPlan && item.path === "/pages"));
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => !(isBasicPlan && (item.path === "/pages" || item.path === "/sales-ai")),
+  );
 
   function isActive(item: NavItem): boolean {
     const paths = ACTIVE_PATHS[item.path] ?? [item.path];
@@ -90,7 +92,7 @@ export function Sidebar() {
           <div className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2.5 shadow-[0_3px_12px_rgb(15_23_42/0.035)]">
             <span className={cn("h-1.5 w-1.5 rounded-full", dealer?.status === "active" ? "bg-success" : "bg-muted-foreground/40")} />
             <span className="min-w-0 truncate text-xs font-semibold text-sidebar-foreground/75">
-              {dealer?.name ?? "Alpha MotorSports"}
+              {dealer?.name ?? "Dealer"}
             </span>
           </div>
           <Link href="/inventory" className="mt-3 flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-[0_8px_18px_rgb(15_23_42/0.12)] transition-[background-color,transform] hover:bg-primary/90 hover:-translate-y-px">

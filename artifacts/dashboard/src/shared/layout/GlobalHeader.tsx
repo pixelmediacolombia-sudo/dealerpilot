@@ -8,12 +8,14 @@ import {
   useConnectMarketplace,
   useListFeedRuns,
   useListCreativeJobs,
-  useListDealers,
   getGetConnectionStatusQueryKey,
+  useGetDealer,
+  getGetDealerQueryKey,
   getListFeedRunsQueryKey,
   getListCreativeJobsQueryKey,
   type ConnectionStatus,
 } from "@workspace/api-client-react";
+import { useAccount } from "@/app/AuthGate";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
@@ -95,9 +97,10 @@ const LOCATIONS: LocationOption[] = [
   { value: "Manassas", label: "Manassas" },
 ];
 
-function LocationSelector() {
+function LocationSelector({ dealerName, dealerId }: { dealerName: string; dealerId: number }) {
   const { selectedLocation, setSelectedLocation } = useDealerLocation();
   const displayLabel = selectedLocation === "" ? "All locations" : selectedLocation;
+  const locations = dealerId === 1 ? LOCATIONS : [{ value: "", label: "All Locations" } satisfies LocationOption];
 
   return (
     <DropdownMenu>
@@ -105,7 +108,7 @@ function LocationSelector() {
         <button className="group flex min-h-9 shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-card px-3 text-left shadow-[0_2px_8px_rgb(15_23_42/0.025)] transition-colors hover:bg-muted">
           <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span className="hidden text-sm font-medium text-foreground lg:inline">
-            Alpha Motorsport
+            {dealerName}
           </span>
           <span className="text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
             {displayLabel}
@@ -114,14 +117,14 @@ function LocationSelector() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[220px]">
-        {LOCATIONS.map(({ value, label }) => (
+        {locations.map(({ value, label }) => (
           <DropdownMenuItem
             key={value}
             className={cn("text-xs cursor-pointer", value === selectedLocation && "text-primary font-semibold")}
             onClick={() => setSelectedLocation(value)}
           >
             <MapPin className={cn("w-3.5 h-3.5 mr-2 shrink-0", value === selectedLocation ? "text-primary" : "text-muted-foreground")} />
-            {value === "" ? "All Locations" : `Alpha Motorsport — ${label}`}
+            {value === "" ? "All Locations" : `${dealerName} — ${label}`}
             {value === selectedLocation && <span className="ml-auto text-primary text-xs">✓</span>}
           </DropdownMenuItem>
         ))}
@@ -222,8 +225,10 @@ function deriveConn(data: ConnectionStatus | undefined) {
 export function GlobalHeader() {
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  const { data: dealersData } = useListDealers();
-  const dealerId = dealersData?.dealers?.[0]?.id;
+  const { dealerId } = useAccount();
+  const { data: dealer } = useGetDealer(dealerId, {
+    query: { queryKey: getGetDealerQueryKey(dealerId) },
+  });
 
   const { data: connData } = useGetConnectionStatus({
     query: {
@@ -306,7 +311,7 @@ export function GlobalHeader() {
 
       {/* Location */}
       <div className="shrink-0">
-        <LocationSelector />
+        <LocationSelector dealerName={dealer?.name ?? "Dealer"} dealerId={dealerId} />
       </div>
 
       <StatusSelector items={statusOptions} />

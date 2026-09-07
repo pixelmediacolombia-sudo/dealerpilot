@@ -14,6 +14,7 @@ import {
 } from "@workspace/db";
 import { ensureVehicleIntelligenceSchema, seedMarketplaceIntelligence } from "../intelligence/seed";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
+import { resolveDealerId } from "./auth";
 
 const router = Router();
 
@@ -489,6 +490,7 @@ function computeEstimatedDaysToSell(price: number | null, confidenceScore: numbe
 // GET /api/marketplace-intelligence/recommendations
 router.get("/marketplace-intelligence/recommendations", async (req, res) => {
   await ensureVehicleIntelligenceSchema(req.log);
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
 
   const location = typeof req.query.location === "string" ? req.query.location : "";
 
@@ -498,14 +500,14 @@ router.get("/marketplace-intelligence/recommendations", async (req, res) => {
     .select()
     .from(vehicleIntelligenceTable)
     .where(and(
-      eq(vehicleIntelligenceTable.dealerId, DEALER_ID),
+      eq(vehicleIntelligenceTable.dealerId, dealerId),
       isNotNull(vehicleIntelligenceTable.opportunityScore),
     ))
     .orderBy(desc(sql`coalesce(${vehicleIntelligenceTable.demandScore}, ${vehicleIntelligenceTable.opportunityScore})`));
 
   // Include both Active and Price Changed vehicles (same filter as market intelligence)
   const vehicleConditions = [
-    eq(vehiclesTable.dealerId, DEALER_ID),
+    eq(vehiclesTable.dealerId, dealerId),
     or(
       eq(vehiclesTable.status, "Active"),
       eq(vehiclesTable.status, "Price Changed"),

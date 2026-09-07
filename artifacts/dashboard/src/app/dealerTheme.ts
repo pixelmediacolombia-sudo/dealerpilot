@@ -14,7 +14,7 @@ export const DEALER_THEME_UPDATED_EVENT = "dealerpilot:theme-updated";
 const FALLBACK_THEME: Required<Pick<DealerThemePayload, "primaryColors" | "secondaryColors" | "accentColors">> = {
   primaryColors: ["#7658d6"],
   secondaryColors: ["#f3f4f8"],
-  accentColors: ["#42b883"],
+  accentColors: ["#7658d6"],
 };
 
 function normalizeHexColor(value: unknown): string | null {

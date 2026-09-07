@@ -23,6 +23,7 @@ import workersRouter from "./workers";
 import orchestratorRouter from "./orchestrator";
 import pagesRouter from "./pages";
 import commandCenterRouter from "./commandCenter";
+import { attachAuthenticatedUser } from "./auth";
 
 const router: IRouter = Router();
 
@@ -31,6 +32,7 @@ router.use(workersRouter);
 router.use(orchestratorRouter);
 router.use(healthRouter);
 router.use(authRouter);
+router.use(attachAuthenticatedUser);
 router.use(extensionRouter);
 router.use(dealersRouter);
 router.use(vehiclesRouter);

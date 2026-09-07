@@ -10,8 +10,13 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { Input } from "@/shared/ui/input";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 
 const TOKEN_KEY = "dealerpilot.sessionToken";
+
+// Generated dashboard queries must carry the same bearer session used by the
+// login gate so the API can scope every response to the authenticated dealer.
+setAuthTokenGetter(() => (typeof localStorage === "undefined" ? null : localStorage.getItem(TOKEN_KEY)));
 
 export function getAuthToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);

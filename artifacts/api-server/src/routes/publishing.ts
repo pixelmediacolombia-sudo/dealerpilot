@@ -38,6 +38,7 @@ import { recordMarketplaceSoldAction } from "../marketplace/soldAction";
 import { getDownPaymentPolicy } from "../downPayment/policy";
 import { isAlphaManassasVehicle } from "../lib/dealer";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
+import { resolveDealerId } from "./auth";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1. Marketplace publishing is
 // restricted to inventory verified at the Manassas lot.
@@ -164,6 +165,7 @@ async function deferPublishingJobForPhotoDirector(
 
 // GET /publishing/jobs — full queue for the UI.
 router.get("/publishing/jobs", async (req, res) => {
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const status = typeof req.query.status === "string" ? req.query.status : "";
   const location = typeof req.query.location === "string" ? req.query.location : "";
 
@@ -181,6 +183,7 @@ router.get("/publishing/jobs", async (req, res) => {
     .from(publishingJobsTable)
     .where(
       and(
+        eq(publishingJobsTable.dealerId, dealerId),
         status ? eq(publishingJobsTable.status, status) : undefined,
         vehicleIdSet !== null
           ? vehicleIdSet.size > 0
