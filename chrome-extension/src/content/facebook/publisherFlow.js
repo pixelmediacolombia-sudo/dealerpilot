@@ -3479,7 +3479,11 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
   function findMarketplaceListingUrlOnPage(job) {
     const urls = findMarketplaceListingUrlsOnPage(job);
-    return urls.length === 1 ? urls[0] : null;
+    // Facebook can expose the same matching listing through more than one
+    // anchor (for example, the thumbnail and the title). The URL set is
+    // already deduplicated and every candidate has passed the exact vehicle
+    // token check, so the first matching URL is safe to use.
+    return urls[0] || null;
   }
 
   function findMarketplaceListingUrlsOnPage(job) {
@@ -3754,6 +3758,13 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         candidate.click();
         await sleep(1800);
 
+        // Some Facebook variants navigate directly to the selected item's
+        // detail page instead of opening a dialog. Accept it only when the
+        // visible item still matches the job being published.
+        if (window.location.pathname.includes("/marketplace/item/") && currentMarketplaceItemMatchesJob(job)) {
+          return window.location.href;
+        }
+
         const dialog = Array.from(document.querySelectorAll('[role="dialog"]'))
           .find((el) => marketplaceTextMatchesExpectedListing(el.innerText || el.textContent || "", expectedTokens));
         if (!dialog) continue;
@@ -3761,6 +3772,25 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         const listingLink = Array.from(dialog.querySelectorAll('a[href*="/marketplace/item/"]'))
           .find((anchor) => marketplaceTextMatchesExpectedListing(anchor.innerText || anchor.textContent || dialog.innerText || "", expectedTokens));
         if (listingLink?.href) return listingLink.href;
+
+        // A dialog may expose the listing only behind a second action. Click
+        // that action and re-check both the resulting item URL and the seller
+        // page anchors. Never accept a generic first link or an unmatched
+        // vehicle from the dialog.
+        const openListingAction = Array.from(dialog.querySelectorAll('[role="button"], button, a'))
+          .find((el) => {
+            const text = normalizeText(el.innerText || el.textContent || el.getAttribute("aria-label") || "");
+            return /^(?:view|see|open|go to) (?:the )?(?:listing|item)|^(?:ver|abrir|ir a) (?:la )?(?:publicaci[oó]n|publicacion|ficha|anuncio)$/.test(text);
+          });
+        if (openListingAction) {
+          openListingAction.click();
+          await sleep(1600);
+          if (window.location.pathname.includes("/marketplace/item/") && currentMarketplaceItemMatchesJob(job)) {
+            return window.location.href;
+          }
+          const dialogUrls = findMarketplaceListingUrlsOnPage(job);
+          if (dialogUrls.length > 0) return dialogUrls[0];
+        }
       } catch (err) {
         console.warn("[DealerPilot AI] seller dialog listing URL lookup failed", err);
       }
@@ -3779,7 +3809,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       }
 
       const pageUrls = findMarketplaceListingUrlsOnPage(job);
-      if (pageUrls.length === 1) return pageUrls[0];
+      if (pageUrls.length > 0) return pageUrls[0];
 
       if (!sellerDialogAttempted && window.location.pathname.includes("/marketplace/you/selling")) {
         sellerDialogAttempted = true;
@@ -3794,7 +3824,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       return window.location.href;
     }
     const pageUrls = findMarketplaceListingUrlsOnPage(job);
-    return pageUrls.length === 1 ? pageUrls[0] : null;
+    return pageUrls[0] || null;
   }
 
   async function waitForPublishOutcome(job, timeoutMs) {

@@ -334,12 +334,18 @@ test("Facebook Your Listings landing captures item URL before completing", () =>
   assert.match(content, /a\[href\*="\/marketplace\/item\/"\]/);
   assert.match(content, /function marketplaceTextMatchesExpectedListing\(text, expectedTokens\)/);
   assert.match(content, /async function findMarketplaceListingUrlFromSellerDialog\(job\)/);
+  assert.match(content, /return urls\[0\] \|\| null/);
+  assert.match(content, /currentMarketplaceItemMatchesJob\(job\)[\s\S]*return window\.location\.href/);
+  assert.match(content, /openListingAction/);
+  assert.match(content, /view\|see\|open\|go to/);
   assert.match(content, /querySelectorAll\('\[role="dialog"\]'\)/);
   assert.match(content, /findMarketplaceListingUrlOnPage\(job\) \|\|[\s\S]*await findMarketplaceListingUrlFromSellerDialog\(job\)/);
   assert.match(content, /Facebook Your Listings did not expose a Marketplace item URL matching this vehicle/);
   assert.match(content, /publishedLanding: true/);
   assert.match(content, /outcome\.listingUrl \|\| outcome\.blockReason \|\| outcome\.publishedLanding/);
   assert.match(content, /type: "COMPLETE_JOB"[\s\S]*listingUrl/);
+  assert.match(content, /if \(pageUrls\.length > 0\) return pageUrls\[0\]/);
+  assert.match(content, /return pageUrls\[0\] \|\| null/);
   assert.doesNotMatch(content, /return anchors\[0\]\?\.href \|\| null/);
   assert.doesNotMatch(content, /Auto-publish failed and backend fail-sync failed/);
 });
@@ -357,7 +363,7 @@ test("Marketplace promotion is skipped and the already-published vehicle returns
   assert.match(content, /window\.location\.assign\("https:\/\/www\.facebook\.com\/marketplace\/you\/selling"\)/);
   assert.match(content, /waitForMarketplaceListingAfterPromotion\(job, 30_000\)/);
   assert.match(content, /findMarketplaceListingUrlsOnPage\(job\)/);
-  assert.match(content, /urls\.length === 1/);
+  assert.match(content, /return urls\[0\] \|\| null/);
   assert.doesNotMatch(content, /waitForPromotionAuthorization|Autorizar y publicar|marketplace_promotion_publish_clicked/);
   assert.match(content, /if \(isMarketplacePromotionPage\(\)\)/);
 });

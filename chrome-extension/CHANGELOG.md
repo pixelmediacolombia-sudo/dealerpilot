@@ -1,5 +1,12 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.4.4
+
+- Strengthens post-publish Marketplace URL capture.
+- Accepts a matching listing URL from duplicated anchors, direct item navigation,
+  selected listing cards, or a listing action inside Facebook's dialog.
+- Keeps the vehicle-token match required before completing the backend job.
+
 ## v1.3.99
 
 - Adds a draggable Marketplace panel header with persisted position and a reset-position control.
