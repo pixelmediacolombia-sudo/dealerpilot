@@ -27,10 +27,11 @@ router.get("/leads", async (req, res) => {
 
 router.get("/leads/:id", async (req, res) => {
   const id = Number(req.params.id);
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const [lead] = await db
     .select()
     .from(leadsTable)
-    .where(eq(leadsTable.id, id))
+    .where(and(eq(leadsTable.id, id), eq(leadsTable.dealerId, dealerId)))
     .limit(1);
   if (!lead) {
     res.status(404).json({ error: "Lead not found" });
@@ -41,11 +42,12 @@ router.get("/leads/:id", async (req, res) => {
 
 router.patch("/leads/:id", async (req, res) => {
   const id = Number(req.params.id);
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const updates = req.body as Partial<typeof leadsTable.$inferInsert>;
   const [updated] = await db
     .update(leadsTable)
     .set({ ...updates, updatedAt: new Date() })
-    .where(eq(leadsTable.id, id))
+    .where(and(eq(leadsTable.id, id), eq(leadsTable.dealerId, dealerId)))
     .returning();
   if (!updated) {
     res.status(404).json({ error: "Lead not found" });

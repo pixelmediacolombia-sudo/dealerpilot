@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
+import { getAuthToken } from "@/app/AuthGate";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -77,7 +78,10 @@ interface PhotoSetResponse {
 const API_BASE = "/api";
 
 async function fetchPhotoSet(vehicleId: number): Promise<PhotoSetResponse> {
-  const r = await fetch(`${API_BASE}/photo-studio/sets/${vehicleId}`);
+  const token = getAuthToken();
+  const r = await fetch(`${API_BASE}/photo-studio/sets/${vehicleId}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   if (!r.ok) throw new Error("Failed to fetch photo set");
   return r.json() as Promise<PhotoSetResponse>;
 }

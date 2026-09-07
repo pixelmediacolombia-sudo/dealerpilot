@@ -10,9 +10,10 @@ import {
 } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { z } from "zod/v4";
+import { getAuthenticatedDealerId, resolveDealerId } from "./auth";
 
 const router = Router();
-const DEALER_ID = 1;
+const DEFAULT_DEALER_ID = 1;
 
 // ─── In-memory cache: vehicleId → { result, expiresAt } ──────────────────────
 const analysisCache = new Map<number, { result: GmAnalysisResult; expiresAt: number }>();
@@ -46,10 +47,10 @@ interface GmAnalysisResult {
 }
 
 // ─── Build structured prompt from real DB data ────────────────────────────────
-async function buildVehicleContext(vehicleId: number) {
+async function buildVehicleContext(vehicleId: number, dealerId: number) {
   // 1. Vehicle base data
   const vehicle = await db.query.vehiclesTable.findFirst({
-    where: and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, DEALER_ID)),
+    where: and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, dealerId)),
   });
   if (!vehicle) return null;
 
@@ -83,7 +84,7 @@ async function buildVehicleContext(vehicleId: number) {
     .leftJoin(vehicleIntelligenceTable, eq(vehicleIntelligenceTable.vehicleId, vehiclesTable.id))
     .where(
       and(
-        eq(vehiclesTable.dealerId, DEALER_ID),
+        eq(vehiclesTable.dealerId, dealerId),
         eq(vehiclesTable.make, vehicle.make),
         eq(vehiclesTable.model, vehicle.model),
         ne(vehiclesTable.id, vehicleId),
@@ -108,6 +109,7 @@ router.post("/gm/analyze", async (req, res) => {
   }
 
   const { vehicleId, priceDeltaPercent } = body.data;
+  const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
 
   // Cache hit (skip for what-if variants)
   if (!priceDeltaPercent) {
@@ -118,7 +120,7 @@ router.post("/gm/analyze", async (req, res) => {
     }
   }
 
-  const ctx = await buildVehicleContext(vehicleId);
+  const ctx = await buildVehicleContext(vehicleId, dealerId);
   if (!ctx) {
     res.status(422).json({ error: "Vehicle not found or does not belong to this dealer" });
     return;
@@ -131,7 +133,7 @@ router.post("/gm/analyze", async (req, res) => {
 
   // Build the data brief for OpenAI — no invented data, only DB values
   const dataBrief = `
-VEHICLE DATA (Alpha Motorsport inventory — do NOT invent any data beyond what is listed here):
+VEHICLE DATA (current dealer inventory — do NOT invent any data beyond what is listed here):
 
 Vehicle: ${vehicle.year ?? "Unknown"} ${vehicle.make} ${vehicle.model}${vehicle.trim ? ` ${vehicle.trim}` : ""}
 Stock #: ${vehicle.stockNumber ?? "N/A"}
@@ -162,7 +164,7 @@ ${siblings.length === 0
     ).join("\n")}
 `.trim();
 
-  const systemPrompt = `You are DealerPilot, the AI General Manager for Alpha Motorsport, a used car dealership.
+  const systemPrompt = `You are DealerPilot, the AI General Manager for the current dealership, a used car dealership.
 
 Your job is to review a vehicle before an operator publishes it to Facebook Marketplace and provide an honest, data-grounded executive recommendation.
 
@@ -265,9 +267,10 @@ router.post("/gm/whatif", async (req, res) => {
   }
 
   const { vehicleId, priceDeltaPercent } = body.data;
+  const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
 
   const vehicle = await db.query.vehiclesTable.findFirst({
-    where: and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, DEALER_ID)),
+    where: and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, dealerId)),
   });
   if (!vehicle) {
     res.status(422).json({ error: "Vehicle not found" });
@@ -365,6 +368,18 @@ router.post("/gm/decisions", async (req, res) => {
     res.status(400).json({ error: "Invalid request body" });
     return;
   }
+  const dealerId = getAuthenticatedDealerId(res);
+  if (dealerId !== null) {
+    const [vehicle] = await db
+      .select({ id: vehiclesTable.id })
+      .from(vehiclesTable)
+      .where(and(eq(vehiclesTable.id, parsed.data.vehicleId), eq(vehiclesTable.dealerId, dealerId)))
+      .limit(1);
+    if (!vehicle) {
+      res.status(404).json({ error: "Vehicle not found" });
+      return;
+    }
+  }
   const [row] = await db
     .insert(gmDecisionLogTable)
     .values({
@@ -384,15 +399,20 @@ router.post("/gm/decisions", async (req, res) => {
 router.get("/gm/decisions", async (req, res) => {
   const vehicleIdParam = req.query.vehicleId ? Number(req.query.vehicleId) : null;
   const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
+  const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
 
   const rows = await db
-    .select()
+    .select({ decision: gmDecisionLogTable })
     .from(gmDecisionLogTable)
-    .where(vehicleIdParam ? eq(gmDecisionLogTable.vehicleId, vehicleIdParam) : undefined)
+    .innerJoin(vehiclesTable, eq(vehiclesTable.id, gmDecisionLogTable.vehicleId))
+    .where(and(
+      eq(vehiclesTable.dealerId, dealerId),
+      vehicleIdParam ? eq(gmDecisionLogTable.vehicleId, vehicleIdParam) : undefined,
+    ))
     .orderBy(desc(gmDecisionLogTable.createdAt))
     .limit(limit);
 
-  res.json({ decisions: rows });
+  res.json({ decisions: rows.map(({ decision }) => decision) });
 });
 
 export default router;

@@ -22,6 +22,7 @@ import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoSetViewer } from "../components/PhotoSetViewer";
+import { getAuthToken, useAccount } from "@/app/AuthGate";
 
 const API_BASE = "/api";
 
@@ -88,36 +89,45 @@ type PhotoProcessingMode = "fidelity-first" | "balanced" | "strong-restoration";
 
 interface ProcessArgs {
   vehicleId: number;
+  dealerId: number;
   processingMode: PhotoProcessingMode;
 }
 
 // ── API calls ─────────────────────────────────────────────────────────────────
 
-async function fetchJobs(): Promise<{ jobs: PhotoJob[] }> {
-  const r = await fetch(`${API_BASE}/photo-studio/jobs?limit=200`);
+function apiHeaders(json = false): HeadersInit {
+  const token = getAuthToken();
+  return {
+    ...(json ? { "Content-Type": "application/json" } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+async function fetchJobs(dealerId: number): Promise<{ jobs: PhotoJob[] }> {
+  const r = await fetch(`${API_BASE}/photo-studio/jobs?dealerId=${dealerId}&limit=200`, { headers: apiHeaders() });
   if (!r.ok) throw new Error("Failed to fetch jobs");
   return r.json() as Promise<{ jobs: PhotoJob[] }>;
 }
 
-async function fetchStats(): Promise<PhotoStudioStats> {
-  const r = await fetch(`${API_BASE}/photo-studio/stats`);
+async function fetchStats(dealerId: number): Promise<PhotoStudioStats> {
+  const r = await fetch(`${API_BASE}/photo-studio/stats?dealerId=${dealerId}`, { headers: apiHeaders() });
   if (!r.ok) throw new Error("Failed to fetch photo studio stats");
   return r.json() as Promise<PhotoStudioStats>;
 }
 
-async function fetchInventory(location?: string): Promise<{ vehicles: InventoryVehicle[] }> {
-  const params = new URLSearchParams({ sort: "newest" });
+async function fetchInventory(dealerId: number, location?: string): Promise<{ vehicles: InventoryVehicle[] }> {
+  const params = new URLSearchParams({ dealerId: String(dealerId), sort: "newest" });
   if (location) params.set("location", location);
-  const r = await fetch(`${API_BASE}/vehicles?${params.toString()}`);
+  const r = await fetch(`${API_BASE}/vehicles?${params.toString()}`, { headers: apiHeaders() });
   if (!r.ok) throw new Error("Failed to fetch inventory");
   return r.json() as Promise<{ vehicles: InventoryVehicle[] }>;
 }
 
-async function triggerProcess({ vehicleId, processingMode }: ProcessArgs, confirmCost = false): Promise<void> {
+async function triggerProcess({ vehicleId, dealerId, processingMode }: ProcessArgs, confirmCost = false): Promise<void> {
   const r = await fetch(`${API_BASE}/photo-studio/vehicles/${vehicleId}/process`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dealerId: 1, processingMode, confirmCost }),
+    headers: apiHeaders(true),
+    body: JSON.stringify({ dealerId, processingMode, confirmCost }),
   });
   if (r.status === 409) {
     const body = (await r.json().catch(() => ({}))) as {
@@ -131,7 +141,7 @@ async function triggerProcess({ vehicleId, processingMode }: ProcessArgs, confir
       const message = body.message ??
         `${estimate?.photosNeedingRestoration ?? "Some"} of ${estimate?.totalPhotos ?? "the"} photos need AI restoration. Estimated cost: $${estimate?.estimatedCostUsd ?? "unknown"}.`;
       if (window.confirm(message)) {
-        return triggerProcess({ vehicleId, processingMode }, true);
+        return triggerProcess({ vehicleId, dealerId, processingMode }, true);
       }
       throw new Error("Enhancement cancelled before OpenAI spend.");
     }
@@ -143,11 +153,11 @@ async function triggerProcess({ vehicleId, processingMode }: ProcessArgs, confir
   }
 }
 
-async function enqueueAll(location?: string): Promise<{ enqueued: number; skipped: number }> {
+async function enqueueAll(dealerId: number, location?: string): Promise<{ enqueued: number; skipped: number }> {
   const r = await fetch(`${API_BASE}/photo-studio/enqueue-all`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dealerId: 1, ...(location ? { location } : {}) }),
+    headers: apiHeaders(true),
+    body: JSON.stringify({ dealerId, ...(location ? { location } : {}) }),
   });
   if (!r.ok) throw new Error("Failed to enqueue");
   return r.json() as Promise<{ enqueued: number; skipped: number }>;
@@ -325,11 +335,13 @@ function VehicleCard({
 // ── Inventory Browser ─────────────────────────────────────────────────────────
 
 function InventoryBrowser({
+  dealerId,
   jobsByVehicleId,
   onEnhance,
   onOpenStudio,
   pendingVehicleIds,
 }: {
+  dealerId: number;
   jobsByVehicleId: Map<number, PhotoJob>;
   onEnhance: (vehicleId: number) => void;
   onOpenStudio: (vehicleId: number) => void;
@@ -340,8 +352,8 @@ function InventoryBrowser({
   const { selectedLocation } = useDealerLocation();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["inventory-for-studio", selectedLocation],
-    queryFn: () => fetchInventory(selectedLocation),
+    queryKey: ["inventory-for-studio", dealerId, selectedLocation],
+    queryFn: () => fetchInventory(dealerId, selectedLocation),
     staleTime: 30_000,
   });
 
@@ -496,10 +508,11 @@ export function AIPhotoStudio() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { selectedLocation } = useDealerLocation();
+  const { dealerId } = useAccount();
 
   const { data: allJobs, isLoading } = useQuery({
-    queryKey: ["photo-studio-jobs"],
-    queryFn: fetchJobs,
+    queryKey: ["photo-studio-jobs", dealerId],
+    queryFn: () => fetchJobs(dealerId),
     refetchInterval: (query) => {
       const jobs = query.state.data?.jobs ?? [];
       const hasActive = jobs.some((j) => j.status === "Processing" || j.status === "Queued");
@@ -507,8 +520,8 @@ export function AIPhotoStudio() {
     },
   });
   const { data: stats } = useQuery({
-    queryKey: ["photo-studio-stats"],
-    queryFn: fetchStats,
+    queryKey: ["photo-studio-stats", dealerId],
+    queryFn: () => fetchStats(dealerId),
     refetchInterval: 30000,
   });
 
@@ -519,8 +532,8 @@ export function AIPhotoStudio() {
     },
     onSuccess: (_data, { vehicleId }) => {
       setPendingIds((prev) => { const s = new Set(prev); s.delete(vehicleId); return s; });
-      void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
-      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
+      void qc.invalidateQueries({ queryKey: ["photo-studio-jobs", dealerId] });
+      void qc.invalidateQueries({ queryKey: ["photo-studio-stats", dealerId] });
       toast({ title: "Enhancement started", description: "Photos are being processed." });
     },
     onError: (err: Error, { vehicleId }) => {
@@ -530,10 +543,10 @@ export function AIPhotoStudio() {
   });
 
   const enqueueAllMutation = useMutation({
-    mutationFn: () => enqueueAll(selectedLocation),
+    mutationFn: () => enqueueAll(dealerId, selectedLocation),
     onSuccess: (data) => {
-      void qc.invalidateQueries({ queryKey: ["photo-studio-jobs"] });
-      void qc.invalidateQueries({ queryKey: ["photo-studio-stats"] });
+      void qc.invalidateQueries({ queryKey: ["photo-studio-jobs", dealerId] });
+      void qc.invalidateQueries({ queryKey: ["photo-studio-stats", dealerId] });
       toast({
         title: "Enhancement queued",
         description: `${data.enqueued} vehicle${data.enqueued !== 1 ? "s" : ""} added to the queue.`,
@@ -578,7 +591,7 @@ export function AIPhotoStudio() {
       <PhotoSetViewer
         vehicleId={openVehicleId}
         onClose={() => setOpenVehicleId(null)}
-        onReprocess={(id) => { reprocessMutation.mutate({ vehicleId: id, processingMode }); setOpenVehicleId(null); }}
+        onReprocess={(id) => { reprocessMutation.mutate({ vehicleId: id, dealerId, processingMode }); setOpenVehicleId(null); }}
       />
     );
   }
@@ -719,7 +732,7 @@ export function AIPhotoStudio() {
                   key={job.vehicleId}
                   job={job}
                   onOpenStudio={setOpenVehicleId}
-                  onReprocess={(id) => reprocessMutation.mutate({ vehicleId: id, processingMode })}
+                  onReprocess={(id) => reprocessMutation.mutate({ vehicleId: id, dealerId, processingMode })}
                 />
               ))}
             </div>
@@ -728,8 +741,9 @@ export function AIPhotoStudio() {
 
         {/* Always-visible inventory browser */}
         <InventoryBrowser
+          dealerId={dealerId}
           jobsByVehicleId={jobsByVehicleId}
-          onEnhance={(id) => reprocessMutation.mutate({ vehicleId: id, processingMode })}
+          onEnhance={(id) => reprocessMutation.mutate({ vehicleId: id, dealerId, processingMode })}
           onOpenStudio={setOpenVehicleId}
           pendingVehicleIds={pendingIds}
         />

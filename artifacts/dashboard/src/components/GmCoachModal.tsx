@@ -8,6 +8,7 @@ import {
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
+import { getAuthToken } from "@/app/AuthGate";
 import {
   Brain,
   ShieldAlert,
@@ -97,6 +98,14 @@ function DeltaBadge({ pct }: { pct: number }) {
   );
 }
 
+function authJsonHeaders(): HeadersInit {
+  const token = getAuthToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function GmCoachModal({
@@ -131,7 +140,7 @@ export function GmCoachModal({
 
     fetch("/api/gm/analyze", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authJsonHeaders(),
       body: JSON.stringify({ vehicleId }),
     })
       .then(async (r) => {
@@ -153,7 +162,7 @@ export function GmCoachModal({
       setWhatIfLoading(true);
       fetch("/api/gm/whatif", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(),
         body: JSON.stringify({ vehicleId, priceDeltaPercent: delta }),
       })
         .then(r => r.json() as Promise<GmWhatIfResult>)
@@ -181,7 +190,7 @@ export function GmCoachModal({
     if (vehicleId && analysis) {
       fetch("/api/gm/decisions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(),
         body: JSON.stringify({
           vehicleId,
           vehicleLabel: vehicleLabel ?? `Vehicle #${vehicleId}`,
@@ -202,7 +211,7 @@ export function GmCoachModal({
       const overridden = analysis.recommendation !== "PUBLISH";
       fetch("/api/gm/decisions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(),
         body: JSON.stringify({
           vehicleId,
           vehicleLabel: vehicleLabel ?? `Vehicle #${vehicleId}`,

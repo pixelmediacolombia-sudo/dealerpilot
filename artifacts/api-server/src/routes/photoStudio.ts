@@ -32,6 +32,7 @@ import {
   PHOTO_DIRECTOR_COST_CAPS_USD,
   type PhotoDirectorMode,
 } from "../photo/photoDirector";
+import { resolveDealerId } from "./auth";
 
 
 // ── Multer: background image upload ─────────────────────────────────────────
@@ -54,6 +55,7 @@ const bgUpload = multer({
 });
 
 const router = Router();
+const DEFAULT_DEALER_ID = 1;
 
 async function getActivePhotoJob(vehicleId: number) {
   const activeJobs = await db
@@ -69,6 +71,11 @@ async function getActivePhotoJob(vehicleId: number) {
     .limit(10);
 
   return activeJobs.find((job) => job.status === "Processing") ?? activeJobs[0] ?? null;
+}
+
+async function getActivePhotoJobForDealer(vehicleId: number, dealerId: number) {
+  const job = await getActivePhotoJob(vehicleId);
+  return job?.dealerId === dealerId ? job : null;
 }
 
 function parseQualityFlags(value: string | null | undefined): Record<string, unknown> {
@@ -321,6 +328,7 @@ async function resolveProcessingPhotos(
 // ── Queue list (all jobs, recent first) ─────────────────────────────────────
 router.get("/photo-studio/jobs", async (req: Request, res: Response) => {
   try {
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
     const rawStatus = req.query["status"];
     const status: string | undefined = typeof rawStatus === "string" ? rawStatus : undefined;
     const limitN = Math.min(parseInt(req.query["limit"] as string || "50", 10) || 50, 200);
@@ -363,7 +371,10 @@ router.get("/photo-studio/jobs", async (req: Request, res: Response) => {
       })
       .from(aiPhotoJobsTable)
       .leftJoin(vehiclesTable, eq(vehiclesTable.id, aiPhotoJobsTable.vehicleId))
-      .where(and(status ? eq(aiPhotoJobsTable.status, status) : undefined))
+      .where(and(
+        eq(aiPhotoJobsTable.dealerId, dealerId),
+        status ? eq(aiPhotoJobsTable.status, status) : undefined,
+      ))
       .orderBy(desc(aiPhotoJobsTable.createdAt))
       .limit(limitN)
       .offset(offsetN);
@@ -379,10 +390,11 @@ router.get("/photo-studio/jobs", async (req: Request, res: Response) => {
 router.get("/photo-studio/jobs/:id", async (req: Request, res: Response) => {
   try {
     const jobId = Number(req.params.id);
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
     const [job] = await db
       .select()
       .from(aiPhotoJobsTable)
-      .where(eq(aiPhotoJobsTable.id, jobId))
+      .where(and(eq(aiPhotoJobsTable.id, jobId), eq(aiPhotoJobsTable.dealerId, dealerId)))
       .limit(1);
 
     if (!job) {
@@ -415,6 +427,16 @@ router.get("/photo-studio/jobs/:id", async (req: Request, res: Response) => {
 router.get("/photo-studio/vehicles/:vehicleId/selection-plan", async (req: Request, res: Response) => {
   try {
     const vehicleId = Number(req.params.vehicleId);
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
+    const [vehicle] = await db
+      .select({ id: vehiclesTable.id })
+      .from(vehiclesTable)
+      .where(and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, dealerId)))
+      .limit(1);
+    if (!vehicle) {
+      res.status(404).json({ error: "Vehicle not found" });
+      return;
+    }
     const selectionMode = normalizePhotoDirectorMode(req.query["selectionMode"] ?? req.query["mode"]);
     const sourceSetId = normalizeOptionalSourceSetId(req.query["sourceSetId"]);
     const maxPhotos = Number(req.query["maxPhotos"] ?? 10);
@@ -429,6 +451,16 @@ router.get("/photo-studio/vehicles/:vehicleId/selection-plan", async (req: Reque
 router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, res: Response) => {
   try {
     const vehicleId = Number(req.params.vehicleId);
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
+    const [vehicle] = await db
+      .select()
+      .from(vehiclesTable)
+      .where(and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, dealerId)))
+      .limit(1);
+    if (!vehicle) {
+      res.status(404).json({ error: "Vehicle not found" });
+      return;
+    }
     const body = req.body as {
       processingMode?: string;
       confirmCost?: boolean;
@@ -467,23 +499,12 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
       processingPhotos.localEnhancementPhotoIds,
       selectionMode,
     );
-    const [vehicle] = await db
-      .select()
-      .from(vehiclesTable)
-      .where(eq(vehiclesTable.id, vehicleId))
-      .limit(1);
-
-    if (!vehicle) {
-      res.status(404).json({ error: "Vehicle not found" });
-      return;
-    }
-
     if (processingPhotos.photoUrls.length === 0) {
       res.status(422).json({ error: "Vehicle has no photos — cannot process" });
       return;
     }
 
-    const activeJob = await getActivePhotoJob(vehicleId);
+    const activeJob = await getActivePhotoJobForDealer(vehicleId, dealerId);
     if (activeJob) {
       if (activeJob.presetVersion !== presetVersion) {
         res.status(409).json({
@@ -660,7 +681,8 @@ router.post("/photo-studio/vehicles/:vehicleId/process", async (req: Request, re
 // ── Bulk enqueue: process all vehicles missing AI photos ─────────────────────
 router.post("/photo-studio/enqueue-all", async (req: Request, res: Response) => {
   try {
-    const { dealerId = 1, location = "" } = req.body as { dealerId?: number; location?: string };
+    const { location = "" } = req.body as { dealerId?: number; location?: string };
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
 
     // Find all active vehicles with images but no Ready AI set
     const vehicles = await db
@@ -780,7 +802,7 @@ router.post("/photo-studio/enqueue-all", async (req: Request, res: Response) => 
 // than the current studio pack.  Used by the dashboard to show the reprocess banner.
 router.get("/photo-studio/stale-count", async (req: Request, res: Response) => {
   try {
-    const { dealerId = 1 } = req.query as { dealerId?: number };
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
 
     const [defaultPack] = await db
       .select({ backgroundVersion: aiStudioPacksTable.backgroundVersion })
@@ -826,7 +848,7 @@ router.get("/photo-studio/stale-count", async (req: Request, res: Response) => {
 // skipped — only compositing and later stages run, at zero extra OpenAI/Fal.ai cost.
 router.post("/photo-studio/reprocess-stale", async (req: Request, res: Response) => {
   try {
-    const { dealerId = 1 } = req.body as { dealerId?: number };
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
 
     const [defaultPack] = await db
       .select()
@@ -938,10 +960,15 @@ router.post("/photo-studio/reprocess-stale", async (req: Request, res: Response)
 router.delete("/photo-studio/jobs/:id", async (req: Request, res: Response) => {
   try {
     const jobId = Number(req.params.id);
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
     const [job] = await db
       .update(aiPhotoJobsTable)
       .set({ status: "Cancelled" })
-      .where(and(eq(aiPhotoJobsTable.id, jobId), eq(aiPhotoJobsTable.status, "Queued")))
+      .where(and(
+        eq(aiPhotoJobsTable.id, jobId),
+        eq(aiPhotoJobsTable.dealerId, dealerId),
+        eq(aiPhotoJobsTable.status, "Queued"),
+      ))
       .returning();
 
     if (!job) {
@@ -959,13 +986,15 @@ router.delete("/photo-studio/jobs/:id", async (req: Request, res: Response) => {
 router.get("/photo-studio/vehicles/:vehicleId/sets", async (req: Request, res: Response) => {
   try {
     const vehicleId = Number(req.params.vehicleId);
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
     const sets = await db
-      .select()
+      .select({ set: aiPhotoSetsTable })
       .from(aiPhotoSetsTable)
-      .where(eq(aiPhotoSetsTable.vehicleId, vehicleId))
+      .innerJoin(vehiclesTable, eq(vehiclesTable.id, aiPhotoSetsTable.vehicleId))
+      .where(and(eq(aiPhotoSetsTable.vehicleId, vehicleId), eq(vehiclesTable.dealerId, dealerId)))
       .orderBy(desc(aiPhotoSetsTable.version));
 
-    res.json({ sets });
+    res.json({ sets: sets.map(({ set }) => set) });
   } catch (err) {
     req.log.error({ err }, "GET /photo-studio/vehicles/:vehicleId/sets failed");
     res.status(500).json({ error: "Failed to list photo sets" });
@@ -978,11 +1007,12 @@ router.get("/photo-studio/vehicles/:vehicleId/sets", async (req: Request, res: R
 router.get("/photo-studio/sets/:vehicleId", async (req: Request, res: Response) => {
   try {
     const vehicleId = Number(req.params.vehicleId);
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
 
     const [vehicle] = await db
       .select()
       .from(vehiclesTable)
-      .where(eq(vehiclesTable.id, vehicleId))
+      .where(and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, dealerId)))
       .limit(1);
 
     if (!vehicle) {
@@ -990,7 +1020,7 @@ router.get("/photo-studio/sets/:vehicleId", async (req: Request, res: Response) 
       return;
     }
 
-    const activeJob = await getActivePhotoJob(vehicleId);
+    const activeJob = await getActivePhotoJobForDealer(vehicleId, dealerId);
 
     // Get the latest set for this vehicle
     const [set] = await db
@@ -1049,6 +1079,17 @@ router.get("/photo-studio/sets/:vehicleId", async (req: Request, res: Response) 
 router.get("/photo-studio/sets/:setId/images", async (req: Request, res: Response) => {
   try {
     const setId = Number(req.params.setId);
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
+    const [setOwner] = await db
+      .select({ vehicleId: aiPhotoSetsTable.vehicleId })
+      .from(aiPhotoSetsTable)
+      .innerJoin(vehiclesTable, eq(vehiclesTable.id, aiPhotoSetsTable.vehicleId))
+      .where(and(eq(aiPhotoSetsTable.id, setId), eq(vehiclesTable.dealerId, dealerId)))
+      .limit(1);
+    if (!setOwner) {
+      res.status(404).json({ error: "Photo set not found" });
+      return;
+    }
     const images = await db
       .select()
       .from(aiPhotoImagesTable)
@@ -1072,10 +1113,11 @@ router.get("/photo-studio/sets/:setId/images", async (req: Request, res: Respons
 // ── Studio Packs ─────────────────────────────────────────────────────────────
 router.get("/photo-studio/packs", async (req: Request, res: Response) => {
   try {
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
     const packs = await db
       .select()
       .from(aiStudioPacksTable)
-      .where(eq(aiStudioPacksTable.isActive, true))
+      .where(and(eq(aiStudioPacksTable.dealerId, dealerId), eq(aiStudioPacksTable.isActive, true)))
       .orderBy(desc(aiStudioPacksTable.isDefault), asc(aiStudioPacksTable.name));
 
     res.json({ packs });
@@ -1106,6 +1148,11 @@ router.patch("/photo-studio/packs/:id", async (req: Request, res: Response) => {
       .where(eq(aiStudioPacksTable.id, packId))
       .limit(1);
     if (!existing) {
+      res.status(404).json({ error: "Pack not found" });
+      return;
+    }
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
+    if (existing.dealerId !== dealerId) {
       res.status(404).json({ error: "Pack not found" });
       return;
     }
@@ -1161,7 +1208,7 @@ router.post(
       const bgHeight = meta.height ?? 720;
 
       // Auto-generate logo safe zones (0–1 relative coords):
-      //   Alpha Motorsport logo is typically in the top strip of the background.
+      //   The dealer logo is typically in the top strip of the background.
       //   Reserve the full top 15% of the frame so vehicles never overlap it.
       const logoSafeZones = [{ x: 0.0, y: 0.0, w: 1.0, h: 0.15, label: "top-logo-strip" }];
 
@@ -1181,11 +1228,13 @@ router.post(
       // Bump background version (short timestamp token) to trigger re-processing
       const newVersion = `v${Date.now().toString(36)}`;
 
-      // Update the default studio pack for dealer 1
+      const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
+
+      // Update the default studio pack for the authenticated dealer.
       const [pack] = await db
         .select()
         .from(aiStudioPacksTable)
-        .where(and(eq(aiStudioPacksTable.dealerId, 1), eq(aiStudioPacksTable.isDefault, true)))
+        .where(and(eq(aiStudioPacksTable.dealerId, dealerId), eq(aiStudioPacksTable.isDefault, true)))
         .limit(1);
 
       if (!pack) {
@@ -1236,10 +1285,11 @@ router.post(
 // Returns which pipeline stages are enabled/disabled and what is still missing.
 router.get("/photo-studio/setup-status", async (req: Request, res: Response) => {
   try {
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
     const [defaultPack] = await db
       .select()
       .from(aiStudioPacksTable)
-      .where(and(eq(aiStudioPacksTable.dealerId, 1), eq(aiStudioPacksTable.isDefault, true)))
+      .where(and(eq(aiStudioPacksTable.dealerId, dealerId), eq(aiStudioPacksTable.isDefault, true)))
       .limit(1);
 
     const backgroundFromPack = defaultPack?.backgroundUrl ?? null;
@@ -1271,7 +1321,7 @@ router.get("/photo-studio/setup-status", async (req: Request, res: Response) => 
         composite: {
           enabled: !!backgroundUrl,
           provider: backgroundUrl ? "Sharp.js" : null,
-          blockedReason: backgroundUrl ? null : "Upload the Alpha Motorsport studio background to enable compositing.",
+          blockedReason: backgroundUrl ? null : "Upload this dealer's studio background to enable compositing.",
         },
         enhance: { enabled: true, provider: "Sharp.js" },
         validate: { enabled: true, provider: "built-in" },
@@ -1289,6 +1339,7 @@ router.get("/photo-studio/setup-status", async (req: Request, res: Response) => 
 // ── Stats for the dashboard ──────────────────────────────────────────────────
 router.get("/photo-studio/stats", async (req: Request, res: Response) => {
   try {
+    const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
     const [statusCounts] = await db
       .select({
         queued: sql<number>`count(*) filter (where ${aiPhotoJobsTable.status} = 'Queued')`,
@@ -1297,7 +1348,8 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
         failed: sql<number>`count(*) filter (where ${aiPhotoJobsTable.status} = 'Failed')`,
         cancelled: sql<number>`count(*) filter (where ${aiPhotoJobsTable.status} = 'Cancelled')`,
       })
-      .from(aiPhotoJobsTable);
+      .from(aiPhotoJobsTable)
+      .where(eq(aiPhotoJobsTable.dealerId, dealerId));
 
     const [vehicleCounts] = await db
       .select({
@@ -1308,14 +1360,17 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
         total: sql<number>`count(*)`,
       })
       .from(vehiclesTable)
-      .where(eq(vehiclesTable.dealerId, 1));
+      .where(eq(vehiclesTable.dealerId, dealerId));
 
     const [imageStats] = await db
       .select({
         total: count(aiPhotoImagesTable.id),
         withAI: sql<number>`count(*) filter (where ${aiPhotoImagesTable.processedUrl} is not null)`,
       })
-      .from(aiPhotoImagesTable);
+      .from(aiPhotoImagesTable)
+      .innerJoin(aiPhotoSetsTable, eq(aiPhotoSetsTable.id, aiPhotoImagesTable.setId))
+      .innerJoin(vehiclesTable, eq(vehiclesTable.id, aiPhotoSetsTable.vehicleId))
+      .where(eq(vehiclesTable.dealerId, dealerId));
 
     // FAL.ai has no public balance API — estimate spend from processed image count.
     const [falUsageRow] = await db
@@ -1325,7 +1380,10 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
           and ${aiPhotoImagesTable.usedFallback} = 0
         )`,
       })
-      .from(aiPhotoImagesTable);
+      .from(aiPhotoImagesTable)
+      .innerJoin(aiPhotoSetsTable, eq(aiPhotoSetsTable.id, aiPhotoImagesTable.setId))
+      .innerJoin(vehiclesTable, eq(vehiclesTable.id, aiPhotoSetsTable.vehicleId))
+      .where(eq(vehiclesTable.dealerId, dealerId));
 
     const falCostPerImageUsd = parseFloat(process.env["FAL_COST_PER_IMAGE_USD"] ?? "0.01");
     const falThresholdUsd = parseFloat(process.env["FAL_LOW_BALANCE_THRESHOLD_USD"] ?? "10");
@@ -1336,7 +1394,7 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
     const [defaultPack] = await db
       .select()
       .from(aiStudioPacksTable)
-      .where(and(eq(aiStudioPacksTable.dealerId, 1), eq(aiStudioPacksTable.isDefault, true)))
+      .where(and(eq(aiStudioPacksTable.dealerId, dealerId), eq(aiStudioPacksTable.isDefault, true)))
       .limit(1);
 
     const backgroundConfigured = !!(defaultPack?.backgroundUrl ?? process.env["AI_STUDIO_BACKGROUND"]);
@@ -1363,7 +1421,7 @@ router.get("/photo-studio/stats", async (req: Request, res: Response) => {
             )
             .where(
               and(
-                eq(vehiclesTable.dealerId, 1),
+                eq(vehiclesTable.dealerId, dealerId),
                 eq(vehiclesTable.aiPhotoStatus, "Ready"),
                 or(
                   isNull(aiPhotoSetsTable.studioVersion),

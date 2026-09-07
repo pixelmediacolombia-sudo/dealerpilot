@@ -10,8 +10,31 @@ import { desc, sql } from "drizzle-orm";
 import { getAllWorkers, getWorker, runWorkerOnce } from "../workers";
 import { getPhotoBudgetStatus } from "../workers/costGuardrail";
 import type { WorkerStatusLabel } from "../workers/types";
+import { resolveDealerId } from "./auth";
 
 const router: IRouter = Router();
+const DEFAULT_DEALER_ID = 1;
+
+type TimelineDetail = { dealerId?: number; dealer_id?: number } & Record<string, unknown>;
+
+function parseTimelineDetail(value: string | null): TimelineDetail | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as TimelineDetail;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function timelineEventBelongsToDealer(detail: TimelineDetail | null, dealerId: number): boolean {
+  const eventDealerId = detail?.dealerId ?? detail?.dealer_id;
+  // Existing untagged worker events belong to Alpha's legacy data. All other
+  // dealers must receive explicitly tagged events to prevent cross-tenant logs.
+  return dealerId === DEFAULT_DEALER_ID
+    ? eventDealerId === undefined || eventDealerId === dealerId
+    : eventDealerId === dealerId;
+}
 
 function deriveStatus(
   enabled: boolean,
@@ -106,21 +129,26 @@ router.post("/workers/:id/run", async (req, res) => {
 router.get("/workers/timeline", async (req, res) => {
   const limitRaw = Number(req.query["limit"]);
   const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 200) : 30;
+  const dealerId = resolveDealerId(req, res, DEFAULT_DEALER_ID);
 
   const rows = await db
     .select()
     .from(systemTimelineEventsTable)
     .orderBy(desc(systemTimelineEventsTable.createdAt))
-    .limit(limit);
+    .limit(Math.min(limit * 5, 200));
 
-  const events = rows.map((r) => ({
-    id: r.id,
-    category: r.category,
-    workerId: r.workerId,
-    message: r.message,
-    detail: r.detailJson ? JSON.parse(r.detailJson) : null,
-    createdAt: r.createdAt.toISOString(),
-  }));
+  const events = rows
+    .map((r) => ({ row: r, detail: parseTimelineDetail(r.detailJson) }))
+    .filter(({ detail }) => timelineEventBelongsToDealer(detail, dealerId))
+    .slice(0, limit)
+    .map(({ row: r, detail }) => ({
+      id: r.id,
+      category: r.category,
+      workerId: r.workerId,
+      message: r.message,
+      detail,
+      createdAt: r.createdAt.toISOString(),
+    }));
 
   res.json({ events });
 });

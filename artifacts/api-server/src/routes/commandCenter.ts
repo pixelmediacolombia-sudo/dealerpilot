@@ -21,7 +21,7 @@ const DEFAULT_DEALER_ID = 1;
 const PUBLISHING_ALERT_DAYS = 4;
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
 
-type CleanupEvent = { action?: string; listingId?: number; error?: string };
+type CleanupEvent = { action?: string; listingId?: number; error?: string; dealerId?: number; dealer_id?: number };
 
 function parseCleanupEvent(value: string | null): CleanupEvent | null {
   if (!value) return null;
@@ -31,6 +31,16 @@ function parseCleanupEvent(value: string | null): CleanupEvent | null {
   } catch {
     return null;
   }
+}
+
+function cleanupEventBelongsToDealer(detailJson: string | null, dealerId: number): boolean {
+  const detail = parseCleanupEvent(detailJson);
+  const eventDealerId = detail?.dealerId ?? detail?.dealer_id;
+  // Legacy Alpha events predate multi-dealer metadata and remain visible only
+  // in Alpha's own command center. Every other dealer sees only tagged events.
+  return dealerId === DEFAULT_DEALER_ID
+    ? eventDealerId === undefined || eventDealerId === dealerId
+    : eventDealerId === dealerId;
 }
 
 function vehicleLabel(vehicle: { year: number | null; make: string; model: string; trim: string | null }) {
@@ -80,13 +90,14 @@ router.get("/command-center/alerts", async (req: Request, res: Response) => {
           .from(listingsTable)
           .innerJoin(vehiclesTable, eq(vehiclesTable.id, listingsTable.vehicleId))
           .where(and(eq(listingsTable.channel, "marketplace"), eq(listingsTable.status, "Published"), eq(vehiclesTable.dealerId, dealerId))),
-        db.select().from(extensionConnectionsTable),
+        db.select().from(extensionConnectionsTable).where(eq(extensionConnectionsTable.dealerId, dealerId)),
         db.select().from(autoPublishSettingsTable).where(eq(autoPublishSettingsTable.dealerId, dealerId)),
         db.select().from(feedIngestionsTable).where(eq(feedIngestionsTable.dealerId, dealerId)).orderBy(desc(feedIngestionsTable.ingestedAt)).limit(7),
       ]);
 
     const latestEventByListingId = new Map<number, { action?: string; createdAt: Date; error?: string }>();
     for (const event of cleanupEvents) {
+      if (!cleanupEventBelongsToDealer(event.detailJson, dealerId)) continue;
       const detail = parseCleanupEvent(event.detailJson);
       if (!detail?.listingId || latestEventByListingId.has(detail.listingId)) continue;
       latestEventByListingId.set(detail.listingId, {
