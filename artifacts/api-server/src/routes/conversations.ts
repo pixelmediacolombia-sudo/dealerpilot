@@ -453,6 +453,12 @@ function historyContainsDealerPrompt(visibleMessages: string[], pattern: RegExp)
     .some((message) => message?.role === "assistant" && pattern.test(normalizeIntentText(message.content)));
 }
 
+const BUYER_PHONE_PROMPT_PATTERN = /best (?:phone )?number|what(?:'s| is) the best number|what number should we use|what number.*(?:reach|contact)|(?:a que|cual es el mejor|numero para).*(?:contact|comunicar)/;
+
+function shouldAskBuyerPhoneAfterQualification(visibleMessages: string[]): boolean {
+  return !historyContainsDealerPrompt(visibleMessages, BUYER_PHONE_PROMPT_PATTERN);
+}
+
 function buyerAcceptedInterest(value: string): boolean {
   return /\b(?:yes|yeah|yep|sure|okay|ok|interested|i am interested|me interesa|estoy interesado|estoy interesada|si|s[ií]|claro|por supuesto)\b/i.test(normalizeIntentText(value));
 }
@@ -911,7 +917,7 @@ function resolveSalesReplyStage(
   const latestIntent = normalizeIntentText(currentMessage);
   const history = visibleMessages.slice(-8).map(cleanConversationText).join(" ").toLowerCase();
   const buyerPhoneAlreadyKnown = historyHasBuyerPhone(visibleMessages);
-  const askedForBuyerPhone = historyContainsDealerPrompt(visibleMessages, /best phone number|phone number|numero de telefono|n[uú]mero de tel[eé]fono/);
+  const askedForBuyerPhone = historyContainsDealerPrompt(visibleMessages, BUYER_PHONE_PROMPT_PATTERN);
   const askedForDownPayment = historyContainsDealerPrompt(visibleMessages, /down payment|down|enganche|inicial/);
   const askedForTimeline = historyContainsDealerPrompt(visibleMessages, /this week|this month|esta semana|este mes|when.*buy|cuando.*compr/);
   const askedForDocuments = historyContainsDealerPrompt(visibleMessages, /proof of income|income proof|prueba de ingresos|comprobante de ingresos|identification|identificacion|tax id|pasaporte|bank account|cuenta bancaria/);
@@ -1156,6 +1162,7 @@ function buildBaseSafeFallbackReply(
       : vehicleNames.full)
     : (language === "es" ? "vehículo" : "vehicle");
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
+  const askForBuyerPhone = shouldAskBuyerPhoneAfterQualification(visibleMessages);
   const storeAddress = resolveStoreAddress(lotLocation, dealerKnowledge);
   const knowledge = (key: keyof NonNullable<DealerMarketplaceKnowledge["en"]>, fallback: string) =>
     dealerKnowledgeValue(dealerKnowledge, language, key, fallback);
@@ -1212,7 +1219,9 @@ function buildBaseSafeFallbackReply(
       return "Entiendo. Actualmente estamos pidiendo identificación y comprobante de ingresos para avanzar. Cuando los tengas, con gusto te ayudamos. Quedamos atentos.";
     }
     if (stage === "qualified_exit") {
-      return `Perfecto ✅ Ya tengo toda tu información y cumples con los requisitos. Puedes llamarnos al ${storePhone} y nuestro equipo continuará contigo. ¡Gracias por tu interés!`;
+      return askForBuyerPhone
+        ? `Perfecto ✅ Ya tengo toda tu información y cumples con los requisitos. Para facilitar el proceso, ¿cuál es el mejor número de teléfono para comunicarnos contigo? También puedes llamarnos al ${storePhone} y nuestro equipo continuará contigo.`
+        : `Perfecto ✅ Ya tengo toda tu información y cumples con los requisitos. Puedes llamarnos al ${storePhone} y nuestro equipo continuará contigo. ¡Gracias por tu interés!`;
     }
     if (stage === "request_phone") {
       return `Perfecto. ¿Cuál es el mejor número de teléfono para comunicarnos contigo sobre el ${vehicle}?`;
@@ -1336,7 +1345,9 @@ function buildBaseSafeFallbackReply(
       return "I understand. We currently require a valid ID and proof of income to move forward. Please reach out when you have both. We are here if you need anything else.";
     }
     if (stage === "qualified_exit") {
-      return `Perfect ✅ I have all your information and you meet the requirements. You can call us at ${storePhone}, and our team will continue with you. Thanks for your interest!`;
+      return askForBuyerPhone
+        ? `Perfect ✅ I have all your information and you meet the requirements. To make the process easier, what's the best phone number to reach you? You can also call us at ${storePhone}, and our team will continue with you.`
+        : `Perfect ✅ I have all your information and you meet the requirements. You can call us at ${storePhone}, and our team will continue with you. Thanks for your interest!`;
     }
   if (stage === "request_phone") {
     return `Great. What's the best phone number to reach you about the ${vehicle}?`;
@@ -1489,6 +1500,7 @@ function isAiReplyAligned(
   downPaymentPolicy: DownPaymentPolicy = NO_DOWN_PAYMENT_POLICY,
   vehicleFacts?: MarketplaceVehicleFacts,
   hasCleanTitleInventory: boolean = false,
+  askForBuyerPhone: boolean = true,
 ): boolean {
   const normalized = cleanConversationText(reply).toLowerCase();
   if (!normalized) return false;
@@ -1643,7 +1655,14 @@ function isAiReplyAligned(
     return /id|identification|identificaci[oó]n/.test(normalized) && /proof of income|comprobante de ingresos|prueba de ingresos|income/.test(normalized) && /\?/.test(normalized);
   }
   if (stage === "qualified_exit") {
-    return /information|informaci[oó]n/.test(normalized) && /requirement|requisit/.test(normalized) && replyIncludesStorePhone(reply, storePhone) && !/\?/.test(normalized);
+    const qualifiedReply = /information|informaci[oó]n/.test(normalized) &&
+      /requirement|requisit/.test(normalized) &&
+      replyIncludesStorePhone(reply, storePhone);
+    if (!qualifiedReply) return false;
+    if (askForBuyerPhone) {
+      return /(?:phone|number|tel[eé]fono|n[uú]mero)/.test(normalized) && /\?/.test(normalized);
+    }
+    return !/\?/.test(normalized);
   }
   if (stage === "price_inquiry") {
     if (vehicleFacts?.price != null) {
@@ -2088,7 +2107,7 @@ Language rules:
 - If the current stage is phone_received, thank the buyer, say a sales agent will contact them shortly, add a brief goodbye, and do not ask another question.
 - If the current stage is handoff_confirmation, confirm that the sales team will review the offer and do not ask another question.
 - If the current stage is question_repair, answer the most recent unanswered buyer question from the history. Never repeat the previous generic phone request or ask a new qualification question.
-- If the current stage is qualified_exit, include the Alpha Manassas dealership phone at the end and do not ask a question
+- If the current stage is qualified_exit and the buyer's phone has not been requested earlier, confirm that the buyer meets the requirements, ask for the buyer's best phone number to make the process easier, and include the Alpha Manassas dealership phone as an immediate call option. If the phone was already requested, do not repeat the question; include the dealership phone and close politely.
 - If the current stage is store_phone_requested, give only Alpha's dealership phone and a brief polite closing; do not ask a question
 - NEVER say: guaranteed approval, everyone approved, bad credit, denied, rejected, disqualified, "no tengo ese detalle confirmado", "I do not have that detail confirmed", "not confirmed", or variants that open by saying the bot is ignorant of the answer.
 - NEVER promise a loan or specific rate
@@ -2160,6 +2179,7 @@ export async function generateAiReply(
   void publishedDownPayment;
   void vehicleType;
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
+  const askForBuyerPhone = stage === "qualified_exit" && shouldAskBuyerPhoneAfterQualification(visibleMessages);
   const persistentUnansweredBuyerTurns = hasPersistentUnansweredBuyerTurns(
     visibleMessages,
     currentMessage,
@@ -2216,7 +2236,9 @@ export async function generateAiReply(
     timeline_declined: "Thank the buyer and close politely because a clear purchase timeframe is required. Do not ask another question.",
     documents_request: "Ask whether the buyer has both a valid ID and proof of income. Both are required; do not substitute a bank account question.",
     documents_declined: "Explain that both a valid ID and proof of income are currently required, then close politely without asking another question.",
-    qualified_exit: `Confirm that all required information was received and that the buyer meets the requirements. Suggest the Alpha Manassas dealership phone ${storePhone} at the end and do not ask a question.`,
+    qualified_exit: askForBuyerPhone
+      ? `Confirm that all required information was received and that the buyer meets the requirements. To make the process easier, ask for the buyer's best phone number and offer the Alpha Manassas dealership phone ${storePhone} as an immediate call option. Keep the question in the same reply.`
+      : `Confirm that all required information was received and that the buyer meets the requirements. The buyer's phone number was already requested earlier, so do not ask for it again. Offer the Alpha Manassas dealership phone ${storePhone} as an immediate call option and close politely without a question.`,
     address_request: `The buyer is asking for the address or directions. Confirm that the exact vehicle is available, provide the complete dealership address, give Alpha Motorsports' dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Do not ask for a visit day or financing question.`,
     test_drive_request: `The buyer is asking when they can test drive the vehicle. Provide the supplied dealership address and hours, mention the supplied test-drive policy when useful, then ask what day works best. Do not claim an appointment is confirmed and do not ask for a phone number.`,
     dealer_hours: `Answer with the exact dealer hours from the dealer knowledge block. If the buyer asks about Sunday, answer the Sunday hours directly. Ask at most one short next question.`,
@@ -2294,7 +2316,7 @@ The "reply" must be one short message that follows the stage instruction exactly
 
     if (
       candidateReply &&
-      isAiReplyAligned(candidateReply, candidateStage, storePhone, firstDealerReply, downPaymentPolicy, vehicleFacts, hasCleanTitleInventory) &&
+      isAiReplyAligned(candidateReply, candidateStage, storePhone, firstDealerReply, downPaymentPolicy, vehicleFacts, hasCleanTitleInventory, askForBuyerPhone) &&
       isReplyLanguageMirrored(candidateReply, language) &&
       isReplyRelevantToCurrentMessage(candidateReply, currentMessage) &&
       !replyRepeatsRecentDealerMessage(candidateReply, visibleMessages)
@@ -2965,7 +2987,7 @@ router.post("/conversations/intake", async (req, res) => {
       retryableReply &&
       (
         !isReplyLanguageMirrored(retryableReply, language) ||
-        !isAiReplyAligned(retryableReply, retryStage, storePhone, isFirstDealerReply(retryHistory), downPaymentPolicy, vehicleFacts, hasCleanTitleInventory) ||
+        !isAiReplyAligned(retryableReply, retryStage, storePhone, isFirstDealerReply(retryHistory), downPaymentPolicy, vehicleFacts, hasCleanTitleInventory, retryStage === "qualified_exit" && shouldAskBuyerPhoneAfterQualification(retryHistory)) ||
         !isReplyRelevantToCurrentMessage(retryableReply, inbound)
       )
     ) {
@@ -3015,7 +3037,7 @@ router.post("/conversations/intake", async (req, res) => {
         suggestedReply: retryableReply,
         deliveryRetry: true,
         outboundJob,
-        closeConversationAfterDelivery: retryStage === "store_phone_requested" || retryStage === "qualified_exit" || retryStage === "phone_received",
+        closeConversationAfterDelivery: retryStage === "store_phone_requested" || retryStage === "phone_received",
         language,
         fallbackUsed: retryFallbackUsed,
         fallbackReason: retryFallbackReason,
@@ -3061,7 +3083,6 @@ router.post("/conversations/intake", async (req, res) => {
     "down_payment_declined",
     "timeline_declined",
     "documents_declined",
-    "qualified_exit",
     "phone_received",
   ].includes(currentStage);
   const latestExistingAssistant = existingMsgs.find((m) => m.role === "assistant");

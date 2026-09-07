@@ -27,10 +27,25 @@ test("phone capture closes with a neutral handoff and no follow-up question", ()
   assert.match(source, /phone_received: "The buyer provided a phone number[\s\S]*brief goodbye/);
   assert.match(source, /Thanks for your number\. A sales agent will reach out to you shortly\. We are here if you need anything else\./);
   assert.match(source, /Gracias por tu número\. Un agente de ventas te contactará en breve\. Quedamos atentos\./);
-  assert.match(source, /closeConversationAfterDelivery: retryStage === "store_phone_requested" \|\| retryStage === "qualified_exit" \|\| retryStage === "phone_received"/);
+  assert.match(source, /closeConversationAfterDelivery: retryStage === "store_phone_requested" \|\| retryStage === "phone_received"/);
+  assert.doesNotMatch(source, /closeConversationAfterDelivery: [^\n]*qualified_exit/);
   assert.doesNotMatch(source, /phone_received[\s\S]{0,100}Have a great day/);
   assert.doesNotMatch(source, /phone_received[\s\S]{0,100}Que tengas un buen día/);
   assert.doesNotMatch(source, /Have a great day|Que tengas un buen día|good day|great day/i);
+});
+
+test("qualified buyers are asked for their phone and the thread stays open until phone capture", () => {
+  const qualifiedExit = source.indexOf('if (stage === "qualified_exit")');
+  assert.ok(qualifiedExit >= 0);
+  const qualifiedReply = source.slice(qualifiedExit, source.indexOf('if (stage === "request_phone")', qualifiedExit));
+  assert.match(qualifiedReply, /cumples con los requisitos/);
+  assert.match(qualifiedReply, /mejor n[uú]mero de tel[eé]fono/);
+  assert.match(qualifiedReply, /\?[^\n]*\$\{storePhone\}/);
+  assert.match(source, /best phone number to reach you/);
+  assert.match(source, /shouldAskBuyerPhoneAfterQualification/);
+  assert.match(source, /qualified_exit: askForBuyerPhone/);
+  assert.match(source, /already requested earlier, so do not ask for it again/);
+  assert.match(source, /If the current stage is qualified_exit and the buyer's phone has not been requested earlier/);
 });
 
 test("buyer language detection includes natural Spanish vehicle questions", () => {
