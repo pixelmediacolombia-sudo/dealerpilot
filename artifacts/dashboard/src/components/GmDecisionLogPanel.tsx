@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { Brain, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useListGmDecisions } from "@workspace/api-client-react";
+import { useAccount } from "@/app/AuthGate";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,7 +54,11 @@ function StatusBadge({ status }: { status: string }) {
 
 export function GmDecisionLogPanel() {
   const [expanded, setExpanded] = useState(true);
-  const { data, isLoading, refetch, isFetching } = useListGmDecisions({ limit: 30 });
+  const { dealerId } = useAccount();
+  const { data, isLoading, refetch, isFetching } = useListGmDecisions(
+    { limit: 30 },
+    { query: { queryKey: ["/api/gm/decisions", dealerId] } },
+  );
 
   const decisions = data?.decisions ?? [];
 

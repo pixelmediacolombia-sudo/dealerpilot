@@ -27,12 +27,12 @@ import { attachAuthenticatedUser } from "./auth";
 
 const router: IRouter = Router();
 
-router.use(gmRouter);
-router.use(workersRouter);
-router.use(orchestratorRouter);
 router.use(healthRouter);
 router.use(authRouter);
 router.use(attachAuthenticatedUser);
+router.use(gmRouter);
+router.use(workersRouter);
+router.use(orchestratorRouter);
 router.use(extensionRouter);
 router.use(dealersRouter);
 router.use(vehiclesRouter);

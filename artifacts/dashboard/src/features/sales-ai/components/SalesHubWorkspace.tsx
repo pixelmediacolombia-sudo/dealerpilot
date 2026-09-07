@@ -672,7 +672,9 @@ export function SalesHub() {
   const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations({ location: locationFilter });
   const { data: jobsData } = useListPublishingJobs({ location: locationFilter });
   const { data: creativeJobs } = useListCreativeJobs();
-  const { data: leads } = useGetLeads();
+  const { data: leads } = useGetLeads({
+    query: { queryKey: ["/api/leads", dealerId] },
+  });
   const { data: feedRuns } = useListFeedRuns(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getListFeedRunsQueryKey(dealerId!) },
   });
