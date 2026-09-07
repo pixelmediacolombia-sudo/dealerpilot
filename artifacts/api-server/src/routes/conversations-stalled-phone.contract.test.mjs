@@ -97,3 +97,19 @@ test("unresolved vehicle-detail replies give Alpha's phone and request the buyer
   assert.match(source, /También puedes llamar a Alpha Motorsports al \$\{storePhone\}\. ¿A qué número te contactamos\?/);
   assert.match(source, /You can also call Alpha Motorsports at \$\{storePhone\}\. What number should we use to reach you\?/);
 });
+
+test("trade-in replies request vehicle photos and both phone options", () => {
+  const stageStart = source.indexOf('if (stage === "trade_in_request")', source.indexOf("function isAiReplyAligned"));
+  const stageEnd = source.indexOf('if (stage === "payment_methods_request")', stageStart);
+  assert.ok(stageStart >= 0);
+  assert.ok(stageEnd > stageStart);
+  const guard = source.slice(stageStart, stageEnd);
+
+  assert.match(guard, /requestsPhotos/);
+  assert.match(guard, /asksForBuyerPhone/);
+  assert.match(guard, /replyIncludesStorePhone\(reply, storePhone\)/);
+  assert.match(source, /trade_in_vehicle_photos/);
+  assert.match(source, /Envíanos fotos del vehículo que quieres dar a cuenta/);
+  assert.match(source, /Send us photos of the vehicle you want to trade in/);
+  assert.match(source, /trade_in_request:[\s\S]{0,420}best phone number[\s\S]{0,180}dealership phone/);
+});

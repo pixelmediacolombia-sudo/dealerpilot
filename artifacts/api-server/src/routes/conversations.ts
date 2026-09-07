@@ -765,6 +765,7 @@ function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
     stage === "vin_inquiry" ||
     stage === "address_request" ||
     stage === "vehicle_link_request" ||
+    stage === "trade_in_request" ||
     stage === "carfax_request" ||
     stage === "cash_visit_request_phone" ||
     stage === "urgent_vehicle_request_phone" ||
@@ -1076,6 +1077,8 @@ function buildRedactedCopyBrief(params: {
       break;
     case "trade_in_request":
       factsToDeliver.push("trade_in_policy");
+      factsToDeliver.push("trade_in_vehicle_photos");
+      factsToDeliver.push(`dealer_phone=${params.storePhone}`);
       break;
     case "payment_methods_request":
       factsToDeliver.push("payment_methods");
@@ -1262,7 +1265,7 @@ function buildBaseSafeFallbackReply(
       return `Nuestro horario es ${knowledge("hours", "lunes a sábado de 9am a 8pm")}. ¿Qué día te queda mejor?`;
     }
     if (stage === "trade_in_request") {
-      return `${knowledge("tradeIn", "Sí, recibimos su carro como parte de pago")}. ¿Qué te gustaría saber?`;
+      return `${knowledge("tradeIn", "Sí, recibimos su carro como parte de pago")}. Envíanos fotos del vehículo que quieres dar a cuenta; ¿cuál es el mejor número para comunicarnos contigo? También puedes llamar a Alpha Motorsports al ${storePhone}.`;
     }
     if (stage === "payment_methods_request") {
       return `${knowledge("payment", "Contado y financiamiento")}. ¿Qué opción te interesa?`;
@@ -1388,7 +1391,7 @@ function buildBaseSafeFallbackReply(
     return `Our hours are ${knowledge("hours", "Monday-Saturday from 9am to 8pm")}. What day works best for you?`;
   }
   if (stage === "trade_in_request") {
-    return `${knowledge("tradeIn", "Yes, we take trade-ins")}. What would you like to know?`;
+    return `${knowledge("tradeIn", "Yes, we take trade-ins")}. Send us photos of the vehicle you want to trade in; what's the best number to reach you? You can also call Alpha Motorsports at ${storePhone}.`;
   }
   if (stage === "payment_methods_request") {
     return `${knowledge("payment", "Cash and financing")}. Which option interests you?`;
@@ -1602,8 +1605,11 @@ function isAiReplyAligned(
     return /(?:hour|hours|horario|abren|open|sunday|domingo|monday|lunes)/.test(normalized) && /\?/.test(reply);
   }
   if (stage === "trade_in_request") {
-    return /(?:trade[- ]?in|trade-ins|parte de pago|recibimos|take trade)/.test(normalized) &&
-      !/phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
+    const confirmsTradeIn = /(?:trade[- ]?in|trade-ins|parte de pago|recibimos|take trade)/.test(normalized);
+    const requestsPhotos = /(?:photo|photos|picture|pictures|image|images|foto|fotos|imagen|imagenes)/.test(normalized);
+    const asksForBuyerPhone = /phone|number|tel[eé]fono|n[uú]mero/.test(normalized) && /\?/.test(reply);
+    return confirmsTradeIn && requestsPhotos && asksForBuyerPhone && replyIncludesStorePhone(reply, storePhone) &&
+      !/financ|financing|down payment|enganche|inicial/.test(normalized);
   }
   if (stage === "payment_methods_request") {
     return /(?:cash|contado|financing|financiamiento)/.test(normalized) &&
@@ -2242,7 +2248,7 @@ export async function generateAiReply(
     address_request: `The buyer is asking for the address or directions. Confirm that the exact vehicle is available, provide the complete dealership address, give Alpha Motorsports' dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Do not ask for a visit day or financing question.`,
     test_drive_request: `The buyer is asking when they can test drive the vehicle. Provide the supplied dealership address and hours, mention the supplied test-drive policy when useful, then ask what day works best. Do not claim an appointment is confirmed and do not ask for a phone number.`,
     dealer_hours: `Answer with the exact dealer hours from the dealer knowledge block. If the buyer asks about Sunday, answer the Sunday hours directly. Ask at most one short next question.`,
-    trade_in_request: `Answer exactly from the dealer knowledge block that trade-ins are accepted. Do not ask for a phone number or financing.`,
+    trade_in_request: `Confirm from the dealer knowledge block that trade-ins are accepted. Ask the buyer to send photos of the vehicle they want to trade in, ask for the buyer's best phone number in the same reply, and include Alpha Motorsports' dealership phone ${storePhone}. Do not ask about financing, down payment, value, or price, and do not invent a trade-in estimate.`,
     payment_methods_request: `Answer exactly from the dealer knowledge block with the available payment methods. Do not add rates, approvals, terms, or a phone request.`,
     vehicle_link_request: vehicleFacts.vdpUrl
       ? `The buyer asked for photos or more information. Send exactly this dealer-domain vehicle page once: ${vehicleFacts.vdpUrl}. Say that it contains the vehicle's photos and do not ask for a phone number, repeat "what would you like to know?", ask another qualification question, or mention financing.`
