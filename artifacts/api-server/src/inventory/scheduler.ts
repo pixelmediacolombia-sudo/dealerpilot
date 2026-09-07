@@ -31,6 +31,25 @@ export type InventorySyncResult = {
   summary: ImportSummary;
 };
 
+function emptyInventorySummary(): ImportSummary {
+  return {
+    feedRunId: 0,
+    rawCount: 0,
+    imported: 0,
+    errors: 0,
+    created: 0,
+    updated: 0,
+    removed: 0,
+    active: 0,
+    totalImages: 0,
+    locationBreakdown: {
+      Manassas: 0,
+      Fredericksburg: 0,
+      unknown: 0,
+    },
+  };
+}
+
 /**
  * Core sync pipeline for a single dealer:
  * 1. Fetch XML feed
@@ -69,7 +88,8 @@ async function syncDealer(
       log.info({ dealerId, trigger, startedAt, reconciliation }, "Alpha lot reconciliation complete without XML feed");
       return summary;
     }
-    throw new Error(`No inventory feed URL configured for dealer ${dealerId}`);
+    log.info({ dealerId, trigger }, "No inventory feed URL configured; inventory sync skipped");
+    return emptyInventorySummary();
   }
 
   const startedAt = new Date();

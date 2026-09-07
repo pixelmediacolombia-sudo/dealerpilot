@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type NextFunction, type Response } 
 import crypto from "crypto";
 import { z } from "zod/v4";
 import { pool } from "@workspace/db";
+import type { Logger } from "pino";
 
 const router: IRouter = Router();
 
@@ -166,6 +167,71 @@ async function ensureAlphaUser() {
     [ALPHA_DEALER_ID, ALPHA_USERNAME, hashPassword(ALPHA_INITIAL_PASSWORD)],
   );
   return created.rows[0]!;
+}
+
+/**
+ * Bootstraps Lucky Mazda's first dashboard user from deployment-only secrets.
+ * The password is hashed immediately and is never returned or logged. Existing
+ * users are not reset on restart, so changing the env secret cannot silently
+ * invalidate an already provisioned account.
+ */
+export async function ensureLuckyMazdaUser(dealerId: number, log: Logger): Promise<void> {
+  const username = process.env.LUCKY_MAZDA_USERNAME?.trim().toLowerCase() ?? "";
+  const password = process.env.LUCKY_MAZDA_INITIAL_PASSWORD ?? "";
+
+  if (!username && !password) {
+    log.info({ dealerId }, "Lucky Mazda auth bootstrap skipped — credentials not configured");
+    return;
+  }
+  if (!username || !password) {
+    log.error({ dealerId }, "Lucky Mazda auth bootstrap skipped — both credential variables are required");
+    return;
+  }
+
+  await ensureAuthSchema();
+  const dealer = await pool.query("select id from dealers where id = $1 limit 1", [dealerId]);
+  if (!dealer.rows[0]) {
+    log.error({ dealerId }, "Lucky Mazda auth bootstrap skipped — dealer record not found");
+    return;
+  }
+
+  const existingResult = await pool.query<DealerUserRow>(
+    "select * from dealer_users where username = $1 limit 1",
+    [username],
+  );
+  const existing = existingResult.rows[0];
+
+  if (existing) {
+    if (existing.dealer_id !== dealerId) {
+      log.error({ dealerId }, "Lucky Mazda auth bootstrap skipped — username belongs to another dealer");
+      return;
+    }
+    if (existing.status !== "Active" || existing.display_name !== "Lucky Mazda") {
+      await pool.query(
+        `update dealer_users
+         set display_name = 'Lucky Mazda',
+             role = coalesce(nullif(role, ''), 'admin'),
+             status = 'Active',
+             updated_at = now()
+         where id = $1`,
+        [existing.id],
+      );
+    }
+    log.info({ dealerId }, "Lucky Mazda auth user already exists");
+    return;
+  }
+
+  if (passwordPolicyErrors(password, username).length > 0) {
+    log.error({ dealerId }, "Lucky Mazda auth bootstrap skipped — password policy rejected");
+    return;
+  }
+
+  await pool.query(
+    `insert into dealer_users (dealer_id, username, password_hash, display_name, role, status)
+     values ($1, $2, $3, 'Lucky Mazda', 'admin', 'Active')`,
+    [dealerId, username, hashPassword(password)],
+  );
+  log.info({ dealerId }, "Seeded Lucky Mazda auth user");
 }
 
 function safeUser(user: DealerUserRow) {

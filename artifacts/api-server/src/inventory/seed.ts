@@ -1,4 +1,4 @@
-import { db, dealersTable, feedsTable, vehiclesTable } from "@workspace/db";
+import { db, dealersTable, feedsTable, vehiclesTable, type Dealer } from "@workspace/db";
 import { count, eq } from "drizzle-orm";
 import type { Logger } from "pino";
 import { importFeed } from "./importFeed";
@@ -6,6 +6,7 @@ import { fetchFeedXml } from "./feedSource";
 import { ALPHA_MARKETPLACE_KNOWLEDGE } from "../lib/dealer";
 
 const ALPHA = "Alpha Motorsport";
+const LUCKY_MAZDA = "Lucky Mazda";
 const REAL_FEED_URL = "https://www.alphamotorsport.net/facebook-catalog-feed.xml";
 
 function isSampleFeedUrl(url: string | null | undefined): boolean {
@@ -115,4 +116,36 @@ export async function seedDealerAndInventory(log: Logger): Promise<void> {
     { dealerId: dealer.id, ...summary },
     "Initial inventory sync complete from real Alpha Motorsport feed",
   );
+}
+
+/**
+ * Creates the Lucky Mazda dealer shell without inventing inventory/feed data.
+ * The account is Marketplace-only for now; its XML feed and vehicles are added
+ * later when the dealership provides the direct automotive inventory feed.
+ */
+export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
+  const [existing] = await db
+    .select()
+    .from(dealersTable)
+    .where(eq(dealersTable.name, LUCKY_MAZDA))
+    .limit(1);
+
+  if (existing) {
+    log.info({ dealerId: existing.id }, "Lucky Mazda dealer already exists; inventory remains unconfigured");
+    return existing;
+  }
+
+  const [created] = await db
+    .insert(dealersTable)
+    .values({
+      name: LUCKY_MAZDA,
+      plan: "basic",
+      status: "Active",
+      notes: "Marketplace-only account. XML inventory feed pending from Lucky Mazda.",
+      marketplaceKnowledge: {},
+    })
+    .returning();
+
+  log.info({ dealerId: created!.id }, "Seeded Lucky Mazda dealer shell without inventory");
+  return created!;
 }

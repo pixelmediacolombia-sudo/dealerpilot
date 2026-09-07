@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seedDealerAndInventory } from "./inventory/seed";
+import { seedDealerAndInventory, seedLuckyMazdaDealer } from "./inventory/seed";
 import { seedCreative } from "./creative/seed";
 import { startCreativeWorker } from "./creative/worker";
 import { seedMarketplaceIntelligence } from "./intelligence/seed";
@@ -11,6 +11,7 @@ import { startPhotoWorker } from "./photo/worker";
 import { startWorkers } from "./workers";
 import { startPagesPublishingWorker } from "./pages/pagesPublishing.worker";
 import { runSchemaMigrations } from "./db/migrate";
+import { ensureLuckyMazdaUser } from "./routes/auth";
 
 const rawPort = process.env["PORT"];
 
@@ -43,6 +44,8 @@ async function startServer(): Promise<void> {
     logger.info({ port }, "Server listening");
 
     void seedDealerAndInventory(logger)
+      .then(() => seedLuckyMazdaDealer(logger))
+      .then((luckyMazda) => ensureLuckyMazdaUser(luckyMazda.id, logger))
       .then(() => seedCreative(logger))
       .then(() => startCreativeWorker(logger))
       .then(() => seedMarketplaceIntelligence(logger))

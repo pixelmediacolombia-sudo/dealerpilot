@@ -33,6 +33,25 @@ function toFeedRun(run: FeedRun) {
   };
 }
 
+function toSkippedFeedRun(dealerId: number, triggerType: string) {
+  const now = new Date().toISOString();
+  return {
+    id: 0,
+    dealerId,
+    status: "skipped",
+    triggerType,
+    startedAt: now,
+    finishedAt: now,
+    vehiclesImported: 0,
+    vehiclesNew: 0,
+    vehiclesUpdated: 0,
+    vehiclesRemoved: 0,
+    vehiclesActive: 0,
+    errorCount: 0,
+    errorMessage: null,
+  };
+}
+
 async function toDealer(dealer: Dealer) {
   const [latest] = await db
     .select()
@@ -218,6 +237,10 @@ router.post("/dealers/:id/sync", async (req, res) => {
       dealerId: dealer.id,
       trigger: "manual",
     });
+    if (summary.feedRunId === 0) {
+      res.json(toSkippedFeedRun(dealer.id, "manual"));
+      return;
+    }
     const [run] = await db
       .select()
       .from(feedRunsTable)
