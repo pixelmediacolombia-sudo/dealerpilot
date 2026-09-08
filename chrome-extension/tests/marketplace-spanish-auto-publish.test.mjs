@@ -333,9 +333,13 @@ test("Facebook Your Listings landing captures item URL before completing", () =>
   assert.match(content, /function findMarketplaceListingUrlOnPage\(job\)/);
   assert.match(content, /a\[href\*="\/marketplace\/item\/"\]/);
   assert.match(content, /function marketplaceTextMatchesExpectedListing\(text, expectedTokens\)/);
+  assert.match(content, /function normalizeMarketplaceListingUrl\(value\)/);
+  assert.match(content, /function currentMarketplaceItemUrlForJob\(job\)/);
+  assert.match(content, /direct item navigation is the strongest URL receipt Facebook exposes/i);
+  assert.match(content, /new URL\(String\(value \|\| \"\"\), window\.location\.origin\)/);
   assert.match(content, /async function findMarketplaceListingUrlFromSellerDialog\(job\)/);
   assert.match(content, /return urls\[0\] \|\| null/);
-  assert.match(content, /currentMarketplaceItemMatchesJob\(job\)[\s\S]*return window\.location\.href/);
+  assert.match(content, /currentMarketplaceItemUrlForJob\(job\)[\s\S]*return directDialogUrl/);
   assert.match(content, /openListingAction/);
   assert.match(content, /view\|see\|open\|go to/);
   assert.match(content, /querySelectorAll\('\[role="dialog"\]'\)/);

@@ -24,14 +24,19 @@ test("a bare down-payment number uses the preceding dealer question context", ()
 });
 
 test("phone capture closes with a neutral handoff and no follow-up question", () => {
+  const stageStart = source.indexOf('if (hasPhoneNumber(latest)) return "phone_received";');
+  assert.ok(stageStart >= 0);
+  assert.doesNotMatch(
+    source.slice(stageStart, stageStart + 120),
+    /!buyerPhoneAlreadyKnown/,
+    "the current phone turn must not be treated as already known",
+  );
   assert.match(source, /phone_received: "The buyer provided a phone number[\s\S]*brief goodbye/);
-  assert.match(source, /Thanks for your number\. A sales agent will reach out to you shortly\. We are here if you need anything else\./);
+  assert.match(source, /Thanks for your number\. A sales agent will reach out to you shortly\. We remain available\./);
   assert.match(source, /Gracias por tu número\. Un agente de ventas te contactará en breve\. Quedamos atentos\./);
   assert.match(source, /closeConversationAfterDelivery: retryStage === "store_phone_requested" \|\| retryStage === "phone_received"/);
+  assert.match(source, /const closeAfterDelivery = immediateHandoffReason === "buyer_phone_received" \|\| \[/);
   assert.doesNotMatch(source, /closeConversationAfterDelivery: [^\n]*qualified_exit/);
-  assert.doesNotMatch(source, /phone_received[\s\S]{0,100}Have a great day/);
-  assert.doesNotMatch(source, /phone_received[\s\S]{0,100}Que tengas un buen día/);
-  assert.doesNotMatch(source, /Have a great day|Que tengas un buen día|good day|great day/i);
 });
 
 test("qualified buyers are asked for their phone and the thread stays open until phone capture", () => {

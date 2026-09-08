@@ -923,7 +923,11 @@ function resolveSalesReplyStage(
   const askedForTimeline = historyContainsDealerPrompt(visibleMessages, /this week|this month|esta semana|este mes|when.*buy|cuando.*compr/);
   const askedForDocuments = historyContainsDealerPrompt(visibleMessages, /proof of income|income proof|prueba de ingresos|comprobante de ingresos|identification|identificacion|tax id|pasaporte|bank account|cuenta bancaria/);
   const vehicleRequest = detectVehicleRequestKind(latest);
-  if (hasPhoneNumber(latest) && !buyerPhoneAlreadyKnown) return "phone_received";
+  // The current buyer turn must win even when visibleMessages already contains
+  // that same number. Facebook/Messenger sends the new turn in both places,
+  // and treating it as "already known" can incorrectly advance to the next
+  // qualification question instead of closing with the phone handoff.
+  if (hasPhoneNumber(latest)) return "phone_received";
   if (resolveImmediateHandoffReason(latest)) return "handoff_confirmation";
   if (vehicleRequest === "photos") return "vehicle_link_request";
   if (vehicleRequest === "carfax") return "carfax_request";
@@ -1309,7 +1313,7 @@ function buildBaseSafeFallbackReply(
       return `Of course, our number is ${storePhone}. We are here if you need anything else.`;
     }
   if (stage === "phone_received") {
-    return "Thanks for your number. A sales agent will reach out to you shortly. We are here if you need anything else.";
+    return "Thanks for your number. A sales agent will reach out to you shortly. We remain available.";
   }
   if (stage === "handoff_confirmation") {
     return "Thanks for the offer. A salesperson will review it with you shortly.";
@@ -1618,7 +1622,7 @@ function isAiReplyAligned(
   if (stage === "phone_received") {
     return /(?:sales agent|salesperson|sales representative|agente de ventas|vendedor)/.test(normalized) &&
       /(?:reach out|contact|contactar|comunicar|pondr[aá] en contacto)/.test(normalized) &&
-      /(?:thank|thanks|gracias|goodbye|quedamos atentos|inter[eé]s)/.test(normalized) &&
+      /(?:thank|thanks|gracias|goodbye|quedamos atentos|we remain available|we are here if you need anything else|nos vemos|inter[eé]s)/.test(normalized) &&
       !/\?/.test(reply);
   }
   if (stage === "handoff_confirmation") {
@@ -3084,7 +3088,7 @@ router.post("/conversations/intake", async (req, res) => {
     ? "qualification_completed"
     : null;
   const handoffReason = immediateHandoffReason ?? qualificationHandoffReason;
-  const closeAfterDelivery = [
+  const closeAfterDelivery = immediateHandoffReason === "buyer_phone_received" || [
     "interest_declined",
     "down_payment_declined",
     "timeline_declined",

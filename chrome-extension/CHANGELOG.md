@@ -1,5 +1,11 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.4.5
+
+- Captures and normalizes the direct Facebook Marketplace item URL after Publish.
+- Uses the rendered item title/headings as a fallback while Facebook hydrates the
+  listing page, then sends the verified URL to complete the publishing job.
+
 ## v1.4.4
 
 - Strengthens post-publish Marketplace URL capture.

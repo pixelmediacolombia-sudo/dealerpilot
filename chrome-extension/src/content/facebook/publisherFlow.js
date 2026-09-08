@@ -3486,6 +3486,18 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     return urls[0] || null;
   }
 
+  function normalizeMarketplaceListingUrl(value) {
+    try {
+      const url = new URL(String(value || ""), window.location.origin);
+      if (!/^(?:www\.|web\.)?facebook\.com$/i.test(url.hostname)) return null;
+      if (!/^\/marketplace\/item\/\d+\/?$/i.test(url.pathname)) return null;
+      url.hash = "";
+      return url.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
   function findMarketplaceListingUrlsOnPage(job) {
     const anchors = Array.from(document.querySelectorAll('a[href*="/marketplace/item/"]'));
     if (anchors.length === 0) return [];
@@ -3494,7 +3506,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     const urls = new Set();
 
     for (const anchor of anchors) {
-      const href = anchor.href;
+      const href = normalizeMarketplaceListingUrl(anchor.href);
       if (!href) continue;
       const contexts = [anchor.innerText || anchor.textContent || ""];
       let parent = anchor.parentElement;
@@ -3554,9 +3566,35 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   }
 
   function currentMarketplaceItemMatchesJob(job) {
-    if (!window.location.href.includes("/marketplace/item/")) return false;
+    if (!normalizeMarketplaceListingUrl(window.location.href)) return false;
     const expectedTokens = expectedMarketplaceListingTokens(job);
     return marketplaceTextMatchesExpectedListing(document.body?.innerText || "", expectedTokens);
+  }
+
+  // A direct item navigation is the strongest URL receipt Facebook exposes
+  // after Publish. The item title can render after the URL, so use the title
+  // and headings as a second identity source before giving up on the receipt.
+  function currentMarketplaceItemUrlForJob(job) {
+    const listingUrl = normalizeMarketplaceListingUrl(window.location.href);
+    if (!listingUrl) return null;
+    if (currentMarketplaceItemMatchesJob(job)) return listingUrl;
+
+    const expectedYear = String(job?.year || "").trim();
+    const expectedMake = normalizeText(job?.make || "");
+    const expectedModel = normalizeText(job?.model || "");
+    if (!expectedYear || !expectedMake || !expectedModel) return null;
+
+    const identityText = normalizeText([
+      document.title,
+      ...Array.from(document.querySelectorAll("h1, h2, [role=heading]"))
+        .map((el) => el.innerText || el.textContent || ""),
+    ].join(" "));
+    const explicitWrongYear = detectMarketplaceYearMismatchOnPage(job);
+    if (explicitWrongYear) return null;
+    if ([expectedYear, expectedMake, expectedModel].every((token) => identityText.includes(token))) {
+      return listingUrl;
+    }
+    return null;
   }
 
   function isMarketplacePromotionPage() {
@@ -3761,8 +3799,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         // Some Facebook variants navigate directly to the selected item's
         // detail page instead of opening a dialog. Accept it only when the
         // visible item still matches the job being published.
-        if (window.location.pathname.includes("/marketplace/item/") && currentMarketplaceItemMatchesJob(job)) {
-          return window.location.href;
+        const directDialogUrl = currentMarketplaceItemUrlForJob(job);
+        if (directDialogUrl) {
+          return directDialogUrl;
         }
 
         const dialog = Array.from(document.querySelectorAll('[role="dialog"]'))
@@ -3785,8 +3824,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         if (openListingAction) {
           openListingAction.click();
           await sleep(1600);
-          if (window.location.pathname.includes("/marketplace/item/") && currentMarketplaceItemMatchesJob(job)) {
-            return window.location.href;
+          const directOpenUrl = currentMarketplaceItemUrlForJob(job);
+          if (directOpenUrl) {
+            return directOpenUrl;
           }
           const dialogUrls = findMarketplaceListingUrlsOnPage(job);
           if (dialogUrls.length > 0) return dialogUrls[0];
@@ -3804,8 +3844,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     let sellerDialogAttempted = false;
 
     while (Date.now() - start < timeoutMs) {
-      if (window.location.pathname.includes("/marketplace/item/") && currentMarketplaceItemMatchesJob(job)) {
-        return window.location.href;
+      const directUrl = currentMarketplaceItemUrlForJob(job);
+      if (directUrl) {
+        return directUrl;
       }
 
       const pageUrls = findMarketplaceListingUrlsOnPage(job);
@@ -3820,8 +3861,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
       await sleep(500);
     }
 
-    if (window.location.pathname.includes("/marketplace/item/") && currentMarketplaceItemMatchesJob(job)) {
-      return window.location.href;
+    const directUrl = currentMarketplaceItemUrlForJob(job);
+    if (directUrl) {
+      return directUrl;
     }
     const pageUrls = findMarketplaceListingUrlsOnPage(job);
     return pageUrls[0] || null;
@@ -3846,8 +3888,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         return promotionOutcome;
       }
       if (cur !== startUrl && cur.includes("/marketplace/item/")) {
-        if (currentMarketplaceItemMatchesJob(job)) {
-          return { listingUrl: cur, blockReason: null, publishedLanding: false };
+        const directUrl = currentMarketplaceItemUrlForJob(job);
+        if (directUrl) {
+          return { listingUrl: directUrl, blockReason: null, publishedLanding: false };
         }
       }
       if (cur !== startUrl && cur.includes("/marketplace/you/selling")) {
@@ -3863,7 +3906,8 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         document.querySelector('[aria-label*="listed" i]') ||
         document.querySelector('[data-testid*="success" i]');
       if (successEl && window.location.href.includes("/marketplace/item/")) {
-        return { listingUrl: window.location.href, blockReason: null, publishedLanding: false };
+        const directUrl = currentMarketplaceItemUrlForJob(job);
+        if (directUrl) return { listingUrl: directUrl, blockReason: null, publishedLanding: false };
       }
       const blockReason = detectMarketplacePublishBlock();
       if (blockReason) return { listingUrl: null, blockReason, publishedLanding: false };
@@ -3871,8 +3915,9 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     }
     const final = window.location.href;
     if (final !== startUrl && final.includes("/marketplace/item/")) {
-      if (currentMarketplaceItemMatchesJob(job)) {
-        return { listingUrl: final, blockReason: null, publishedLanding: false };
+        const directUrl = currentMarketplaceItemUrlForJob(job);
+        if (directUrl) {
+          return { listingUrl: directUrl, blockReason: null, publishedLanding: false };
       }
       return {
         listingUrl: null,
