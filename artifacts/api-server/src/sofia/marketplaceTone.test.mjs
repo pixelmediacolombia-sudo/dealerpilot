@@ -8,6 +8,7 @@ import {
   hasDownPaymentAmount,
   hasVisitDaySignal,
   hasVehicleValueFact,
+  isCashOfferReviewQuestion,
   isConciseMarketplaceReply,
   vehicleValueFact,
 } from "./marketplaceTone.ts";
@@ -31,6 +32,11 @@ test("recognizes down-payment and concrete cash signals without treating phone a
   assert.equal(hasConcreteCashOffer("Are you gonna sell it for me? 16,000 right"), true);
   assert.equal(hasConcreteCashOffer("Can you take $16k?"), true);
   assert.equal(hasConcreteCashOffer("¿Me lo pueden vender por $16,000?"), true);
+  assert.equal(hasConcreteCashOffer("Jessica said that 20,000 in cash out the door work"), false);
+  assert.equal(hasConcreteCashOffer("20,000 cash out the door?"), false);
+  assert.equal(hasConcreteCashOffer("I can do $20,000 cash out the door"), true);
+  assert.equal(isCashOfferReviewQuestion("Jessica said that 20,000 in cash out the door work"), true);
+  assert.equal(isCashOfferReviewQuestion("I can do $20,000 cash out the door"), false);
 });
 
 test("routes photo and Carfax requests independently", () => {

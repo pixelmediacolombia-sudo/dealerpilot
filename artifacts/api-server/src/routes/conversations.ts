@@ -33,6 +33,7 @@ import {
   extractCarfaxUrlFromSourceRaw,
   hasConcreteCashOffer,
   hasVisitDaySignal,
+  isCashOfferReviewQuestion,
   isConciseMarketplaceReply,
   type MarketplaceVehicleFacts,
 } from "../sofia/marketplaceTone";
@@ -928,6 +929,7 @@ function resolveSalesReplyStage(
   // and treating it as "already known" can incorrectly advance to the next
   // qualification question instead of closing with the phone handoff.
   if (hasPhoneNumber(latest)) return "phone_received";
+  if (isCashOfferReviewQuestion(latest)) return "open_question";
   if (resolveImmediateHandoffReason(latest)) return "handoff_confirmation";
   if (vehicleRequest === "photos") return "vehicle_link_request";
   if (vehicleRequest === "carfax") return "carfax_request";
@@ -1171,10 +1173,16 @@ function buildBaseSafeFallbackReply(
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
   const askForBuyerPhone = shouldAskBuyerPhoneAfterQualification(visibleMessages);
   const storeAddress = resolveStoreAddress(lotLocation, dealerKnowledge);
+  const cashOfferAmount = isCashOfferReviewQuestion(currentMessage)
+    ? extractDownPaymentAmount(currentMessage)
+    : null;
   const knowledge = (key: keyof NonNullable<DealerMarketplaceKnowledge["en"]>, fallback: string) =>
     dealerKnowledgeValue(dealerKnowledge, language, key, fallback);
   if (language === "es") {
     if (stage === "open_question") {
+      if (cashOfferAmount != null) {
+        return `Nuestros agentes de ventas pueden confirmar si $${cashOfferAmount.toLocaleString("en-US")} de contado funciona. ¿A qué número te contactamos? También puedes llamarnos al ${storePhone}.`;
+      }
       return `Con gusto te ayudan nuestros agentes de ventas con ese detalle. También puedes llamar a Alpha Motorsports al ${storePhone}. ¿A qué número te contactamos?`;
     }
     if (stage === "vehicle_link_request") {
@@ -1301,6 +1309,9 @@ function buildBaseSafeFallbackReply(
     return `Con gusto te ayudo con el ${vehicle}. ¿Qué te gustaría saber?`;
   }
   if (stage === "open_question") {
+    if (cashOfferAmount != null) {
+      return `Our sales agents can confirm whether $${cashOfferAmount.toLocaleString("en-US")} out the door works. What number should we use to reach you? You can also call Alpha Motorsports at ${storePhone}.`;
+    }
     return `Our sales agents can help with that detail. You can also call Alpha Motorsports at ${storePhone}. What number should we use to reach you?`;
   }
   if (stage === "vehicle_link_request") {
