@@ -10,20 +10,24 @@ const dealersRoute = read("../routes/dealers.ts");
 const index = read("../index.ts");
 const auth = read("../routes/auth.ts");
 
-test("Lucky Mazda is seeded as an idempotent Marketplace-only dealer shell", () => {
-  assert.match(seed, /const LUCKY_MAZDA = "Lucky Mazda"/);
+test("Lucki Mazda is seeded as an idempotent Marketplace-only dealer shell", () => {
+  assert.match(seed, /const LUCKI_MAZDA = "Lucki Mazda"/);
+  assert.match(seed, /const LEGACY_LUCKY_MAZDA = "Lucky Mazda"/);
+  assert.match(seed, /or\(eq\(dealersTable\.name, LUCKI_MAZDA\), eq\(dealersTable\.name, LEGACY_LUCKY_MAZDA\)\)/);
   assert.match(seed, /export async function seedLuckyMazdaDealer/);
-  assert.match(seed, /name: LUCKY_MAZDA/);
+  assert.match(seed, /name: LUCKI_MAZDA/);
   assert.match(seed, /plan: "basic"/);
   assert.match(seed, /status: "Active"/);
   assert.match(seed, /marketplaceKnowledge: \{\}/);
-  assert.match(seed, /XML inventory feed pending from Lucky Mazda/);
-  const luckyInsert = seed.match(/\.values\(\{\s*name: LUCKY_MAZDA,[\s\S]*?marketplaceKnowledge: \{\},\s*\}\)/)?.[0] ?? "";
-  assert.doesNotMatch(luckyInsert, /xmlFeedUrl/);
+  assert.match(seed, /XML inventory feed pending from Lucki Mazda/);
+  const luckiInsert = seed.match(/\.values\(\{\s*name: LUCKI_MAZDA,[\s\S]*?marketplaceKnowledge: \{\},\s*\}\)/)?.[0] ?? "";
+  assert.doesNotMatch(luckiInsert, /xmlFeedUrl/);
   assert.match(index, /\.then\(\(\) => seedLuckyMazdaDealer\(logger\)\)/);
   assert.match(index, /ensureLuckyMazdaUser\(luckyMazda\.id, logger\)/);
   assert.match(auth, /process\.env\.LUCKY_MAZDA_USERNAME/);
   assert.match(auth, /process\.env\.LUCKY_MAZDA_INITIAL_PASSWORD/);
+  assert.match(auth, /display_name = 'Lucki Mazda'/);
+  assert.match(auth, /values \(\$1, \$2, \$3, 'Lucki Mazda'/);
   assert.match(auth, /export async function ensureLuckyMazdaUser/);
   assert.match(auth, /hashPassword\(password\)/);
   assert.match(auth, /insert into dealer_users/);

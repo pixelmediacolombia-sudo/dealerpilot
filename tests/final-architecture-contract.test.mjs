@@ -27,6 +27,9 @@ const publisherTheme = read("chrome-extension/src/shared/theme.js");
 const messengerTheme = read("chrome-extension-messenger/src/shared/theme.js");
 const messengerClient = read("chrome-extension-messenger/src/background/messengerClient.js");
 const messengerAi = read("chrome-extension-messenger/src/content/facebook/messengerAi.js");
+const salesHubWorkspace = read("artifacts/dashboard/src/features/sales-ai/components/SalesHubWorkspace.tsx");
+const globalHeader = read("artifacts/dashboard/src/shared/layout/GlobalHeader.tsx");
+const connectionCenter = read("artifacts/dashboard/src/features/connection/pages/ConnectionCenter.tsx");
 
 test("listings domain rules keep deterministic category, down-payment, and priority decisions", () => {
   assert.match(listingRules, /export function categorize\(vehicle: Vehicle\): VehicleCategory/);
@@ -100,6 +103,20 @@ test("sales-ai intake protects lead handoff and conversation continuity", () => 
   assert.match(conversations, /historyContainsDealerPrompt/);
   assert.match(conversations, /buyerAcceptedInterest/);
   assert.match(conversations, /historyContainsDealerPrompt\(visibleMessages, \/interested/);
+});
+
+test("dashboard timelines keep every dealer's cache isolated", () => {
+  for (const source of [salesHubWorkspace, globalHeader, connectionCenter]) {
+    assert.match(source, /dealerId/);
+  }
+  assert.match(salesHubWorkspace, /getGetVehicleStatsQueryKey\(\{ location: locationFilter \}\), dealerId/);
+  assert.match(salesHubWorkspace, /getListListingWorkspacesQueryKey\(\{ location: locationFilter \}\), dealerId/);
+  assert.match(salesHubWorkspace, /getListMarketplaceRecommendationsQueryKey\(\{ location: locationFilter \}\), dealerId/);
+  assert.match(salesHubWorkspace, /getListPublishingJobsQueryKey\(\{ location: locationFilter \}\), dealerId/);
+  assert.match(salesHubWorkspace, /getListCreativeJobsQueryKey\(\), dealerId/);
+  assert.match(salesHubWorkspace, /getGetLeadsQueryKey\(\), dealerId/);
+  assert.match(globalHeader, /getListCreativeJobsQueryKey\(\), dealerId/);
+  assert.match(connectionCenter, /getGetSystemTimelineQueryKey\(\{ limit: 8 \}\), dealerId/);
 });
 
 test("backend-extension sacred endpoints are centralized and shape-compatible", () => {

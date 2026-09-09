@@ -58,7 +58,7 @@ export async function seedCreative(log: Logger): Promise<void> {
   log.info({ count: CREATIVE_TEMPLATES.length }, "Seeded creative templates");
 
   // Ensure every dealer has its own Brand DNA row. Existing rows are never
-  // overwritten, so adding a dealer or changing Lucky's palette cannot alter
+  // overwritten, so adding a dealer or changing Lucki's palette cannot alter
   // Alpha or any other dealer.
   const dealers = await db.select().from(dealersTable).orderBy(asc(dealersTable.id));
   if (dealers.length === 0) {
@@ -70,7 +70,7 @@ export async function seedCreative(log: Logger): Promise<void> {
   const existingDealerIds = new Set(existing.map((d) => d.dealerId));
   for (const dealer of dealers) {
     if (existingDealerIds.has(dealer.id)) continue;
-    const dna = dealer.name === "Lucky Mazda" ? LIGHT_DEALER_DNA : DEFAULT_DNA;
+    const dna = dealer.name === "Lucki Mazda" ? LIGHT_DEALER_DNA : DEFAULT_DNA;
     await db.insert(dealerBrandDnaTable).values({ dealerId: dealer.id, ...dna });
     log.info({ dealerId: dealer.id }, "Seeded default dealer Brand DNA");
   }

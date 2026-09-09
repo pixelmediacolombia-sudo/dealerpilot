@@ -57,6 +57,7 @@ import {
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { useAccount } from "@/app/AuthGate";
 
 // ── Status helpers ─────────────────────────────────────────────────────────────
 
@@ -358,6 +359,7 @@ function photoWorkerStatusColor(status: string): "success" | "destructive" | "wa
 function AiWorkersPanel() {
   const queryClient = useQueryClient();
   const [runningId, setRunningId] = useState<string | null>(null);
+  const { dealerId } = useAccount();
 
   const { data: workersData, isLoading } = useListWorkers({
     query: { queryKey: getListWorkersQueryKey(), refetchInterval: 15000 },
@@ -365,7 +367,13 @@ function AiWorkersPanel() {
 
   const { data: timelineData } = useGetSystemTimeline(
     { limit: 8 },
-    { query: { queryKey: getGetSystemTimelineQueryKey({ limit: 8 }), refetchInterval: 15000 } },
+    {
+      query: {
+        enabled: !!dealerId,
+        queryKey: [...getGetSystemTimelineQueryKey({ limit: 8 }), dealerId],
+        refetchInterval: 15000,
+      },
+    },
   );
 
   const { mutate: runWorker } = useRunWorkerNow({

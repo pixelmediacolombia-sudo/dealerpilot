@@ -1,12 +1,13 @@
 import { db, dealersTable, feedsTable, vehiclesTable, type Dealer } from "@workspace/db";
-import { count, eq } from "drizzle-orm";
+import { count, eq, or } from "drizzle-orm";
 import type { Logger } from "pino";
 import { importFeed } from "./importFeed";
 import { fetchFeedXml } from "./feedSource";
 import { ALPHA_MARKETPLACE_KNOWLEDGE } from "../lib/dealer";
 
 const ALPHA = "Alpha Motorsport";
-const LUCKY_MAZDA = "Lucky Mazda";
+const LUCKI_MAZDA = "Lucki Mazda";
+const LEGACY_LUCKY_MAZDA = "Lucky Mazda";
 const REAL_FEED_URL = "https://www.alphamotorsport.net/facebook-catalog-feed.xml";
 
 function isSampleFeedUrl(url: string | null | undefined): boolean {
@@ -119,7 +120,7 @@ export async function seedDealerAndInventory(log: Logger): Promise<void> {
 }
 
 /**
- * Creates the Lucky Mazda dealer shell without inventing inventory/feed data.
+ * Creates the Lucki Mazda dealer shell without inventing inventory/feed data.
  * The account is Marketplace-only for now; its XML feed and vehicles are added
  * later when the dealership provides the direct automotive inventory feed.
  */
@@ -127,25 +128,30 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
   const [existing] = await db
     .select()
     .from(dealersTable)
-    .where(eq(dealersTable.name, LUCKY_MAZDA))
+    .where(or(eq(dealersTable.name, LUCKI_MAZDA), eq(dealersTable.name, LEGACY_LUCKY_MAZDA)))
     .limit(1);
 
   if (existing) {
-    log.info({ dealerId: existing.id }, "Lucky Mazda dealer already exists; inventory remains unconfigured");
+    if (existing.name !== LUCKI_MAZDA) {
+      await db.update(dealersTable).set({ name: LUCKI_MAZDA }).where(eq(dealersTable.id, existing.id));
+      log.info({ dealerId: existing.id }, "Normalized dealer display name to Lucki Mazda");
+      return { ...existing, name: LUCKI_MAZDA };
+    }
+    log.info({ dealerId: existing.id }, "Lucki Mazda dealer already exists; inventory remains unconfigured");
     return existing;
   }
 
   const [created] = await db
     .insert(dealersTable)
     .values({
-      name: LUCKY_MAZDA,
+      name: LUCKI_MAZDA,
       plan: "basic",
       status: "Active",
-      notes: "Marketplace-only account. XML inventory feed pending from Lucky Mazda.",
+      notes: "Marketplace-only account. XML inventory feed pending from Lucki Mazda.",
       marketplaceKnowledge: {},
     })
     .returning();
 
-  log.info({ dealerId: created!.id }, "Seeded Lucky Mazda dealer shell without inventory");
+  log.info({ dealerId: created!.id }, "Seeded Lucki Mazda dealer shell without inventory");
   return created!;
 }

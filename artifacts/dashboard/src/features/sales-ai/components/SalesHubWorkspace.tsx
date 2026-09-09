@@ -13,13 +13,19 @@ import {
   useGetDealer,
   getGetDealerQueryKey,
   useGetVehicleStats,
+  getGetVehicleStatsQueryKey,
   useListListingWorkspaces,
+  getListListingWorkspacesQueryKey,
   useListPublishingJobs,
+  getListPublishingJobsQueryKey,
   useListCreativeJobs,
+  getListCreativeJobsQueryKey,
   useGetLeads,
+  getGetLeadsQueryKey,
   useListFeedRuns,
   getListFeedRunsQueryKey,
   useListMarketplaceRecommendations,
+  getListMarketplaceRecommendationsQueryKey,
   useBulkSchedulePublishing,
 } from "@workspace/api-client-react";
 import { useDealerLocation } from "@/context/LocationContext";
@@ -667,13 +673,50 @@ export function SalesHub() {
   const { selectedLocation } = useDealerLocation();
   const locationFilter = selectedLocation || undefined;
 
-  const { data: vehicleStats } = useGetVehicleStats({ location: locationFilter });
-  const { data: workspacesData, isLoading: workspacesLoading } = useListListingWorkspaces({ location: locationFilter });
-  const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations({ location: locationFilter });
-  const { data: jobsData } = useListPublishingJobs({ location: locationFilter });
-  const { data: creativeJobs } = useListCreativeJobs();
+  const { data: vehicleStats } = useGetVehicleStats(
+    { location: locationFilter },
+    {
+      query: {
+        enabled: !!dealerId,
+        queryKey: [...getGetVehicleStatsQueryKey({ location: locationFilter }), dealerId],
+      },
+    },
+  );
+  const { data: workspacesData, isLoading: workspacesLoading } = useListListingWorkspaces(
+    { location: locationFilter },
+    {
+      query: {
+        enabled: !!dealerId,
+        queryKey: [...getListListingWorkspacesQueryKey({ location: locationFilter }), dealerId],
+      },
+    },
+  );
+  const { data: recsData, isLoading: recsLoading } = useListMarketplaceRecommendations(
+    { location: locationFilter },
+    {
+      query: {
+        enabled: !!dealerId,
+        queryKey: [...getListMarketplaceRecommendationsQueryKey({ location: locationFilter }), dealerId],
+      },
+    },
+  );
+  const { data: jobsData } = useListPublishingJobs(
+    { location: locationFilter },
+    {
+      query: {
+        enabled: !!dealerId,
+        queryKey: [...getListPublishingJobsQueryKey({ location: locationFilter }), dealerId],
+      },
+    },
+  );
+  const { data: creativeJobs } = useListCreativeJobs(undefined, {
+    query: {
+      enabled: !!dealerId,
+      queryKey: [...getListCreativeJobsQueryKey(), dealerId],
+    },
+  });
   const { data: leads } = useGetLeads({
-    query: { queryKey: ["/api/leads", dealerId] },
+    query: { enabled: !!dealerId, queryKey: [...getGetLeadsQueryKey(), dealerId] },
   });
   const { data: feedRuns } = useListFeedRuns(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getListFeedRunsQueryKey(dealerId!) },

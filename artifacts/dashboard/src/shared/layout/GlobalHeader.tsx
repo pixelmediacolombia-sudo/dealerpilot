@@ -242,7 +242,11 @@ export function GlobalHeader() {
     query: { queryKey: getListFeedRunsQueryKey(dealerId ?? 1), enabled: true, staleTime: 60000 },
   });
   const { data: jobsData } = useListCreativeJobs(undefined, {
-    query: { queryKey: getListCreativeJobsQueryKey(), refetchInterval: 10000 },
+    query: {
+      enabled: !!dealerId,
+      queryKey: [...getListCreativeJobsQueryKey(), dealerId],
+      refetchInterval: 10000,
+    },
   });
   const { mutate: connectMarketplace, isPending } = useConnectMarketplace({
     mutation: {
