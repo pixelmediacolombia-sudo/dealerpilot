@@ -114,7 +114,8 @@ test("dashboard timelines keep every dealer's cache isolated", () => {
   assert.match(salesHubWorkspace, /getListMarketplaceRecommendationsQueryKey\(\{ location: locationFilter \}\), dealerId/);
   assert.match(salesHubWorkspace, /getListPublishingJobsQueryKey\(\{ location: locationFilter \}\), dealerId/);
   assert.match(salesHubWorkspace, /getListCreativeJobsQueryKey\(\), dealerId/);
-  assert.match(salesHubWorkspace, /getGetLeadsQueryKey\(\), dealerId/);
+  assert.match(salesHubWorkspace, /useListLeads/);
+  assert.match(salesHubWorkspace, /getListLeadsQueryKey\(\{ dealerId \}\), dealerId/);
   assert.match(globalHeader, /getListCreativeJobsQueryKey\(\), dealerId/);
   assert.match(connectionCenter, /getGetSystemTimelineQueryKey\(\{ limit: 8 \}\), dealerId/);
 });

@@ -20,8 +20,8 @@ import {
   getListPublishingJobsQueryKey,
   useListCreativeJobs,
   getListCreativeJobsQueryKey,
-  useGetLeads,
-  getGetLeadsQueryKey,
+  useListLeads,
+  getListLeadsQueryKey,
   useListFeedRuns,
   getListFeedRunsQueryKey,
   useListMarketplaceRecommendations,
@@ -715,9 +715,15 @@ export function SalesHub() {
       queryKey: [...getListCreativeJobsQueryKey(), dealerId],
     },
   });
-  const { data: leads } = useGetLeads({
-    query: { enabled: !!dealerId, queryKey: [...getGetLeadsQueryKey(), dealerId] },
-  });
+  const { data: leads } = useListLeads(
+    { dealerId },
+    {
+      query: {
+        enabled: !!dealerId,
+        queryKey: [...getListLeadsQueryKey({ dealerId }), dealerId],
+      },
+    },
+  );
   const { data: feedRuns } = useListFeedRuns(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getListFeedRunsQueryKey(dealerId!) },
   });

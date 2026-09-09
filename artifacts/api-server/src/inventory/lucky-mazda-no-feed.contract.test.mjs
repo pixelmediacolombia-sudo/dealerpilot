@@ -13,6 +13,7 @@ const auth = read("../routes/auth.ts");
 test("Lucki Mazda is seeded as an idempotent Marketplace-only dealer shell", () => {
   assert.match(seed, /const LUCKI_MAZDA = "Lucki Mazda"/);
   assert.match(seed, /const LEGACY_LUCKY_MAZDA = "Lucky Mazda"/);
+  assert.match(seed, /const LUCKI_NOTES = "Marketplace-only account\. XML inventory feed pending from Lucki Mazda\."/);
   assert.match(seed, /or\(eq\(dealersTable\.name, LUCKI_MAZDA\), eq\(dealersTable\.name, LEGACY_LUCKY_MAZDA\)\)/);
   assert.match(seed, /export async function seedLuckyMazdaDealer/);
   assert.match(seed, /name: LUCKI_MAZDA/);
@@ -20,6 +21,7 @@ test("Lucki Mazda is seeded as an idempotent Marketplace-only dealer shell", () 
   assert.match(seed, /status: "Active"/);
   assert.match(seed, /marketplaceKnowledge: \{\}/);
   assert.match(seed, /XML inventory feed pending from Lucki Mazda/);
+  assert.match(seed, /existing\.notes === LEGACY_LUCKY_NOTES/);
   const luckiInsert = seed.match(/\.values\(\{\s*name: LUCKI_MAZDA,[\s\S]*?marketplaceKnowledge: \{\},\s*\}\)/)?.[0] ?? "";
   assert.doesNotMatch(luckiInsert, /xmlFeedUrl/);
   assert.match(index, /\.then\(\(\) => seedLuckyMazdaDealer\(logger\)\)/);

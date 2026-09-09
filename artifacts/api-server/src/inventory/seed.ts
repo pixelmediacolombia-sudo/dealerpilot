@@ -8,6 +8,8 @@ import { ALPHA_MARKETPLACE_KNOWLEDGE } from "../lib/dealer";
 const ALPHA = "Alpha Motorsport";
 const LUCKI_MAZDA = "Lucki Mazda";
 const LEGACY_LUCKY_MAZDA = "Lucky Mazda";
+const LEGACY_LUCKY_NOTES = "Marketplace-only account. XML inventory feed pending from Lucky Mazda.";
+const LUCKI_NOTES = "Marketplace-only account. XML inventory feed pending from Lucki Mazda.";
 const REAL_FEED_URL = "https://www.alphamotorsport.net/facebook-catalog-feed.xml";
 
 function isSampleFeedUrl(url: string | null | undefined): boolean {
@@ -133,9 +135,12 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
 
   if (existing) {
     if (existing.name !== LUCKI_MAZDA) {
-      await db.update(dealersTable).set({ name: LUCKI_MAZDA }).where(eq(dealersTable.id, existing.id));
+      await db
+        .update(dealersTable)
+        .set({ name: LUCKI_MAZDA, ...(existing.notes === LEGACY_LUCKY_NOTES ? { notes: LUCKI_NOTES } : {}) })
+        .where(eq(dealersTable.id, existing.id));
       log.info({ dealerId: existing.id }, "Normalized dealer display name to Lucki Mazda");
-      return { ...existing, name: LUCKI_MAZDA };
+      return { ...existing, name: LUCKI_MAZDA, ...(existing.notes === LEGACY_LUCKY_NOTES ? { notes: LUCKI_NOTES } : {}) };
     }
     log.info({ dealerId: existing.id }, "Lucki Mazda dealer already exists; inventory remains unconfigured");
     return existing;
@@ -147,7 +152,7 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
       name: LUCKI_MAZDA,
       plan: "basic",
       status: "Active",
-      notes: "Marketplace-only account. XML inventory feed pending from Lucki Mazda.",
+      notes: LUCKI_NOTES,
       marketplaceKnowledge: {},
     })
     .returning();
