@@ -1195,7 +1195,7 @@ function buildBaseSafeFallbackReply(
       return `Con gusto, nuestro número es ${storePhone}. Quedamos atentos.`;
     }
     if (stage === "phone_received") {
-      return "Gracias por tu número. Un agente de ventas te contactará en breve. Quedamos atentos.";
+      return "Gracias por tu número. Un agente de ventas te contactará en breve. ¡Que tengas un buen día!";
     }
     if (stage === "handoff_confirmation") {
       return "Gracias por la oferta. Un vendedor la revisará contigo en breve.";
@@ -1324,7 +1324,7 @@ function buildBaseSafeFallbackReply(
       return `Of course, our number is ${storePhone}. We are here if you need anything else.`;
     }
   if (stage === "phone_received") {
-    return "Thanks for your number. A sales agent will reach out to you shortly. We remain available.";
+    return "Thanks for your number. A sales agent will reach out to you shortly. Goodbye, and have a great day!";
   }
   if (stage === "handoff_confirmation") {
     return "Thanks for the offer. A salesperson will review it with you shortly.";
@@ -1633,7 +1633,7 @@ function isAiReplyAligned(
   if (stage === "phone_received") {
     return /(?:sales agent|salesperson|sales representative|agente de ventas|vendedor)/.test(normalized) &&
       /(?:reach out|contact|contactar|comunicar|pondr[aá] en contacto)/.test(normalized) &&
-      /(?:thank|thanks|gracias|goodbye|quedamos atentos|we remain available|we are here if you need anything else|nos vemos|inter[eé]s)/.test(normalized) &&
+      /(?:thank|thanks|gracias|goodbye|good day|great day|have a .* day|quedamos atentos|que tengas un buen dia|que tengas un excelente dia|we remain available|we are here if you need anything else|nos vemos|inter[eé]s)/.test(normalized) &&
       !/\?/.test(reply);
   }
   if (stage === "handoff_confirmation") {
@@ -2200,6 +2200,13 @@ export async function generateAiReply(
   void publishedDownPayment;
   void vehicleType;
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
+  // Phone capture is terminal for the automated flow: always send the
+  // deterministic farewell before the extension closes after delivery.
+  if (stage === "phone_received") {
+    return language === "es"
+      ? "Gracias por tu número. Un agente de ventas te contactará en breve. ¡Que tengas un buen día!"
+      : "Thanks for your number. A sales agent will reach out to you shortly. Goodbye, and have a great day!";
+  }
   const askForBuyerPhone = stage === "qualified_exit" && shouldAskBuyerPhoneAfterQualification(visibleMessages);
   const persistentUnansweredBuyerTurns = hasPersistentUnansweredBuyerTurns(
     visibleMessages,

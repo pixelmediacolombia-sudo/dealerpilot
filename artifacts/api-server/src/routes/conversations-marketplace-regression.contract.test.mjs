@@ -32,8 +32,9 @@ test("phone capture closes with a neutral handoff and no follow-up question", ()
     "the current phone turn must not be treated as already known",
   );
   assert.match(source, /phone_received: "The buyer provided a phone number[\s\S]*brief goodbye/);
-  assert.match(source, /Thanks for your number\. A sales agent will reach out to you shortly\. We remain available\./);
-  assert.match(source, /Gracias por tu número\. Un agente de ventas te contactará en breve\. Quedamos atentos\./);
+  assert.match(source, /Thanks for your number\. A sales agent will reach out to you shortly\. Goodbye, and have a great day!/);
+  assert.match(source, /Gracias por tu número\. Un agente de ventas te contactará en breve\. ¡Que tengas un buen día!/);
+  assert.match(source, /stage === "phone_received"[\s\S]{0,260}Goodbye, and have a great day/);
   assert.match(source, /closeConversationAfterDelivery: retryStage === "phone_received"/);
   assert.doesNotMatch(
     source,
