@@ -34,7 +34,12 @@ test("phone capture closes with a neutral handoff and no follow-up question", ()
   assert.match(source, /phone_received: "The buyer provided a phone number[\s\S]*brief goodbye/);
   assert.match(source, /Thanks for your number\. A sales agent will reach out to you shortly\. We remain available\./);
   assert.match(source, /Gracias por tu número\. Un agente de ventas te contactará en breve\. Quedamos atentos\./);
-  assert.match(source, /closeConversationAfterDelivery: retryStage === "store_phone_requested" \|\| retryStage === "phone_received"/);
+  assert.match(source, /closeConversationAfterDelivery: retryStage === "phone_received"/);
+  assert.doesNotMatch(
+    source,
+    /closeConversationAfterDelivery: retryStage === "store_phone_requested"/,
+    "retrying a dealership-phone request must not close the conversation",
+  );
   assert.match(source, /const closeAfterDelivery = immediateHandoffReason === "buyer_phone_received" \|\| \[/);
   assert.doesNotMatch(source, /closeConversationAfterDelivery: [^\n]*qualified_exit/);
 });

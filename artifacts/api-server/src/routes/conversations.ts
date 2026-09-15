@@ -3058,7 +3058,7 @@ router.post("/conversations/intake", async (req, res) => {
         suggestedReply: retryableReply,
         deliveryRetry: true,
         outboundJob,
-        closeConversationAfterDelivery: retryStage === "store_phone_requested" || retryStage === "phone_received",
+        closeConversationAfterDelivery: retryStage === "phone_received",
         language,
         fallbackUsed: retryFallbackUsed,
         fallbackReason: retryFallbackReason,
