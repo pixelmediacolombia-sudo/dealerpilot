@@ -150,7 +150,13 @@ export interface ErrorResponse {
   error: string;
 }
 
-export type DealerPlan = "basic" | "complete";
+export type DealerPlan = typeof DealerPlan[keyof typeof DealerPlan];
+
+
+export const DealerPlan = {
+  basic: 'basic',
+  complete: 'complete',
+} as const;
 
 export interface Dealer {
   id: number;
@@ -159,6 +165,12 @@ export interface Dealer {
   websiteUrl?: string | null;
   /** @nullable */
   xmlFeedUrl?: string | null;
+  /** @nullable */
+  providerName?: string | null;
+  /** @nullable */
+  providerDealerId?: string | null;
+  /** @nullable */
+  feedAuthMode?: string | null;
   plan: DealerPlan;
   status: string;
   /** @nullable */
@@ -177,12 +189,20 @@ export interface DealerList {
   dealers: Dealer[];
 }
 
+export type DealerUpdatePlan = typeof DealerUpdatePlan[keyof typeof DealerUpdatePlan];
+
+
+export const DealerUpdatePlan = {
+  basic: 'basic',
+  complete: 'complete',
+} as const;
+
 export interface DealerUpdate {
   /** @minLength 1 */
   name?: string;
   websiteUrl?: string;
   xmlFeedUrl?: string;
-  plan?: DealerPlan;
+  plan?: DealerUpdatePlan;
   status?: string;
   notes?: string;
 }
@@ -242,10 +262,17 @@ export interface Vehicle {
   /** @nullable */
   primaryImageUrl?: string | null;
   imageCount: number;
-  /** @nullable */
+  /**
+     * Facebook Marketplace listing URL previously captured for this vehicle.
+     * @nullable
+     */
   marketplaceListingUrl: string | null;
-  /** @nullable */
+  /**
+     * DealerPilot's current Marketplace lifecycle status for this vehicle.
+     * @nullable
+     */
   marketplaceListingStatus: string | null;
+  /** True when the vehicle is sold and its captured Marketplace listing still requires removal. */
   marketplaceRemovalRequired: boolean;
   /** @nullable */
   lastSyncAt?: string | null;
@@ -1036,6 +1063,13 @@ export interface PublishingBatch {
   failedCount: number;
   skippedCount: number;
   needsReviewCount: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  progressPercent?: number;
+  /** @nullable */
+  currentStep?: string | null;
   /** @nullable */
   scheduledAt?: string | null;
   /** @nullable */
@@ -2087,6 +2121,10 @@ sort?: ListVehiclesSort;
  * Filter by lot location (e.g. Manassas, Manassas)
  */
 location?: string;
+/**
+ * Dealer scope for non-dashboard callers; authenticated dashboards are always scoped server-side
+ */
+dealerId?: number;
 };
 
 export type ListVehiclesSort = typeof ListVehiclesSort[keyof typeof ListVehiclesSort];
@@ -2104,6 +2142,10 @@ export type GetVehicleStatsParams = {
  * Filter by lot location (e.g. Manassas, Manassas)
  */
 location?: string;
+/**
+ * Dealer scope for non-dashboard callers; authenticated dashboards are always scoped server-side
+ */
+dealerId?: number;
 };
 
 export type BulkVehicleAction200 = {

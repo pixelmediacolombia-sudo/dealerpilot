@@ -1,4 +1,11 @@
-import { CURRENT_SAMPLE_FEED } from "./sampleFeed";
+import { CURRENT_SAMPLE_FEED } from "./sampleFeed.ts";
+
+export type FetchFeedOptions = {
+  headers?: Readonly<Record<string, string>>;
+  timeoutMs?: number;
+};
+
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 // Hosts that must never be fetched: a dealer-supplied feed URL is attacker-
 // controllable input, so we block loopback/link-local/metadata targets to
@@ -38,7 +45,10 @@ function isBlockedHost(hostname: string): boolean {
 // Resolve a dealer's feed URL to XML text. The built-in sample feed is served
 // locally (no network round-trip) so the spike works offline; any other URL is
 // fetched over HTTP after SSRF validation.
-export async function fetchFeedXml(url: string | null | undefined): Promise<string> {
+export async function fetchFeedXml(
+  url: string | null | undefined,
+  options: FetchFeedOptions = {},
+): Promise<string> {
   const trimmed = (url ?? "").trim();
   if (
     trimmed === "" ||
@@ -61,9 +71,30 @@ export async function fetchFeedXml(url: string | null | undefined): Promise<stri
     throw new Error(`Feed URL host is not allowed: ${parsed.hostname}`);
   }
 
-  const res = await fetch(parsed.toString(), { redirect: "error" });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(parsed.toString(), {
+      redirect: "error",
+      headers: options.headers,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("Feed request timed out");
+    if (error instanceof TypeError) throw new Error("Feed request failed before receiving a response");
+    throw new Error("Feed request failed before receiving a response");
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!res.ok) {
     throw new Error(`Feed request failed: ${res.status} ${res.statusText}`);
   }
-  return await res.text();
+  const contentType = res.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!contentType.includes("xml") && !contentType.includes("rss") && !contentType.includes("atom")) {
+    throw new Error("Feed response was not XML");
+  }
+  const body = await res.text();
+  if (!body.trim()) throw new Error("Feed response was empty");
+  return body;
 }

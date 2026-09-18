@@ -5,12 +5,13 @@ import { getNextSyncAt, runInventorySync } from "../inventory/scheduler";
 import { ALPHA_DEALER_ID } from "../lib/dealer";
 import { db, feedIngestionsTable, vehiclesTable } from "@workspace/db";
 import { and, desc, eq, gte, lt } from "drizzle-orm";
+import { resolveDealerId } from "./auth";
 
 const router: IRouter = Router();
 
 router.get("/inventory/sold", async (req, res) => {
   try {
-    const dealerId = Number(req.query.dealer_id ?? req.query.dealerId ?? ALPHA_DEALER_ID);
+    const dealerId = resolveDealerId(req, res, ALPHA_DEALER_ID);
     const date = typeof req.query.date === "string" ? req.query.date : "today";
     if (!Number.isInteger(dealerId) || dealerId <= 0) {
       res.status(400).json({ error: "Invalid dealer_id" });
@@ -36,7 +37,7 @@ router.get("/inventory/sold", async (req, res) => {
 
 router.get("/feed/ingestions", async (req, res) => {
   try {
-    const dealerId = Number(req.query.dealer_id ?? req.query.dealerId ?? ALPHA_DEALER_ID);
+    const dealerId = resolveDealerId(req, res, ALPHA_DEALER_ID);
     const requestedLimit = Number(req.query.limit ?? 20);
     const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20;
     if (!Number.isInteger(dealerId) || dealerId <= 0) {
@@ -63,7 +64,8 @@ router.get("/sample-feed", (req, res) => {
 
 router.get("/inventory/health", async (req, res) => {
   try {
-    const report = await computeFeedHealth(1, getNextSyncAt());
+    const dealerId = resolveDealerId(req, res, ALPHA_DEALER_ID);
+    const report = await computeFeedHealth(dealerId, getNextSyncAt());
     res.json(report);
   } catch (err) {
     req.log.error({ err }, "Failed to compute inventory health");

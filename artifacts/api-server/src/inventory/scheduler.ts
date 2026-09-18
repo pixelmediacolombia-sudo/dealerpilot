@@ -7,6 +7,11 @@ import { seedOpportunityScores } from "../intelligence/seed";
 import { ALPHA_DEALER_ID } from "../lib/dealer";
 import { db, dealersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import {
+  assertLuckiMazdaFeedConfig,
+  getLuckiMazdaFeedConfig,
+  LUCKI_MAZDA_DEALER_ID,
+} from "./dealerFeedConfig";
 
 // Scheduling itself (24h interval, startup catch-up) is owned by the Worker
 // Framework (see ../workers/index.ts). This module only tracks the
@@ -95,7 +100,11 @@ async function syncDealer(
   const startedAt = new Date();
   log.info({ trigger, dealerId, startedAt }, "Inventory sync starting");
 
-  const xml = await fetchFeedXml(dealer.xmlFeedUrl);
+  const luckiConfig = dealerId === LUCKI_MAZDA_DEALER_ID
+    ? assertLuckiMazdaFeedConfig(getLuckiMazdaFeedConfig())
+    : null;
+  const feedUrl = luckiConfig?.xmlFeedUrl ?? dealer.xmlFeedUrl;
+  const xml = await fetchFeedXml(feedUrl, luckiConfig ? { headers: luckiConfig.headers } : undefined);
   const summary = await importFeed(dealer.id, xml, log, {
     trigger: trigger === "manual" ? "manual" : "auto",
   });
@@ -130,7 +139,7 @@ async function syncDealer(
 
   // Disabled by default: photo enhancement is run per selected/publishing vehicle,
   // not across every imported vehicle.
-  if (summary.created > 0 || summary.updated > 0) {
+  if (dealerId === ALPHA_DEALER_ID && (summary.created > 0 || summary.updated > 0)) {
     try {
       const { enqueued, skipped } = await autoEnqueueAfterImport(dealer.id, log);
       log.info({ enqueued, skipped, trigger, dealerId }, "photo:auto-enqueue triggered by inventory sync");

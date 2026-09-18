@@ -220,10 +220,11 @@ router.get("/vehicles", async (req, res) => {
 
 router.get("/vehicles/:id", async (req, res) => {
   const id = Number(req.params.id);
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const [vehicle] = await db
     .select(vehicleResponseColumns)
     .from(vehiclesTable)
-    .where(eq(vehiclesTable.id, id));
+    .where(and(eq(vehiclesTable.id, id), eq(vehiclesTable.dealerId, dealerId)));
   if (!vehicle) {
     res.status(404).json({ error: "Vehicle not found" });
     return;
@@ -284,11 +285,12 @@ router.post("/vehicles/bulk", async (req, res) => {
   }
   const { vehicleIds, action } = parsed.data;
   const status = STATUS_MAP[action]!;
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
 
   const updated = await db
     .update(vehiclesTable)
     .set({ status })
-    .where(inArray(vehiclesTable.id, vehicleIds))
+    .where(and(eq(vehiclesTable.dealerId, dealerId), inArray(vehiclesTable.id, vehicleIds)))
     .returning({ id: vehiclesTable.id });
 
   if (updated.length > 0) {
@@ -320,6 +322,7 @@ const DownPaymentOverrideBody = z.object({
 
 router.patch("/vehicles/:id/down-payment", async (req, res) => {
   const id = Number(req.params.id);
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const parsed = DownPaymentOverrideBody.safeParse(req.body ?? {});
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid vehicle down-payment override", issues: parsed.error.issues });
@@ -342,7 +345,7 @@ router.patch("/vehicles/:id/down-payment", async (req, res) => {
       downPaymentOverrideEffectiveFrom: effectiveFrom,
       downPaymentOverrideEffectiveTo: effectiveTo,
     })
-    .where(eq(vehiclesTable.id, id))
+    .where(and(eq(vehiclesTable.id, id), eq(vehiclesTable.dealerId, dealerId)))
     .returning();
   if (!updated) {
     res.status(404).json({ error: "Vehicle not found" });
@@ -354,6 +357,7 @@ router.patch("/vehicles/:id/down-payment", async (req, res) => {
 
 router.patch("/vehicles/:id/status", async (req, res) => {
   const id = Number(req.params.id);
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const parsed = StatusBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid status" });
@@ -362,7 +366,7 @@ router.patch("/vehicles/:id/status", async (req, res) => {
   const [updated] = await db
     .update(vehiclesTable)
     .set({ status: parsed.data.status })
-    .where(eq(vehiclesTable.id, id))
+    .where(and(eq(vehiclesTable.id, id), eq(vehiclesTable.dealerId, dealerId)))
     .returning();
   if (!updated) {
     res.status(404).json({ error: "Vehicle not found" });

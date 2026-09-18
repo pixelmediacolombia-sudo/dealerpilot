@@ -30,3 +30,57 @@ test("inventory parser keeps the physical feed city and catalog dealer id", () =
     ],
   );
 });
+
+test("inventory parser deduplicates repeated VINs and merges photos and changes", () => {
+  const xml = `<?xml version="1.0"?>
+    <inventory xmlns:v="urn:dealerpilot:inventory"><v:vehicle>
+      <v:vin>1REPEATVIN</v:vin><v:vehicle_id>STK-1</v:vehicle_id>
+      <v:make>Mazda</v:make><v:model>CX-5</v:model><v:year>2022</v:year>
+      <v:price>24995</v:price><v:mileage>31000</v:mileage>
+      <v:photo><v:url>https://img.example.test/one.jpg</v:url></v:photo>
+      <v:photo><v:url>https://img.example.test/two.jpg</v:url></v:photo>
+    </v:vehicle><v:vehicle>
+      <v:vin>1REPEATVIN</v:vin><v:vehicle_id>STK-1</v:vehicle_id>
+      <v:make>Mazda</v:make><v:model>CX-5</v:model><v:price>23995</v:price>
+      <v:mileage>32000</v:mileage><v:description>Updated description</v:description>
+      <v:photo><v:url>https://img.example.test/two.jpg</v:url></v:photo>
+      <v:photo><v:url>https://img.example.test/three.jpg</v:url></v:photo>
+    </v:vehicle></inventory>`;
+
+  const result = parseInventoryXml(xml);
+  assert.equal(result.rawCount, 2);
+  assert.equal(result.errors, 0);
+  assert.equal(result.vehicles.length, 1);
+  assert.partialDeepStrictEqual(result.vehicles[0], {
+    vin: "1REPEATVIN",
+    stockNumber: "STK-1",
+    price: 23995,
+    mileage: 32000,
+    description: "Updated description",
+    lotLocation: null,
+  });
+  assert.deepEqual(
+    result.vehicles[0].images.map((image) => image.url),
+    [
+      "https://img.example.test/one.jpg",
+      "https://img.example.test/two.jpg",
+      "https://img.example.test/three.jpg",
+    ],
+  );
+});
+
+test("inventory parser preserves explicit unknown locations but never invents one", () => {
+  const xml = `<?xml version="1.0"?>
+    <inventory><vehicle><vin>1NOLOCATION</vin><vehicle_id>S-2</vehicle_id>
+      <make>Mazda</make><model>3</model><year>2021</year>
+      <dealer_id>148954</dealer_id><vdp_url>https://dealer.example.test/vehicles/1</vdp_url>
+    </vehicle><vehicle><vin>1EXPLICITLOCATION</vin><vehicle_id>S-3</vehicle_id>
+      <make>Mazda</make><model>CX-30</model><location>Woodbridge</location>
+    </vehicle></inventory>`;
+
+  const result = parseInventoryXml(xml);
+  assert.equal(result.vehicles[0].feedDealerId, "148954");
+  assert.equal(result.vehicles[0].vdpUrl, "https://dealer.example.test/vehicles/1");
+  assert.equal(result.vehicles[0].lotLocation, null);
+  assert.equal(result.vehicles[1].lotLocation, "Woodbridge");
+});

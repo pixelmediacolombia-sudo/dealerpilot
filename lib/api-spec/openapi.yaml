@@ -333,6 +333,11 @@ paths:
           required: false
           schema: { type: string }
           description: Filter by lot location (e.g. Manassas, Manassas)
+        - name: dealerId
+          in: query
+          required: false
+          schema: { type: integer }
+          description: Dealer scope for non-dashboard callers; authenticated dashboards are always scoped server-side
       responses:
         "200":
           description: Vehicle list
@@ -351,6 +356,11 @@ paths:
           required: false
           schema: { type: string }
           description: Filter by lot location (e.g. Manassas, Manassas)
+        - name: dealerId
+          in: query
+          required: false
+          schema: { type: integer }
+          description: Dealer scope for non-dashboard callers; authenticated dashboards are always scoped server-side
       responses:
         "200":
           description: Inventory stats
@@ -2367,6 +2377,9 @@ components:
         name: { type: string }
         websiteUrl: { type: ["string", "null"] }
         xmlFeedUrl: { type: ["string", "null"] }
+        providerName: { type: ["string", "null"] }
+        providerDealerId: { type: ["string", "null"] }
+        feedAuthMode: { type: ["string", "null"] }
         plan: { type: string, enum: [basic, complete], default: complete }
         status: { type: string }
         notes: { type: ["string", "null"] }

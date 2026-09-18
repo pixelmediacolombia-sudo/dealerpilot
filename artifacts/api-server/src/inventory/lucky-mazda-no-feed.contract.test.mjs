@@ -5,6 +5,7 @@ import { test } from "node:test";
 const read = (path) => readFileSync(new URL(`./${path}`, import.meta.url), "utf8");
 
 const seed = read("seed.ts");
+const config = read("dealerFeedConfig.ts");
 const scheduler = read("scheduler.ts");
 const dealersRoute = read("../routes/dealers.ts");
 const index = read("../index.ts");
@@ -13,7 +14,13 @@ const auth = read("../routes/auth.ts");
 test("Lucki Mazda is seeded as an idempotent Marketplace-only dealer shell", () => {
   assert.match(seed, /const LUCKI_MAZDA = "Lucki Mazda"/);
   assert.match(seed, /const LEGACY_LUCKY_MAZDA = "Lucky Mazda"/);
-  assert.match(seed, /const LUCKI_NOTES = "Marketplace-only account\. XML inventory feed pending from Lucki Mazda\."/);
+  assert.match(seed, /const LUCKI_NOTES_PENDING = "Marketplace-only account\. XML inventory feed pending from Lucki Mazda\."/);
+  assert.match(config, /VINCUE_LUCKI_MAZDA_DEALER_ID/);
+  assert.match(config, /VINCUE_LUCKI_MAZDA_XML_URL/);
+  assert.match(config, /VINCUE_API_KEY_LUCKI_MAZDA/);
+  assert.match(seed, /providerName: runtime\.providerName/);
+  assert.match(seed, /providerDealerId: runtime\.providerDealerId/);
+  assert.match(seed, /feedAuthMode: "x-api-key"/);
   assert.match(seed, /or\(eq\(dealersTable\.name, LUCKI_MAZDA\), eq\(dealersTable\.name, LEGACY_LUCKY_MAZDA\)\)/);
   assert.match(seed, /export async function seedLuckyMazdaDealer/);
   assert.match(seed, /name: LUCKI_MAZDA/);
@@ -22,8 +29,7 @@ test("Lucki Mazda is seeded as an idempotent Marketplace-only dealer shell", () 
   assert.match(seed, /marketplaceKnowledge: \{\}/);
   assert.match(seed, /XML inventory feed pending from Lucki Mazda/);
   assert.match(seed, /existing\.notes === LEGACY_LUCKY_NOTES/);
-  const luckiInsert = seed.match(/\.values\(\{\s*name: LUCKI_MAZDA,[\s\S]*?marketplaceKnowledge: \{\},\s*\}\)/)?.[0] ?? "";
-  assert.doesNotMatch(luckiInsert, /xmlFeedUrl/);
+  assert.doesNotMatch(seed, /x-api-key\s*:\s*["']/);
   assert.match(index, /\.then\(\(\) => seedLuckyMazdaDealer\(logger\)\)/);
   assert.match(index, /ensureLuckyMazdaUser\(luckyMazda\.id, logger\)/);
   assert.match(auth, /process\.env\.LUCKY_MAZDA_USERNAME/);

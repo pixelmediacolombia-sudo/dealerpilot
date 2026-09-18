@@ -4,12 +4,14 @@ import type { Logger } from "pino";
 import { importFeed } from "./importFeed";
 import { fetchFeedXml } from "./feedSource";
 import { ALPHA_MARKETPLACE_KNOWLEDGE } from "../lib/dealer";
+import { getLuckiMazdaFeedConfig, LUCKI_MAZDA_DEALER_ID } from "./dealerFeedConfig";
 
 const ALPHA = "Alpha Motorsport";
 const LUCKI_MAZDA = "Lucki Mazda";
 const LEGACY_LUCKY_MAZDA = "Lucky Mazda";
 const LEGACY_LUCKY_NOTES = "Marketplace-only account. XML inventory feed pending from Lucky Mazda.";
-const LUCKI_NOTES = "Marketplace-only account. XML inventory feed pending from Lucki Mazda.";
+const LUCKI_NOTES_PENDING = "Marketplace-only account. XML inventory feed pending from Lucki Mazda.";
+const LUCKI_CONFIGURED_NOTES = "Marketplace-only account. Inventory feed configured through Vincue runtime settings.";
 const REAL_FEED_URL = "https://www.alphamotorsport.net/facebook-catalog-feed.xml";
 
 function isSampleFeedUrl(url: string | null | undefined): boolean {
@@ -122,9 +124,8 @@ export async function seedDealerAndInventory(log: Logger): Promise<void> {
 }
 
 /**
- * Creates the Lucki Mazda dealer shell without inventing inventory/feed data.
- * The account is Marketplace-only for now; its XML feed and vehicles are added
- * later when the dealership provides the direct automotive inventory feed.
+ * Creates or refreshes Lucki Mazda's dealer-scoped Vincue inventory settings.
+ * The API key is read only at runtime and never persisted in dealer metadata.
  */
 export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
   const [existing] = await db
@@ -134,29 +135,74 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
     .limit(1);
 
   if (existing) {
-    if (existing.name !== LUCKI_MAZDA) {
-      await db
-        .update(dealersTable)
-        .set({ name: LUCKI_MAZDA, ...(existing.notes === LEGACY_LUCKY_NOTES ? { notes: LUCKI_NOTES } : {}) })
-        .where(eq(dealersTable.id, existing.id));
-      log.info({ dealerId: existing.id }, "Normalized dealer display name to Lucki Mazda");
-      return { ...existing, name: LUCKI_MAZDA, ...(existing.notes === LEGACY_LUCKY_NOTES ? { notes: LUCKI_NOTES } : {}) };
+    if (existing.id !== LUCKI_MAZDA_DEALER_ID) {
+      throw new Error(`Lucki Mazda must use dealerId=${LUCKI_MAZDA_DEALER_ID}; found dealerId=${existing.id}`);
     }
-    log.info({ dealerId: existing.id }, "Lucki Mazda dealer already exists; inventory remains unconfigured");
-    return existing;
+    const runtime = getLuckiMazdaFeedConfig();
+    const configured = Boolean(
+      runtime.xmlFeedUrl && runtime.providerDealerId && runtime.feedAuthMode === "x-api-key",
+    );
+    const updates = {
+      name: LUCKI_MAZDA,
+      ...(existing.notes === LEGACY_LUCKY_NOTES ? { notes: configured ? LUCKI_CONFIGURED_NOTES : LUCKI_NOTES_PENDING } : {}),
+      ...(configured
+        ? {
+            xmlFeedUrl: runtime.xmlFeedUrl,
+            providerName: runtime.providerName,
+            providerDealerId: runtime.providerDealerId,
+            feedAuthMode: "x-api-key",
+            notes: LUCKI_CONFIGURED_NOTES,
+          }
+        : {}),
+    };
+    const changed =
+      existing.name !== updates.name ||
+      (updates.notes !== undefined && existing.notes !== updates.notes) ||
+      (configured && (
+        existing.xmlFeedUrl !== updates.xmlFeedUrl ||
+        existing.providerName !== updates.providerName ||
+        existing.providerDealerId !== updates.providerDealerId ||
+        existing.feedAuthMode !== updates.feedAuthMode
+      ));
+    const dealer = changed
+      ? (await db.update(dealersTable).set(updates).where(eq(dealersTable.id, existing.id)).returning())[0]!
+      : existing;
+    if (existing.name !== LUCKI_MAZDA) {
+      log.info({ dealerId: existing.id }, "Normalized dealer display name to Lucki Mazda");
+      return dealer;
+    }
+    log.info({ dealerId: existing.id, configured }, configured ? "Lucki Mazda dealer feed configuration refreshed" : "Lucki Mazda dealer already exists; inventory remains unconfigured");
+    return dealer;
   }
 
+  const runtime = getLuckiMazdaFeedConfig();
+  const configured = Boolean(
+    runtime.xmlFeedUrl && runtime.providerDealerId && runtime.feedAuthMode === "x-api-key",
+  );
   const [created] = await db
     .insert(dealersTable)
     .values({
+      id: LUCKI_MAZDA_DEALER_ID,
       name: LUCKI_MAZDA,
       plan: "basic",
       status: "Active",
-      notes: LUCKI_NOTES,
+      notes: configured ? LUCKI_CONFIGURED_NOTES : LUCKI_NOTES_PENDING,
+      ...(configured
+        ? {
+            xmlFeedUrl: runtime.xmlFeedUrl,
+            providerName: runtime.providerName,
+            providerDealerId: runtime.providerDealerId,
+            feedAuthMode: "x-api-key",
+          }
+        : {}),
       marketplaceKnowledge: {},
     })
     .returning();
 
-  log.info({ dealerId: created!.id }, "Seeded Lucki Mazda dealer shell without inventory");
+  if (created!.id !== LUCKI_MAZDA_DEALER_ID) {
+    throw new Error(`Lucki Mazda must use dealerId=${LUCKI_MAZDA_DEALER_ID}; created dealerId=${created!.id}`);
+  }
+
+  log.info({ dealerId: created!.id, configured }, configured ? "Seeded Lucki Mazda dealer with runtime feed configuration" : "Seeded Lucki Mazda dealer shell without inventory");
   return created!;
 }

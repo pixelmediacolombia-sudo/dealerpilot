@@ -74,6 +74,9 @@ async function toDealer(dealer: Dealer) {
     name: dealer.name,
     websiteUrl: dealer.websiteUrl ?? null,
     xmlFeedUrl: dealer.xmlFeedUrl ?? null,
+    providerName: dealer.providerName ?? null,
+    providerDealerId: dealer.providerDealerId ?? null,
+    feedAuthMode: dealer.feedAuthMode ?? null,
     plan: dealer.plan === "basic" ? "basic" : "complete",
     status: dealer.status,
     notes: dealer.notes ?? null,
@@ -167,6 +170,11 @@ function parseConfigDate(value: string | undefined, fallback: Date | null): Date
 
 router.get("/dealers/:id/down-payment-config", async (req, res) => {
   const id = Number(req.params.id);
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  if (authenticatedDealerId !== null && authenticatedDealerId !== id) {
+    res.status(404).json({ error: "Dealer not found" });
+    return;
+  }
   const [dealer] = await db.select({ id: dealersTable.id }).from(dealersTable).where(eq(dealersTable.id, id));
   if (!dealer) {
     res.status(404).json({ error: "Dealer not found" });
@@ -201,6 +209,11 @@ router.get("/dealers/:id/down-payment-config", async (req, res) => {
 
 router.put("/dealers/:id/down-payment-config", async (req, res) => {
   const id = Number(req.params.id);
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  if (authenticatedDealerId !== null && authenticatedDealerId !== id) {
+    res.status(404).json({ error: "Dealer not found" });
+    return;
+  }
   const parsed = DownPaymentConfigBody.safeParse(req.body ?? {});
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid down-payment configuration", issues: parsed.error.issues });
@@ -243,6 +256,11 @@ router.put("/dealers/:id/down-payment-config", async (req, res) => {
 
 router.post("/dealers/:id/sync", async (req, res) => {
   const id = Number(req.params.id);
+  const authenticatedDealerId = getAuthenticatedDealerId(res);
+  if (authenticatedDealerId !== null && authenticatedDealerId !== id) {
+    res.status(404).json({ error: "Dealer not found" });
+    return;
+  }
   const [dealer] = await db.select().from(dealersTable).where(eq(dealersTable.id, id));
   if (!dealer) {
     res.status(404).json({ error: "Dealer not found" });

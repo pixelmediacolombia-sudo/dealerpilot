@@ -31,7 +31,7 @@ export type NormalizedVehicle = {
 };
 
 // Repeated element tag names — bare and Google Base namespaced variants.
-const ARRAY_TAG_LOCALS = new Set(["image", "photo", "picture", "item"]);
+const ARRAY_TAG_LOCALS = new Set(["image", "photo", "picture", "item", "vehicle"]);
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -271,7 +271,42 @@ function canonicalizeLotLocation(value: string | null): string | null {
   const normalized = value.trim().toLowerCase();
   if (normalized.includes("manassas")) return "Manassas";
   if (normalized.includes("fredericksburg")) return "Fredericksburg";
-  return null;
+  // Preserve an explicit provider location without guessing a branch from
+  // dealer name or provider dealer id. Publication policy remains responsible
+  // for deciding whether that location is eligible for Marketplace.
+  return value.trim();
+}
+
+function mergeVehicles(existing: NormalizedVehicle, incoming: NormalizedVehicle): NormalizedVehicle {
+  const preferIncoming = <T>(oldValue: T | null, newValue: T | null): T | null =>
+    newValue !== null && newValue !== undefined && String(newValue).trim() !== ""
+      ? newValue
+      : oldValue;
+  const imageByUrl = new Map<string, FeedImage>();
+  for (const image of [...existing.images, ...incoming.images]) {
+    if (!imageByUrl.has(image.url)) imageByUrl.set(image.url, image);
+  }
+  return {
+    ...existing,
+    stockNumber: preferIncoming(existing.stockNumber, incoming.stockNumber),
+    year: preferIncoming(existing.year, incoming.year),
+    make: incoming.make || existing.make,
+    model: incoming.model || existing.model,
+    trim: preferIncoming(existing.trim, incoming.trim),
+    mileage: preferIncoming(existing.mileage, incoming.mileage),
+    price: preferIncoming(existing.price, incoming.price),
+    exteriorColor: preferIncoming(existing.exteriorColor, incoming.exteriorColor),
+    interiorColor: preferIncoming(existing.interiorColor, incoming.interiorColor),
+    bodyStyle: preferIncoming(existing.bodyStyle, incoming.bodyStyle),
+    transmission: preferIncoming(existing.transmission, incoming.transmission),
+    fuelType: preferIncoming(existing.fuelType, incoming.fuelType),
+    description: preferIncoming(existing.description, incoming.description),
+    vdpUrl: preferIncoming(existing.vdpUrl, incoming.vdpUrl),
+    lotLocation: preferIncoming(existing.lotLocation, incoming.lotLocation),
+    feedDealerId: preferIncoming(existing.feedDealerId, incoming.feedDealerId),
+    images: [...imageByUrl.values()],
+    sourceRaw: incoming.sourceRaw || existing.sourceRaw,
+  };
 }
 
 function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null {
@@ -358,10 +393,15 @@ export type ParseResult = {
 export function parseInventoryXml(xml: string): ParseResult {
   const parsed = parser.parse(xml);
   const nodes = findVehicleNodes(parsed);
-  const vehicles: NormalizedVehicle[] = [];
+  const byVin = new Map<string, NormalizedVehicle>();
+  let parsedNodes = 0;
   for (const node of nodes) {
     const normalized = normalizeNode(node);
-    if (normalized) vehicles.push(normalized);
+    if (!normalized) continue;
+    parsedNodes += 1;
+    const key = normalized.vin.trim().toUpperCase();
+    const previous = byVin.get(key);
+    byVin.set(key, previous ? mergeVehicles(previous, normalized) : normalized);
   }
-  return { vehicles, rawCount: nodes.length, errors: nodes.length - vehicles.length };
+  return { vehicles: [...byVin.values()], rawCount: nodes.length, errors: nodes.length - parsedNodes };
 }

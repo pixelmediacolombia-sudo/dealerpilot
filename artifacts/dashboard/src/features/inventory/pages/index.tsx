@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { AppLayout } from "@/shared/layout/AppLayout";
+import { useAccount } from "@/app/AuthGate";
 import {
   useBulkVehicleAction,
   useBulkGenerateCreative,
@@ -43,12 +44,14 @@ export function InventoryDashboard() {
   const [confirmAction, setConfirmAction] = useState<"mark_sold" | "archive" | null>(null);
 
   const queryClient = useQueryClient();
+  const { dealerId } = useAccount();
   const selection = useVehicleSelection();
   const { selectedLocation } = useDealerLocation();
 
   const locationFilter = selectedLocation || undefined;
 
   const { stats, statsLoading, vehiclesData, vehiclesLoading } = useInventoryVehicles({
+    dealerId,
     search,
     statusFilter,
     sortOrder,
@@ -61,9 +64,9 @@ export function InventoryDashboard() {
   ).length;
 
   const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: getListVehiclesQueryKey() });
-    queryClient.invalidateQueries({ queryKey: getGetVehicleStatsQueryKey() });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: getListVehiclesQueryKey({ dealerId }) });
+    queryClient.invalidateQueries({ queryKey: getGetVehicleStatsQueryKey({ dealerId }) });
+  }, [dealerId, queryClient]);
 
   const bulkStatus = useBulkVehicleAction({
     mutation: {
@@ -182,7 +185,7 @@ export function InventoryDashboard() {
               <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-warning" />
               <div className="text-[13px] leading-relaxed">
                 <span className="font-semibold text-warning">{stats!.noLot} vehicle{stats!.noLot !== 1 ? "s" : ""} with unknown lot location</span>
-                {" — "}these cannot be published to Marketplace until their lot is assigned to Manassas. Use the{" "}
+                {" — "}these cannot be published to Marketplace until their lot is assigned to a verified location. Use the{" "}
                 <span className="font-medium text-warning">location filter</span> to find them (they appear in the "All" view only).
               </div>
             </div>
