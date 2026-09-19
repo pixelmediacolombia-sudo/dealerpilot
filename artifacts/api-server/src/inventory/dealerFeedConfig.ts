@@ -26,7 +26,12 @@ export function getLuckiMazdaFeedConfig(
     providerDealerId,
     xmlFeedUrl,
     feedAuthMode: apiKey ? "x-api-key" : "none",
-    headers: apiKey ? { "x-api-key": apiKey } : {},
+    // Vincue negotiates JSON by default; explicitly request its XML contract.
+    // Keep the API key runtime-only while allowing fetchFeedXml to forward both
+    // provider headers without persisting either one in dealer configuration.
+    headers: apiKey
+      ? { "x-api-key": apiKey, Accept: "application/xml" }
+      : {},
   };
 }
 

@@ -6,12 +6,14 @@ import { parseInventoryXml } from "./xmlEngine.ts";
 
 test("Vincue feed E2E preserves x-api-key request, stock, price, VDP and images", async (t) => {
   let receivedApiKey = null;
+  let receivedAccept = null;
   let receivedPath = null;
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async (input, init) => {
     const requestUrl = new URL(String(input));
     receivedApiKey = init?.headers?.["x-api-key"] ?? null;
+    receivedAccept = init?.headers?.Accept ?? null;
     receivedPath = `${requestUrl.pathname}${requestUrl.search}`;
     return new Response(LUCKI_MAZDA_SERIALIZED_XML, {
       status: 200,
@@ -21,11 +23,12 @@ test("Vincue feed E2E preserves x-api-key request, stock, price, VDP and images"
 
   const xml = await fetchFeedXml(
     "https://provider.example.test/api/Inventory/ActiveInventoryXML?dealerID=148954",
-    { headers: { "x-api-key": "fixture-auth-value" } },
+    { headers: { "x-api-key": "fixture-auth-value", Accept: "application/xml" } },
   );
   const result = parseInventoryXml(xml);
 
   assert.equal(receivedApiKey, "fixture-auth-value");
+  assert.equal(receivedAccept, "application/xml");
   assert.equal(receivedPath, "/api/Inventory/ActiveInventoryXML?dealerID=148954");
   assert.equal(result.rawCount, 1);
   assert.equal(result.vehicles.length, 1);

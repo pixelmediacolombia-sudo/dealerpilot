@@ -14,6 +14,7 @@ test("Lucki runtime config creates x-api-key headers without persisting the key"
   assert.equal(config.xmlFeedUrl, "https://inventory.example.test/lucki.xml");
   assert.equal(config.feedAuthMode, "x-api-key");
   assert.equal(config.headers["x-api-key"], "runtime-only-test-value");
+  assert.equal(config.headers.Accept, "application/xml");
 });
 
 test("Lucki runtime config fails closed when the API key is absent", () => {
