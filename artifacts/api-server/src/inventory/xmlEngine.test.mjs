@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { LUCKI_MAZDA_SERIALIZED_XML } from "./luckiMazdaFixture.mjs";
 import { parseInventoryXml } from "./xmlEngine.ts";
 
 test("inventory parser keeps the physical feed city and catalog dealer id", () => {
@@ -83,4 +84,28 @@ test("inventory parser preserves explicit unknown locations but never invents on
   assert.equal(result.vehicles[0].vdpUrl, "https://dealer.example.test/vehicles/1");
   assert.equal(result.vehicles[0].lotLocation, null);
   assert.equal(result.vehicles[1].lotLocation, "Woodbridge");
+});
+
+test("inventory parser unwraps Vincue's serialized XML response", () => {
+  const result = parseInventoryXml(LUCKI_MAZDA_SERIALIZED_XML);
+
+  assert.equal(result.rawCount, 1);
+  assert.equal(result.vehicles.length, 1);
+  assert.equal(result.errors, 0);
+  assert.partialDeepStrictEqual(result.vehicles[0], {
+    vin: "1SANITIZEDVIN0001",
+    stockNumber: "U00016",
+    year: 2022,
+    make: "Mazda",
+    model: "CX-5",
+    price: 24995,
+    mileage: 31000,
+    feedDealerId: "148954",
+    vdpUrl: "https://dealer.example.test/vdp/U00016",
+    lotLocation: null,
+  });
+  assert.deepEqual(result.vehicles[0].images.map((image) => image.url), [
+    "https://images.example.test/U00016-1.jpg",
+    "https://images.example.test/U00016-2.jpg",
+  ]);
 });

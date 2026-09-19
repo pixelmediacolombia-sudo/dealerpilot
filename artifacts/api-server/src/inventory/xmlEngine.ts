@@ -44,6 +44,56 @@ const parser = new XMLParser({
   },
 });
 
+const wrapperParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: "",
+  trimValues: false,
+  parseTagValue: false,
+});
+
+function decodeXmlEntities(value: string): string {
+  return value.replace(
+    /&(#x[0-9a-f]+|#\d+|lt|gt|amp|quot|apos);/gi,
+    (_entity: string, name: string) => {
+      const normalized = name.toLowerCase();
+      if (normalized === "lt") return "<";
+      if (normalized === "gt") return ">";
+      if (normalized === "amp") return "&";
+      if (normalized === "quot") return '"';
+      if (normalized === "apos") return "'";
+      if (normalized.startsWith("#x")) return String.fromCodePoint(Number.parseInt(normalized.slice(2), 16));
+      return String.fromCodePoint(Number.parseInt(normalized.slice(1), 10));
+    },
+  );
+}
+
+/**
+ * Vincue's ActiveInventoryXML endpoint currently returns a SOAP-style string
+ * wrapper whose text is the actual inventory XML escaped as XML entities:
+ * <string>&lt;inventory&gt;...&lt;/inventory&gt;</string>.
+ * Unwrap exactly one serialization layer before the normal parser runs.
+ */
+function unwrapSerializedXml(xml: string): string {
+  const trimmed = xml.trim();
+  if (!/^<string(?:\s[^>]*)?>/i.test(trimmed)) return xml;
+
+  try {
+    const parsed = wrapperParser.parse(trimmed) as Record<string, unknown>;
+    const value = parsed.string;
+    if (typeof value === "string" && value.trim().startsWith("<")) {
+      return value.trim();
+    }
+    if (typeof value === "string") {
+      const decoded = decodeXmlEntities(value).trim();
+      if (decoded.startsWith("<")) return decoded;
+    }
+  } catch {
+    // Let the primary parser report an empty/invalid feed through its normal
+    // zero-parsed safeguards instead of weakening feed validation here.
+  }
+  return xml;
+}
+
 // Strip namespace prefix ("g:" → ""), lowercase, strip non-alphanumerics.
 // "g:body_style" → "bodystyle"  |  "Stock_Number" → "stocknumber"
 function normalizeKey(key: string): string {
@@ -391,7 +441,7 @@ export type ParseResult = {
 };
 
 export function parseInventoryXml(xml: string): ParseResult {
-  const parsed = parser.parse(xml);
+  const parsed = parser.parse(unwrapSerializedXml(xml));
   const nodes = findVehicleNodes(parsed);
   const byVin = new Map<string, NormalizedVehicle>();
   let parsedNodes = 0;
