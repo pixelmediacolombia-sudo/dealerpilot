@@ -47,6 +47,23 @@ const DEALER_ID = 1;
 
 const router: IRouter = Router();
 
+type ExtensionDealerScope = {
+  extensionId: string;
+  dealerId: number;
+};
+
+async function getExtensionDealerScope(extensionId: string, dealerIdHint?: number): Promise<ExtensionDealerScope | null> {
+  const hasDealerHint = Number.isInteger(dealerIdHint) && (dealerIdHint ?? 0) > 0;
+  const result = await pool.query<{ dealer_id: number | null }>(
+    hasDealerHint
+      ? "select dealer_id from extension_connections where chrome_extension_id = $1 and dealer_id = $2 order by updated_at desc limit 1"
+      : "select dealer_id from extension_connections where chrome_extension_id = $1 order by updated_at desc limit 1",
+    hasDealerHint ? [extensionId, dealerIdHint] : [extensionId],
+  );
+  const dealerId = Number(result.rows[0]?.dealer_id);
+  return Number.isInteger(dealerId) && dealerId > 0 ? { extensionId, dealerId } : null;
+}
+
 // GET /publishing/to-remove — sold inventory that still has a Marketplace listing.
 router.get("/publishing/to-remove", async (req, res) => {
   try {
@@ -218,6 +235,13 @@ router.post("/publishing/jobs/:id/assign", async (req, res) => {
     res.status(404).json({ error: "Job not found" });
     return;
   }
+  if (extensionId) {
+    const extensionScope = await getExtensionDealerScope(extensionId, job.dealerId);
+    if (!extensionScope || extensionScope.dealerId !== job.dealerId) {
+      res.status(403).json({ error: "Extension is not configured for this dealer", code: "EXTENSION_DEALER_MISMATCH" });
+      return;
+    }
+  }
   const [assignVehicle] = await db.select(vehicleOperationalColumns).from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
   if (!assignVehicle || assignVehicle.dealerId !== job.dealerId || !isVerifiedDealerPublishingVehicle(assignVehicle)) {
     res.status(422).json({ error: "Vehicle is not verified for this dealer's configured lot", code: "NON_VERIFIED_LOT" });
@@ -262,6 +286,16 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
     return;
   }
 
+  const requestedDealerId = Number(req.query.dealerId);
+  const extensionScope = await getExtensionDealerScope(
+    extensionId,
+    Number.isInteger(requestedDealerId) && requestedDealerId > 0 ? requestedDealerId : undefined,
+  );
+  if (!extensionScope) {
+    res.json({ job: null, code: "EXTENSION_DEALER_NOT_CONFIGURED" });
+    return;
+  }
+
   const aliases = new Set<string>([extensionId]);
   const connection = await pool.query<{ name: string }>(
     "select name from extension_connections where chrome_extension_id = $1 limit 1",
@@ -269,7 +303,8 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
   );
   if (connection.rows[0]?.name) aliases.add(connection.rows[0].name);
   const onlineConnection = await pool.query<{ name: string | null; chrome_extension_id: string | null }>(
-    "select name, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+    "select name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+    [extensionScope.dealerId],
   );
   const online = onlineConnection.rows[0];
   if (online?.name) aliases.add(online.name);
@@ -287,6 +322,7 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
       .where(
         and(
           eq(publishingJobsTable.status, "Assigned"),
+          eq(publishingJobsTable.dealerId, extensionScope.dealerId),
           isNull(publishingJobsTable.claimedByExtension),
           or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
           or(isNull(publishingJobsTable.assignedExtensionId), ne(publishingJobsTable.assignedExtensionId, extensionId)),
@@ -300,6 +336,7 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
     .where(
       and(
         eq(publishingJobsTable.status, "Assigned"),
+        eq(publishingJobsTable.dealerId, extensionScope.dealerId),
         inArray(publishingJobsTable.assignedExtensionId, [...aliases]),
         or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
         isNull(publishingJobsTable.claimedByExtension),
@@ -349,6 +386,21 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
 // then by created_at ASC (FIFO). This prevents stale Retry jobs from
 // blocking fresh publish_now jobs that share the same priority value.
 router.get("/publishing/jobs/next", async (req, res) => {
+  const extensionId = typeof req.query.extensionId === "string" ? req.query.extensionId : null;
+  if (!extensionId) {
+    res.status(400).json({ error: "extensionId query param is required", code: "EXTENSION_ID_REQUIRED" });
+    return;
+  }
+  const requestedDealerId = Number(req.query.dealerId);
+  const extensionScope = await getExtensionDealerScope(
+    extensionId,
+    Number.isInteger(requestedDealerId) && requestedDealerId > 0 ? requestedDealerId : undefined,
+  );
+  if (!extensionScope) {
+    res.json({ job: null, code: "EXTENSION_DEALER_NOT_CONFIGURED" });
+    return;
+  }
+
   const now = new Date();
   const [row] = await db
     .select()
@@ -363,6 +415,7 @@ router.get("/publishing/jobs/next", async (req, res) => {
           eq(publishingJobsTable.status, "Retry"),
           and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, now)),
         ),
+        eq(publishingJobsTable.dealerId, extensionScope.dealerId),
         isNull(publishingJobsTable.claimedByExtension),
       ),
     )
@@ -721,6 +774,12 @@ router.post("/publishing/jobs/:id/claim", async (req, res) => {
     .where(eq(publishingJobsTable.id, id));
   if (!job) {
     res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  const extensionScope = await getExtensionDealerScope(parsed.data.extensionId, job.dealerId);
+  if (!extensionScope || extensionScope.dealerId !== job.dealerId) {
+    res.status(403).json({ error: "Extension is not configured for this dealer", code: "EXTENSION_DEALER_MISMATCH" });
     return;
   }
 

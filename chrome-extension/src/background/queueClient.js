@@ -159,6 +159,14 @@ async function getDealerId(windowId = null) {
   return (await getPublisherSettings(windowId)).dealerId;
 }
 
+function buildQueueScopeQuery(settings, extensionId) {
+  const params = new URLSearchParams({
+    extensionId,
+    dealerId: String(settings.dealerId),
+  });
+  return `?${params.toString()}`;
+}
+
 function getQueueDecision(job, extra = {}) {
   const nowMs = Date.now();
   const scheduledMs = job?.scheduledAt ? new Date(job.scheduledAt).getTime() : null;
@@ -471,8 +479,10 @@ const handlers = {
   },
 
   // ---- Publishing queue ----
-  async GET_NEXT_JOB() {
-    return apiGet("/api/publishing/jobs/next");
+  async GET_NEXT_JOB(message = {}, sender) {
+    const settings = await getPublisherSettings(await resolveWindowId(message, sender));
+    const extensionId = chrome.runtime.id || await getExtensionId();
+    return apiGet(`/api/publishing/jobs/next${buildQueueScopeQuery(settings, extensionId)}`);
   },
 
   async CLAIM_JOB(message) {
@@ -565,9 +575,10 @@ const handlers = {
 
   // ---- App-controlled bridge mode ----
 
-  async GET_ASSIGNED_JOB() {
+  async GET_ASSIGNED_JOB(message = {}, sender) {
     const extensionId = chrome.runtime.id || await getExtensionId();
-    return apiGet(`/api/publishing/jobs/assigned?extensionId=${encodeURIComponent(extensionId)}`);
+    const settings = await getPublisherSettings(await resolveWindowId(message, sender));
+    return apiGet(`/api/publishing/jobs/assigned${buildQueueScopeQuery(settings, extensionId)}`);
   },
 
   async AUTO_START_ASSIGNED(message) {
@@ -814,11 +825,13 @@ const handlers = {
     await sendHeartbeatSnapshot();
 
     const extensionId = chrome.runtime.id || await getExtensionId();
+    const settings = await getPublisherSettings(await resolveWindowId(message));
+    const queueScope = buildQueueScopeQuery(settings, extensionId);
 
     // Check for a job explicitly assigned to this extension
     let data;
     try {
-      data = await apiGet(`/api/publishing/jobs/assigned?extensionId=${encodeURIComponent(extensionId)}`);
+      data = await apiGet(`/api/publishing/jobs/assigned${queueScope}`);
     } catch {
       return { job: null };
     }
@@ -844,7 +857,7 @@ const handlers = {
     // job lands here seconds after the operator clicks the button.
     let nextData;
     try {
-      nextData = await apiGet("/api/publishing/jobs/next");
+      nextData = await apiGet(`/api/publishing/jobs/next${queueScope}`);
       const summary = (nextData && nextData.job)
         ? `job #${nextData.job.id} — ${nextData.job.vehicleLabel || nextData.job.status}`
         : "null";
@@ -980,9 +993,10 @@ const handlers = {
 
   // ── Instant wake: called by the dashboard immediately after Publish Now ──
   // Bypasses the alarm interval so the job is claimed in under 2 seconds.
-  async POLL_NOW(message = {}) {
+  async POLL_NOW(message = {}, sender) {
     return handlers.POLL_ASSIGNED_JOB({
       forceUserAction: message.forceUserAction === true,
+      windowId: await resolveWindowId(message, sender),
     });
   },
 
@@ -1018,9 +1032,10 @@ const handlers = {
     return apiGet(`/api/publishing/jobs/${message.jobId}/progress`);
   },
 
-  async RESTORE_ACTIVE_JOB() {
+  async RESTORE_ACTIVE_JOB(message = {}, sender) {
     const extensionId = await getExtensionId();
-    const data = await apiGet("/api/publishing/jobs");
+    const settings = await getPublisherSettings(await resolveWindowId(message, sender));
+    const data = await apiGet(`/api/publishing/jobs?dealerId=${encodeURIComponent(settings.dealerId)}`);
     const activeStatuses = new Set([
       "Publishing",
       "Opening Facebook",

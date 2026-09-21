@@ -15,7 +15,6 @@
 import {
   autoPublishSettingsTable,
   db,
-  extensionConnectionsTable,
   listingVersionsTable,
   listingsTable,
   pool,
@@ -435,42 +434,48 @@ async function maybeCreateAutomaticBatch(
   return { created: selected.length, summary: `Auto-created batch #${batchNumber} with ${selected.length} job(s)` };
 }
 
-async function findOnlineExtension(): Promise<{ id: string; name: string } | null> {
-  const rows = await db
-    .select()
-    .from(extensionConnectionsTable)
-    .orderBy(desc(extensionConnectionsTable.lastHeartbeatAt));
-  const cutoff = Date.now() - ONLINE_THRESHOLD_MS;
-  const online = rows.find(
-    (r) => r.lastHeartbeatAt && r.lastHeartbeatAt.getTime() >= cutoff && r.status === "online",
+type OnlineExtension = { id: string; name: string; dealerId: number };
+
+async function findOnlineExtensions(): Promise<OnlineExtension[]> {
+  const result = await pool.query<{
+    name: string;
+    dealer_id: number | null;
+    chrome_extension_id: string | null;
+  }>(
+    "select name, dealer_id, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc",
   );
-  const chromeId = online
-    ? await pool.query<{ chrome_extension_id: string | null }>(
-        "select chrome_extension_id from extension_connections where id = $1 limit 1",
-        [online.id],
-      )
-    : null;
-  const extensionId = chromeId?.rows[0]?.chrome_extension_id ?? online?.name ?? null;
-  return extensionId && online ? { id: extensionId, name: online.name } : null;
+  const byDealer = new Map<number, OnlineExtension>();
+  for (const row of result.rows) {
+    const dealerId = Number(row.dealer_id);
+    const extensionId = row.chrome_extension_id?.trim() || row.name?.trim();
+    if (!Number.isInteger(dealerId) || dealerId <= 0 || !extensionId || byDealer.has(dealerId)) continue;
+    byDealer.set(dealerId, { id: extensionId, name: row.name, dealerId });
+  }
+  return [...byDealer.values()];
 }
 
-async function rebindDueAssignedJobsToOnlineExtension(extensionId: string): Promise<number> {
-  const rebound = await db
-    .update(publishingJobsTable)
-    .set({ assignedExtensionId: extensionId, assignedAt: new Date() })
-    .where(
-      and(
-        eq(publishingJobsTable.status, "Assigned"),
-        isNull(publishingJobsTable.claimedByExtension),
-        or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
-        or(
-          isNull(publishingJobsTable.assignedExtensionId),
-          ne(publishingJobsTable.assignedExtensionId, extensionId),
+async function rebindDueAssignedJobsToOnlineExtensions(extensions: OnlineExtension[]): Promise<number> {
+  let reboundCount = 0;
+  for (const extension of extensions) {
+    const rebound = await db
+      .update(publishingJobsTable)
+      .set({ assignedExtensionId: extension.id, assignedAt: new Date() })
+      .where(
+        and(
+          eq(publishingJobsTable.status, "Assigned"),
+          eq(publishingJobsTable.dealerId, extension.dealerId),
+          isNull(publishingJobsTable.claimedByExtension),
+          or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
+          or(
+            isNull(publishingJobsTable.assignedExtensionId),
+            ne(publishingJobsTable.assignedExtensionId, extension.id),
+          ),
         ),
-      ),
-    )
-    .returning({ id: publishingJobsTable.id });
-  return rebound.length;
+      )
+      .returning({ id: publishingJobsTable.id });
+    reboundCount += rebound.length;
+  }
+  return reboundCount;
 }
 
 async function repairLegacyStaleAssignedJobs(log: import("pino").Logger): Promise<number> {
@@ -504,22 +509,27 @@ async function repairLegacyStaleAssignedJobs(log: import("pino").Logger): Promis
 }
 
 async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOutcome> {
-  const extension = await findOnlineExtension();
-  if (!extension) {
+  const onlineExtensions = await findOnlineExtensions();
+  if (onlineExtensions.length === 0) {
     return { summary: "Publishing worker skipped — no extension online", skipped: true };
   }
 
   const duplicateConflictIds = await getDuplicateConflictVehicleIds();
-  const autoBatch = await maybeCreateAutomaticBatch(log, duplicateConflictIds);
+  const alphaExtensionOnline = onlineExtensions.some((extension) => extension.dealerId === DEALER_ID);
+  const autoBatch = alphaExtensionOnline
+    ? await maybeCreateAutomaticBatch(log, duplicateConflictIds)
+    : { created: 0, summary: null };
   const repairedStaleAssignments = await repairLegacyStaleAssignedJobs(log);
-  const reboundAssignments = await rebindDueAssignedJobsToOnlineExtension(extension.id);
+  const reboundAssignments = await rebindDueAssignedJobsToOnlineExtensions(onlineExtensions);
   if (reboundAssignments > 0) {
     log.info(
-      { extensionId: extension.id, reboundAssignments },
-      "Publishing worker rebound unclaimed jobs to the active extension",
+      { reboundAssignments, dealerIds: onlineExtensions.map((extension) => extension.dealerId) },
+      "Publishing worker rebound unclaimed jobs to online dealer extensions",
     );
   }
 
+  const onlineDealerIds = onlineExtensions.map((extension) => extension.dealerId);
+  const extensionByDealer = new Map(onlineExtensions.map((extension) => [extension.dealerId, extension]));
   const candidates = await db
     .select({
       job: publishingJobsTable,
@@ -529,7 +539,6 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
     .innerJoin(vehiclesTable, eq(vehiclesTable.id, publishingJobsTable.vehicleId))
     .where(
       and(
-        eq(publishingJobsTable.dealerId, DEALER_ID),
         or(
           and(
             eq(publishingJobsTable.status, "Queued"),
@@ -538,6 +547,7 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
           eq(publishingJobsTable.status, "Retry"),
           and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, new Date())),
         ),
+        inArray(publishingJobsTable.dealerId, onlineDealerIds),
         isNull(publishingJobsTable.assignedExtensionId),
         isNull(publishingJobsTable.claimedByExtension),
       ),
@@ -568,6 +578,9 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
 
   for (const { job, vehicle } of candidates) {
     if (assigned >= MAX_ASSIGNMENTS_PER_RUN) break;
+
+    const extension = extensionByDealer.get(job.dealerId);
+    if (!extension) continue;
 
     // Last-moment inventory guard: the joined candidate can be stale if an
     // inventory sync or operator action changed the vehicle after selection.
@@ -696,7 +709,7 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
   }
 
   return {
-    summary: `${autoBatch.summary ? `${autoBatch.summary}; ` : ""}Assigned ${assigned} publishing job${assigned === 1 ? "" : "s"} to extension "${extension.id}"`,
+    summary: `${autoBatch.summary ? `${autoBatch.summary}; ` : ""}Assigned ${assigned} publishing job${assigned === 1 ? "" : "s"} to online dealer extension${onlineExtensions.length === 1 ? "" : "s"} (${onlineExtensions.map((extension) => `${extension.dealerId}:${extension.id}`).join(", ")})`,
     detail: { autoCreated: autoBatch.created, repairedStaleAssignments, reboundAssignments, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
   };
 }

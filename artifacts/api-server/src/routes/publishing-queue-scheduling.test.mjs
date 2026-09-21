@@ -190,7 +190,7 @@ test("assigned endpoint only returns due assigned jobs", () => {
 test("assigned endpoint can map the extension storage id to the online Chrome connection", () => {
   assert.match(
     routeSource,
-    /select name, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now\(\) - interval '5 minutes'/,
+    /select name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = \$1 and last_heartbeat_at > now\(\) - interval '5 minutes'/,
   );
   assert.match(routeSource, /if \(online\?\.name\) aliases\.add\(online\.name\);/);
   assert.match(routeSource, /if \(online\?\.chrome_extension_id\) aliases\.add\(online\.chrome_extension_id\);/);
@@ -234,11 +234,12 @@ test("Publish Now cleanup cannot cancel scheduled or automatic batch jobs", () =
   );
 });
 
-test("publishing worker rebinds due unclaimed jobs after the Chrome extension id changes", () => {
-  assert.match(workerSource, /rebindDueAssignedJobsToOnlineExtension/);
+test("publishing worker rebinds due unclaimed jobs to each online dealer extension", () => {
+  assert.match(workerSource, /rebindDueAssignedJobsToOnlineExtensions/);
   assert.match(workerSource, /eq\(publishingJobsTable\.status,\s*"Assigned"\)/);
-  assert.match(workerSource, /ne\(publishingJobsTable\.assignedExtensionId,\s*extensionId\)/);
-  assert.match(workerSource, /Publishing worker rebound unclaimed jobs to the active extension/);
+  assert.match(workerSource, /eq\(publishingJobsTable\.dealerId,\s*extension\.dealerId\)/);
+  assert.match(workerSource, /ne\(publishingJobsTable\.assignedExtensionId,\s*extension\.id\)/);
+  assert.match(workerSource, /Publishing worker rebound unclaimed jobs to online dealer extensions/);
 });
 
 test("publishing worker repairs legacy stale assignments before selecting the next vehicle", () => {
@@ -246,6 +247,17 @@ test("publishing worker repairs legacy stale assignments before selecting the ne
   assert.match(workerSource, /status:\s*"Retry"/);
   assert.match(workerSource, /failedReason} like 'Auto-expired:%'/);
   assert.match(workerSource, /Publishing worker repaired legacy stale assignments back to Retry/);
+});
+
+test("publishing queue scopes extension polling and claims to the configured dealer", () => {
+  assert.match(routeSource, /getExtensionDealerScope\(extensionId, job\.dealerId\)/);
+  assert.match(routeSource, /extensionId query param is required/);
+  assert.match(routeSource, /eq\(publishingJobsTable\.dealerId, extensionScope\.dealerId\)/);
+  assert.match(routeSource, /dealer_id = \$1/);
+  assert.match(routeSource, /EXTENSION_DEALER_MISMATCH/);
+  assert.match(queueClientSource, /extensionId,\s*dealerId: String\(settings\.dealerId\)/);
+  assert.match(queueClientSource, /jobs\/assigned\$\{buildQueueScopeQuery\(settings, extensionId\)\}/);
+  assert.match(queueClientSource, /jobs\/next\$\{queueScope\}/);
 });
 
 test("automatic batching isolates active vehicles instead of blocking the next candidates", () => {

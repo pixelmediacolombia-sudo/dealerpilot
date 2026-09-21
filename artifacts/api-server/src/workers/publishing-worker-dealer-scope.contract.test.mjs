@@ -17,3 +17,18 @@ test("assigned, payload, and controlled-mode paths use dealer-aware location pol
   assert.match(controlledModeSource, /isVerifiedDealerPublishingVehicle\(vehicle\)/);
   assert.doesNotMatch(controlledModeSource, /const lotCity = resolveAlphaLotCity\(vehicle\.lotLocation\)/);
 });
+
+test("publishing worker assigns each online dealer to its own extension", () => {
+  assert.match(workerSource, /findOnlineExtensions/);
+  assert.match(workerSource, /inArray\(publishingJobsTable\.dealerId, onlineDealerIds\)/);
+  assert.match(workerSource, /const extensionByDealer = new Map\(onlineExtensions\.map/);
+  assert.match(workerSource, /const extension = extensionByDealer\.get\(job\.dealerId\)/);
+  assert.match(workerSource, /assignedExtensionId: extension\.id/);
+  assert.match(workerSource, /alphaExtensionOnline/);
+});
+
+test("publishing routes reject an extension configured for another dealer", () => {
+  assert.match(routeSource, /getExtensionDealerScope\(parsed\.data\.extensionId, job\.dealerId\)/);
+  assert.match(routeSource, /Extension is not configured for this dealer/);
+  assert.match(routeSource, /eq\(publishingJobsTable\.dealerId, extensionScope\.dealerId\)/);
+});

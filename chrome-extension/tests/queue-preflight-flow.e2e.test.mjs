@@ -97,8 +97,8 @@ function createHarness(payload, options = {}) {
         }
         return { job: null };
       }
-      if (path === "/api/publishing/jobs") return { jobs: options.jobs ?? [] };
-      if (path === "/api/publishing/jobs/next") return { job: null };
+      if (path.startsWith("/api/publishing/jobs?")) return { jobs: options.jobs ?? [] };
+      if (path.startsWith("/api/publishing/jobs/next")) return { job: null };
       if (path === "/api/extension/connect-status") return { connectRequested: false };
       throw new Error(`Unexpected GET ${path}`);
     },
@@ -134,6 +134,7 @@ function createHarness(payload, options = {}) {
     console: { log() {}, warn() {}, error() {} },
     crypto: { randomUUID: () => "uuid-e2e" },
     URL,
+    URLSearchParams,
     Date,
     setTimeout,
     clearTimeout,
@@ -189,7 +190,7 @@ test("incomplete assigned vehicle moves to Needs Review and polls the next job w
   assert.equal(calls.updatedTabs.length, 0);
   assert.ok(calls.apiGet.includes("/api/publishing/jobs/101/payload"));
   assert.ok(calls.apiGet.some((path) => path.startsWith("/api/publishing/jobs/assigned")));
-  assert.ok(calls.apiGet.includes("/api/publishing/jobs/next"));
+  assert.ok(calls.apiGet.some((path) => path.startsWith("/api/publishing/jobs/next")));
 
   const reviewPost = calls.apiPost.find((call) => call.path === "/api/publishing/jobs/101/needs-review");
   assert.ok(reviewPost, "job should be moved to Needs Review");
@@ -296,7 +297,7 @@ test("assigned queue poll uses the Chrome runtime id while claiming with storage
   assert.equal(calls.heartbeats[0].backendUrl, "https://app.1987dealerpilot.com");
   assert.equal(calls.heartbeats[0].chromeExtensionId, "chrome-runtime-e2e");
   assert.ok(
-    calls.apiGet.includes("/api/publishing/jobs/assigned?extensionId=chrome-runtime-e2e"),
+    calls.apiGet.includes("/api/publishing/jobs/assigned?extensionId=chrome-runtime-e2e&dealerId=1"),
     "assigned poll should use chrome.runtime.id so it matches backend heartbeat assignment",
   );
   assert.deepEqual(calls.claims, [{ jobId: 202, extensionId: "ext-e2e" }]);
