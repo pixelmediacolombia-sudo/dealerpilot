@@ -36,7 +36,8 @@ import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 import { compactFutureAutoPublishQueue } from "../publishing/autoPublishQueueCompaction";
 import { recordMarketplaceSoldAction } from "../marketplace/soldAction";
 import { getDownPaymentPolicy } from "../downPayment/policy";
-import { ALPHA_DEALER_ID, isVerifiedDealerPublishingVehicle } from "../lib/dealer";
+import { ALPHA_DEALER_ID, LUCKI_MAZDA_DEALER_ID, isVerifiedDealerPublishingVehicle } from "../lib/dealer";
+import { buildFallbackMarketplaceCopy } from "../publishing/marketplaceCopy";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 import { resolveDealerId } from "./auth";
 
@@ -580,9 +581,33 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       ].filter(Boolean).join("\n");
     }
 
+    const fallbackMarketplaceCopy = buildFallbackMarketplaceCopy({
+      dealerId: job.dealerId,
+      autoTitle,
+      priceTextEn: pricing.actualVehiclePrice > 0
+        ? `$${pricing.actualVehiclePrice.toLocaleString("en-US")}`
+        : "Call for price",
+      priceTextEs: pricing.actualVehiclePrice > 0
+        ? `$${pricing.actualVehiclePrice.toLocaleString("en-US")}`
+        : "Llama para precio",
+      mileageTextEn: vehicle.mileage != null
+        ? `${vehicle.mileage.toLocaleString("en-US")} miles`
+        : null,
+      mileageTextEs: vehicle.mileage != null
+        ? `${vehicle.mileage.toLocaleString("en-US")} millas`
+        : null,
+      lotLocation: lotCity,
+    });
+
     function buildBilingualMarketplaceDescription(rawEn?: string | null, rawEs?: string | null, rawCta?: string | null): string {
-      const english = isProseText(rawEn) ? ensureEmojiLead(rawEn, "🚗") : buildEnglishSalesCopy();
-      const spanish = isProseText(rawEs) ? ensureEmojiLead(rawEs, "🚗") : buildSpanishSalesCopy();
+      const englishFallback = job.dealerId === LUCKI_MAZDA_DEALER_ID
+        ? fallbackMarketplaceCopy.english
+        : buildEnglishSalesCopy();
+      const spanishFallback = job.dealerId === LUCKI_MAZDA_DEALER_ID
+        ? fallbackMarketplaceCopy.spanish
+        : buildSpanishSalesCopy();
+      const english = isProseText(rawEn) ? ensureEmojiLead(rawEn, "🚗") : englishFallback;
+      const spanish = isProseText(rawEs) ? ensureEmojiLead(rawEs, "🚗") : spanishFallback;
       const cta = isProseText(rawCta) ? ensureEmojiLead(rawCta, "📞") : null;
       return [
         "🇺🇸 English",

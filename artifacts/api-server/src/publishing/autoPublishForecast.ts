@@ -23,7 +23,14 @@ import {
   ACTIVE_PUBLISHING_JOB_STATUSES,
   LOT_CITY_MAP,
 } from "./controlledMode";
-import { ALPHA_DEALER_ID, ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
+import {
+  ALPHA_DEALER_ID,
+  ALPHA_LOT_MANASSAS,
+  LUCKI_MAZDA_DEALER_ID,
+  isAlphaManassasVehicle,
+  isVerifiedDealerPublishingVehicle,
+} from "../lib/dealer";
+import { getDealerBatchPriority } from "./dealerBatchPriority";
 import { findLatestNeedsReviewVehicleIds } from "./needsReviewGuard";
 import { photoDirectorPublishBlockReason } from "../photo/publishReadiness";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
@@ -167,6 +174,7 @@ export type AutoPublishForecastVehicle = {
   photoScore: number;
   photoDecision: string;
   priorityScore: number;
+  completenessScore: number;
 };
 
 export async function previewAutoPublishVehicles(
@@ -212,12 +220,14 @@ export async function previewAutoPublishVehicles(
     const listing = listingByVehicle.get(vehicle.id);
     if (listing?.status === "Published") return [];
     if (dealerId === ALPHA_DEALER_ID && (!LOT_CITY_MAP[vehicle.lotLocation ?? ""] || !isAlphaManassasVehicle(vehicle))) return [];
+    if (dealerId === LUCKI_MAZDA_DEALER_ID && !isVerifiedDealerPublishingVehicle(vehicle)) return [];
     const images = imagesByVehicle.get(vehicle.id) ?? [];
     if (!vehicle.vin || !vehicle.year || !vehicle.price || !vehicle.mileage || images.length < 5) return [];
     if (getCachedGmDecision(vehicle.id)?.recommendation && ["HOLD", "RECONSIDER"].includes(getCachedGmDecision(vehicle.id)!.recommendation)) return [];
     if (photoDirectorPublishBlockReason(vehicle)) return [];
     const photos = analyzePhotos(images);
     const label = `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.trim ? ` ${vehicle.trim}` : ""}`.trim();
+    const batchPriority = getDealerBatchPriority(dealerId, priorityScore(vehicle, photos.photoScore), vehicle, images.length);
     return [{
       vehicleId: vehicle.id,
       label,
@@ -227,7 +237,7 @@ export async function previewAutoPublishVehicles(
       photoCount: photos.photoCount,
       photoScore: photos.photoScore,
       photoDecision: photos.photoDecision,
-      priorityScore: priorityScore(vehicle, photos.photoScore),
+      ...batchPriority,
       listingVersionId: latestVersionByVehicle.get(vehicle.id)?.id ?? null,
     }];
   }).sort((a, b) => b.priorityScore - a.priorityScore);

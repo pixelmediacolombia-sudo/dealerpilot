@@ -273,10 +273,10 @@ test("Alpha publishing fails closed for unverified or non-Manassas inventory", (
   assert.match(controlledModeSource, /function normalizeAlphaLotLocation\(lotLocation: string \| null\)/);
   assert.match(controlledModeSource, /normalized === "manassas"/);
   assert.match(controlledModeSource, /normalized === "fredericksburg"/);
-  assert.match(controlledModeSource, /isAlphaManassasVehicle/);
-  assert.match(workerSource, /isAlphaManassasVehicle\(currentVehicle\)/);
+  assert.match(controlledModeSource, /isVerifiedDealerPublishingVehicle/);
+  assert.match(workerSource, /isVerifiedDealerPublishingVehicle\(currentVehicle\)/);
   assert.doesNotMatch(workerSource, /set\(\{ lotLocation: "Manassas" \}\)/);
-  assert.match(routeSource, /code: "NON_MANASSAS_LOT"/);
+  assert.match(controlledModeSource, /code: alphaGuard \? "NON_MANASSAS_LOT"/);
 });
 
 test("extension records the next queue vehicle and clears terminal local jobs", () => {

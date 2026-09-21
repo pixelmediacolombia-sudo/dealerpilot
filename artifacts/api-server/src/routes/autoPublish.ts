@@ -47,7 +47,14 @@ import {
   photoDirectorPublishBlockReason,
 } from "../photo/publishReadiness";
 import { getNextAutoPublishForecast } from "../publishing/autoPublishForecast";
-import { ALPHA_DEALER_ID, ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
+import {
+  ALPHA_DEALER_ID,
+  ALPHA_LOT_MANASSAS,
+  LUCKI_MAZDA_DEALER_ID,
+  isAlphaManassasVehicle,
+  isVerifiedDealerPublishingVehicle,
+} from "../lib/dealer";
+import { getDealerBatchPriority, getLuckiCompletenessScore } from "../publishing/dealerBatchPriority";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 import { getAuthenticatedDealerId, resolveDealerId } from "./auth";
 
@@ -57,6 +64,7 @@ function isVerifiedDealerInventory(
   dealerId: number,
   vehicle: { dealerId: number; lotLocation: string | null; sourceRaw?: string | null },
 ): boolean {
+  if (dealerId === LUCKI_MAZDA_DEALER_ID) return isVerifiedDealerPublishingVehicle(vehicle);
   if (dealerId !== ALPHA_DEALER_ID) return true;
   return Boolean(LOT_CITY_MAP[vehicle.lotLocation ?? ""] && isAlphaManassasVehicle(vehicle));
 }
@@ -541,6 +549,7 @@ router.post("/auto-publish/batches", async (req, res) => {
     freshnessBonus: number;
     photoBonus: number;
     neverPublishedBonus: number;
+    completenessScore: number;
     photoAnalysis: ReturnType<typeof analyzePhotos>;
     eligible: boolean;
     ineligibleReason: string | null;
@@ -579,10 +588,12 @@ router.post("/auto-publish/batches", async (req, res) => {
     const neverPublished = !listing || listing.status !== "Published";
 
     const scores = computePriorityScore(v, photoAnalysis.photoScore, neverPublished);
+    const batchPriority = getDealerBatchPriority(dealerId, scores.priorityScore, v, imgs.length);
 
     scored.push({
       vehicle: v,
       ...scores,
+      ...batchPriority,
       photoAnalysis,
       eligible: validation.eligible,
       ineligibleReason: validation.reason,
@@ -1299,6 +1310,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     photoScore: number;
     photoDecision: string;
     priorityScore: number;
+    completenessScore: number;
     eligible: boolean;
     skipReason: string | null;
   };
@@ -1309,18 +1321,18 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     const label = `${v.year ?? ""} ${v.make} ${v.model}${v.trim ? ` ${v.trim}` : ""}`.trim();
 
     if (alreadyQueued.has(v.id)) {
-      scored.push({ vehicleId: v.id, label, vin: v.vin, price: v.price, mileage: v.mileage, photoCount: 0, photoScore: 0, photoDecision: "needs_review", priorityScore: 0, eligible: false, skipReason: "Already in queue" });
+      scored.push({ vehicleId: v.id, label, vin: v.vin, price: v.price, mileage: v.mileage, photoCount: 0, photoScore: 0, photoDecision: "needs_review", priorityScore: 0, completenessScore: 0, eligible: false, skipReason: "Already in queue" });
       continue;
     }
 
     const imgs = imagesByVehicle.get(v.id) ?? [];
     if (needsReviewVehicleIds.has(v.id)) {
-      scored.push({ vehicleId: v.id, label, vin: v.vin, price: v.price, mileage: v.mileage, photoCount: imgs.length, photoScore: 0, photoDecision: "needs_review", priorityScore: 0, eligible: false, skipReason: "Latest publishing job is Needs Review — operator action required" });
+      scored.push({ vehicleId: v.id, label, vin: v.vin, price: v.price, mileage: v.mileage, photoCount: imgs.length, photoScore: 0, photoDecision: "needs_review", priorityScore: 0, completenessScore: getLuckiCompletenessScore(v, imgs.length), eligible: false, skipReason: "Latest publishing job is Needs Review — operator action required" });
       continue;
     }
     const listing = listingByVehicle.get(v.id);
     if (listing?.status === "Published") {
-      scored.push({ vehicleId: v.id, label, vin: v.vin, price: v.price, mileage: v.mileage, photoCount: imgs.length, photoScore: 0, photoDecision: "needs_review", priorityScore: 0, eligible: false, skipReason: "Already published" });
+      scored.push({ vehicleId: v.id, label, vin: v.vin, price: v.price, mileage: v.mileage, photoCount: imgs.length, photoScore: 0, photoDecision: "needs_review", priorityScore: 0, completenessScore: getLuckiCompletenessScore(v, imgs.length), eligible: false, skipReason: "Already published" });
       continue;
     }
 
@@ -1342,7 +1354,8 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     }
 
     const neverPublished = !listing || listing.status !== "Published";
-    const { priorityScore } = computePriorityScore(v, photoAnalysis.photoScore, neverPublished);
+    const basePriority = computePriorityScore(v, photoAnalysis.photoScore, neverPublished).priorityScore;
+    const batchPriority = getDealerBatchPriority(dealerId, basePriority, v, imgs.length);
 
     scored.push({
       vehicleId: v.id,
@@ -1353,7 +1366,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
       photoCount: imgs.length,
       photoScore: photoAnalysis.photoScore,
       photoDecision: photoAnalysis.photoDecision,
-      priorityScore,
+      ...batchPriority,
       eligible: validation.eligible,
       skipReason: validation.reason,
     });
