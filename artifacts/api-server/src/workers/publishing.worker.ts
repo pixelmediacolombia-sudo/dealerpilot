@@ -48,7 +48,7 @@ import {
   resolveAlphaLotCity,
   resolvePublishMode,
 } from "../publishing/controlledMode";
-import { isAlphaManassasVehicle } from "../lib/dealer";
+import { ALPHA_DEALER_ID, isAlphaManassasVehicle, isVerifiedDealerPublishingVehicle } from "../lib/dealer";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 import { getInitialBatchTiming } from "../publishing/batchProgress";
 import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
@@ -602,15 +602,35 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
       continue;
     }
 
-    if (!isAlphaManassasVehicle(currentVehicle)) {
+    if (currentVehicle.dealerId !== job.dealerId) {
       skippedUnknownLot++;
       await db
         .update(publishingJobsTable)
         .set({
           status: "Needs Review",
-          failedReason: "Vehicle is not verified as Alpha Manassas inventory",
-          reviewReason: "NON_MANASSAS_LOT",
-          currentStep: "Blocked - non-Manassas inventory",
+          failedReason: "Vehicle does not belong to the publishing job dealer",
+          reviewReason: "DEALER_MISMATCH",
+          currentStep: "Blocked - dealer mismatch",
+          claimedByExtension: null,
+          assignedExtensionId: null,
+          assignedAt: null,
+        })
+        .where(eq(publishingJobsTable.id, job.id));
+      continue;
+    }
+
+    if (!isVerifiedDealerPublishingVehicle(currentVehicle)) {
+      skippedUnknownLot++;
+      const alphaGuard = currentVehicle.dealerId === ALPHA_DEALER_ID;
+      await db
+        .update(publishingJobsTable)
+        .set({
+          status: "Needs Review",
+          failedReason: alphaGuard
+            ? "Vehicle is not verified as Alpha Manassas inventory"
+            : "Vehicle has no verified lot location",
+          reviewReason: alphaGuard ? "NON_MANASSAS_LOT" : "UNKNOWN_LOT",
+          currentStep: alphaGuard ? "Blocked - non-Manassas inventory" : "Blocked - unknown lot",
           claimedByExtension: null,
           assignedExtensionId: null,
           assignedAt: null,

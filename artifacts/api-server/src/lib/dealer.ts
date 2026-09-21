@@ -139,3 +139,18 @@ export function isAlphaManassasVehicle(vehicle: {
     getFeedDealerId(vehicle.sourceRaw) === ALPHA_FEED_DEALER_ID
   );
 }
+
+/**
+ * Publishing location policy by dealer. Alpha keeps its strict Manassas
+ * crosswalk; other dealers must have their own persisted lot location.
+ */
+export function isVerifiedDealerPublishingVehicle(vehicle: {
+  dealerId: number;
+  lotLocation: string | null;
+  sourceRaw?: string | null;
+}): boolean {
+  if (vehicle.dealerId === ALPHA_DEALER_ID) return isAlphaManassasVehicle(vehicle);
+  const configuredLot = getDealerDefaultLotLocation(vehicle.dealerId);
+  if (configuredLot) return vehicle.lotLocation === configuredLot;
+  return Boolean(vehicle.lotLocation);
+}

@@ -4,6 +4,7 @@ import {
   getDealerDefaultLotLocation,
   getFeedDealerId,
   isAlphaManassasVehicle,
+  isVerifiedDealerPublishingVehicle,
   markVerifiedFeedLotLocation,
   resolveImportedLotLocation,
 } from "./dealer.ts";
@@ -42,4 +43,10 @@ test("the same city remains isolated by the internal dealer id", () => {
 
   assert.equal(lucki.lotLocation, anotherDealerInWoodbridge.lotLocation);
   assert.notEqual(lucki.dealerId, anotherDealerInWoodbridge.dealerId);
+});
+
+test("Lucki publishing requires its configured Woodbridge lot", () => {
+  assert.equal(isVerifiedDealerPublishingVehicle({ dealerId: 2, lotLocation: "Woodbridge" }), true);
+  assert.equal(isVerifiedDealerPublishingVehicle({ dealerId: 2, lotLocation: "Manassas" }), false);
+  assert.equal(isVerifiedDealerPublishingVehicle({ dealerId: 2, lotLocation: null }), false);
 });

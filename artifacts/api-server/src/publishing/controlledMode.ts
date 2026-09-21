@@ -14,7 +14,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, extensionConnectionsTable, publishingJobsTable } from "@workspace/db";
 import { getCachedGmDecision } from "../routes/gm";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
-import { isAlphaManassasVehicle } from "../lib/dealer";
+import { ALPHA_DEALER_ID, isVerifiedDealerPublishingVehicle } from "../lib/dealer";
 
 export const LOT_CITY_MAP: Record<string, string> = {
   Manassas: "Manassas, VA",
@@ -134,17 +134,16 @@ export async function checkPublishGuardrails(params: {
     };
   }
 
-  // 2. Lot location must be the active Alpha Motorsports destination.
-  const lotCity = resolveAlphaLotCity(vehicle.lotLocation);
-  if (!lotCity || !isAlphaManassasVehicle({
-    dealerId: vehicle.dealerId,
-    lotLocation: vehicle.lotLocation,
-    sourceRaw: vehicle.sourceRaw,
-  })) {
+  // 2. Alpha requires its verified Manassas inventory; other dealers require
+  // their own persisted lot location and never inherit Alpha's policy.
+  if (!isVerifiedDealerPublishingVehicle(vehicle)) {
+    const alphaGuard = vehicle.dealerId === ALPHA_DEALER_ID;
     return {
       ok: false,
-      code: "NON_MANASSAS_LOT",
-      reason: `Vehicle is not verified as Alpha's Manassas inventory (lot: "${vehicle.lotLocation ?? "unknown"}").`,
+      code: alphaGuard ? "NON_MANASSAS_LOT" : "NON_VERIFIED_LOT",
+      reason: alphaGuard
+        ? `Vehicle is not verified as Alpha's Manassas inventory (lot: "${vehicle.lotLocation ?? "unknown"}").`
+        : `Vehicle is not verified for this dealer's configured lot (lot: "${vehicle.lotLocation ?? "unknown"}").`,
     };
   }
 
