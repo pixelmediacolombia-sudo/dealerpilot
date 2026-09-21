@@ -472,7 +472,9 @@ router.post("/auto-publish/batches", async (req, res) => {
         ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
         ne(vehiclesTable.status, "Archived"),
-        eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
+        // Alpha remains restricted to its verified Manassas lot. Other dealers
+        // must be selected by dealerId and may use their own configured lot.
+        dealerId === ALPHA_DEALER_ID ? eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS) : undefined,
         lotLocation ? eq(vehiclesTable.lotLocation, lotLocation) : undefined,
       ),
     );
@@ -560,7 +562,6 @@ router.post("/auto-publish/batches", async (req, res) => {
     const photoAnalysis = analyzePhotos(imgs);
     let validation = validateVehicleForPublish(v, imgs.length);
 
-    // Lot location must exist and be the active Manassas destination.
     if (validation.eligible && !isVerifiedDealerInventory(dealerId, v)) {
       validation = { eligible: false, reason: `Vehicle is not verified for this dealer's configured lot (lot: "${v.lotLocation ?? "unknown"}")` };
     }
@@ -1227,7 +1228,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
   }
   const { dealerId, count } = parsed.data;
 
-  // Same vehicle selection as batch — dealer_id = 1, no DB writes
+  // Same vehicle selection as batch, without writing any records.
   const vehicles = await db
     .select(vehicleOperationalColumns)
     .from(vehiclesTable)
@@ -1238,7 +1239,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
         ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
         ne(vehiclesTable.status, "Archived"),
-        eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
+        dealerId === ALPHA_DEALER_ID ? eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS) : undefined,
       ),
     );
 

@@ -23,7 +23,7 @@ import {
   ACTIVE_PUBLISHING_JOB_STATUSES,
   LOT_CITY_MAP,
 } from "./controlledMode";
-import { ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
+import { ALPHA_DEALER_ID, ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
 import { findLatestNeedsReviewVehicleIds } from "./needsReviewGuard";
 import { photoDirectorPublishBlockReason } from "../photo/publishReadiness";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
@@ -182,7 +182,9 @@ export async function previewAutoPublishVehicles(
       ne(vehiclesTable.status, "Sold/Removed"),
       ne(vehiclesTable.status, "Removed"),
       ne(vehiclesTable.status, "Archived"),
-      eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
+      // Alpha remains restricted to Manassas; other dealers are scoped by
+      // dealerId and their own configured location.
+      dealerId === ALPHA_DEALER_ID ? eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS) : undefined,
     ));
   if (vehicles.length === 0) return { selected: [], totalEligible: 0 };
 
@@ -208,7 +210,8 @@ export async function previewAutoPublishVehicles(
   const eligible = vehicles.flatMap((vehicle) => {
     if (activeVehicleIds.has(vehicle.id) || needsReviewVehicleIds.has(vehicle.id) || duplicateConflictIds.has(vehicle.id)) return [];
     const listing = listingByVehicle.get(vehicle.id);
-    if (listing?.status === "Published" || !LOT_CITY_MAP[vehicle.lotLocation ?? ""] || !isAlphaManassasVehicle(vehicle)) return [];
+    if (listing?.status === "Published") return [];
+    if (dealerId === ALPHA_DEALER_ID && (!LOT_CITY_MAP[vehicle.lotLocation ?? ""] || !isAlphaManassasVehicle(vehicle))) return [];
     const images = imagesByVehicle.get(vehicle.id) ?? [];
     if (!vehicle.vin || !vehicle.year || !vehicle.price || !vehicle.mileage || images.length < 5) return [];
     if (getCachedGmDecision(vehicle.id)?.recommendation && ["HOLD", "RECONSIDER"].includes(getCachedGmDecision(vehicle.id)!.recommendation)) return [];
