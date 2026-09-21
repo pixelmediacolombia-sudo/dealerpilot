@@ -10,7 +10,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Logger } from "pino";
 import { parseInventoryXml, type FeedImage } from "./xmlEngine";
 import { reconcileAlphaLotLocations } from "./locationReconcile";
-import { ALPHA_DEALER_ID } from "../lib/dealer";
+import { ALPHA_DEALER_ID, resolveImportedLotLocation } from "../lib/dealer";
 import { syncSoldMarketplaceState } from "../marketplace/soldState";
 import { vehicleOperationalColumns, type VehicleOperationalRow } from "../lib/vehicleColumns";
 
@@ -149,8 +149,12 @@ export async function importFeed(
     // Branch provenance is added only by the authoritative location
     // crosswalk below; the combined XML feed does not identify a physical lot.
     const persistedSourceRaw = n.sourceRaw;
+    // Vincue's Lucki XML is dealer-scoped but currently omits the physical
+    // lot. Persist the verified dealer configuration in lot_location only;
+    // never add the fallback to source_raw as if it came from the XML.
+    const lotLocation = resolveImportedLotLocation(dealerId, n.lotLocation);
     // Track location counts for logging
-    const locationKey = n.lotLocation ?? "unknown";
+    const locationKey = lotLocation ?? "unknown";
     locationBreakdown[locationKey] = (locationBreakdown[locationKey] ?? 0) + 1;
 
     seenVins.add(n.vin);
@@ -176,7 +180,7 @@ export async function importFeed(
           fuelType: n.fuelType,
           description: n.description,
           vdpUrl: n.vdpUrl,
-          lotLocation: n.lotLocation,
+          lotLocation,
           sourceRaw: persistedSourceRaw,
           status: "New",
           firstSeenAt: now,
@@ -261,7 +265,7 @@ export async function importFeed(
         fuelType: n.fuelType,
         description: n.description,
         vdpUrl: n.vdpUrl,
-        lotLocation: n.lotLocation,
+        lotLocation,
         sourceRaw: persistedSourceRaw,
         status: nextStatus,
         lastSeenAt: now,

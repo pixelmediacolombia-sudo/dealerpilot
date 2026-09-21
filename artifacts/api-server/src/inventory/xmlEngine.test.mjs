@@ -109,3 +109,9 @@ test("inventory parser unwraps Vincue's serialized XML response", () => {
     "https://images.example.test/U00016-2.jpg",
   ]);
 });
+
+test("Lucki's missing XML location stays null at parser level for dealer-scoped import fallback", () => {
+  const result = parseInventoryXml(LUCKI_MAZDA_SERIALIZED_XML);
+  assert.equal(result.vehicles[0].lotLocation, null);
+  assert.doesNotMatch(result.vehicles[0].sourceRaw, /Woodbridge/i);
+});

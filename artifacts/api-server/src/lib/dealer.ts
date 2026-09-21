@@ -20,6 +20,27 @@ export const ALPHA_FEED_DEALER_ID = "DC1786";
 
 export const ALPHA_LOT_MANASSAS = "Manassas";
 
+/**
+ * Lucki's feed is dealer-scoped but does not currently emit a physical lot
+ * field. This is a verified dealer configuration, not an XML-derived value.
+ * It is intentionally keyed by the internal dealer id so another Woodbridge
+ * or Manassas dealer can use the same city without sharing inventory.
+ */
+export const LUCKI_MAZDA_DEALER_ID = 2;
+export const LUCKI_MAZDA_LOT_WOODBRIDGE = "Woodbridge";
+
+export function getDealerDefaultLotLocation(dealerId: number): string | null {
+  if (dealerId === LUCKI_MAZDA_DEALER_ID) return LUCKI_MAZDA_LOT_WOODBRIDGE;
+  // Alpha's physical branch is resolved by its authoritative stock crosswalk,
+  // so a missing XML location must remain unknown rather than guessed here.
+  return null;
+}
+
+/** Apply only a dealer-scoped fallback when the provider omitted a location. */
+export function resolveImportedLotLocation(dealerId: number, feedLotLocation: string | null): string | null {
+  return feedLotLocation ?? getDealerDefaultLotLocation(dealerId);
+}
+
 export const ALPHA_MARKETPLACE_KNOWLEDGE = {
   es: {
     address: "9120 Euclid Ave, Manassas, VA 20110",

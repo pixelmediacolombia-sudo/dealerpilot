@@ -12,6 +12,11 @@ const LEGACY_LUCKY_MAZDA = "Lucky Mazda";
 const LEGACY_LUCKY_NOTES = "Marketplace-only account. XML inventory feed pending from Lucky Mazda.";
 const LUCKI_NOTES_PENDING = "Marketplace-only account. XML inventory feed pending from Lucki Mazda.";
 const LUCKI_CONFIGURED_NOTES = "Marketplace-only account. Inventory feed configured through Vincue runtime settings.";
+const LUCKI_LOCATION = {
+  city: "Woodbridge",
+  state: "VA",
+  country: "US",
+};
 const REAL_FEED_URL = "https://www.alphamotorsport.net/facebook-catalog-feed.xml";
 
 function isSampleFeedUrl(url: string | null | undefined): boolean {
@@ -154,6 +159,7 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
             notes: LUCKI_CONFIGURED_NOTES,
           }
         : {}),
+      ...LUCKI_LOCATION,
     };
     const changed =
       existing.name !== updates.name ||
@@ -164,7 +170,12 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
         existing.providerDealerId !== updates.providerDealerId ||
         existing.feedAuthMode !== updates.feedAuthMode
       ));
-    const dealer = changed
+    const locationChanged =
+      existing.city !== LUCKI_LOCATION.city ||
+      existing.state !== LUCKI_LOCATION.state ||
+      existing.country !== LUCKI_LOCATION.country;
+    const hasUpdates = changed || locationChanged;
+    const dealer = hasUpdates
       ? (await db.update(dealersTable).set(updates).where(eq(dealersTable.id, existing.id)).returning())[0]!
       : existing;
     if (existing.name !== LUCKI_MAZDA) {
@@ -196,6 +207,7 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
           }
         : {}),
       marketplaceKnowledge: {},
+      ...LUCKI_LOCATION,
     })
     .returning();
 
