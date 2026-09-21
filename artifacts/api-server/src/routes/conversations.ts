@@ -624,7 +624,7 @@ function buyerAskedInventoryOptions(latest: string): boolean {
 }
 
 function buyerAskedDetailedVehicleInfo(latest: string): boolean {
-  return /\b(?:price|precio|cash|efectivo|miles|millas|odometer|payment|pago|cuota|down payment|inicial|historial|history|accident|accidente|condition|condici[oó]n|warranty|garant[ií]a|deductible|deducible|coverage|cobertura)\b/i.test(latest);
+  return /\b(?:price|precio|cash|efectivo|miles|millas|odometer|payment|pago|cuota|down payment|inicial|historial|history|accident|accidente|condition|condici[oó]n|warranty|garant[ií]a|deductible|deducible|coverage|cobertura|battery|bater[ií]a|range|autonom[ií]a|heated|calefacci[oó]n|fsd|feature|included|incluido|charging|carga|seats?|asientos)\b/i.test(latest);
 }
 
 function buyerAskedCleanTitle(latest: string): boolean {
@@ -636,7 +636,10 @@ function buyerAskedCleanTitleAndWarranty(latest: string): boolean {
 }
 
 function buyerAskedWarrantyInfo(latest: string): boolean {
-  return /\b(?:warranty|garant[ií]a|deductible|deducible|certif(?:ied|ication)|certificad[oa]|engine|motor|transmission|transmisi[oó]n|mechanic|mec[aá]nico|repair|reparaci[oó]n|issue|issues|problem|problems|third-party|dealership|included|cover|days|miles|mill?as)\b/i.test(latest);
+  // Keep warranty routing narrow. Vehicle-detail questions such as
+  // "is FSD included?", "heated seats?", or "what is the range?" need the
+  // advisor handoff, not an unrelated title/Carfax answer.
+  return /\b(?:warranty|guarantee|garant[ií]a|deductible|deducible|coverage|cobertura|certif(?:ied|ication)|certificad[oa])\b/i.test(latest);
 }
 
 function buyerAskedAdvisorQuestion(latest: string): boolean {
@@ -763,6 +766,7 @@ function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
   return stage === "store_phone_requested" ||
     stage === "open_question" ||
     stage === "advisor_question" ||
+    stage === "question_repair" ||
     stage === "vin_inquiry" ||
     stage === "address_request" ||
     stage === "vehicle_link_request" ||
@@ -1181,9 +1185,9 @@ function buildBaseSafeFallbackReply(
   if (language === "es") {
     if (stage === "open_question") {
       if (cashOfferAmount != null) {
-        return `Nuestros agentes de ventas pueden confirmar si $${cashOfferAmount.toLocaleString("en-US")} de contado funciona. ¿A qué número te contactamos? También puedes llamarnos al ${storePhone}.`;
+        return `Nuestros agentes de ventas se comunicarán contigo para confirmar si $${cashOfferAmount.toLocaleString("en-US")} de contado funciona. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${storePhone}.`;
       }
-      return `Con gusto te ayudan nuestros agentes de ventas con ese detalle. También puedes llamar a Alpha Motorsports al ${storePhone}. ¿A qué número te contactamos?`;
+      return `Nuestros agentes de ventas se comunicarán contigo para responder esa pregunta específica. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${storePhone}.`;
     }
     if (stage === "vehicle_link_request") {
       return buildVehiclePhotoRequestReply("es", storePhone);
@@ -1304,15 +1308,15 @@ function buildBaseSafeFallbackReply(
         : `Nuestros agentes de ventas tienen el reporte del ${vehicle} y pueden confirmar el título y los detalles de la garantía. ¿A qué número te enviamos el reporte?`;
     }
     if (stage === "advisor_question") {
-      return `Nuestros agentes de ventas pueden confirmar ese detalle del ${vehicle}. También puedes llamar a Alpha Motorsports al ${storePhone}.`;
+      return `Nuestros agentes de ventas se comunicarán contigo para responder esas preguntas específicas y confirmar esos detalles del ${vehicle}. ¿Cuál es el mejor número de teléfono para comunicarnos contigo? También puedes llamarnos al ${storePhone}.`;
     }
     return `Con gusto te ayudo con el ${vehicle}. ¿Qué te gustaría saber?`;
   }
   if (stage === "open_question") {
     if (cashOfferAmount != null) {
-      return `Our sales agents can confirm whether $${cashOfferAmount.toLocaleString("en-US")} out the door works. What number should we use to reach you? You can also call Alpha Motorsports at ${storePhone}.`;
+      return `Our sales agents will contact you to confirm whether $${cashOfferAmount.toLocaleString("en-US")} out the door works. What is the best phone number to reach you? You can also call Alpha Motorsports at ${storePhone}.`;
     }
-    return `Our sales agents can help with that detail. You can also call Alpha Motorsports at ${storePhone}. What number should we use to reach you?`;
+    return `Our sales agents will contact you to answer that specific question. What is the best phone number to reach you? You can also call Alpha Motorsports at ${storePhone}.`;
   }
   if (stage === "vehicle_link_request") {
     return buildVehiclePhotoRequestReply("en", storePhone);
@@ -1433,7 +1437,7 @@ function buildBaseSafeFallbackReply(
       : `Our sales agents have the report for the ${vehicle} and can confirm the title and warranty details. What number should we send the report to?`;
   }
   if (stage === "advisor_question") {
-    return `Our sales agents can confirm that detail for the ${vehicle}. You can also call us at ${storePhone} for direct help.`;
+    return `Our sales agents will contact you to answer those specific questions and confirm those details about the ${vehicle}. What is the best phone number to reach you? You can also call Alpha Motorsports at ${storePhone}.`;
   }
   return `I'd be happy to help with the ${vehicle}. What would you like to know?`;
 }
@@ -1643,7 +1647,10 @@ function isAiReplyAligned(
   }
   if (stage === "question_repair") {
     return /(?:answer|respond|responder|contestar|question|pregunta|offer|oferta|review|revisar|sales agent|agente de ventas)/.test(normalized) &&
-      !/what number should we use|what's the best phone number|cu[aá]l es el mejor n[uú]mero|a qu[eé] n[uú]mero te contactamos/.test(normalized);
+      /phone|number|tel[eé]fono|n[uú]mero/.test(normalized) &&
+      /\?/.test(reply) &&
+      replyIncludesStorePhone(reply, storePhone) &&
+      !/carfax|financ|financing/.test(normalized);
   }
   if (stage === "down_payment_request") {
     const hasConfiguredAmount = downPaymentPolicy.vehicleOverride != null || downPaymentPolicy.planAmounts.length > 0
@@ -1858,12 +1865,12 @@ function buildQuestionRepairFallback(
     return firstFallbackNotRepeated(
       language === "es"
         ? [
-          `Tienes razón: tu oferta necesita revisión de un vendedor. Puedes llamar a Alpha Motorsports al ${storePhone} para que te confirmen si pueden aceptar esa cantidad.`,
-          `Entiendo la pregunta. Un vendedor debe revisar tu oferta y confirmar si pueden aceptar esa cantidad. Llámanos al ${storePhone}.`,
+          `Tienes razón: nuestros agentes de ventas deben revisar tu oferta y confirmar si pueden aceptar esa cantidad. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${storePhone}.`,
+          `Nuestros agentes de ventas confirmarán si pueden aceptar esa cantidad. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${storePhone}.`,
         ]
         : [
-          `You're right — your offer needs to be reviewed by a salesperson. You can call Alpha Motorsports at ${storePhone} so they can confirm whether they can accept that amount.`,
-          `I understand the question. A salesperson needs to review your offer and confirm whether they can accept that amount. Call us at ${storePhone}.`,
+          `You're right — our sales agents need to review your offer and confirm whether they can accept that amount. What is the best phone number to reach you? You can also call Alpha Motorsports at ${storePhone}.`,
+          `Our sales agents will confirm whether they can accept that amount. What is the best phone number to reach you? You can also call Alpha Motorsports at ${storePhone}.`,
         ],
       visibleMessages,
     );
@@ -1871,12 +1878,12 @@ function buildQuestionRepairFallback(
   return firstFallbackNotRepeated(
     language === "es"
       ? [
-        `Tienes razón; permíteme aclararlo. Un vendedor puede responder esa pregunta directamente al ${storePhone}.`,
-        `Para darte una respuesta correcta, un vendedor debe confirmar ese detalle. Puedes llamarnos al ${storePhone}.`,
+        `Tienes razón. Nuestros agentes de ventas responderán esas preguntas específicas y confirmarán los detalles. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${storePhone}.`,
+        `Para darte una respuesta correcta, nuestros agentes de ventas deben confirmar esos detalles. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${storePhone}.`,
       ]
       : [
-        `You're right — let me clarify. A salesperson can answer that question directly at ${storePhone}.`,
-        `To give you an accurate answer, a salesperson needs to confirm that detail. You can call us at ${storePhone}.`,
+        `You're right. Our sales agents will answer those specific questions and confirm the details. What is the best phone number to reach you? You can also call Alpha Motorsports at ${storePhone}.`,
+        `To give you an accurate answer, our sales agents need to confirm those details. What is the best phone number to reach you? You can also call Alpha Motorsports at ${storePhone}.`,
       ],
     visibleMessages,
   );
@@ -1924,12 +1931,12 @@ function avoidRepeatedFallback(
     return firstFallbackNotRepeated(
       language === "es"
         ? [
-          `Tienes razón; permíteme responderlo directamente. Un vendedor puede confirmar ese detalle al ${configuredPhone}.`,
-          `Para darte una respuesta correcta, un vendedor debe confirmar ese detalle. Puedes llamar a Alpha Motorsports al ${configuredPhone}.`,
+          `Tienes razón. Nuestros agentes de ventas responderán esa pregunta específica y confirmarán el detalle. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${configuredPhone}.`,
+          `Nuestros agentes de ventas confirmarán ese detalle. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${configuredPhone}.`,
         ]
         : [
-          `You're right — let me answer directly. A salesperson can confirm that detail at ${configuredPhone}.`,
-          `To give you an accurate answer, a salesperson needs to confirm that detail. You can call Alpha Motorsports at ${configuredPhone}.`,
+          `You're right. Our sales agents will answer that specific question and confirm the detail. What is the best phone number to reach you? You can also call Alpha Motorsports at ${configuredPhone}.`,
+          `Our sales agents will confirm that detail. What is the best phone number to reach you? You can also call Alpha Motorsports at ${configuredPhone}.`,
         ],
       visibleMessages,
     );
@@ -1950,12 +1957,12 @@ function avoidRepeatedFallback(
       return firstFallbackNotRepeated(
         language === "es"
           ? [
-            `Tienes razón; permíteme responderlo directamente. Un vendedor puede confirmar ese detalle al ${configuredPhone}.`,
-            `Nuestros agentes de ventas pueden confirmar ese detalle. Puedes llamarnos al ${configuredPhone}.`,
+            `Tienes razón. Nuestros agentes de ventas responderán esas preguntas específicas y confirmarán los detalles. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${configuredPhone}.`,
+            `Nuestros agentes de ventas confirmarán esos detalles. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${configuredPhone}.`,
           ]
           : [
-            `You're right — let me answer directly. A salesperson can confirm that detail at ${configuredPhone}.`,
-            `Our sales agents can confirm that detail. You can call us at ${configuredPhone}.`,
+            `You're right. Our sales agents will answer those specific questions and confirm the details. What is the best phone number to reach you? You can also call Alpha Motorsports at ${configuredPhone}.`,
+            `Our sales agents will confirm those details. What is the best phone number to reach you? You can also call Alpha Motorsports at ${configuredPhone}.`,
           ],
         visibleMessages,
       );
@@ -2246,7 +2253,7 @@ export async function generateAiReply(
     request_phone: "Ask for the buyer's best phone number to confirm the tentative visit. Do not add unrequested vehicle facts or ask about financing or down payment.",
     phone_received: "The buyer provided a phone number. Thank them, say a sales agent will reach out shortly, add a brief goodbye, and do not ask another question or continue qualification in the reply.",
     handoff_confirmation: "The buyer made a concrete cash offer. Thank them and say that a sales agent will review the offer shortly. Do not ask another question or request a phone number.",
-    question_repair: "The buyer says the previous reply did not answer their question. Find the most recent unanswered buyer question in the conversation history and answer that question first. Do not repeat the previous generic sales-agent or phone-number wording, do not ask a new qualification question, and do not invent a price, approval, warranty, or financing fact.",
+    question_repair: `The buyer says the previous reply did not answer the specific question. Answer it only from supplied facts. If the answer is not supplied, say that our sales agents will answer and confirm those details, ask for the buyer's best phone number in the same reply, and include Alpha Motorsports' dealership phone ${storePhone}. Never close the conversation, say goodbye, mention Carfax unless the buyer asked about it, or invent a price, approval, warranty, or financing fact.`,
     vin_inquiry: vehicleFacts.vin
       ? `Answer directly with the feed-backed VIN ${vehicleFacts.vin}. Give Alpha Motorsports' dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Do not ask what else they would like to know or mention financing.`
       : `The buyer asked for the VIN, but it is not in the available feed facts. Say that the sales agents can help with that detail, give Alpha Motorsports' dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Do not invent a VIN.`,

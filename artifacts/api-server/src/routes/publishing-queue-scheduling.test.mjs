@@ -796,7 +796,10 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.ok(cleanTitleStage >= 0 && cleanTitleStage < warrantyStage);
   assert.ok(warrantyStage >= 0 && warrantyStage < genericQuestionStage);
   assert.match(conversationsSource, /buyerAskedCleanTitle\(latest\) \|\| buyerAskedWarrantyInfo\(latest\)/);
-  assert.match(conversationsSource, /issue\|issues\|problem\|problems/);
+  assert.match(conversationsSource, /battery/);
+  assert.match(conversationsSource, /heated/);
+  assert.match(conversationsSource, /fsd/);
+  assert.doesNotMatch(conversationsSource, /included\|cover\|days\|miles\|mill\?as/);
   assert.match(conversationsSource, /stagesAllowedToMentionNumericVehicleDetails/);
   assert.match(conversationsSource, /replyClaimsUnrequestedVehicleStatus/);
   assert.match(conversationsSource, /replyContainsUnauthorizedPromise/);

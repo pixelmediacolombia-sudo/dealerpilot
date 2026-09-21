@@ -70,6 +70,8 @@ test("buyer language detection includes natural Spanish vehicle questions", () =
 test("answer-repair stage prevents repeating the generic phone fallback", () => {
   assert.match(source, /buyerRequestsAnswerToPendingQuestion/);
   assert.match(source, /question_repair/);
-  assert.match(source, /Do not repeat the previous generic sales-agent or phone-number wording/);
+  assert.match(source, /If the answer is not supplied, say that our sales agents will answer and confirm those details/);
+  assert.match(source, /Never close the conversation/);
+  assert.match(source, /mention Carfax unless the buyer asked about it/);
   assert.match(source, /buildQuestionRepairFallback/);
 });
