@@ -37,9 +37,19 @@ import {
   isConciseMarketplaceReply,
   type MarketplaceVehicleFacts,
 } from "../sofia/marketplaceTone";
-import { ALPHA_LOT_MANASSAS, isAlphaManassasVehicle } from "../lib/dealer";
+import {
+  ALPHA_LOT_MANASSAS,
+  getDealerDefaultLotLocation,
+  isVerifiedDealerPublishingVehicle,
+} from "../lib/dealer";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 import { detectConversationLanguage, detectLanguage } from "../conversations/language";
+import {
+  getEffectiveMessengerKnowledge,
+  getMessengerDealerPolicy,
+  buildLuckiGeneralOnlyReply,
+  isLuckiMazdaPhone,
+} from "../conversations/dealerMessengerPolicy";
 
 
 const router = Router();
@@ -2198,6 +2208,17 @@ export async function generateAiReply(
   hasCleanTitleInventory: boolean = false,
   dealerKnowledge?: DealerMarketplaceKnowledge,
 ): Promise<string> {
+  if (isLuckiMazdaPhone(storePhone)) {
+    return buildLuckiGeneralOnlyReply({
+      language,
+      currentMessage,
+      vehicleTitle,
+      storePhone,
+      vehicleFacts,
+      hasCleanTitleInventory,
+    });
+  }
+
   const langNote =
     language === "es"
       ? "The latest buyer message is Spanish. Respond ONLY in Spanish. Do not include English."
@@ -2600,8 +2621,9 @@ router.post("/conversations/intake", async (req, res) => {
     res.status(400).json({ error: "Unknown dealerId" });
     return;
   }
-  const hasCleanTitleInventory = targetDealer.hasCleanTitleInventory === true;
-  const dealerKnowledge = targetDealer.marketplaceKnowledge ?? {};
+  const messengerPolicy = getMessengerDealerPolicy(dealerId);
+  const hasCleanTitleInventory = targetDealer.hasCleanTitleInventory === true || messengerPolicy.cleanTitleClaimsAllowed;
+  const dealerKnowledge = getEffectiveMessengerKnowledge(dealerId, targetDealer.marketplaceKnowledge);
   // Outbound storage is additive. An unavailable migration must never stop
   // the established Sales AI intake and normal response path.
   try {
@@ -2756,7 +2778,9 @@ router.post("/conversations/intake", async (req, res) => {
         .innerJoin(vehiclesTable, eq(vehiclesTable.id, marketplaceListingsTable.vehicleId))
         .where(and(
           eq(marketplaceListingsTable.dealerId, dealerId),
-          eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
+          ...(getDealerDefaultLotLocation(dealerId)
+            ? [eq(vehiclesTable.lotLocation, getDealerDefaultLotLocation(dealerId)!)]
+            : []),
         ));
       const marketplaceListing = marketplaceListings.find((listing) => {
         if (!detectedMarketplaceItemId) return listing.listingUrl === detectedMarketplaceListingUrl;
@@ -2765,7 +2789,7 @@ router.post("/conversations/intake", async (req, res) => {
           extractMarketplaceItemId(listing.listingUrl) === detectedMarketplaceItemId
         );
       });
-      if (marketplaceListing && isAlphaManassasVehicle(marketplaceListing)) {
+      if (marketplaceListing && isVerifiedDealerPublishingVehicle(marketplaceListing)) {
         vehicleId = marketplaceListing.vehicleId;
         vehicleMatchSource = "marketplace_listing_url";
       }
@@ -2792,7 +2816,9 @@ router.post("/conversations/intake", async (req, res) => {
       .from(vehiclesTable)
       .where(and(
         eq(vehiclesTable.dealerId, dealerId),
-        eq(vehiclesTable.lotLocation, ALPHA_LOT_MANASSAS),
+        ...(getDealerDefaultLotLocation(dealerId)
+          ? [eq(vehiclesTable.lotLocation, getDealerDefaultLotLocation(dealerId)!)]
+          : []),
       ));
 
     const match = vRow.find((v) => {
@@ -2803,7 +2829,7 @@ router.post("/conversations/intake", async (req, res) => {
       ].map(normalizeVehicleTitle);
       return exactTitles.includes(normalizedDetectedTitle);
     });
-    if (match && isAlphaManassasVehicle(match)) {
+    if (match && isVerifiedDealerPublishingVehicle(match)) {
       vehicleId = match.id;
       lotLocation = match.lotLocation ?? null;
       vehicleMatchSource = "detected_vehicle_title";
@@ -3619,8 +3645,8 @@ router.post("/sales-ai/test-message", async (req, res) => {
         .from(dealersTable)
         .where(eq(dealersTable.id, v.dealerId))
         .limit(1);
-      testDealerKnowledge = dealer?.marketplaceKnowledge ?? {};
-      testHasCleanTitleInventory = dealer?.hasCleanTitleInventory === true;
+      testDealerKnowledge = getEffectiveMessengerKnowledge(v.dealerId, dealer?.marketplaceKnowledge);
+      testHasCleanTitleInventory = dealer?.hasCleanTitleInventory === true || getMessengerDealerPolicy(v.dealerId).cleanTitleClaimsAllowed;
       testStorePhone = resolveStorePhone(v.lotLocation, testDealerKnowledge);
       testDownPaymentPolicy = await getDownPaymentPolicy(v.dealerId, v.id);
       testVehicleFacts = {

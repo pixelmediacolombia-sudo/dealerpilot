@@ -159,6 +159,7 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
             notes: LUCKI_CONFIGURED_NOTES,
           }
         : {}),
+      ...(existing.hasCleanTitleInventory !== true ? { hasCleanTitleInventory: true } : {}),
       ...LUCKI_LOCATION,
     };
     const changed =
@@ -169,7 +170,7 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
         existing.providerName !== updates.providerName ||
         existing.providerDealerId !== updates.providerDealerId ||
         existing.feedAuthMode !== updates.feedAuthMode
-      ));
+      )) || existing.hasCleanTitleInventory !== true;
     const locationChanged =
       existing.city !== LUCKI_LOCATION.city ||
       existing.state !== LUCKI_LOCATION.state ||
@@ -197,6 +198,7 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
       name: LUCKI_MAZDA,
       plan: "basic",
       status: "Active",
+      hasCleanTitleInventory: true,
       notes: configured ? LUCKI_CONFIGURED_NOTES : LUCKI_NOTES_PENDING,
       ...(configured
         ? {

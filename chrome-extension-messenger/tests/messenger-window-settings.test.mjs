@@ -109,3 +109,18 @@ test("same extension keeps Alpha and another dealer isolated by browser window",
   assert.ok(storage["messengerSettingsWindow:11"]);
   assert.ok(storage["messengerSettingsWindow:22"]);
 });
+
+test("Lucki dealer selection cannot retain Alpha seller profile names", async () => {
+  const storage = { extensionId: "shared-extension" };
+  const lucki = createHarness({ storage, windowId: 22, apiCalls: [] });
+
+  const saved = await lucki.SAVE_SETTINGS({
+    dealerId: 2,
+    sellerProfileNames: ["Alpha Manassas", "Alpha Motorsport"],
+    sessionId: "lucki-session",
+  });
+
+  assert.equal(saved.dealerId, 2);
+  assert.deepEqual(Array.from(saved.sellerProfileNames), ["Lucki Mazda"]);
+  assert.deepEqual(Array.from(storage["messengerSettingsWindow:22"].sellerProfileNames), ["Lucki Mazda"]);
+});

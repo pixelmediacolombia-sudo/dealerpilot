@@ -9,6 +9,8 @@
   });
   const LEGACY_BACKEND_URL = "https://1987dealerpilot.com";
   const WINDOW_SETTINGS_PREFIX = "messengerSettingsWindow:";
+  const LUCKI_SELLER_PROFILE_NAMES = ["Lucki Mazda"];
+  const ALPHA_SELLER_PROFILE_NAMES = new Set(["alpha manassas", "alpha motorsport", "andres ibanez"]);
   const conversationIntakeInFlight = new Set();
   const recentConversationIntakes = new Map();
 
@@ -42,6 +44,17 @@
   function normalizeBackendUrl(value) {
     const normalized = String(value || "").trim().replace(/\/+$/, "");
     return normalized === LEGACY_BACKEND_URL ? DEFAULT_SETTINGS.backendUrl : normalized;
+  }
+
+  function normalizeSellerProfileNames(dealerId, names) {
+    const cleaned = Array.isArray(names) ? names.map((name) => String(name).trim()).filter(Boolean) : [];
+    if (Number(dealerId) === 2 && (
+      cleaned.length === 0 ||
+      cleaned.every((name) => ALPHA_SELLER_PROFILE_NAMES.has(name.toLowerCase()))
+    )) {
+      return [...LUCKI_SELLER_PROFILE_NAMES];
+    }
+    return cleaned.length > 0 ? cleaned : DEFAULT_SETTINGS.sellerProfileNames;
   }
 
   async function reportSessionStatus(windowId = null) {
@@ -111,17 +124,16 @@
       }
     }
     const backendUrl = normalizeBackendUrl(values.backendUrl) || DEFAULT_SETTINGS.backendUrl;
+    const dealerId = Number.isInteger(Number(values.dealerId)) && Number(values.dealerId) > 0 ? Number(values.dealerId) : 1;
     return {
       ...DEFAULT_SETTINGS,
       ...Object.fromEntries(Object.keys(DEFAULT_SETTINGS).map((setting) => [setting, values[setting]])),
       backendUrl,
       windowId: validWindowId(windowId),
       autoReplyEnabled: values.autoReplyEnabled !== false,
-      dealerId: Number.isInteger(Number(values.dealerId)) && Number(values.dealerId) > 0 ? Number(values.dealerId) : 1,
+      dealerId,
       sessionId: typeof values.sessionId === "string" ? values.sessionId.trim() : "",
-      sellerProfileNames: Array.isArray(values.sellerProfileNames)
-        ? values.sellerProfileNames.filter(Boolean)
-        : DEFAULT_SETTINGS.sellerProfileNames,
+      sellerProfileNames: normalizeSellerProfileNames(dealerId, values.sellerProfileNames),
     };
   }
 
@@ -148,7 +160,14 @@
       throw new Error("window_id_unavailable_settings_not_saved");
     }
     const current = await getSettings(windowId);
-    const next = { ...current, ...patch };
+    const next = {
+      ...current,
+      ...patch,
+      sellerProfileNames: normalizeSellerProfileNames(
+        patch.dealerId ?? current.dealerId,
+        patch.sellerProfileNames ?? current.sellerProfileNames,
+      ),
+    };
     await chrome.storage.local.set({ [key]: next });
     return getSettings(windowId);
   }
