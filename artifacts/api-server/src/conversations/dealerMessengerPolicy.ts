@@ -119,6 +119,13 @@ export function buildLuckiGeneralOnlyReply(params: {
     /\b(?:dealer|store|call|contact|llamar|contactar)\b.{0,24}\b(?:number|numero|número)\b/.test(normalized);
   const cleanTitleRequested = /\b(?:clean title|clear title|titulo limpio|t[ií]tulo limpio|warranty|garantia|garant[ií]a)\b/.test(normalized);
   const photosRequested = /\b(?:photo|photos|picture|pictures|image|images|foto|fotos|imagen|imagenes)\b/.test(normalized);
+  const greetingOnly = /^(?:hi|hello|hey|hola|buenas(?:\s+(?:dias|d[ií]as|tardes|noches))?)[\s!,.?]*$/i.test(normalized);
+
+  if (greetingOnly) {
+    return language === "es"
+      ? "¡Hola! Somos Lucki Mazda. ¿Qué te gustaría saber?"
+      : "Hello! This is Lucki Mazda. What would you like to know?";
+  }
 
   if (phoneProvided) {
     return language === "es"

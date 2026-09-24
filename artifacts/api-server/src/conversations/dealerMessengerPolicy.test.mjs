@@ -70,3 +70,19 @@ test("Lucki reply path answers approved general facts without Alpha or qualifica
     assert.doesNotMatch(reply, /Alpha|Manassas|down payment|financing/i);
   }
 });
+
+test("Lucki greets as Lucki Mazda for standalone greetings", () => {
+  const base = {
+    storePhone: LUCKI_MAZDA_PHONE,
+    vehicleFacts: {},
+    hasCleanTitleInventory: true,
+  };
+
+  const english = buildLuckiGeneralOnlyReply({ ...base, language: "en", currentMessage: "Hi" });
+  const spanish = buildLuckiGeneralOnlyReply({ ...base, language: "es", currentMessage: "Hola" });
+
+  assert.match(english, /Lucki Mazda/);
+  assert.match(spanish, /Lucki Mazda/);
+  assert.doesNotMatch(english, /Alpha|Manassas/i);
+  assert.doesNotMatch(spanish, /Alpha|Manassas/i);
+});
