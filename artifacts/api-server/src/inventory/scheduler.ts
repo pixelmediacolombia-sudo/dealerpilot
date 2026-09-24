@@ -170,6 +170,27 @@ export async function runSyncNow(
 }
 
 /**
+ * Run Lucki Mazda's configured Vincue feed. The scheduled worker calls this
+ * separately from Alpha so one dealer's feed failure cannot hide the other's
+ * result, and an unconfigured Lucki shell remains a clean no-op.
+ */
+export async function runLuckiSyncNow(
+  log: Logger,
+  trigger: "auto" | "manual" = "auto",
+): Promise<ImportSummary | null> {
+  const config = getLuckiMazdaFeedConfig();
+  if (!config.xmlFeedUrl || !config.providerDealerId || config.feedAuthMode !== "x-api-key") {
+    return null;
+  }
+  try {
+    return await syncDealer(LUCKI_MAZDA_DEALER_ID, log, trigger);
+  } catch (err) {
+    log.error({ trigger, dealerId: LUCKI_MAZDA_DEALER_ID, err }, "Lucki Mazda inventory sync failed");
+    return null;
+  }
+}
+
+/**
  * Run a full inventory sync for an arbitrary dealer, throwing on failure so
  * API callers can surface a real error response. Used by
  * routes/dealers.ts (per-dealer manual sync) and routes/feed.ts

@@ -86,6 +86,17 @@ test("inventory parser preserves explicit unknown locations but never invents on
   assert.equal(result.vehicles[1].lotLocation, "Woodbridge");
 });
 
+test("inventory parser preserves the per-vehicle condition for Marketplace", () => {
+  const xml = `<?xml version="1.0"?>
+    <inventory><vehicle><vin>1CONDITIONVIN</vin><vehicle_id>S-4</vehicle_id>
+      <make>Mazda</make><model>CX-5</model><year>2024</year>
+      <vehicle_condition>Excellent</vehicle_condition>
+    </vehicle></inventory>`;
+
+  const result = parseInventoryXml(xml);
+  assert.equal(result.vehicles[0].condition, "Excellent");
+});
+
 test("inventory parser unwraps Vincue's serialized XML response", () => {
   const result = parseInventoryXml(LUCKI_MAZDA_SERIALIZED_XML);
 

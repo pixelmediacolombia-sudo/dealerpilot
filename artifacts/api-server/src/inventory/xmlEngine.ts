@@ -17,6 +17,7 @@ export type NormalizedVehicle = {
   exteriorColor: string | null;
   interiorColor: string | null;
   bodyStyle: string | null;
+  condition: string | null;
   transmission: string | null;
   fuelType: string | null;
   description: string | null;
@@ -348,6 +349,7 @@ function mergeVehicles(existing: NormalizedVehicle, incoming: NormalizedVehicle)
     exteriorColor: preferIncoming(existing.exteriorColor, incoming.exteriorColor),
     interiorColor: preferIncoming(existing.interiorColor, incoming.interiorColor),
     bodyStyle: preferIncoming(existing.bodyStyle, incoming.bodyStyle),
+    condition: preferIncoming(existing.condition, incoming.condition),
     transmission: preferIncoming(existing.transmission, incoming.transmission),
     fuelType: preferIncoming(existing.fuelType, incoming.fuelType),
     description: preferIncoming(existing.description, incoming.description),
@@ -420,6 +422,7 @@ function normalizeNode(node: Record<string, unknown>): NormalizedVehicle | null 
     exteriorColor: firstString(lookup, ["exteriorcolor", "extcolor", "color", "colour", "exterior"]),
     interiorColor: firstString(lookup, ["interiorcolor", "intcolor", "interior"]),
     bodyStyle: firstString(lookup, ["bodystyle", "body", "bodytype", "style"]),
+    condition: firstString(lookup, ["condition", "vehiclecondition", "conditionofvehicle", "itemcondition"]),
     transmission: firstString(lookup, ["transmission", "trans", "gearbox"]),
     fuelType: firstString(lookup, ["fueltype", "fuel", "enginefuel"]),
     description: firstString(lookup, [

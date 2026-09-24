@@ -5,6 +5,7 @@ import { importFeed } from "./importFeed";
 import { fetchFeedXml } from "./feedSource";
 import { ALPHA_MARKETPLACE_KNOWLEDGE } from "../lib/dealer";
 import { getLuckiMazdaFeedConfig, LUCKI_MAZDA_DEALER_ID } from "./dealerFeedConfig";
+import { runInventorySync } from "./scheduler";
 
 const ALPHA = "Alpha Motorsport";
 const LUCKI_MAZDA = "Lucki Mazda";
@@ -18,6 +19,24 @@ const LUCKI_LOCATION = {
   country: "US",
 };
 const REAL_FEED_URL = "https://www.alphamotorsport.net/facebook-catalog-feed.xml";
+
+async function syncConfiguredLuckiInventory(log: Logger, configured: boolean): Promise<void> {
+  if (!configured) return;
+  try {
+    const { summary } = await runInventorySync(log, {
+      dealerId: LUCKI_MAZDA_DEALER_ID,
+      trigger: "startup",
+    });
+    log.info(
+      { dealerId: LUCKI_MAZDA_DEALER_ID, ...summary },
+      "Lucki Mazda inventory refreshed from Vincue during seed",
+    );
+  } catch (err) {
+    // Keep the API available with the last protected inventory snapshot when
+    // Vincue is temporarily unavailable. The next scheduled sync can retry.
+    log.warn({ err, dealerId: LUCKI_MAZDA_DEALER_ID }, "Lucki Mazda inventory refresh during seed failed");
+  }
+}
 
 function isSampleFeedUrl(url: string | null | undefined): boolean {
   if (!url) return true;
@@ -181,9 +200,9 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
       : existing;
     if (existing.name !== LUCKI_MAZDA) {
       log.info({ dealerId: existing.id }, "Normalized dealer display name to Lucki Mazda");
-      return dealer;
     }
     log.info({ dealerId: existing.id, configured }, configured ? "Lucki Mazda dealer feed configuration refreshed" : "Lucki Mazda dealer already exists; inventory remains unconfigured");
+    await syncConfiguredLuckiInventory(log, configured);
     return dealer;
   }
 
@@ -218,5 +237,6 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
   }
 
   log.info({ dealerId: created!.id, configured }, configured ? "Seeded Lucki Mazda dealer with runtime feed configuration" : "Seeded Lucki Mazda dealer shell without inventory");
+  await syncConfiguredLuckiInventory(log, configured);
   return created!;
 }

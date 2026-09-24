@@ -31,6 +31,7 @@ export const vehiclesTable = pgTable(
     exteriorColor: text("exterior_color"),
     interiorColor: text("interior_color"),
     bodyStyle: text("body_style"),
+    condition: text("condition"),
     transmission: text("transmission"),
     fuelType: text("fuel_type"),
     description: text("description"),

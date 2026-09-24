@@ -719,6 +719,8 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
         trim: vehicle.trim ?? null,
         vin: vehicle.vin,
         bodyStyle: vehicle.bodyStyle ?? null,
+        interiorColor: vehicle.interiorColor ?? null,
+        condition: vehicle.condition ?? null,
         exteriorColor: vehicle.exteriorColor ?? null,
         fuelType: vehicle.fuelType ?? null,
         transmission: vehicle.transmission ?? null,

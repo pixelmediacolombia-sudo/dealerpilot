@@ -16,6 +16,7 @@ export const vehicleOperationalColumns = {
   exteriorColor: vehiclesTable.exteriorColor,
   interiorColor: vehiclesTable.interiorColor,
   bodyStyle: vehiclesTable.bodyStyle,
+  condition: vehiclesTable.condition,
   transmission: vehiclesTable.transmission,
   fuelType: vehiclesTable.fuelType,
   description: vehiclesTable.description,
