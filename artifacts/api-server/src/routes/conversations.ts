@@ -341,6 +341,20 @@ function normalizeVehicleTitle(value?: string | null): string {
     .trim();
 }
 
+function vehicleIdentityMatchesDetectedTitle(
+  vehicle: { year?: number | null; make?: string | null; model?: string | null; trim?: string | null },
+  detectedVehicleTitle?: string | null,
+): boolean {
+  const normalizedDetectedTitle = normalizeVehicleTitle(detectedVehicleTitle);
+  if (!normalizedDetectedTitle) return true;
+  return [
+    [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" "),
+    [vehicle.year, vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(" "),
+  ]
+    .map(normalizeVehicleTitle)
+    .includes(normalizedDetectedTitle);
+}
+
 function extractMarketplaceItemId(value?: string | null): string | null {
   return value?.match(/\/marketplace\/item\/(\d+)/i)?.[1] ?? null;
 }
@@ -898,6 +912,15 @@ function replyMentionsWrongVehicleYear(reply: string, vehicleFacts?: Marketplace
   const currentYear = vehicleFacts?.title?.match(/\b(?:19|20)\d{2}\b/)?.[0];
   if (!currentYear) return false;
   return [...cleanConversationText(reply).matchAll(/\b(?:19|20)\d{2}\b/g)].some((match) => match[0] !== currentYear);
+}
+
+function replyContainsMismatchedVehicleLink(reply: string, vehicleFacts?: MarketplaceVehicleFacts): boolean {
+  const vehiclePageUrls = [...cleanConversationText(reply).matchAll(/https?:\/\/[^\s)]+/gi)]
+    .map((match) => match[0].replace(/[.,!?;:]+$/g, ""))
+    .filter((url) => /\/(?:used-|inventory|vehicle|cars?\/)/i.test(url));
+  if (!vehiclePageUrls.length) return false;
+  const expectedUrl = cleanConversationText(vehicleFacts?.vdpUrl);
+  return vehiclePageUrls.some((url) => !expectedUrl || url !== expectedUrl);
 }
 
 function downPaymentAmountsMentioned(reply: string): number[] {
@@ -1547,6 +1570,7 @@ function isAiReplyAligned(
   if (firstDealerReply && /\b(?:finance|financing|financiamiento|financiar)\b/i.test(normalized)) return false;
   if (!isConciseMarketplaceReply(reply) && stage !== "address_request") return false;
   if (vehicleFacts && replyMentionsUnrequestedVehicleFact(reply, stage, vehicleFacts)) return false;
+  if (replyContainsMismatchedVehicleLink(reply, vehicleFacts)) return false;
   const stagesAllowedToMentionNumericVehicleDetails = new Set<SalesReplyStage>([
     "price_inquiry",
     "mileage_inquiry",
@@ -2772,6 +2796,10 @@ router.post("/conversations/intake", async (req, res) => {
           facebookListingId: marketplaceListingsTable.facebookListingId,
           dealerId: vehiclesTable.dealerId,
           lotLocation: vehiclesTable.lotLocation,
+          year: vehiclesTable.year,
+          make: vehiclesTable.make,
+          model: vehiclesTable.model,
+          trim: vehiclesTable.trim,
           sourceRaw: vehiclesTable.sourceRaw,
         })
         .from(marketplaceListingsTable)
@@ -2789,9 +2817,25 @@ router.post("/conversations/intake", async (req, res) => {
           extractMarketplaceItemId(listing.listingUrl) === detectedMarketplaceItemId
         );
       });
-      if (marketplaceListing && isVerifiedDealerPublishingVehicle(marketplaceListing)) {
+      if (
+        marketplaceListing &&
+        isVerifiedDealerPublishingVehicle(marketplaceListing) &&
+        vehicleIdentityMatchesDetectedTitle(marketplaceListing, detectedVehicleTitle)
+      ) {
         vehicleId = marketplaceListing.vehicleId;
         vehicleMatchSource = "marketplace_listing_url";
+      } else if (marketplaceListing && detectedVehicleTitle && !vehicleIdentityMatchesDetectedTitle(marketplaceListing, detectedVehicleTitle)) {
+        req.log.warn(
+          {
+            externalThreadRef,
+            detectedMarketplaceListingUrl,
+            detectedVehicleTitle,
+            listingVehicleTitle: [marketplaceListing.year, marketplaceListing.make, marketplaceListing.model, marketplaceListing.trim]
+              .filter(Boolean)
+              .join(" "),
+          },
+          "Conversation intake rejected marketplace listing with mismatched selected vehicle title",
+        );
       }
     } catch (error) {
       // The verified-lot lookup was added for the Alpha safety gate. A stale
@@ -2840,7 +2884,8 @@ router.post("/conversations/intake", async (req, res) => {
     existingConv?.vehicleId &&
     vehicleId &&
     vehicleId !== existingConv.vehicleId &&
-    vehicleMatchSource !== "marketplace_listing_url"
+    vehicleMatchSource !== "marketplace_listing_url" &&
+    vehicleMatchSource !== "detected_vehicle_title"
   ) {
     req.log.warn(
       {

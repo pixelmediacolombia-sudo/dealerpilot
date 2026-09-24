@@ -698,6 +698,9 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /blocked_facebook_surface/);
   assert.match(conversationsSource, /buyer_name_missing/);
   assert.match(conversationsSource, /normalizeVehicleTitle/);
+  assert.match(conversationsSource, /function vehicleIdentityMatchesDetectedTitle/);
+  assert.match(conversationsSource, /vehicleIdentityMatchesDetectedTitle\(marketplaceListing, detectedVehicleTitle\)/);
+  assert.match(conversationsSource, /rejected marketplace listing with mismatched selected vehicle title/);
   assert.match(conversationsSource, /extractMarketplaceItemId/);
   assert.match(conversationsSource, /marketplaceListingsTable\.facebookListingId/);
   assert.match(conversationsSource, /exactTitles\.includes\(normalizedDetectedTitle\)/);
@@ -710,6 +713,8 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /resolveSalesReplyStage/);
   assert.match(conversationsSource, /extractPhoneNumber/);
   assert.match(conversationsSource, /isAiReplyAligned/);
+  assert.match(conversationsSource, /function replyContainsMismatchedVehicleLink/);
+  assert.match(conversationsSource, /replyContainsMismatchedVehicleLink\(reply, vehicleFacts\)/);
   assert.match(conversationsSource, /isReplyLanguageMirrored/);
   assert.match(conversationsSource, /Mirror the latest buyer message language exactly/);
   assert.match(conversationsSource, /Never write a bilingual reply/);
