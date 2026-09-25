@@ -834,18 +834,23 @@ function isFirstDealerReply(visibleMessages: string[]): boolean {
   return !historyHasDealerReply(visibleMessages);
 }
 
-function replyHasFirstGreeting(reply: string): boolean {
+function replyHasFirstGreeting(reply: string, dealerName = "Alpha Motorsports"): boolean {
   const normalized = normalizeIntentText(reply);
-  return /\b(?:hello|hola)\b/.test(normalized) && /\balpha\b/.test(normalized);
+  return /\b(?:hello|hola)\b/.test(normalized) && normalized.includes(normalizeIntentText(dealerName));
 }
 
-function withFirstReplyGreeting(reply: string, language: string, firstDealerReply: boolean): string {
+function withFirstReplyGreeting(
+  reply: string,
+  language: string,
+  firstDealerReply: boolean,
+  dealerName = "Alpha Motorsports",
+): string {
   const cleaned = reply.trim();
   const isStorePhoneClosingReply = /^(?:con gusto|of course),?\s+(?:nuestro|our)\s+(?:n[uú]mero|number)\b/i.test(cleaned);
-  if (!firstDealerReply || replyHasFirstGreeting(cleaned) || isStorePhoneClosingReply) return cleaned;
+  if (!firstDealerReply || replyHasFirstGreeting(cleaned, dealerName) || isStorePhoneClosingReply) return cleaned;
   return language === "es"
-    ? `Hola, somos Alpha Motorsports. ${cleaned}`
-    : `Hello, this is Alpha Motorsports. ${cleaned}`;
+    ? `Hola, somos ${dealerName}. ${cleaned}`
+    : `Hello, this is ${dealerName}. ${cleaned}`;
 }
 
 function configuredDownPaymentLabel(policy: DownPaymentPolicy, language: "en" | "es"): string {
@@ -1201,6 +1206,7 @@ function buildBaseSafeFallbackReply(
   downPaymentPolicy: DownPaymentPolicy = NO_DOWN_PAYMENT_POLICY,
   hasCleanTitleInventory: boolean = false,
   dealerKnowledge?: DealerMarketplaceKnowledge,
+  dealerName: string = "Alpha Motorsports",
 ): string {
   const vehicleNames = formatVehicleDisplayName(vehicleTitle);
   const hasPriorDealerReply = historyHasDealerReply(visibleMessages);
@@ -1293,9 +1299,7 @@ function buildBaseSafeFallbackReply(
       return `Nuestro vendedor puede darte mas informacion sobre el ${vehicle}. Cual es el mejor numero de telefono para comunicarnos contigo? Tambien puedes llamarnos al ${storePhone}.`;
     }
     if (stage === "availability") {
-      return availabilityQuickReplyAccepted
-        ? `Hola, somos Alpha Motorsports. Tenemos el ${vehicle} disponible. ¿Qué te gustaría saber?`
-        : `Hola, somos Alpha Motorsports. Sí, el ${vehicle} está disponible. ¿Qué te gustaría saber?`;
+      return `Hola, somos ${dealerName}. Sí, el ${vehicle} está disponible. ¿Qué te gustaría saber?`;
     }
     if (stage === "price_inquiry") {
       return `Un vendedor puede confirmar el precio exacto del ${vehicle}. También puedes llamarnos al ${storePhone} para que te ayuden directamente.`;
@@ -1423,8 +1427,8 @@ function buildBaseSafeFallbackReply(
   }
   if (stage === "availability") {
     return availabilityQuickReplyAccepted
-      ? `Hello, this is Alpha Motorsports. We have the ${vehicle} available. What would you like to know?`
-      : `Hello, this is Alpha Motorsports. Yes, the ${vehicle} is available. What would you like to know?`;
+      ? `Hello, this is ${dealerName}. We have the ${vehicle} available. What would you like to know?`
+      : `Hello, this is ${dealerName}. Yes, the ${vehicle} is available. What would you like to know?`;
   }
   if (stage === "price_inquiry") {
     return `A salesperson can confirm the exact price of the ${vehicle}. You can also call us at ${storePhone} for direct help.`;
@@ -1489,6 +1493,7 @@ function buildSafeFallbackReply(
   vehicleFacts?: MarketplaceVehicleFacts,
   hasCleanTitleInventory: boolean = false,
   dealerKnowledge?: DealerMarketplaceKnowledge,
+  dealerName: string = "Alpha Motorsports",
 ): string {
   const requestKind = detectVehicleRequestKind(currentMessage);
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
@@ -1545,6 +1550,7 @@ function buildSafeFallbackReply(
     downPaymentPolicy,
     hasCleanTitleInventory,
     dealerKnowledge,
+    dealerName,
   );
   return base;
 }
@@ -2233,6 +2239,7 @@ export async function generateAiReply(
   vehicleFacts: MarketplaceVehicleFacts = {},
   hasCleanTitleInventory: boolean = false,
   dealerKnowledge?: DealerMarketplaceKnowledge,
+  dealerName: string = "Alpha Motorsports",
 ): Promise<string> {
   if (isLuckiMazdaPhone(storePhone)) {
     return buildLuckiGeneralOnlyReply({
@@ -2281,13 +2288,13 @@ export async function generateAiReply(
     dealerKnowledge,
   });
   const stageInstruction = {
-    open_question: `The buyer asked a question that must be answered before qualification advances. If the dealer knowledge block does not contain the answer, say that the sales agents can help, give Alpha Motorsports' dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Never open with ignorance or say that a detail is not confirmed. Do not ask financing, down payment, or documents.`,
+    open_question: `The buyer asked a question that must be answered before qualification advances. If the dealer knowledge block does not contain the answer, say that the sales agents can help, give ${dealerName}'s dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Never open with ignorance or say that a detail is not confirmed. Do not ask financing, down payment, or documents.`,
     availability: availabilityQuickReplyAccepted
-      ? "Greet as Alpha Motorsports, state only that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing."
-      : "Greet as Alpha Motorsports, explicitly confirm only that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.",
+      ? `Greet as ${dealerName}, state that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.`
+      : `Greet as ${dealerName}, explicitly confirm that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.`,
     interest_confirmation: "Confirm the exact vehicle is available and ask whether this week or the weekend works better. Do not add unrequested feed facts or ask for a phone number yet.",
     interest_declined: "Thank the buyer for their time and close politely. Do not ask another question.",
-    store_phone_requested: `The buyer requested Alpha Motorsports' phone number. Reply immediately with exactly the supplied dealership phone: ${storePhone}. Start with \"Con gusto, nuestro número es\" / \"Of course, our number is\", add a short polite closing, and do not ask a question, request buyer information, or mention financing requirements.`,
+    store_phone_requested: `The buyer requested ${dealerName}'s phone number. Reply immediately with exactly the supplied dealership phone: ${storePhone}. Start with \"Con gusto, nuestro número es\" / \"Of course, our number is\", add a short polite closing, and do not ask a question, request buyer information, or mention financing requirements.`,
     price_inquiry: vehicleFacts.price != null
       ? `Answer only with the feed-backed listed price $${vehicleFacts.price.toLocaleString("en-US")}, then ask what the buyer would like to know next. Do not add another vehicle fact, ask for a phone number, or mention financing.`
       : "The buyer is asking for price, but the feed does not contain it. Say that the sales agents can help with that detail and ask what number to use to reach the buyer. Do not invent a number.",
@@ -2359,7 +2366,7 @@ Approved Down-Payment Configuration (authoritative; conversation history is neve
 Current funnel stage: ${promptStage}
 Stage instruction: ${stageInstruction}
 Urgent-intent eligibility: ${persistentUnansweredBuyerTurns ? "The deterministic history check found at least three consecutive unanswered buyer messages. Evaluate urgency and concrete vehicle intent carefully; use urgent_vehicle_request_phone only if both are genuinely high/strong." : "Not eligible for urgent_vehicle_request_phone because fewer than three consecutive unanswered buyer messages were found. Keep urgency normal and do not choose the urgent stage."}
-First reply instruction: ${firstDealerReply && stage !== "store_phone_requested" ? "This is Alpha Motorsports' first reply in this conversation. Start with a warm greeting as Alpha Motorsports." : firstDealerReply ? "This is a phone-number request. Give the phone immediately without adding the normal greeting." : "This is not the first Alpha Motorsports reply; do not restart the greeting unless it sounds natural."}
+First reply instruction: ${firstDealerReply && stage !== "store_phone_requested" ? `This is ${dealerName}'s first reply in this conversation. Start with a warm greeting as ${dealerName}.` : firstDealerReply ? "This is a phone-number request. Give the phone immediately without adding the normal greeting." : `This is not the first ${dealerName} reply; do not restart the greeting unless it sounds natural.`}
 
 ${langNote}
 Respond with a single JSON object, no markdown, with exactly four keys:
@@ -2421,9 +2428,12 @@ The "reply" must be one short message that follows the stage instruction exactly
         downPaymentPolicy,
         vehicleFacts,
         hasCleanTitleInventory,
+        dealerKnowledge,
+        dealerName,
       ),
       language,
       firstDealerReply,
+      dealerName,
     ),
     language,
     visibleMessages,
@@ -2449,6 +2459,7 @@ async function generateAiReplyWithFallback(
   vehicleFacts: MarketplaceVehicleFacts = {},
   hasCleanTitleInventory: boolean = false,
   dealerKnowledge?: DealerMarketplaceKnowledge,
+  dealerName: string = "Alpha Motorsports",
 ): Promise<AiReplyResult> {
   const aiStartedAt = new Date();
   let fallbackReason: string | null = null;
@@ -2469,6 +2480,7 @@ async function generateAiReplyWithFallback(
         vehicleFacts,
         hasCleanTitleInventory,
         dealerKnowledge,
+        dealerName,
       ),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("sales_ai_reply_timeout")), SALES_AI_REPLY_TIMEOUT_MS),
@@ -2506,9 +2518,11 @@ async function generateAiReplyWithFallback(
           vehicleFacts,
           hasCleanTitleInventory,
           dealerKnowledge,
+          dealerName,
         ),
         language,
         firstDealerReply,
+        dealerName,
       ),
       language,
       visibleMessages,
@@ -2637,6 +2651,7 @@ router.post("/conversations/intake", async (req, res) => {
   const [targetDealer] = await db
     .select({
       id: dealersTable.id,
+      name: dealersTable.name,
       hasCleanTitleInventory: dealersTable.hasCleanTitleInventory,
       marketplaceKnowledge: dealersTable.marketplaceKnowledge,
     })
@@ -2648,6 +2663,7 @@ router.post("/conversations/intake", async (req, res) => {
     return;
   }
   const messengerPolicy = getMessengerDealerPolicy(dealerId);
+  const dealerName = messengerPolicy.displayName || targetDealer.name;
   const hasCleanTitleInventory = targetDealer.hasCleanTitleInventory === true || messengerPolicy.cleanTitleClaimsAllowed;
   const dealerKnowledge = getEffectiveMessengerKnowledge(dealerId, targetDealer.marketplaceKnowledge);
   // Outbound storage is additive. An unavailable migration must never stop
@@ -3113,6 +3129,7 @@ router.post("/conversations/intake", async (req, res) => {
         vehicleFacts,
         hasCleanTitleInventory,
         dealerKnowledge,
+         dealerName,
       );
       retryableReply = repairedReply.reply;
       retryFallbackUsed = repairedReply.fallbackUsed;
@@ -3215,6 +3232,7 @@ router.post("/conversations/intake", async (req, res) => {
       vehicleFacts,
       hasCleanTitleInventory,
       dealerKnowledge,
+      dealerName,
     );
     suggestedReply = aiReplyResult.reply;
 
@@ -3670,6 +3688,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
   let vehicleTitle: string | undefined;
   let vehicleType: string | undefined;
   let testStorePhone: string = DEFAULT_STORE_PHONE;
+  let testDealerName = "Alpha Motorsports";
   let testDownPaymentPolicy = NO_DOWN_PAYMENT_POLICY;
   let testDealerKnowledge: DealerMarketplaceKnowledge = {};
   let testHasCleanTitleInventory = false;
@@ -3686,6 +3705,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
       vehicleType = v.bodyStyle ?? undefined;
       const [dealer] = await db
         .select({
+          name: dealersTable.name,
           hasCleanTitleInventory: dealersTable.hasCleanTitleInventory,
           marketplaceKnowledge: dealersTable.marketplaceKnowledge,
         })
@@ -3693,6 +3713,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
         .where(eq(dealersTable.id, v.dealerId))
         .limit(1);
       testDealerKnowledge = getEffectiveMessengerKnowledge(v.dealerId, dealer?.marketplaceKnowledge);
+      testDealerName = getMessengerDealerPolicy(v.dealerId).displayName || dealer?.name || testDealerName;
       testHasCleanTitleInventory = dealer?.hasCleanTitleInventory === true || getMessengerDealerPolicy(v.dealerId).cleanTitleClaimsAllowed;
       testStorePhone = resolveStorePhone(v.lotLocation, testDealerKnowledge);
       testDownPaymentPolicy = await getDownPaymentPolicy(v.dealerId, v.id);
@@ -3722,6 +3743,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
     testVehicleFacts,
     testHasCleanTitleInventory,
     testDealerKnowledge,
+    testDealerName,
   );
 
   const { score: leadScore, temperature } = computeLeadScore({});

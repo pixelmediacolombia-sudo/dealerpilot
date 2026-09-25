@@ -736,7 +736,7 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /Nuestros agentes de ventas tienen el reporte Carfax/);
   assert.match(conversationsSource, /¿A qué número te lo enviamos\? También puedes llamar a Alpha Motorsports al/);
   assert.match(conversationsSource, /Alpha Motorsports al \$\{storePhone\}/);
-  assert.match(conversationsSource, /Hello, this is Alpha Motorsports/);
+  assert.match(conversationsSource, /Hello, this is \$\{dealerName\}/);
   assert.match(conversationsSource, /What would you like to know/);
   assert.match(conversationsSource, /QUALIFICATION FUNNEL FOR ALPHA MANASSAS/);
   assert.match(conversationsSource, /Approved Down-Payment Configuration/);

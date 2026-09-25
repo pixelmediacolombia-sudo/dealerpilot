@@ -103,7 +103,18 @@ test("availability questions ask what the buyer wants to know before phone hando
   assert.match(source, /sigue.*estando.*disponible/);
   assert.match(source, /if \(buyerAskedAvailability\(latest\)\) return false;/);
   assert.match(source, /if \(buyerAskedAvailability\(latest\)\) return "availability";/);
-  assert.match(source, /Hola, somos Alpha Motorsports\. Sí, el \$\{vehicle\} está disponible\. ¿Qué te gustaría saber\?/);
+  assert.match(source, /Hola, somos \$\{dealerName\}\. Sí, el \$\{vehicle\} está disponible\. ¿Qué te gustaría saber\?/);
+});
+
+test("availability greeting uses the dealer loaded by dealerId", () => {
+  assert.match(source, /name: dealersTable\.name/);
+  assert.match(source, /where\(eq\(dealersTable\.id, dealerId\)\)/);
+  assert.match(source, /getMessengerDealerPolicy\(dealerId\)/);
+  assert.match(source, /const dealerName = messengerPolicy\.displayName \|\| targetDealer\.name/);
+  assert.match(source, /testDealerName = getMessengerDealerPolicy\(v\.dealerId\)\.displayName/);
+  assert.match(source, /dealerName: string = "Alpha Motorsports"/);
+  assert.match(source, /Hola, somos \$\{dealerName\}/);
+  assert.match(source, /Hello, this is \$\{dealerName\}/);
 });
 
 test("trade-in replies request vehicle photos and both phone options", () => {

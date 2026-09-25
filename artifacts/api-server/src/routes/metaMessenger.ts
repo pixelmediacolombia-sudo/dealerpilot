@@ -161,11 +161,13 @@ async function matchVehicleFromMessage(message: string): Promise<{
 }
 
 async function loadDealerContext(): Promise<{
+  dealerName: string;
   hasCleanTitleInventory: boolean;
   marketplaceKnowledge: DealerMarketplaceKnowledge;
 }> {
   const [dealer] = await db
     .select({
+      name: dealersTable.name,
       hasCleanTitleInventory: dealersTable.hasCleanTitleInventory,
       marketplaceKnowledge: dealersTable.marketplaceKnowledge,
     })
@@ -173,6 +175,7 @@ async function loadDealerContext(): Promise<{
     .where(eq(dealersTable.id, DEALER_ID))
     .limit(1);
   return {
+    dealerName: dealer?.name ?? "Alpha Motorsports",
     hasCleanTitleInventory: dealer?.hasCleanTitleInventory === true,
     marketplaceKnowledge: dealer?.marketplaceKnowledge ?? {},
   };
@@ -416,6 +419,7 @@ async function processMessengerEvent(event: MetaMessagingEvent): Promise<{
     vehicleMatch.vehicleFacts ?? {},
     dealerContext.hasCleanTitleInventory,
     dealerContext.marketplaceKnowledge,
+    dealerContext.dealerName,
   );
 
   await db.insert(conversationMessagesTable).values({
