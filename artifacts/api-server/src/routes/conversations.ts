@@ -698,12 +698,16 @@ function hasPersistentUnansweredBuyerTurns(
   return consecutiveBuyerMessages.length >= 3;
 }
 
+function buyerAskedAvailability(latest: string): boolean {
+  return /\b(?:is (?:it|this|the .+?) (?:still )?available|still available|sigue(?: estando)? disponible|esta disponible|est[aá] (?:a la venta|en venta)|lo tiene disponible|lo tienen disponible|lo tienes disponible|tienen este|hay alguno disponible|lo venden aun|lo siguen vendiendo|a[uú]n lo tienen)\b/i.test(latest);
+}
+
 function buyerHasOpenQuestion(latest: string): boolean {
   if (!buyerAskedAdvisorQuestion(latest)) return false;
   if (buyerRequestedStorePhone(latest)) return false;
   if (detectVehicleRequestKind(latest)) return false;
   if (buyerAskedCleanTitle(latest) || buyerAskedWarrantyInfo(latest)) return false;
-  if (/\b(?:is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|esta disponible|est[aá] (?:a la venta|en venta)|lo tiene disponible|lo tienen disponible|tienen este|hay alguno disponible|lo venden aun|lo siguen vendiendo|a[uú]n lo tienen)\b/i.test(latest)) return false;
+  if (buyerAskedAvailability(latest)) return false;
   if (buyerAskedDocumentRequirements(latest)) return false;
   if (/\b(?:address|location|directions|direccion|ubicacion|donde queda|como llegar|visitar|visit the lot|come see|stop by|come by|maps?)\b/i.test(latest)) return false;
   return true;
@@ -1026,9 +1030,7 @@ function resolveSalesReplyStage(
   if (buyerAskedInventoryOptions(latestIntent)) return "inventory_options";
   if (historyContainsDealerPrompt(visibleMessages, /interested|interesado|interesada/) && buyerAcceptedInterest(latest)) return "timeline_request";
   if (historyContainsDealerPrompt(visibleMessages, /interested|interesado|interesada/) && buyerDeclinedCurrentStep(latest)) return "interest_declined";
-  if (/\b(is (?:it|this|the .+?) (?:still )?available|still available|sigue disponible|esta disponible|está disponible|esta(?:n)? (?:a la venta|en venta)|lo tiene disponible|lo tienen disponible|lo tienes disponible|tienen este|tienen esa|tienen ese (?:vehiculo|carro|auto|car|suv|camioneta)|tienen este (?:vehiculo|carro|auto|car|suv|camioneta)|hay alguno disponible|lo venden aun|lo siguen vendiendo|aun lo tienen|a[uú]n lo tienen)\b/i.test(latest)) {
-    return "availability";
-  }
+  if (buyerAskedAvailability(latest)) return "availability";
   if (buyerAskedAdvisorQuestion(latest)) return "advisor_question";
   if (historyAskedCashOrVisit(history)) return "cash_visit_request_phone";
   if (historyRequestedPhone(history)) return "request_phone";

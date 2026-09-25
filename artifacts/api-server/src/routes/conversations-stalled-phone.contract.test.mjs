@@ -98,6 +98,14 @@ test("unresolved vehicle-detail replies give Alpha's phone and request the buyer
   assert.match(source, /You can also call Alpha Motorsports at \$\{storePhone\}\. What number should we use to reach you\?/);
 });
 
+test("availability questions ask what the buyer wants to know before phone handoff", () => {
+  assert.match(source, /function buyerAskedAvailability\(latest: string\)/);
+  assert.match(source, /sigue.*estando.*disponible/);
+  assert.match(source, /if \(buyerAskedAvailability\(latest\)\) return false;/);
+  assert.match(source, /if \(buyerAskedAvailability\(latest\)\) return "availability";/);
+  assert.match(source, /Hola, somos Alpha Motorsports\. Sí, el \$\{vehicle\} está disponible\. ¿Qué te gustaría saber\?/);
+});
+
 test("trade-in replies request vehicle photos and both phone options", () => {
   const stageStart = source.indexOf('if (stage === "trade_in_request")', source.indexOf("function isAiReplyAligned"));
   const stageEnd = source.indexOf('if (stage === "payment_methods_request")', stageStart);
