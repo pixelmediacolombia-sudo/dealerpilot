@@ -123,6 +123,10 @@ function createHarness(payload, options = {}) {
     async sendSessionReport() {
       return { ok: true };
     },
+    async completePublishingJob(jobId, body) {
+      calls.apiPost.push({ path: `/api/publishing/jobs/${jobId}/complete`, body });
+      return { ok: true };
+    },
   };
 
   const source =
@@ -387,4 +391,22 @@ test("publish completion closes only the requesting Marketplace tab", async () =
 
   assert.equal(result.closed, true);
   assert.deepEqual(calls.removedTabs.sort((a, b) => a - b), [76]);
+});
+
+test("COMPLETE_JOB closes the sender Marketplace tab after backend confirmation", async () => {
+  const { handlers, calls } = createHarness({}, {
+    facebookTabs: [
+      { id: 77, url: "https://www.facebook.com/marketplace/you/selling" },
+      { id: 79, url: "https://www.facebook.com/messages" },
+    ],
+  });
+
+  const result = await handlers.COMPLETE_JOB(
+    { jobId: 101, listingUrl: "https://www.facebook.com/marketplace/item/123" },
+    { tab: { id: 77, url: "https://www.facebook.com/marketplace/you/selling" } },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  assert.deepEqual(result, { ok: true });
+  assert.deepEqual(calls.removedTabs, [77]);
 });

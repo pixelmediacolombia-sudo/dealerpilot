@@ -7,6 +7,10 @@ const MARKETPLACE_CREATE_URL = "https://www.facebook.com/marketplace/create/vehi
 const FACEBOOK_LOGIN_URL =
   "https://www.facebook.com/login/?next=%2Fmarketplace%2Fcreate%2Fvehicle";
 
+function isMarketplaceTabUrl(value) {
+  return /facebook\.com\/marketplace\//i.test(String(value || ""));
+}
+
 async function getBackendUrl() {
   return DealerPilotApiClient.getBackendUrl();
 }
@@ -512,7 +516,7 @@ const handlers = {
     return { ok: true };
   },
 
-  async COMPLETE_JOB(message) {
+  async COMPLETE_JOB(message, sender) {
     const extensionId = await getExtensionId();
     const body = { extensionId };
     if (message.listingUrl) body.listingUrl = message.listingUrl;
@@ -526,6 +530,15 @@ const handlers = {
         listingUrl: message.listingUrl || null,
       },
     });
+    // Facebook can replace the create page with Your Listings and leave the
+    // success modal open before the content-script timer gets a chance to run.
+    // Close only the Marketplace tab that acknowledged this completion; never
+    // sweep the user's other Facebook or Messenger tabs.
+    if (sender?.tab?.id != null && isMarketplaceTabUrl(sender.tab.url)) {
+      setTimeout(() => {
+        closeMarketplaceTabs(sender, { reason: "publish_flow_finished" }).catch(() => { });
+      }, 250);
+    }
     return result;
   },
 
