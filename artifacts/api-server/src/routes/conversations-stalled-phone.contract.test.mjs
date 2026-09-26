@@ -106,6 +106,25 @@ test("availability questions ask what the buyer wants to know before phone hando
   assert.match(source, /Hola, somos \$\{dealerName\}\. Sí, el \$\{vehicle\} está disponible\. ¿Qué te gustaría saber\?/);
 });
 
+test("price questions are classified before the generic open-question fallback", () => {
+  const resolverStart = source.indexOf("function resolveSalesReplyStage(");
+  const resolverEnd = source.indexOf("function formatVehicleDisplayName", resolverStart);
+  const resolver = source.slice(resolverStart, resolverEnd);
+  assert.ok(resolver.indexOf("if (buyerAskedPriceInquiry(latest)) return \"price_inquiry\";") < resolver.indexOf("if (buyerHasOpenQuestion(latest)) return \"open_question\""));
+  assert.match(source, /marketplaceAskingPrice/);
+  assert.match(source, /price: vehicleFacts\.price \?\? parsedAskingPrice/);
+});
+
+test("dealer-hours replies include hours, welcome, and both phone options", () => {
+  assert.match(source, /Nuestro horario es .*Te esperamos.*mejor n[uú]mero.*llamarnos al \$\{storePhone\}/);
+  assert.match(source, /Our hours are .*look forward to seeing you.*best number.*call us at \$\{storePhone\}/);
+  const guardStart = source.indexOf('if (stage === "dealer_hours")', source.indexOf("function isAiReplyAligned"));
+  const guardEnd = source.indexOf('if (stage === "trade_in_request")', guardStart);
+  const guard = source.slice(guardStart, guardEnd);
+  assert.match(guard, /replyIncludesStorePhone\(reply, storePhone\)/);
+  assert.match(guard, /look forward|esperamos/);
+});
+
 test("availability greeting uses the dealer loaded by dealerId", () => {
   assert.match(source, /name: dealersTable\.name/);
   assert.match(source, /where\(eq\(dealersTable\.id, dealerId\)\)/);

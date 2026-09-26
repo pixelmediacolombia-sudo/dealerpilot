@@ -878,6 +878,7 @@
 
   const isMarketplaceCreate = /\/marketplace\/create/.test(location.pathname);
   const isMarketplaceItem = /\/marketplace\/item\//.test(location.pathname);
+  const isMarketplaceSellerListings = /\/marketplace\/you\/selling/.test(location.pathname);
 
   // ---- Panel UI ----
   const panel = document.createElement("div");
@@ -2227,6 +2228,7 @@
             await send({ type: "MARK_NEEDS_REVIEW", jobId: job.id, reason });
             await chrome.storage.local.remove("activeJob");
             renderReview(job, { filled, missed, warnings });
+            closeMarketplaceTabSoon();
             return;
           }
           warnings.push(photoResult.reason || "Photo upload failed — upload photos manually");
@@ -2243,6 +2245,7 @@
           await send({ type: "MARK_NEEDS_REVIEW", jobId: job.id, reason });
           await chrome.storage.local.remove("activeJob");
           renderReview(job, { filled, missed, warnings });
+          closeMarketplaceTabSoon();
           return;
         }
       }
@@ -2997,10 +3000,8 @@
         await send({ type: "MARK_NEEDS_REVIEW", jobId: job.id, reason: validation.reason });
         await chrome.storage.local.remove("activeJob");
         setStatus(`${validation.reason} Checking the next vehicle...`, "err");
-        setTimeout(() => {
-          window.location.replace("https://www.facebook.com/marketplace/create/vehicle");
-        }, 2000);
         await send({ type: "POLL_NOW" }).catch(() => { });
+        closeMarketplaceTabSoon();
         return;
       }
       const retried = await handleAutoRetry(job, validation.reason);
@@ -3051,6 +3052,10 @@
     const listingUrl = publishOutcome.listingUrl;
     if (!listingUrl) {
       if (publishOutcome.jobAborted) {
+        return;
+      }
+      if (publishOutcome.navigationPending) {
+        setStatus("Publicación confirmada. Esperando Your Listings para capturar la URL…", "ok");
         return;
       }
       if (publishOutcome.publishedLanding) {
@@ -3681,8 +3686,26 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
         // Some Facebook variants render no dismiss button. Going to the
         // seller listings is safe because the vehicle was already published;
         // it avoids ever clicking the promotion's Publish button.
-        window.location.assign("https://www.facebook.com/marketplace/you/selling");
-        stateLog("Marketplace promotion: no exit control found; opened Your Listings");
+        await chrome.storage.local.set({
+          promotionSkippedJobId: job?.id ?? null,
+          promotionSkippedAt: new Date().toISOString(),
+        });
+        await chrome.storage.local.remove(["marketplacePromotionAuthorization", "promotionHandledJobId"]);
+        const navigation = await send({ type: "NAVIGATE_TO_MARKETPLACE_SELLER_LISTINGS" });
+        if (!navigation?.ok) {
+          return {
+            listingUrl: null,
+            blockReason: navigation?.error || "Could not open Facebook Your Listings safely.",
+            publishedLanding: false,
+          };
+        }
+        stateLog("Marketplace promotion: no exit control found; background opened Your Listings");
+        return {
+          listingUrl: null,
+          blockReason: null,
+          publishedLanding: true,
+          navigationPending: true,
+        };
       }
 
       await chrome.storage.local.set({
@@ -3739,6 +3762,7 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     }
 
     const promotionOutcome = await runMarketplacePromotionFlow(activeJob);
+    if (promotionOutcome.navigationPending) return;
     if (!promotionOutcome.publishedLanding) {
       setStatus(promotionOutcome.blockReason || "Marketplace promotion was not completed.", "err");
       return;
@@ -3772,6 +3796,66 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
 
     await chrome.storage.local.remove("activeJob");
     await send({ type: "POLL_NOW" }).catch(() => { });
+    closeMarketplaceTabSoon();
+  }
+
+  async function handleMarketplaceSellerListingsLanding() {
+    const { activeJob, promotionSkippedJobId } = await chrome.storage.local.get([
+      "activeJob",
+      "promotionSkippedJobId",
+    ]);
+    if (!activeJob?.id || Number(promotionSkippedJobId) !== Number(activeJob.id)) return;
+
+    const validation = await send({ type: "VALIDATE_JOB", jobId: activeJob.id }).catch(() => null);
+    const status = validation?.ok ? validation.data?.status : null;
+    const activeStatuses = new Set([
+      "Claimed",
+      "Publishing",
+      "Opening Facebook",
+      "Filling Form",
+      "Auto Publishing",
+      "Ready for Review",
+    ]);
+    if (!activeStatuses.has(status)) {
+      await chrome.storage.local.remove(["activeJob", "promotionSkippedJobId"]);
+      return;
+    }
+
+    const listingUrl = await waitForMarketplaceListingAfterPromotion(activeJob, 30_000);
+    const reason = "Facebook published the vehicle, but Your Listings did not expose its Marketplace item URL.";
+    await send({
+      type: "SEND_JOB_EVENT",
+      jobId: activeJob.id,
+      event: "marketplace_promotion_skipped",
+      details: listingUrl ? `Optional promotion skipped; listing URL captured: ${listingUrl}` : reason,
+    }).catch(() => { });
+
+    if (listingUrl) {
+      send({
+        type: "SEND_JOB_EVENT",
+        jobId: activeJob.id,
+        event: "listing_url_captured",
+        details: listingUrl,
+      }).catch(() => { });
+      const completed = await send({
+        type: "COMPLETE_JOB",
+        jobId: activeJob.id,
+        listingUrl,
+      }).catch(() => null);
+      if (!completed?.ok) {
+        await send({
+          type: "MARK_NEEDS_REVIEW",
+          jobId: activeJob.id,
+          reason: `${reason} Backend completion did not acknowledge the listing URL.`,
+        }).catch(() => { });
+      }
+    } else {
+      await send({ type: "MARK_NEEDS_REVIEW", jobId: activeJob.id, reason }).catch(() => { });
+    }
+
+    await chrome.storage.local.remove(["activeJob", "promotionSkippedJobId"]);
+    await send({ type: "POLL_NOW" }).catch(() => { });
+    closeMarketplaceTabSoon();
   }
 
   async function findMarketplaceListingUrlFromSellerDialog(job) {
@@ -4126,15 +4210,90 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
     setStatus("Marketplace listing marked sold. DealerPilot will not republish this vehicle.", "ok");
   }
 
+  // Facebook can complete Publish by navigating the existing tab to the new
+  // /marketplace/item/<id> page. That navigation unloads the create-page flow
+  // before waitForPublishOutcome can report the URL. Resume the active job from
+  // the item page so a successful Facebook publish is never left unrecorded.
+  let marketplacePublishedLandingPromise = null;
+  async function handleMarketplacePublishedLanding() {
+    if (marketplacePublishedLandingPromise) return marketplacePublishedLandingPromise;
+    marketplacePublishedLandingPromise = (async () => {
+      const { activeJob } = await chrome.storage.local.get("activeJob");
+      if (!activeJob?.id) return;
+
+      const validation = await send({ type: "VALIDATE_JOB", jobId: activeJob.id }).catch(() => null);
+      const activeStatuses = new Set([
+        "Claimed",
+        "Publishing",
+        "Opening Facebook",
+        "Filling Form",
+        "Auto Publishing",
+        "Ready for Review",
+      ]);
+      if (!validation?.ok || !activeStatuses.has(validation.data?.status)) {
+        return;
+      }
+
+      const timeoutAt = Date.now() + 30_000;
+      while (Date.now() < timeoutAt) {
+        const listingUrl = currentMarketplaceItemUrlForJob(activeJob);
+        if (listingUrl) {
+          send({
+            type: "SEND_JOB_EVENT",
+            jobId: activeJob.id,
+            event: "listing_url_captured",
+            details: listingUrl,
+          }).catch(() => { });
+          const completed = await send({
+            type: "COMPLETE_JOB",
+            jobId: activeJob.id,
+            listingUrl,
+          }).catch(() => null);
+          await chrome.storage.local.remove("activeJob");
+          if (completed?.ok) {
+            setStatus("✓ Published successfully. Listing URL captured.", "ok");
+            closeMarketplaceTabSoon(2200);
+          } else {
+            setStatus("Facebook published the listing, but DealerPilot could not sync the URL.", "err");
+            closeMarketplaceTabSoon();
+          }
+          return;
+        }
+        await sleep(500);
+      }
+
+      const reason = "Facebook opened the Marketplace item page after Publish, but its vehicle identity could not be verified for the active job.";
+      send({ type: "SEND_JOB_EVENT", jobId: activeJob.id, event: "auto_publish_failed", details: reason }).catch(() => { });
+      await send({ type: "MARK_NEEDS_REVIEW", jobId: activeJob.id, reason }).catch(() => { });
+      await chrome.storage.local.remove("activeJob");
+      setStatus("Published page found, but the vehicle identity needs review.", "err");
+      closeMarketplaceTabSoon();
+    })().catch((err) => {
+      stateError("Marketplace published landing recovery failed", err);
+    });
+    return marketplacePublishedLandingPromise;
+  }
+
   // ==================================================================
   // Marketplace create page — job flow + debug button
   // ==================================================================
   if (isMarketplaceItem) {
     setTimeout(() => {
+      handleMarketplacePublishedLanding();
+    }, 1200);
+    setTimeout(() => {
       runMarketplaceSoldAction().catch((err) => {
         stateError("Marketplace sold action failed", err);
       });
     }, 1600);
+  }
+
+  if (isMarketplaceSellerListings) {
+    setTimeout(() => {
+      handleMarketplaceSellerListingsLanding().catch((err) => {
+        stateError("Marketplace seller listings recovery failed", err);
+      });
+    }, 1200);
   }
 
   if (isMarketplacePromotionPage()) {

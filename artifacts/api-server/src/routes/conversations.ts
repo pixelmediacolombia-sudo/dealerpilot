@@ -991,7 +991,6 @@ function resolveSalesReplyStage(
   if (buyerAskedLocation(latest)) return "address_request";
   if (buyerRequestedVisitOrTestDrive(latest) && !hasVisitDaySignal(latest)) return "test_drive_request";
   if (buyerRequestsAnswerToPendingQuestion(latest)) return "question_repair";
-  if (buyerHasOpenQuestion(latest)) return "open_question";
   if (buyerRequestedStorePhone(latest)) return "store_phone_requested";
   if (askedForDocuments) {
     const documentStatus = buyerDocumentStatus(latest);
@@ -1017,12 +1016,6 @@ function resolveSalesReplyStage(
     return "down_payment_request";
   }
   if (buyerPhoneAlreadyKnown && (askedForBuyerPhone || historyContainsDealerPrompt(visibleMessages, /interested|interesado|interesada/))) return "down_payment_request";
-  if (
-    historyRequestedPhone(history) &&
-    (buyerAskedPriceInquiry(latest) || buyerAskedDetailedVehicleInfo(latest) || buyerAskedWarrantyInfo(latest) || buyerAskedAdvisorQuestion(latest))
-  ) {
-    return "salesperson_request_phone";
-  }
   if (hasStalledConversation(visibleMessages, currentMessage)) return "stalled_conversation_request_phone";
   if (buyerRequestedVisitOrTestDrive(latest) && (historyAskedCashOrVisit(history) || historyShowsFinancingDeclined(history))) {
     return "cash_visit_request_phone";
@@ -1032,10 +1025,17 @@ function resolveSalesReplyStage(
   }
   if (buyerAskedDocumentRequirements(latest)) return "document_requirements";
   if (buyerAskedPriceInquiry(latest)) return "price_inquiry";
+  if (
+    historyRequestedPhone(history) &&
+    (buyerAskedDetailedVehicleInfo(latest) || buyerAskedWarrantyInfo(latest) || buyerAskedAdvisorQuestion(latest))
+  ) {
+    return "salesperson_request_phone";
+  }
   if (buyerAskedInventoryOptions(latestIntent)) return "inventory_options";
   if (historyContainsDealerPrompt(visibleMessages, /interested|interesado|interesada/) && buyerAcceptedInterest(latest)) return "timeline_request";
   if (historyContainsDealerPrompt(visibleMessages, /interested|interesado|interesada/) && buyerDeclinedCurrentStep(latest)) return "interest_declined";
   if (buyerAskedAvailability(latest)) return "availability";
+  if (buyerHasOpenQuestion(latest)) return "open_question";
   if (buyerAskedAdvisorQuestion(latest)) return "advisor_question";
   if (historyAskedCashOrVisit(history)) return "cash_visit_request_phone";
   if (historyRequestedPhone(history)) return "request_phone";
@@ -1267,7 +1267,7 @@ function buildBaseSafeFallbackReply(
       return "Perfecto. ¿Qué te queda mejor: un día entre semana o el fin de semana?";
     }
     if (stage === "timeline_received") {
-      return "Perfecto. ¿A qué número te llama el vendedor para confirmarte la hora?";
+      return `Perfecto, te esperamos. Para comunicarnos mejor contigo y confirmar la hora, ¿cuál es el mejor número para llamarte? También puedes llamarnos al ${storePhone}.`;
     }
     if (stage === "timeline_declined") {
       return "Entiendo. En este momento estamos atendiendo a quienes planean comprar esta semana o este mes. Cuando estés listo, con gusto te ayudamos. Quedamos atentos.";
@@ -1317,7 +1317,7 @@ function buildBaseSafeFallbackReply(
       return `Puedes venir cuando quieras — estamos en ${knowledge("address", storeAddress)}, ${knowledge("hours", "lunes a sábado de 9am a 8pm")}. ¿Qué día te queda mejor?`;
     }
     if (stage === "dealer_hours") {
-      return `Nuestro horario es ${knowledge("hours", "lunes a sábado de 9am a 8pm")}. ¿Qué día te queda mejor?`;
+      return `Nuestro horario es ${knowledge("hours", "lunes a sábado de 9am a 8pm")}. Te esperamos. Para comunicarnos mejor contigo, ¿cuál es el mejor número para llamarte? También puedes llamarnos al ${storePhone}.`;
     }
     if (stage === "trade_in_request") {
       return `${knowledge("tradeIn", "Sí, recibimos su carro como parte de pago")}. Envíanos fotos del vehículo que quieres dar a cuenta; ¿cuál es el mejor número para comunicarnos contigo? También puedes llamar a Alpha Motorsports al ${storePhone}.`;
@@ -1394,7 +1394,7 @@ function buildBaseSafeFallbackReply(
       return "Perfect. Would a weekday or the weekend work better?";
     }
   if (stage === "timeline_received") {
-    return "Perfect. What number should the salesperson call to confirm the time?";
+    return `Perfect, we look forward to seeing you. To stay in touch and confirm the time, what's the best number to reach you? You can also call us at ${storePhone}.`;
     }
     if (stage === "timeline_declined") {
       return "I understand. Right now we are prioritizing buyers planning to purchase this week or this month. When you are ready, we will be happy to help. We are here if you need anything else.";
@@ -1446,7 +1446,7 @@ function buildBaseSafeFallbackReply(
     return `You can come by anytime — we're at ${knowledge("address", storeAddress)}, ${knowledge("hours", "Monday-Saturday from 9am to 8pm")}. What day works best for you?`;
   }
   if (stage === "dealer_hours") {
-    return `Our hours are ${knowledge("hours", "Monday-Saturday from 9am to 8pm")}. What day works best for you?`;
+    return `Our hours are ${knowledge("hours", "Monday-Saturday from 9am to 8pm")}. We look forward to seeing you. To stay in touch, what's the best number to reach you? You can also call us at ${storePhone}.`;
   }
   if (stage === "trade_in_request") {
     return `${knowledge("tradeIn", "Yes, we take trade-ins")}. Send us photos of the vehicle you want to trade in; what's the best number to reach you? You can also call Alpha Motorsports at ${storePhone}.`;
@@ -1663,7 +1663,11 @@ function isAiReplyAligned(
       !/phone|number|tel[eé]fono|n[uú]mero|appointment|cita|scheduled|programad/.test(normalized);
   }
   if (stage === "dealer_hours") {
-    return /(?:hour|hours|horario|abren|open|sunday|domingo|monday|lunes)/.test(normalized) && /\?/.test(reply);
+    return /(?:hour|hours|horario|abren|open|sunday|domingo|monday|lunes)/.test(normalized) &&
+      /(?:phone|number|tel[eé]fono|n[uú]mero)/.test(normalized) &&
+      /(?:esperamos|look forward|seeing you|vernos)/.test(normalized) &&
+      /\?/.test(reply) &&
+      replyIncludesStorePhone(reply, storePhone);
   }
   if (stage === "trade_in_request") {
     const confirmsTradeIn = /(?:trade[- ]?in|trade-ins|parte de pago|recibimos|take trade)/.test(normalized);
@@ -1716,7 +1720,11 @@ function isAiReplyAligned(
     return /weekday|weekend|entre semana|fin de semana/.test(normalized) && /\?/.test(normalized);
   }
   if (stage === "timeline_received") {
-    return /(?:phone|number|tel[eé]fono|n[uú]mero)/.test(normalized) && /(?:confirm|confirmar)/.test(normalized) && /\?/.test(normalized);
+    return /(?:phone|number|tel[eé]fono|n[uú]mero)/.test(normalized) &&
+      /(?:confirm|confirmar)/.test(normalized) &&
+      /(?:esperamos|look forward|seeing you|vernos)/.test(normalized) &&
+      /\?/.test(normalized) &&
+      replyIncludesStorePhone(reply, storePhone);
   }
   if (stage === "timeline_declined" || stage === "documents_declined") {
     return !/\?/.test(normalized) && /thank|gracias|understand|entiendo/.test(normalized);
@@ -2321,7 +2329,7 @@ export async function generateAiReply(
     down_payment_low: "Explain the configured minimum down payment and ask whether the buyer can reach it. Do not invent a minimum.",
     down_payment_declined: "Thank the buyer and close politely because the configured minimum down payment is required. Do not invent or repeat a number from history.",
     timeline_request: "Ask when the buyer plans to purchase. Accept any clear Spanish or English timeframe, such as this week, this month, in 15 days, in one week, next month, the other month, or a named month. Ask only that one question.",
-    timeline_received: "The buyer gave a visit day. Ask for the buyer's phone number to confirm the tentative visit; the seller will call to confirm the exact hour. Do not promise a confirmed hour.",
+    timeline_received: "The buyer gave a visit day. Say that you look forward to seeing them, ask for the buyer's phone number so the seller can confirm the tentative time, and offer the dealership phone if they prefer to call. Do not promise a confirmed hour.",
     timeline_declined: "Thank the buyer and close politely because a clear purchase timeframe is required. Do not ask another question.",
     documents_request: "Ask whether the buyer has both a valid ID and proof of income. Both are required; do not substitute a bank account question.",
     documents_declined: "Explain that both a valid ID and proof of income are currently required, then close politely without asking another question.",
@@ -2330,7 +2338,7 @@ export async function generateAiReply(
       : `Confirm that all required information was received and that the buyer meets the requirements. The buyer's phone number was already requested earlier, so do not ask for it again. Offer the Alpha Manassas dealership phone ${storePhone} as an immediate call option and close politely without a question.`,
     address_request: `The buyer is asking for the address or directions. Confirm that the exact vehicle is available, provide the complete dealership address, give Alpha Motorsports' dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Do not ask for a visit day or financing question.`,
     test_drive_request: `The buyer is asking when they can test drive the vehicle. Provide the supplied dealership address and hours, mention the supplied test-drive policy when useful, then ask what day works best. Do not claim an appointment is confirmed and do not ask for a phone number.`,
-    dealer_hours: `Answer with the exact dealer hours from the dealer knowledge block. If the buyer asks about Sunday, answer the Sunday hours directly. Ask at most one short next question.`,
+    dealer_hours: `Answer with the exact dealer hours from the dealer knowledge block. If the buyer asks about Sunday, answer the Sunday hours directly. Then say that we look forward to seeing the buyer, ask for the buyer's best phone number so we can reach them, and offer ${dealerName}'s dealership phone ${storePhone} if they prefer to call. These three pieces must be in the same reply.`,
     trade_in_request: `Confirm from the dealer knowledge block that trade-ins are accepted. Ask the buyer to send photos of the vehicle they want to trade in, ask for the buyer's best phone number in the same reply, and include Alpha Motorsports' dealership phone ${storePhone}. Do not ask about financing, down payment, value, or price, and do not invent a trade-in estimate.`,
     payment_methods_request: `Answer exactly from the dealer knowledge block with the available payment methods. Do not add rates, approvals, terms, or a phone request.`,
     vehicle_link_request: vehicleFacts.vdpUrl
@@ -2965,6 +2973,10 @@ router.post("/conversations/intake", async (req, res) => {
   const storePhone = resolveStorePhone(lotLocation, dealerKnowledge);
   vehicleFacts = {
     ...vehicleFacts,
+    // The selected Marketplace card is a bounded fallback when the listing
+    // cannot be matched to local inventory. Do not let a missing DB binding
+    // turn an explicit price question into a generic sales-agent handoff.
+    price: vehicleFacts.price ?? parsedAskingPrice,
     dealerPhone: storePhone,
     dealerAddress: resolveStoreAddress(lotLocation, dealerKnowledge),
   };

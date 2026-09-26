@@ -3,6 +3,14 @@
     autoReplyEnabled: true,
     sellerProfileNames: ["Alpha Manassas", "Alpha Motorsport", "Andres Ibanez"],
   });
+  const GENERIC_CURRENT_USER_MARKERS = new Set([
+    "you",
+    "your",
+    "tu",
+    "yo",
+    "voce",
+    "vous",
+  ]);
   const REPLY_QUIET_MS = 7000;
   const OWN_REPLY_GUARD_MS = 120000;
   const SEND_EVIDENCE_TIMEOUT_MS = 8000;
@@ -72,6 +80,10 @@
       .toLowerCase();
   }
 
+  function isGenericCurrentUserMarker(value) {
+    return GENERIC_CURRENT_USER_MARKERS.has(normalizeProfileName(value));
+  }
+
   function extractCurrentProfileName(root = document, sellerProfileNames = DEFAULT_SETTINGS.sellerProfileNames) {
     const expectedProfileNames = (Array.isArray(sellerProfileNames) && sellerProfileNames.length
       ? sellerProfileNames
@@ -100,7 +112,12 @@
       }
     }
     const profileContext = /\b(?:profile|perfil|account|cuenta|manage|administrar|avatar|picture|foto)\b/i;
-    for (const label of labels) {
+    // Facebook often labels the current participant as only "Your", "You",
+    // "Tú", or "Yo". Those are ownership markers, not profile identities.
+    // Ignore them so the window-scoped configured profile remains authoritative
+    // when Facebook does not expose the account name in the DOM.
+    const profileLabels = labels.filter((label) => !isGenericCurrentUserMarker(label.value));
+    for (const label of profileLabels) {
       const exact = expectedByNormalizedName.find((candidate) => candidate.normalized === label.normalized);
       if (exact) return exact.name;
       if (!profileContext.test(label.value)) continue;
@@ -113,11 +130,16 @@
       /(?:profile picture|foto de perfil|profile|perfil|account|cuenta)\s+(?:of|de|for|para)\s+(.+)$/i,
       /^(.+?)(?:['’]s)?\s+(?:profile|perfil|account|cuenta)$/i,
     ];
-    for (const label of labels) {
+    for (const label of profileLabels) {
       for (const pattern of patterns) {
         const match = label.value.match(pattern);
         const candidate = cleanText(match?.[1] || "");
-        if (candidate && candidate.length <= 80 && !profileContext.test(candidate)) return candidate;
+        if (
+          candidate &&
+          candidate.length <= 80 &&
+          !profileContext.test(candidate) &&
+          !isGenericCurrentUserMarker(candidate)
+        ) return candidate;
       }
     }
     return "";
@@ -182,12 +204,21 @@
     return /\b(?:19|20)\d{2}\b/.test(header) && /\b(?:19|20)\d{2}\b/.test(vehicleTitle || header);
   }
 
-  function isLikelyOwnAiReply(value) {
+  function isLikelyOwnAiReply(value, sellerProfileNames = []) {
     const normalized = cleanText(value)
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
-    return /^yes\s+(?:-|--)?\s*the car is still available\b/.test(normalized) ||
+    const configuredSellerGreeting = sellerProfileNames.some((name) => {
+      const seller = normalizeLanguageText(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (!seller) return false;
+      return new RegExp(
+        `^(?:hi|hello|hola)\\s*[,!:.\\-]?\\s*(?:this is|we are|somos)\\s+${seller}\\b`,
+      ).test(normalized);
+    });
+    return configuredSellerGreeting &&
+      /\b(?:available|disponible|vehicle|vehiculo|car|auto|carro)\b/.test(normalized) ||
+      /^yes\s+(?:-|--)?\s*the car is still available\b/.test(normalized) ||
       /\beasy financing options\b/.test(normalized) ||
       /^we don'?t handle ratings here\b/.test(normalized) ||
       /\b(?:id|tax id|passport|pasaporte).{0,120}\b(?:bank account|cuenta bancaria|cuenta de banco)\b/.test(normalized) ||
@@ -278,10 +309,45 @@
     return "unknown";
   }
 
+  function isPhoneOnlyBuyerMessage(value) {
+    const text = cleanText(value);
+    const digits = text.replace(/\D/g, "");
+    return /^[+\d().\s-]+$/.test(text) && digits.length >= 10;
+  }
+
+  function phoneReceivedFarewell(language) {
+    return language === "es"
+      ? "Gracias por tu número. Un agente de ventas te contactará en breve. ¡Que tengas un buen día!"
+      : "Thanks for your number. A sales agent will reach out to you shortly. Goodbye, and have a great day!";
+  }
+
   function replyMirrorsBuyerLanguage(reply, currentMessage, messages = []) {
     const buyerLanguage = buyerLanguageForReply(currentMessage, messages);
     const replyLanguage = detectLikelyLanguage(reply);
     return buyerLanguage === "unknown" || replyLanguage === "unknown" || buyerLanguage === replyLanguage;
+  }
+
+  function replyMatchesDetectedVehicle(reply, vehicleTitle) {
+    const normalizedTitle = normalizeProfileName(vehicleTitle)
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+    const titleTokens = normalizedTitle.split(/\s+/).filter(Boolean);
+    if (!/\b(?:19|20)\d{2}\b/.test(normalizedTitle) || titleTokens.length < 3) return true;
+
+    const vehiclePageUrls = [...cleanText(reply).matchAll(/https?:\/\/[^\s)]+/gi)]
+      .map((match) => match[0].replace(/[.,!?;:]+$/g, ""))
+      .filter((url) => /\/(?:used-|inventory|vehicle|cars?\/)/i.test(url));
+    if (!vehiclePageUrls.length) return true;
+
+    // The selected Messenger header is the authoritative vehicle identity at
+    // this boundary. Require the year, make, and model tokens from that header
+    // to appear in every vehicle-detail URL before anything can be sent.
+    const requiredTokens = titleTokens.slice(0, Math.min(4, titleTokens.length));
+    return vehiclePageUrls.every((url) => {
+      const slug = url.match(/\/(?:used-)([^/?#]+)/i)?.[1] || url;
+      const slugTokens = normalizeProfileName(slug.replace(/[-_]+/g, " ")).split(/\s+/).filter(Boolean);
+      return requiredTokens.every((token) => slugTokens.includes(token));
+    });
   }
 
   function replyRepeatsConversation(reply, messages, currentMessage) {
@@ -289,9 +355,16 @@
     if (!normalizedReply || normalizedReply.length < 4) return false;
     if (messages.some((message) => normalizeLanguageText(message.text) === normalizedReply)) return true;
     const normalizedCurrent = normalizeLanguageText(currentMessage);
-    return !!normalizedCurrent &&
-      normalizedCurrent.length >= 15 &&
-      normalizedReply.includes(normalizedCurrent);
+    if (!normalizedCurrent || normalizedCurrent.length < 15 || !normalizedReply.includes(normalizedCurrent)) {
+      return false;
+    }
+
+    // A useful answer may naturally mention the buyer's topic (for example,
+    // "Maintenance history"). Only treat it as an echo when the reply adds
+    // almost no content beyond that buyer message.
+    const currentWordCount = normalizedCurrent.split(/\s+/).filter(Boolean).length;
+    const replyWordCount = normalizedReply.split(/\s+/).filter(Boolean).length;
+    return replyWordCount <= currentWordCount + 2;
   }
 
   function requirementsReplyFor(value) {
@@ -335,6 +408,17 @@
     return title.slice(0, 160);
   }
 
+  function extractMarketplaceAskingPrice(value) {
+    const text = cleanText(value);
+    if (!text) return null;
+    const marketplacePrice = text.match(/\bmarketplace\s+\$\s*([\d,]+(?:\.\d{2})?)/i);
+    const genericPrice = text.match(/(?:^|\s)\$\s*([\d,]+(?:\.\d{2})?)(?=\s*(?:[-–—·•|]|$))/i);
+    const raw = marketplacePrice?.[1] || genericPrice?.[1] || "";
+    if (!raw) return null;
+    const amount = Number(raw.replace(/,/g, ""));
+    return Number.isFinite(amount) && amount > 0 ? amount : null;
+  }
+
   function detectListingContext(root = document, evidence = {}) {
     const href = location.href || "";
     const itemMatch = href.match(/https?:\/\/[^/]+\/marketplace\/item\/\d+\/?/i);
@@ -344,9 +428,15 @@
     const heading = root?.querySelector?.('[role="heading"], h1, h2, h3');
     const headingText = cleanText(heading?.innerText || heading?.textContent || "");
     const titleFromText = headingText.match(/.{0,80}\b(?:19|20)\d{2}\b.{0,80}/)?.[0] || "";
+    const askingPrice = extractMarketplaceAskingPrice(
+      [evidence.selectedHeaderText || "", headingText, cleanText(root?.innerText || root?.textContent || "")]
+        .filter(Boolean)
+        .join(" "),
+    );
     return {
       listingUrl: listingUrl ? new URL(listingUrl, location.origin).href : "",
       vehicleTitle: cleanText(titleFromSelectedHeader || titleFromText || headingText).slice(0, 160),
+      askingPrice,
     };
   }
 
@@ -357,6 +447,7 @@
     return {
       listingUrl: localContext.listingUrl || pageContext.listingUrl || "",
       vehicleTitle: localContext.vehicleTitle || pageContext.vehicleTitle || "",
+      askingPrice: localContext.askingPrice ?? pageContext.askingPrice ?? null,
     };
   }
 
@@ -405,14 +496,14 @@
     return cleanText(box?.value || box?.innerText || box?.textContent || "");
   }
 
-  function insertReply(reply, root) {
+  function insertReply(reply, root, sellerProfileNames = []) {
     const box = findComposer(root);
     if (!box) return { ok: false, reason: "composer_missing", composerDetected: false };
     const existingText = cleanText(readComposerText(box));
     const replacingExistingAiDraft =
       existingText &&
       existingText !== cleanText(reply) &&
-      isLikelyOwnAiReply(existingText);
+      isLikelyOwnAiReply(existingText, sellerProfileNames);
     if (existingText && existingText !== cleanText(reply) && !replacingExistingAiDraft) {
       return { ok: false, reason: "composer_not_empty", composerDetected: true };
     }
@@ -563,7 +654,7 @@
       const threadKey = payload?.externalThreadRef || "";
       const prevReply = cleanText(lastSuggestedReplyByThread.get(threadKey) || "");
       const matchesExpected = composerText === cleanText(expectedReply) || (prevReply && composerText === prevReply);
-      if (!matchesExpected && !isLikelyOwnAiReply(composerText)) {
+      if (!matchesExpected && !isLikelyOwnAiReply(composerText, settings.sellerProfileNames)) {
         return { ok: false, reason: "composer_not_empty" };
       }
     }
@@ -971,6 +1062,7 @@
       visibleAudios,
       chatText: visibleMessages.join("\n").slice(-4000),
       detectedVehicleTitle: snapshot.context.vehicleTitle || undefined,
+      marketplaceAskingPrice: snapshot.context.askingPrice ?? undefined,
       detectedMarketplaceListingUrl: snapshot.context.listingUrl || undefined,
       messageHash: captureHash,
       autoActionKey,
@@ -1058,7 +1150,7 @@
     if (!actionable.ok) {
       return { autoSent: false, reason: actionable.reason };
     }
-    const inserted = insertReply(reply, snapshot.root);
+    const inserted = insertReply(reply, snapshot.root, settings.sellerProfileNames);
     if (!inserted.ok) {
       return { autoSent: false, reason: inserted.reason, ...inserted };
     }
@@ -1273,6 +1365,21 @@
       }
     }
 
+    // Facebook can expose the buyer bubble first and add the outgoing
+    // "Message sent" ownership metadata a moment later. Re-capture the live
+    // thread before sending the intake so a dealer's manual closing message
+    // cannot be submitted as a new buyer turn.
+    const freshBuyerTurn = freshSnapshotStillPendingBuyer(payload, settings);
+    if (!freshBuyerTurn.ok) {
+      clearPendingBuyer(threadKey);
+      await sendDebug("blocked", {
+        ...debug,
+        reason: freshBuyerTurn.reason,
+        freshCaptureRejected: true,
+      });
+      return { skipped: true, reason: freshBuyerTurn.reason };
+    }
+
     await sendDebug("intake_sending", {
       ...debug,
       backendIntakeSent: false,
@@ -1311,7 +1418,19 @@
 
     lastCaptureHashByThread.set(threadKey, payload.messageHash);
     clearPendingBuyer(threadKey);
-    const lastSuggestedReply = repairSuggestedReplyForBuyerIntent(extractSuggestedReply(response), payload);
+    let lastSuggestedReply = repairSuggestedReplyForBuyerIntent(extractSuggestedReply(response), payload);
+    // A phone-only buyer turn carries no language signal. If the backend
+    // returned a mismatched-language handoff, use the conversation's buyer
+    // language for the required farewell instead of blocking the send.
+    if (
+      isPhoneOnlyBuyerMessage(payload.currentMessage) &&
+      (response.data?.handoffReason === "buyer_phone_received" || response.data?.closeConversationAfterDelivery === true)
+    ) {
+      const buyerLanguage = buyerLanguageForReply(payload.currentMessage, snapshot.messages);
+      if (buyerLanguage !== "unknown" && detectLikelyLanguage(lastSuggestedReply) !== buyerLanguage) {
+        lastSuggestedReply = phoneReceivedFarewell(buyerLanguage);
+      }
+    }
     if (lastSuggestedReply && !replyMirrorsBuyerLanguage(lastSuggestedReply, payload.currentMessage, snapshot.messages)) {
       await sendDebug("auto_send_blocked", {
         ...debug,
@@ -1327,6 +1446,18 @@
         autoSent: false,
         reason: "suggested_reply_language_mismatch",
       };
+    }
+    if (lastSuggestedReply && !replyMatchesDetectedVehicle(lastSuggestedReply, payload.detectedVehicleTitle)) {
+      await sendDebug("auto_send_blocked", {
+        ...debug,
+        aiReplyReceived: true,
+        backendIntakeSent: true,
+        backendIntakeReceived: true,
+        autoSent: false,
+        reason: "reply_vehicle_context_mismatch",
+        suggestedReplyPreview: cleanText(lastSuggestedReply).slice(0, 200),
+      });
+      return { ok: false, suggestedReply: "", autoSent: false, reason: "reply_vehicle_context_mismatch" };
     }
     lastSuggestedReplyByThread.set(threadKey, lastSuggestedReply);
 
@@ -1525,6 +1656,7 @@
     cleanText,
     createCaptureSnapshot,
     findComposer,
+    freshSnapshotStillPendingBuyer,
     getCurrentThreadId,
     getLastDiagnostics: () => lastDiagnostics,
     insertReply,
@@ -1534,6 +1666,7 @@
     isConversationClosingAcknowledgement,
     repairConcatenatedFollowUp,
     replyMirrorsBuyerLanguage,
+    replyMatchesDetectedVehicle,
     replyRepeatsConversation,
     selectWinningSnapshot,
     validateSellerProfile,

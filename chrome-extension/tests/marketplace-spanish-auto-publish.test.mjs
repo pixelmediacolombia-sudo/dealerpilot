@@ -354,6 +354,16 @@ test("Facebook Your Listings landing captures item URL before completing", () =>
   assert.doesNotMatch(content, /Auto-publish failed and backend fail-sync failed/);
 });
 
+test("A direct Facebook item navigation resumes the active publish job and captures its URL", () => {
+  assert.match(content, /async function handleMarketplacePublishedLanding\(\)/);
+  assert.match(content, /const \{ activeJob \} = await chrome\.storage\.local\.get\("activeJob"\)/);
+  assert.match(content, /currentMarketplaceItemUrlForJob\(activeJob\)/);
+  assert.match(content, /type: "COMPLETE_JOB"[\s\S]*jobId: activeJob\.id[\s\S]*listingUrl/);
+  assert.match(content, /event: "listing_url_captured"[\s\S]*details: listingUrl/);
+  assert.match(content, /if \(isMarketplaceItem\) \{[\s\S]*handleMarketplacePublishedLanding\(\)/);
+  assert.match(content, /Facebook opened the Marketplace item page after Publish/);
+});
+
 test("Marketplace promotion is skipped and the already-published vehicle returns to listings", () => {
   assert.match(content, /function isMarketplacePromotionPage\(\)/);
   assert.match(content, /function handleMarketplacePromotionLanding\(\)/);
@@ -364,12 +374,26 @@ test("Marketplace promotion is skipped and the already-published vehicle returns
   assert.match(content, /MARKETPLACE_PROMOTION_EXIT_LABELS/);
   assert.match(content, /marketplace_promotion_skipped/);
   assert.match(content, /Omitiendo promoción pagada/);
-  assert.match(content, /window\.location\.assign\("https:\/\/www\.facebook\.com\/marketplace\/you\/selling"\)/);
+  assert.match(content, /NAVIGATE_TO_MARKETPLACE_SELLER_LISTINGS/);
+  assert.match(content, /navigationPending: true/);
+  assert.match(content, /if \(promotionOutcome\.navigationPending\) return/);
+  assert.match(queueClient, /NAVIGATE_TO_MARKETPLACE_SELLER_LISTINGS/);
+  assert.match(queueClient, /chrome\.tabs\.update\(tabId, \{[\s\S]*MARKETPLACE_SELLER_LISTINGS_URL/);
+  assert.doesNotMatch(content, /window\.location\.assign\("https:\/\/www\.facebook\.com\/marketplace\/you\/selling"\)/);
   assert.match(content, /waitForMarketplaceListingAfterPromotion\(job, 30_000\)/);
   assert.match(content, /findMarketplaceListingUrlsOnPage\(job\)/);
   assert.match(content, /return urls\[0\] \|\| null/);
   assert.doesNotMatch(content, /waitForPromotionAuthorization|Autorizar y publicar|marketplace_promotion_publish_clicked/);
   assert.match(content, /if \(isMarketplacePromotionPage\(\)\)/);
+});
+
+test("Seller listings recovery resumes after background navigation from Facebook promotion", () => {
+  assert.match(content, /isMarketplaceSellerListings/);
+  assert.match(content, /async function handleMarketplaceSellerListingsLanding\(\)/);
+  assert.match(content, /promotionSkippedJobId/);
+  assert.match(content, /handleMarketplaceSellerListingsLanding\(\)/);
+  assert.match(content, /event: "listing_url_captured"[\s\S]*details: listingUrl/);
+  assert.match(content, /if \(publishOutcome\.navigationPending\)/);
 });
 
 test("Publish flow enters the promotion-skip handler before generic button scanning", () => {
@@ -394,4 +418,17 @@ test("Marketplace cleanup never sweeps unrelated Facebook tabs", () => {
   assert.doesNotMatch(queueClient, /isCloseableMarketplaceUrl/);
   assert.match(queueClient, /Only close the tab that explicitly requested cleanup/);
   assert.doesNotMatch(queueClient, /chrome\.tabs\.query\(\{[\s\S]*marketplace\/\*\*/);
+});
+
+test("publish completion closes the seller-listings landing after URL recovery", () => {
+  const sellerHandler = content.indexOf("async function handleMarketplaceSellerListingsLanding()");
+  const sellerEnd = content.indexOf("async function findMarketplaceListingUrlFromSellerDialog", sellerHandler);
+  assert.ok(sellerHandler > -1);
+  assert.ok(sellerEnd > sellerHandler);
+  assert.match(content.slice(sellerHandler, sellerEnd), /closeMarketplaceTabSoon\(\)/);
+});
+
+test("missing photos or required information close the Marketplace tab after review", () => {
+  assert.match(content, /renderReview\(job, \{ filled, missed, warnings \}\);\s*closeMarketplaceTabSoon\(\);/);
+  assert.match(content, /validation\.needsReview[\s\S]*POLL_NOW[\s\S]*closeMarketplaceTabSoon\(\)/);
 });
