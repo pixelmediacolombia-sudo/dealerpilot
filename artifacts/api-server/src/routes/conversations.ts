@@ -417,8 +417,19 @@ function extractPhoneNumber(text: string): string | null {
   return `${localDigits.slice(0, 3)}-${localDigits.slice(3, 6)}-${localDigits.slice(6)}`;
 }
 
-function hasPhoneNumber(text: string): boolean {
-  return extractPhoneNumber(text) !== null;
+function extractBuyerPhoneNumber(text: string, storePhone = ""): string | null {
+  const phone = extractPhoneNumber(text);
+  if (!phone) return null;
+  const phoneDigits = phone.replace(/\D/g, "");
+  const storeDigits = extractPhoneNumber(storePhone)?.replace(/\D/g, "") ?? "";
+  // The dealership phone is intentionally included in many handoff prompts.
+  // It must never be treated as the buyer's number or close the conversation.
+  if (storeDigits && phoneDigits === storeDigits) return null;
+  return phone;
+}
+
+function hasPhoneNumber(text: string, storePhone = ""): boolean {
+  return extractBuyerPhoneNumber(text, storePhone) !== null;
 }
 
 function extractDownPaymentAmount(text: string, downPaymentQuestionAsked = false): number | null {
@@ -460,16 +471,16 @@ function extractDownPaymentAmount(text: string, downPaymentQuestionAsked = false
 
 type ImmediateHandoffReason = "buyer_phone_received" | "concrete_cash_offer_received";
 
-function resolveImmediateHandoffReason(text: string): ImmediateHandoffReason | null {
-  if (extractPhoneNumber(text)) return "buyer_phone_received";
+function resolveImmediateHandoffReason(text: string, storePhone = ""): ImmediateHandoffReason | null {
+  if (extractBuyerPhoneNumber(text, storePhone)) return "buyer_phone_received";
   if (hasConcreteCashOffer(text)) return "concrete_cash_offer_received";
   return null;
 }
 
-function historyHasBuyerPhone(visibleMessages: string[]): boolean {
+function historyHasBuyerPhone(visibleMessages: string[], storePhone = ""): boolean {
   return visibleMessages
     .map(parseConversationMessage)
-    .some((message) => message?.role === "user" && hasPhoneNumber(message.content));
+    .some((message) => message?.role === "user" && hasPhoneNumber(message.content, storePhone));
 }
 
 function historyContainsDealerPrompt(visibleMessages: string[], pattern: RegExp): boolean {
@@ -960,11 +971,12 @@ function resolveSalesReplyStage(
   visibleMessages: string[],
   currentMessage: string,
   downPaymentPolicy: DownPaymentPolicy = NO_DOWN_PAYMENT_POLICY,
+  storePhone = "",
 ): SalesReplyStage {
   const latest = cleanConversationText(currentMessage).toLowerCase();
   const latestIntent = normalizeIntentText(currentMessage);
   const history = visibleMessages.slice(-8).map(cleanConversationText).join(" ").toLowerCase();
-  const buyerPhoneAlreadyKnown = historyHasBuyerPhone(visibleMessages);
+  const buyerPhoneAlreadyKnown = historyHasBuyerPhone(visibleMessages, storePhone);
   const askedForBuyerPhone = historyContainsDealerPrompt(visibleMessages, BUYER_PHONE_PROMPT_PATTERN);
   const askedForDownPayment = historyContainsDealerPrompt(visibleMessages, /down payment|down|enganche|inicial/);
   const askedForTimeline = historyContainsDealerPrompt(visibleMessages, /this week|this month|esta semana|este mes|when.*buy|cuando.*compr/);
@@ -974,9 +986,9 @@ function resolveSalesReplyStage(
   // that same number. Facebook/Messenger sends the new turn in both places,
   // and treating it as "already known" can incorrectly advance to the next
   // qualification question instead of closing with the phone handoff.
-  if (hasPhoneNumber(latest)) return "phone_received";
+  if (hasPhoneNumber(latest, storePhone)) return "phone_received";
   if (isCashOfferReviewQuestion(latest)) return "open_question";
-  if (resolveImmediateHandoffReason(latest)) return "handoff_confirmation";
+  if (resolveImmediateHandoffReason(latest, storePhone)) return "handoff_confirmation";
   if (vehicleRequest === "photos") return "vehicle_link_request";
   if (vehicleRequest === "carfax") return "carfax_request";
   if (buyerAskedVin(latest)) return "vin_inquiry";
@@ -1215,7 +1227,7 @@ function buildBaseSafeFallbackReply(
       ? vehicleNames.short
       : vehicleNames.full)
     : (language === "es" ? "vehículo" : "vehicle");
-  const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
+  const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy, storePhone);
   const askForBuyerPhone = shouldAskBuyerPhoneAfterQualification(visibleMessages);
   const storeAddress = resolveStoreAddress(lotLocation, dealerKnowledge);
   const cashOfferAmount = isCashOfferReviewQuestion(currentMessage)
@@ -1496,7 +1508,7 @@ function buildSafeFallbackReply(
   dealerName: string = "Alpha Motorsports",
 ): string {
   const requestKind = detectVehicleRequestKind(currentMessage);
-  const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
+  const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy, storePhone);
   if (requestKind === "photos" && vehicleFacts?.vdpUrl) {
     return language === "es"
       ? `Aquí está la ficha completa con todas las fotos: ${vehicleFacts.vdpUrl}.`
@@ -1952,7 +1964,7 @@ function avoidRepeatedFallback(
 ): string {
   if (!replyRepeatsRecentDealerMessage(reply, visibleMessages)) return reply;
   const configuredPhone = resolveStorePhone(undefined, dealerKnowledge);
-  const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
+  const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy, configuredPhone);
   const vehicleNames = formatVehicleDisplayName(vehicleTitle);
   const vehicle = vehicleTitle
     ? (historyHasDealerReply(visibleMessages)
@@ -2268,7 +2280,7 @@ export async function generateAiReply(
   const storeAddress = resolveStoreAddress(lotLocation, dealerKnowledge);
   void publishedDownPayment;
   void vehicleType;
-  const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy);
+  const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy, storePhone);
   // Phone capture is terminal for the automated flow: always send the
   // deterministic farewell before the extension closes after delivery.
   if (stage === "phone_received") {
@@ -2774,8 +2786,6 @@ router.post("/conversations/intake", async (req, res) => {
       .map((message) => message.content),
   );
   const buyerQualification = extractBuyerQualification(incomingMsgs);
-  const extractedPhone = extractPhoneNumber(inbound);
-  const immediateHandoffReason = resolveImmediateHandoffReason(inbound);
   if (isTerminalBuyerAcknowledgement(inbound) || isConversationClosingBuyerAcknowledgement(inbound)) {
     req.log.info(
       { externalThreadRef, extensionId: extensionId ?? null, messageHash: messageHash ?? idempotencyKey ?? null },
@@ -2971,6 +2981,8 @@ router.post("/conversations/intake", async (req, res) => {
   }
 
   const storePhone = resolveStorePhone(lotLocation, dealerKnowledge);
+  const extractedPhone = extractBuyerPhoneNumber(inbound, storePhone);
+  const immediateHandoffReason = resolveImmediateHandoffReason(inbound, storePhone);
   vehicleFacts = {
     ...vehicleFacts,
     // The selected Marketplace card is a bounded fallback when the listing
@@ -3118,7 +3130,7 @@ router.post("/conversations/intake", async (req, res) => {
     const retryHistory = formatConversationHistoryForAi(
       conversationHistoryForAi.length ? conversationHistoryForAi : incomingMsgs,
     );
-    const retryStage = resolveSalesReplyStage(retryHistory, inbound, downPaymentPolicy);
+    const retryStage = resolveSalesReplyStage(retryHistory, inbound, downPaymentPolicy, storePhone);
     if (
       retryableReply &&
       (
@@ -3210,6 +3222,7 @@ router.post("/conversations/intake", async (req, res) => {
     formatConversationHistoryForAi(conversationHistoryForAi.length ? conversationHistoryForAi : incomingMsgs),
     inbound,
     downPaymentPolicy,
+    storePhone,
   );
   const qualificationHandoffReason = currentStage === "qualified_exit"
     ? "qualification_completed"

@@ -115,6 +115,15 @@ test("price questions are classified before the generic open-question fallback",
   assert.match(source, /price: vehicleFacts\.price \?\? parsedAskingPrice/);
 });
 
+test("the dealership phone cannot trigger the buyer phone farewell", () => {
+  assert.match(source, /function extractBuyerPhoneNumber\(text: string, storePhone = ""\)/);
+  assert.match(source, /The dealership phone is intentionally included in many handoff prompts/);
+  assert.match(source, /if \(storeDigits && phoneDigits === storeDigits\) return null/);
+  assert.match(source, /const extractedPhone = extractBuyerPhoneNumber\(inbound, storePhone\)/);
+  assert.match(source, /const immediateHandoffReason = resolveImmediateHandoffReason\(inbound, storePhone\)/);
+  assert.match(source, /resolveSalesReplyStage\(visibleMessages, currentMessage, downPaymentPolicy, storePhone\)/);
+});
+
 test("dealer-hours replies include hours, welcome, and both phone options", () => {
   assert.match(source, /Nuestro horario es .*Te esperamos.*mejor n[uú]mero.*llamarnos al \$\{storePhone\}/);
   assert.match(source, /Our hours are .*look forward to seeing you.*best number.*call us at \$\{storePhone\}/);
