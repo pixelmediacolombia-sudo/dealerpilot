@@ -105,7 +105,10 @@
       : [[scopedWindowId, await getSettings(scopedWindowId)]];
     const results = [];
     for (const [targetWindowId, settings] of targets) {
-      if (!settings.sessionId) continue;
+      // A direct refresh request comes from the current window and should work
+      // even before the operator has saved a session id. Scheduled refreshes
+      // still use configured window records only.
+      if (!settings.sessionId && scopedWindowId === null) continue;
       const query = {
         url: [
           "https://www.facebook.com/messages*",
@@ -365,19 +368,11 @@
       };
     },
 
-    async REFRESH_ACTIVE_MESSENGER_CONVERSATION() {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      const tab = tabs.find((candidate) =>
-        typeof candidate?.id === "number" &&
-        /^https:\/\/(?:www\.|web\.)?facebook\.com\/(?:messages\/t\/|marketplace\/inbox)/i.test(String(candidate.url || "")),
-      );
-      if (!tab?.id) return { ok: false, error: "facebook_messenger_tab_not_active" };
-      try {
-        const response = await chrome.tabs.sendMessage(tab.id, { type: "REFRESH_ACTIVE_MESSENGER_CONVERSATION" });
-        return response || { ok: false, error: "messenger_refresh_no_response" };
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : "messenger_refresh_failed" };
-      }
+    async REFRESH_ACTIVE_MESSENGER_CONVERSATION(message, sender) {
+      const windowId = await resolveWindowId(message, sender);
+      const results = await refreshMessengerTabs(windowId);
+      const delivered = results.filter((result) => result.ok);
+      return delivered[0] || { ok: false, error: "facebook_messenger_tab_not_available", results };
     },
 
     async SAVE_SETTINGS(message, sender) {

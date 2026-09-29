@@ -1,9 +1,16 @@
 const DEFAULT_BACKEND_URL = "https://app.1987dealerpilot.com";
+const LEGACY_PUBLIC_BACKEND_URL = "https://1987dealerpilot.com";
 const LEGACY_RENDER_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
 const REPLIT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 const WINDOW_SETTINGS_PREFIX = "publisherSettingsWindow:";
 
+function normalizeBackendUrl(value) {
+  const normalized = String(value || "").trim().replace(/\/+$/, "");
+  return normalized === LEGACY_PUBLIC_BACKEND_URL ? DEFAULT_BACKEND_URL : normalized;
+}
+
 const MARKETPLACE_CREATE_URL = "https://www.facebook.com/marketplace/create/vehicle";
+const MARKETPLACE_SELLER_LISTINGS_URL = "https://www.facebook.com/marketplace/you/selling";
 const FACEBOOK_LOGIN_URL =
   "https://www.facebook.com/login/?next=%2Fmarketplace%2Fcreate%2Fvehicle";
 
@@ -39,6 +46,7 @@ async function getExtensionId() {
 }
 
 function validWindowId(value) {
+  if (value === null || value === undefined || value === "") return null;
   const id = Number(value);
   return Number.isInteger(id) && id >= 0 ? id : null;
 }
@@ -51,16 +59,17 @@ async function resolveWindowId(message = {}, sender = {}) {
   const current = await Promise.resolve(
     chrome.windows?.getCurrent ? chrome.windows.getCurrent() : null,
   ).catch(() => null);
-  return validWindowId(current?.id);
+  const currentId = validWindowId(current?.id);
+  if (currentId !== null) return currentId;
+  const tabs = await Promise.resolve(
+    chrome.tabs?.query ? chrome.tabs.query({ active: true, lastFocusedWindow: true }) : [],
+  ).catch(() => []);
+  return validWindowId(tabs[0]?.windowId);
 }
 
 function windowSettingsKey(windowId) {
   const id = validWindowId(windowId);
-  return id === null ? null : WINDOW_SETTINGS_PREFIX + id;
-}
-
-function normalizePublisherBackendUrl(value) {
-  return String(value || "").trim().replace(/\/+$/, "");
+  return id === null ? null : `${WINDOW_SETTINGS_PREFIX}${id}`;
 }
 
 async function getPublisherSettings(windowId = null) {
@@ -75,7 +84,7 @@ async function getPublisherSettings(windowId = null) {
   const values = { ...stored, ...scoped };
   const dealerId = Number(values.dealerId);
   return {
-    backendUrl: normalizePublisherBackendUrl(values.backendUrl) || DEFAULT_BACKEND_URL,
+    backendUrl: normalizeBackendUrl(values.backendUrl) || DEFAULT_BACKEND_URL,
     dealerId: Number.isInteger(dealerId) && dealerId > 0 ? dealerId : 1,
     sessionId: typeof values.sessionId === "string" ? values.sessionId.trim() : "",
     windowId: validWindowId(windowId),
@@ -389,7 +398,7 @@ async function sendHeartbeatSnapshot(windowId = null) {
       status: "online",
       chromeExtensionId: chrome.runtime.id,
       dealerId: settings.dealerId,
-      sessionId: settings.sessionId || "publisher-window-" + (settings.windowId ?? "legacy"),
+      sessionId: settings.sessionId || `publisher-window-${settings.windowId ?? "legacy"}`,
       fbLoggedIn: resolvedFbLoggedIn,
       marketplaceConnected: resolvedMarketplaceConnected,
     });
@@ -435,7 +444,7 @@ const handlers = {
 
   async SAVE_SETTINGS(message, sender) {
     const patch = {};
-    if (typeof message.backendUrl === "string") patch.backendUrl = normalizePublisherBackendUrl(message.backendUrl);
+    if (typeof message.backendUrl === "string") patch.backendUrl = normalizeBackendUrl(message.backendUrl);
     if (Number.isInteger(Number(message.dealerId)) && Number(message.dealerId) > 0) patch.dealerId = Number(message.dealerId);
     if (typeof message.sessionId === "string") patch.sessionId = message.sessionId.trim();
     return savePublisherSettings(await resolveWindowId(message, sender), patch);
@@ -445,11 +454,26 @@ const handlers = {
     return saveFacebookPageState(sender?.tab?.id, message?.state, sender?.tab?.url);
   },
 
+  async NAVIGATE_TO_MARKETPLACE_SELLER_LISTINGS(_message, sender) {
+    const tabId = Number(sender?.tab?.id);
+    if (!Number.isInteger(tabId) || tabId < 0) {
+      throw new Error("Marketplace seller listings navigation requires a Facebook tab");
+    }
+    const tab = await chrome.tabs.update(tabId, {
+      url: MARKETPLACE_SELLER_LISTINGS_URL,
+      active: true,
+    });
+    if (Number.isInteger(sender?.tab?.windowId)) {
+      await chrome.windows.update(sender.tab.windowId, { focused: true });
+    }
+    return { tabId: tab?.id ?? tabId, url: MARKETPLACE_SELLER_LISTINGS_URL };
+  },
+
   // ---- Backend URL switching (no rebuild required) ----
-  async SET_BACKEND_URL(message) {
-    const url = (message && message.url ? message.url : "").trim().replace(/\/+$/, "");
+  async SET_BACKEND_URL(message, sender) {
+    const url = normalizeBackendUrl(message && message.url ? message.url : "");
     if (!url) throw new Error("Backend URL cannot be empty");
-    await chrome.storage.local.set({ backendUrl: url });
+    await savePublisherSettings(await resolveWindowId(message, sender), { backendUrl: url });
     await logAudit("backend_url_switched", { url, environment: detectEnvironment(url) });
     return { ok: true, backendUrl: url, environment: detectEnvironment(url) };
   },
@@ -594,8 +618,9 @@ const handlers = {
     return apiGet(`/api/publishing/jobs/assigned${buildQueueScopeQuery(settings, extensionId)}`);
   },
 
-  async AUTO_START_ASSIGNED(message) {
+  async AUTO_START_ASSIGNED(message = {}, sender) {
     const extensionId = await getExtensionId();
+    const windowId = await resolveWindowId(message, sender);
     const now = new Date().toISOString();
 
     // ── SAFETY GUARD 1: Job age ──────────────────────────────────────────────
@@ -653,7 +678,7 @@ const handlers = {
       await apiPost(`/api/publishing/jobs/${message.jobId}/needs-review`, { reason });
       await chrome.storage.local.remove("activeJob");
       await logAudit("AUTO_START_SKIPPED_PREFLIGHT", { jobId: message.jobId, reason });
-      return handlers.POLL_ASSIGNED_JOB();
+      return handlers.POLL_ASSIGNED_JOB({ windowId });
     }
 
     const missingFields = findMissingMarketplaceFields(payload);
@@ -667,7 +692,7 @@ const handlers = {
         missingFields,
         reason,
       });
-      return handlers.POLL_ASSIGNED_JOB();
+      return handlers.POLL_ASSIGNED_JOB({ windowId });
     }
 
     // Record that we are attempting to claim this job only after preflight passes.
@@ -707,8 +732,15 @@ const handlers = {
     const retryCount = Number(pendingRetry?.jobId) === Number(job.id)
       ? Number(pendingRetry.retryCount || 0)
       : 0;
+    const settings = await getPublisherSettings(windowId);
     await chrome.storage.local.set({
-      activeJob: { ...job, _retryCount: retryCount, _prefetchedPayload: payload },
+      activeJob: {
+        ...job,
+        windowId,
+        dealerId: settings.dealerId,
+        _retryCount: retryCount,
+        _prefetchedPayload: payload,
+      },
     });
     if (retryCount > 0) await chrome.storage.local.remove("pendingRetry");
 
@@ -731,7 +763,9 @@ const handlers = {
     const { fbLoggedIn } = await chrome.storage.local.get("fbLoggedIn");
     const targetUrl = fbLoggedIn ? MARKETPLACE_CREATE_URL : FACEBOOK_LOGIN_URL;
 
-    const [existing] = await chrome.tabs.query({ url: MARKETPLACE_CREATE_URL + "*" });
+    const tabQuery = { url: MARKETPLACE_CREATE_URL + "*" };
+    if (validWindowId(windowId) !== null) tabQuery.windowId = validWindowId(windowId);
+    const [existing] = await chrome.tabs.query(tabQuery);
     let tab;
     if (existing && fbLoggedIn) {
       // Always reset the existing create form for the newly claimed job. Merely
@@ -741,14 +775,15 @@ const handlers = {
         url: MARKETPLACE_CREATE_URL,
         active: true,
       });
-      await chrome.windows.update(existing.windowId, { focused: true });
       await logAudit("MARKETPLACE_FORM_RELOADED_FOR_JOB", {
         jobId: job.id,
         vehicleId: job.vehicleId || null,
         tabId: existing.id,
       });
     } else {
-      tab = await chrome.tabs.create({ url: targetUrl, active: true });
+      const createOptions = { url: targetUrl, active: true };
+      if (validWindowId(windowId) !== null) createOptions.windowId = validWindowId(windowId);
+      tab = await chrome.tabs.create(createOptions);
     }
     return { ok: true, jobId: job.id, tabId: tab.id };
   },
@@ -790,7 +825,7 @@ const handlers = {
       await DealerPilotApiClient.sendSessionReport({
         extensionId,
         dealerId: settings.dealerId,
-        sessionId: settings.sessionId || "publisher-window-" + (settings.windowId ?? "legacy"),
+        sessionId: settings.sessionId || `publisher-window-${settings.windowId ?? "legacy"}`,
         fbLoggedIn: !!fbLoggedIn,
         marketplaceConnected: !!marketplaceConnected,
       });
@@ -805,7 +840,20 @@ const handlers = {
     return { tabId: tab.id };
   },
 
-  async POLL_ASSIGNED_JOB(message = {}) {
+  async POLL_ASSIGNED_JOB(message = {}, sender) {
+    const pollingWindowId = message.allWindows === true
+      ? null
+      : await resolveWindowId(message, sender);
+    if (pollingWindowId === null) {
+      const targets = await configuredPublisherSettings();
+      if (targets.length > 0) {
+        for (const [windowId] of targets) {
+          const result = await handlers.POLL_ASSIGNED_JOB({ ...message, windowId });
+          if (result?.job || result?.ok || result?.skipped === "stale") return result;
+        }
+        return { job: null };
+      }
+    }
     const forceUserAction = message.forceUserAction === true;
 
     // Self-heal: verify activeJob is still in-progress on the backend.
@@ -824,7 +872,7 @@ const handlers = {
           // fall through to normal poll
         } else {
           await chrome.storage.local.set({ lastPollSkipReason: "active_job_in_progress", lastSkippedJobId: activeJob.id, lastSkippedAt: new Date().toISOString() }).catch(() => {});
-          return { skipped: true, jobId: activeJob.id };
+          return { skipped: true, jobId: activeJob.id, windowId: activeJob.windowId ?? null };
         }
       } catch {
         // Can't verify — keep skipping to avoid thrashing
@@ -835,10 +883,10 @@ const handlers = {
 
     const now = new Date().toISOString();
     await chrome.storage.local.set({ lastPollTime: now });
-    await sendHeartbeatSnapshot();
+    await sendHeartbeatSnapshot(pollingWindowId);
 
     const extensionId = chrome.runtime.id || await getExtensionId();
-    const settings = await getPublisherSettings(await resolveWindowId(message));
+    const settings = await getPublisherSettings(pollingWindowId);
     const queueScope = buildQueueScopeQuery(settings, extensionId);
 
     // Check for a job explicitly assigned to this extension
@@ -862,6 +910,8 @@ const handlers = {
         scheduledAt: assignedJob.scheduledAt || null,
         approvedByUser: true,
         forceUserAction,
+        windowId: pollingWindowId,
+        dealerId: settings.dealerId,
       });
     }
 
@@ -1001,6 +1051,8 @@ const handlers = {
       scheduledAt: nextJob.scheduledAt || null,
       approvedByUser: true,
       forceUserAction,
+      windowId: pollingWindowId,
+      dealerId: settings.dealerId,
     });
   },
 
@@ -1312,6 +1364,10 @@ const STATE_KEYS_TO_CLEAR = [
     "replitUrlMigrated",
     "publicDomainUrlMigrated",
   ]);
+  if (storedUrl === LEGACY_PUBLIC_BACKEND_URL) {
+    await chrome.storage.local.set({ backendUrl: DEFAULT_BACKEND_URL });
+    console.log(`[DealerPilot AI] URL migration: public landing -> app backend (${DEFAULT_BACKEND_URL})`);
+  }
   if (!replitUrlMigrated) {
     if (storedUrl === REPLIT_BACKEND_URL) {
       await chrome.storage.local.set({ backendUrl: DEFAULT_BACKEND_URL });
@@ -1346,7 +1402,7 @@ ensurePollAssignedAlarm().catch((err) => saveLastError(err));
 
 chrome.runtime.onStartup.addListener(() => {
   ensurePollAssignedAlarm()
-    .then(() => handlers.POLL_ASSIGNED_JOB())
+    .then(() => handlers.POLL_ASSIGNED_JOB({ allWindows: true }))
     .catch((err) => saveLastError(err));
 });
 
@@ -1365,7 +1421,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== "pollAssigned") return;
-  handlers.POLL_ASSIGNED_JOB().catch((err) => saveLastError(err));
+  handlers.POLL_ASSIGNED_JOB({ allWindows: true }).catch((err) => saveLastError(err));
 });
 
 chrome.tabs.onRemoved?.addListener((tabId) => {

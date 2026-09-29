@@ -1,5 +1,11 @@
 const DEFAULT_BACKEND_URL = DealerPilotPopupSettings.defaultBackendUrl;
 const REPLIT_BACKEND_URL = DealerPilotPopupSettings.replitBackendUrl;
+const LEGACY_BACKEND_URL = "https://1987dealerpilot.com";
+
+function normalizeBackendUrl(value) {
+  const normalized = String(value || "").trim().replace(/\/+$/, "");
+  return normalized === LEGACY_BACKEND_URL ? DEFAULT_BACKEND_URL : normalized;
+}
 
 // Build date is bumped manually alongside manifest.json's version field.
 const BUILD_DATE = DealerPilotPopupSettings.buildDate;
@@ -91,6 +97,19 @@ function send(message) {
       resolve(response);
     });
   });
+}
+
+async function currentWindowId() {
+  try {
+    const tabs = await chrome.tabs?.query?.({ active: true, currentWindow: true });
+    const tabWindowId = Number(tabs?.[0]?.windowId);
+    if (Number.isInteger(tabWindowId) && tabWindowId >= 0) return tabWindowId;
+    const current = await chrome.windows?.getCurrent?.();
+    const id = Number(current?.id);
+    return Number.isInteger(id) && id >= 0 ? id : null;
+  } catch {
+    return null;
+  }
 }
 
 function setDot(dot, kind) {
@@ -706,9 +725,10 @@ document.getElementById("btn-show-poll")?.addEventListener("click", async () => 
 
 // ---- Save backend URL and dealer identity for this browser window ----
 (async () => {
-  const res = await send({ type: "GET_SETTINGS" });
+  const windowId = await currentWindowId();
+  const res = await send({ type: "GET_SETTINGS", windowId });
   const settings = res?.ok ? res.data : {};
-  urlInput.value = String(settings.backendUrl || DEFAULT_BACKEND_URL).trim().replace(/\/+$/, "");
+  urlInput.value = normalizeBackendUrl(settings.backendUrl) || DEFAULT_BACKEND_URL;
   if (dealerIdInput) {
     dealerIdInput.value = Number.isInteger(Number(settings.dealerId)) && Number(settings.dealerId) > 0
       ? String(Number(settings.dealerId))
@@ -717,11 +737,12 @@ document.getElementById("btn-show-poll")?.addEventListener("click", async () => 
 })();
 
 document.getElementById("save").addEventListener("click", async () => {
-  const value = urlInput.value.trim().replace(/\/+$/, "");
+  const value = normalizeBackendUrl(urlInput.value);
   if (!value) { setStatus("Please enter a URL.", "err"); return; }
   const dealerId = Number(dealerIdInput?.value);
   if (!Number.isInteger(dealerId) || dealerId < 1) { setStatus("Dealer ID must be a positive integer.", "err"); return; }
-  const saved = await send({ type: "SAVE_SETTINGS", backendUrl: value, dealerId });
+  const windowId = await currentWindowId();
+  const saved = await send({ type: "SAVE_SETTINGS", windowId, backendUrl: value, dealerId });
   if (!saved?.ok) {
     setStatus("Could not save window settings: " + (saved?.error || "unknown error"), "err");
     return;
@@ -738,9 +759,9 @@ const switchBackendBtn = document.getElementById("switch-backend");
 async function loadBackendPresetsIntoUI() {
   const res = await send({ type: "GET_BACKEND_PRESETS" });
   const presets = res && res.ok ? res.data : {};
-  const settings = await send({ type: "GET_SETTINGS" });
+  const settings = await send({ type: "GET_SETTINGS", windowId: await currentWindowId() });
   const backendUrl = settings?.ok ? settings.data?.backendUrl : null;
-  const current = String(backendUrl || DEFAULT_BACKEND_URL).trim().replace(/\/+$/, "");
+  const current = normalizeBackendUrl(backendUrl) || DEFAULT_BACKEND_URL;
 
   let selected = "custom";
   if (current === (presets.replit || REPLIT_BACKEND_URL)) selected = "replit";

@@ -1,5 +1,27 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.4.9
+
+- Keeps Marketplace queue polling and the active job tied to the configured
+  browser window and dealer.
+- Selects and reloads the Marketplace form only inside that dealer's window,
+  while allowing the window to remain in the background.
+
+## v1.4.7
+
+- Routes the fallback from Facebook's promotion/ad-center screen through the
+  extension background tab API instead of `window.location.assign`, avoiding
+  Chrome's blocked `beforeunload` confirmation.
+- Resumes the active publish job on `Your Listings` and captures the matching
+  Marketplace item URL after that background navigation.
+
+## v1.4.6
+
+- Resumes an active publishing job when Facebook navigates directly to the
+  newly published Marketplace item page.
+- Verifies the item identity, captures the direct URL, and completes the job
+  after a full-page navigation instead of leaving it stalled after Publish.
+
 ## v1.4.5
 
 - Captures and normalizes the direct Facebook Marketplace item URL after Publish.

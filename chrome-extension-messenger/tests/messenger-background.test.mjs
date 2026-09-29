@@ -306,15 +306,23 @@ test("background closes a phone-request conversation only after the extension co
 test("background reloads the active Facebook conversation without reloading the whole tab", async () => {
   const { handlers, calls } = createHarness({
     activeTab: { id: 31, url: "https://www.facebook.com/messages/t/999999" },
+    inboxTabs: [{ id: 31, windowId: 11, url: "https://www.facebook.com/messages/t/999999" }],
     activeTabResponse: { ok: true, data: { reason: "auto_reply_disabled" } },
   });
 
-  const result = await handlers.REFRESH_ACTIVE_MESSENGER_CONVERSATION();
+  const result = await handlers.REFRESH_ACTIVE_MESSENGER_CONVERSATION({ windowId: 11 });
 
   assert.equal(result.ok, true);
   assert.equal(calls.tabs[0].type, "query");
-  assert.equal(calls.tabs[0].query.active, true);
-  assert.equal(calls.tabs[0].query.currentWindow, true);
+  assert.deepEqual([...calls.tabs[0].query.url], [
+    "https://www.facebook.com/messages*",
+    "https://web.facebook.com/messages*",
+    "https://facebook.com/messages*",
+    "https://www.facebook.com/marketplace/inbox*",
+    "https://web.facebook.com/marketplace/inbox*",
+    "https://facebook.com/marketplace/inbox*",
+  ]);
+  assert.equal(calls.tabs[0].query.windowId, 11);
   assert.equal(calls.tabs[1].type, "sendMessage");
   assert.equal(calls.tabs[1].tabId, 31);
   assert.equal(calls.tabs[1].message.type, "REFRESH_ACTIVE_MESSENGER_CONVERSATION");

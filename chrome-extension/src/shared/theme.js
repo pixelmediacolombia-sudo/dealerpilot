@@ -2,6 +2,12 @@
   "use strict";
 
   const DEFAULT_BACKEND_URL = "https://app.1987dealerpilot.com";
+  const LEGACY_BACKEND_URL = "https://1987dealerpilot.com";
+  const DEFAULT_THEME = {
+    primaryColors: ["#7658d6"],
+    secondaryColors: ["#20243b"],
+    accentColors: ["#42b883"],
+  };
   const THEME_STORAGE_KEY = "dealerTheme";
   const REFRESH_MS = 30 * 1000;
 
@@ -11,18 +17,13 @@
 
   function themeStorageKey(settings = {}) {
     const id = Number(settings.windowId);
-    return Number.isInteger(id) && id >= 0 ? THEME_STORAGE_KEY + ":" + id : THEME_STORAGE_KEY;
+    return Number.isInteger(id) && id >= 0 ? `${THEME_STORAGE_KEY}:${id}` : THEME_STORAGE_KEY;
   }
 
-  function normalizeThemeBackendUrl(value) {
-    return String(value || "").trim().replace(/\/+$/, "");
+  function normalizeBackendUrl(value) {
+    const normalized = String(value || "").trim().replace(/\/+$/, "");
+    return normalized === LEGACY_BACKEND_URL ? DEFAULT_BACKEND_URL : normalized;
   }
-
-  const DEFAULT_THEME = {
-    primaryColors: ["#7658d6"],
-    secondaryColors: ["#20243b"],
-    accentColors: ["#42b883"],
-  };
 
   function normalizeHexColor(value) {
     if (typeof value !== "string") return null;
@@ -133,7 +134,7 @@
 
   async function backendUrl(settings = null) {
     const current = settings || await extensionSettings();
-    return normalizeThemeBackendUrl(current.backendUrl) || DEFAULT_BACKEND_URL;
+    return normalizeBackendUrl(current.backendUrl) || DEFAULT_BACKEND_URL;
   }
 
   async function dealerId(settings = null) {

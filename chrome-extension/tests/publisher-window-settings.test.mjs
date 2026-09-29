@@ -18,11 +18,22 @@ test("Publisher resolves dealer settings and heartbeat identity by browser windo
 
   assert.ok(manifest.permissions.includes("windows"));
   assert.match(queueSource, /publisherSettingsWindow:/);
+  assert.match(queueSource, /value === null \|\| value === undefined/);
   assert.match(queueSource, /chrome\.windows\?\.getCurrent/);
+  assert.match(queueSource, /lastFocusedWindow: true/);
+  assert.match(queueSource, /savePublisherSettings\(await resolveWindowId\(message, sender\)/);
   assert.match(queueSource, /dealerId: settings\.dealerId/);
   assert.match(queueSource, /sessionId: settings\.sessionId/);
+  assert.match(queueSource, /tabQuery\.windowId = validWindowId\(windowId\)/);
+  assert.match(queueSource, /createOptions\.windowId = validWindowId\(windowId\)/);
+  assert.match(queueSource, /activeJob: \{/);
+  assert.match(queueSource, /windowId,\n\s*dealerId: settings\.dealerId/);
+  assert.match(queueSource, /message\.allWindows === true/);
+  assert.match(queueSource, /chrome\.tabs\.update\(existing\.id, \{[\s\S]*active: true/);
   assert.match(popup, /type: "GET_SETTINGS"/);
   assert.match(popup, /type: "SAVE_SETTINGS"/);
+  assert.match(popup, /tabs\?\.query\?\.\(\{ active: true, currentWindow: true \}\)/);
+  assert.match(popup, /type: "SAVE_SETTINGS", windowId/);
 });
 
 function createThemeHarness({ storage, windowId, dealerId, themes }) {
