@@ -96,7 +96,10 @@ router.get("/connection-center", async (req, res) => {
     .select()
     .from(extensionConnectionsTable)
     .where(dealerId ? eq(extensionConnectionsTable.dealerId, dealerId) : undefined)
-    .orderBy(desc(extensionConnectionsTable.lastHeartbeatAt))
+    .orderBy(
+      desc(sql`case when ${extensionConnectionsTable.chromeExtensionId} ~ '^[a-p]{32}$' then 1 else 0 end`),
+      desc(extensionConnectionsTable.lastHeartbeatAt),
+    )
     .limit(1);
 
   let chromeExtension: {

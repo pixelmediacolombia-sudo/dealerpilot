@@ -200,6 +200,20 @@ test("assigned endpoint can map the extension storage id to the online Chrome co
   assert.match(routeSource, /if \(online\?\.chrome_extension_id\) aliases\.add\(online\.chrome_extension_id\);/);
 });
 
+test("publishing queue prefers the real Chrome publisher over Messenger connection rows", () => {
+  assert.match(routeSource, /chrome_extension_id ~ '\^\[a-p\]\{32\}\$'/);
+  assert.match(workerSource, /chrome_extension_id ~ '\^\[a-p\]\{32\}\$'/);
+  assert.match(routeSource, /PUBLISHER_EXTENSION_MISMATCH/);
+  assert.match(controlledModeSource, /!r\.chromeExtensionId \|\| \/\^\[a-p\]\{32\}\$\//);
+});
+
+test("stale manual Publish Now jobs cannot block due automatic batches", () => {
+  assert.match(
+    routeSource,
+    /stale manual Publish Now job must not block an automatic batch[\s\S]*ne\(publishingJobsTable\.source, "publish_now"\)[\s\S]*gte\(publishingJobsTable\.createdAt, new Date\(Date\.now\(\) - 10 \* 60 \* 1000\)\)/,
+  );
+});
+
 test("Publish Now diagnostics stay scoped to the active dealer and do not wake an internal queue id", () => {
   assert.match(publishNowModalSource, /useAccount/);
   assert.match(publishNowModalSource, /connect-status\$\{dealerQuery\}/);

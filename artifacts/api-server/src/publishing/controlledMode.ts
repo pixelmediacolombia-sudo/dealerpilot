@@ -106,7 +106,11 @@ export async function isExtensionOnline(dealerId?: number): Promise<boolean> {
     .where(dealerId ? eq(extensionConnectionsTable.dealerId, dealerId) : undefined);
   const cutoff = Date.now() - EXTENSION_ONLINE_THRESHOLD_MS;
   return rows.some(
-    (r) => r.status === "online" && r.lastHeartbeatAt != null && r.lastHeartbeatAt.getTime() >= cutoff,
+    (r) =>
+      r.status === "online" &&
+      r.lastHeartbeatAt != null &&
+      r.lastHeartbeatAt.getTime() >= cutoff &&
+      (!r.chromeExtensionId || /^[a-p]{32}$/.test(r.chromeExtensionId.trim())),
   );
 }
 

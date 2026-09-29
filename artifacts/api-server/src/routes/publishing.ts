@@ -14,7 +14,7 @@ import {
   vehicleImagesTable,
   systemTimelineEventsTable,
 } from "@workspace/db";
-import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { buildMarketplaceTitle, getMarketplacePricing } from "../listings/pricing";
 import {
   checkPublishGuardrails,
@@ -44,6 +44,11 @@ import { resolveDealerId } from "./auth";
 // Dealer scope: Alpha Motorsport = dealer_id 1. Alpha remains restricted to
 // verified Manassas inventory; other dealers use their own persisted lot.
 const DEALER_ID = 1;
+const CHROME_RUNTIME_EXTENSION_ID = /^[a-p]{32}$/;
+
+function isChromeRuntimeExtensionId(value: string | null | undefined): boolean {
+  return Boolean(value && CHROME_RUNTIME_EXTENSION_ID.test(value.trim()));
+}
 
 const router: IRouter = Router();
 
@@ -303,10 +308,15 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
   );
   if (connection.rows[0]?.name) aliases.add(connection.rows[0].name);
   const onlineConnection = await pool.query<{ name: string | null; chrome_extension_id: string | null }>(
-    "select name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+    "select name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc limit 1",
     [extensionScope.dealerId],
   );
   const online = onlineConnection.rows[0];
+  const onlinePublisherId = online?.chrome_extension_id?.trim() || null;
+  if (isChromeRuntimeExtensionId(onlinePublisherId) && onlinePublisherId !== extensionId) {
+    res.json({ job: null, code: "PUBLISHER_EXTENSION_MISMATCH" });
+    return;
+  }
   if (online?.name) aliases.add(online.name);
   if (online?.chrome_extension_id) aliases.add(online.chrome_extension_id);
 
@@ -340,6 +350,13 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
         inArray(publishingJobsTable.assignedExtensionId, [...aliases]),
         or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
         isNull(publishingJobsTable.claimedByExtension),
+        // A stale manual Publish Now job must not block an automatic batch.
+        // Batch/scheduled jobs may intentionally wait longer than ten minutes.
+        or(
+          ne(publishingJobsTable.source, "publish_now"),
+          isNull(publishingJobsTable.source),
+          gte(publishingJobsTable.createdAt, new Date(Date.now() - 10 * 60 * 1000)),
+        ),
       ),
     )
     .orderBy(desc(publishingJobsTable.priority), asc(publishingJobsTable.createdAt))
@@ -1528,7 +1545,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
   if (claimableNow.length > 0 && extensionOnline) {
     try {
       const conn = await pool.query(
-        "select id, name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+        "select id, name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc limit 1",
         [dealerId],
       );
       const row = conn.rows[0];
@@ -1697,7 +1714,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
   if (mode === "Controlled") {
     try {
       const conn = await pool.query(
-        "select id, name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+        "select id, name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc limit 1",
         [dealerId],
       );
       const row = conn.rows[0];
