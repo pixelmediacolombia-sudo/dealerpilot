@@ -1380,7 +1380,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
       ),
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
-  const duplicateConflictIds = await getDuplicateConflictVehicleIds();
+  const duplicateConflictIds = await getDuplicateConflictVehicleIds(dealerId);
   const extensionOnline = mode === "Controlled" && isImmediate ? await isExtensionOnline(dealerId) : true;
 
   // ── GM Coach + lot-location + duplicate-conflict + extension guardrails ────

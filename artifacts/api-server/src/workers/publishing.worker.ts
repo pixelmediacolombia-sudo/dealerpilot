@@ -199,11 +199,12 @@ function computePriorityScore(vehicle: {
 async function maybeCreateAutomaticBatch(
   log: import("pino").Logger,
   duplicateConflictIds: Set<number>,
+  dealerId = DEALER_ID,
 ): Promise<{ created: number; summary: string | null }> {
   const [settings] = await db
     .select()
     .from(autoPublishSettingsTable)
-    .where(eq(autoPublishSettingsTable.dealerId, DEALER_ID));
+    .where(eq(autoPublishSettingsTable.dealerId, dealerId));
   if (!settings?.enabled) return { created: 0, summary: null };
   if (settings.requireApproval) {
     return { created: 0, summary: "Auto-publish enabled but waiting for operator approval" };
@@ -224,7 +225,7 @@ async function maybeCreateAutomaticBatch(
     .from(publishingJobsTable)
     .where(
       and(
-        eq(publishingJobsTable.dealerId, DEALER_ID),
+        eq(publishingJobsTable.dealerId, dealerId),
         inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
       ),
     );
@@ -239,14 +240,14 @@ async function maybeCreateAutomaticBatch(
   const allScheduledJobs = await db
     .select({ createdAt: publishingJobsTable.createdAt, scheduledAt: publishingJobsTable.scheduledAt })
     .from(publishingJobsTable)
-    .where(eq(publishingJobsTable.dealerId, DEALER_ID));
+    .where(eq(publishingJobsTable.dealerId, dealerId));
 
   const [lastBatch] = await db
     .select({ createdAt: publishingBatchesTable.createdAt, scheduledAt: publishingBatchesTable.scheduledAt })
     .from(publishingBatchesTable)
     .where(
       and(
-        eq(publishingBatchesTable.dealerId, DEALER_ID),
+        eq(publishingBatchesTable.dealerId, dealerId),
         eq(publishingBatchesTable.notes, "Created automatically by Publishing Agent"),
         ne(publishingBatchesTable.status, "Cancelled"),
         ne(publishingBatchesTable.status, "Dismissed"),
@@ -277,7 +278,7 @@ async function maybeCreateAutomaticBatch(
     .from(vehiclesTable)
     .where(
       and(
-        eq(vehiclesTable.dealerId, DEALER_ID),
+        eq(vehiclesTable.dealerId, dealerId),
         ne(vehiclesTable.status, "Published"),
         ne(vehiclesTable.status, "Sold/Removed"),
         ne(vehiclesTable.status, "Removed"),
@@ -324,7 +325,8 @@ async function maybeCreateAutomaticBatch(
       const images = imagesByVehicle.get(vehicle.id) ?? [];
       const listing = listingByVehicle.get(vehicle.id);
       const gm = getCachedGmDecision(vehicle.id);
-      const lotCity = resolveAlphaLotCity(vehicle.lotLocation);
+      const alphaVehicle = dealerId === DEALER_ID;
+      const lotCity = alphaVehicle ? resolveAlphaLotCity(vehicle.lotLocation) : vehicle.lotLocation;
       const photoAnalysis = analyzePhotos(images);
       const invalid =
         !vehicle.vin ||
@@ -334,7 +336,7 @@ async function maybeCreateAutomaticBatch(
         images.length < 5 ||
         listing?.status === "Published" ||
         !lotCity ||
-        !isAlphaManassasVehicle(vehicle) ||
+        (alphaVehicle ? !isAlphaManassasVehicle(vehicle) : !isVerifiedDealerPublishingVehicle(vehicle)) ||
         duplicateConflictIds.has(vehicle.id) ||
         (gm && (gm.recommendation === "HOLD" || gm.recommendation === "RECONSIDER"));
       if (invalid) return null;
@@ -370,14 +372,14 @@ async function maybeCreateAutomaticBatch(
   const batchCountResult = await db
     .select()
     .from(publishingBatchesTable)
-    .where(eq(publishingBatchesTable.dealerId, DEALER_ID));
+    .where(eq(publishingBatchesTable.dealerId, dealerId));
   const batchNumber = batchCountResult.length + 1;
   const batchTiming = getInitialBatchTiming(targetBatchAt, now.getTime());
 
   const [batch] = await db
     .insert(publishingBatchesTable)
     .values({
-      dealerId: DEALER_ID,
+      dealerId,
       batchNumber,
       status: batchTiming.status,
       mode,
@@ -397,7 +399,7 @@ async function maybeCreateAutomaticBatch(
       .insert(publishPriorityScoresTable)
       .values({
         vehicleId: entry.vehicle.id,
-        dealerId: DEALER_ID,
+        dealerId,
         priorityScore: entry.priorityScore,
         eligible: 1,
       })
@@ -409,7 +411,7 @@ async function maybeCreateAutomaticBatch(
       .insert(vehiclePhotoScoresTable)
       .values({
         vehicleId: entry.vehicle.id,
-        dealerId: DEALER_ID,
+        dealerId,
         ...entry.photoAnalysis,
       })
       .onConflictDoUpdate({
@@ -419,7 +421,7 @@ async function maybeCreateAutomaticBatch(
     await db.insert(publishingJobsTable).values({
       listingVersionId: entry.version?.id ?? null,
       vehicleId: entry.vehicle.id,
-      dealerId: DEALER_ID,
+      dealerId,
       batchId: batch.id,
       mode,
       status: jobDueNow ? "Queued" : "Scheduled",
@@ -514,11 +516,25 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
     return { summary: "Publishing worker skipped — no extension online", skipped: true };
   }
 
-  const duplicateConflictIds = await getDuplicateConflictVehicleIds();
-  const alphaExtensionOnline = onlineExtensions.some((extension) => extension.dealerId === DEALER_ID);
-  const autoBatch = alphaExtensionOnline
-    ? await maybeCreateAutomaticBatch(log, duplicateConflictIds)
-    : { created: 0, summary: null };
+  const duplicateConflictIdsByDealer = new Map<number, Set<number>>();
+  const autoBatchResults = await Promise.all(
+    [...new Set(onlineExtensions.map((extension) => extension.dealerId))]
+      .map(async (dealerId) => {
+        const duplicateConflictIds = await getDuplicateConflictVehicleIds(dealerId);
+        duplicateConflictIdsByDealer.set(dealerId, duplicateConflictIds);
+        return maybeCreateAutomaticBatch(log, duplicateConflictIds, dealerId);
+      }),
+  );
+  const autoBatch = {
+    created: autoBatchResults.reduce((total, result) => total + result.created, 0),
+    summary: autoBatchResults
+      .map((result) => result.summary)
+      .filter((summary): summary is string => Boolean(summary))
+      .join("; ") || null,
+  };
+  const duplicateConflictIds = new Set<number>(
+    [...duplicateConflictIdsByDealer.values()].flatMap((ids) => [...ids]),
+  );
   const repairedStaleAssignments = await repairLegacyStaleAssignedJobs(log);
   const reboundAssignments = await rebindDueAssignedJobsToOnlineExtensions(onlineExtensions);
   if (reboundAssignments > 0) {

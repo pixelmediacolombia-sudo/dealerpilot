@@ -466,7 +466,7 @@ router.post("/auto-publish/batches", async (req, res) => {
       return;
     }
   }
-  const duplicateConflictIds = await getDuplicateConflictVehicleIds();
+  const duplicateConflictIds = await getDuplicateConflictVehicleIds(dealerId);
 
   // Fetch active/ready vehicles for this dealer, optionally scoped to a lot location.
   const vehicles = await db
@@ -1286,7 +1286,7 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
   const needsReviewVehicleIds = await findLatestNeedsReviewVehicleIds(vehicleIds);
-  const duplicateConflictIds = await getDuplicateConflictVehicleIds();
+  const duplicateConflictIds = await getDuplicateConflictVehicleIds(dealerId);
 
   const imagesByVehicle = new Map<number, typeof allImages>();
   for (const img of allImages) {

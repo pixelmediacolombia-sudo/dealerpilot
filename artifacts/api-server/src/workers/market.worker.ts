@@ -14,7 +14,7 @@ const AFFORDABLE_PRICE_CEILING_USD = 20000;
 const TRUCK_BODY_STYLES = ["Truck", "Pickup"];
 const SUV_BODY_STYLES = ["SUV", "Crossover"];
 
-async function run(): Promise<WorkerRunOutcome> {
+async function run(dealerId = DEALER_ID): Promise<WorkerRunOutcome> {
   const rows = await db
     .select({
       id: vehiclesTable.id,
@@ -31,7 +31,7 @@ async function run(): Promise<WorkerRunOutcome> {
     })
     .from(vehiclesTable)
     .leftJoin(vehicleIntelligenceTable, eq(vehicleIntelligenceTable.vehicleId, vehiclesTable.id))
-    .where(and(eq(vehiclesTable.dealerId, DEALER_ID)));
+    .where(and(eq(vehiclesTable.dealerId, dealerId)));
 
   const active = rows.filter((r) => ACTIVE_STATUSES.includes(r.status));
 
@@ -79,8 +79,8 @@ export const marketWorker: WorkerDefinition = {
 };
 
 // Exported for the Publishing Worker's duplicate-conflict guardrail.
-export async function getDuplicateConflictVehicleIds(): Promise<Set<number>> {
-  const outcome = await run();
+export async function getDuplicateConflictVehicleIds(dealerId = DEALER_ID): Promise<Set<number>> {
+  const outcome = await run(dealerId);
   const ids = (outcome.detail?.duplicateConflictVehicleIds as number[] | undefined) ?? [];
   return new Set(ids);
 }

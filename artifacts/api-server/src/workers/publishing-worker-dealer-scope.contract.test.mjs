@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 const workerSource = await readFile(new URL("./publishing.worker.ts", import.meta.url), "utf8");
 const routeSource = await readFile(new URL("../routes/publishing.ts", import.meta.url), "utf8");
 const controlledModeSource = await readFile(new URL("../publishing/controlledMode.ts", import.meta.url), "utf8");
+const marketWorkerSource = await readFile(new URL("./market.worker.ts", import.meta.url), "utf8");
 
 test("publishing worker verifies job and vehicle dealer before lot guard", () => {
   assert.match(workerSource, /currentVehicle\.dealerId !== job\.dealerId/);
@@ -24,7 +25,17 @@ test("publishing worker assigns each online dealer to its own extension", () => 
   assert.match(workerSource, /const extensionByDealer = new Map\(onlineExtensions\.map/);
   assert.match(workerSource, /const extension = extensionByDealer\.get\(job\.dealerId\)/);
   assert.match(workerSource, /assignedExtensionId: extension\.id/);
-  assert.match(workerSource, /alphaExtensionOnline/);
+  assert.match(workerSource, /onlineExtensions\.map\(\(extension\) => extension\.dealerId\)/);
+  assert.match(workerSource, /maybeCreateAutomaticBatch\(log, duplicateConflictIds, dealerId\)/);
+  assert.match(workerSource, /getDuplicateConflictVehicleIds\(dealerId\)/);
+});
+
+test("duplicate conflict scans can be scoped to a dealer", () => {
+  assert.match(workerSource, /getDuplicateConflictVehicleIds\(dealerId\)/);
+  assert.match(routeSource, /getDuplicateConflictVehicleIds\(dealerId\)/);
+  assert.match(marketWorkerSource, /async function run\(dealerId = DEALER_ID\)/);
+  assert.match(marketWorkerSource, /eq\(vehiclesTable\.dealerId, dealerId\)/);
+  assert.match(marketWorkerSource, /getDuplicateConflictVehicleIds\(dealerId = DEALER_ID\)/);
 });
 
 test("publishing routes reject an extension configured for another dealer", () => {

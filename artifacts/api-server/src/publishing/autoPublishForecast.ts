@@ -206,7 +206,7 @@ export async function previewAutoPublishVehicles(
       inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
     )),
     findLatestNeedsReviewVehicleIds(vehicleIds),
-    getDuplicateConflictVehicleIds(),
+    getDuplicateConflictVehicleIds(dealerId),
   ]);
   const activeVehicleIds = new Set(activeJobs.map((job) => job.vehicleId));
   const imagesByVehicle = new Map<number, typeof allImages>();

@@ -388,11 +388,11 @@ test("Controlled Auto stays automatic without requiring a second deployment swit
 test("cancelled and dismissed batches do not block the auto-publish frequency gate", () => {
   assert.match(
     workerSource,
-    /from\(publishingBatchesTable\)[\s\S]*eq\(publishingBatchesTable\.dealerId,\s*DEALER_ID\)[\s\S]*ne\(publishingBatchesTable\.status,\s*"Cancelled"\)[\s\S]*orderBy\(desc\(publishingBatchesTable\.createdAt\)\)/,
+    /from\(publishingBatchesTable\)[\s\S]*eq\(publishingBatchesTable\.dealerId,\s*dealerId\)[\s\S]*ne\(publishingBatchesTable\.status,\s*"Cancelled"\)[\s\S]*orderBy\(desc\(publishingBatchesTable\.createdAt\)\)/,
   );
   assert.match(
     workerSource,
-    /from\(publishingBatchesTable\)[\s\S]*eq\(publishingBatchesTable\.dealerId,\s*DEALER_ID\)[\s\S]*ne\(publishingBatchesTable\.status,\s*"Dismissed"\)[\s\S]*orderBy\(desc\(publishingBatchesTable\.createdAt\)\)/,
+    /from\(publishingBatchesTable\)[\s\S]*eq\(publishingBatchesTable\.dealerId,\s*dealerId\)[\s\S]*ne\(publishingBatchesTable\.status,\s*"Dismissed"\)[\s\S]*orderBy\(desc\(publishingBatchesTable\.createdAt\)\)/,
   );
 });
 

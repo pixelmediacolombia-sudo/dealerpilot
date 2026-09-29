@@ -180,7 +180,7 @@ export async function checkPublishGuardrails(params: {
   }
 
   // 4b. Duplicate conflict — Market Agent flagged same year/make/model/lot self-competition.
-  const duplicateConflictIds = params.duplicateConflictIds ?? (await getDuplicateConflictVehicleIds());
+  const duplicateConflictIds = params.duplicateConflictIds ?? (await getDuplicateConflictVehicleIds(vehicle.dealerId));
   if (duplicateConflictIds.has(vehicle.id) && !gmOverride) {
     return {
       ok: false,
