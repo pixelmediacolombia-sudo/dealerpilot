@@ -9,6 +9,7 @@
   });
   const LEGACY_BACKEND_URL = "https://1987dealerpilot.com";
   const WINDOW_SETTINGS_PREFIX = "messengerSettingsWindow:";
+  const WINDOW_RUNTIME_PREFIX = "messengerRuntimeWindow:";
   const MESSENGER_HEARTBEAT_ALARM = "dealerpilot-messenger-heartbeat";
   const MESSENGER_REFRESH_ALARM = "dealerpilot-messenger-refresh";
   const LUCKI_SELLER_PROFILE_NAMES = ["Lucki Mazda"];
@@ -41,6 +42,11 @@
   function windowSettingsKey(windowId) {
     const id = validWindowId(windowId);
     return id === null ? null : `${WINDOW_SETTINGS_PREFIX}${id}`;
+  }
+
+  function windowRuntimeKey(name, windowId) {
+    const id = validWindowId(windowId);
+    return id === null ? name : `${WINDOW_RUNTIME_PREFIX}${id}:${name}`;
   }
 
   function normalizeBackendUrl(value) {
@@ -224,10 +230,10 @@
     if (Object.keys(missing).length > 0) await chrome.storage.local.set(missing);
   }
 
-  async function saveLastError(err) {
+  async function saveLastError(err, windowId = null) {
     const message = err?.message ? String(err.message) : String(err);
     await chrome.storage.local.set({
-      lastError: {
+      [windowRuntimeKey("lastError", windowId)]: {
         message,
         status: err?.status || null,
         data: err?.data || null,
@@ -300,13 +306,14 @@
     return response?.result?.value || { found: false, text: "" };
   }
 
-  async function loadAutoSendState() {
-    const stored = await chrome.storage.local.get("messengerAutoSendState");
-    return stored.messengerAutoSendState || { sendHashes: {}, replies: {} };
+  async function loadAutoSendState(windowId = null) {
+    const key = windowRuntimeKey("messengerAutoSendState", windowId);
+    const stored = await chrome.storage.local.get(key);
+    return stored[key] || { sendHashes: {}, replies: {} };
   }
 
-  async function saveAutoSendState(state) {
-    await chrome.storage.local.set({ messengerAutoSendState: state });
+  async function saveAutoSendState(state, windowId = null) {
+    await chrome.storage.local.set({ [windowRuntimeKey("messengerAutoSendState", windowId)]: state });
   }
 
   const handlers = {
@@ -318,37 +325,43 @@
       return reportSessionStatus(await resolveWindowId(message, sender));
     },
 
-    async LOAD_AUTO_SEND_STATE() {
-      return loadAutoSendState();
+    async LOAD_AUTO_SEND_STATE(message, sender) {
+      return loadAutoSendState(await resolveWindowId(message, sender));
     },
 
-    async SAVE_AUTO_SEND_STATE(message) {
-      const existing = await loadAutoSendState();
+    async SAVE_AUTO_SEND_STATE(message, sender) {
+      const windowId = await resolveWindowId(message, sender);
+      const existing = await loadAutoSendState(windowId);
       existing.sendHashes = { ...existing.sendHashes, ...(message.sendHashes || {}) };
       existing.replies = { ...existing.replies, ...(message.replies || {}) };
-      await saveAutoSendState(existing);
+      await saveAutoSendState(existing, windowId);
       return { saved: true };
     },
 
     async GET_DEBUG_STATE(message, sender) {
-      const settings = await getSettings(await resolveWindowId(message, sender));
-      const stored = await chrome.storage.local.get([
+      const windowId = await resolveWindowId(message, sender);
+      const settings = await getSettings(windowId);
+      const debugKeys = [
         "lastMessengerCaptureDebug",
         "lastMessengerCaptureDebugByTab",
         "messengerCaptureDebugHistory",
         "lastConversationIntake",
         "lastError",
+      ].map((name) => windowRuntimeKey(name, windowId));
+      const stored = await chrome.storage.local.get([
+        ...debugKeys,
         "extensionId",
       ]);
+      const [lastDebugKey, debugByTabKey, debugHistoryKey, intakeKey, lastErrorKey] = debugKeys;
       return {
         version: chrome.runtime.getManifest?.().version || "0.1.6",
         extensionId: stored.extensionId || null,
         settings,
-        lastMessengerCaptureDebug: stored.lastMessengerCaptureDebug || null,
-        lastMessengerCaptureDebugByTab: stored.lastMessengerCaptureDebugByTab || {},
-        messengerCaptureDebugHistory: stored.messengerCaptureDebugHistory || [],
-        lastConversationIntake: stored.lastConversationIntake || null,
-        lastError: stored.lastError || null,
+        lastMessengerCaptureDebug: stored[lastDebugKey] || null,
+        lastMessengerCaptureDebugByTab: stored[debugByTabKey] || {},
+        messengerCaptureDebugHistory: stored[debugHistoryKey] || [],
+        lastConversationIntake: stored[intakeKey] || null,
+        lastError: stored[lastErrorKey] || null,
       };
     },
 
@@ -385,21 +398,20 @@
     },
 
     async MESSENGER_CAPTURE_DEBUG(message, sender) {
+      const windowId = await resolveWindowId(message, sender);
       const sourceTabId = sender?.tab?.id || message.sourceTabId || null;
       const debug = {
         ...(message.debug || {}),
         sourceTabId,
         at: message.debug?.at || new Date().toISOString(),
       };
-      const {
-        lastMessengerCaptureDebugByTab = {},
-        messengerCaptureDebugHistory = [],
-        lastConversationIntake = null,
-      } = await chrome.storage.local.get([
-        "lastMessengerCaptureDebugByTab",
-        "messengerCaptureDebugHistory",
-        "lastConversationIntake",
-      ]);
+      const debugByTabKey = windowRuntimeKey("lastMessengerCaptureDebugByTab", windowId);
+      const debugHistoryKey = windowRuntimeKey("messengerCaptureDebugHistory", windowId);
+      const intakeKey = windowRuntimeKey("lastConversationIntake", windowId);
+      const stored = await chrome.storage.local.get([debugByTabKey, debugHistoryKey, intakeKey]);
+      const lastMessengerCaptureDebugByTab = stored[debugByTabKey] || {};
+      const messengerCaptureDebugHistory = stored[debugHistoryKey] || [];
+      const lastConversationIntake = stored[intakeKey] || null;
       if (sourceTabId) lastMessengerCaptureDebugByTab[String(sourceTabId)] = debug;
       const history = [debug, ...messengerCaptureDebugHistory].slice(0, 20);
       const patch = {
@@ -416,7 +428,18 @@
           suggestedReplyClearReason: "auto_sent",
         };
       }
-      await chrome.storage.local.set(patch);
+      if (debug.reason === "reply_vehicle_context_mismatch" && lastConversationIntake) {
+        patch.lastConversationIntake = {
+          ...lastConversationIntake,
+          suggestedReply: null,
+          suggestedReplyPreview: "",
+          suggestedReplyClearedAt: debug.at,
+          suggestedReplyClearReason: "vehicle_context_mismatch",
+        };
+      }
+      await chrome.storage.local.set(Object.fromEntries(
+        Object.entries(patch).map(([key, value]) => [windowRuntimeKey(key, windowId), value]),
+      ));
       return { saved: true };
     },
 
@@ -479,7 +502,12 @@
     },
 
     async CONVERSATION_INTAKE(message, sender) {
-      const dedupeKey = message.idempotencyKey || message.messageHash || "";
+      const windowId = await resolveWindowId(message, sender);
+      const settings = await getSettings(windowId);
+      const rawDedupeKey = message.idempotencyKey || message.messageHash || "";
+      const dedupeKey = rawDedupeKey
+        ? `${windowId ?? "global"}:${settings.dealerId}:${settings.sessionId}:${rawDedupeKey}`
+        : "";
       pruneRecentConversationIntakes();
       if (dedupeKey && conversationIntakeInFlight.has(dedupeKey)) {
         return { skipped: true, reason: "duplicate_extension_intake" };
@@ -492,7 +520,6 @@
       if (dedupeKey) conversationIntakeInFlight.add(dedupeKey);
       try {
         const extensionId = await getExtensionId();
-        const settings = await getSettings(await resolveWindowId(message, sender));
         const response = await DealerPilotMessengerApiClient.apiPost("/api/conversations/intake", {
           extensionId,
           externalThreadRef: message.externalThreadRef,
@@ -530,7 +557,7 @@
           response?.data?.data?.suggestedReply ||
           "";
         await chrome.storage.local.set({
-          lastConversationIntake: {
+          [windowRuntimeKey("lastConversationIntake", windowId)]: {
             at: new Date().toISOString(),
             externalThreadRef: message.externalThreadRef || null,
             buyerName: message.buyerName || null,
@@ -550,7 +577,7 @@
         return response;
       } catch (err) {
         await chrome.storage.local.set({
-          lastConversationIntake: {
+          [windowRuntimeKey("lastConversationIntake", windowId)]: {
             at: new Date().toISOString(),
             externalThreadRef: message.externalThreadRef || null,
             buyerName: message.buyerName || null,
@@ -589,7 +616,7 @@
         },
       );
       const data = response?.data || response || {};
-      await chrome.storage.local.set({ lastError: null });
+      await chrome.storage.local.set({ [windowRuntimeKey("lastError", await resolveWindowId(message, sender))]: null });
       return data;
     },
 
@@ -642,7 +669,7 @@
         const data = await handler(message, sender);
         sendResponse({ ok: true, data });
       } catch (err) {
-        await saveLastError(err).catch(() => {});
+        await saveLastError(err, await resolveWindowId(message, sender)).catch(() => {});
         sendResponse({
           ok: false,
           error: err?.message ? String(err.message) : String(err),

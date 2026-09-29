@@ -110,6 +110,29 @@ test("same extension keeps Alpha and another dealer isolated by browser window",
   assert.ok(storage["messengerSettingsWindow:22"]);
 });
 
+test("runtime diagnostics and deduplication stay isolated by browser window", async () => {
+  const storage = { extensionId: "shared-extension" };
+  const apiCalls = [];
+  const alpha = createHarness({ storage, windowId: 11, apiCalls });
+  const lucki = createHarness({ storage, windowId: 22, apiCalls });
+
+  await alpha.SAVE_SETTINGS({ dealerId: 1, sessionId: "alpha" });
+  await lucki.SAVE_SETTINGS({ dealerId: 2, sessionId: "lucki" });
+
+  const sharedMessage = {
+    ...intake,
+    idempotencyKey: "same-message-key",
+    messageHash: "same-message-hash",
+  };
+  await alpha.CONVERSATION_INTAKE(sharedMessage, { tab: { windowId: 11 } });
+  await lucki.CONVERSATION_INTAKE(sharedMessage, { tab: { windowId: 22 } });
+
+  assert.equal(apiCalls.filter(({ path }) => path === "/api/conversations/intake").length, 2);
+  assert.equal(storage.lastConversationIntake, undefined);
+  assert.equal(storage["messengerRuntimeWindow:11:lastConversationIntake"].suggestedReply, "ok");
+  assert.equal(storage["messengerRuntimeWindow:22:lastConversationIntake"].suggestedReply, "ok");
+});
+
 test("Lucki dealer selection cannot retain Alpha seller profile names", async () => {
   const storage = { extensionId: "shared-extension" };
   const lucki = createHarness({ storage, windowId: 22, apiCalls: [] });
