@@ -6,6 +6,7 @@ import { fetchFeedXml } from "./feedSource";
 import { ALPHA_MARKETPLACE_KNOWLEDGE } from "../lib/dealer";
 import { getLuckiMazdaFeedConfig, LUCKI_MAZDA_DEALER_ID } from "./dealerFeedConfig";
 import { runInventorySync } from "./scheduler";
+import { getLuckiIncomingValues } from "./luckiMarketplacePolicy";
 
 const ALPHA = "Alpha Motorsport";
 const LUCKI_MAZDA = "Lucki Mazda";
@@ -18,6 +19,7 @@ const LUCKI_LOCATION = {
   state: "VA",
   country: "US",
 };
+const LUCKI_MARKETPLACE_BACKFILL_MARKER = "Lucki Marketplace backfill v1 applied";
 const REAL_FEED_URL = "https://www.alphamotorsport.net/facebook-catalog-feed.xml";
 
 async function syncConfiguredLuckiInventory(log: Logger, configured: boolean): Promise<void> {
@@ -36,6 +38,60 @@ async function syncConfiguredLuckiInventory(log: Logger, configured: boolean): P
     // Vincue is temporarily unavailable. The next scheduled sync can retry.
     log.warn({ err, dealerId: LUCKI_MAZDA_DEALER_ID }, "Lucki Mazda inventory refresh during seed failed");
   }
+}
+
+/**
+ * One-time Lucki-only data backfill requested for Marketplace readiness.
+ * The marker makes this safe to run from every startup without re-burning
+ * values after the initial correction. Future feed runs preserve populated
+ * values through importFeed's Lucki policy.
+ */
+async function applyLuckiMarketplaceBackfill(log: Logger): Promise<void> {
+  const [dealer] = await db
+    .select({ notes: dealersTable.notes })
+    .from(dealersTable)
+    .where(eq(dealersTable.id, LUCKI_MAZDA_DEALER_ID))
+    .limit(1);
+  if (!dealer) return;
+
+  const vehicles = await db
+    .select()
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.dealerId, LUCKI_MAZDA_DEALER_ID));
+  if (vehicles.length === 0 || dealer.notes?.includes(LUCKI_MARKETPLACE_BACKFILL_MARKER)) return;
+
+  let updated = 0;
+  for (const vehicle of vehicles) {
+    const values = getLuckiIncomingValues(vehicle);
+    const next = {
+      lotLocation: values.lotLocation,
+      transmission: values.transmission,
+      condition: values.condition,
+      description: values.description,
+      bodyStyle: vehicle.bodyStyle?.trim() || values.bodyStyle,
+      fuelType: vehicle.fuelType?.trim() || values.fuelType,
+    };
+    const changed =
+      vehicle.lotLocation !== next.lotLocation ||
+      vehicle.transmission !== next.transmission ||
+      vehicle.condition !== next.condition ||
+      vehicle.description !== next.description ||
+      vehicle.bodyStyle !== next.bodyStyle ||
+      vehicle.fuelType !== next.fuelType;
+    if (!changed) continue;
+    await db.update(vehiclesTable).set(next).where(eq(vehiclesTable.id, vehicle.id));
+    updated += 1;
+  }
+
+  const notes = [dealer.notes, LUCKI_MARKETPLACE_BACKFILL_MARKER].filter(Boolean).join("\n");
+  await db
+    .update(dealersTable)
+    .set({ notes })
+    .where(eq(dealersTable.id, LUCKI_MAZDA_DEALER_ID));
+  log.info(
+    { dealerId: LUCKI_MAZDA_DEALER_ID, vehicles: vehicles.length, updated, marker: LUCKI_MARKETPLACE_BACKFILL_MARKER },
+    "Lucki Mazda Marketplace one-time backfill applied",
+  );
 }
 
 function isSampleFeedUrl(url: string | null | undefined): boolean {
@@ -166,6 +222,9 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
     const configured = Boolean(
       runtime.xmlFeedUrl && runtime.providerDealerId && runtime.feedAuthMode === "x-api-key",
     );
+    const configuredNotes = existing.notes?.includes(LUCKI_MARKETPLACE_BACKFILL_MARKER)
+      ? `${LUCKI_CONFIGURED_NOTES}\n${LUCKI_MARKETPLACE_BACKFILL_MARKER}`
+      : LUCKI_CONFIGURED_NOTES;
     const updates = {
       name: LUCKI_MAZDA,
       ...(existing.notes === LEGACY_LUCKY_NOTES ? { notes: configured ? LUCKI_CONFIGURED_NOTES : LUCKI_NOTES_PENDING } : {}),
@@ -175,7 +234,7 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
             providerName: runtime.providerName,
             providerDealerId: runtime.providerDealerId,
             feedAuthMode: "x-api-key",
-            notes: LUCKI_CONFIGURED_NOTES,
+            notes: configuredNotes,
           }
         : {}),
       ...(existing.hasCleanTitleInventory !== true ? { hasCleanTitleInventory: true } : {}),
@@ -203,6 +262,7 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
     }
     log.info({ dealerId: existing.id, configured }, configured ? "Lucki Mazda dealer feed configuration refreshed" : "Lucki Mazda dealer already exists; inventory remains unconfigured");
     await syncConfiguredLuckiInventory(log, configured);
+    await applyLuckiMarketplaceBackfill(log);
     return dealer;
   }
 
@@ -238,5 +298,6 @@ export async function seedLuckyMazdaDealer(log: Logger): Promise<Dealer> {
 
   log.info({ dealerId: created!.id, configured }, configured ? "Seeded Lucki Mazda dealer with runtime feed configuration" : "Seeded Lucki Mazda dealer shell without inventory");
   await syncConfiguredLuckiInventory(log, configured);
+  await applyLuckiMarketplaceBackfill(log);
   return created!;
 }

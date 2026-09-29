@@ -12,6 +12,7 @@ const index = read("../index.ts");
 const auth = read("../routes/auth.ts");
 const dealer = read("../lib/dealer.ts");
 const importer = read("importFeed.ts");
+const policy = read("luckiMarketplacePolicy.ts");
 
 test("Lucki Mazda is seeded as an idempotent Marketplace-only dealer shell", () => {
   assert.match(seed, /const LUCKI_MAZDA = "Lucki Mazda"/);
@@ -34,7 +35,15 @@ test("Lucki Mazda is seeded as an idempotent Marketplace-only dealer shell", () 
   assert.match(dealer, /LUCKI_MAZDA_DEALER_ID = 2/);
   assert.match(dealer, /LUCKI_MAZDA_LOT_WOODBRIDGE = "Woodbridge"/);
   assert.match(importer, /resolveImportedLotLocation\(dealerId, n\.lotLocation\)/);
+  assert.match(importer, /const isLuckiDealer = dealerId === LUCKI_MAZDA_DEALER_ID/);
+  assert.match(importer, /fillOnlyWhenBlank\(prior\.condition, luckiValues!\.condition\)/);
+  assert.match(importer, /priorImageUrls\.length === 0 && newImageUrls\.length > 0/);
+  assert.match(importer, /dealerId === ALPHA_DEALER_ID/);
   assert.match(importer, /never add the fallback to source_raw/);
+  assert.match(seed, /LUCKI_MARKETPLACE_BACKFILL_MARKER/);
+  assert.match(seed, /applyLuckiMarketplaceBackfill/);
+  assert.match(policy, /transmission: "Automatic"/);
+  assert.match(policy, /LUCKI_MAZDA_LOT_WOODBRIDGE/);
   assert.match(seed, /XML inventory feed pending from Lucki Mazda/);
   assert.match(seed, /existing\.notes === LEGACY_LUCKY_NOTES/);
   assert.doesNotMatch(seed, /x-api-key\s*:\s*["']/);

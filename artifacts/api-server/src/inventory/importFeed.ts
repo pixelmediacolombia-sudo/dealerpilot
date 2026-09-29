@@ -10,9 +10,15 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Logger } from "pino";
 import { parseInventoryXml, type FeedImage } from "./xmlEngine";
 import { reconcileAlphaLotLocations } from "./locationReconcile";
-import { ALPHA_DEALER_ID, resolveImportedLotLocation } from "../lib/dealer";
+import {
+  ALPHA_DEALER_ID,
+  LUCKI_MAZDA_DEALER_ID,
+  LUCKI_MAZDA_LOT_WOODBRIDGE,
+  resolveImportedLotLocation,
+} from "../lib/dealer";
 import { syncSoldMarketplaceState } from "../marketplace/soldState";
 import { vehicleOperationalColumns, type VehicleOperationalRow } from "../lib/vehicleColumns";
+import { fillOnlyWhenBlank, getLuckiIncomingValues } from "./luckiMarketplacePolicy";
 
 const ACTIVE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish", "Published"];
 
@@ -138,6 +144,7 @@ export async function importFeed(
   for (const v of existing) existingByVin.set(v.vin, v);
 
   const now = new Date();
+  const isLuckiDealer = dealerId === LUCKI_MAZDA_DEALER_ID;
   const seenVins = new Set<string>();
   let created = 0;
   let updated = 0;
@@ -152,7 +159,10 @@ export async function importFeed(
     // Vincue's Lucki XML is dealer-scoped but currently omits the physical
     // lot. Persist the verified dealer configuration in lot_location only;
     // never add the fallback to source_raw as if it came from the XML.
-    const lotLocation = resolveImportedLotLocation(dealerId, n.lotLocation);
+    const lotLocation = isLuckiDealer
+      ? LUCKI_MAZDA_LOT_WOODBRIDGE
+      : resolveImportedLotLocation(dealerId, n.lotLocation);
+    const luckiValues = isLuckiDealer ? getLuckiIncomingValues(n) : null;
     // Track location counts for logging
     const locationKey = lotLocation ?? "unknown";
     locationBreakdown[locationKey] = (locationBreakdown[locationKey] ?? 0) + 1;
@@ -175,11 +185,11 @@ export async function importFeed(
           price: n.price,
           exteriorColor: n.exteriorColor,
           interiorColor: n.interiorColor,
-          bodyStyle: n.bodyStyle,
-          condition: n.condition,
-          transmission: n.transmission,
-          fuelType: n.fuelType,
-          description: n.description,
+          bodyStyle: luckiValues?.bodyStyle ?? n.bodyStyle,
+          condition: luckiValues?.condition ?? n.condition,
+          transmission: luckiValues?.transmission ?? n.transmission,
+          fuelType: luckiValues?.fuelType ?? n.fuelType,
+          description: luckiValues?.description ?? n.description,
           vdpUrl: n.vdpUrl,
           lotLocation,
           sourceRaw: persistedSourceRaw,
@@ -205,20 +215,83 @@ export async function importFeed(
       continue;
     }
 
-    // Existing vehicle — detect field-level changes.
+    // Existing vehicle — Lucki preserves populated fields and only fills blanks.
+    // Alpha keeps the original feed replacement behavior.
+    const effective = isLuckiDealer
+      ? {
+          stockNumber: fillOnlyWhenBlank(prior.stockNumber, n.stockNumber),
+          year: fillOnlyWhenBlank(prior.year, n.year),
+          make: fillOnlyWhenBlank(prior.make, n.make),
+          model: fillOnlyWhenBlank(prior.model, n.model),
+          trim: fillOnlyWhenBlank(prior.trim, n.trim),
+          mileage: fillOnlyWhenBlank(prior.mileage, n.mileage),
+          price: fillOnlyWhenBlank(prior.price, n.price),
+          exteriorColor: fillOnlyWhenBlank(prior.exteriorColor, n.exteriorColor),
+          interiorColor: fillOnlyWhenBlank(prior.interiorColor, n.interiorColor),
+          bodyStyle: fillOnlyWhenBlank(prior.bodyStyle, luckiValues!.bodyStyle),
+          condition: fillOnlyWhenBlank(prior.condition, luckiValues!.condition),
+          transmission: fillOnlyWhenBlank(prior.transmission, luckiValues!.transmission),
+          fuelType: fillOnlyWhenBlank(prior.fuelType, luckiValues!.fuelType),
+          description: fillOnlyWhenBlank(prior.description, luckiValues!.description),
+          vdpUrl: fillOnlyWhenBlank(prior.vdpUrl, n.vdpUrl),
+          lotLocation: fillOnlyWhenBlank(prior.lotLocation, lotLocation),
+        }
+      : {
+          stockNumber: n.stockNumber,
+          year: n.year,
+          make: n.make,
+          model: n.model,
+          trim: n.trim,
+          mileage: n.mileage,
+          price: n.price,
+          exteriorColor: n.exteriorColor,
+          interiorColor: n.interiorColor,
+          bodyStyle: n.bodyStyle,
+          condition: n.condition,
+          transmission: n.transmission,
+          fuelType: n.fuelType,
+          description: n.description,
+          vdpUrl: n.vdpUrl,
+          lotLocation,
+        };
+
     const drafts: ChangeDraft[] = [];
-    const priceDraft = diffField("price", prior.price, n.price);
-    if (priceDraft) drafts.push(priceDraft);
-    const mileageDraft = diffField("mileage", prior.mileage, n.mileage);
-    if (mileageDraft) drafts.push(mileageDraft);
-    const descDraft = diffField("description", prior.description, n.description);
-    if (descDraft) drafts.push(descDraft);
+    const trackedFields: Array<[string, string | number | null | undefined, string | number | null | undefined]> = isLuckiDealer
+      ? [
+          ["stockNumber", prior.stockNumber, effective.stockNumber],
+          ["year", prior.year, effective.year],
+          ["make", prior.make, effective.make],
+          ["model", prior.model, effective.model],
+          ["trim", prior.trim, effective.trim],
+          ["mileage", prior.mileage, effective.mileage],
+          ["price", prior.price, effective.price],
+          ["exteriorColor", prior.exteriorColor, effective.exteriorColor],
+          ["interiorColor", prior.interiorColor, effective.interiorColor],
+          ["bodyStyle", prior.bodyStyle, effective.bodyStyle],
+          ["condition", prior.condition, effective.condition],
+          ["transmission", prior.transmission, effective.transmission],
+          ["fuelType", prior.fuelType, effective.fuelType],
+          ["description", prior.description, effective.description],
+          ["vdpUrl", prior.vdpUrl, effective.vdpUrl],
+          ["lotLocation", prior.lotLocation, effective.lotLocation],
+        ]
+      : [
+          ["price", prior.price, effective.price],
+          ["mileage", prior.mileage, effective.mileage],
+          ["description", prior.description, effective.description],
+        ];
+    for (const [field, oldValue, newValue] of trackedFields) {
+      const draft = diffField(field, oldValue ?? null, newValue ?? null);
+      if (draft) drafts.push(draft);
+    }
+    const priceDraft = drafts.find((draft) => draft.field === "price") ?? null;
 
     const priorImageUrls = await getImageUrls(prior.id);
     const newImageUrls = n.images.map((i) => i.url);
-    const imagesChanged =
-      priorImageUrls.length !== newImageUrls.length ||
-      priorImageUrls.some((u, i) => u !== newImageUrls[i]);
+    const imagesChanged = isLuckiDealer
+      ? priorImageUrls.length === 0 && newImageUrls.length > 0
+      : priorImageUrls.length !== newImageUrls.length ||
+        priorImageUrls.some((u, i) => u !== newImageUrls[i]);
     if (imagesChanged) {
       drafts.push({
         changeType: "image_change",
@@ -252,22 +325,22 @@ export async function importFeed(
     await db
       .update(vehiclesTable)
       .set({
-        stockNumber: n.stockNumber,
-        year: n.year,
-        make: n.make,
-        model: n.model,
-        trim: n.trim,
-        mileage: n.mileage,
-        price: n.price,
-        exteriorColor: n.exteriorColor,
-        interiorColor: n.interiorColor,
-        bodyStyle: n.bodyStyle,
-        condition: n.condition,
-        transmission: n.transmission,
-        fuelType: n.fuelType,
-        description: n.description,
-        vdpUrl: n.vdpUrl,
-        lotLocation,
+        stockNumber: effective.stockNumber,
+        year: effective.year,
+        make: effective.make ?? n.make,
+        model: effective.model ?? n.model,
+        trim: effective.trim,
+        mileage: effective.mileage,
+        price: effective.price,
+        exteriorColor: effective.exteriorColor,
+        interiorColor: effective.interiorColor,
+        bodyStyle: effective.bodyStyle,
+        condition: effective.condition,
+        transmission: effective.transmission,
+        fuelType: effective.fuelType,
+        description: effective.description,
+        vdpUrl: effective.vdpUrl,
+        lotLocation: effective.lotLocation,
         sourceRaw: persistedSourceRaw,
         status: nextStatus,
         lastSeenAt: now,

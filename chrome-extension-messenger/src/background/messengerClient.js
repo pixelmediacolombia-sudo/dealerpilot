@@ -9,6 +9,8 @@
   });
   const LEGACY_BACKEND_URL = "https://1987dealerpilot.com";
   const WINDOW_SETTINGS_PREFIX = "messengerSettingsWindow:";
+  const MESSENGER_HEARTBEAT_ALARM = "dealerpilot-messenger-heartbeat";
+  const MESSENGER_REFRESH_ALARM = "dealerpilot-messenger-refresh";
   const LUCKI_SELLER_PROFILE_NAMES = ["Lucki Mazda"];
   const ALPHA_SELLER_PROFILE_NAMES = new Set(["alpha manassas", "alpha motorsport", "andres ibanez"]);
   const conversationIntakeInFlight = new Set();
@@ -88,6 +90,48 @@
       });
     }));
     return reports.length === 1 ? reports[0] : reports;
+  }
+
+  async function refreshMessengerTabs(windowId = null) {
+    const scopedWindowId = validWindowId(windowId);
+    const targets = scopedWindowId === null
+      ? await configuredWindowSettings()
+      : [[scopedWindowId, await getSettings(scopedWindowId)]];
+    const results = [];
+    for (const [targetWindowId, settings] of targets) {
+      if (!settings.sessionId) continue;
+      const query = {
+        url: [
+          "https://www.facebook.com/messages*",
+          "https://web.facebook.com/messages*",
+          "https://facebook.com/messages*",
+          "https://www.facebook.com/marketplace/inbox*",
+          "https://web.facebook.com/marketplace/inbox*",
+          "https://facebook.com/marketplace/inbox*",
+        ],
+      };
+      if (validWindowId(targetWindowId) !== null) query.windowId = targetWindowId;
+      const tabs = await chrome.tabs.query(query).catch(() => []);
+      for (const tab of tabs) {
+        if (typeof tab.id !== "number") continue;
+        try {
+          const response = await chrome.tabs.sendMessage(tab.id, {
+            type: "REFRESH_ACTIVE_MESSENGER_CONVERSATION",
+          });
+          results.push({ windowId: targetWindowId, tabId: tab.id, ok: response?.ok !== false });
+        } catch (error) {
+          // A tab may not have finished loading its content script. The next
+          // alarm will retry without affecting another dealer's window.
+          results.push({
+            windowId: targetWindowId,
+            tabId: tab.id,
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+    return results;
   }
 
   async function getExtensionId() {
@@ -572,15 +616,19 @@
 
   chrome.runtime.onInstalled?.addListener(async () => {
     await preserveMissingDefaultSettings().catch(() => {});
-    chrome.alarms?.create?.("dealerpilot-messenger-heartbeat", { periodInMinutes: 1 });
+    chrome.alarms?.create?.(MESSENGER_HEARTBEAT_ALARM, { periodInMinutes: 1 });
+    chrome.alarms?.create?.(MESSENGER_REFRESH_ALARM, { periodInMinutes: 0.5 });
   });
 
   chrome.runtime.onStartup?.addListener(() => {
-    chrome.alarms?.create?.("dealerpilot-messenger-heartbeat", { periodInMinutes: 1 });
+    chrome.alarms?.create?.(MESSENGER_HEARTBEAT_ALARM, { periodInMinutes: 1 });
+    chrome.alarms?.create?.(MESSENGER_REFRESH_ALARM, { periodInMinutes: 0.5 });
     reportSessionStatus().catch(() => {});
+    refreshMessengerTabs().catch(() => {});
   });
   chrome.alarms?.onAlarm?.addListener((alarm) => {
-    if (alarm?.name === "dealerpilot-messenger-heartbeat") reportSessionStatus().catch(() => {});
+    if (alarm?.name === MESSENGER_HEARTBEAT_ALARM) reportSessionStatus().catch(() => {});
+    if (alarm?.name === MESSENGER_REFRESH_ALARM) refreshMessengerTabs().catch(() => {});
   });
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

@@ -147,7 +147,33 @@ test("extension updates preserve an operator-approved automatic messaging settin
   assert.equal(storage.backendUrl, "https://dealer.example");
   assert.deepEqual(storage.sellerProfileNames, ["Andres Ibanez"]);
   assert.equal(calls.tabs.some((call) => call.type === "create"), false);
-  assert.deepEqual(calls.alarms.map((alarm) => alarm.name).sort(), ["dealerpilot-messenger-heartbeat"]);
+  assert.deepEqual(calls.alarms.map((alarm) => alarm.name).sort(), [
+    "dealerpilot-messenger-heartbeat",
+    "dealerpilot-messenger-refresh",
+  ]);
+});
+
+test("background refreshes Messenger tabs even when they are not active", async () => {
+  const { listeners, calls } = createHarness({
+    initialStorage: { sessionId: "lucki-session", dealerId: 2 },
+    inboxTabs: [
+      { id: 77, url: "https://www.facebook.com/messages/t/123" },
+      { id: 78, url: "https://www.facebook.com/marketplace/inbox" },
+    ],
+  });
+
+  await listeners.alarm({ name: "dealerpilot-messenger-refresh" });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.deepEqual(
+    calls.tabs
+      .filter((call) => call.type === "sendMessage")
+      .map(({ tabId, message }) => ({ tabId, type: message.type })),
+    [
+      { tabId: 77, type: "REFRESH_ACTIVE_MESSENGER_CONVERSATION" },
+      { tabId: 78, type: "REFRESH_ACTIVE_MESSENGER_CONVERSATION" },
+    ],
+  );
 });
 
 test("background deduplicates identical intakes inside the extension", async () => {
