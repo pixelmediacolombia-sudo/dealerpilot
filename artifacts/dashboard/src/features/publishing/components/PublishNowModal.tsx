@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAccount } from "@/app/AuthGate";
 import {
   Sheet,
   SheetContent,
@@ -72,6 +73,7 @@ function StepRow({ label, state }: {
 
 export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }: PublishNowModalProps) {
   const isOpen = vehicleId !== null;
+  const { dealerId } = useAccount();
   const [jobId, setJobId] = useState<number | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
@@ -85,23 +87,42 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
     setWakeDebug(null);
     setJobVisibleToExt(null);
 
-    // Check whether the job is visible to the extension right now.
+    const dealerQuery = dealerId ? `?dealerId=${encodeURIComponent(String(dealerId))}` : "";
+
+    // Read the extension identity for the active dealer before checking the
+    // queue. Without this scope the diagnostic falls back to Alpha and can
+    // report that a valid Lucki job is invisible.
+    let extId: string | undefined;
     try {
-      const nextData = await fetch("/api/publishing/jobs/next")
+      const status = await fetch(`/api/extension/connect-status${dealerQuery}`)
         .then((r) => r.json())
         .catch(() => null);
-      setJobVisibleToExt(nextData?.job?.id === newJobId);
+      extId = typeof status?.extensionId === "string" ? status.extensionId : undefined;
+
+      if (extId) {
+        const assignedData = await fetch(
+          `/api/publishing/jobs/assigned?dealerId=${encodeURIComponent(String(dealerId))}&extensionId=${encodeURIComponent(extId)}`,
+        )
+          .then((r) => r.json())
+          .catch(() => null);
+        setJobVisibleToExt(assignedData?.job?.id === newJobId);
+      } else {
+        setJobVisibleToExt(false);
+      }
     } catch {
       // ignore — visibility check is diagnostic only
     }
 
     try {
-      const status = await fetch("/api/extension/connect-status")
-        .then((r) => r.json())
-        .catch(() => null);
-      const extId: string | undefined = status?.extensionId;
       if (!extId) {
         setWakeDebug("Extension wake failed: no extensionId on file (extension may not be connected)");
+        return;
+      }
+      // The backend also stores a private queue identity for the extension.
+      // That value is valid for API claims but is not a Chrome runtime ID and
+      // must never be passed to chrome.runtime.sendMessage.
+      if (!/^[a-p]{32}$/.test(extId)) {
+        setWakeDebug("Extension wake skipped: waiting for the current Chrome extension heartbeat");
         return;
       }
       const cr = (window as { chrome?: { runtime?: { sendMessage?: Function; lastError?: { message?: string } } } })

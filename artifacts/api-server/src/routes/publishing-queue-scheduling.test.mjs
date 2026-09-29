@@ -4,6 +4,10 @@ import { test } from "node:test";
 import vm from "node:vm";
 
 const routeSource = readFileSync(new URL("./publishing.ts", import.meta.url), "utf8");
+const publishNowModalSource = readFileSync(
+  new URL("../../../dashboard/src/features/publishing/components/PublishNowModal.tsx", import.meta.url),
+  "utf8",
+);
 const queueCompactionSource = readFileSync(
   new URL("../publishing/autoPublishQueueCompaction.ts", import.meta.url),
   "utf8",
@@ -194,6 +198,14 @@ test("assigned endpoint can map the extension storage id to the online Chrome co
   );
   assert.match(routeSource, /if \(online\?\.name\) aliases\.add\(online\.name\);/);
   assert.match(routeSource, /if \(online\?\.chrome_extension_id\) aliases\.add\(online\.chrome_extension_id\);/);
+});
+
+test("Publish Now diagnostics stay scoped to the active dealer and do not wake an internal queue id", () => {
+  assert.match(publishNowModalSource, /useAccount/);
+  assert.match(publishNowModalSource, /connect-status\$\{dealerQuery\}/);
+  assert.match(publishNowModalSource, /jobs\/assigned\?dealerId=/);
+  assert.doesNotMatch(publishNowModalSource, /fetch\("\/api\/publishing\/jobs\/next"\)/);
+  assert.match(publishNowModalSource, /waiting for the current Chrome extension heartbeat/);
 });
 
 test("assigned polling repairs due jobs after the extension identifier changes", () => {
