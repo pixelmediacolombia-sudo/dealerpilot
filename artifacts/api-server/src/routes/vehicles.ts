@@ -13,6 +13,7 @@ import {
 import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { syncSoldMarketplaceState } from "../marketplace/soldState";
 import { resolveDealerId } from "./auth";
+import { getDealerDefaultLotLocation } from "../lib/dealer";
 
 const router: IRouter = Router();
 
@@ -139,7 +140,8 @@ router.get("/vehicles/stats", async (req, res) => {
 
   // Two queries in parallel: filtered stats + global unknown-lot count.
   // noLot is always dealer-wide so the warning shows regardless of location tab.
-  const KNOWN_LOTS = new Set(["Manassas"]);
+  const configuredLot = getDealerDefaultLotLocation(dealerId);
+  const KNOWN_LOTS = new Set(["Manassas", configuredLot].filter(Boolean));
   const [rows, allLotRows] = await Promise.all([
     db
       .select({ status: vehiclesTable.status })
