@@ -242,6 +242,15 @@ test("publishing worker rebinds due unclaimed jobs to each online dealer extensi
   assert.match(workerSource, /Publishing worker rebound unclaimed jobs to online dealer extensions/);
 });
 
+test("orchestrator wakes Lucki batches from any recent dealer-scoped extension heartbeat", () => {
+  assert.match(orchestratorSource, /function findOnlineDealerIds\(\)/);
+  assert.match(orchestratorSource, /eq\(extensionConnectionsTable\.status,\s*"online"\)/);
+  assert.match(orchestratorSource, /inArray\(publishingJobsTable\.dealerId,\s*onlineDealerIds\)/);
+  assert.match(orchestratorSource, /inArray\(autoPublishSettingsTable\.dealerId,\s*onlineDealerIds\)/);
+  assert.match(orchestratorSource, /activeAutoPlan = settings\.find/);
+  assert.match(orchestratorSource, /dealer-scoped online set/);
+});
+
 test("publishing worker repairs legacy stale assignments before selecting the next vehicle", () => {
   assert.match(workerSource, /repairLegacyStaleAssignedJobs/);
   assert.match(workerSource, /status:\s*"Retry"/);

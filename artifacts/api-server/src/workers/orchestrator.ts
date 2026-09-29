@@ -291,9 +291,27 @@ async function findOnlineExtension(dealerId = DEALER_ID): Promise<boolean> {
   return rows.some((r) => r.lastHeartbeatAt && r.lastHeartbeatAt.getTime() >= cutoff && r.status === "online");
 }
 
+async function findOnlineDealerIds(): Promise<number[]> {
+  const rows = await db
+    .select({ dealerId: extensionConnectionsTable.dealerId, lastHeartbeatAt: extensionConnectionsTable.lastHeartbeatAt })
+    .from(extensionConnectionsTable)
+    .where(eq(extensionConnectionsTable.status, "online"));
+  const cutoff = Date.now() - ONLINE_THRESHOLD_MS;
+  return [...new Set(
+    rows
+      .filter((row) => Number.isInteger(row.dealerId) && row.dealerId! > 0)
+      .filter((row) => row.lastHeartbeatAt && row.lastHeartbeatAt.getTime() >= cutoff)
+      .map((row) => row.dealerId!),
+  )];
+}
+
 async function decidePublishing(): Promise<WorkerDecision> {
-  const extensionOnline = await findOnlineExtension(DEALER_ID);
-  if (!extensionOnline) {
+  // The publishing worker assigns each job to the online extension belonging
+  // to that job's dealer. The orchestrator must therefore use the same
+  // dealer-scoped online set; checking Alpha alone leaves Lucki batches
+  // active but untouched whenever Alpha is offline.
+  const onlineDealerIds = await findOnlineDealerIds();
+  if (onlineDealerIds.length === 0) {
     return { workerId: "publishing", action: "SKIP", reason: "extension offline", dependencyStatus: "extension offline" };
   }
 
@@ -303,7 +321,7 @@ async function decidePublishing(): Promise<WorkerDecision> {
     .from(publishingJobsTable)
     .where(
       and(
-        eq(publishingJobsTable.dealerId, DEALER_ID),
+        inArray(publishingJobsTable.dealerId, onlineDealerIds),
         or(
           ...QUEUED_JOB_STATUSES.map((s) => eq(publishingJobsTable.status, s)),
           and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, now)),
@@ -315,22 +333,33 @@ async function decidePublishing(): Promise<WorkerDecision> {
   const queued = queueRow?.n ?? 0;
 
   if (queued === 0) {
-    const [settings] = await db
+    const settings = await db
       .select()
       .from(autoPublishSettingsTable)
-      .where(eq(autoPublishSettingsTable.dealerId, DEALER_ID));
-    if (settings?.enabled && !settings.requireApproval) {
+      .where(inArray(autoPublishSettingsTable.dealerId, onlineDealerIds));
+    const activeAutoPlan = settings.find((row) => row.enabled && !row.requireApproval);
+    if (activeAutoPlan) {
       return {
         workerId: "publishing",
         action: "RUN",
-        reason: "auto-publish plan active, extension online",
-        dependencyStatus: "extension online, auto plan active",
+        reason: `auto-publish plan active for dealer ${activeAutoPlan.dealerId}, extension online`,
+        dependencyStatus: `extension online for dealer${onlineDealerIds.length === 1 ? "" : "s"} ${onlineDealerIds.join(", ")}, auto plan active`,
       };
     }
-    return { workerId: "publishing", action: "SKIP", reason: "no approved vehicles in queue", dependencyStatus: "extension online, queue empty" };
+    return {
+      workerId: "publishing",
+      action: "SKIP",
+      reason: "no approved vehicles in queue",
+      dependencyStatus: `extension online for dealer${onlineDealerIds.length === 1 ? "" : "s"} ${onlineDealerIds.join(", ")}, queue empty`,
+    };
   }
 
-  return { workerId: "publishing", action: "RUN", reason: `${queued} job${queued === 1 ? "" : "s"} queued, extension online`, dependencyStatus: "extension online" };
+  return {
+    workerId: "publishing",
+    action: "RUN",
+    reason: `${queued} job${queued === 1 ? "" : "s"} queued for online dealer extension${onlineDealerIds.length === 1 ? "" : "s"}`,
+    dependencyStatus: `extension online for dealer${onlineDealerIds.length === 1 ? "" : "s"} ${onlineDealerIds.join(", ")}`,
+  };
 }
 
 async function decideLearning(intervalMs: number): Promise<WorkerDecision> {
