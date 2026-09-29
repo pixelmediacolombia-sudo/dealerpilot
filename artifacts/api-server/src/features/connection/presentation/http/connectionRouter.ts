@@ -6,9 +6,10 @@ import {
   leadsTable,
   conversationsTable,
 } from "@workspace/db";
-import { desc, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { getNextSyncAt } from "../../../../inventory/scheduler";
 import { isRecentHeartbeat } from "../../application/isRecentHeartbeat";
+import { getAuthenticatedDealerId } from "../../../../routes/auth";
 
 const router: IRouter = Router();
 
@@ -86,9 +87,15 @@ router.get("/connection-center", async (req, res) => {
     };
   }
 
+  const requestedDealerId = getAuthenticatedDealerId(res)
+    ?? Number(req.query.dealerId ?? req.header("x-dealer-id"));
+  const dealerId = Number.isInteger(requestedDealerId) && requestedDealerId > 0
+    ? requestedDealerId
+    : null;
   const [ext] = await db
     .select()
     .from(extensionConnectionsTable)
+    .where(dealerId ? eq(extensionConnectionsTable.dealerId, dealerId) : undefined)
     .orderBy(desc(extensionConnectionsTable.lastHeartbeatAt))
     .limit(1);
 

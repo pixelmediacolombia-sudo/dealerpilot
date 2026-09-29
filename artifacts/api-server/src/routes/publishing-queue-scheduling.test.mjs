@@ -541,7 +541,10 @@ test("sold inventory feeds Marketplace and extension state so vehicles cannot be
   assert.match(extensionRouteSource, /\/extension\/marketplace-sold-actions/);
   assert.match(extensionRouteSource, /eq\(marketplaceListingsTable\.status, "Sold"\)/);
   assert.match(extensionRouteSource, /eq\(vehiclesTable\.status, "Sold\/Removed"\)/);
-  assert.match(queueClientSource, /apiGet\("\/api\/extension\/marketplace-sold-actions"\)/);
+  assert.match(
+    queueClientSource,
+    /apiGet\(`\/api\/extension\/marketplace-sold-actions\$\{buildExtensionIdentityQuery\(settings\)\}`\)/,
+  );
   assert.match(queueClientSource, /activeSoldAction: action/);
   assert.match(queueClientSource, /MARKETPLACE_SOLD_ACTION_OPENED/);
   assert.match(publisherFlowSource, /const isMarketplaceItem = \/\\\/marketplace\\\/item\\\//);

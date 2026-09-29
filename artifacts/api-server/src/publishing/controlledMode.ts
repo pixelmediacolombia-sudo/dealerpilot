@@ -99,8 +99,11 @@ export function resolvePublishMode(dealerAutoClickPublish: boolean): "Assisted" 
   return "Assisted";
 }
 
-export async function isExtensionOnline(): Promise<boolean> {
-  const rows = await db.select().from(extensionConnectionsTable);
+export async function isExtensionOnline(dealerId?: number): Promise<boolean> {
+  const rows = await db
+    .select()
+    .from(extensionConnectionsTable)
+    .where(dealerId ? eq(extensionConnectionsTable.dealerId, dealerId) : undefined);
   const cutoff = Date.now() - EXTENSION_ONLINE_THRESHOLD_MS;
   return rows.some(
     (r) => r.status === "online" && r.lastHeartbeatAt != null && r.lastHeartbeatAt.getTime() >= cutoff,
@@ -189,7 +192,7 @@ export async function checkPublishGuardrails(params: {
   // 5. Extension must be online for immediate/Controlled dispatch — a job that
   // auto-clicks Publish with nobody able to run it is not safe to create.
   if (requireExtensionOnline) {
-    const online = await isExtensionOnline();
+    const online = await isExtensionOnline(vehicle.dealerId);
     if (!online) {
       return {
         ok: false,

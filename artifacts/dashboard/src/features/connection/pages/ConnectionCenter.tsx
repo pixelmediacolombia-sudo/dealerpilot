@@ -16,6 +16,7 @@ import {
   type WorkerStatus,
   type WorkerDecision,
 } from "@workspace/api-client-react";
+import { useAccount } from "@/app/AuthGate";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -725,8 +726,7 @@ const SERVICES = [
 export function ConnectionCenter() {
   const queryClient = useQueryClient();
   const [isConnecting, setIsConnecting] = useState(false);
-  const { data: dealersData } = useListDealers();
-  const dealerId = dealersData?.dealers?.[0]?.id;
+  const { dealerId } = useAccount();
   const { data: dealer } = useGetDealer(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getGetDealerQueryKey(dealerId!) },
   });
@@ -734,7 +734,8 @@ export function ConnectionCenter() {
 
   const { data: status, isLoading } = useGetConnectionStatus({
     query: {
-      queryKey: getGetConnectionStatusQueryKey(),
+      queryKey: [...getGetConnectionStatusQueryKey(), dealerId],
+      enabled: !!dealerId,
       // Poll faster while a connect request is pending
       refetchInterval: (query) => {
         const d = query.state.data;
@@ -742,9 +743,11 @@ export function ConnectionCenter() {
         return 15000;
       },
     },
+    request: { headers: { "x-dealer-id": String(dealerId ?? "") } },
   });
 
   const { mutate: doConnect } = useConnectMarketplace({
+    request: { headers: { "x-dealer-id": String(dealerId ?? "") } },
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetConnectionStatusQueryKey() });

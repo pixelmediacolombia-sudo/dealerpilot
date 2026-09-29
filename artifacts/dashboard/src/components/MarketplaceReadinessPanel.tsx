@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { useAccount } from "@/app/AuthGate";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -97,15 +98,19 @@ function deriveState(data: ConnectionStatus | undefined) {
 
 export function MarketplaceReadinessPanel() {
   const queryClient = useQueryClient();
+  const { dealerId } = useAccount();
 
   const { data, isLoading } = useGetConnectionStatus({
     query: {
-      queryKey: getGetConnectionStatusQueryKey(),
+      queryKey: [...getGetConnectionStatusQueryKey(), dealerId],
+      enabled: !!dealerId,
       refetchInterval: 12000,
     },
+    request: { headers: { "x-dealer-id": String(dealerId ?? "") } },
   });
 
   const { mutate: connectMarketplace, isPending } = useConnectMarketplace({
+    request: { headers: { "x-dealer-id": String(dealerId ?? "") } },
     mutation: {
       onSuccess: () => {
         toast({

@@ -161,11 +161,15 @@ async function getExtRow(identity: ExtensionIdentity = {}) {
         eq(extensionConnectionsTable.dealerId, normalized.dealerId),
         eq(extensionConnectionsTable.sessionId, normalized.sessionId),
       )
-    : eq(extensionConnectionsTable.name, EXTENSION_NAME);
+    : normalized.dealerId
+      ? eq(extensionConnectionsTable.dealerId, normalized.dealerId)
+      : eq(extensionConnectionsTable.name, EXTENSION_NAME);
   const [ext] = await db
     .select()
     .from(extensionConnectionsTable)
-    .where(conditions);
+    .where(conditions)
+    .orderBy(desc(extensionConnectionsTable.lastHeartbeatAt))
+    .limit(1);
   return ext ?? null;
 }
 
@@ -251,7 +255,14 @@ router.post("/extension/heartbeat", async (req, res) => {
 // ── Connect Acknowledge (clears connectRequested immediately after extension opens the tab) ──
 
 router.post("/extension/connect-acknowledge", async (req, res) => {
-  await upsertExtRow({ connectRequestedAt: null, connectAction: null });
+  const dealerId = Number(req.body?.dealerId ?? req.header("x-dealer-id"));
+  const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : undefined;
+  await upsertExtRow({
+    ...(Number.isInteger(dealerId) && dealerId > 0 ? { dealerId } : {}),
+    ...(sessionId ? { sessionId } : {}),
+    connectRequestedAt: null,
+    connectAction: null,
+  });
   req.log.info("Connect-acknowledge: connectRequested cleared by extension");
   res.json({ ok: true });
 });
@@ -260,6 +271,8 @@ router.post("/extension/connect-acknowledge", async (req, res) => {
 
 const ConnectMarketplaceBody = z.object({
   action: z.enum(["marketplace", "login"]).optional().default("marketplace"),
+  dealerId: z.number().int().positive().optional(),
+  sessionId: z.string().trim().min(1).max(160).optional(),
 });
 
 router.post("/extension/connect-marketplace", async (req, res) => {
@@ -268,7 +281,12 @@ router.post("/extension/connect-marketplace", async (req, res) => {
     res.status(400).json({ error: "Invalid body" });
     return;
   }
+  const headerDealerId = Number(req.header("x-dealer-id"));
+  const dealerId = parsed.data.dealerId
+    ?? (Number.isInteger(headerDealerId) && headerDealerId > 0 ? headerDealerId : undefined);
   const row = await upsertExtRow({
+    ...(dealerId !== undefined ? { dealerId } : {}),
+    ...(parsed.data.sessionId !== undefined ? { sessionId: parsed.data.sessionId } : {}),
     connectRequestedAt: new Date(),
     connectAction: parsed.data.action,
   });
@@ -279,7 +297,12 @@ router.post("/extension/connect-marketplace", async (req, res) => {
 // ── Connect Status (polled by extension alarm) ─────────────────────────────────
 
 router.get("/extension/connect-status", async (req, res) => {
-  const ext = await getExtRow();
+  const dealerId = Number(req.query.dealerId ?? req.header("x-dealer-id"));
+  const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : undefined;
+  const ext = await getExtRow({
+    ...(Number.isInteger(dealerId) && dealerId > 0 ? { dealerId } : {}),
+    ...(sessionId ? { sessionId } : {}),
+  });
   const CONNECT_WINDOW_MS = 5 * 60 * 1000; // ignore stale requests > 5 min
   const connectRequested =
     !!ext?.connectRequestedAt &&
@@ -298,7 +321,11 @@ router.get("/extension/connect-status", async (req, res) => {
 // Dashboard feedback channel for the extension/operator: when DealerPilot marks
 // inventory Sold/Removed, the extension can surface the live Marketplace URL so
 // the Facebook listing is also marked Sold and the vehicle cannot be republished.
-router.get("/extension/marketplace-sold-actions", async (_req, res) => {
+router.get("/extension/marketplace-sold-actions", async (req, res) => {
+  const dealerId = Number(req.query.dealerId ?? req.header("x-dealer-id"));
+  const dealerFilter = Number.isInteger(dealerId) && dealerId > 0
+    ? eq(marketplaceListingsTable.dealerId, dealerId)
+    : undefined;
   const rows = await db
     .select({
       listingId: marketplaceListingsTable.id,
@@ -319,6 +346,7 @@ router.get("/extension/marketplace-sold-actions", async (_req, res) => {
         eq(marketplaceListingsTable.status, "Sold"),
         eq(vehiclesTable.status, "Sold/Removed"),
         isNotNull(marketplaceListingsTable.listingUrl),
+        dealerFilter,
       ),
     )
     .orderBy(desc(marketplaceListingsTable.updatedAt))
@@ -335,6 +363,8 @@ router.get("/extension/marketplace-sold-actions", async (_req, res) => {
 
 const MarketplaceSoldActionReportBody = z.object({
   extensionId: z.string().min(1).optional(),
+  dealerId: z.number().int().positive().optional(),
+  sessionId: z.string().trim().min(1).max(160).optional(),
   status: z.enum(["completed", "failed"]),
   error: z.string().trim().max(500).optional(),
 });
@@ -355,6 +385,10 @@ router.post("/extension/marketplace-sold-actions/:listingId/report", async (req,
     .limit(1);
   if (!row || row.vehicle.status !== "Sold/Removed") {
     res.status(404).json({ error: "Sold Marketplace listing not found" });
+    return;
+  }
+  if (parsed.data.dealerId !== undefined && row.vehicle.dealerId !== parsed.data.dealerId) {
+    res.status(403).json({ error: "Dealer scope mismatch" });
     return;
   }
 

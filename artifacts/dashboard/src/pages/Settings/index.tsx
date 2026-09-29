@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { AppLayout } from "@/shared/layout/AppLayout";
 import { 
-  useListDealers, 
   useGetDealer, 
   useUpdateDealer, 
   useSyncDealerFeed,
@@ -10,6 +9,7 @@ import {
   useListFeedRuns,
   getListFeedRunsQueryKey,
   getGetDealerQueryKey,
+  getGetConnectionStatusQueryKey,
   getListVehiclesQueryKey,
   getGetVehicleStatsQueryKey
 } from "@workspace/api-client-react";
@@ -27,19 +27,22 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { PageHeader, SectionCard, StatusPulse } from "@/shared/ui";
 import { cn } from "@/lib/utils";
+import { useAccount } from "@/app/AuthGate";
 
 export function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Get dealer
-  const { data: dealersData } = useListDealers();
-  const dealerId = dealersData?.dealers?.[0]?.id;
+  const { dealerId } = useAccount();
   const { data: dealer, isLoading: dealerLoading } = useGetDealer(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getGetDealerQueryKey(dealerId!) }
   });
 
-  const { data: connections } = useGetConnectionStatus();
+  const { data: connections } = useGetConnectionStatus({
+    query: { queryKey: [...getGetConnectionStatusQueryKey(), dealerId], enabled: !!dealerId },
+    request: { headers: { "x-dealer-id": String(dealerId ?? "") } },
+  });
   const { data: feedRunsData } = useListFeedRuns(dealerId!, {
     query: { enabled: !!dealerId, queryKey: getListFeedRunsQueryKey(dealerId!) }
   });

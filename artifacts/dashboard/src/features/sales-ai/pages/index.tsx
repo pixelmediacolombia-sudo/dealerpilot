@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatMileage } from "@/lib/format";
+import { useAccount } from "@/app/AuthGate";
 
 const API_BASE = "/api";
 const DEALER_ID = 1;
@@ -634,12 +635,15 @@ function LeadPanel({ convId }: { convId: number }) {
 
 function EmptyPane() {
   const [, navigate] = useLocation();
+  const { dealerId } = useAccount();
   const { data: connectionStatus } = useGetConnectionStatus({
     query: {
-      queryKey: getGetConnectionStatusQueryKey(),
+      queryKey: [...getGetConnectionStatusQueryKey(), dealerId],
+      enabled: !!dealerId,
       refetchInterval: 8000,
       refetchOnWindowFocus: "always",
     },
+    request: { headers: { "x-dealer-id": String(dealerId ?? "") } },
   });
   const extStatus = (connectionStatus?.chromeExtension as { status?: string } | null | undefined)?.status?.toLowerCase() ?? "";
   const extOnline = extStatus === "connected" || extStatus === "online";

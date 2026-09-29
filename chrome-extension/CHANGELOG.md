@@ -1,5 +1,10 @@
 # DealerPilot AI Extension — Changelog
 
+## v1.4.10
+
+- Keeps Marketplace connection state, connect requests, and sold-listing actions scoped to the configured dealer and browser window.
+- Prevents Alpha and Lucki Mazda heartbeats from changing each other's Marketplace status.
+
 ## v1.4.9
 
 - Keeps Marketplace queue polling and the active job tied to the configured

@@ -232,11 +232,13 @@ export function GlobalHeader() {
 
   const { data: connData } = useGetConnectionStatus({
     query: {
-      queryKey: getGetConnectionStatusQueryKey(),
+      queryKey: [...getGetConnectionStatusQueryKey(), dealerId],
+      enabled: !!dealerId,
       refetchInterval: 5000,
       refetchIntervalInBackground: true,
       refetchOnWindowFocus: "always",
     },
+    request: { headers: { "x-dealer-id": String(dealerId ?? "") } },
   });
   const { data: feedRunsData } = useListFeedRuns(dealerId ?? 1, {
     query: { queryKey: getListFeedRunsQueryKey(dealerId ?? 1), enabled: true, staleTime: 60000 },
@@ -249,6 +251,7 @@ export function GlobalHeader() {
     },
   });
   const { mutate: connectMarketplace, isPending } = useConnectMarketplace({
+    request: { headers: { "x-dealer-id": String(dealerId ?? "") } },
     mutation: {
       onSuccess: () => {
         toast({ title: "Connect request sent", description: "Extension is opening Facebook Marketplace." });

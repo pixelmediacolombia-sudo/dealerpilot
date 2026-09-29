@@ -3,6 +3,7 @@ const LEGACY_PUBLIC_BACKEND_URL = "https://1987dealerpilot.com";
 const LEGACY_RENDER_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
 const REPLIT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 const WINDOW_SETTINGS_PREFIX = "publisherSettingsWindow:";
+const WINDOW_PAGE_STATE_PREFIX = "publisherFacebookStateWindow:";
 
 function normalizeBackendUrl(value) {
   const normalized = String(value || "").trim().replace(/\/+$/, "");
@@ -70,6 +71,16 @@ async function resolveWindowId(message = {}, sender = {}) {
 function windowSettingsKey(windowId) {
   const id = validWindowId(windowId);
   return id === null ? null : `${WINDOW_SETTINGS_PREFIX}${id}`;
+}
+
+function windowPageStateKey(windowId) {
+  const id = validWindowId(windowId);
+  return id === null ? null : `${WINDOW_PAGE_STATE_PREFIX}${id}`;
+}
+
+function windowPageStateSummaryKey(windowId) {
+  const key = windowPageStateKey(windowId);
+  return key ? `${key}:summary` : null;
 }
 
 async function getPublisherSettings(windowId = null) {
@@ -180,6 +191,14 @@ function buildQueueScopeQuery(settings, extensionId) {
   return `?${params.toString()}`;
 }
 
+function buildExtensionIdentityQuery(settings) {
+  const params = new URLSearchParams({
+    dealerId: String(settings.dealerId),
+    sessionId: settings.sessionId || `publisher-window-${settings.windowId ?? "legacy"}`,
+  });
+  return `?${params.toString()}`;
+}
+
 function getQueueDecision(job, extra = {}) {
   const nowMs = Date.now();
   const scheduledMs = job?.scheduledAt ? new Date(job.scheduledAt).getTime() : null;
@@ -213,9 +232,12 @@ async function recordQueueDecision(event, job, extra = {}) {
 
 // ---- Clear connectRequested on backend immediately after opening connection tab ----
 // Prevents repeated tab-opens on every 15-second poll if the FB page doesn't load.
-async function clearConnectRequested() {
+async function clearConnectRequested(settings) {
   try {
-    await apiPost("/api/extension/connect-acknowledge", {});
+    await apiPost("/api/extension/connect-acknowledge", {
+      dealerId: settings.dealerId,
+      sessionId: settings.sessionId || `publisher-window-${settings.windowId ?? "legacy"}`,
+    });
   } catch (e) {
     console.warn("[DealerPilot AI] Failed to clear connectRequested:", e);
   }
@@ -273,11 +295,14 @@ function aggregateFacebookPageStates(pageStates, nowMs = Date.now()) {
   };
 }
 
-async function saveFacebookPageState(tabId, state, tabUrl) {
+async function saveFacebookPageState(tabId, state, tabUrl, windowId = null) {
   if (!Number.isInteger(tabId) || tabId <= 0) {
     return { ok: false, reason: "sender_tab_missing" };
   }
-  const { facebookPageStates = {} } = await chrome.storage.local.get("facebookPageStates");
+  const resolvedWindowId = validWindowId(windowId);
+  const pageStateKey = windowPageStateKey(resolvedWindowId) || "facebookPageStates";
+  const stored = await chrome.storage.local.get(pageStateKey);
+  const facebookPageStates = stored[pageStateKey] || {};
   const reportedAt = new Date().toISOString();
   facebookPageStates[String(tabId)] = {
     fbLoggedIn: state?.fbLoggedIn === true,
@@ -289,21 +314,23 @@ async function saveFacebookPageState(tabId, state, tabUrl) {
     reportedAt,
   };
   const aggregate = aggregateFacebookPageStates(facebookPageStates);
-  await chrome.storage.local.set({
-    facebookPageStates: aggregate.pageStates,
-    ...aggregate.patch,
-  });
+  const summaryKey = windowPageStateSummaryKey(resolvedWindowId);
+  await chrome.storage.local.set(summaryKey
+    ? { [pageStateKey]: aggregate.pageStates, [summaryKey]: aggregate.patch }
+    : { facebookPageStates: aggregate.pageStates, ...aggregate.patch });
   return { ok: true, ...aggregate.patch };
 }
 
-async function removeFacebookPageState(tabId) {
-  const { facebookPageStates = {} } = await chrome.storage.local.get("facebookPageStates");
+async function removeFacebookPageState(tabId, windowId = null) {
+  const pageStateKey = windowPageStateKey(windowId) || "facebookPageStates";
+  const stored = await chrome.storage.local.get(pageStateKey);
+  const facebookPageStates = stored[pageStateKey] || {};
   delete facebookPageStates[String(tabId)];
   const aggregate = aggregateFacebookPageStates(facebookPageStates);
-  await chrome.storage.local.set({
-    facebookPageStates: aggregate.pageStates,
-    ...aggregate.patch,
-  });
+  const summaryKey = windowPageStateSummaryKey(windowId);
+  await chrome.storage.local.set(summaryKey
+    ? { [pageStateKey]: aggregate.pageStates, [summaryKey]: aggregate.patch }
+    : { facebookPageStates: aggregate.pageStates, ...aggregate.patch });
 }
 
 async function detectFacebookTabState(windowId = null) {
@@ -326,18 +353,18 @@ async function detectFacebookTabState(windowId = null) {
       }
       if (state.marketplaceConnected) break;
     }
-    if (!best) return {};
-
     const now = new Date().toISOString();
     const patch = {
-      fbLoggedIn: best.fbLoggedIn,
-      marketplaceConnected: best.marketplaceConnected,
-      marketplaceDetected: best.marketplaceDetected,
-      marketplacePath: best.marketplacePath,
-      marketplaceUrl: best.marketplaceUrl,
-      marketplaceDetectedAt: best.marketplaceDetected ? now : null,
+      fbLoggedIn: best?.fbLoggedIn ?? null,
+      marketplaceConnected: best?.marketplaceConnected ?? null,
+      marketplaceDetected: best?.marketplaceDetected ?? false,
+      marketplacePath: best?.marketplacePath ?? null,
+      marketplaceUrl: best?.marketplaceUrl ?? null,
+      marketplaceDetectedAt: best?.marketplaceDetected ? now : null,
+      reportedAt: now,
     };
-    await chrome.storage.local.set(patch);
+    const summaryKey = windowPageStateSummaryKey(windowId);
+    await chrome.storage.local.set(summaryKey ? { [summaryKey]: patch } : patch);
     return patch;
   } catch (err) {
     console.warn("[DealerPilot AI] Facebook tab state detection failed", err);
@@ -382,13 +409,15 @@ async function sendHeartbeatSnapshot(windowId = null) {
   const settings = await getPublisherSettings(windowId);
   const base = settings.backendUrl;
   const detected = await detectFacebookTabState(windowId);
-  const { fbLoggedIn, marketplaceConnected } = await chrome.storage.local.get([
-    "fbLoggedIn",
-    "marketplaceConnected",
-  ]);
-  const resolvedFbLoggedIn = detected.fbLoggedIn ?? fbLoggedIn ?? null;
-  const resolvedMarketplaceConnected =
-    detected.marketplaceConnected ?? marketplaceConnected ?? null;
+  const summaryKey = windowPageStateSummaryKey(windowId);
+  const stored = await chrome.storage.local.get(summaryKey || ["fbLoggedIn", "marketplaceConnected"]);
+  const storedState = summaryKey ? (stored[summaryKey] || {}) : stored;
+  const resolvedFbLoggedIn = detected.fbLoggedIn !== undefined
+    ? detected.fbLoggedIn
+    : storedState.fbLoggedIn ?? null;
+  const resolvedMarketplaceConnected = detected.marketplaceConnected !== undefined
+    ? detected.marketplaceConnected
+    : storedState.marketplaceConnected ?? null;
   const now = new Date().toISOString();
   const heartbeatUrl = `${base}/api/extension/heartbeat`;
 
@@ -451,7 +480,7 @@ const handlers = {
   },
 
   async PAGE_STATE_REPORT(message, sender) {
-    return saveFacebookPageState(sender?.tab?.id, message?.state, sender?.tab?.url);
+    return saveFacebookPageState(sender?.tab?.id, message?.state, sender?.tab?.url, sender?.tab?.windowId);
   },
 
   async NAVIGATE_TO_MARKETPLACE_SELLER_LISTINGS(_message, sender) {
@@ -791,6 +820,8 @@ const handlers = {
   // ---- Marketplace Connection flow ----
 
   async CONNECT_MARKETPLACE(message) {
+    const windowId = await resolveWindowId(message);
+    const settings = await getPublisherSettings(windowId);
     const action = message?.action || "marketplace";
     const url = action === "login" ? FACEBOOK_LOGIN_URL : MARKETPLACE_CREATE_URL;
 
@@ -806,19 +837,28 @@ const handlers = {
       timestamp: new Date().toISOString(),
     });
 
-    const tab = await chrome.tabs.create({ url, active: true });
-    await chrome.storage.local.set({ connectTabId: tab.id });
+    const createOptions = { url, active: true };
+    if (validWindowId(windowId) !== null) createOptions.windowId = validWindowId(windowId);
+    const tab = await chrome.tabs.create(createOptions);
+    await chrome.storage.local.set({
+      [windowPageStateSummaryKey(windowId) || "connectTabId"]: windowPageStateSummaryKey(windowId)
+        ? { connectTabId: tab.id, at: new Date().toISOString() }
+        : tab.id,
+    });
 
     // SAFETY: clear connectRequested on backend immediately after opening the tab.
     // Without this, every 15-second poll sees connectRequested=true and opens another tab.
-    await clearConnectRequested();
+    await clearConnectRequested(settings);
 
     return { ok: true, tabId: tab.id, action };
   },
 
   async FB_SESSION_REPORT(message, sender) {
     const { fbLoggedIn, marketplaceConnected } = message;
-    await chrome.storage.local.set({ fbLoggedIn, marketplaceConnected });
+    const windowId = await resolveWindowId(message, sender);
+    const summaryKey = windowPageStateSummaryKey(windowId);
+    const summary = { fbLoggedIn, marketplaceConnected, reportedAt: new Date().toISOString() };
+    await chrome.storage.local.set(summaryKey ? { [summaryKey]: summary } : summary);
     const extensionId = await getExtensionId();
     const settings = await getPublisherSettings(await resolveWindowId(message, sender));
     try {
@@ -946,7 +986,7 @@ const handlers = {
     );
     if (!nextJob) {
       try {
-        const soldData = await apiGet("/api/extension/marketplace-sold-actions");
+        const soldData = await apiGet(`/api/extension/marketplace-sold-actions${buildExtensionIdentityQuery(settings)}`);
         const action = Array.isArray(soldData?.actions) ? soldData.actions[0] : null;
         if (action?.listingUrl) {
           const { lastSoldActionOpenedId } = await chrome.storage.local.get("lastSoldActionOpenedId");
@@ -974,7 +1014,7 @@ const handlers = {
       // No publish job in queue — only now check connect-status so it never
       // interrupts an active Publish Now flow.
       try {
-        const connectStatus = await apiGet("/api/extension/connect-status");
+          const connectStatus = await apiGet(`/api/extension/connect-status${buildExtensionIdentityQuery(settings)}`);
         if (connectStatus.connectRequested) {
           return handlers.CONNECT_MARKETPLACE({ action: connectStatus.connectAction || "marketplace" });
         }
@@ -1424,8 +1464,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   handlers.POLL_ASSIGNED_JOB({ allWindows: true }).catch((err) => saveLastError(err));
 });
 
-chrome.tabs.onRemoved?.addListener((tabId) => {
-  removeFacebookPageState(tabId).catch((err) =>
+chrome.tabs.onRemoved?.addListener((tabId, removeInfo) => {
+  removeFacebookPageState(tabId, removeInfo?.windowId).catch((err) =>
     console.warn("[DealerPilot AI] Failed to remove closed Facebook tab state", err),
   );
 });

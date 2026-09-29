@@ -1344,10 +1344,11 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
   const gmOverrideSet = new Set(gmOverrides);
 
   const vehicleOrder = new Map(vehicleIds.map((id, index) => [id, index]));
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const vehicles = (await db
     .select(vehicleOperationalColumns)
     .from(vehiclesTable)
-    .where(inArray(vehiclesTable.id, vehicleIds)))
+    .where(and(inArray(vehiclesTable.id, vehicleIds), eq(vehiclesTable.dealerId, dealerId))))
     .sort(
       (a, b) =>
         (vehicleOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
@@ -1364,7 +1365,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
   const [dealerSettings] = await db
     .select()
     .from(autoPublishSettingsTable)
-    .where(eq(autoPublishSettingsTable.dealerId, DEALER_ID));
+    .where(eq(autoPublishSettingsTable.dealerId, dealerId));
   const mode = resolvePublishMode(dealerSettings?.autoClickPublish ?? false);
   const isImmediate = !scheduledAtStr;
 
@@ -1380,7 +1381,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
     );
   const alreadyQueued = new Set(activeJobs.map((j) => j.vehicleId));
   const duplicateConflictIds = await getDuplicateConflictVehicleIds();
-  const extensionOnline = mode === "Controlled" && isImmediate ? await isExtensionOnline() : true;
+  const extensionOnline = mode === "Controlled" && isImmediate ? await isExtensionOnline(dealerId) : true;
 
   // ── GM Coach + lot-location + duplicate-conflict + extension guardrails ────
   // Block any vehicle the GM has flagged HOLD or RECONSIDER unless the operator
@@ -1527,7 +1528,8 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
   if (claimableNow.length > 0 && extensionOnline) {
     try {
       const conn = await pool.query(
-        "select id, name, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+        "select id, name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+        [dealerId],
       );
       const row = conn.rows[0];
       if (row) {
@@ -1569,12 +1571,12 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     return;
   }
   const { vehicleId, gmOverride } = parsed.data;
-  const DEALER_ID = 1;
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
 
   const [vehicle] = await db
     .select(vehicleOperationalColumns)
     .from(vehiclesTable)
-    .where(and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, DEALER_ID)));
+    .where(and(eq(vehiclesTable.id, vehicleId), eq(vehiclesTable.dealerId, dealerId)));
   if (!vehicle) {
     res.status(404).json({ error: "Vehicle not found" });
     return;
@@ -1595,7 +1597,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     .set({ status: "Cancelled", failedReason: "Auto-cancelled: stale job older than 10 minutes" })
     .where(
       and(
-        eq(publishingJobsTable.dealerId, DEALER_ID),
+        eq(publishingJobsTable.dealerId, dealerId),
         eq(publishingJobsTable.source, "publish_now"),
         inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
         lt(publishingJobsTable.createdAt, STALE_THRESHOLD),
@@ -1609,6 +1611,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     .where(
       and(
         eq(publishingJobsTable.vehicleId, vehicleId),
+        eq(publishingJobsTable.dealerId, dealerId),
         inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES]),
       ),
     )
@@ -1642,7 +1645,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
       .insert(publishingJobsTable)
       .values({
         vehicleId,
-        dealerId: DEALER_ID,
+    dealerId,
         listingVersionId: null,
         mode,
         status: "Scheduled",
@@ -1677,7 +1680,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
     .insert(publishingJobsTable)
     .values({
       vehicleId,
-      dealerId: DEALER_ID,
+      dealerId,
       listingVersionId: null,
       mode,
       status: "Queued",
@@ -1694,7 +1697,8 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
   if (mode === "Controlled") {
     try {
       const conn = await pool.query(
-        "select id, name, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+        "select id, name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by last_heartbeat_at desc limit 1",
+        [dealerId],
       );
       const row = conn.rows[0];
       if (row) {

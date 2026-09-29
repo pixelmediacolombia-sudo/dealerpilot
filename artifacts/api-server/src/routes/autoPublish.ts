@@ -460,7 +460,7 @@ router.post("/auto-publish/batches", async (req, res) => {
   const mode = resolvePublishMode(dealerAutoPublishSettings?.autoClickPublish ?? false);
   const isImmediate = !scheduledAt;
   if (mode === "Controlled" && isImmediate) {
-    const online = await isExtensionOnline();
+    const online = await isExtensionOnline(dealerId);
     if (!online) {
       res.status(422).json({ error: "Chrome extension is offline — cannot dispatch a Controlled Mode batch.", code: "EXTENSION_OFFLINE" });
       return;
@@ -1396,7 +1396,11 @@ router.get("/auto-publish/extension-diagnostics", async (req, res) => {
   }
 
   // All extension connections
-  const connections = await db.select().from(extensionConnectionsTable).orderBy(desc(extensionConnectionsTable.lastHeartbeatAt));
+  const connections = await db
+    .select()
+    .from(extensionConnectionsTable)
+    .where(eq(extensionConnectionsTable.dealerId, dealerId))
+    .orderBy(desc(extensionConnectionsTable.lastHeartbeatAt));
   const onlineConnections = connections.filter((c) => c.status === "online");
   const latestConnection = connections[0] ?? null;
 
@@ -1548,7 +1552,10 @@ router.get("/auto-publish/launch-checklist", async (req, res) => {
     .limit(1);
 
   // 2. Extension installed (any connection ever seen)
-  const connections = await db.select().from(extensionConnectionsTable);
+  const connections = await db
+    .select()
+    .from(extensionConnectionsTable)
+    .where(eq(extensionConnectionsTable.dealerId, dealerId));
   const extensionInstalled = connections.length > 0;
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   const extensionOnline =

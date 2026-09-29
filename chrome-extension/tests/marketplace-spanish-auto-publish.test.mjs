@@ -315,7 +315,7 @@ test("Incomplete vehicles move to review and the queue continues before Facebook
   const preflightIndex = queueClient.indexOf("findMissingMarketplaceFields(payload)");
   const tabOpenIndex = queueClient.indexOf('logAudit("MARKETPLACE_TAB_OPENED"', preflightIndex);
   assert.ok(preflightIndex > -1 && tabOpenIndex > preflightIndex, "preflight must run before Facebook opens");
-  assert.match(queueClient, /return handlers\.POLL_ASSIGNED_JOB\(\)/);
+  assert.match(queueClient, /return handlers\.POLL_ASSIGNED_JOB\(\{ windowId \}\)/);
 });
 
 test("A repeated Facebook form failure is reviewed and wakes the next queue job", () => {

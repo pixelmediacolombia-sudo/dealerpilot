@@ -282,14 +282,17 @@ async function decidePhoto(): Promise<WorkerDecision> {
   };
 }
 
-async function findOnlineExtension(): Promise<boolean> {
-  const rows = await db.select().from(extensionConnectionsTable);
+async function findOnlineExtension(dealerId = DEALER_ID): Promise<boolean> {
+  const rows = await db
+    .select()
+    .from(extensionConnectionsTable)
+    .where(eq(extensionConnectionsTable.dealerId, dealerId));
   const cutoff = Date.now() - ONLINE_THRESHOLD_MS;
   return rows.some((r) => r.lastHeartbeatAt && r.lastHeartbeatAt.getTime() >= cutoff && r.status === "online");
 }
 
 async function decidePublishing(): Promise<WorkerDecision> {
-  const extensionOnline = await findOnlineExtension();
+  const extensionOnline = await findOnlineExtension(DEALER_ID);
   if (!extensionOnline) {
     return { workerId: "publishing", action: "SKIP", reason: "extension offline", dependencyStatus: "extension offline" };
   }
