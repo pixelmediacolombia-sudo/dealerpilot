@@ -369,6 +369,7 @@ type SalesReplyStage =
   | "open_question"
   | "availability"
   | "interest_confirmation"
+  | "clean_title_interest_confirmation"
   | "interest_declined"
   | "store_phone_requested"
   | "vehicle_link_request"
@@ -487,6 +488,18 @@ function historyContainsDealerPrompt(visibleMessages: string[], pattern: RegExp)
   return visibleMessages
     .map(parseConversationMessage)
     .some((message) => message?.role === "assistant" && pattern.test(normalizeIntentText(message.content)));
+}
+
+function historyContainsCleanTitleInterestPrompt(visibleMessages: string[]): boolean {
+  return visibleMessages
+    .map(parseConversationMessage)
+    .some((message) => {
+      if (message?.role !== "assistant") return false;
+      const content = normalizeIntentText(message.content);
+      return /\b(?:clean title|clear title|titulo limpio|t[ií]tulo limpio)\b/.test(content) &&
+        /\b(?:interested|interesa|interesad[oa])\b/.test(content) &&
+        /\?/.test(message.content);
+    });
 }
 
 const BUYER_PHONE_PROMPT_PATTERN = /best (?:phone )?number|what(?:'s| is) the best number|what number should we use|what number.*(?:reach|contact)|(?:a que|cual es el mejor|numero para).*(?:contact|comunicar)/;
@@ -803,6 +816,7 @@ function replyIncludesStorePhone(reply: string, storePhone: string): boolean {
 
 function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
   return stage === "store_phone_requested" ||
+    stage === "clean_title_interest_confirmation" ||
     stage === "open_question" ||
     stage === "advisor_question" ||
     stage === "question_repair" ||
@@ -1028,6 +1042,12 @@ function resolveSalesReplyStage(
     return "down_payment_request";
   }
   if (buyerPhoneAlreadyKnown && (askedForBuyerPhone || historyContainsDealerPrompt(visibleMessages, /interested|interesado|interesada/))) return "down_payment_request";
+  if (historyContainsCleanTitleInterestPrompt(visibleMessages) && buyerAcceptedInterest(latest)) {
+    return "clean_title_interest_confirmation";
+  }
+  if (historyContainsCleanTitleInterestPrompt(visibleMessages) && buyerDeclinedCurrentStep(latest)) {
+    return "interest_declined";
+  }
   if (hasStalledConversation(visibleMessages, currentMessage)) return "stalled_conversation_request_phone";
   if (buyerRequestedVisitOrTestDrive(latest) && (historyAskedCashOrVisit(history) || historyShowsFinancingDeclined(history))) {
     return "cash_visit_request_phone";
@@ -1146,9 +1166,11 @@ function buildRedactedCopyBrief(params: {
       factsToDeliver.push("payment_methods");
       break;
     case "clean_title":
+    case "clean_title_interest_confirmation":
     case "clean_title_and_warranty":
     case "warranty_info":
       if (params.hasCleanTitleInventory) factsToDeliver.push("clean_title");
+      if (params.stage === "clean_title_interest_confirmation") factsToDeliver.push(`dealer_phone=${params.storePhone}`);
       factsToDeliver.push("sales_agent_report");
       break;
     default:
@@ -1343,9 +1365,12 @@ function buildBaseSafeFallbackReply(
     if (stage === "document_requirements") {
       return `${knowledge("financingRequirements", "Para avanzar necesitamos identificación y comprobante de ingresos")}. ¿Cuentas con ambos?`;
     }
+    if (stage === "clean_title_interest_confirmation") {
+      return `¡Excelente! ¿Cuál es el mejor número de teléfono para comunicarnos contigo? También puedes llamar a Alpha Motorsports al ${storePhone}.`;
+    }
     if (stage === "clean_title") {
       return hasCleanTitleInventory
-        ? knowledge("title", "Todos nuestros vehículos son de título limpio")
+        ? `${knowledge("title", "Todos nuestros vehículos, incluido este vehículo, tienen título limpio")}. ¿Te interesa continuar con este vehículo?`
         : `Nuestros agentes de ventas tienen el reporte del ${vehicle} y pueden confirmar el título y los detalles de la garantía. ¿A qué número te enviamos el reporte?`;
     }
     if (stage === "clean_title_and_warranty") {
@@ -1472,9 +1497,12 @@ function buildBaseSafeFallbackReply(
     if (stage === "document_requirements") {
       return `${knowledge("financingRequirements", "To move forward, we need a valid ID and proof of income")}. Do you have both?`;
   }
+  if (stage === "clean_title_interest_confirmation") {
+    return `Great! What's the best phone number to reach you? You can also call Alpha Motorsports at ${storePhone}.`;
+  }
   if (stage === "clean_title") {
     return hasCleanTitleInventory
-      ? knowledge("title", "All our vehicles have a clean title")
+      ? `${knowledge("title", "All our vehicles, including this vehicle, have a clean title")}. Are you interested in proceeding with this vehicle?`
       : `Our sales agents have the report for the ${vehicle} and can confirm the title and warranty details. What number should we send the report to?`;
   }
   if (stage === "clean_title_and_warranty") {
@@ -1820,9 +1848,18 @@ function isAiReplyAligned(
       /requisitos|cuentas|tienes|have|both|ambos/.test(normalized) &&
       !/phone|number|tel[eé]fono|n[uú]mero/.test(normalized);
   }
+  if (stage === "clean_title_interest_confirmation") {
+    return /phone|number|tel[eé]fono|n[uú]mero/.test(normalized) &&
+      /(?:best|reach|contact|llamar|comunicar)/.test(normalized) &&
+      /\?/.test(reply) &&
+      replyIncludesStorePhone(reply, storePhone) &&
+      !/financ|financing/.test(normalized);
+  }
   if (stage === "clean_title") {
     if (hasCleanTitleInventory) {
       return /clean title|clear title|titulo limpio|t[ií]tulo limpio/.test(normalized) &&
+        /(?:are you interested|interested in proceeding|te interesa|interesad[oa])/.test(normalized) &&
+        /\?/.test(reply) &&
         !/phone|number|tel[eé]fono|n[uú]mero|warranty|carfax|report|reporte/.test(normalized);
     }
     return /confirm|confirmar|report|reporte|title|t[ií]tulo/.test(normalized) &&
@@ -2038,11 +2075,16 @@ function avoidRepeatedFallback(
         : `Our sales agents have the report for the ${vehicle} and can confirm the title and warranty details. What number should we send the report to?`;
     return reply;
   }
+  if (stage === "clean_title_interest_confirmation") {
+    return language === "es"
+      ? `¡Excelente! ¿Cuál es el mejor número de teléfono para comunicarnos contigo? También puedes llamar a Alpha Motorsports al ${configuredPhone}.`
+      : `Great! What's the best phone number to reach you? You can also call Alpha Motorsports at ${configuredPhone}.`;
+  }
   if (stage === "clean_title") {
     const reply = hasCleanTitleInventory
       ? language === "es"
-        ? `Sí, el ${vehicle} tiene título limpio. Nuestros agentes de ventas tienen el reporte del vehículo y pueden darte los detalles de la garantía. ¿A qué número te enviamos el reporte?`
-        : `Yes, the ${vehicle} has a clean title. Our sales agents have the vehicle report and can provide the warranty details. What number should we send the report to?`
+        ? `Sí, el ${vehicle} tiene título limpio. ¿Te interesa continuar con este vehículo?`
+        : `Yes, the ${vehicle} has a clean title. Are you interested in proceeding with this vehicle?`
       : language === "es"
         ? `Nuestros agentes de ventas tienen el reporte del ${vehicle} y pueden confirmar el título y los detalles de la garantía. ¿A qué número te enviamos el reporte?`
         : `Our sales agents have the report for the ${vehicle} and can confirm the title and warranty details. What number should we send the report to?`;
@@ -2073,6 +2115,7 @@ type AiReplyResult = {
 const SALES_REPLY_STAGES: readonly SalesReplyStage[] = [
   "open_question",
   "availability",
+  "clean_title_interest_confirmation",
   "store_phone_requested",
   "vehicle_link_request",
   "carfax_request",
@@ -2168,6 +2211,7 @@ QUALIFICATION FUNNEL FOR ALPHA MANASSAS:
 11. If the buyer asks for Alpha Motorsports' phone number directly, give the supplied dealership phone and close politely. Do not restart qualification in that reply.
 12. Keep exactly one short reply for the latest buyer turn. One idea, one question, except for an explicit handoff or closing reply that must not ask another question. Never repeat a question already answered in the history.
 13. Use the dealer configuration field hasCleanTitleInventory for title claims. When it is true, say directly that the vehicle has a clean title. When it is false, do not claim clean title. The vehicle report is held by our sales agents, who can provide warranty details. Do not invent specific warranty terms, price, mileage, approval, history, range, or financing terms.
+14. When a buyer asks about clean title and hasCleanTitleInventory is true, answer the title question and immediately ask whether they are interested in proceeding with that vehicle. If they answer affirmatively, ask for their phone number and include the supplied Alpha Motorsports dealership phone in the same reply.
 
 ADDRESS / DIRECTIONS HANDLING:
 - If the buyer asks for the address, directions, or location, confirm that the vehicle is available, provide the complete store address directly, give the dealership phone, and ask for the buyer's best phone number in the same reply.
@@ -2313,6 +2357,7 @@ export async function generateAiReply(
       ? `Greet as ${dealerName}, state that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.`
       : `Greet as ${dealerName}, explicitly confirm that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.`,
     interest_confirmation: "Confirm the exact vehicle is available and ask whether this week or the weekend works better. Do not add unrequested feed facts or ask for a phone number yet.",
+    clean_title_interest_confirmation: `The buyer just confirmed interest after the clean-title follow-up. Ask for the buyer's best phone number and include Alpha Motorsports' dealership phone ${storePhone} in the same reply. Do not ask about financing, down payment, visit timing, or another qualification step.`,
     interest_declined: "Thank the buyer for their time and close politely. Do not ask another question.",
     store_phone_requested: `The buyer requested ${dealerName}'s phone number. Reply immediately with exactly the supplied dealership phone: ${storePhone}. Start with \"Con gusto, nuestro número es\" / \"Of course, our number is\", add a short polite closing, and do not ask a question, request buyer information, or mention financing requirements.`,
     price_inquiry: vehicleFacts.price != null
@@ -2360,7 +2405,7 @@ export async function generateAiReply(
     inventory_options: "The buyer is asking whether more vehicles or similar options are available. Confirm that more vehicles are available, then ask which option they would like to explore. Do not ask for requirements yet.",
     document_requirements: `The buyer is asking what is needed. Use the exact financing requirements from the dealer knowledge block, including ID/Tax ID/Social Security or passport and the listed proof-of-income options. Ask if they have both. Do not ask for a phone number yet.`,
     clean_title: hasCleanTitleInventory
-      ? "Follow the supplied hasCleanTitleInventory configuration and state directly that all vehicles have a clean title. Answer only the title question in one short sentence; do not add Carfax, warranty, report, phone, or qualification content unless the buyer explicitly asks for it."
+      ? "Follow the supplied hasCleanTitleInventory configuration and state directly that all vehicles have a clean title. In the same short reply, immediately ask whether the buyer is interested in proceeding with this vehicle. Do not add Carfax, warranty, report, phone, or financing content."
       : "Do not claim the vehicle has a clean title. Explain that our sales agents have the vehicle report and can confirm the title and warranty details, then ask what number to send the report to.",
     clean_title_and_warranty: hasCleanTitleInventory
       ? "The buyer asked about clean title and warranty while mentioning cash. State directly that the vehicle has a clean title, explain that our sales agents have the vehicle report and can provide the warranty details, including what applies to a cash purchase, then ask what number to send the report to. Do not invent specific warranty terms or assign BDC before qualification is complete."
@@ -2391,7 +2436,7 @@ First reply instruction: ${firstDealerReply && stage !== "store_phone_requested"
 ${langNote}
 Respond with a single JSON object, no markdown, with exactly four keys:
 {"intent": "the sales funnel stage that best matches the conversation", "urgency": "high or normal", "vehicleIntent": "strong or unclear", "reply": "your reply"}
-Valid intent values: open_question, availability, interest_confirmation, interest_declined, store_phone_requested, vehicle_link_request, carfax_request, vin_inquiry, mileage_inquiry, color_inquiry, price_inquiry, down_payment_request, down_payment_low, down_payment_declined, timeline_request, timeline_received, timeline_declined, documents_request, documents_declined, qualified_exit, financing_intro, financing_declined, cash_visit_request_phone, test_drive_request, dealer_hours, trade_in_request, payment_methods_request, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, handoff_confirmation, address_request, inventory_options, document_requirements, clean_title, clean_title_and_warranty, warranty_info, advisor_question, general.
+Valid intent values: open_question, availability, interest_confirmation, clean_title_interest_confirmation, interest_declined, store_phone_requested, vehicle_link_request, carfax_request, vin_inquiry, mileage_inquiry, color_inquiry, price_inquiry, down_payment_request, down_payment_low, down_payment_declined, timeline_request, timeline_received, timeline_declined, documents_request, documents_declined, qualified_exit, financing_intro, financing_declined, cash_visit_request_phone, test_drive_request, dealer_hours, trade_in_request, payment_methods_request, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, handoff_confirmation, address_request, inventory_options, document_requirements, clean_title, clean_title_and_warranty, warranty_info, advisor_question, general.
 Choose urgent_vehicle_request_phone only when Urgent-intent eligibility allows it, urgency is high, and vehicleIntent is strong. Otherwise follow the supplied Current funnel stage and Stage instruction.
 The "reply" must be one short message that follows the stage instruction exactly, mentions the vehicle naturally, and mirrors the buyer's language.`;
 
