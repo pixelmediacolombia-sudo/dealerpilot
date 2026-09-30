@@ -237,6 +237,14 @@ test("Publish Now diagnostics stay scoped to the active dealer and do not wake a
   assert.match(publishNowModalSource, /waiting for the current Chrome extension heartbeat/);
 });
 
+test("Publish Now refreshes the active dealer heartbeat before creating the job", () => {
+  assert.match(publishNowModalSource, /type: "HEARTBEAT_NOW", dealerId/);
+  assert.match(
+    publishNowModalSource,
+    /refreshExtensionHeartbeatBeforePublish\(\)[\s\S]*publishNow\(\{ data: \{ vehicleId \} \}\)/,
+  );
+});
+
 test("assigned polling repairs due jobs after the extension identifier changes", () => {
   assert.match(routeSource, /if \(online\?\.chrome_extension_id === extensionId\)/);
   assert.match(routeSource, /set\(\{ assignedExtensionId: extensionId, assignedAt: new Date\(\) \}\)/);

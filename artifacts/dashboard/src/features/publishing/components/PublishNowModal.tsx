@@ -80,6 +80,50 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
   const [wakeDebug, setWakeDebug] = useState<string | null>(null);
   const [jobVisibleToExt, setJobVisibleToExt] = useState<boolean | null>(null);
 
+  // Refresh the dealer-scoped extension heartbeat before creating a Controlled
+  // job. The backend validates the heartbeat during job creation, so waiting
+  // until onSuccess is too late when the previous heartbeat has expired.
+  async function refreshExtensionHeartbeatBeforePublish() {
+    if (!dealerId) return;
+
+    try {
+      const dealerQuery = `?dealerId=${encodeURIComponent(String(dealerId))}`;
+      const status = await fetch(`/api/extension/connect-status${dealerQuery}`)
+        .then((r) => r.json())
+        .catch(() => null);
+      const extId = typeof status?.extensionId === "string" ? status.extensionId : "";
+      if (!/^[a-p]{32}$/.test(extId)) return;
+
+      const cr = (window as { chrome?: { runtime?: {
+        sendMessage?: Function;
+        lastError?: { message?: string };
+      } } }).chrome?.runtime;
+      if (!cr?.sendMessage) return;
+
+      await new Promise<void>((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        const timeout = window.setTimeout(finish, 2500);
+        try {
+          cr.sendMessage(extId, { type: "HEARTBEAT_NOW", dealerId }, () => {
+            window.clearTimeout(timeout);
+            finish();
+          });
+        } catch {
+          window.clearTimeout(timeout);
+          finish();
+        }
+      });
+    } catch {
+      // The backend still returns a precise EXTENSION_OFFLINE error if the
+      // browser cannot reach the extension, so this preflight is best effort.
+    }
+  }
+
   // After the job is created, try to wake the extension immediately via
   // chrome.runtime.sendMessage (requires externally_connectable in the manifest).
   // Also checks /jobs/next to confirm the job is visible to the extension.
@@ -164,9 +208,14 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
     if (isOpen && vehicleId != null) {
       setJobId(null);
       setCreateError(null);
-      publishNow({ data: { vehicleId } });
+      let cancelled = false;
+      void (async () => {
+        await refreshExtensionHeartbeatBeforePublish();
+        if (!cancelled) publishNow({ data: { vehicleId } });
+      })();
+      return () => { cancelled = true; };
     }
-  }, [isOpen, vehicleId, retryKey]);
+  }, [isOpen, vehicleId, retryKey, dealerId]);
 
   const { data: progress } = useGetPublishingJobProgress(jobId ?? 0, {
     query: {

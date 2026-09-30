@@ -1529,7 +1529,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 chrome.runtime.onMessageExternal?.addListener((message, sender, sendResponse) => {
   (async () => {
     try {
-      if (message?.type !== "POLL_NOW") {
+      if (message?.type !== "POLL_NOW" && message?.type !== "HEARTBEAT_NOW") {
         sendResponse({ ok: false, error: "Unsupported external message" });
         return;
       }
@@ -1548,11 +1548,13 @@ chrome.runtime.onMessageExternal?.addListener((message, sender, sendResponse) =>
         return;
       }
 
-      const data = await handlers.POLL_NOW({
-        windowId,
-        dealerId: requestedDealerId,
-        forceUserAction: true,
-      });
+      const data = message.type === "HEARTBEAT_NOW"
+        ? await handlers.PING({ windowId, dealerId: requestedDealerId })
+        : await handlers.POLL_NOW({
+          windowId,
+          dealerId: requestedDealerId,
+          forceUserAction: true,
+        });
       sendResponse({ ok: true, data });
     } catch (err) {
       saveLastError(err);

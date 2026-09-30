@@ -367,6 +367,37 @@ test("dashboard Publish Now wake reaches the configured dealer window", async ()
   assert.equal(calls.heartbeats[0].sessionId, "publisher-window-22");
 });
 
+test("dashboard Publish Now heartbeat reaches the requested dealer window before job creation", async () => {
+  const { externalWake, calls } = createHarness({}, {
+    browserWindows: [{ id: 11 }, { id: 22 }],
+    initialStorage: {
+      "publisherSettingsWindow:11": {
+        backendUrl: "https://app.1987dealerpilot.com",
+        dealerId: 1,
+        sessionId: "publisher-window-11",
+      },
+      "publisherSettingsWindow:22": {
+        backendUrl: "https://app.1987dealerpilot.com",
+        dealerId: 2,
+        sessionId: "publisher-window-22",
+      },
+    },
+  });
+
+  const response = await new Promise((resolve) => externalWake(
+    { type: "HEARTBEAT_NOW", dealerId: 2 },
+    { url: "https://app.1987dealerpilot.com/listings", tab: { windowId: 11 } },
+    resolve,
+  ));
+
+  assert.equal(response.ok, true);
+  assert.equal(calls.heartbeats.length, 1);
+  assert.deepEqual(
+    { dealerId: calls.heartbeats[0].dealerId, sessionId: calls.heartbeats[0].sessionId },
+    { dealerId: 2, sessionId: "publisher-window-22" },
+  );
+});
+
 test("debug status reads Facebook readiness from the configured dealer window", async () => {
   const { handlers } = createHarness({}, {
     browserWindows: [{ id: 22 }],
