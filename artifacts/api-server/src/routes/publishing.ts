@@ -350,6 +350,10 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
         eq(publishingJobsTable.status, "Assigned"),
         eq(publishingJobsTable.dealerId, extensionScope.dealerId),
         inArray(publishingJobsTable.assignedExtensionId, [...aliases]),
+        // A Controlled extension may only receive an operator-approved job.
+        // Without this guard, an older unapproved assignment can sit ahead of
+        // approved batch jobs and make the extension report "No approved job".
+        eq(publishingJobsTable.approvedByUser, true),
         or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
         isNull(publishingJobsTable.claimedByExtension),
         // A stale manual Publish Now job must not block an automatic batch.

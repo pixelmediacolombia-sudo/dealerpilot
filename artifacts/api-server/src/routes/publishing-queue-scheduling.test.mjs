@@ -191,6 +191,13 @@ test("assigned endpoint only returns due assigned jobs", () => {
   );
 });
 
+test("assigned polling skips unapproved jobs so they cannot block approved batches", () => {
+  assert.match(
+    routeSource,
+    /eq\(publishingJobsTable\.status,\s*"Assigned"\)[\s\S]*eq\(publishingJobsTable\.approvedByUser,\s*true\)/,
+  );
+});
+
 test("assigned endpoint can map the extension storage id to the online Chrome connection", () => {
   assert.match(
     routeSource,
