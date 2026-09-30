@@ -1268,9 +1268,15 @@ const handlers = {
     ];
     const windowId = await resolveWindowId(message, sender);
     const runtimeKey = windowRuntimeKey(windowId);
-    const stored = await chrome.storage.local.get(runtimeKey ? [...keys, runtimeKey] : keys);
+    const pageStateSummaryKey = windowPageStateSummaryKey(windowId);
+    const stored = await chrome.storage.local.get(runtimeKey
+      ? [...keys, runtimeKey, pageStateSummaryKey]
+      : keys);
     const runtime = runtimeKey && stored[runtimeKey] && typeof stored[runtimeKey] === "object"
       ? stored[runtimeKey]
+      : {};
+    const pageState = pageStateSummaryKey && stored[pageStateSummaryKey] && typeof stored[pageStateSummaryKey] === "object"
+      ? stored[pageStateSummaryKey]
       : {};
     const settings = await getPublisherSettings(windowId);
     const base = settings.backendUrl;
@@ -1292,11 +1298,11 @@ const handlers = {
       lastClaimedJob: stored.lastClaimedJob || null,
       lastPublishedJob: stored.lastPublishedJob || null,
       lastError: stored.lastError || null,
-      marketplaceDetected: stored.marketplaceDetected || false,
+      marketplaceDetected: pageState.marketplaceDetected ?? stored.marketplaceDetected ?? false,
       workflowStep: stored.workflowStep || null,
       workflowStepAt: stored.workflowStepAt || null,
-      fbLoggedIn: stored.fbLoggedIn ?? null,
-      marketplaceConnected: stored.marketplaceConnected ?? null,
+      fbLoggedIn: pageState.fbLoggedIn ?? stored.fbLoggedIn ?? null,
+      marketplaceConnected: pageState.marketplaceConnected ?? stored.marketplaceConnected ?? null,
       connectTabId: stored.connectTabId || null,
       activeJob: stored.activeJob || null,
       lastPollTime: stored.lastPollTime || null,

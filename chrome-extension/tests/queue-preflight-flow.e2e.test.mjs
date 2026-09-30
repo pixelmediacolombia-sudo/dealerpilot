@@ -367,6 +367,31 @@ test("dashboard Publish Now wake reaches the configured dealer window", async ()
   assert.equal(calls.heartbeats[0].sessionId, "publisher-window-22");
 });
 
+test("debug status reads Facebook readiness from the configured dealer window", async () => {
+  const { handlers } = createHarness({}, {
+    browserWindows: [{ id: 22 }],
+    initialStorage: {
+      "publisherSettingsWindow:22": {
+        backendUrl: "https://app.1987dealerpilot.com",
+        dealerId: 2,
+        sessionId: "publisher-window-22",
+      },
+      "publisherFacebookStateWindow:22:summary": {
+        fbLoggedIn: true,
+        marketplaceConnected: true,
+        marketplaceDetected: true,
+      },
+    },
+  });
+
+  const response = await handlers.GET_DEBUG_STATE({ windowId: 22 }, {});
+
+  assert.equal(response.dealerId, 2);
+  assert.equal(response.fbLoggedIn, true);
+  assert.equal(response.marketplaceConnected, true);
+  assert.equal(response.marketplaceDetected, true);
+});
+
 test("queue polling no longer opens seller inbox monitor tabs", async () => {
   const payload = { fill: {}, images: [] };
   const { handlers, calls, storage } = createHarness(payload, {
