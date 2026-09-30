@@ -393,6 +393,30 @@ test("Facebook session reports preserve the real Chrome runtime id", async () =>
   assert.equal(calls.sessionReports[0].sessionId, "publisher-window-22");
 });
 
+test("a Messenger tab cannot overwrite Marketplace readiness for the same publisher window", async () => {
+  const { handlers, calls } = createHarness({}, {
+    facebookTabs: [
+      { id: 41, windowId: 22, url: "https://www.facebook.com/marketplace/you/selling" },
+      { id: 42, windowId: 22, url: "https://www.facebook.com/messages" },
+    ],
+    initialStorage: {
+      "publisherSettingsWindow:22": {
+        backendUrl: "https://app.1987dealerpilot.com",
+        dealerId: 2,
+        sessionId: "publisher-window-22",
+      },
+    },
+  });
+
+  await handlers.FB_SESSION_REPORT(
+    { fbLoggedIn: true, marketplaceConnected: false, windowId: 22 },
+    { tab: { id: 42, windowId: 22 } },
+  );
+
+  assert.equal(calls.sessionReports[0].dealerId, 2);
+  assert.equal(calls.sessionReports[0].marketplaceConnected, true);
+});
+
 test("heartbeat and diagnostics stay isolated by publisher window and dealer", async () => {
   const { handlers, calls, storage } = createHarness({}, {
     initialStorage: {

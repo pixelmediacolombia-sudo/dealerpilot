@@ -879,8 +879,18 @@ const handlers = {
   async FB_SESSION_REPORT(message, sender) {
     const { fbLoggedIn, marketplaceConnected } = message;
     const windowId = await resolveWindowId(message, sender);
+    // Messenger and Marketplace tabs report independently. Re-read the
+    // complete Facebook tab set for this window before persisting readiness;
+    // a Messenger report must not overwrite a live Marketplace tab.
+    const detected = await detectFacebookTabState(windowId);
+    const resolvedFbLoggedIn = detected.fbLoggedIn ?? fbLoggedIn;
+    const resolvedMarketplaceConnected = detected.marketplaceConnected ?? marketplaceConnected;
     const summaryKey = windowPageStateSummaryKey(windowId);
-    const summary = { fbLoggedIn, marketplaceConnected, reportedAt: new Date().toISOString() };
+    const summary = {
+      fbLoggedIn: resolvedFbLoggedIn,
+      marketplaceConnected: resolvedMarketplaceConnected,
+      reportedAt: new Date().toISOString(),
+    };
     await chrome.storage.local.set(summaryKey ? { [summaryKey]: summary } : summary);
     // Session reports update the connection identity used by the publishing
     // queue. That column must contain Chrome's runtime ID, never the private
@@ -892,8 +902,8 @@ const handlers = {
         extensionId,
         dealerId: settings.dealerId,
         sessionId: settings.sessionId || `publisher-window-${settings.windowId ?? "legacy"}`,
-        fbLoggedIn: !!fbLoggedIn,
-        marketplaceConnected: !!marketplaceConnected,
+        fbLoggedIn: !!resolvedFbLoggedIn,
+        marketplaceConnected: !!resolvedMarketplaceConnected,
       });
     } catch (err) {
       console.warn("[DealerPilot AI] session-report failed", err);
