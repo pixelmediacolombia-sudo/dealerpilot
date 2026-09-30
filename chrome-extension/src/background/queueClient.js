@@ -4,6 +4,7 @@ const LEGACY_RENDER_BACKEND_URL = "https://dealerpilot-cq3x.onrender.com";
 const REPLIT_BACKEND_URL = "https://dealerpilot1987.replit.app";
 const WINDOW_SETTINGS_PREFIX = "publisherSettingsWindow:";
 const WINDOW_PAGE_STATE_PREFIX = "publisherFacebookStateWindow:";
+const WINDOW_RUNTIME_PREFIX = "publisherRuntimeWindow:";
 
 function normalizeBackendUrl(value) {
   const normalized = String(value || "").trim().replace(/\/+$/, "");
@@ -81,6 +82,11 @@ function windowPageStateKey(windowId) {
 function windowPageStateSummaryKey(windowId) {
   const key = windowPageStateKey(windowId);
   return key ? `${key}:summary` : null;
+}
+
+function windowRuntimeKey(windowId) {
+  const id = validWindowId(windowId);
+  return id === null ? null : `${WINDOW_RUNTIME_PREFIX}${id}`;
 }
 
 async function getPublisherSettings(windowId = null) {
@@ -431,24 +437,28 @@ async function sendHeartbeatSnapshot(windowId = null) {
       fbLoggedIn: resolvedFbLoggedIn,
       marketplaceConnected: resolvedMarketplaceConnected,
     });
-    await chrome.storage.local.set({
+    const heartbeatState = {
       lastHeartbeat: now,
       lastHeartbeatUrl: heartbeatUrl,
       lastHeartbeatResponse: { ok: true, status: 200, body: data, at: now },
-    });
+    };
+    const runtimeKey = windowRuntimeKey(windowId);
+    await chrome.storage.local.set(runtimeKey ? { [runtimeKey]: heartbeatState } : heartbeatState);
     return { backendUrl: base, environment: detectEnvironment(base), ok: true };
   } catch (heartbeatErr) {
     console.warn("[DealerPilot AI] heartbeat failed", heartbeatErr);
+    const heartbeatState = {
+      lastHeartbeatUrl: heartbeatUrl,
+      lastHeartbeatResponse: {
+        ok: false,
+        status: heartbeatErr && heartbeatErr.status ? heartbeatErr.status : null,
+        error: heartbeatErr instanceof Error ? heartbeatErr.message : String(heartbeatErr),
+        at: now,
+      },
+    };
+    const runtimeKey = windowRuntimeKey(windowId);
     await chrome.storage.local
-      .set({
-        lastHeartbeatUrl: heartbeatUrl,
-        lastHeartbeatResponse: {
-          ok: false,
-          status: heartbeatErr && heartbeatErr.status ? heartbeatErr.status : null,
-          error: heartbeatErr instanceof Error ? heartbeatErr.message : String(heartbeatErr),
-          at: now,
-        },
-      })
+      .set(runtimeKey ? { [runtimeKey]: heartbeatState } : heartbeatState)
       .catch(() => {});
     return { backendUrl: base, environment: detectEnvironment(base), ok: false };
   }
@@ -460,7 +470,11 @@ const handlers = {
   async PING(message, sender) {
     await apiGet("/api/healthz");
     const heartbeat = await sendHeartbeatSnapshot(await resolveWindowId(message, sender));
-    return { backendUrl: heartbeat.backendUrl, environment: heartbeat.environment };
+    return {
+      backendUrl: heartbeat.backendUrl,
+      environment: heartbeat.environment,
+      heartbeatOk: heartbeat.ok === true,
+    };
   },
 
   async GET_WINDOW_CONTEXT(message, sender) {
@@ -472,11 +486,14 @@ const handlers = {
   },
 
   async SAVE_SETTINGS(message, sender) {
+    const windowId = await resolveWindowId(message, sender);
     const patch = {};
     if (typeof message.backendUrl === "string") patch.backendUrl = normalizeBackendUrl(message.backendUrl);
     if (Number.isInteger(Number(message.dealerId)) && Number(message.dealerId) > 0) patch.dealerId = Number(message.dealerId);
     if (typeof message.sessionId === "string") patch.sessionId = message.sessionId.trim();
-    return savePublisherSettings(await resolveWindowId(message, sender), patch);
+    const saved = await savePublisherSettings(windowId, patch);
+    const heartbeat = await sendHeartbeatSnapshot(windowId);
+    return { ...saved, heartbeatOk: heartbeat.ok === true };
   },
 
   async PAGE_STATE_REPORT(message, sender) {
@@ -1249,8 +1266,13 @@ const handlers = {
       "lastHeartbeatResponse",
       "lastPayloadDebug",
     ];
-    const stored = await chrome.storage.local.get(keys);
-    const settings = await getPublisherSettings(await resolveWindowId(message, sender));
+    const windowId = await resolveWindowId(message, sender);
+    const runtimeKey = windowRuntimeKey(windowId);
+    const stored = await chrome.storage.local.get(runtimeKey ? [...keys, runtimeKey] : keys);
+    const runtime = runtimeKey && stored[runtimeKey] && typeof stored[runtimeKey] === "object"
+      ? stored[runtimeKey]
+      : {};
+    const settings = await getPublisherSettings(windowId);
     const base = settings.backendUrl;
     const dealerId = settings.dealerId;
     const manifest = chrome.runtime.getManifest();
@@ -1262,10 +1284,10 @@ const handlers = {
       sessionId: settings.sessionId,
       environment: detectEnvironment(base),
       dealerId,
-      dealerName: dealerId === 1 ? "Alpha Motorsport" : `Dealer ${dealerId}`,
-      lastHeartbeat: stored.lastHeartbeat || null,
-      lastHeartbeatUrl: stored.lastHeartbeatUrl || null,
-      lastHeartbeatResponse: stored.lastHeartbeatResponse || null,
+      dealerName: dealerId === 1 ? "Alpha Motorsport" : dealerId === 2 ? "Lucki Mazda" : `Dealer ${dealerId}`,
+      lastHeartbeat: runtime.lastHeartbeat || stored.lastHeartbeat || null,
+      lastHeartbeatUrl: runtime.lastHeartbeatUrl || stored.lastHeartbeatUrl || null,
+      lastHeartbeatResponse: runtime.lastHeartbeatResponse || stored.lastHeartbeatResponse || null,
       lastPayloadDebug: stored.lastPayloadDebug || null,
       lastClaimedJob: stored.lastClaimedJob || null,
       lastPublishedJob: stored.lastPublishedJob || null,

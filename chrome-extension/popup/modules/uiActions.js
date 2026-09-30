@@ -10,13 +10,27 @@ function normalizeBackendUrl(value) {
 // Build date is bumped manually alongside manifest.json's version field.
 const BUILD_DATE = DealerPilotPopupSettings.buildDate;
 
+function dealerNameForId(value) {
+  const id = Number(value);
+  if (id === 1) return "Alpha Motorsport";
+  if (id === 2) return "Lucki Mazda";
+  return `Dealer ${Number.isInteger(id) && id > 0 ? id : "—"}`;
+}
+
+function updateDealerHeader(dealerId) {
+  const headerVersionEl = document.getElementById("header-version");
+  if (!headerVersionEl) return;
+  const version = chrome.runtime.getManifest().version;
+  headerVersionEl.textContent = `v${version} · ${dealerNameForId(dealerId)}`;
+}
+
 (function initVersionDisplay() {
   const manifest = chrome.runtime.getManifest();
   const version = manifest.version;
   const headerVersionEl = document.getElementById("header-version");
   const headerBuildEl   = document.getElementById("header-build");
   const dBuildEl        = document.getElementById("d-build");
-  if (headerVersionEl) headerVersionEl.textContent = `v${version} · Alpha Motorsport`;
+  if (headerVersionEl) headerVersionEl.textContent = `v${version} · Loading dealer…`;
   if (headerBuildEl)   headerBuildEl.textContent   = `Build: ${version} — ${BUILD_DATE}`;
   if (dBuildEl)         dBuildEl.textContent        = `APP_CONTROLLED_PUBLISHING_${version} — ${BUILD_DATE}`;
 })();
@@ -462,8 +476,8 @@ async function refresh() {
   el.vBackend.textContent = "Checking…";
   setDot(el.dotBackend, "warn");
 
-  const ping = await send({ type: "PING" });
-  lastConnectionOk = !!(ping && ping.ok);
+  const ping = await send({ type: "PING", windowId: await currentWindowId() });
+  lastConnectionOk = !!(ping && ping.ok && ping.data?.heartbeatOk !== false);
 
   if (lastConnectionOk) {
     el.vBackend.textContent = "Connected";
@@ -728,6 +742,7 @@ document.getElementById("btn-show-poll")?.addEventListener("click", async () => 
   const windowId = await currentWindowId();
   const res = await send({ type: "GET_SETTINGS", windowId });
   const settings = res?.ok ? res.data : {};
+  updateDealerHeader(settings.dealerId);
   urlInput.value = normalizeBackendUrl(settings.backendUrl) || DEFAULT_BACKEND_URL;
   if (dealerIdInput) {
     dealerIdInput.value = Number.isInteger(Number(settings.dealerId)) && Number(settings.dealerId) > 0
@@ -747,6 +762,7 @@ document.getElementById("save").addEventListener("click", async () => {
     setStatus("Could not save window settings: " + (saved?.error || "unknown error"), "err");
     return;
   }
+  updateDealerHeader(dealerId);
   setStatus("Saved. Testing connection…");
   await refresh();
 });

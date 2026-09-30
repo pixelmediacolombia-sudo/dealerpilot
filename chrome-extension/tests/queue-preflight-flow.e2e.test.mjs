@@ -89,6 +89,7 @@ function createHarness(payload, options = {}) {
     },
     async apiGet(path) {
       calls.apiGet.push(path);
+      if (path === "/api/healthz") return { ok: true };
       if (path.endsWith("/payload")) return payload;
       if (path.startsWith("/api/publishing/jobs/assigned")) {
         if (!assignedJobReturned && options.assignedJob) {
@@ -305,6 +306,36 @@ test("assigned queue poll uses the Chrome runtime id while claiming with storage
     "assigned poll should use chrome.runtime.id so it matches backend heartbeat assignment",
   );
   assert.deepEqual(calls.claims, [{ jobId: 202, extensionId: "ext-e2e" }]);
+});
+
+test("heartbeat and diagnostics stay isolated by publisher window and dealer", async () => {
+  const { handlers, calls, storage } = createHarness({}, {
+    initialStorage: {
+      "publisherSettingsWindow:11": {
+        backendUrl: "https://app.1987dealerpilot.com",
+        dealerId: 1,
+        sessionId: "publisher-window-11",
+      },
+      "publisherSettingsWindow:22": {
+        backendUrl: "https://app.1987dealerpilot.com",
+        dealerId: 2,
+        sessionId: "publisher-window-22",
+      },
+    },
+  });
+
+  const alpha = await handlers.PING({ windowId: 11 });
+  const lucki = await handlers.PING({ windowId: 22 });
+
+  assert.equal(alpha.heartbeatOk, true);
+  assert.equal(lucki.heartbeatOk, true);
+  assert.deepEqual(calls.heartbeats.map((body) => ({ dealerId: body.dealerId, sessionId: body.sessionId })), [
+    { dealerId: 1, sessionId: "publisher-window-11" },
+    { dealerId: 2, sessionId: "publisher-window-22" },
+  ]);
+  assert.ok(storage["publisherRuntimeWindow:11"].lastHeartbeatResponse);
+  assert.ok(storage["publisherRuntimeWindow:22"].lastHeartbeatResponse);
+  assert.equal(storage.lastHeartbeat, undefined);
 });
 
 test("queue polling no longer opens seller inbox monitor tabs", async () => {
