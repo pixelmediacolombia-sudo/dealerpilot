@@ -101,6 +101,11 @@ function createHarness(payload, options = {}) {
           assignedJobReturned = true;
           return { job: options.assignedJob };
         }
+        if (options.assignedJobByDealer) {
+          const dealerId = new URLSearchParams(path.split("?")[1] || "").get("dealerId");
+          const scopedJob = options.assignedJobByDealer[dealerId];
+          if (scopedJob) return { job: scopedJob };
+        }
         return { job: null };
       }
       if (path.startsWith("/api/publishing/jobs?")) return { jobs: options.jobs ?? [] };
@@ -257,14 +262,14 @@ test("claimed active jobs can be restored when activeJob storage is lost", async
         id: 301,
         vehicleId: 601,
         status: "Publishing",
-        claimedByExtension: "ext-e2e",
+        claimedByExtension: "chrome-runtime-e2e",
         vehicleLabel: "2024 RESTORE TEST",
       },
       {
         id: 302,
         vehicleId: 602,
         status: "Needs Review",
-        claimedByExtension: "ext-e2e",
+        claimedByExtension: "chrome-runtime-e2e",
         vehicleLabel: "2024 TERMINAL TEST",
       },
     ],
@@ -277,7 +282,7 @@ test("claimed active jobs can be restored when activeJob storage is lost", async
   assert.equal(storage.lastClaimedJob.restoredAt != null, true);
 });
 
-test("assigned queue poll uses the Chrome runtime id while claiming with storage id", async () => {
+test("assigned queue poll and claim use the Chrome runtime id", async () => {
   const payload = {
     fill: {
       year: 2020,
@@ -312,7 +317,58 @@ test("assigned queue poll uses the Chrome runtime id while claiming with storage
     calls.apiGet.includes("/api/publishing/jobs/assigned?extensionId=chrome-runtime-e2e&dealerId=1"),
     "assigned poll should use chrome.runtime.id so it matches backend heartbeat assignment",
   );
-  assert.deepEqual(calls.claims, [{ jobId: 202, extensionId: "ext-e2e" }]);
+  assert.deepEqual(calls.claims, [{ jobId: 202, extensionId: "chrome-runtime-e2e" }]);
+});
+
+test("two configured publisher windows keep Alpha and Lucki jobs dealer-scoped through claim", async () => {
+  const payload = {
+    fill: {
+      year: 2020,
+      make: "Toyota",
+      model: "Camry",
+      mileage: 75000,
+      bodyStyle: "SUV",
+      exteriorColor: "White",
+      fuelType: "Gasoline",
+      transmission: "Automatic",
+      location: "Manassas, VA",
+      description: "Clean unit ready for financing.",
+      price: 1000,
+    },
+    images: ["https://1987dealerpilot.com/photo.jpg"],
+  };
+  const { handlers, calls, storage } = createHarness(payload, {
+    browserWindows: [{ id: 11 }, { id: 22 }],
+    initialStorage: {
+      "publisherSettingsWindow:11": {
+        backendUrl: "https://app.1987dealerpilot.com",
+        dealerId: 1,
+        sessionId: "publisher-window-11",
+      },
+      "publisherSettingsWindow:22": {
+        backendUrl: "https://app.1987dealerpilot.com",
+        dealerId: 2,
+        sessionId: "publisher-window-22",
+      },
+    },
+    assignedJobByDealer: {
+      "1": { id: 101, assignedAt: new Date().toISOString(), createdAt: new Date().toISOString(), mode: "Controlled" },
+      "2": { id: 202, assignedAt: new Date().toISOString(), createdAt: new Date().toISOString(), mode: "Controlled" },
+    },
+  });
+
+  await handlers.POLL_ASSIGNED_JOB({ windowId: 11 });
+  delete storage.activeJob;
+  await handlers.POLL_ASSIGNED_JOB({ windowId: 22 });
+
+  assert.ok(calls.apiGet.includes("/api/publishing/jobs/assigned?extensionId=chrome-runtime-e2e&dealerId=1"));
+  assert.ok(calls.apiGet.includes("/api/publishing/jobs/assigned?extensionId=chrome-runtime-e2e&dealerId=2"));
+  assert.deepEqual(calls.claims, [
+    { jobId: 101, extensionId: "chrome-runtime-e2e" },
+    { jobId: 202, extensionId: "chrome-runtime-e2e" },
+  ]);
+  assert.equal(storage["publisherSettingsWindow:11"].dealerId, 1);
+  assert.equal(storage["publisherSettingsWindow:22"].dealerId, 2);
 });
 
 test("Facebook session reports preserve the real Chrome runtime id", async () => {

@@ -47,6 +47,12 @@ async function getExtensionId() {
   return generated;
 }
 
+// The queue identity must be Chrome's runtime ID. Keep the generated storage
+// ID only for legacy audit/debug records; it is not a valid publisher owner.
+async function getPublisherExtensionId() {
+  return chrome.runtime?.id || await getExtensionId();
+}
+
 function validWindowId(value) {
   if (value === null || value === undefined || value === "") return null;
   const id = Number(value);
@@ -560,7 +566,7 @@ const handlers = {
   },
 
   async CLAIM_JOB(message) {
-    const extensionId = await getExtensionId();
+    const extensionId = await getPublisherExtensionId();
     const job = await DealerPilotApiClient.claimPublishingJob(message.jobId, extensionId);
     await chrome.storage.local.set({
       lastClaimedJob: {
@@ -587,7 +593,7 @@ const handlers = {
   },
 
   async COMPLETE_JOB(message, sender) {
-    const extensionId = await getExtensionId();
+    const extensionId = await getPublisherExtensionId();
     const body = { extensionId };
     if (message.listingUrl) body.listingUrl = message.listingUrl;
     const result = await DealerPilotApiClient.completePublishingJob(message.jobId, body);
@@ -613,7 +619,7 @@ const handlers = {
   },
 
   async FAIL_JOB(message) {
-    const extensionId = await getExtensionId();
+    const extensionId = await getPublisherExtensionId();
     const body = { extensionId };
     if (message.reason) body.reason = message.reason;
     const result = await apiPost(`/api/publishing/jobs/${message.jobId}/fail`, body);
@@ -628,7 +634,7 @@ const handlers = {
   },
 
   async REPORT_SOLD_ACTION(message) {
-    const extensionId = await getExtensionId();
+    const extensionId = await getPublisherExtensionId();
     return apiPost(`/api/extension/marketplace-sold-actions/${message.listingId}/report`, {
       extensionId,
       status: message.status,
@@ -647,7 +653,7 @@ const handlers = {
   },
 
   async SEND_JOB_EVENT(message) {
-    const extensionId = await getExtensionId();
+    const extensionId = await getPublisherExtensionId();
     return apiPost(`/api/publishing/jobs/${message.jobId}/event`, {
       event: message.event,
       extensionId,
@@ -665,7 +671,7 @@ const handlers = {
   },
 
   async AUTO_START_ASSIGNED(message = {}, sender) {
-    const extensionId = await getExtensionId();
+    const extensionId = await getPublisherExtensionId();
     const windowId = await resolveWindowId(message, sender);
     const now = new Date().toISOString();
 
@@ -1158,7 +1164,7 @@ const handlers = {
   },
 
   async RESTORE_ACTIVE_JOB(message = {}, sender) {
-    const extensionId = await getExtensionId();
+    const extensionId = await getPublisherExtensionId();
     const settings = await getPublisherSettings(await resolveWindowId(message, sender));
     const data = await apiGet(`/api/publishing/jobs?dealerId=${encodeURIComponent(settings.dealerId)}`);
     const activeStatuses = new Set([
@@ -1217,7 +1223,7 @@ const handlers = {
     // Cancel active job on backend (mark Failed)
     if (activeJob && activeJob.id) {
       try {
-        const extensionId = await getExtensionId();
+        const extensionId = await getPublisherExtensionId();
         await apiPost(`/api/publishing/jobs/${activeJob.id}/fail`, {
           extensionId,
           reason: "Emergency kill switch activated by operator",
