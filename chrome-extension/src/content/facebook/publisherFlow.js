@@ -3533,14 +3533,15 @@ const r = await send({ type: "COMPLETE_JOB", jobId: job.id, listingUrl });
   }
 
   function expectedMarketplaceListingTokens(job) {
-    const fallbackVehicleLabel = [
-      job?.year,
-      job?.make,
-      job?.model,
-    ].filter(Boolean).join(" ");
-    const expectedLabel = normalizeText(
-      job?.vehicleLabel || job?.listingTitle || job?.title || fallbackVehicleLabel,
-    );
+    // Facebook frequently omits the trim from the Marketplace title (for
+    // example, it renders "2019 Subaru Outback" while the payload label is
+    // "2019 Subaru Outback 2.5i").  The trim is useful metadata, but it is
+    // not a safe required identity token for URL recovery.  Keep the
+    // dealer-agnostic identity anchored to year/make/model so Lucki and any
+    // other dealer use the same capture path as Alpha.
+    const coreLabel = [job?.year, job?.make, job?.model].filter(Boolean).join(" ");
+    const fallbackLabel = job?.vehicleLabel || job?.listingTitle || job?.title || coreLabel;
+    const expectedLabel = normalizeText(coreLabel || fallbackLabel);
     return expectedLabel
       ? expectedLabel.split(/\s+/).filter((token) => token.length >= 3)
       : [];

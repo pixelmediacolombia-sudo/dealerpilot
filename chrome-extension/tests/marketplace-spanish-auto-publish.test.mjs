@@ -354,6 +354,12 @@ test("Facebook Your Listings landing captures item URL before completing", () =>
   assert.doesNotMatch(content, /Auto-publish failed and backend fail-sync failed/);
 });
 
+test("Marketplace URL identity does not require Facebook to render the vehicle trim", () => {
+  assert.match(content, /const coreLabel = \[job\?\.year, job\?\.make, job\?\.model\]/);
+  assert.match(content, /Facebook frequently omits the trim from the Marketplace title/);
+  assert.doesNotMatch(content, /const expectedLabel = normalizeText\(\s*job\?\.vehicleLabel \|\| job\?\.listingTitle/);
+});
+
 test("A direct Facebook item navigation resumes the active publish job and captures its URL", () => {
   assert.match(content, /async function handleMarketplacePublishedLanding\(\)/);
   assert.match(content, /const \{ activeJob \} = await chrome\.storage\.local\.get\("activeJob"\)/);
