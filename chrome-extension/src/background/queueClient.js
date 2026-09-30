@@ -876,7 +876,10 @@ const handlers = {
     const summaryKey = windowPageStateSummaryKey(windowId);
     const summary = { fbLoggedIn, marketplaceConnected, reportedAt: new Date().toISOString() };
     await chrome.storage.local.set(summaryKey ? { [summaryKey]: summary } : summary);
-    const extensionId = await getExtensionId();
+    // Session reports update the connection identity used by the publishing
+    // queue. That column must contain Chrome's runtime ID, never the private
+    // ext-* storage ID used for job audit/claim records.
+    const extensionId = chrome.runtime.id || await getExtensionId();
     const settings = await getPublisherSettings(await resolveWindowId(message, sender));
     try {
       await DealerPilotApiClient.sendSessionReport({

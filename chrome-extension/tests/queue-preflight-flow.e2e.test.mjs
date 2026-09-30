@@ -11,6 +11,7 @@ function createHarness(payload, options = {}) {
     claims: [],
     createdTabs: [],
     heartbeats: [],
+    sessionReports: [],
     alarmCreates: [],
     removedTabs: [],
     updatedTabs: [],
@@ -125,7 +126,8 @@ function createHarness(payload, options = {}) {
       calls.heartbeats.push(body);
       return { ok: true };
     },
-    async sendSessionReport() {
+    async sendSessionReport(body) {
+      calls.sessionReports.push(body);
       return { ok: true };
     },
     async completePublishingJob(jobId, body) {
@@ -311,6 +313,28 @@ test("assigned queue poll uses the Chrome runtime id while claiming with storage
     "assigned poll should use chrome.runtime.id so it matches backend heartbeat assignment",
   );
   assert.deepEqual(calls.claims, [{ jobId: 202, extensionId: "ext-e2e" }]);
+});
+
+test("Facebook session reports preserve the real Chrome runtime id", async () => {
+  const { handlers, calls } = createHarness({}, {
+    initialStorage: {
+      "publisherSettingsWindow:22": {
+        backendUrl: "https://app.1987dealerpilot.com",
+        dealerId: 2,
+        sessionId: "publisher-window-22",
+      },
+    },
+  });
+
+  await handlers.FB_SESSION_REPORT(
+    { fbLoggedIn: true, marketplaceConnected: true, windowId: 22 },
+    { tab: { windowId: 22 } },
+  );
+
+  assert.equal(calls.sessionReports.length, 1);
+  assert.equal(calls.sessionReports[0].extensionId, "chrome-runtime-e2e");
+  assert.equal(calls.sessionReports[0].dealerId, 2);
+  assert.equal(calls.sessionReports[0].sessionId, "publisher-window-22");
 });
 
 test("heartbeat and diagnostics stay isolated by publisher window and dealer", async () => {

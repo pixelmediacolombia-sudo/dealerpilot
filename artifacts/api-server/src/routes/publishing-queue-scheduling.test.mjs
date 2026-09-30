@@ -8,6 +8,7 @@ const publishNowModalSource = readFileSync(
   new URL("../../../dashboard/src/features/publishing/components/PublishNowModal.tsx", import.meta.url),
   "utf8",
 );
+const extensionRouteSource = readFileSync(new URL("./extension.ts", import.meta.url), "utf8");
 const queueCompactionSource = readFileSync(
   new URL("../publishing/autoPublishQueueCompaction.ts", import.meta.url),
   "utf8",
@@ -36,7 +37,6 @@ const marketplaceKnowledgeMigrationSource = readFileSync(new URL("../../../../li
 const dealersRouteSource = readFileSync(new URL("./dealers.ts", import.meta.url), "utf8");
 const inventorySeedSource = readFileSync(new URL("../inventory/seed.ts", import.meta.url), "utf8");
 const authSource = readFileSync(new URL("./auth.ts", import.meta.url), "utf8");
-const extensionRouteSource = readFileSync(new URL("./extension.ts", import.meta.url), "utf8");
 const marketplaceListingsSource = readFileSync(new URL("./marketplaceListings.ts", import.meta.url), "utf8");
 const vehiclesRouteSource = readFileSync(new URL("./vehicles.ts", import.meta.url), "utf8");
 const soldStateSource = readFileSync(new URL("../marketplace/soldState.ts", import.meta.url), "utf8");
@@ -243,6 +243,12 @@ test("Publish Now refreshes the active dealer heartbeat before creating the job"
     publishNowModalSource,
     /refreshExtensionHeartbeatBeforePublish\(\)[\s\S]*publishNow\(\{ data: \{ vehicleId \} \}\)/,
   );
+});
+
+test("extension session reports cannot overwrite the queue identity with a private storage id", () => {
+  assert.match(extensionRouteSource, /CHROME_RUNTIME_EXTENSION_ID = \/\^\[a-p\]\{32\}\$\//);
+  assert.match(extensionRouteSource, /if \(!normalized \|\| !CHROME_RUNTIME_EXTENSION_ID\.test\(normalized\)\) return/);
+  assert.match(extensionRouteSource, /const storedChromeExtensionId = await getChromeExtensionId\(row\.id\)/);
 });
 
 test("assigned polling repairs due jobs after the extension identifier changes", () => {

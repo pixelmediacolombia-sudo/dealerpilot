@@ -6,6 +6,7 @@ import { recordMarketplaceSoldAction } from "../marketplace/soldAction";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 
 const EXTENSION_NAME = "Chrome Extension";
+const CHROME_RUNTIME_EXTENSION_ID = /^[a-p]{32}$/;
 
 const router: IRouter = Router();
 
@@ -27,10 +28,14 @@ function ensureExtensionColumns(): Promise<void> {
 }
 
 async function saveChromeExtensionId(rowId: number, chromeExtensionId: string | undefined): Promise<void> {
-  if (!chromeExtensionId) return;
+  const normalized = chromeExtensionId?.trim();
+  // The publishing queue uses this column to identify a real Chrome runtime.
+  // Ignore the private ext-* storage identifier used by job audit records so
+  // a Facebook session report cannot overwrite a valid runtime ID.
+  if (!normalized || !CHROME_RUNTIME_EXTENSION_ID.test(normalized)) return;
   await ensureExtensionColumns();
   await pool.query("update extension_connections set chrome_extension_id = $1 where id = $2", [
-    chromeExtensionId,
+    normalized,
     rowId,
   ]);
 }
@@ -42,7 +47,8 @@ async function getChromeExtensionId(rowId: number | undefined): Promise<string |
     "select chrome_extension_id from extension_connections where id = $1 limit 1",
     [rowId],
   );
-  return result.rows[0]?.chrome_extension_id ?? null;
+  const value = result.rows[0]?.chrome_extension_id?.trim() ?? null;
+  return value && CHROME_RUNTIME_EXTENSION_ID.test(value) ? value : null;
 }
 
 const TEST_LISTING = {
@@ -236,12 +242,13 @@ router.post("/extension/heartbeat", async (req, res) => {
 
   const row = await upsertExtRow(updates);
   await saveChromeExtensionId(row.id, chromeExtensionId);
+  const storedChromeExtensionId = await getChromeExtensionId(row.id);
 
   req.log.info({ fbLoggedIn, marketplaceConnected }, "Recorded extension heartbeat");
   res.json({
     id: row.id,
     name: row.name,
-    extensionId: chromeExtensionId ?? (await getChromeExtensionId(row.id)),
+    extensionId: storedChromeExtensionId,
     backendUrl: row.backendUrl ?? null,
     status: row.status,
     dealerId: row.dealerId ?? null,
@@ -433,11 +440,12 @@ router.post("/extension/session-report", async (req, res) => {
     connectAction: null,
   });
   await saveChromeExtensionId(row.id, extensionId);
+  const storedChromeExtensionId = await getChromeExtensionId(row.id);
 
   req.log.info({ fbLoggedIn, marketplaceConnected }, "Extension session report saved");
   res.json({
     ok: true,
-    extensionId: extensionId ?? (await getChromeExtensionId(row.id)),
+    extensionId: storedChromeExtensionId,
     status: row.status,
     dealerId: row.dealerId ?? null,
     sessionId: row.sessionId ?? null,
