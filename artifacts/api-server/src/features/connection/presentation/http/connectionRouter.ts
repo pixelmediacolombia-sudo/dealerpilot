@@ -6,10 +6,11 @@ import {
   leadsTable,
   conversationsTable,
 } from "@workspace/db";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 import { getNextSyncAt } from "../../../../inventory/scheduler";
 import { isRecentHeartbeat } from "../../application/isRecentHeartbeat";
 import { getAuthenticatedDealerId } from "../../../../routes/auth";
+import { PUBLISHER_SESSION_PREFIX } from "../../../../publishing/controlledMode";
 
 const router: IRouter = Router();
 
@@ -95,7 +96,13 @@ router.get("/connection-center", async (req, res) => {
   const [ext] = await db
     .select()
     .from(extensionConnectionsTable)
-    .where(dealerId ? eq(extensionConnectionsTable.dealerId, dealerId) : undefined)
+    .where(and(
+      dealerId ? eq(extensionConnectionsTable.dealerId, dealerId) : undefined,
+      or(
+        isNull(extensionConnectionsTable.sessionId),
+        like(extensionConnectionsTable.sessionId, `${PUBLISHER_SESSION_PREFIX}%`),
+      ),
+    ))
     .orderBy(
       desc(sql`case when ${extensionConnectionsTable.chromeExtensionId} ~ '^[a-p]{32}$' then 1 else 0 end`),
       desc(extensionConnectionsTable.lastHeartbeatAt),

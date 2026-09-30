@@ -20,6 +20,7 @@ import {
   checkPublishGuardrails,
   isExtensionOnline,
   isFullAutoMode,
+  PUBLISHER_SESSION_PREFIX,
   resolvePublishMode,
   resolveAlphaLotCity,
   ACTIVE_PUBLISHING_JOB_STATUSES,
@@ -45,6 +46,7 @@ import { resolveDealerId } from "./auth";
 // verified Manassas inventory; other dealers use their own persisted lot.
 const DEALER_ID = 1;
 const CHROME_RUNTIME_EXTENSION_ID = /^[a-p]{32}$/;
+const PUBLISHER_SESSION_FILTER_SQL = `(session_id is null or session_id like '${PUBLISHER_SESSION_PREFIX}%')`;
 
 function isChromeRuntimeExtensionId(value: string | null | undefined): boolean {
   return Boolean(value && CHROME_RUNTIME_EXTENSION_ID.test(value.trim()));
@@ -61,8 +63,8 @@ async function getExtensionDealerScope(extensionId: string, dealerIdHint?: numbe
   const hasDealerHint = Number.isInteger(dealerIdHint) && (dealerIdHint ?? 0) > 0;
   const result = await pool.query<{ dealer_id: number | null }>(
     hasDealerHint
-      ? "select dealer_id from extension_connections where chrome_extension_id = $1 and dealer_id = $2 order by updated_at desc limit 1"
-      : "select dealer_id from extension_connections where chrome_extension_id = $1 order by updated_at desc limit 1",
+      ? `select dealer_id from extension_connections where chrome_extension_id = $1 and dealer_id = $2 and ${PUBLISHER_SESSION_FILTER_SQL} order by updated_at desc limit 1`
+      : `select dealer_id from extension_connections where chrome_extension_id = $1 and ${PUBLISHER_SESSION_FILTER_SQL} order by updated_at desc limit 1`,
     hasDealerHint ? [extensionId, dealerIdHint] : [extensionId],
   );
   const dealerId = Number(result.rows[0]?.dealer_id);
@@ -303,12 +305,12 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
 
   const aliases = new Set<string>([extensionId]);
   const connection = await pool.query<{ name: string }>(
-    "select name from extension_connections where chrome_extension_id = $1 limit 1",
+    `select name from extension_connections where chrome_extension_id = $1 and ${PUBLISHER_SESSION_FILTER_SQL} limit 1`,
     [extensionId],
   );
   if (connection.rows[0]?.name) aliases.add(connection.rows[0].name);
   const onlineConnection = await pool.query<{ name: string | null; chrome_extension_id: string | null }>(
-    "select name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc limit 1",
+    `select name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' and ${PUBLISHER_SESSION_FILTER_SQL} order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc limit 1`,
     [extensionScope.dealerId],
   );
   const online = onlineConnection.rows[0];
@@ -1545,7 +1547,7 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
   if (claimableNow.length > 0 && extensionOnline) {
     try {
       const conn = await pool.query(
-        "select id, name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc limit 1",
+        `select id, name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' and ${PUBLISHER_SESSION_FILTER_SQL} order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc limit 1`,
         [dealerId],
       );
       const row = conn.rows[0];
@@ -1714,7 +1716,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
   if (mode === "Controlled") {
     try {
       const conn = await pool.query(
-        "select id, name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc limit 1",
+        `select id, name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' and ${PUBLISHER_SESSION_FILTER_SQL} order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc limit 1`,
         [dealerId],
       );
       const row = conn.rows[0];

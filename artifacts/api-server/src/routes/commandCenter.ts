@@ -12,7 +12,7 @@ import {
   vehiclesTable,
 } from "@workspace/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { ACTIVE_PUBLISHING_JOB_STATUSES } from "../publishing/controlledMode";
+import { ACTIVE_PUBLISHING_JOB_STATUSES, isPublisherSession } from "../publishing/controlledMode";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 import { resolveDealerId } from "./auth";
 
@@ -174,7 +174,7 @@ router.get("/command-center/alerts", async (req: Request, res: Response) => {
     const activeJobs = jobs.filter((job) => ACTIVE_PUBLISHING_JOB_STATUSES.includes(job.status as never));
     const needsReviewCount = jobs.filter((job) => job.status === "Needs Review").length;
     const failedCount = jobs.filter((job) => job.status === "Failed").length;
-    const extensionOnline = extensionRows.some(
+    const extensionOnline = extensionRows.filter((connection) => isPublisherSession(connection.sessionId)).some(
       (connection) => connection.status === "online" && connection.lastHeartbeatAt && Date.now() - connection.lastHeartbeatAt.getTime() <= ONLINE_THRESHOLD_MS,
     );
     const autoPublishEnabled = settings[0]?.enabled === true;

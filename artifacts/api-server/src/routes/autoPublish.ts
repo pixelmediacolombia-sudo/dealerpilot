@@ -34,6 +34,7 @@ import {
 import {
   ACTIVE_PUBLISHING_JOB_STATUSES,
   isExtensionOnline,
+  isPublisherSession,
   LOT_CITY_MAP,
   resolvePublishMode,
 } from "../publishing/controlledMode";
@@ -1401,8 +1402,9 @@ router.get("/auto-publish/extension-diagnostics", async (req, res) => {
     .from(extensionConnectionsTable)
     .where(eq(extensionConnectionsTable.dealerId, dealerId))
     .orderBy(desc(extensionConnectionsTable.lastHeartbeatAt));
-  const onlineConnections = connections.filter((c) => c.status === "online");
-  const latestConnection = connections[0] ?? null;
+  const publisherConnections = connections.filter((c) => isPublisherSession(c.sessionId));
+  const onlineConnections = publisherConnections.filter((c) => c.status === "online");
+  const latestConnection = publisherConnections[0] ?? null;
 
   // 5-minute window for "online"
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
@@ -1556,10 +1558,11 @@ router.get("/auto-publish/launch-checklist", async (req, res) => {
     .select()
     .from(extensionConnectionsTable)
     .where(eq(extensionConnectionsTable.dealerId, dealerId));
-  const extensionInstalled = connections.length > 0;
+  const publisherConnections = connections.filter((c) => isPublisherSession(c.sessionId));
+  const extensionInstalled = publisherConnections.length > 0;
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   const extensionOnline =
-    connections.some(
+    publisherConnections.some(
       (c) => c.status === "online" || (c.lastHeartbeatAt != null && c.lastHeartbeatAt > fiveMinutesAgo),
     );
 

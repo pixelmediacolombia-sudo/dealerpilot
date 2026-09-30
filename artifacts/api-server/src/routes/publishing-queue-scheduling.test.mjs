@@ -207,6 +207,13 @@ test("publishing queue prefers the real Chrome publisher over Messenger connecti
   assert.match(controlledModeSource, /!r\.chromeExtensionId \|\| \/\^\[a-p\]\{32\}\$\//);
 });
 
+test("publishing connections are isolated from Messenger sessions", () => {
+  assert.match(routeSource, /session_id is null or session_id like '\$\{PUBLISHER_SESSION_PREFIX\}%'/);
+  assert.match(workerSource, /session_id is null or session_id like '\$\{PUBLISHER_SESSION_PREFIX\}%'/);
+  assert.match(controlledModeSource, /PUBLISHER_SESSION_PREFIX/);
+  assert.match(controlledModeSource, /like\(extensionConnectionsTable\.sessionId/);
+});
+
 test("stale manual Publish Now jobs cannot block due automatic batches", () => {
   assert.match(
     routeSource,

@@ -10,7 +10,7 @@
 // The per-dealer `autoPublishSettings.autoClickPublish` toggle is the
 // dashboard's explicit choice for automatic Marketplace publishing. The
 // deployment mode remains available for the global full-auto override.
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, like, or } from "drizzle-orm";
 import { db, extensionConnectionsTable, publishingJobsTable } from "@workspace/db";
 import { getCachedGmDecision } from "../routes/gm";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
@@ -36,6 +36,11 @@ export function resolveAlphaLotCity(lotLocation: string | null): string | undefi
 }
 
 const EXTENSION_ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
+export const PUBLISHER_SESSION_PREFIX = "publisher-window-";
+
+export function isPublisherSession(sessionId: string | null | undefined): boolean {
+  return !sessionId || sessionId.startsWith(PUBLISHER_SESSION_PREFIX);
+}
 
 export const QUEUED_PUBLISHING_JOB_STATUSES = ["Queued", "Scheduled", "Retry"] as const;
 
@@ -103,7 +108,13 @@ export async function isExtensionOnline(dealerId?: number): Promise<boolean> {
   const rows = await db
     .select()
     .from(extensionConnectionsTable)
-    .where(dealerId ? eq(extensionConnectionsTable.dealerId, dealerId) : undefined);
+    .where(and(
+      dealerId ? eq(extensionConnectionsTable.dealerId, dealerId) : undefined,
+      or(
+        isNull(extensionConnectionsTable.sessionId),
+        like(extensionConnectionsTable.sessionId, `${PUBLISHER_SESSION_PREFIX}%`),
+      ),
+    ));
   const cutoff = Date.now() - EXTENSION_ONLINE_THRESHOLD_MS;
   return rows.some(
     (r) =>

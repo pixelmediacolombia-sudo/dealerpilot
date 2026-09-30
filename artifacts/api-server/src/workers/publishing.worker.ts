@@ -44,6 +44,7 @@ import type { WorkerDefinition, WorkerRunOutcome } from "./types";
 import {
   ACTIVE_PUBLISHING_JOB_STATUSES,
   NOT_ELIGIBLE_STATUSES,
+  PUBLISHER_SESSION_PREFIX,
   resolveAlphaLotCity,
   resolvePublishMode,
 } from "../publishing/controlledMode";
@@ -444,7 +445,7 @@ async function findOnlineExtensions(): Promise<OnlineExtension[]> {
     dealer_id: number | null;
     chrome_extension_id: string | null;
   }>(
-    "select name, dealer_id, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc",
+    `select name, dealer_id, chrome_extension_id from extension_connections where status = 'online' and last_heartbeat_at > now() - interval '5 minutes' and (session_id is null or session_id like '${PUBLISHER_SESSION_PREFIX}%') order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc`,
   );
   const byDealer = new Map<number, OnlineExtension>();
   for (const row of result.rows) {
