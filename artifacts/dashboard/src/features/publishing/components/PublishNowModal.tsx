@@ -131,7 +131,7 @@ export function PublishNowModal({ vehicleId, vehicleLabel, onClose, onSuccess }:
         setWakeDebug("Extension wake failed: chrome.runtime not available in this browser");
         return;
       }
-      cr.sendMessage(extId, { type: "POLL_NOW" }, () => {
+      cr.sendMessage(extId, { type: "POLL_NOW", dealerId }, () => {
         const err = cr.lastError;
         if (err) {
           setWakeDebug(`Extension wake failed: ${err.message ?? String(err)}`);

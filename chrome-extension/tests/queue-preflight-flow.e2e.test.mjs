@@ -62,6 +62,9 @@ function createHarness(payload, options = {}) {
     },
     windows: {
       async update() {},
+      async getAll() {
+        return options.browserWindows ?? [];
+      },
     },
     runtime: {
       id: "chrome-runtime-e2e",
@@ -71,6 +74,7 @@ function createHarness(payload, options = {}) {
       onStartup: { addListener() {} },
       onInstalled: { addListener() {} },
       onMessage: { addListener(listener) { this.listener = listener; } },
+      onMessageExternal: { addListener(listener) { this.listener = listener; } },
     },
     alarms: {
       async get() {
@@ -150,6 +154,7 @@ function createHarness(payload, options = {}) {
     handlers: context.__DealerPilotQueueHandlers,
     calls,
     storage,
+    externalWake: chrome.runtime.onMessageExternal.listener,
   };
 }
 
@@ -336,6 +341,30 @@ test("heartbeat and diagnostics stay isolated by publisher window and dealer", a
   assert.ok(storage["publisherRuntimeWindow:11"].lastHeartbeatResponse);
   assert.ok(storage["publisherRuntimeWindow:22"].lastHeartbeatResponse);
   assert.equal(storage.lastHeartbeat, undefined);
+});
+
+test("dashboard Publish Now wake reaches the configured dealer window", async () => {
+  const { externalWake, calls } = createHarness({}, {
+    browserWindows: [{ id: 22 }],
+    initialStorage: {
+      "publisherSettingsWindow:22": {
+        backendUrl: "https://app.1987dealerpilot.com",
+        dealerId: 2,
+        sessionId: "publisher-window-22",
+      },
+    },
+  });
+
+  const response = await new Promise((resolve) => externalWake(
+    { type: "POLL_NOW", dealerId: 2 },
+    { url: "https://app.1987dealerpilot.com/listings", tab: { windowId: 22 } },
+    resolve,
+  ));
+
+  assert.equal(response.ok, true);
+  assert.equal(calls.heartbeats.length, 1);
+  assert.equal(calls.heartbeats[0].dealerId, 2);
+  assert.equal(calls.heartbeats[0].sessionId, "publisher-window-22");
 });
 
 test("queue polling no longer opens seller inbox monitor tabs", async () => {

@@ -1514,3 +1514,48 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   })();
   return true;
 });
+
+// The DealerPilot dashboard lives in a normal web page, so its immediate
+// Publish Now wake arrives through onMessageExternal rather than onMessage.
+// Keep this surface intentionally narrow and dealer-scoped: the dashboard
+// supplies the dealer id, and the extension resolves that id to its own
+// configured browser window before polling.
+chrome.runtime.onMessageExternal?.addListener((message, sender, sendResponse) => {
+  (async () => {
+    try {
+      if (message?.type !== "POLL_NOW") {
+        sendResponse({ ok: false, error: "Unsupported external message" });
+        return;
+      }
+
+      const requestedDealerId = Number(message.dealerId);
+      const senderWindowId = validWindowId(sender?.tab?.windowId);
+      const targets = await configuredPublisherSettings();
+      const scopedTarget = targets.find(([, settings]) => settings.dealerId === requestedDealerId);
+      const senderTarget = targets.find(([id, settings]) =>
+        id === senderWindowId && settings.dealerId === requestedDealerId
+      );
+      const windowId = senderTarget?.[0] ?? scopedTarget?.[0] ?? null;
+
+      if (windowId === null) {
+        sendResponse({ ok: false, error: "No configured publisher window for dealer" });
+        return;
+      }
+
+      const data = await handlers.POLL_NOW({
+        windowId,
+        dealerId: requestedDealerId,
+        forceUserAction: true,
+      });
+      sendResponse({ ok: true, data });
+    } catch (err) {
+      saveLastError(err);
+      sendResponse({
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        status: err && err.status,
+      });
+    }
+  })();
+  return true;
+});

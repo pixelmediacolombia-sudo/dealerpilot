@@ -232,6 +232,7 @@ test("Publish Now diagnostics stay scoped to the active dealer and do not wake a
   assert.match(publishNowModalSource, /useAccount/);
   assert.match(publishNowModalSource, /connect-status\$\{dealerQuery\}/);
   assert.match(publishNowModalSource, /jobs\/assigned\?dealerId=/);
+  assert.match(publishNowModalSource, /sendMessage\(extId, \{ type: "POLL_NOW", dealerId \}/);
   assert.doesNotMatch(publishNowModalSource, /fetch\("\/api\/publishing\/jobs\/next"\)/);
   assert.match(publishNowModalSource, /waiting for the current Chrome extension heartbeat/);
 });
