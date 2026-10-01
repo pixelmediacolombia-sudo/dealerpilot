@@ -5,6 +5,7 @@ import { test } from "node:test";
 const importFeed = readFileSync(new URL("../inventory/importFeed.ts", import.meta.url), "utf8");
 const commandCenter = readFileSync(new URL("./commandCenter.ts", import.meta.url), "utf8");
 const publishing = readFileSync(new URL("./publishing.ts", import.meta.url), "utf8");
+const toRemovePanel = readFileSync(new URL("../../../dashboard/src/features/listings/components/ToRemovePanel.tsx", import.meta.url), "utf8");
 const feed = readFileSync(new URL("./feed.ts", import.meta.url), "utf8");
 const extension = readFileSync(new URL("./extension.ts", import.meta.url), "utf8");
 const queueClient = readFileSync(new URL("../../../../chrome-extension/src/background/queueClient.js", import.meta.url), "utf8");
@@ -32,6 +33,16 @@ test("server and operator surfaces expose the Marketplace To Remove workflow", (
   assert.match(commandCenter, /kind: "marketplace_cleanup"/);
   assert.match(commandCenter, /kind: "feed_guardrail"/);
   assert.match(commandCenter, /toRemoveCount/);
+});
+
+test("Marketplace cleanup is isolated to the authenticated dealer", () => {
+  assert.match(toRemovePanel, /useAccount/);
+  assert.match(toRemovePanel, /dealer_id=\$\{encodeURIComponent\(dealerId\)\}/);
+  assert.match(toRemovePanel, /queryKey: \["marketplace-to-remove", dealerId\]/);
+  assert.doesNotMatch(toRemovePanel, /dealer_id=1/);
+  assert.match(publishing, /router\.get\("\/publishing\/to-remove"[\s\S]*?const dealerId = resolveDealerId\(req, res, DEALER_ID\)/);
+  assert.match(publishing, /router\.post\("\/publishing\/listings\/:id\/mark-sold"[\s\S]*?const dealerId = resolveDealerId\(req, res, DEALER_ID\)/);
+  assert.match(publishing, /recordMarketplaceSoldAction\(\{[\s\S]*?listingId,[\s\S]*?dealerId,/);
 });
 
 test("Chrome reports the actual Mark as Sold result", () => {

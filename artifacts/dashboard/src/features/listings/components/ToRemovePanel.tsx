@@ -5,6 +5,7 @@ import { Badge } from "@/shared/ui/badge";
 import { EmptyState, SectionCard } from "@/shared/ui";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
+import { useAccount } from "@/app/AuthGate";
 
 type ToRemoveItem = {
   id: number;
@@ -19,8 +20,8 @@ type ToRemoveItem = {
   error: string | null;
 };
 
-async function fetchToRemove(): Promise<{ items: ToRemoveItem[] }> {
-  const response = await fetch("/api/publishing/to-remove?dealer_id=1");
+async function fetchToRemove(dealerId: number): Promise<{ items: ToRemoveItem[] }> {
+  const response = await fetch(`/api/publishing/to-remove?dealer_id=${encodeURIComponent(dealerId)}`);
   if (!response.ok) throw new Error("No se pudo cargar la cola de Marketplace");
   return response.json() as Promise<{ items: ToRemoveItem[] }>;
 }
@@ -35,12 +36,18 @@ async function markSold(listingId: number): Promise<void> {
 }
 
 export function ToRemovePanel() {
+  const { dealerId } = useAccount();
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: ["marketplace-to-remove"], queryFn: fetchToRemove, refetchInterval: 60_000 });
+  const query = useQuery({
+    queryKey: ["marketplace-to-remove", dealerId],
+    queryFn: () => fetchToRemove(dealerId),
+    enabled: Number.isInteger(dealerId) && dealerId > 0,
+    refetchInterval: 60_000,
+  });
   const mutation = useMutation({
     mutationFn: markSold,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["marketplace-to-remove"] });
+      void queryClient.invalidateQueries({ queryKey: ["marketplace-to-remove", dealerId] });
       toast({ title: "Acción registrada", description: "La unidad quedó lista para confirmar en Marketplace." });
     },
     onError: (error: Error) => toast({ title: "No se pudo completar", description: error.message, variant: "destructive" }),
@@ -62,7 +69,7 @@ export function ToRemovePanel() {
         break;
       }
     }
-    void queryClient.invalidateQueries({ queryKey: ["marketplace-to-remove"] });
+    void queryClient.invalidateQueries({ queryKey: ["marketplace-to-remove", dealerId] });
   };
 
   return (

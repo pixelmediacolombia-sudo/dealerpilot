@@ -117,11 +117,7 @@ async function canLegacyStorageExtensionClaimAssignedJob(
 // GET /publishing/to-remove — sold inventory that still has a Marketplace listing.
 router.get("/publishing/to-remove", async (req, res) => {
   try {
-    const dealerId = Number(req.query.dealer_id ?? req.query.dealerId ?? DEALER_ID);
-    if (!Number.isInteger(dealerId) || dealerId <= 0) {
-      res.status(400).json({ error: "Invalid dealer_id" });
-      return;
-    }
+    const dealerId = resolveDealerId(req, res, DEALER_ID);
     const rows = await db
       .select({ listing: marketplaceListingsTable, vehicle: vehicleOperationalColumns })
       .from(marketplaceListingsTable)
@@ -190,6 +186,7 @@ router.get("/publishing/to-remove", async (req, res) => {
 // POST /publishing/listings/:id/mark-sold — operator or extension reports the Facebook action.
 router.post("/publishing/listings/:id/mark-sold", async (req, res) => {
   const listingId = Number(req.params.id);
+  const dealerId = resolveDealerId(req, res, DEALER_ID);
   const parsed = z.object({
     status: z.enum(["success", "failed"]),
     error: z.string().max(500).optional(),
@@ -201,6 +198,7 @@ router.post("/publishing/listings/:id/mark-sold", async (req, res) => {
   }
   const result = await recordMarketplaceSoldAction({
     listingId,
+    dealerId,
     status: parsed.data.status,
     error: parsed.data.error,
     extensionId: parsed.data.extensionId,

@@ -402,6 +402,7 @@ router.post("/extension/marketplace-sold-actions/:listingId/report", async (req,
   const now = new Date();
   const result = await recordMarketplaceSoldAction({
     listingId,
+    dealerId: parsed.data.dealerId ?? row.vehicle.dealerId,
     status: parsed.data.status === "completed" ? "success" : "failed",
     error: parsed.data.error,
     extensionId: parsed.data.extensionId,
