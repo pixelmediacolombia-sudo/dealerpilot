@@ -474,8 +474,17 @@ async function sendHeartbeatSnapshot(windowId = null) {
 
 const handlers = {
   async PING(message, sender) {
+    const windowId = await resolveWindowId(message, sender);
     await apiGet("/api/healthz");
-    const heartbeat = await sendHeartbeatSnapshot(await resolveWindowId(message, sender));
+    const heartbeat = await sendHeartbeatSnapshot(windowId);
+    const settings = await getPublisherSettings(windowId);
+    // Lucki can remain online while an older service worker has lost its
+    // polling alarm. A page PING is already a live signal from that configured
+    // publisher window, so use it as a dealer-scoped queue wake. Alpha keeps
+    // its existing alarm-driven path unchanged.
+    if (heartbeat.ok === true && settings.dealerId !== 1) {
+      await handlers.POLL_ASSIGNED_JOB({ windowId, skipHeartbeat: true }).catch((err) => saveLastError(err));
+    }
     return {
       backendUrl: heartbeat.backendUrl,
       environment: heartbeat.environment,
@@ -959,7 +968,9 @@ const handlers = {
 
     const now = new Date().toISOString();
     await chrome.storage.local.set({ lastPollTime: now });
-    await sendHeartbeatSnapshot(pollingWindowId);
+    if (message.skipHeartbeat !== true) {
+      await sendHeartbeatSnapshot(pollingWindowId);
+    }
 
     const extensionId = chrome.runtime.id || await getExtensionId();
     const settings = await getPublisherSettings(pollingWindowId);

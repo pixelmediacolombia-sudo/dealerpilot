@@ -442,6 +442,8 @@ test("heartbeat and diagnostics stay isolated by publisher window and dealer", a
     { dealerId: 1, sessionId: "publisher-window-11" },
     { dealerId: 2, sessionId: "publisher-window-22" },
   ]);
+  assert.equal(calls.apiGet.some((path) => path.includes("/api/publishing/jobs/assigned?extensionId=chrome-runtime-e2e&dealerId=1")), false);
+  assert.equal(calls.apiGet.some((path) => path.includes("/api/publishing/jobs/assigned?extensionId=chrome-runtime-e2e&dealerId=2")), true);
   assert.ok(storage["publisherRuntimeWindow:11"].lastHeartbeatResponse);
   assert.ok(storage["publisherRuntimeWindow:22"].lastHeartbeatResponse);
   assert.equal(storage.lastHeartbeat, undefined);
