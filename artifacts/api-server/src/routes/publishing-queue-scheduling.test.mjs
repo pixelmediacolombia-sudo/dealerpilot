@@ -214,6 +214,13 @@ test("publishing queue prefers the real Chrome publisher over Messenger connecti
   assert.match(controlledModeSource, /!r\.chromeExtensionId \|\| \/\^\[a-p\]\{32\}\$\//);
 });
 
+test("legacy storage ids can claim only a job assigned to the current dealer runtime", () => {
+  assert.match(routeSource, /LEGACY_STORAGE_EXTENSION_ID = \/\^ext-\[0-9a-f-\]\{36\}\$\/i/);
+  assert.match(routeSource, /canLegacyStorageExtensionClaimAssignedJob/);
+  assert.match(routeSource, /chrome_extension_id = \$2/);
+  assert.match(routeSource, /last_heartbeat_at > now\(\) - interval '5 minutes'/);
+});
+
 test("publishing connections are isolated from Messenger sessions", () => {
   assert.match(routeSource, /session_id is null or session_id like '\$\{PUBLISHER_SESSION_PREFIX\}%'/);
   assert.match(workerSource, /session_id is null or session_id like '\$\{PUBLISHER_SESSION_PREFIX\}%'/);

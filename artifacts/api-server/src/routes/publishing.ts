@@ -52,6 +52,8 @@ function isChromeRuntimeExtensionId(value: string | null | undefined): boolean {
   return Boolean(value && CHROME_RUNTIME_EXTENSION_ID.test(value.trim()));
 }
 
+const LEGACY_STORAGE_EXTENSION_ID = /^ext-[0-9a-f-]{36}$/i;
+
 const router: IRouter = Router();
 
 type ExtensionDealerScope = {
@@ -69,6 +71,27 @@ async function getExtensionDealerScope(extensionId: string, dealerIdHint?: numbe
   );
   const dealerId = Number(result.rows[0]?.dealer_id);
   return Number.isInteger(dealerId) && dealerId > 0 ? { extensionId, dealerId } : null;
+}
+
+async function canLegacyStorageExtensionClaimAssignedJob(
+  extensionId: string,
+  job: { dealerId: number; assignedExtensionId: string | null },
+): Promise<boolean> {
+  if (!LEGACY_STORAGE_EXTENSION_ID.test(extensionId.trim())) return false;
+  if (!isChromeRuntimeExtensionId(job.assignedExtensionId)) return false;
+
+  const result = await pool.query(
+    `select 1
+       from extension_connections
+      where dealer_id = $1
+        and chrome_extension_id = $2
+        and status = 'online'
+        and last_heartbeat_at > now() - interval '5 minutes'
+        and ${PUBLISHER_SESSION_FILTER_SQL}
+      limit 1`,
+    [job.dealerId, job.assignedExtensionId.trim()],
+  );
+  return result.rowCount === 1;
 }
 
 // GET /publishing/to-remove — sold inventory that still has a Marketplace listing.
@@ -803,7 +826,10 @@ router.post("/publishing/jobs/:id/claim", async (req, res) => {
   }
 
   const extensionScope = await getExtensionDealerScope(parsed.data.extensionId, job.dealerId);
-  if (!extensionScope || extensionScope.dealerId !== job.dealerId) {
+  const legacyAssignedExtension = !extensionScope
+    ? await canLegacyStorageExtensionClaimAssignedJob(parsed.data.extensionId, job)
+    : false;
+  if ((!extensionScope || extensionScope.dealerId !== job.dealerId) && !legacyAssignedExtension) {
     res.status(403).json({ error: "Extension is not configured for this dealer", code: "EXTENSION_DEALER_MISMATCH" });
     return;
   }
@@ -846,7 +872,10 @@ router.post("/publishing/jobs/:id/claim", async (req, res) => {
 
   await reconcileBatchProgress(updated.batchId);
 
-  req.log.info({ jobId: id, extensionId: parsed.data.extensionId }, "Publishing job claimed");
+  req.log.info(
+    { jobId: id, extensionId: parsed.data.extensionId, legacyAssignedExtension },
+    "Publishing job claimed",
+  );
   const [enriched] = await enrich([updated]);
   res.json(enriched);
 });
