@@ -221,6 +221,13 @@ test("legacy storage ids can claim only a job assigned to the current dealer run
   assert.match(routeSource, /last_heartbeat_at > now\(\) - interval '5 minutes'/);
 });
 
+test("legacy storage ids can poll assigned jobs only through the same dealer's online Chrome runtime", () => {
+  assert.match(routeSource, /getLegacyStorageDealerScope/);
+  assert.match(routeSource, /chrome_extension_id ~ '\^\[a-p\]\{32\}\$'/);
+  assert.match(routeSource, /const effectiveExtensionScope = extensionScope \?\? legacyStorageScope/);
+  assert.match(routeSource, /!legacyStorageScope/);
+});
+
 test("publishing connections are isolated from Messenger sessions", () => {
   assert.match(routeSource, /session_id is null or session_id like '\$\{PUBLISHER_SESSION_PREFIX\}%'/);
   assert.match(workerSource, /session_id is null or session_id like '\$\{PUBLISHER_SESSION_PREFIX\}%'/);
@@ -323,7 +330,7 @@ test("publishing worker repairs legacy stale assignments before selecting the ne
 test("publishing queue scopes extension polling and claims to the configured dealer", () => {
   assert.match(routeSource, /getExtensionDealerScope\(extensionId, job\.dealerId\)/);
   assert.match(routeSource, /extensionId query param is required/);
-  assert.match(routeSource, /eq\(publishingJobsTable\.dealerId, extensionScope\.dealerId\)/);
+  assert.match(routeSource, /eq\(publishingJobsTable\.dealerId, effectiveExtensionScope\.dealerId\)/);
   assert.match(routeSource, /dealer_id = \$1/);
   assert.match(routeSource, /EXTENSION_DEALER_MISMATCH/);
   assert.match(queueClientSource, /extensionId,\s*dealerId: String\(settings\.dealerId\)/);

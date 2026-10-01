@@ -73,6 +73,26 @@ async function getExtensionDealerScope(extensionId: string, dealerIdHint?: numbe
   return Number.isInteger(dealerId) && dealerId > 0 ? { extensionId, dealerId } : null;
 }
 
+async function getLegacyStorageDealerScope(extensionId: string, dealerIdHint?: number): Promise<ExtensionDealerScope | null> {
+  if (!LEGACY_STORAGE_EXTENSION_ID.test(extensionId.trim())) return null;
+  if (!Number.isInteger(dealerIdHint) || (dealerIdHint ?? 0) <= 0) return null;
+
+  const result = await pool.query<{ dealer_id: number | null }>(
+    `select dealer_id
+       from extension_connections
+      where dealer_id = $1
+        and status = 'online'
+        and last_heartbeat_at > now() - interval '5 minutes'
+        and chrome_extension_id ~ '^[a-p]{32}$'
+        and ${PUBLISHER_SESSION_FILTER_SQL}
+      order by updated_at desc
+      limit 1`,
+    [dealerIdHint],
+  );
+  const dealerId = Number(result.rows[0]?.dealer_id);
+  return Number.isInteger(dealerId) && dealerId > 0 ? { extensionId, dealerId } : null;
+}
+
 async function canLegacyStorageExtensionClaimAssignedJob(
   extensionId: string,
   job: { dealerId: number; assignedExtensionId: string | null },
@@ -321,7 +341,14 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
     extensionId,
     Number.isInteger(requestedDealerId) && requestedDealerId > 0 ? requestedDealerId : undefined,
   );
-  if (!extensionScope) {
+  const legacyStorageScope = !extensionScope
+    ? await getLegacyStorageDealerScope(
+        extensionId,
+        Number.isInteger(requestedDealerId) && requestedDealerId > 0 ? requestedDealerId : undefined,
+      )
+    : null;
+  const effectiveExtensionScope = extensionScope ?? legacyStorageScope;
+  if (!effectiveExtensionScope) {
     res.json({ job: null, code: "EXTENSION_DEALER_NOT_CONFIGURED" });
     return;
   }
@@ -334,11 +361,11 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
   if (connection.rows[0]?.name) aliases.add(connection.rows[0].name);
   const onlineConnection = await pool.query<{ name: string | null; chrome_extension_id: string | null }>(
     `select name, chrome_extension_id from extension_connections where status = 'online' and dealer_id = $1 and last_heartbeat_at > now() - interval '5 minutes' and ${PUBLISHER_SESSION_FILTER_SQL} order by case when chrome_extension_id ~ '^[a-p]{32}$' then 1 else 0 end desc, last_heartbeat_at desc limit 1`,
-    [extensionScope.dealerId],
+    [effectiveExtensionScope.dealerId],
   );
   const online = onlineConnection.rows[0];
   const onlinePublisherId = online?.chrome_extension_id?.trim() || null;
-  if (isChromeRuntimeExtensionId(onlinePublisherId) && onlinePublisherId !== extensionId) {
+  if (isChromeRuntimeExtensionId(onlinePublisherId) && onlinePublisherId !== extensionId && !legacyStorageScope) {
     res.json({ job: null, code: "PUBLISHER_EXTENSION_MISMATCH" });
     return;
   }
@@ -357,7 +384,7 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
       .where(
         and(
           eq(publishingJobsTable.status, "Assigned"),
-          eq(publishingJobsTable.dealerId, extensionScope.dealerId),
+          eq(publishingJobsTable.dealerId, effectiveExtensionScope.dealerId),
           isNull(publishingJobsTable.claimedByExtension),
           or(isNull(publishingJobsTable.scheduledAt), lte(publishingJobsTable.scheduledAt, new Date())),
           or(isNull(publishingJobsTable.assignedExtensionId), ne(publishingJobsTable.assignedExtensionId, extensionId)),
@@ -371,7 +398,7 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
     .where(
       and(
         eq(publishingJobsTable.status, "Assigned"),
-        eq(publishingJobsTable.dealerId, extensionScope.dealerId),
+        eq(publishingJobsTable.dealerId, effectiveExtensionScope.dealerId),
         inArray(publishingJobsTable.assignedExtensionId, [...aliases]),
         // A Controlled extension may only receive an operator-approved job.
         // Without this guard, an older unapproved assignment can sit ahead of
@@ -442,7 +469,11 @@ router.get("/publishing/jobs/next", async (req, res) => {
     extensionId,
     Number.isInteger(requestedDealerId) && requestedDealerId > 0 ? requestedDealerId : undefined,
   );
-  if (!extensionScope) {
+  const effectiveExtensionScope = extensionScope ?? await getLegacyStorageDealerScope(
+    extensionId,
+    Number.isInteger(requestedDealerId) && requestedDealerId > 0 ? requestedDealerId : undefined,
+  );
+  if (!effectiveExtensionScope) {
     res.json({ job: null, code: "EXTENSION_DEALER_NOT_CONFIGURED" });
     return;
   }
@@ -461,7 +492,7 @@ router.get("/publishing/jobs/next", async (req, res) => {
           eq(publishingJobsTable.status, "Retry"),
           and(eq(publishingJobsTable.status, "Scheduled"), lte(publishingJobsTable.scheduledAt, now)),
         ),
-        eq(publishingJobsTable.dealerId, extensionScope.dealerId),
+        eq(publishingJobsTable.dealerId, effectiveExtensionScope.dealerId),
         isNull(publishingJobsTable.claimedByExtension),
       ),
     )
