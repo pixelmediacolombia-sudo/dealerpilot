@@ -1076,6 +1076,9 @@
       .replace(/[.,!?;:]+/g, " ")
       .replace(/\s+/g, " ")
       .trim();
+    const clarifiesExactVehicle = /\b(?:not interested|no interest)\s+in\s+(?:a|an|another|different|other)\s+(?:one|vehicle|car)\b/.test(normalized) ||
+      /\b(?:no me interesa|no quiero|no busco)\s+(?:otro|otra|uno diferente|una diferente)\b/.test(normalized);
+    if (clarifiesExactVehicle) return false;
     return /\b(?:not interested|no thanks|do not contact|stop messaging|goodbye|bye)\b/.test(normalized) ||
       /\b(?:no me interesa|ya no estoy interesado|no gracias|no me contacten|deja de escribir|adios|chao)\b/.test(normalized);
   }

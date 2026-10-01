@@ -75,3 +75,14 @@ test("answer-repair stage prevents repeating the generic phone fallback", () => 
   assert.match(source, /mention Carfax unless the buyer asked about it/);
   assert.match(source, /buildQuestionRepairFallback/);
 });
+
+test("exact-vehicle visit clarifications continue the thread instead of closing it", () => {
+  assert.match(source, /function buyerClarifiesExactVehicle\(value: string\)/);
+  assert.match(source, /if \(buyerClarifiesExactVehicle\(value\)\) return false;/);
+  assert.match(source, /arrange\|schedule\|set up\|book/);
+  assert.match(source, /time\|appointment/);
+  assert.match(source, /see\|view/);
+  const visitCheck = source.indexOf('if (buyerRequestedVisitOrTestDrive(latest) && !hasVisitDaySignal(latest)) return "test_drive_request";');
+  const genericCheck = source.indexOf('if (buyerHasOpenQuestion(latest)) return "open_question";');
+  assert.ok(visitCheck >= 0 && genericCheck > visitCheck);
+});

@@ -601,7 +601,12 @@ function historyShowsFinancingDeclined(history: string): boolean {
 }
 
 function buyerRequestedVisitOrTestDrive(latest: string): boolean {
-  return /\b(?:test drive|take (?:it|the vehicle) for a drive|drive it|come see|come by|stop by|visit|appointment|cita|prueba de manejo|probarlo|manejarlo|venir a verlo|visitar)\b/i.test(normalizeIntentText(latest)) || hasVisitDaySignal(latest);
+  const normalized = normalizeIntentText(latest);
+  return /\b(?:test drive|take (?:it|the vehicle) for a drive|drive it|come see|come by|stop by|visit|appointment|cita|prueba de manejo|probarlo|manejarlo|venir a verlo|visitar)\b/i.test(normalized) ||
+    /\b(?:arrange|schedule|set up|book)\s+(?:a|the)\s+(?:time|appointment)\s+to\s+see\b/i.test(normalized) ||
+    /\b(?:when|what time)\s+can\s+(?:i|we)\s+(?:come\s+)?see\b/i.test(normalized) ||
+    /\b(?:see|view)\s+(?:this|the)\s+(?:exact\s+)?(?:vehicle|car|one)\b/i.test(normalized) ||
+    hasVisitDaySignal(latest);
 }
 
 function buyerDeclinedFinancing(latest: string, history: string): boolean {
@@ -757,8 +762,15 @@ function buyerClearlyAdvancesFinancing(value: string): boolean {
 }
 
 function buyerExplicitlyDisengages(value: string): boolean {
+  if (buyerClarifiesExactVehicle(value)) return false;
   return /\b(?:not interested|no thanks|don't contact|do not contact|stop messaging|goodbye|bye)\b/i.test(value) ||
     /\b(?:no me interesa|no gracias|no me contacten|deja de escribir|adi[oó]s|chao)\b/i.test(value);
+}
+
+function buyerClarifiesExactVehicle(value: string): boolean {
+  const normalized = normalizeIntentText(value);
+  return /\b(?:not interested|no interest)\s+in\s+(?:a|an|another|different|other)\s+(?:one|vehicle|car)\b/.test(normalized) ||
+    /\b(?:no me interesa|no quiero|no busco)\s+(?:otro|otra|uno diferente|una diferente)\b/.test(normalized);
 }
 
 function hasStalledConversation(
@@ -832,6 +844,7 @@ function stageRequiresStorePhone(stage: SalesReplyStage): boolean {
 }
 
 function isConversationClosingBuyerAcknowledgement(value: string): boolean {
+  if (buyerClarifiesExactVehicle(value)) return false;
   const normalized = cleanConversationText(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
