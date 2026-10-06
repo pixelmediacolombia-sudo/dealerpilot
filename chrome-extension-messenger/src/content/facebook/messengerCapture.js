@@ -107,6 +107,20 @@
       /\bcalifica(?:r)?\s+[a-z][a-z\s.'-]{1,80}$/.test(normalized);
   }
 
+  const PHONE_NUMBER_PATTERN = /(?:^|\D)((?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})(?=$|\D)/;
+  const PHONE_CARD_LABEL_PATTERN = /\b(?:phone number|n[uú]mero de tel[eé]fono|numero de telefono)\b/i;
+
+  function extractPhoneLikeText(value) {
+    const text = cleanMessageText(value);
+    const match = text.match(PHONE_NUMBER_PATTERN);
+    return match?.[1]?.trim() || "";
+  }
+
+  function canonicalPhoneDigits(value) {
+    const digits = String(value || "").replace(/\D/g, "");
+    return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  }
+
   function scoreBubbleCandidate(element, scope) {
     if (!element || !scope) return 0;
     let score = 0;
@@ -664,6 +678,10 @@
     if (isUntrustedMessageText(text)) return "";
     if (isLikelyAutoReplyText(text)) return "";
     if (isFacebookRatingCardText(text)) return "";
+    const phoneLike = extractPhoneLikeText(text);
+    if (phoneLike && (PHONE_CARD_LABEL_PATTERN.test(text) || /^[+\d().\s-]+$/.test(text))) {
+      return phoneLike;
+    }
     const requirementsMatch = text.match(
       /((?:q|que|qu[eÃ©])\s+(?:se\s+)?necesit[ao][\s\S]{0,140}\?|requisitos?[\s\S]{0,140}\?|documentos?[\s\S]{0,140}\?|what (?:do|will) i need[\s\S]{0,140}\?|what documents[\s\S]{0,140}\?|requirements?[\s\S]{0,140}\?)/i,
     );
@@ -690,6 +708,66 @@
     const rightGap = Math.max(0, scopeRect.right - rect.right);
     return leftGap > rightGap + minDealerOffset &&
       rect.left > scopeRect.left + (scopeRect.width * 0.35);
+  }
+
+  function phoneCardRectIsBuyerSide(element, scope) {
+    if (!element || !scope) return false;
+    const scopeRect = rectOf(scope);
+    if (!scopeRect.width || !scopeRect.height) return false;
+    let current = element;
+    let incomingGeometry = false;
+    for (let depth = 0; current && current !== scope && depth < 8; depth += 1, current = current.parentElement) {
+      const rect = rectOf(current);
+      const right = rect.right || (rect.left + rect.width);
+      const width = rect.width || Math.max(0, right - rect.left);
+      const withinVerticalScope =
+        rect.top >= scopeRect.top - 24 &&
+        rect.top + rect.height <= scopeRect.top + scopeRect.height + 24;
+      if (!withinVerticalScope || width <= 0) continue;
+      if (isClearlyOwnSide(current, scope)) return false;
+      const compactBubble = width < scopeRect.width * 0.9;
+      const leftSide = rect.left <= scopeRect.left + scopeRect.width * 0.6;
+      if (compactBubble && leftSide) incomingGeometry = true;
+    }
+    return incomingGeometry;
+  }
+
+  function readBuyerPhoneCards(scope, buyerName, visualMessages = []) {
+    // Native Facebook phone cards are rendered inside the message log. Do not
+    // scan the whole document: the dealer's own phone link can be exposed by
+    // a portal/aria-label outside the selected incoming message bubble.
+    const sources = Array.from(scope?.querySelectorAll?.('[aria-label], div[dir="auto"], span[dir="auto"]') || []);
+
+    const seenPhones = new Set();
+    return sources
+      .filter((element) => isVisible(element) && !isComposerNode(element))
+      .map((element) => {
+        const text = cleanMessageText([
+          textOf(element),
+          element.getAttribute?.('aria-label') || '',
+        ].filter(Boolean).join(' '));
+        return {
+          element,
+          text,
+          phone: extractPhoneLikeText(text),
+          top: rectOf(element).top || 0,
+        };
+      })
+      .filter((candidate) => {
+        if (!candidate.phone || !PHONE_CARD_LABEL_PATTERN.test(candidate.text)) return false;
+        if (candidate.text.length > 260 || !phoneCardRectIsBuyerSide(candidate.element, scope)) return false;
+        if (visualMessages.some((message) =>
+          message.speaker === 'Dealer' && canonicalPhoneDigits(extractPhoneLikeText(message.text)) === canonicalPhoneDigits(candidate.phone),
+        )) return false;
+        if (visualMessages.some((message) =>
+          message.speaker !== 'Dealer' && canonicalPhoneDigits(extractPhoneLikeText(message.text)) === canonicalPhoneDigits(candidate.phone),
+        )) return false;
+        if (seenPhones.has(candidate.phone)) return false;
+        seenPhones.add(candidate.phone);
+        return true;
+      })
+      .sort((left, right) => left.top - right.top)
+      .map((candidate) => ({ speaker: buyerName || 'Buyer', text: candidate.phone, __top: candidate.top }));
   }
 
   function extractVisibleBuyerMessages(root, documentRef, buyerName, scope) {
@@ -875,6 +953,7 @@
       )
       .filter((message) => !isUntrustedMessageText(message.text));
     const visibleBuyerMessages = extractVisibleBuyerMessages(root, documentRef, buyerName, scope);
+    const buyerPhoneCards = readBuyerPhoneCards(scope, buyerName, visualMessages);
     const hasBuyerMessage = messages.some((message) => message.speaker !== "Dealer");
     const inboxPreview = !hasBuyerMessage && !visibleBuyerMessages.length
       ? extractInboxPreviewMessage(documentRef, buyerName)
@@ -898,6 +977,16 @@
         !finalMessages.some((message) => message.speaker !== "Dealer" && message.text === visibleBuyerMessage.text)
       ) {
         finalMessages.push(visibleBuyerMessage);
+      }
+    }
+    for (const buyerPhoneCard of buyerPhoneCards) {
+      if (!finalMessages.some((message) =>
+        message.speaker !== "Dealer" && (
+          normalizeForMatch(message.text) === normalizeForMatch(buyerPhoneCard.text) ||
+          canonicalPhoneDigits(extractPhoneLikeText(message.text)) === canonicalPhoneDigits(buyerPhoneCard.text)
+        ),
+      )) {
+        finalMessages.push(buyerPhoneCard);
       }
     }
     const buyerToken = normalizeForMatch(buyerName);

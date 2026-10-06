@@ -1097,11 +1097,21 @@
     if (intake?.closeConversationAfterDelivery !== true || !intake?.conversationId || !externalThreadRef) {
       return { closed: false, skipped: true };
     }
-    const response = await send({
+    let response = await send({
       type: "CLOSE_MESSENGER_CONVERSATION",
       conversationId: intake.conversationId,
       externalThreadRef,
     });
+    if (!response?.ok) {
+      // The farewell is terminal. Retry once because the close request is a
+      // separate network hop from the confirmed Facebook send.
+      await sleep(250);
+      response = await send({
+        type: "CLOSE_MESSENGER_CONVERSATION",
+        conversationId: intake.conversationId,
+        externalThreadRef,
+      });
+    }
     if (!response?.ok) {
       return { closed: false, error: response?.error || "conversation_close_failed" };
     }
@@ -1423,16 +1433,16 @@
     clearPendingBuyer(threadKey);
     let lastSuggestedReply = repairSuggestedReplyForBuyerIntent(extractSuggestedReply(response), payload);
     // A phone-only buyer turn carries no language signal. If the backend
-    // returned a mismatched-language handoff, use the conversation's buyer
-    // language for the required farewell instead of blocking the send.
+    // A buyer phone is terminal: always replace any model/static drift with
+    // the single farewell before delivery and closure. Language detection is
+    // recovered from the prior buyer turns because a phone-only turn has no
+    // language signal of its own.
     if (
       isPhoneOnlyBuyerMessage(payload.currentMessage) &&
       (response.data?.handoffReason === "buyer_phone_received" || response.data?.closeConversationAfterDelivery === true)
     ) {
       const buyerLanguage = buyerLanguageForReply(payload.currentMessage, snapshot.messages);
-      if (buyerLanguage !== "unknown" && detectLikelyLanguage(lastSuggestedReply) !== buyerLanguage) {
-        lastSuggestedReply = phoneReceivedFarewell(buyerLanguage);
-      }
+      lastSuggestedReply = phoneReceivedFarewell(buyerLanguage === "es" ? "es" : "en");
     }
     if (lastSuggestedReply && !replyMirrorsBuyerLanguage(lastSuggestedReply, payload.currentMessage, snapshot.messages)) {
       await sendDebug("auto_send_blocked", {

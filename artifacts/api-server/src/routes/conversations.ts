@@ -71,6 +71,26 @@ const NO_DOWN_PAYMENT_POLICY: DownPaymentPolicy = {
   source: "none",
 };
 
+// Messenger can report the same buyer turn from both the DOM observer and the
+// heartbeat. Serialize intake per dealer/thread so both requests cannot read
+// the same pre-insert history and generate two different assistant messages.
+const conversationIntakeLocks = new Map<string, Promise<void>>();
+
+async function acquireConversationIntakeLock(key: string): Promise<() => void> {
+  const previous = conversationIntakeLocks.get(key) ?? Promise.resolve();
+  let releaseCurrent!: () => void;
+  const current = new Promise<void>((resolve) => {
+    releaseCurrent = resolve;
+  });
+  const tail = previous.then(() => current);
+  conversationIntakeLocks.set(key, tail);
+  await previous;
+  return () => {
+    if (conversationIntakeLocks.get(key) === tail) conversationIntakeLocks.delete(key);
+    releaseCurrent();
+  };
+}
+
 function resolveStorePhone(
   lotLocation?: string | null,
   dealerKnowledge?: DealerMarketplaceKnowledge,
@@ -470,11 +490,10 @@ function extractDownPaymentAmount(text: string, downPaymentQuestionAsked = false
   return wordAmounts.find(([pattern]) => pattern.test(normalized))?.[1] ?? null;
 }
 
-type ImmediateHandoffReason = "buyer_phone_received" | "concrete_cash_offer_received";
+type ImmediateHandoffReason = "buyer_phone_received";
 
 function resolveImmediateHandoffReason(text: string, storePhone = ""): ImmediateHandoffReason | null {
   if (extractBuyerPhoneNumber(text, storePhone)) return "buyer_phone_received";
-  if (hasConcreteCashOffer(text)) return "concrete_cash_offer_received";
   return null;
 }
 
@@ -1014,8 +1033,11 @@ function resolveSalesReplyStage(
   // and treating it as "already known" can incorrectly advance to the next
   // qualification question instead of closing with the phone handoff.
   if (hasPhoneNumber(latest, storePhone)) return "phone_received";
+  // A cash/cheque offer is a negotiation turn, not a terminal handoff. Keep
+  // the buyer in the conversation so the next qualification question can be
+  // answered without assigning the lead to a salesperson prematurely.
+  if (hasConcreteCashOffer(latest)) return "open_question";
   if (isCashOfferReviewQuestion(latest)) return "open_question";
-  if (resolveImmediateHandoffReason(latest, storePhone)) return "handoff_confirmation";
   if (vehicleRequest === "photos") return "vehicle_link_request";
   if (vehicleRequest === "carfax") return "carfax_request";
   if (buyerAskedVin(latest)) return "vin_inquiry";
@@ -1265,6 +1287,7 @@ function buildBaseSafeFallbackReply(
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy, storePhone);
   const askForBuyerPhone = shouldAskBuyerPhoneAfterQualification(visibleMessages);
   const storeAddress = resolveStoreAddress(lotLocation, dealerKnowledge);
+  const concreteCashOffer = hasConcreteCashOffer(currentMessage);
   const cashOfferAmount = isCashOfferReviewQuestion(currentMessage)
     ? extractDownPaymentAmount(currentMessage)
     : null;
@@ -1272,6 +1295,9 @@ function buildBaseSafeFallbackReply(
     dealerKnowledgeValue(dealerKnowledge, language, key, fallback);
   if (language === "es") {
     if (stage === "open_question") {
+      if (concreteCashOffer) {
+        return "Gracias por la oferta. Nuestros agentes de ventas revisarán los detalles. ¿Qué vehículo te gustaría dar a cuenta?";
+      }
       if (cashOfferAmount != null) {
         return `Nuestros agentes de ventas se comunicarán contigo para confirmar si $${cashOfferAmount.toLocaleString("en-US")} de contado funciona. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${storePhone}.`;
       }
@@ -1402,6 +1428,9 @@ function buildBaseSafeFallbackReply(
     return `Con gusto te ayudo con el ${vehicle}. ¿Qué te gustaría saber?`;
   }
   if (stage === "open_question") {
+    if (concreteCashOffer) {
+      return "Thanks for the offer. Our sales agents will review the details. What vehicle would you like to trade in?";
+    }
     if (cashOfferAmount != null) {
       return `Our sales agents will contact you to confirm whether $${cashOfferAmount.toLocaleString("en-US")} out the door works. What is the best phone number to reach you? You can also call Alpha Motorsports at ${storePhone}.`;
     }
@@ -2338,6 +2367,7 @@ export async function generateAiReply(
   void publishedDownPayment;
   void vehicleType;
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy, storePhone);
+  const concreteCashOffer = hasConcreteCashOffer(currentMessage);
   // Phone capture is terminal for the automated flow: always send the
   // deterministic farewell before the extension closes after delivery.
   if (stage === "phone_received") {
@@ -2365,7 +2395,9 @@ export async function generateAiReply(
     dealerKnowledge,
   });
   const stageInstruction = {
-    open_question: `The buyer asked a question that must be answered before qualification advances. If the dealer knowledge block does not contain the answer, say that the sales agents can help, give ${dealerName}'s dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Never open with ignorance or say that a detail is not confirmed. Do not ask financing, down payment, or documents.`,
+    open_question: concreteCashOffer
+      ? `The buyer made a concrete cash or payment offer. Acknowledge the offer and say that the sales agents will review the details, then ask exactly one next conversational qualification question about a trade-in. Keep the conversation active. Do not request a phone number, assign the buyer to a salesperson, say goodbye, close the conversation, or ask about financing, down payment, or documents.`
+      : `The buyer asked a question that must be answered before qualification advances. If the dealer knowledge block does not contain the answer, say that the sales agents can help, give ${dealerName}'s dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Never open with ignorance or say that a detail is not confirmed. Do not ask financing, down payment, or documents.`,
     availability: availabilityQuickReplyAccepted
       ? `Greet as ${dealerName}, state that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.`
       : `Greet as ${dealerName}, explicitly confirm that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.`,
@@ -2726,6 +2758,10 @@ router.post("/conversations/intake", async (req, res) => {
   const dealerId = Number.isInteger(parsedDealerId) && parsedDealerId > 0
     ? parsedDealerId
     : DEALER_ID;
+  const releaseConversationIntakeLock = await acquireConversationIntakeLock(
+    `${dealerId}:${externalThreadRef}`,
+  );
+  try {
   const [targetDealer] = await db
     .select({
       id: dealersTable.id,
@@ -3488,6 +3524,9 @@ router.post("/conversations/intake", async (req, res) => {
     fallbackReason: aiReplyResult?.fallbackReason ?? null,
     timings,
   });
+  } finally {
+    releaseConversationIntakeLock();
+  }
 });
 
 router.post("/conversations/outbound/:jobId/delivered", async (req, res) => {

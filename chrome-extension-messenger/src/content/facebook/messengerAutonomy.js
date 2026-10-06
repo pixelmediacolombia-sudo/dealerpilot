@@ -4,6 +4,8 @@
   const THREAD_SETTLE_MS = 900;
   const PROCESS_RETRY_MS = 1200;
   const PROCESS_MAX_ATTEMPTS = 9;
+  const THREAD_CHANGE_REQUEUE_DELAY_MS = 1200;
+  const THREAD_CHANGE_REQUEUE_LIMIT = 2;
   const RETRYABLE_PROCESS_REASONS = new Set([
     "waiting_quiet_window",
     "capture_in_flight",
@@ -285,6 +287,7 @@
     const MutationObserverCtor = options.MutationObserverCtor || globalThis.MutationObserver;
     const previewById = new Map();
     const handledSignatureById = new Map();
+    const threadChangeRequeuesById = new Map();
     const seenActiveBuyerSignatures = new Set(incomingBuyerSignaturesFromMutationRecords([
       { target: documentRef.body || documentRef.documentElement, addedNodes: [] },
     ], options.sellerProfileNames || []));
@@ -352,7 +355,23 @@
         await sleepFn(PROCESS_RETRY_MS);
       }
       if (!RETRYABLE_PROCESS_REASONS.has(result?.reason)) {
+        threadChangeRequeuesById.delete(target.threadId);
         handledSignatureById.set(target.threadId, target.signature || "");
+      } else if (result?.reason === "thread_changed_before_send" || result?.reason === "thread_route_mismatch") {
+        const requeues = threadChangeRequeuesById.get(target.threadId) || 0;
+        if (requeues < THREAD_CHANGE_REQUEUE_LIMIT) {
+          threadChangeRequeuesById.set(target.threadId, requeues + 1);
+          setTimeout(() => {
+            if (!isSupportedConversationRoute(locationRef.pathname)) return;
+            queue.enqueue({
+              ...target,
+              reason: "thread_change_recovery",
+              observedAt: Date.now(),
+            });
+          }, THREAD_CHANGE_REQUEUE_DELAY_MS);
+        } else {
+          threadChangeRequeuesById.delete(target.threadId);
+        }
       }
       return result;
     }

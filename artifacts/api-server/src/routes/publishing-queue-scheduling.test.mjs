@@ -873,7 +873,11 @@ test("Sales AI intake is owned by the Messenger AI extension and backend contrac
   assert.match(conversationsSource, /Nuestros agentes de ventas tienen el reporte del vehículo/);
   assert.match(conversationsSource, /buyer_phone_received/);
   assert.doesNotMatch(conversationsSource, /down_payment_amount_received/);
-  assert.match(conversationsSource, /concrete_cash_offer_received/);
+  assert.doesNotMatch(conversationsSource, /concrete_cash_offer_received/);
+  assert.match(conversationsSource, /hasConcreteCashOffer\(latest\)\) return "open_question"/);
+  assert.match(conversationsSource, /The buyer made a concrete cash or payment offer/);
+  assert.match(conversationsSource, /What vehicle would you like to trade in/);
+  assert.match(conversationsSource, /acquireConversationIntakeLock/);
   assert.match(conversationsSource, /The buyer provided a phone number[\s\S]*brief goodbye/);
   assert.match(conversationsSource, /handoff_confirmation/);
   assert.match(conversationsSource, /status: handoffReason \? "BDC Assigned"/);

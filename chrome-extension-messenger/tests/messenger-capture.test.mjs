@@ -892,6 +892,108 @@ test("captureFromRoot records buyer voice messages and preserves the media sourc
   assert.equal(capture.audioMessages[0].audio.src, "blob:https://www.facebook.com/voice-note-1");
 });
 
+test("Facebook phone cards become the latest buyer message", () => {
+  const phoneCard = new FakeElement({
+    attributes: { "aria-label": "Phone number +1 561-356-4543" },
+    text: "Phone number +1 561-356-4543 WhatsApp call Call",
+    rect: { left: 40, right: 300, top: 620, width: 260, height: 110 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [phoneCard],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Madinah · 2022 Ford F150 Lightning" }),
+      scope,
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" } }),
+    ],
+  });
+
+  const capture = runCapture(root);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(capture.messages)), [
+    { speaker: "Madinah", text: "+1 561-356-4543" },
+  ]);
+  assert.equal(capture.messages.at(-1).text, "+1 561-356-4543");
+});
+
+test("Marketplace buyer phone card does not duplicate a typed buyer number", () => {
+  const dealerPhoneMessage = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "Alpha Motorsports at +1 703-763-4675.",
+    rect: { left: 220, right: 410, top: 280, width: 190, height: 44 },
+  });
+  const buyerTypedPhone = new FakeElement({
+    attributes: { dir: "auto" },
+    text: "240 517 3781",
+    rect: { left: 40, right: 190, top: 360, width: 150, height: 44 },
+  });
+  const buyerPhoneCard = new FakeElement({
+    attributes: { "aria-label": "Phone number +1 240-517-3781" },
+    text: "WhatsApp message WhatsApp call",
+    rect: { left: 40, right: 300, top: 420, width: 260, height: 110 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [dealerPhoneMessage, buyerTypedPhone, buyerPhoneCard],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Qu · 2020 Land Rover RANGE ROVER SPORT" }),
+      scope,
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" } }),
+    ],
+  });
+
+  const capture = runCapture(root);
+  const phoneCardMessages = capture.messages.filter((message) => message.text === "+1 240-517-3781");
+  const buyerPhoneMessages = capture.messages.filter((message) =>
+    message.speaker !== "Dealer" && /240[-.\s]?517[-.\s]?3781/.test(message.text.replace(/^\+1\s*/, "")),
+  );
+
+  assert.equal(capture.messages.at(-1).text, "240 517 3781");
+  assert.equal(capture.messages.at(-1).speaker, "Qu");
+  assert.equal(phoneCardMessages.length, 0);
+  assert.equal(buyerPhoneMessages.length, 1);
+  assert.equal(capture.messages.some((message) => message.text.includes("703-763-4675") && message.speaker !== "Dealer"), false);
+});
+
+test("dealer phone cards are not promoted to buyer messages", () => {
+  const dealerPhoneCard = new FakeElement({
+    attributes: { "aria-label": "Phone number +1 703-763-4675" },
+    text: "Phone number +1 703-763-4675 Call",
+    rect: { left: 220, right: 410, top: 620, width: 190, height: 90 },
+  });
+  const scope = new FakeElement({
+    attributes: { role: "log" },
+    rect: { left: 0, right: 420, top: 180, width: 420, height: 520 },
+    children: [dealerPhoneCard],
+  });
+  const root = new FakeElement({
+    attributes: { role: "dialog", "aria-label": "Marketplace conversation" },
+    rect: { left: 900, right: 1320, top: 120, width: 420, height: 780 },
+    children: [
+      new FakeElement({ tagName: "h2", text: "Madinah · 2022 Ford F150 Lightning" }),
+      scope,
+      new FakeElement({ attributes: { contenteditable: "true", role: "textbox", "aria-label": "Aa" } }),
+    ],
+  });
+
+  const capture = runCapture(root);
+
+  assert.equal(
+    capture.messages.some((message) => message.speaker !== "Dealer" && message.text.includes("703-763-4675")),
+    false,
+  );
+});
+
 test("standalone Message sent timestamps never become the final message", () => {
   const timestamp = new FakeElement({
     attributes: { "aria-label": "Message sent Fri 5:40 PM" },

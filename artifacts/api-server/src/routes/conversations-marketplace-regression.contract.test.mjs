@@ -24,7 +24,7 @@ test("a bare down-payment number uses the preceding dealer question context", ()
 });
 
 test("phone capture closes with a neutral handoff and no follow-up question", () => {
-  const stageStart = source.indexOf('if (hasPhoneNumber(latest)) return "phone_received";');
+  const stageStart = source.indexOf('if (hasPhoneNumber(latest, storePhone)) return "phone_received";');
   assert.ok(stageStart >= 0);
   assert.doesNotMatch(
     source.slice(stageStart, stageStart + 120),

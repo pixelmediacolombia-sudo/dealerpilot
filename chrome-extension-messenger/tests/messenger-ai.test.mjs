@@ -102,6 +102,8 @@ function createHarness({
   sendClearDelayMs = 0,
   includeDecoySendButton = false,
   dynamicSendControl = false,
+  profileLabel = "Manage Andres Ibanez notification settings",
+  vehicleTitle = "2021 Toyota RAV4",
   locationOverride = null,
   nowMs = null,
   sessionStorageRef = null,
@@ -150,7 +152,7 @@ function createHarness({
     composerElement.innerText = composerText;
     composerElement.textContent = composerText;
   }
-  const heading = new FakeElement({ tagName: "h2", text: "Buyer A - 2021 Toyota RAV4" });
+  const heading = new FakeElement({ tagName: "h2", text: `Buyer A - ${vehicleTitle}` });
   const root = new FakeElement({
     attributes: { "aria-label": "Marketplace conversation" },
     children: [
@@ -160,7 +162,7 @@ function createHarness({
         : []),
     ],
   });
-  const profile = new FakeElement({ attributes: { "aria-label": "Manage Andres Ibanez notification settings" } });
+  const profile = new FakeElement({ attributes: { "aria-label": profileLabel } });
   const document = {
     execCommand(command, _showUi, value) {
       if (command === "insertText" && composerElement) {
@@ -268,7 +270,7 @@ function createHarness({
             messageScopeDetected: true,
             extractionMode: "semantic",
             threadIdentity: "facebook-thread-buyer-a",
-            selectedHeaderText: "Buyer A - 2021 Toyota RAV4",
+            selectedHeaderText: `Buyer A - ${vehicleTitle}`,
             latestMessageDirection: "buyer",
             composerDetected: !!composerElement,
           },
@@ -331,6 +333,63 @@ test("seller profile detection accepts Facebook account and profile label varian
   assert.equal(profile.matched, true);
 });
 
+test("generic Facebook current-user markers do not block the configured window profile", async () => {
+  const { ai, calls } = createHarness({
+    settings: { autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    profileLabel: "Your",
+    intakeResponse: { ok: true, data: { suggestedReply: "Yes, it is available." } },
+    sendSucceeds: true,
+  });
+
+  const profile = ai.validateSellerProfile(new FakeElement({ attributes: { "aria-label": "Your" } }), ["Andres Ibanez"]);
+  assert.equal(profile.currentProfileName, "");
+  assert.equal(profile.matched, false);
+
+  const result = await ai.captureConversation({ automatic: false });
+  assert.equal(result.autoSent, true);
+  assert.notEqual(calls.debug.at(-1).reason, "seller_profile_mismatch");
+});
+
+test("manual dealer closing message cancels a stale buyer turn before backend intake", async () => {
+  const { ai } = createHarness({
+    settings: { autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    captures: [{
+      root: new FakeElement({
+        attributes: { "aria-label": "Marketplace conversation" },
+        children: [new FakeElement({
+          tagName: "h2",
+          text: "Buyer A - 2021 Toyota RAV4",
+        })],
+      }),
+      scope: null,
+      buyerName: "Buyer A",
+      messages: [
+        { speaker: "Buyer A", text: "+1 425-350-0860" },
+        { speaker: "Dealer", text: "Yes that is ok" },
+      ],
+      evidence: {
+        threadRootDetected: true,
+        messageScopeDetected: true,
+        extractionMode: "semantic",
+        selectedHeaderText: "Buyer A - 2021 Toyota RAV4",
+        latestMessageDirection: "dealer",
+        composerDetected: true,
+      },
+    }],
+  });
+
+  const result = ai.freshSnapshotStillPendingBuyer(
+    {
+      externalThreadRef: "facebook-messages-thread-999999",
+      currentMessage: "+1 425-350-0860",
+    },
+    { sellerProfileNames: ["Andres Ibanez"] },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "manual_reply_after_buyer");
+});
+
 test("autoReply never sends a backend reply that repeats an existing conversation message", async () => {
   const { ai, calls, composerElement, sendButton } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
@@ -369,6 +428,35 @@ test("autoReply never sends a backend reply that echoes the buyer question verba
   assert.equal(composerElement.textContent, "");
   assert.deepEqual(sendButton.events, []);
   assert.equal(calls.debug.at(-1).reason, "reply_repeats_conversation");
+});
+
+test("autoReply sends a substantive answer that references the buyer topic", async () => {
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [
+      { speaker: "Malo", text: "14k cash in hand outdoor today" },
+      { speaker: "Dealer", text: "I'd be happy to help with the Cayenne. What would you like to know?" },
+      { speaker: "Malo", text: "Maintenance history" },
+    ],
+    intakeResponse: {
+      ok: true,
+      data: {
+        suggestedReply: "We can pull the maintenance history for the 2017 Porsche Cayenne — what's the best phone number to reach you? Our number is +1 703-763-4675.",
+      },
+    },
+    sendSucceeds: true,
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(calls.intake.length, 1);
+  assert.equal(result.autoSent, true);
+  assert.equal(result.deliveryConfirmed, true);
+  assert.notEqual(result.reason, "reply_repeats_conversation");
+  assert.match(
+    calls.messages.find((message) => message.type === "DEBUGGER_COMPOSER_WRITE")?.text || "",
+    /maintenance history/i,
+  );
 });
 
 test("repair removes a stale generic follow-up prefix before a fresh vehicle reply", () => {
@@ -429,6 +517,46 @@ test("auto reply is active by default and sends through the local Messenger harn
   assert.equal(calls.intake.length, 1);
   assert.ok(calls.messages.some((message) => message.type === "DEBUGGER_COMPOSER_WRITE"));
   assert.ok(calls.messages.some((message) => message.type === "DEBUGGER_COMPOSER_SUBMIT"));
+  assert.equal(calls.debug.at(-1).stage, "intake_ok");
+});
+
+test("autoReply blocks a vehicle link contaminated from another listing", async () => {
+  const { ai, calls, composerElement, sendButton } = createHarness({
+    vehicleTitle: "2021 Tesla MODEL Y",
+    messages: [{ speaker: "Irfan", text: "Send me tesla y application" }],
+    intakeResponse: {
+      ok: true,
+      data: {
+        suggestedReply:
+          "Here is the complete vehicle page with all the photos: https://www.alphamotorsport.net/used-2021-TOYOTA-CAMRY-SE-fredericksburg-virginia-22408/vd/638958.",
+      },
+    },
+    sendSucceeds: true,
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(result.autoSent, false);
+  assert.equal(result.reason, "reply_vehicle_context_mismatch");
+  assert.equal(composerElement.textContent, "");
+  assert.deepEqual(sendButton.events, []);
+  assert.equal(calls.debug.at(-1).reason, "reply_vehicle_context_mismatch");
+});
+
+test("autoReply allows a vehicle link matching the selected chat vehicle", async () => {
+  const correctReply =
+    "Here is the complete vehicle page with all the photos: https://www.alphamotorsport.net/used-2021-TESLA-MODEL-Y-manassas-virginia/vd/638959.";
+  const { ai, calls } = createHarness({
+    vehicleTitle: "2021 Tesla MODEL Y",
+    messages: [{ speaker: "Irfan", text: "Send me tesla y application" }],
+    intakeResponse: { ok: true, data: { suggestedReply: correctReply } },
+    sendSucceeds: true,
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(result.autoSent, true);
+  assert.equal(result.deliveryConfirmed, true);
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
 });
 
@@ -999,6 +1127,39 @@ test("Spanish history keeps a phone-only buyer reply in Spanish", async () => {
   assert.equal(composerElement.textContent, "");
 });
 
+test("Spanish phone handoff sends a localized farewell before closing", async () => {
+  const { ai, calls } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
+    messages: [
+      { speaker: "Kimberlin", text: "Ok puedo llamar mañana" },
+      { speaker: "Kimberlin", text: "8042554656" },
+    ],
+    intakeResponse: {
+      ok: true,
+      data: {
+        conversationId: 92,
+        handoffReason: "buyer_phone_received",
+        suggestedReply: "¿Cuál es el mejor número para comunicarnos contigo?",
+        closeConversationAfterDelivery: true,
+      },
+    },
+    sendSucceeds: true,
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+  const written = calls.messages.find((message) => message.type === "DEBUGGER_COMPOSER_WRITE");
+  const writeIndex = calls.messages.findIndex((message) => message.type === "DEBUGGER_COMPOSER_WRITE");
+  const closeIndex = calls.messages.findIndex((message) => message.type === "CLOSE_MESSENGER_CONVERSATION");
+
+  assert.equal(result.autoSent, true);
+  assert.equal(result.deliveryConfirmed, true);
+  assert.match(written?.text || "", /Gracias por tu número/);
+  assert.match(written?.text || "", /buen día/);
+  assert.doesNotMatch(written?.text || "", /\?/);
+  assert.ok(writeIndex >= 0 && closeIndex > writeIndex);
+  assert.equal(calls.messages.filter((message) => message.type === "CLOSE_MESSENGER_CONVERSATION").length, 1);
+});
+
 test("terminal Spanish acknowledgement is not sent to AI and receives no automatic reply", async () => {
   const { ai, calls, composerElement, sendButton } = createHarness({
     settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Andres Ibanez"] },
@@ -1126,6 +1287,27 @@ test("autoReply sends a pending own phone draft instead of blocking composer_not
   assert.equal(composerElement.textContent, "");
   assert.deepEqual(sendButton.events, []);
   assert.equal(calls.debug.at(-1).stage, "intake_ok");
+});
+
+test("autoReply recognizes a stale configured-seller greeting draft and replaces it", async () => {
+  const staleGreetingDraft =
+    "Hello, this is Alpha Motorsports. Yes, the vehicle is available. What would you like to know?";
+  const freshReply = "Yes, the 2023 Mercedes-Benz EQE 350 is available. What would you like to know?";
+  const { ai, calls, composerElement } = createHarness({
+    settings: { dryRun: false, autoReplyEnabled: true, sellerProfileNames: ["Alpha Motorsports", "Andres Ibanez"] },
+    messages: [{ speaker: "Hares", text: "Good evening, is this still available?" }],
+    composerText: staleGreetingDraft,
+    intakeResponse: { ok: true, data: { suggestedReply: freshReply } },
+    sendSucceeds: true,
+  });
+
+  const result = await ai.captureConversation({ automatic: false });
+
+  assert.equal(result.autoSent, true);
+  assert.equal(result.composerDraftReplaced, true);
+  assert.equal(result.deliveryConfirmed, true);
+  assert.equal(calls.messages.find((message) => message.type === "DEBUGGER_COMPOSER_WRITE")?.text, freshReply);
+  assert.equal(composerElement.textContent, "");
 });
 
 test("autoReply revalidates the same root before writing to Messenger", async () => {
