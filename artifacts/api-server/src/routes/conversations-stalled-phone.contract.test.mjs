@@ -72,17 +72,28 @@ test("address replies must include the Manassas address and dealership phone bef
   assert.match(guard, /replyIncludesStorePhone\(reply, storePhone\)/);
 });
 
-test("VIN replies give the dealership phone and request the buyer phone", () => {
+test("VIN replies continue with the next question without requesting the buyer phone", () => {
   const guardStart = source.indexOf('if (stage === "vin_inquiry")', source.indexOf("function isAiReplyAligned"));
   const guardEnd = source.indexOf('if (stage === "mileage_inquiry")', guardStart);
   assert.ok(guardStart >= 0);
   assert.ok(guardEnd > guardStart);
   const guard = source.slice(guardStart, guardEnd);
+  assert.match(guard, /asksWhatElse/);
+  assert.match(guard, /would you like to know/);
+  assert.match(guard, /!\/phone\|number\|tel/);
+  assert.match(guard, /if \(vehicleFacts\?\.vin\)/);
   assert.match(guard, /asksForBuyerPhone/);
-  assert.match(guard, /replyIncludesStorePhone\(reply, storePhone\)/);
   assert.match(source, /case "vin_inquiry":[\s\S]{0,220}dealer_phone=/);
-  assert.match(source, /Give Alpha Motorsports' dealership phone/);
-  assert.match(source, /También puedes llamar a Alpha Motorsports al \$\{storePhone\}/);
+  assert.match(source, /stage === "vin_inquiry"/);
+  assert.match(source, /!\(stage === "vin_inquiry" && vehicleFacts\?\.vin\)/);
+  assert.match(source, /Answer directly with the feed-backed VIN \$\{vehicleFacts\.vin\}[\s\S]*ask what else the buyer would like to know/);
+  assert.match(source, /Do not give the dealership phone, ask for the buyer's phone number/);
+  assert.match(source, /El VIN es \$\{vehicleFacts\.vin\}\. ¿Qué más te gustaría saber\?/);
+  assert.match(source, /The VIN is \$\{vehicleFacts\.vin\}\. What else would you like to know\?/);
+  assert.match(source, /Nuestros agentes de ventas pueden ayudarte con ese dato\. También puedes llamar a Alpha Motorsports al \$\{storePhone\}\. ¿A qué número te contactamos\?/);
+  assert.match(source, /Our sales agents can help with that detail\. You can also call Alpha Motorsports at \$\{storePhone\}\. What number should we use to reach you\?/);
+  assert.match(source, /const vin = vehicleFacts\?\.vin\?\.trim\(\);[\s\S]{0,240}if \(vin\)/);
+  assert.match(source, /Our sales agents can help with that detail\. You can also call Alpha Motorsports at \$\{configuredPhone\}\. What number should we use to reach you\?/);
 });
 
 test("unresolved vehicle-detail replies give Alpha's phone and request the buyer phone", () => {
@@ -94,8 +105,8 @@ test("unresolved vehicle-detail replies give Alpha's phone and request the buyer
   assert.match(phoneStages, /stage === "open_question"/);
   assert.match(phoneStages, /stage === "advisor_question"/);
 
-  assert.match(source, /También puedes llamar a Alpha Motorsports al \$\{storePhone\}\. ¿A qué número te contactamos\?/);
-  assert.match(source, /You can also call Alpha Motorsports at \$\{storePhone\}\. What number should we use to reach you\?/);
+  assert.match(source, /Nuestros agentes de ventas se comunicarán contigo para responder esa pregunta específica\. ¿Cuál es el mejor número para comunicarnos contigo\?/);
+  assert.match(source, /What is the best phone number to reach you\?/);
 });
 
 test("availability questions ask what the buyer wants to know before phone handoff", () => {
