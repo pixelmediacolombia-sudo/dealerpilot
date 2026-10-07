@@ -50,6 +50,10 @@ import {
   buildLuckiGeneralOnlyReply,
   isLuckiMazdaPhone,
 } from "../conversations/dealerMessengerPolicy";
+import {
+  buildNegotiabilityReply,
+  detectNegotiabilityIntent,
+} from "../conversations/negotiability";
 
 
 const router = Router();
@@ -398,6 +402,7 @@ type SalesReplyStage =
   | "mileage_inquiry"
   | "color_inquiry"
   | "price_inquiry"
+  | "negotiability_inquiry"
   | "down_payment_request"
   | "down_payment_low"
   | "down_payment_declined"
@@ -663,6 +668,10 @@ function buyerAskedDocumentRequirements(latest: string): boolean {
 
 function buyerAskedPriceInquiry(latest: string): boolean {
   return /\b(?:price|precio|cash price|precio cash|cu[aá]nto cuesta|cuanto cuesta|how much|what(?:'s| is).{0,40}price|valor)\b/i.test(latest);
+}
+
+function buyerAskedNegotiability(latest: string): boolean {
+  return detectNegotiabilityIntent(latest) === "ASK_NEGOTIABLE";
 }
 
 function buyerAskedVin(latest: string): boolean {
@@ -1091,6 +1100,7 @@ function resolveSalesReplyStage(
     return "cash_visit_request_phone";
   }
   if (buyerAskedDocumentRequirements(latest)) return "document_requirements";
+  if (buyerAskedNegotiability(latest)) return "negotiability_inquiry";
   if (buyerAskedPriceInquiry(latest)) return "price_inquiry";
   if (
     historyRequestedPhone(history) &&
@@ -1294,6 +1304,9 @@ function buildBaseSafeFallbackReply(
   const knowledge = (key: keyof NonNullable<DealerMarketplaceKnowledge["en"]>, fallback: string) =>
     dealerKnowledgeValue(dealerKnowledge, language, key, fallback);
   if (language === "es") {
+    if (stage === "negotiability_inquiry") {
+      return buildNegotiabilityReply("es", dealerName);
+    }
     if (stage === "open_question") {
       if (concreteCashOffer) {
         return "Gracias por la oferta. Nuestros agentes de ventas revisarán los detalles. ¿Qué vehículo te gustaría dar a cuenta?";
@@ -1426,6 +1439,9 @@ function buildBaseSafeFallbackReply(
       return `Nuestros agentes de ventas se comunicarán contigo para responder esas preguntas específicas y confirmar esos detalles del ${vehicle}. ¿Cuál es el mejor número de teléfono para comunicarnos contigo? También puedes llamarnos al ${storePhone}.`;
     }
     return `Con gusto te ayudo con el ${vehicle}. ¿Qué te gustaría saber?`;
+  }
+  if (stage === "negotiability_inquiry") {
+    return buildNegotiabilityReply("en", dealerName);
   }
   if (stage === "open_question") {
     if (concreteCashOffer) {
@@ -1684,6 +1700,13 @@ function isAiReplyAligned(
     return /(?:detail|detalle|information|informaci[oó]n|question|pregunta|sales agent|agente de ventas|number|n[uú]mero)/i.test(normalized) &&
       /\?/.test(reply) &&
       !/financ|financing|down payment|enganche|inicial|document|requisit|follow[- ]?up/.test(normalized);
+  }
+  if (stage === "negotiability_inquiry") {
+    return /(?:negotiable|negociable|negotiate|negociar|offer|oferta)/.test(normalized) &&
+      /(?:yes|si|s[ií]|is|es|can|podemos|podemos negociar)/.test(normalized) &&
+      /(?:what would you like to know|what do you want to know|que te gustaria saber|que quieres saber)/.test(normalized) &&
+      !/phone|number|tel[eé]fono|n[uú]mero|financ|financing|llamar|call us/.test(normalized) &&
+      !replyIncludesStorePhone(reply, storePhone);
   }
   if (stage === "vehicle_link_request") {
     if (vehicleFacts?.vdpUrl) {
@@ -1955,7 +1978,7 @@ function isReplyRelevantToCurrentMessage(reply: string, currentMessage: string):
   const topicContracts = [
     {
       reply: /\b(?:cash price|asking price|precio(?: en efectivo)?|precio exacto)\b/,
-      buyer: /\b(?:cash|price|precio|cuanto|cuesta|valor)\b/,
+      buyer: /\b(?:cash|price|precio|cuanto|cuesta|valor|negociable|negotiable|negociar|negotiate)\b/,
     },
     {
       reply: /\b(?:warranty|coverage|deductible|garantia|cobertura|deducible)\b/,
@@ -1976,6 +1999,10 @@ function isReplyRelevantToCurrentMessage(reply: string, currentMessage: string):
     {
       reply: /\b(?:clean title|titulo limpio)\b/,
       buyer: /\b(?:clean title|clear title|titulo limpio)\b/,
+    },
+    {
+      reply: /\b(?:negotiable|negociable|negotiate|negociar|offer|oferta)\b/,
+      buyer: /\b(?:negotiable|negociable|negotiate|negociar|offer|oferta)\b/,
     },
   ];
   return topicContracts.every((topic) => !topic.reply.test(normalizedReply) || topic.buyer.test(normalizedBuyer));
@@ -2170,6 +2197,7 @@ type AiReplyResult = {
 const SALES_REPLY_STAGES: readonly SalesReplyStage[] = [
   "open_question",
   "availability",
+  "negotiability_inquiry",
   "clean_title_interest_confirmation",
   "store_phone_requested",
   "vehicle_link_request",
@@ -2414,6 +2442,7 @@ export async function generateAiReply(
     availability: availabilityQuickReplyAccepted
       ? `Greet as ${dealerName}, state that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.`
       : `Greet as ${dealerName}, explicitly confirm that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.`,
+    negotiability_inquiry: `Greet as ${dealerName}, confirm affirmatively that the price is negotiable, then ask what the buyer would like to know. Do not ask for a phone number, give the dealership phone, mention financing, or hand off to sales in this first reply.`,
     interest_confirmation: "Confirm the exact vehicle is available and ask whether this week or the weekend works better. Do not add unrequested feed facts or ask for a phone number yet.",
     clean_title_interest_confirmation: `The buyer just confirmed interest after the clean-title follow-up. Ask for the buyer's best phone number and include Alpha Motorsports' dealership phone ${storePhone} in the same reply. Do not ask about financing, down payment, visit timing, or another qualification step.`,
     interest_declined: "Thank the buyer for their time and close politely. Do not ask another question.",
@@ -2494,7 +2523,7 @@ First reply instruction: ${firstDealerReply && stage !== "store_phone_requested"
 ${langNote}
 Respond with a single JSON object, no markdown, with exactly four keys:
 {"intent": "the sales funnel stage that best matches the conversation", "urgency": "high or normal", "vehicleIntent": "strong or unclear", "reply": "your reply"}
-Valid intent values: open_question, availability, interest_confirmation, clean_title_interest_confirmation, interest_declined, store_phone_requested, vehicle_link_request, carfax_request, vin_inquiry, mileage_inquiry, color_inquiry, price_inquiry, down_payment_request, down_payment_low, down_payment_declined, timeline_request, timeline_received, timeline_declined, documents_request, documents_declined, qualified_exit, financing_intro, financing_declined, cash_visit_request_phone, test_drive_request, dealer_hours, trade_in_request, payment_methods_request, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, handoff_confirmation, address_request, inventory_options, document_requirements, clean_title, clean_title_and_warranty, warranty_info, advisor_question, general.
+  Valid intent values: open_question, availability, negotiability_inquiry, interest_confirmation, clean_title_interest_confirmation, interest_declined, store_phone_requested, vehicle_link_request, carfax_request, vin_inquiry, mileage_inquiry, color_inquiry, price_inquiry, down_payment_request, down_payment_low, down_payment_declined, timeline_request, timeline_received, timeline_declined, documents_request, documents_declined, qualified_exit, financing_intro, financing_declined, cash_visit_request_phone, test_drive_request, dealer_hours, trade_in_request, payment_methods_request, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, handoff_confirmation, address_request, inventory_options, document_requirements, clean_title, clean_title_and_warranty, warranty_info, advisor_question, general.
 Choose urgent_vehicle_request_phone only when Urgent-intent eligibility allows it, urgency is high, and vehicleIntent is strong. Otherwise follow the supplied Current funnel stage and Stage instruction.
 The "reply" must be one short message that follows the stage instruction exactly, mentions the vehicle naturally, and mirrors the buyer's language.`;
 
