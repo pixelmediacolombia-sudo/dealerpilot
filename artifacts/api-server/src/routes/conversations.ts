@@ -2388,6 +2388,7 @@ export async function generateAiReply(
   dealerKnowledge?: DealerMarketplaceKnowledge,
   dealerName: string = "Alpha Motorsports",
 ): Promise<string> {
+  const firstDealerReply = isFirstDealerReply(visibleMessages);
   if (isLuckiMazdaPhone(storePhone)) {
     return buildLuckiGeneralOnlyReply({
       language,
@@ -2396,6 +2397,7 @@ export async function generateAiReply(
       storePhone,
       vehicleFacts,
       hasCleanTitleInventory,
+      firstDealerReply,
     });
   }
 
@@ -2421,7 +2423,6 @@ export async function generateAiReply(
     visibleMessages,
     currentMessage,
   );
-  const firstDealerReply = isFirstDealerReply(visibleMessages);
   const promptStage = stage === "advisor_question" ? "detailed_question" : stage;
   const redactedCopyBrief = buildRedactedCopyBrief({
     stage,

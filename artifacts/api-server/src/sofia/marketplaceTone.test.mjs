@@ -35,6 +35,7 @@ test("recognizes down-payment and concrete cash signals without treating phone a
   assert.equal(hasConcreteCashOffer("Jessica said that 20,000 in cash out the door work"), false);
   assert.equal(hasConcreteCashOffer("20,000 cash out the door?"), false);
   assert.equal(hasConcreteCashOffer("I can do $20,000 cash out the door"), true);
+  assert.equal(hasConcreteCashOffer("I would like to make an offer of $11000 in cash"), true);
   assert.equal(isCashOfferReviewQuestion("Jessica said that 20,000 in cash out the door work"), true);
   assert.equal(isCashOfferReviewQuestion("I can do $20,000 cash out the door"), false);
 });

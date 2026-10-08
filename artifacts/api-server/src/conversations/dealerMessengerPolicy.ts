@@ -94,6 +94,18 @@ function normalize(value: string): string {
     .toLowerCase();
 }
 
+function hasLuckiConcreteCashOffer(value: string): boolean {
+  const text = normalize(value);
+  const offerSignal = /\b(?:offer|oferta|sell|vender|take|accept|aceptar|deal|trato|can you do|would you take|will you take)\b/.test(text);
+  const firstPersonCashPurchaseSignal =
+    /\b(?:i|we)\s+(?:can|could|would|will)\s+(?:pay|buy|purchase)\b.{0,40}\b(?:cash|contado|efectivo)\b/.test(text);
+  const firstPersonOfferSignal =
+    /\b(?:i|we)\s+(?:can|could|would|will)\s+(?:do|offer)\b/.test(text);
+  const withoutPhone = text.replace(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, " ");
+  const hasOfferAmount = /(?:\$\s*\d{4,6}\b|\b\d{1,3}(?:,\d{3})+\b|\b\d+(?:\.\d+)?\s*(?:k|thousand|mil)\b)/.test(withoutPhone);
+  return (offerSignal || firstPersonCashPurchaseSignal || firstPersonOfferSignal) && hasOfferAmount;
+}
+
 function vehicleName(value?: string): { full: string; short: string } {
   const full = clean(value) || "vehicle";
   const parts = full.split(/\s+/);
@@ -109,6 +121,7 @@ export function buildLuckiGeneralOnlyReply(params: {
   storePhone: string;
   vehicleFacts: LuckiVehicleFacts;
   hasCleanTitleInventory: boolean;
+  firstDealerReply?: boolean;
 }): string {
   const language = params.language === "es" ? "es" : "en";
   const names = vehicleName(params.vehicleTitle);
@@ -120,6 +133,18 @@ export function buildLuckiGeneralOnlyReply(params: {
   const cleanTitleRequested = /\b(?:clean title|clear title|titulo limpio|t[ií]tulo limpio|warranty|garantia|garant[ií]a)\b/.test(normalized);
   const photosRequested = /\b(?:photo|photos|picture|pictures|image|images|foto|fotos|imagen|imagenes)\b/.test(normalized);
   const greetingOnly = /^(?:hi|hello|hey|hola|buenas(?:\s+(?:dias|d[ií]as|tardes|noches))?)[\s!,.?]*$/i.test(normalized);
+  const firstDealerReply = params.firstDealerReply ?? true;
+
+  if (hasLuckiConcreteCashOffer(latest)) {
+    const reply = language === "es"
+      ? `Gracias por tu oferta en efectivo por el ${names.full}. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamar a Lucki Mazda al ${params.storePhone}.`
+      : `Thanks for your cash offer on the ${names.full}. What's the best phone number to reach you? You can also call Lucki Mazda at ${params.storePhone}.`;
+    return firstDealerReply
+      ? language === "es"
+        ? `Hola, somos Lucki Mazda. ${reply}`
+        : `Hello, this is Lucki Mazda. ${reply}`
+      : reply;
+  }
 
   if (greetingOnly) {
     return language === "es"

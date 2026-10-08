@@ -86,3 +86,37 @@ test("Lucki greets as Lucki Mazda for standalone greetings", () => {
   assert.doesNotMatch(english, /Alpha|Manassas/i);
   assert.doesNotMatch(spanish, /Alpha|Manassas/i);
 });
+
+test("Lucki first Marketplace cash offer greets, requests buyer phone, and gives Lucki phone", () => {
+  const reply = buildLuckiGeneralOnlyReply({
+    language: "en",
+    currentMessage: "Hi, I am interested about your listing. I would like to make an offer of $11000 in cash. Please let me know if it works for you.",
+    vehicleTitle: "2016 Honda HR-V",
+    storePhone: LUCKI_MAZDA_PHONE,
+    vehicleFacts: {},
+    hasCleanTitleInventory: true,
+    firstDealerReply: true,
+  });
+
+  assert.match(reply, /^Hello, this is Lucki Mazda\./);
+  assert.match(reply, /cash offer/i);
+  assert.match(reply, /best phone number/i);
+  assert.match(reply, /Lucki Mazda at \+15717747848/);
+  assert.equal((reply.match(/\?/g) || []).length, 1);
+  assert.equal(isLuckiReplySafe(reply), true);
+});
+
+test("Lucki does not restart the greeting on a later cash offer", () => {
+  const reply = buildLuckiGeneralOnlyReply({
+    language: "en",
+    currentMessage: "I can offer $11,000 cash.",
+    vehicleTitle: "2016 Honda HR-V",
+    storePhone: LUCKI_MAZDA_PHONE,
+    vehicleFacts: {},
+    hasCleanTitleInventory: true,
+    firstDealerReply: false,
+  });
+
+  assert.doesNotMatch(reply, /^Hello|^Lucki Mazda\./i);
+  assert.match(reply, /Lucki Mazda at \+15717747848/);
+});

@@ -53,7 +53,7 @@ export function hasConcreteCashOffer(value: unknown): boolean {
   const firstPersonOfferSignal =
     /\b(?:i|we)\s+(?:can|could|would|will)\s+(?:do|offer)\b/.test(text);
   const withoutPhone = text.replace(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, " ");
-  const bareOfferAmount = /\b\d{1,3}(?:,\d{3})?\b/.test(withoutPhone);
+  const bareOfferAmount = /(?:\$\s*\d{4,6}\b|\b\d{1,3}(?:,\d{3})+\b|\b\d+(?:\.\d+)?\s*(?:k|thousand|mil)\b)/.test(withoutPhone);
   return (offerSignal || firstPersonCashPurchaseSignal || firstPersonOfferSignal) &&
     (hasDownPaymentAmount(text) || bareOfferAmount);
 }
