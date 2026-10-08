@@ -51,6 +51,7 @@ import {
 import { ALPHA_DEALER_ID, isAlphaManassasVehicle, isVerifiedDealerPublishingVehicle } from "../lib/dealer";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 import { getInitialBatchTiming } from "../publishing/batchProgress";
+import { getDealerBatchPriority } from "../publishing/dealerBatchPriority";
 import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 import { reconcileBatchProgress } from "../features/publishing/infrastructure/publishingRepository";
 
@@ -342,11 +343,13 @@ async function maybeCreateAutomaticBatch(
         (gm && (gm.recommendation === "HOLD" || gm.recommendation === "RECONSIDER"));
       if (invalid) return null;
       const neverPublished = !listing || listing.status !== "Published";
+      const basePriorityScore = computePriorityScore(vehicle, photoAnalysis.photoScore, neverPublished);
+      const batchPriority = getDealerBatchPriority(dealerId, basePriorityScore, vehicle, images.length);
       return {
         vehicle,
         version: versionByVehicle.get(vehicle.id) ?? null,
         photoAnalysis,
-        priorityScore: computePriorityScore(vehicle, photoAnalysis.photoScore, neverPublished),
+        priorityScore: batchPriority.priorityScore,
       };
     })
     .filter((entry) => entry != null)

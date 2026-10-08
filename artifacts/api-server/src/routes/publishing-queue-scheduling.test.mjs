@@ -346,6 +346,12 @@ test("automatic batching isolates active vehicles instead of blocking the next c
   assert.doesNotMatch(workerSource, /if \(activeJobs\.length > 0\) \{\s*return \{ created: 0, summary:/);
 });
 
+test("automatic batch creation applies Lucki-only completeness priority", () => {
+  assert.match(workerSource, /getDealerBatchPriority/);
+  assert.match(workerSource, /const batchPriority = getDealerBatchPriority\(dealerId, basePriorityScore, vehicle, images\.length\);/);
+  assert.match(workerSource, /priorityScore: batchPriority\.priorityScore/);
+});
+
 test("automatic selection excludes vehicles whose latest publishing job is Needs Review", () => {
   assert.match(autoPublishSource, /findLatestNeedsReviewVehicleIds/);
   assert.match(autoPublishSource, /needsReviewVehicleIds\.has\(v\.id\)/);
