@@ -45,6 +45,14 @@ test("phone capture closes with a neutral handoff and no follow-up question", ()
   assert.doesNotMatch(source, /closeConversationAfterDelivery: [^\n]*qualified_exit/);
 });
 
+test("Lucki normalizes phone-card controls in the backend only", () => {
+  assert.match(source, /function isLuckiPhoneCardArtifact\(value: string\)/);
+  assert.match(source, /function recoverLuckiPhoneCardTurn\(/);
+  assert.match(source, /if \(dealerId === LUCKI_MAZDA_DEALER_ID\)/);
+  assert.match(source, /Lucki Messenger normalized buyer phone card controls into the phone turn/);
+  assert.match(source, /isLuckiMazdaPhone\(phone\)/);
+});
+
 test("qualified buyers are asked for their phone and the thread stays open until phone capture", () => {
   const qualifiedExit = source.indexOf('if (stage === "qualified_exit")');
   assert.ok(qualifiedExit >= 0);

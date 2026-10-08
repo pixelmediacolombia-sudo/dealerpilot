@@ -120,3 +120,18 @@ test("Lucki does not restart the greeting on a later cash offer", () => {
   assert.doesNotMatch(reply, /^Hello|^Lucki Mazda\./i);
   assert.match(reply, /Lucki Mazda at \+15717747848/);
 });
+
+test("Lucki phone receipt uses the terminal handoff without another question", () => {
+  const reply = buildLuckiGeneralOnlyReply({
+    language: "en",
+    currentMessage: "9297565466",
+    vehicleTitle: "2016 Honda HR-V",
+    storePhone: LUCKI_MAZDA_PHONE,
+    vehicleFacts: {},
+    hasCleanTitleInventory: true,
+  });
+
+  assert.match(reply, /Lucki Mazda sales agent will contact you shortly/i);
+  assert.match(reply, /Goodbye, and have a great day/i);
+  assert.doesNotMatch(reply, /\?/);
+});

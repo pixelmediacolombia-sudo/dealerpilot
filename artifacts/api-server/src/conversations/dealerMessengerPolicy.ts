@@ -154,8 +154,8 @@ export function buildLuckiGeneralOnlyReply(params: {
 
   if (phoneProvided) {
     return language === "es"
-      ? "Gracias por tu número. Un agente de Lucki Mazda te contactará en breve."
-      : "Thanks for your number. A Lucki Mazda sales agent will contact you shortly.";
+      ? "Gracias por tu número. Un agente de Lucki Mazda te contactará en breve. ¡Que tengas un buen día!"
+      : "Thanks for your number. A Lucki Mazda sales agent will contact you shortly. Goodbye, and have a great day!";
   }
   if (phoneRequested) {
     return language === "es"

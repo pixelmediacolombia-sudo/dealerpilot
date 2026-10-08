@@ -48,6 +48,7 @@ import {
   getEffectiveMessengerKnowledge,
   getMessengerDealerPolicy,
   buildLuckiGeneralOnlyReply,
+  LUCKI_MAZDA_DEALER_ID,
   isLuckiMazdaPhone,
 } from "../conversations/dealerMessengerPolicy";
 import {
@@ -250,6 +251,46 @@ function parseConversationMessage(value: unknown): ParsedConversationMessage | n
 
   if (!text || isUiConversationText(text)) return null;
   return { role, content: text.slice(0, 1000) };
+}
+
+function isLuckiPhoneCardArtifact(value: string): boolean {
+  const normalized = normalizeIntentText(value).replace(/[.!?]+$/g, "").trim();
+  if (["call", "whatsapp call", "whatsapp message", "view buyer"].includes(normalized)) return true;
+  return normalized.startsWith("phone number ") && !!extractPhoneNumber(value);
+}
+
+function recoverLuckiPhoneCardTurn(
+  messages: ParsedConversationMessage[],
+  currentMessage: string,
+): { messages: ParsedConversationMessage[]; phone: string } | null {
+  if (!isLuckiPhoneCardArtifact(currentMessage)) return null;
+
+  const phoneIndex = [...messages].reverse().findIndex((message) => {
+    if (message.role !== "user") return false;
+    const phone = extractPhoneNumber(message.content);
+    return !!phone && !isLuckiMazdaPhone(phone);
+  });
+  if (phoneIndex < 0) return null;
+
+  const resolvedIndex = messages.length - 1 - phoneIndex;
+  const phone = extractPhoneNumber(messages[resolvedIndex]?.content || "");
+  if (!phone) return null;
+
+  const trailing = messages.slice(resolvedIndex + 1);
+  const onlyPhoneCardArtifacts = trailing.every((message) => {
+    if (message.role !== "user") return false;
+    const normalizedPhone = extractPhoneNumber(message.content);
+    return isLuckiPhoneCardArtifact(message.content) || normalizedPhone === phone;
+  });
+  if (!onlyPhoneCardArtifacts) return null;
+
+  return {
+    messages: [
+      ...messages.slice(0, resolvedIndex),
+      { role: "user", content: phone },
+    ],
+    phone,
+  };
 }
 
 function sameParsedConversationMessage(
@@ -2872,8 +2913,22 @@ router.post("/conversations/intake", async (req, res) => {
 
   const rawMsgs = Array.isArray(visibleMessages) ? visibleMessages : [];
   const parsedMsgs = rawMsgs.map(parseConversationMessage).filter((msg): msg is ParsedConversationMessage => !!msg);
-  const currentParsed = parseConversationMessage(currentMessage);
+  let currentParsed = parseConversationMessage(currentMessage);
   let incomingMsgs = mergeCurrentConversationMessage(parsedMsgs, currentParsed);
+  if (dealerId === LUCKI_MAZDA_DEALER_ID) {
+    const recoveredLuckiTurn = recoverLuckiPhoneCardTurn(
+      incomingMsgs,
+      currentParsed?.role === "user" ? currentParsed.content : currentMessage,
+    );
+    if (recoveredLuckiTurn) {
+      incomingMsgs = recoveredLuckiTurn.messages;
+      currentParsed = { role: "user", content: recoveredLuckiTurn.phone };
+      req.log.info(
+        { externalThreadRef, messageHash: messageHash ?? idempotencyKey ?? null },
+        "Lucki Messenger normalized buyer phone card controls into the phone turn",
+      );
+    }
+  }
   // The extension validates currentMessage against the live Messenger bubble.
   // Preserve it as the source of truth even if Facebook momentarily returns
   // stale or reordered history rows around a DOM rerender.
