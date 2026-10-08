@@ -135,3 +135,37 @@ test("Lucki phone receipt uses the terminal handoff without another question", (
   assert.match(reply, /Goodbye, and have a great day/i);
   assert.doesNotMatch(reply, /\?/);
 });
+
+test("Lucki first unanswered question greets as Lucki and requests both phone options", () => {
+  const reply = buildLuckiGeneralOnlyReply({
+    language: "en",
+    currentMessage: "Does it have adaptive cruise control?",
+    vehicleTitle: "2016 Honda HR-V",
+    storePhone: LUCKI_MAZDA_PHONE,
+    vehicleFacts: {},
+    hasCleanTitleInventory: true,
+    firstDealerReply: true,
+  });
+
+  assert.match(reply, /^Hello, this is Lucki Mazda\./);
+  assert.match(reply, /best phone number to reach you/i);
+  assert.match(reply, /call Lucki Mazda at \+15717747848/i);
+  assert.doesNotMatch(reply, /Alpha|Manassas/i);
+});
+
+test("Lucki answers an unavailable clean-title detail with its own handoff", () => {
+  const reply = buildLuckiGeneralOnlyReply({
+    language: "es",
+    currentMessage: "¿Tiene garantía?",
+    vehicleTitle: "2016 Honda HR-V",
+    storePhone: LUCKI_MAZDA_PHONE,
+    vehicleFacts: {},
+    hasCleanTitleInventory: false,
+    firstDealerReply: true,
+  });
+
+  assert.match(reply, /^Hola, somos Lucki Mazda\./);
+  assert.match(reply, /mejor número para comunicarnos contigo/i);
+  assert.match(reply, /Lucki Mazda al \+15717747848/i);
+  assert.doesNotMatch(reply, /Alpha|Manassas/i);
+});

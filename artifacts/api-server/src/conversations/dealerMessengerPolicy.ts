@@ -134,79 +134,81 @@ export function buildLuckiGeneralOnlyReply(params: {
   const photosRequested = /\b(?:photo|photos|picture|pictures|image|images|foto|fotos|imagen|imagenes)\b/.test(normalized);
   const greetingOnly = /^(?:hi|hello|hey|hola|buenas(?:\s+(?:dias|d[ií]as|tardes|noches))?)[\s!,.?]*$/i.test(normalized);
   const firstDealerReply = params.firstDealerReply ?? true;
+  const finish = (reply: string): string => {
+    const cleaned = clean(reply);
+    if (!firstDealerReply || /^(?:hello|hola),?\s+(?:this is|somos) lucki mazda\b/i.test(cleaned)) return cleaned;
+    return language === "es"
+      ? `Hola, somos Lucki Mazda. ${cleaned}`
+      : `Hello, this is Lucki Mazda. ${cleaned}`;
+  };
+  const buyerPhoneHandoff = language === "es"
+    ? `Nuestros agentes de ventas pueden confirmar ese detalle. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos a Lucki Mazda al ${params.storePhone}.`
+    : `Our sales agents can confirm that detail. What's the best phone number to reach you? You can also call Lucki Mazda at ${params.storePhone}.`;
 
   if (hasLuckiConcreteCashOffer(latest)) {
     const reply = language === "es"
       ? `Gracias por tu oferta en efectivo por el ${names.full}. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamar a Lucki Mazda al ${params.storePhone}.`
       : `Thanks for your cash offer on the ${names.full}. What's the best phone number to reach you? You can also call Lucki Mazda at ${params.storePhone}.`;
-    return firstDealerReply
-      ? language === "es"
-        ? `Hola, somos Lucki Mazda. ${reply}`
-        : `Hello, this is Lucki Mazda. ${reply}`
-      : reply;
+    return finish(reply);
   }
 
   if (greetingOnly) {
-    return language === "es"
+    return finish(language === "es"
       ? "¡Hola! Somos Lucki Mazda. ¿Qué te gustaría saber?"
-      : "Hello! This is Lucki Mazda. What would you like to know?";
+      : "Hello! This is Lucki Mazda. What would you like to know?");
   }
 
   if (phoneProvided) {
-    return language === "es"
+    return finish(language === "es"
       ? "Gracias por tu número. Un agente de Lucki Mazda te contactará en breve. ¡Que tengas un buen día!"
-      : "Thanks for your number. A Lucki Mazda sales agent will contact you shortly. Goodbye, and have a great day!";
+      : "Thanks for your number. A Lucki Mazda sales agent will contact you shortly. Goodbye, and have a great day!");
   }
   if (phoneRequested) {
-    return language === "es"
+    return finish(language === "es"
       ? `Con gusto, el número de Lucki Mazda es ${params.storePhone}.`
-      : `Of course, Lucki Mazda's number is ${params.storePhone}.`;
+      : `Of course, Lucki Mazda's number is ${params.storePhone}.`);
   }
   if (cleanTitleRequested) {
-    return params.hasCleanTitleInventory
+    return finish(params.hasCleanTitleInventory
       ? language === "es"
         ? `Sí, el ${names.short} tiene título limpio.`
         : `Yes, the ${names.short} has a clean title.`
-      : language === "es"
-        ? "Un agente de Lucki Mazda puede confirmar ese detalle."
-        : "A Lucki Mazda sales agent can confirm that detail.";
+      : buyerPhoneHandoff);
   }
   if (photosRequested && params.vehicleFacts.vdpUrl && isLuckiReplySafe(params.vehicleFacts.vdpUrl)) {
-    return language === "es"
+    return finish(language === "es"
       ? `Aquí está la ficha del ${names.full} con sus fotos: ${params.vehicleFacts.vdpUrl}.`
-      : `Here is the ${names.full} vehicle page with its photos: ${params.vehicleFacts.vdpUrl}.`;
+      : `Here is the ${names.full} vehicle page with its photos: ${params.vehicleFacts.vdpUrl}.`);
   }
   if (/\b(?:price|precio|how much|cuanto|cuánto)\b/.test(normalized) && params.vehicleFacts.price != null) {
-    return language === "es"
+    return finish(language === "es"
       ? `El precio publicado del ${names.full} es $${params.vehicleFacts.price.toLocaleString("en-US")}.`
-      : `The listed price for the ${names.full} is $${params.vehicleFacts.price.toLocaleString("en-US")}.`;
+      : `The listed price for the ${names.full} is $${params.vehicleFacts.price.toLocaleString("en-US")}.`);
   }
   if (/\b(?:mileage|miles|millas|millaje|kilometraje)\b/.test(normalized) && params.vehicleFacts.mileage != null) {
-    return language === "es"
+    return finish(language === "es"
       ? `El ${names.full} tiene ${params.vehicleFacts.mileage.toLocaleString("en-US")} millas.`
-      : `The ${names.full} has ${params.vehicleFacts.mileage.toLocaleString("en-US")} miles.`;
+      : `The ${names.full} has ${params.vehicleFacts.mileage.toLocaleString("en-US")} miles.`);
   }
   if (/\b(?:color|colour|paint)\b/.test(normalized) && params.vehicleFacts.exteriorColor) {
-    return language === "es"
+    return finish(language === "es"
       ? `El color exterior es ${params.vehicleFacts.exteriorColor}.`
-      : `The exterior color is ${params.vehicleFacts.exteriorColor}.`;
+      : `The exterior color is ${params.vehicleFacts.exteriorColor}.`);
   }
   if (/\bvin\b/.test(normalized) && params.vehicleFacts.vin) {
-    return language === "es"
+    return finish(language === "es"
       ? `El VIN del ${names.full} es ${params.vehicleFacts.vin}.`
-      : `The VIN for the ${names.full} is ${params.vehicleFacts.vin}.`;
+      : `The VIN for the ${names.full} is ${params.vehicleFacts.vin}.`);
   }
   if (/\b(?:where|location|address|donde|dónde|ubicad[oa]|direccion|dirección)\b/.test(normalized)) {
-    return language === "es"
+    return finish(language === "es"
       ? `Lucki Mazda está en Woodbridge, Virginia. Puedes llamarnos al ${params.storePhone}.`
-      : `Lucki Mazda is in Woodbridge, Virginia. You can call us at ${params.storePhone}.`;
+      : `Lucki Mazda is in Woodbridge, Virginia. You can call us at ${params.storePhone}.`);
   }
   if (/\b(?:available|disponible|still for sale|sigue en venta|sigue disponible)\b/.test(normalized)) {
-    return language === "es"
+    return finish(language === "es"
       ? `Hola, somos Lucki Mazda. Sí, el ${names.full} está disponible. ¿Qué te gustaría saber?`
-      : `Hello, this is Lucki Mazda. Yes, the ${names.full} is available. What would you like to know?`;
+      : `Hello, this is Lucki Mazda. Yes, the ${names.full} is available. What would you like to know?`);
   }
-  return language === "es"
-    ? `Con gusto te ayudamos con preguntas generales sobre el ${names.full}. ¿Qué te gustaría saber?`
-    : `We are happy to help with general questions about the ${names.full}. What would you like to know?`;
+  return finish(buyerPhoneHandoff);
 }
