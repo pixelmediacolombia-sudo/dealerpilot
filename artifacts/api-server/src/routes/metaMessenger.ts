@@ -420,6 +420,7 @@ async function processMessengerEvent(event: MetaMessagingEvent): Promise<{
     dealerContext.hasCleanTitleInventory,
     dealerContext.marketplaceKnowledge,
     dealerContext.dealerName,
+    DEALER_ID,
   );
 
   await db.insert(conversationMessagesTable).values({

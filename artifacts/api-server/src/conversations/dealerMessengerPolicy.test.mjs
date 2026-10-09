@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  ALPHA_MOTORSPORTS_DEALER_ID,
+  buildStrongPurchaseIntentReply,
   getEffectiveMessengerKnowledge,
   getMessengerDealerPolicy,
   buildLuckiGeneralOnlyReply,
@@ -10,6 +12,8 @@ import {
 } from "./dealerMessengerPolicy.ts";
 
 test("Lucki Messenger policy is dealer-scoped and contains no Alpha defaults", () => {
+  assert.equal(ALPHA_MOTORSPORTS_DEALER_ID, 1);
+  assert.equal(getMessengerDealerPolicy(ALPHA_MOTORSPORTS_DEALER_ID).displayName, "Alpha Motorsports");
   const policy = getMessengerDealerPolicy(2);
   assert.equal(policy.displayName, "Lucki Mazda");
   assert.equal(policy.phone, LUCKI_MAZDA_PHONE);
@@ -39,6 +43,20 @@ test("Lucki safe reply guard blocks Alpha and financing/down-payment leakage", (
   assert.equal(isLuckiReplySafe("Alpha Motorsports in Manassas"), false);
   assert.equal(isLuckiReplySafe("What is your down payment?"), false);
   assert.equal(isLuckiReplySafe("We can discuss financing."), false);
+});
+
+test("strong-purchase reply is dealer-configured for Alpha", () => {
+  const reply = buildStrongPurchaseIntentReply({
+    language: "es",
+    dealerName: "Alpha Motorsports",
+    storePhone: "+1 703-763-4675",
+  });
+
+  assert.match(reply, /Sí, podemos considerar tu oferta en efectivo/i);
+  assert.match(reply, /nuestros asesores pueden comunicarse contigo/i);
+  assert.match(reply, /mejor número para llamarte/i);
+  assert.match(reply, /Alpha Motorsports al \+1 703-763-4675/i);
+  assert.doesNotMatch(reply, /Lucki|571-774-7848|specific question/i);
 });
 
 test("Lucki reply path answers approved general facts without Alpha or qualification terms", () => {
@@ -104,6 +122,25 @@ test("Lucki first Marketplace cash offer greets, requests buyer phone, and gives
   assert.match(reply, /Lucki Mazda at \+15717747848/);
   assert.equal((reply.match(/\?/g) || []).length, 1);
   assert.equal(isLuckiReplySafe(reply), true);
+});
+
+test("Lucki recognizes a short cash-now offer and answers affirmatively", () => {
+  const reply = buildLuckiGeneralOnlyReply({
+    language: "en",
+    currentMessage: "19 k cash today?",
+    vehicleTitle: "2021 Mazda CX-5",
+    storePhone: LUCKI_MAZDA_PHONE,
+    vehicleFacts: {},
+    hasCleanTitleInventory: true,
+    firstDealerReply: true,
+  });
+
+  assert.match(reply, /^Hello, this is Lucki Mazda\./);
+  assert.match(reply, /Yes, we can consider your cash offer/i);
+  assert.match(reply, /sales advisors can contact you/i);
+  assert.match(reply, /best phone number/i);
+  assert.match(reply, /Lucki Mazda at \+15717747848/i);
+  assert.doesNotMatch(reply, /specific question|Alpha|Manassas/i);
 });
 
 test("Lucki does not restart the greeting on a later cash offer", () => {

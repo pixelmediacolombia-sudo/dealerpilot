@@ -32,6 +32,7 @@ import {
   buildVehiclePhotoRequestReply,
   extractCarfaxUrlFromSourceRaw,
   hasConcreteCashOffer,
+  detectPurchaseIntent,
   hasVisitDaySignal,
   isCashOfferReviewQuestion,
   isConciseMarketplaceReply,
@@ -48,7 +49,10 @@ import {
   getEffectiveMessengerKnowledge,
   getMessengerDealerPolicy,
   buildLuckiGeneralOnlyReply,
+  buildStrongPurchaseIntentReply,
+  ALPHA_MOTORSPORTS_DEALER_ID,
   LUCKI_MAZDA_DEALER_ID,
+  LUCKI_MAZDA_PHONE,
   isLuckiMazdaPhone,
 } from "../conversations/dealerMessengerPolicy";
 import {
@@ -59,7 +63,7 @@ import {
 
 const router = Router();
 
-const DEALER_ID = 1;
+const DEALER_ID = ALPHA_MOTORSPORTS_DEALER_ID;
 
 const DEFAULT_STORE_PHONE = "+1 703-763-4675";
 const SALES_AI_REPLY_TIMEOUT_MS = 12000;
@@ -1087,6 +1091,7 @@ function resolveSalesReplyStage(
   // the buyer in the conversation so the next qualification question can be
   // answered without assigning the lead to a salesperson prematurely.
   if (hasConcreteCashOffer(latest)) return "open_question";
+  if (detectPurchaseIntent(latest) === "STRONG_PURCHASE_INTENT") return "open_question";
   if (isCashOfferReviewQuestion(latest)) return "open_question";
   if (vehicleRequest === "photos") return "vehicle_link_request";
   if (vehicleRequest === "carfax") return "carfax_request";
@@ -1339,6 +1344,7 @@ function buildBaseSafeFallbackReply(
   const askForBuyerPhone = shouldAskBuyerPhoneAfterQualification(visibleMessages);
   const storeAddress = resolveStoreAddress(lotLocation, dealerKnowledge);
   const concreteCashOffer = hasConcreteCashOffer(currentMessage);
+  const strongPurchaseIntent = detectPurchaseIntent(currentMessage) === "STRONG_PURCHASE_INTENT";
   const cashOfferAmount = isCashOfferReviewQuestion(currentMessage)
     ? extractDownPaymentAmount(currentMessage)
     : null;
@@ -1349,8 +1355,8 @@ function buildBaseSafeFallbackReply(
       return buildNegotiabilityReply("es", dealerName);
     }
     if (stage === "open_question") {
-      if (concreteCashOffer) {
-        return "Gracias por la oferta. Nuestros agentes de ventas revisarán los detalles. ¿Qué vehículo te gustaría dar a cuenta?";
+      if (strongPurchaseIntent || concreteCashOffer) {
+        return buildStrongPurchaseIntentReply({ language: "es", dealerName, storePhone });
       }
       if (cashOfferAmount != null) {
         return `Nuestros agentes de ventas se comunicarán contigo para confirmar si $${cashOfferAmount.toLocaleString("en-US")} de contado funciona. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamarnos al ${storePhone}.`;
@@ -1485,8 +1491,8 @@ function buildBaseSafeFallbackReply(
     return buildNegotiabilityReply("en", dealerName);
   }
   if (stage === "open_question") {
-    if (concreteCashOffer) {
-      return "Thanks for the offer. Our sales agents will review the details. What vehicle would you like to trade in?";
+    if (strongPurchaseIntent || concreteCashOffer) {
+      return buildStrongPurchaseIntentReply({ language: "en", dealerName, storePhone });
     }
     if (cashOfferAmount != null) {
       return `Our sales agents will contact you to confirm whether $${cashOfferAmount.toLocaleString("en-US")} out the door works. What is the best phone number to reach you? You can also call Alpha Motorsports at ${storePhone}.`;
@@ -2428,14 +2434,16 @@ export async function generateAiReply(
   hasCleanTitleInventory: boolean = false,
   dealerKnowledge?: DealerMarketplaceKnowledge,
   dealerName: string = "Alpha Motorsports",
+  dealerId: number = DEALER_ID,
 ): Promise<string> {
   const firstDealerReply = isFirstDealerReply(visibleMessages);
-  if (isLuckiMazdaPhone(storePhone)) {
+  if (dealerId === LUCKI_MAZDA_DEALER_ID) {
+    const effectiveLuckiPhone = LUCKI_MAZDA_PHONE;
     return buildLuckiGeneralOnlyReply({
       language,
       currentMessage,
       vehicleTitle,
-      storePhone,
+      storePhone: effectiveLuckiPhone,
       vehicleFacts,
       hasCleanTitleInventory,
       firstDealerReply,
@@ -2452,12 +2460,17 @@ export async function generateAiReply(
   void vehicleType;
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy, storePhone);
   const concreteCashOffer = hasConcreteCashOffer(currentMessage);
+  const strongPurchaseIntent = detectPurchaseIntent(currentMessage) === "STRONG_PURCHASE_INTENT";
   // Phone capture is terminal for the automated flow: always send the
   // deterministic farewell before the extension closes after delivery.
   if (stage === "phone_received") {
     return language === "es"
       ? "Gracias por tu número. Un agente de ventas te contactará en breve. ¡Que tengas un buen día!"
       : "Thanks for your number. A sales agent will reach out to you shortly. Goodbye, and have a great day!";
+  }
+  if (strongPurchaseIntent) {
+    const reply = buildStrongPurchaseIntentReply({ language, dealerName, storePhone });
+    return withFirstReplyGreeting(reply, language, firstDealerReply, dealerName);
   }
   const askForBuyerPhone = stage === "qualified_exit" && shouldAskBuyerPhoneAfterQualification(visibleMessages);
   const persistentUnansweredBuyerTurns = hasPersistentUnansweredBuyerTurns(
@@ -2478,8 +2491,8 @@ export async function generateAiReply(
     dealerKnowledge,
   });
   const stageInstruction = {
-    open_question: concreteCashOffer
-      ? `The buyer made a concrete cash or payment offer. Acknowledge the offer and say that the sales agents will review the details, then ask exactly one next conversational qualification question about a trade-in. Keep the conversation active. Do not request a phone number, assign the buyer to a salesperson, say goodbye, close the conversation, or ask about financing, down payment, or documents.`
+    open_question: strongPurchaseIntent || concreteCashOffer
+      ? `The buyer has strong purchase intent and a concrete cash amount. Respond affirmatively that ${dealerName} can consider or evaluate the cash offer. Say that, if the buyer would like, the sales advisors can contact them to coordinate the details. Ask for the buyer's best phone number and include ${dealerName}'s dealership phone ${storePhone}. Ask exactly one question. Do not use evasive wording such as "answer that specific question", ask about trade-in, financing, down payment, or documents, or close the conversation.`
       : `The buyer asked a question that must be answered before qualification advances. If the dealer knowledge block does not contain the answer, say that the sales agents can help, give ${dealerName}'s dealership phone ${storePhone}, and ask for the buyer's best phone number in the same reply. Never open with ignorance or say that a detail is not confirmed. Do not ask financing, down payment, or documents.`,
     availability: availabilityQuickReplyAccepted
       ? `Greet as ${dealerName}, state that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.`
@@ -2654,6 +2667,7 @@ async function generateAiReplyWithFallback(
   hasCleanTitleInventory: boolean = false,
   dealerKnowledge?: DealerMarketplaceKnowledge,
   dealerName: string = "Alpha Motorsports",
+  dealerId: number = DEALER_ID,
 ): Promise<AiReplyResult> {
   const aiStartedAt = new Date();
   let fallbackReason: string | null = null;
@@ -2675,6 +2689,7 @@ async function generateAiReplyWithFallback(
         hasCleanTitleInventory,
         dealerKnowledge,
         dealerName,
+        dealerId,
       ),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("sales_ai_reply_timeout")), SALES_AI_REPLY_TIMEOUT_MS),
@@ -3346,6 +3361,7 @@ router.post("/conversations/intake", async (req, res) => {
         hasCleanTitleInventory,
         dealerKnowledge,
          dealerName,
+        dealerId,
       );
       retryableReply = repairedReply.reply;
       retryFallbackUsed = repairedReply.fallbackUsed;
@@ -3450,6 +3466,7 @@ router.post("/conversations/intake", async (req, res) => {
       hasCleanTitleInventory,
       dealerKnowledge,
       dealerName,
+      dealerId,
     );
     suggestedReply = aiReplyResult.reply;
 
@@ -3908,6 +3925,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
   let vehicleTitle: string | undefined;
   let vehicleType: string | undefined;
   let testStorePhone: string = DEFAULT_STORE_PHONE;
+  let testDealerId = DEALER_ID;
   let testDealerName = "Alpha Motorsports";
   let testDownPaymentPolicy = NO_DOWN_PAYMENT_POLICY;
   let testDealerKnowledge: DealerMarketplaceKnowledge = {};
@@ -3921,6 +3939,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
       .where(eq(vehiclesTable.id, vehicleId))
       .limit(1);
     if (v) {
+      testDealerId = v.dealerId;
       vehicleTitle = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ");
       vehicleType = v.bodyStyle ?? undefined;
       const [dealer] = await db
@@ -3964,6 +3983,7 @@ router.post("/sales-ai/test-message", async (req, res) => {
     testHasCleanTitleInventory,
     testDealerKnowledge,
     testDealerName,
+    testDealerId,
   );
 
   const { score: leadScore, temperature } = computeLeadScore({});

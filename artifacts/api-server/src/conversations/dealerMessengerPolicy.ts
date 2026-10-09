@@ -1,5 +1,7 @@
 import type { DealerMarketplaceKnowledge } from "@workspace/db";
+import { hasStrongPurchaseIntent } from "../sofia/marketplaceTone.ts";
 
+export const ALPHA_MOTORSPORTS_DEALER_ID = 1;
 export const LUCKI_MAZDA_DEALER_ID = 2;
 export const LUCKI_MAZDA_PHONE = "+15717747848";
 export const LUCKI_MAZDA_LOCATION = "Woodbridge, VA";
@@ -27,7 +29,7 @@ export function getMessengerDealerPolicy(dealerId: number): MessengerDealerPolic
 
   return {
     dealerId,
-    displayName: dealerId === 1 ? "Alpha Motorsports" : "",
+    displayName: dealerId === ALPHA_MOTORSPORTS_DEALER_ID ? "Alpha Motorsports" : "",
     phone: null,
     location: null,
     cleanTitleClaimsAllowed: false,
@@ -75,6 +77,21 @@ export function isLuckiReplySafe(reply: string): boolean {
   return !/\b(?:alpha|manassas|down\s*payment|down|enganche|inicial|financ(?:e|ing|iamiento)|financiar)\b/i.test(reply);
 }
 
+export function buildStrongPurchaseIntentReply(params: {
+  language: string;
+  dealerName: string;
+  storePhone: string;
+  vehicleTitle?: string;
+}): string {
+  const language = params.language === "es" ? "es" : "en";
+  const vehicleSuffix = params.vehicleTitle
+    ? language === "es" ? ` por el ${params.vehicleTitle}` : ` on the ${params.vehicleTitle}`
+    : "";
+  return language === "es"
+    ? `Sí, podemos considerar tu oferta en efectivo${vehicleSuffix}. Si gustas, nuestros asesores pueden comunicarse contigo para coordinar los detalles. ¿Cuál es el mejor número para llamarte? También puedes llamar a ${params.dealerName} al ${params.storePhone}.`
+    : `Yes, we can consider your cash offer${vehicleSuffix}. If you would like, our sales advisors can contact you to coordinate the details. What's the best phone number to reach you? You can also call ${params.dealerName} at ${params.storePhone}.`;
+}
+
 export type LuckiVehicleFacts = {
   price?: number | null;
   mileage?: number | null;
@@ -103,7 +120,8 @@ function hasLuckiConcreteCashOffer(value: string): boolean {
     /\b(?:i|we)\s+(?:can|could|would|will)\s+(?:do|offer)\b/.test(text);
   const withoutPhone = text.replace(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, " ");
   const hasOfferAmount = /(?:\$\s*\d{4,6}\b|\b\d{1,3}(?:,\d{3})+\b|\b\d+(?:\.\d+)?\s*(?:k|thousand|mil)\b)/.test(withoutPhone);
-  return (offerSignal || firstPersonCashPurchaseSignal || firstPersonOfferSignal) && hasOfferAmount;
+  return hasStrongPurchaseIntent(value) ||
+    ((offerSignal || firstPersonCashPurchaseSignal || firstPersonOfferSignal) && hasOfferAmount);
 }
 
 function vehicleName(value?: string): { full: string; short: string } {
@@ -146,9 +164,12 @@ export function buildLuckiGeneralOnlyReply(params: {
     : `Our sales agents can confirm that detail. What's the best phone number to reach you? You can also call Lucki Mazda at ${params.storePhone}.`;
 
   if (hasLuckiConcreteCashOffer(latest)) {
-    const reply = language === "es"
-      ? `Gracias por tu oferta en efectivo por el ${names.full}. ¿Cuál es el mejor número para comunicarnos contigo? También puedes llamar a Lucki Mazda al ${params.storePhone}.`
-      : `Thanks for your cash offer on the ${names.full}. What's the best phone number to reach you? You can also call Lucki Mazda at ${params.storePhone}.`;
+    const reply = buildStrongPurchaseIntentReply({
+      language,
+      dealerName: "Lucki Mazda",
+      storePhone: params.storePhone,
+      vehicleTitle: names.full,
+    });
     return finish(reply);
   }
 

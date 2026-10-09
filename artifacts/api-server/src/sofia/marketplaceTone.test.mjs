@@ -3,9 +3,11 @@ import { test } from "node:test";
 import {
   buildVehiclePhotoRequestReply,
   detectVehicleRequestKind,
+  detectPurchaseIntent,
   extractCarfaxUrlFromSourceRaw,
   hasConcreteCashOffer,
   hasDownPaymentAmount,
+  hasStrongPurchaseIntent,
   hasVisitDaySignal,
   hasVehicleValueFact,
   isCashOfferReviewQuestion,
@@ -38,6 +40,16 @@ test("recognizes down-payment and concrete cash signals without treating phone a
   assert.equal(hasConcreteCashOffer("I would like to make an offer of $11000 in cash"), true);
   assert.equal(isCashOfferReviewQuestion("Jessica said that 20,000 in cash out the door work"), true);
   assert.equal(isCashOfferReviewQuestion("I can do $20,000 cash out the door"), false);
+});
+
+test("classifies strong purchase intent from short cash-now messages", () => {
+  assert.equal(hasStrongPurchaseIntent("19 k cash today?"), true);
+  assert.equal(hasStrongPurchaseIntent("I can bring $15,000 cash now"), true);
+  assert.equal(hasStrongPurchaseIntent("Will you take $20,000 today?"), true);
+  assert.equal(hasStrongPurchaseIntent("What is the cash price?"), false);
+  assert.equal(hasStrongPurchaseIntent("I don't have cash today"), false);
+  assert.equal(detectPurchaseIntent("19 k cash today?"), "STRONG_PURCHASE_INTENT");
+  assert.equal(detectPurchaseIntent("What is the cash price?"), "GENERAL_INQUIRY");
 });
 
 test("routes photo and Carfax requests independently", () => {

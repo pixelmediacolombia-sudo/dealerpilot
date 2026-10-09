@@ -58,6 +58,35 @@ export function hasConcreteCashOffer(value: unknown): boolean {
     (hasDownPaymentAmount(text) || bareOfferAmount);
 }
 
+/**
+ * Detects a buyer who is ready to purchase with a concrete amount now,
+ * including short Marketplace messages such as "19 k cash today?".
+ * This is intentionally narrower than a generic price/cash question so the
+ * normal inventory and advisor flows remain unchanged.
+ */
+export function hasStrongPurchaseIntent(value: unknown): boolean {
+  const text = normalized(value);
+  if (!text) return false;
+  if (/\b(?:no cash|not cash|don't have cash|do not have cash|no tengo efectivo|no cuento con efectivo)\b/.test(text)) {
+    return false;
+  }
+
+  const withoutPhone = text.replace(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, " ");
+  const amountSignal = /(?:\$\s*\d{4,6}\b|\b\d{1,3}(?:,\d{3})+\b|\b\d+(?:\.\d+)?\s*(?:k|thousand|mil)\b)/.test(withoutPhone);
+  if (!amountSignal) return false;
+
+  const cashSignal = /\b(?:cash|cash offer|cash buyer|contado|efectivo|de contado|en efectivo)\b/.test(text);
+  const immediateSignal = /\b(?:today|right now|now|immediately|asap|hoy|ahora|ya|de inmediato|inmediatamente)\b/.test(text);
+  const directOfferSignal = /\b(?:offer|oferta|would you take|will you take|can you do|i can bring|i can pay|i would pay|we can pay|pay cash|buy cash|make an offer|te ofrezco|puedo dar|puedo pagar|doy)\b/.test(text);
+
+  return (cashSignal && (immediateSignal || directOfferSignal)) ||
+    (immediateSignal && directOfferSignal);
+}
+
+export function detectPurchaseIntent(value: unknown): "STRONG_PURCHASE_INTENT" | "GENERAL_INQUIRY" {
+  return hasStrongPurchaseIntent(value) ? "STRONG_PURCHASE_INTENT" : "GENERAL_INQUIRY";
+}
+
 export function isCashOfferReviewQuestion(value: unknown): boolean {
   const text = normalized(value);
   if (!/\b(?:out the door|cash price|cash offer)\b/.test(text)) return false;
