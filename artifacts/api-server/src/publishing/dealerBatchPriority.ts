@@ -37,9 +37,24 @@ const LUCKI_COMPLETENESS_FIELDS: Array<keyof CompletenessVehicle> = [
   "fuelType",
 ];
 
+// Marketplace photo upload expects a real set of source images. Lucki should
+// not spend a batch slot on a vehicle that only has the minimum validation
+// count when complete inventory is available.
+export const LUCKI_MIN_COMPLETE_PHOTO_COUNT = 10;
+
 function hasValue(value: string | number | null): boolean {
   if (typeof value === "number") return Number.isFinite(value);
   return Boolean(value?.trim());
+}
+
+export function isLuckiVehicleCompleteForPublish(
+  vehicle: CompletenessVehicle,
+  photoCount: number,
+): boolean {
+  return (
+    LUCKI_COMPLETENESS_FIELDS.every((field) => hasValue(vehicle[field])) &&
+    photoCount >= LUCKI_MIN_COMPLETE_PHOTO_COUNT
+  );
 }
 
 /**

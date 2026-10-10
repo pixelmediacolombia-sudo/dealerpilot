@@ -30,7 +30,10 @@ import {
   isAlphaManassasVehicle,
   isVerifiedDealerPublishingVehicle,
 } from "../lib/dealer";
-import { getDealerBatchPriority } from "./dealerBatchPriority";
+import {
+  getDealerBatchPriority,
+  isLuckiVehicleCompleteForPublish,
+} from "./dealerBatchPriority";
 import { findLatestNeedsReviewVehicleIds } from "./needsReviewGuard";
 import { photoDirectorPublishBlockReason } from "../photo/publishReadiness";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
@@ -223,6 +226,7 @@ export async function previewAutoPublishVehicles(
     if (dealerId === LUCKI_MAZDA_DEALER_ID && !isVerifiedDealerPublishingVehicle(vehicle)) return [];
     const images = imagesByVehicle.get(vehicle.id) ?? [];
     if (!vehicle.vin || !vehicle.year || !vehicle.price || !vehicle.mileage || images.length < 5) return [];
+    if (dealerId === LUCKI_MAZDA_DEALER_ID && !isLuckiVehicleCompleteForPublish(vehicle, images.length)) return [];
     if (getCachedGmDecision(vehicle.id)?.recommendation && ["HOLD", "RECONSIDER"].includes(getCachedGmDecision(vehicle.id)!.recommendation)) return [];
     if (photoDirectorPublishBlockReason(vehicle)) return [];
     const photos = analyzePhotos(images);

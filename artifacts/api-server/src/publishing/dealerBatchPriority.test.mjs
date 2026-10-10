@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getDealerBatchPriority, getLuckiCompletenessScore } from "./dealerBatchPriority.ts";
+import {
+  getDealerBatchPriority,
+  getLuckiCompletenessScore,
+  isLuckiVehicleCompleteForPublish,
+} from "./dealerBatchPriority.ts";
 
 const completeLuckiVehicle = {
   vin: "VIN-1",
@@ -26,6 +30,12 @@ test("Lucki completeness rewards complete data and photos", () => {
   const partial = getLuckiCompletenessScore({ ...completeLuckiVehicle, description: "", exteriorColor: null, vdpUrl: null }, 0);
   assert.equal(complete, 100);
   assert.ok(complete > partial);
+});
+
+test("Lucki only treats complete vehicle data with a full source photo set as publish-complete", () => {
+  assert.equal(isLuckiVehicleCompleteForPublish(completeLuckiVehicle, 10), true);
+  assert.equal(isLuckiVehicleCompleteForPublish(completeLuckiVehicle, 9), false);
+  assert.equal(isLuckiVehicleCompleteForPublish({ ...completeLuckiVehicle, vdpUrl: null }, 24), false);
 });
 
 test("Lucki completeness outranks the old score for first batches", () => {

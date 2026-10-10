@@ -346,6 +346,13 @@ test("automatic batching isolates active vehicles instead of blocking the next c
   assert.doesNotMatch(workerSource, /if \(activeJobs\.length > 0\) \{\s*return \{ created: 0, summary:/);
 });
 
+test("Lucki automatic batching respects an operator-planned batch for the same day", () => {
+  assert.match(workerSource, /dealerId === LUCKI_MAZDA_DEALER_ID/);
+  assert.match(workerSource, /plannedBatches/);
+  assert.match(workerSource, /Lucki already has a planned batch for/);
+  assert.match(workerSource, /newYorkDateKey\(batch\.scheduledAt\) === targetBatchDateKey/);
+});
+
 test("automatic batch creation applies Lucki-only completeness priority", () => {
   assert.match(workerSource, /getDealerBatchPriority/);
   assert.match(workerSource, /const batchPriority = getDealerBatchPriority\(dealerId, basePriorityScore, vehicle, images\.length\);/);

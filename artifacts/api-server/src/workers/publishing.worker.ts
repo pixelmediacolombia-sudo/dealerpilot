@@ -48,10 +48,18 @@ import {
   resolveAlphaLotCity,
   resolvePublishMode,
 } from "../publishing/controlledMode";
-import { ALPHA_DEALER_ID, isAlphaManassasVehicle, isVerifiedDealerPublishingVehicle } from "../lib/dealer";
+import {
+  ALPHA_DEALER_ID,
+  LUCKI_MAZDA_DEALER_ID,
+  isAlphaManassasVehicle,
+  isVerifiedDealerPublishingVehicle,
+} from "../lib/dealer";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 import { getInitialBatchTiming } from "../publishing/batchProgress";
-import { getDealerBatchPriority } from "../publishing/dealerBatchPriority";
+import {
+  getDealerBatchPriority,
+  isLuckiVehicleCompleteForPublish,
+} from "../publishing/dealerBatchPriority";
 import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 import { reconcileBatchProgress } from "../features/publishing/infrastructure/publishingRepository";
 
@@ -59,6 +67,7 @@ const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const DEALER_ID = 1;
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // heartbeat within last 5 minutes = online
 const MAX_ASSIGNMENTS_PER_RUN = 1;
+const ACTIVE_BATCH_STATUSES = ["Scheduled", "Preparing", "Active"] as const;
 
 async function deferJobForPhotoDirector(jobId: number, reason: string) {
   await db
@@ -269,6 +278,25 @@ async function maybeCreateAutomaticBatch(
     return { created: 0, summary: `Auto-publish next batch already planned for ${lastBatchDateKey}` };
   }
 
+  // Lucki can also have an operator-created batch. The automatic planner must
+  // respect that reservation; otherwise a worker tick creates a second batch
+  // for the same day and consumes an extra vehicle/job outside the operator's
+  // intended queue. Alpha keeps its existing automatic-planner behavior.
+  if (dealerId === LUCKI_MAZDA_DEALER_ID) {
+    const plannedBatches = await db
+      .select({ scheduledAt: publishingBatchesTable.scheduledAt })
+      .from(publishingBatchesTable)
+      .where(
+        and(
+          eq(publishingBatchesTable.dealerId, dealerId),
+          inArray(publishingBatchesTable.status, [...ACTIVE_BATCH_STATUSES]),
+        ),
+      );
+    if (plannedBatches.some((batch) => batch.scheduledAt && newYorkDateKey(batch.scheduledAt) === targetBatchDateKey)) {
+      return { created: 0, summary: `Lucki already has a planned batch for ${targetBatchDateKey}` };
+    }
+  }
+
   const postsOnTargetDay = allScheduledJobs.filter((job) => newYorkDateKey(job.scheduledAt ?? job.createdAt) === targetBatchDateKey).length;
   const remainingTargetDay = Math.max(0, settings.maxPostsPerDay - postsOnTargetDay);
   if (remainingTargetDay <= 0) {
@@ -336,6 +364,7 @@ async function maybeCreateAutomaticBatch(
         !vehicle.price ||
         !vehicle.mileage ||
         images.length < 5 ||
+        (dealerId === LUCKI_MAZDA_DEALER_ID && !isLuckiVehicleCompleteForPublish(vehicle, images.length)) ||
         listing?.status === "Published" ||
         !lotCity ||
         (alphaVehicle ? !isAlphaManassasVehicle(vehicle) : !isVerifiedDealerPublishingVehicle(vehicle)) ||

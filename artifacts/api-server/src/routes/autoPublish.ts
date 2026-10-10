@@ -55,7 +55,11 @@ import {
   isAlphaManassasVehicle,
   isVerifiedDealerPublishingVehicle,
 } from "../lib/dealer";
-import { getDealerBatchPriority, getLuckiCompletenessScore } from "../publishing/dealerBatchPriority";
+import {
+  getDealerBatchPriority,
+  getLuckiCompletenessScore,
+  isLuckiVehicleCompleteForPublish,
+} from "../publishing/dealerBatchPriority";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 import { getAuthenticatedDealerId, resolveDealerId } from "./auth";
 
@@ -571,6 +575,10 @@ router.post("/auto-publish/batches", async (req, res) => {
     const bestVersion = versionByVehicle.get(v.id);
     const photoAnalysis = analyzePhotos(imgs);
     let validation = validateVehicleForPublish(v, imgs.length);
+
+    if (validation.eligible && dealerId === LUCKI_MAZDA_DEALER_ID && !isLuckiVehicleCompleteForPublish(v, imgs.length)) {
+      validation = { eligible: false, reason: "Lucki requires complete vehicle data and at least 10 source photos" };
+    }
 
     if (validation.eligible && !isVerifiedDealerInventory(dealerId, v)) {
       validation = { eligible: false, reason: `Vehicle is not verified for this dealer's configured lot (lot: "${v.lotLocation ?? "unknown"}")` };
@@ -1340,6 +1348,10 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     const bestVersion = versionByVehicle.get(v.id);
     const photoAnalysis = analyzePhotos(imgs);
     let validation = validateVehicleForPublish(v, imgs.length);
+
+    if (validation.eligible && dealerId === LUCKI_MAZDA_DEALER_ID && !isLuckiVehicleCompleteForPublish(v, imgs.length)) {
+      validation = { eligible: false, reason: "Lucki requires complete vehicle data and at least 10 source photos" };
+    }
 
     if (validation.eligible && !isVerifiedDealerInventory(dealerId, v)) {
       validation = { eligible: false, reason: `Vehicle is not verified for this dealer's configured lot (lot: "${v.lotLocation ?? "unknown"}")` };
