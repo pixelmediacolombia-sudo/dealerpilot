@@ -8,10 +8,6 @@ test("Alpha Manassas qualification follows the new required order", () => {
   assert.match(source, /QUALIFICATION FUNNEL FOR ALPHA MANASSAS/);
   assert.match(source, /function historyHasBuyerPhone\(/);
   assert.match(source, /function extractBuyerQualification\(/);
-  assert.match(source, /getDownPaymentPolicy/);
-  assert.match(source, /function buyerAcceptedCashPurchase/);
-  assert.match(source, /Approved Down-Payment Configuration/);
-  assert.match(source, /approvedDownPaymentConfiguration/);
   assert.match(source, /this week or this month/);
   assert.match(source, /in 15 days/);
   assert.match(source, /en 15 dias/);
@@ -24,8 +20,10 @@ test("Alpha Manassas qualification follows the new required order", () => {
   assert.doesNotMatch(source, /Fredericksburg/);
   assert.doesNotMatch(source, /active bank account/);
   assert.match(source, /buyerPhoneAlreadyKnown/);
-  assert.match(source, /if \(buyerPhoneAlreadyKnown/);
-  assert.match(source, /buyerQualification\.downPayment/);
+  assert.match(source, /hasPhoneNumber\(latest, storePhone\) \|\| buyerPhoneAlreadyKnown/);
+  assert.match(source, /phoneCaptured/);
+  assert.match(source, /status: phoneCaptured \? "completed" : "active"/);
+  assert.match(source, /status: phoneCaptured \? "COMPLETED" : "IN_PROGRESS"/);
   assert.match(source, /buyerQualification\.timeline/);
   assert.match(source, /buyerQualification\.documents/);
   assert.doesNotMatch(
@@ -36,20 +34,16 @@ test("Alpha Manassas qualification follows the new required order", () => {
   assert.doesNotMatch(
     source,
     /latestExistingAssistant\?\.content\.trim\(\) !== inbound\.trim\(\) &&\s*!immediateHandoffReason/,
-    "receiving the buyer phone must still generate the next qualification question",
+    "phone capture must not be suppressed before the terminal farewell is generated",
   );
 });
 
-test("monthly payment targets are not treated as available down payments", () => {
-  const extractorStart = source.indexOf("function extractDownPaymentAmount");
-  const extractorEnd = source.indexOf("type ImmediateHandoffReason", extractorStart);
-  assert.ok(extractorStart >= 0);
-  assert.ok(extractorEnd > extractorStart);
-  const extractor = source.slice(extractorStart, extractorEnd);
-  assert.match(extractor, /monthlyTargetAmount/);
-  assert.match(extractor, /per\\s\+month\|monthly\|a\\s\+month/);
-  assert.match(extractor, /explicitlyLabeledDownPayment/);
-  assert.match(extractor, /monthlyTargetAmount\s+&&\s+!explicitlyLabeledDownPayment/);
+test("down-payment qualification is retired from the conversational decision path", () => {
+  assert.doesNotMatch(source, /function extractDownPaymentAmount/);
+  assert.doesNotMatch(source, /down_payment_request|down_payment_low|down_payment_declined/);
+  assert.doesNotMatch(source, /Approved Down-Payment Configuration|approvedDownPaymentConfiguration/);
+  assert.doesNotMatch(source, /How much do you have available for the down payment/);
+  assert.doesNotMatch(source, /¿Con cuánto cuentas para el enganche\?/);
 });
 
 test("an explicit address request takes priority over stalled phone recovery", () => {
