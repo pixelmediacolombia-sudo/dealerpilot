@@ -60,6 +60,7 @@ import {
   getLuckiCompletenessScore,
   isLuckiVehicleCompleteForPublish,
 } from "../publishing/dealerBatchPriority";
+import { checkLuckiPhotoSetDownloadable } from "../publishing/luckiPhotoReadiness";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
 import { getAuthenticatedDealerId, resolveDealerId } from "./auth";
 
@@ -656,10 +657,34 @@ router.post("/auto-publish/batches", async (req, res) => {
       });
   }
 
-  const prioritySorted = scored
+  const priorityCandidates = scored
     .filter((s) => s.eligible)
-    .sort((a, b) => b.priorityScore - a.priorityScore)
-    .slice(0, count);
+    .sort((a, b) => b.priorityScore - a.priorityScore);
+
+  // Lucki-only last-mile photo preflight. A vehicle can have ten inventory
+  // rows while one URL is expired or not downloadable by the publisher. Do
+  // this before slicing the batch so a failed candidate cannot consume a slot
+  // ahead of a complete one. Alpha keeps the existing selection path.
+  const prioritySorted: ScoredVehicle[] = [];
+  for (const candidate of priorityCandidates) {
+    if (dealerId === LUCKI_MAZDA_DEALER_ID) {
+      const photoReadiness = await checkLuckiPhotoSetDownloadable(imagesByVehicle.get(candidate.vehicle.id) ?? []);
+      if (!photoReadiness.ready) {
+        candidate.eligible = false;
+        candidate.ineligibleReason = photoReadiness.reason;
+        await db
+          .update(publishPriorityScoresTable)
+          .set({ eligible: 0, ineligibleReason: photoReadiness.reason, computedAt: new Date(), updatedAt: new Date() })
+          .where(and(
+            eq(publishPriorityScoresTable.vehicleId, candidate.vehicle.id),
+            eq(publishPriorityScoresTable.dealerId, dealerId),
+          ));
+        continue;
+      }
+    }
+    prioritySorted.push(candidate);
+    if (prioritySorted.length >= count) break;
+  }
 
   // ── GM Coach guardrail ──────────────────────────────────────────────────────
   // Any vehicle the GM has flagged HOLD or RECONSIDER is blocked from batch
@@ -1385,9 +1410,22 @@ router.post("/auto-publish/dry-run", async (req, res) => {
     });
   }
 
-  const eligible = scored
+  const eligibleCandidates = scored
     .filter((s) => s.eligible)
     .sort((a, b) => b.priorityScore - a.priorityScore);
+  const eligible: ScoredEntry[] = [];
+  for (const candidate of eligibleCandidates) {
+    if (dealerId === LUCKI_MAZDA_DEALER_ID) {
+      const photoReadiness = await checkLuckiPhotoSetDownloadable(imagesByVehicle.get(candidate.vehicleId) ?? []);
+      if (!photoReadiness.ready) {
+        candidate.eligible = false;
+        candidate.skipReason = photoReadiness.reason;
+        continue;
+      }
+    }
+    eligible.push(candidate);
+    if (eligible.length >= count) break;
+  }
   const selected = eligible.slice(0, count);
   const skipped = scored.filter((s) => !s.eligible);
 

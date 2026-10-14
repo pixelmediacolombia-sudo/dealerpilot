@@ -34,6 +34,7 @@ import {
   getDealerBatchPriority,
   isLuckiVehicleCompleteForPublish,
 } from "./dealerBatchPriority";
+import { checkLuckiPhotoSetDownloadable } from "./luckiPhotoReadiness";
 import { findLatestNeedsReviewVehicleIds } from "./needsReviewGuard";
 import { photoDirectorPublishBlockReason } from "../photo/publishReadiness";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
@@ -218,7 +219,7 @@ export async function previewAutoPublishVehicles(
   const latestVersionByVehicle = new Map<number, typeof allVersions[number]>();
   for (const version of allVersions) if (!latestVersionByVehicle.has(version.vehicleId)) latestVersionByVehicle.set(version.vehicleId, version);
 
-  const eligible = vehicles.flatMap((vehicle) => {
+  const eligibleCandidates = vehicles.flatMap((vehicle) => {
     if (activeVehicleIds.has(vehicle.id) || needsReviewVehicleIds.has(vehicle.id) || duplicateConflictIds.has(vehicle.id)) return [];
     const listing = listingByVehicle.get(vehicle.id);
     if (listing?.status === "Published") return [];
@@ -245,6 +246,16 @@ export async function previewAutoPublishVehicles(
       listingVersionId: latestVersionByVehicle.get(vehicle.id)?.id ?? null,
     }];
   }).sort((a, b) => b.priorityScore - a.priorityScore);
+
+  const eligible = [] as typeof eligibleCandidates;
+  for (const candidate of eligibleCandidates) {
+    if (dealerId === LUCKI_MAZDA_DEALER_ID) {
+      const photoReadiness = await checkLuckiPhotoSetDownloadable(imagesByVehicle.get(candidate.vehicleId) ?? []);
+      if (!photoReadiness.ready) continue;
+    }
+    eligible.push(candidate);
+    if (eligible.length >= count) break;
+  }
 
   return { selected: eligible.slice(0, count).map(({ listingVersionId: _listingVersionId, ...vehicle }) => vehicle), totalEligible: eligible.length };
 }

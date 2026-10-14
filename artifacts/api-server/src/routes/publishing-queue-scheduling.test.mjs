@@ -14,7 +14,9 @@ const queueCompactionSource = readFileSync(
   "utf8",
 );
 const autoPublishSource = readFileSync(new URL("./autoPublish.ts", import.meta.url), "utf8");
+const autoPublishForecastSource = readFileSync(new URL("../publishing/autoPublishForecast.ts", import.meta.url), "utf8");
 const workerSource = readFileSync(new URL("../workers/publishing.worker.ts", import.meta.url), "utf8");
+const luckiPhotoReadinessSource = readFileSync(new URL("../publishing/luckiPhotoReadiness.ts", import.meta.url), "utf8");
 const intelligenceSeedSource = readFileSync(new URL("../intelligence/seed.ts", import.meta.url), "utf8");
 const dealerSource = readFileSync(new URL("../lib/dealer.ts", import.meta.url), "utf8");
 const locationScraperSource = readFileSync(new URL("../inventory/locationScraper.ts", import.meta.url), "utf8");
@@ -357,6 +359,15 @@ test("automatic batch creation applies Lucki-only completeness priority", () => 
   assert.match(workerSource, /getDealerBatchPriority/);
   assert.match(workerSource, /const batchPriority = getDealerBatchPriority\(dealerId, basePriorityScore, vehicle, images\.length\);/);
   assert.match(workerSource, /priorityScore: batchPriority\.priorityScore/);
+});
+
+test("Lucki batches preflight every source photo before selecting or assigning", () => {
+  assert.match(luckiPhotoReadinessSource, /at least 10 photos/);
+  assert.match(luckiPhotoReadinessSource, /response\.arrayBuffer\(\)/);
+  assert.match(autoPublishSource, /dealerId === LUCKI_MAZDA_DEALER_ID[\s\S]*checkLuckiPhotoSetDownloadable/);
+  assert.match(autoPublishForecastSource, /dealerId === LUCKI_MAZDA_DEALER_ID[\s\S]*checkLuckiPhotoSetDownloadable/);
+  assert.match(workerSource, /dealerId === LUCKI_MAZDA_DEALER_ID[\s\S]*checkLuckiPhotoSetDownloadable/);
+  assert.match(workerSource, /LUCKI_PHOTO_PREFLIGHT_FAILED/);
 });
 
 test("automatic selection excludes vehicles whose latest publishing job is Needs Review", () => {

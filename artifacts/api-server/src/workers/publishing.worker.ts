@@ -60,6 +60,7 @@ import {
   getDealerBatchPriority,
   isLuckiVehicleCompleteForPublish,
 } from "../publishing/dealerBatchPriority";
+import { checkLuckiPhotoSetDownloadable } from "../publishing/luckiPhotoReadiness";
 import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 import { reconcileBatchProgress } from "../features/publishing/infrastructure/publishingRepository";
 
@@ -384,8 +385,23 @@ async function maybeCreateAutomaticBatch(
     .filter((entry) => entry != null)
     .sort((a, b) => b.priorityScore - a.priorityScore);
 
-  const selected: typeof selectedCandidates = [];
+  const photoReadyCandidates: typeof selectedCandidates = [];
   for (const entry of selectedCandidates) {
+    if (dealerId === LUCKI_MAZDA_DEALER_ID) {
+      const photoReadiness = await checkLuckiPhotoSetDownloadable(imagesByVehicle.get(entry.vehicle.id) ?? []);
+      if (!photoReadiness.ready) {
+        log.info(
+          { vehicleId: entry.vehicle.id, reason: photoReadiness.reason },
+          "Publishing worker skipped Lucki candidate because the complete source photo set is not downloadable",
+        );
+        continue;
+      }
+    }
+    photoReadyCandidates.push(entry);
+  }
+
+  const selected: typeof selectedCandidates = [];
+  for (const entry of photoReadyCandidates) {
     if (selected.length >= Math.min(settings.vehiclesPerBatch, remainingTargetDay)) break;
     const photoReadiness = await ensurePhotoDirectorReadyForPublish(entry.vehicle, log);
     if (!photoReadiness.ready) {
@@ -624,6 +640,7 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
   let skippedDuplicate = 0;
   let skippedGm = 0;
   let skippedPhotoDirector = 0;
+  let skippedLuckiPhotos = 0;
 
   for (const { job, vehicle } of candidates) {
     if (assigned >= MAX_ASSIGNMENTS_PER_RUN) break;
@@ -727,6 +744,37 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
       continue;
     }
 
+    if (job.dealerId === LUCKI_MAZDA_DEALER_ID) {
+      const images = await db
+        .select({ url: vehicleImagesTable.url })
+        .from(vehicleImagesTable)
+        .where(eq(vehicleImagesTable.vehicleId, vehicle.id))
+        .orderBy(asc(vehicleImagesTable.position));
+      const luckiPhotoReadiness = await checkLuckiPhotoSetDownloadable(images);
+      if (!luckiPhotoReadiness.ready) {
+        skippedLuckiPhotos++;
+        await db
+          .update(publishingJobsTable)
+          .set({
+            status: "Needs Review",
+            currentStep: "Ready for review",
+            progressPercent: 70,
+            failedReason: luckiPhotoReadiness.reason,
+            needsReview: true,
+            reviewReason: "LUCKI_PHOTO_PREFLIGHT_FAILED",
+            claimedByExtension: null,
+            assignedExtensionId: null,
+            assignedAt: null,
+          })
+          .where(eq(publishingJobsTable.id, job.id));
+        log.warn(
+          { jobId: job.id, vehicleId: vehicle.id, reason: luckiPhotoReadiness.reason },
+          "Publishing worker blocked Lucki job before extension photo upload",
+        );
+        continue;
+      }
+    }
+
     const [updated] = await db
       .update(publishingJobsTable)
       .set({ status: "Assigned", assignedExtensionId: extension.id, assignedAt: new Date() })
@@ -751,15 +799,15 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
   if (assigned === 0) {
     const autoSummary = autoBatch.summary ? `${autoBatch.summary}; ` : "";
     return {
-      summary: `${autoSummary}No jobs assigned - ${skippedUnknownLot} unknown lot, ${skippedDuplicate} duplicate conflicts, ${skippedGm} GM held, ${skippedPhotoDirector} waiting for Photo Director`,
+      summary: `${autoSummary}No jobs assigned - ${skippedUnknownLot} unknown lot, ${skippedDuplicate} duplicate conflicts, ${skippedGm} GM held, ${skippedPhotoDirector} waiting for Photo Director, ${skippedLuckiPhotos} Lucki photo preflight failures`,
       skipped: true,
-      detail: { autoCreated: autoBatch.created, repairedStaleAssignments, reboundAssignments, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
+      detail: { autoCreated: autoBatch.created, repairedStaleAssignments, reboundAssignments, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector, skippedLuckiPhotos },
     };
   }
 
   return {
     summary: `${autoBatch.summary ? `${autoBatch.summary}; ` : ""}Assigned ${assigned} publishing job${assigned === 1 ? "" : "s"} to online dealer extension${onlineExtensions.length === 1 ? "" : "s"} (${onlineExtensions.map((extension) => `${extension.dealerId}:${extension.id}`).join(", ")})`,
-    detail: { autoCreated: autoBatch.created, repairedStaleAssignments, reboundAssignments, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector },
+    detail: { autoCreated: autoBatch.created, repairedStaleAssignments, reboundAssignments, assigned, skippedUnknownLot, skippedDuplicate, skippedGm, skippedPhotoDirector, skippedLuckiPhotos },
   };
 }
 
