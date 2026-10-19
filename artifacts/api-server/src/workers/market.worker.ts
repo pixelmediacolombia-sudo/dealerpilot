@@ -6,6 +6,7 @@
 import { db, vehiclesTable, vehicleIntelligenceTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import type { WorkerDefinition, WorkerRunOutcome } from "./types";
+import { LUCKI_MAZDA_DEALER_ID } from "../lib/dealer";
 
 const INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const DEALER_ID = 1;
@@ -80,6 +81,12 @@ export const marketWorker: WorkerDefinition = {
 
 // Exported for the Publishing Worker's duplicate-conflict guardrail.
 export async function getDuplicateConflictVehicleIds(dealerId = DEALER_ID): Promise<Set<number>> {
+  // Lucki's publishing policy prioritizes every vehicle with complete data and
+  // a downloadable photo set. Same-model inventory is expected at this dealer
+  // and must not block the complete-data queue. Alpha keeps the existing
+  // duplicate-conflict protection because its policy is unchanged.
+  if (dealerId === LUCKI_MAZDA_DEALER_ID) return new Set<number>();
+
   const outcome = await run(dealerId);
   const ids = (outcome.detail?.duplicateConflictVehicleIds as number[] | undefined) ?? [];
   return new Set(ids);

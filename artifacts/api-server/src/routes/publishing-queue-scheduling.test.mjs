@@ -16,6 +16,7 @@ const queueCompactionSource = readFileSync(
 const autoPublishSource = readFileSync(new URL("./autoPublish.ts", import.meta.url), "utf8");
 const autoPublishForecastSource = readFileSync(new URL("../publishing/autoPublishForecast.ts", import.meta.url), "utf8");
 const workerSource = readFileSync(new URL("../workers/publishing.worker.ts", import.meta.url), "utf8");
+const marketWorkerSource = readFileSync(new URL("../workers/market.worker.ts", import.meta.url), "utf8");
 const luckiPhotoReadinessSource = readFileSync(new URL("../publishing/luckiPhotoReadiness.ts", import.meta.url), "utf8");
 const intelligenceSeedSource = readFileSync(new URL("../intelligence/seed.ts", import.meta.url), "utf8");
 const dealerSource = readFileSync(new URL("../lib/dealer.ts", import.meta.url), "utf8");
@@ -368,6 +369,12 @@ test("Lucki batches preflight every source photo before selecting or assigning",
   assert.match(autoPublishForecastSource, /dealerId === LUCKI_MAZDA_DEALER_ID[\s\S]*checkLuckiPhotoSetDownloadable/);
   assert.match(workerSource, /dealerId === LUCKI_MAZDA_DEALER_ID[\s\S]*checkLuckiPhotoSetDownloadable/);
   assert.match(workerSource, /LUCKI_PHOTO_PREFLIGHT_FAILED/);
+});
+
+test("Lucki bypasses the generic duplicate-model guard while Alpha keeps it", () => {
+  assert.match(marketWorkerSource, /LUCKI_MAZDA_DEALER_ID/);
+  assert.match(marketWorkerSource, /if \(dealerId === LUCKI_MAZDA_DEALER_ID\) return new Set<number>\(\);/);
+  assert.match(marketWorkerSource, /const outcome = await run\(dealerId\);/);
 });
 
 test("automatic selection excludes vehicles whose latest publishing job is Needs Review", () => {
