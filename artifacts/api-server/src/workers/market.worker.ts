@@ -5,7 +5,7 @@
 // vehicles at the same lot.
 import { db, vehiclesTable, vehicleIntelligenceTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import type { WorkerDefinition, WorkerRunOutcome } from "./types";
+import type { WorkerDefinition, WorkerRunContext, WorkerRunOutcome } from "./types";
 import { LUCKI_MAZDA_DEALER_ID } from "../lib/dealer";
 
 const INTERVAL_MS = 60 * 60 * 1000; // 1 hour
@@ -15,7 +15,7 @@ const AFFORDABLE_PRICE_CEILING_USD = 20000;
 const TRUCK_BODY_STYLES = ["Truck", "Pickup"];
 const SUV_BODY_STYLES = ["SUV", "Crossover"];
 
-async function run(dealerId = DEALER_ID): Promise<WorkerRunOutcome> {
+async function runMarketScan(dealerId = DEALER_ID): Promise<WorkerRunOutcome> {
   const rows = await db
     .select({
       id: vehiclesTable.id,
@@ -70,6 +70,10 @@ async function run(dealerId = DEALER_ID): Promise<WorkerRunOutcome> {
   };
 }
 
+async function run(_ctx: WorkerRunContext): Promise<WorkerRunOutcome> {
+  return runMarketScan();
+}
+
 export const marketWorker: WorkerDefinition = {
   id: "market",
   name: "Market Agent",
@@ -87,7 +91,7 @@ export async function getDuplicateConflictVehicleIds(dealerId = DEALER_ID): Prom
   // duplicate-conflict protection because its policy is unchanged.
   if (dealerId === LUCKI_MAZDA_DEALER_ID) return new Set<number>();
 
-  const outcome = await run(dealerId);
+  const outcome = await runMarketScan(dealerId);
   const ids = (outcome.detail?.duplicateConflictVehicleIds as number[] | undefined) ?? [];
   return new Set(ids);
 }

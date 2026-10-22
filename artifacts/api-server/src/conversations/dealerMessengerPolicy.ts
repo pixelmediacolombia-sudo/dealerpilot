@@ -1,5 +1,5 @@
 import type { DealerMarketplaceKnowledge } from "@workspace/db";
-import { hasStrongPurchaseIntent } from "../sofia/marketplaceTone.ts";
+import { hasStrongPurchaseIntent } from "../sofia/marketplaceTone";
 
 export const ALPHA_MOTORSPORTS_DEALER_ID = 1;
 export const LUCKI_MAZDA_DEALER_ID = 2;
@@ -120,14 +120,14 @@ function hasLuckiConcreteCashOffer(value: string): boolean {
     /\b(?:i|we)\s+(?:can|could|would|will)\s+(?:do|offer)\b/.test(text);
   const withoutPhone = text.replace(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, " ");
   const hasOfferAmount = /(?:\$\s*\d{4,6}\b|\b\d{1,3}(?:,\d{3})+\b|\b\d+(?:\.\d+)?\s*(?:k|thousand|mil)\b)/.test(withoutPhone);
-  return hasStrongPurchaseIntent(value) ||
+  return hasStrongPurchaseIntent(value ?? "") ||
     ((offerSignal || firstPersonCashPurchaseSignal || firstPersonOfferSignal) && hasOfferAmount);
 }
 
 function vehicleName(value?: string): { full: string; short: string } {
-  const full = clean(value) || "vehicle";
+  const full = clean(value ?? "") || "vehicle";
   const parts = full.split(/\s+/);
-  const short = parts.length >= 3 && /^\d{4}$/.test(parts[0] || "") ? parts[2] || full : parts.at(-1) || full;
+  const short = parts.length >= 3 && /^\d{4}$/.test(parts[0] || "") ? parts[2] || full : parts.at(-1) ?? full;
   return { full, short };
 }
 

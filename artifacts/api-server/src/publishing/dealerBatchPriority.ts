@@ -1,4 +1,4 @@
-import { LUCKI_MAZDA_DEALER_ID, LUCKI_MAZDA_LOT_WOODBRIDGE } from "../lib/dealer.ts";
+import { LUCKI_MAZDA_DEALER_ID, LUCKI_MAZDA_LOT_WOODBRIDGE } from "../lib/dealer";
 
 type CompletenessVehicle = {
   vin: string | null;

@@ -57,6 +57,9 @@ import {
   buildNegotiabilityReply,
   detectNegotiabilityIntent,
 } from "../conversations/negotiability";
+import { DealerInventoryService } from "../conversations/dealerInventoryService";
+import { formatPriceConfirmation } from "../conversations/messageFormatter";
+import { CONFIRM_PRICE_INTENT, detectPriceIntent } from "../conversations/priceIntentDetector";
 
 
 const router = Router();
@@ -77,6 +80,35 @@ const NO_DOWN_PAYMENT_POLICY: DownPaymentPolicy = {
   vehicleOverride: null,
   source: "none",
 };
+
+const dealerInventoryService = new DealerInventoryService(async ({ dealerId, vehicleId, vin }) => {
+  const conditions = [eq(vehiclesTable.dealerId, dealerId)];
+  if (Number.isInteger(vehicleId)) {
+    conditions.push(eq(vehiclesTable.id, vehicleId as number));
+  } else if (vin) {
+    conditions.push(eq(vehiclesTable.vin, vin));
+  }
+  const [vehicle] = await db
+    .select({
+      id: vehiclesTable.id,
+      dealerId: vehiclesTable.dealerId,
+      vin: vehiclesTable.vin,
+      lotLocation: vehiclesTable.lotLocation,
+      year: vehiclesTable.year,
+      make: vehiclesTable.make,
+      model: vehiclesTable.model,
+      trim: vehiclesTable.trim,
+      mileage: vehiclesTable.mileage,
+      exteriorColor: vehiclesTable.exteriorColor,
+      price: vehiclesTable.price,
+      vdpUrl: vehiclesTable.vdpUrl,
+      sourceRaw: vehiclesTable.sourceRaw,
+    })
+    .from(vehiclesTable)
+    .where(and(...conditions))
+    .limit(1);
+  return vehicle ?? null;
+});
 
 // Messenger can report the same buyer turn from both the DOM observer and the
 // heartbeat. Serialize intake per dealer/thread so both requests cannot read
@@ -435,6 +467,7 @@ function parseTimestamp(value: unknown): Date | null {
 type SalesReplyStage =
   | "open_question"
   | "availability"
+  | "confirm_price_intent"
   | "interest_confirmation"
   | "clean_title_interest_confirmation"
   | "interest_declined"
@@ -988,6 +1021,7 @@ function resolveSalesReplyStage(
   if (buyerRequestedVisitOrTestDrive(latest) && !hasVisitDaySignal(latest)) return "test_drive_request";
   if (buyerRequestsAnswerToPendingQuestion(latest)) return "question_repair";
   if (buyerRequestedStorePhone(latest)) return "store_phone_requested";
+  if (detectPriceIntent(latest) === CONFIRM_PRICE_INTENT) return "confirm_price_intent";
   if (askedForDocuments) {
     const documentStatus = buyerDocumentStatus(latest);
     if (documentStatus && (!documentStatus.hasId || !documentStatus.hasProofOfIncome)) return "documents_declined";
@@ -1086,6 +1120,7 @@ function buildRedactedCopyBrief(params: {
         ? `exterior_color=${params.vehicleFacts.exteriorColor}`
         : "exterior_color=agent_help");
       break;
+    case "confirm_price_intent":
     case "price_inquiry":
       factsToDeliver.push(params.vehicleFacts.price != null
         ? `price=$${params.vehicleFacts.price.toLocaleString("en-US")}`
@@ -1182,7 +1217,7 @@ function replyMentionsUnrequestedVehicleFact(
     stage === "vin_inquiry" ? ["vin"]
       : stage === "mileage_inquiry" ? ["mileage"]
         : stage === "color_inquiry" ? ["color"]
-          : stage === "price_inquiry" ? ["price"]
+          : stage === "price_inquiry" || stage === "confirm_price_intent" ? ["price"]
             : stage === "vehicle_link_request" ? ["vdpUrl"]
               : [],
   );
@@ -1484,6 +1519,14 @@ function buildSafeFallbackReply(
 ): string {
   const requestKind = detectVehicleRequestKind(currentMessage);
   const stage = resolveSalesReplyStage(visibleMessages, currentMessage, downPaymentPolicy, storePhone);
+  if (stage === "confirm_price_intent") {
+    return formatPriceConfirmation({
+      language,
+      price: vehicleFacts?.inventoryPrice,
+      listedPrice: vehicleFacts?.listedPrice ?? vehicleFacts?.price,
+      vehicleTitle: vehicleFacts?.title ?? vehicleTitle,
+    });
+  }
   if (requestKind === "photos" && vehicleFacts?.vdpUrl) {
     return language === "es"
       ? `Aquí está la ficha completa con todas las fotos: ${vehicleFacts.vdpUrl}.`
@@ -1567,6 +1610,7 @@ function isAiReplyAligned(
   if (replyContainsMismatchedVehicleLink(reply, vehicleFacts)) return false;
   const stagesAllowedToMentionNumericVehicleDetails = new Set<SalesReplyStage>([
     "price_inquiry",
+    "confirm_price_intent",
     "mileage_inquiry",
   ]);
   if (replyGivesRestrictedVehicleDetails(reply) && !stagesAllowedToMentionNumericVehicleDetails.has(stage)) return false;
@@ -1721,6 +1765,11 @@ function isAiReplyAligned(
       return /(?:phone|number|tel[eé]fono|n[uú]mero)/.test(normalized) && /\?/.test(normalized);
     }
     return !/\?/.test(normalized);
+  }
+  if (stage === "confirm_price_intent") {
+    return /(?:total|final|precio de lista|list price|published|publicado)/.test(normalized) &&
+      /(?:interesad|interested)/.test(normalized) &&
+      /\?/.test(reply);
   }
   if (stage === "price_inquiry") {
     if (vehicleFacts?.price != null) {
@@ -2064,6 +2113,7 @@ type AiReplyResult = {
 const SALES_REPLY_STAGES: readonly SalesReplyStage[] = [
   "open_question",
   "availability",
+  "confirm_price_intent",
   "negotiability_inquiry",
   "clean_title_interest_confirmation",
   "store_phone_requested",
@@ -2255,6 +2305,14 @@ export async function generateAiReply(
   dealerId: number = DEALER_ID,
 ): Promise<string> {
   const firstDealerReply = isFirstDealerReply(visibleMessages);
+  if (detectPriceIntent(currentMessage) === CONFIRM_PRICE_INTENT) {
+    return formatPriceConfirmation({
+      language,
+      price: vehicleFacts.inventoryPrice,
+      listedPrice: vehicleFacts.listedPrice ?? vehicleFacts.price,
+      vehicleTitle: vehicleFacts.title ?? vehicleTitle,
+    });
+  }
   if (dealerId === LUCKI_MAZDA_DEALER_ID) {
     const effectiveLuckiPhone = LUCKI_MAZDA_PHONE;
     return buildLuckiGeneralOnlyReply({
@@ -2315,6 +2373,7 @@ export async function generateAiReply(
     availability: availabilityQuickReplyAccepted
       ? `Greet as ${dealerName}, state that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.`
       : `Greet as ${dealerName}, explicitly confirm that the exact vehicle is available, then ask what the buyer would like to know. Do not add mileage, price, color, VIN, or other feed facts. Do not ask for a phone number or financing.`,
+    confirm_price_intent: "Confirm the exact total price from the inventory record, repeat the exact amount and full vehicle name, then ask whether the buyer is still interested. If inventory price is unavailable, say the published listing value is the current list price without inventing an amount.",
     negotiability_inquiry: `Greet as ${dealerName}, confirm affirmatively that the price is negotiable, then ask what the buyer would like to know. Do not ask for a phone number, give the dealership phone, mention financing, or hand off to sales in this first reply.`,
     interest_confirmation: "Confirm the exact vehicle is available and ask whether this week or the weekend works better. Do not add unrequested feed facts or ask for a phone number yet.",
     clean_title_interest_confirmation: `The buyer just confirmed interest after the clean-title follow-up. Ask for the buyer's best phone number and include Alpha Motorsports' dealership phone ${storePhone} in the same reply. Do not ask about financing, visit timing, or another qualification step.`,
@@ -2388,7 +2447,7 @@ First reply instruction: ${firstDealerReply && stage !== "store_phone_requested"
 ${langNote}
 Respond with a single JSON object, no markdown, with exactly four keys:
 {"intent": "the sales funnel stage that best matches the conversation", "urgency": "high or normal", "vehicleIntent": "strong or unclear", "reply": "your reply"}
-  Valid intent values: open_question, availability, negotiability_inquiry, interest_confirmation, clean_title_interest_confirmation, interest_declined, store_phone_requested, vehicle_link_request, carfax_request, vin_inquiry, mileage_inquiry, color_inquiry, price_inquiry, timeline_request, timeline_received, timeline_declined, documents_request, documents_declined, qualified_exit, financing_intro, financing_declined, cash_visit_request_phone, test_drive_request, dealer_hours, trade_in_request, payment_methods_request, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, handoff_confirmation, address_request, inventory_options, document_requirements, clean_title, clean_title_and_warranty, warranty_info, advisor_question, general.
+  Valid intent values: open_question, availability, confirm_price_intent, negotiability_inquiry, interest_confirmation, clean_title_interest_confirmation, interest_declined, store_phone_requested, vehicle_link_request, carfax_request, vin_inquiry, mileage_inquiry, color_inquiry, price_inquiry, timeline_request, timeline_received, timeline_declined, documents_request, documents_declined, qualified_exit, financing_intro, financing_declined, cash_visit_request_phone, test_drive_request, dealer_hours, trade_in_request, payment_methods_request, urgent_vehicle_request_phone, stalled_conversation_request_phone, salesperson_request_phone, request_phone, phone_received, handoff_confirmation, address_request, inventory_options, document_requirements, clean_title, clean_title_and_warranty, warranty_info, advisor_question, general.
 Choose urgent_vehicle_request_phone only when Urgent-intent eligibility allows it, urgency is high, and vehicleIntent is strong. Otherwise follow the supplied Current funnel stage and Stage instruction.
 The "reply" must be one short message that follows the stage instruction exactly, mentions the vehicle naturally, and mirrors the buyer's language.`;
 
@@ -2597,7 +2656,7 @@ router.post("/conversations/intake", async (req, res) => {
     visibleMessages,
     visibleImages,
     visibleAudios,
-    currentMessage,
+    currentMessage = "",
     detectedMarketplaceListingUrl,
     detectedVehicleTitle,
     marketplaceDownPayment: _marketplaceDownPayment,
@@ -2957,23 +3016,7 @@ router.post("/conversations/intake", async (req, res) => {
   }
 
   if (vehicleId) {
-    const [vehicle] = await db
-      .select({
-        vin: vehiclesTable.vin,
-        lotLocation: vehiclesTable.lotLocation,
-        year: vehiclesTable.year,
-        make: vehiclesTable.make,
-        model: vehiclesTable.model,
-        trim: vehiclesTable.trim,
-        mileage: vehiclesTable.mileage,
-        exteriorColor: vehiclesTable.exteriorColor,
-        price: vehiclesTable.price,
-        vdpUrl: vehiclesTable.vdpUrl,
-        sourceRaw: vehiclesTable.sourceRaw,
-      })
-      .from(vehiclesTable)
-      .where(eq(vehiclesTable.id, vehicleId))
-      .limit(1);
+    const vehicle = await dealerInventoryService.findVehicle({ dealerId, vehicleId });
     lotLocation = vehicle?.lotLocation ?? null;
     vehicleTitleFromDb = vehicle
       ? [vehicle.year, vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(" ")
@@ -2989,6 +3032,7 @@ router.post("/conversations/intake", async (req, res) => {
         mileage: vehicle.mileage,
         exteriorColor: vehicle.exteriorColor,
         price: vehicle.price,
+        inventoryPrice: vehicle.price,
         vdpUrl: vehicle.vdpUrl,
         photoCount: Number(imageCount?.count ?? 0),
         carfaxUrl: extractCarfaxUrlFromSourceRaw(vehicle.sourceRaw),
@@ -3005,6 +3049,7 @@ router.post("/conversations/intake", async (req, res) => {
     // cannot be matched to local inventory. Do not let a missing DB binding
     // turn an explicit price question into a generic sales-agent handoff.
     price: vehicleFacts.price ?? parsedAskingPrice,
+    listedPrice: parsedAskingPrice,
     dealerPhone: storePhone,
     dealerAddress: resolveStoreAddress(lotLocation, dealerKnowledge),
   };
@@ -3093,7 +3138,7 @@ router.post("/conversations/intake", async (req, res) => {
   const newMessages = findNewConversationMessages(existingChronological, incomingMsgs);
   const conversationHistoryForAi = [...existingChronological, ...newMessages];
   const phoneCaptured = immediateHandoffReason === "buyer_phone_received" ||
-    historyHasBuyerPhone(conversationHistoryForAi, storePhone);
+    historyHasBuyerPhone(formatConversationHistoryForAi(conversationHistoryForAi), storePhone);
   let hasNewBuyerMessage = false;
 
   for (const msg of newMessages) {

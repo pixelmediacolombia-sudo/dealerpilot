@@ -1,4 +1,4 @@
-import { ALPHA_DEALER_ID, LUCKI_MAZDA_DEALER_ID } from "../lib/dealer.ts";
+import { ALPHA_DEALER_ID, LUCKI_MAZDA_DEALER_ID } from "../lib/dealer";
 
 export type FallbackMarketplaceCopyInput = {
   dealerId: number;

@@ -3,6 +3,8 @@ export type MarketplaceVehicleFacts = {
   vin?: string | null;
   mileage?: number | null;
   price?: number | null;
+  inventoryPrice?: number | null;
+  listedPrice?: number | null;
   exteriorColor?: string | null;
   vdpUrl?: string | null;
   photoCount?: number | null;

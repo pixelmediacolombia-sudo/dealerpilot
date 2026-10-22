@@ -1,4 +1,4 @@
-import { CURRENT_SAMPLE_FEED } from "./sampleFeed.ts";
+import { CURRENT_SAMPLE_FEED } from "./sampleFeed";
 
 export type FetchFeedOptions = {
   headers?: Readonly<Record<string, string>>;

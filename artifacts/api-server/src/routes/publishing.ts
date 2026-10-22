@@ -98,7 +98,8 @@ async function canLegacyStorageExtensionClaimAssignedJob(
   job: { dealerId: number; assignedExtensionId: string | null },
 ): Promise<boolean> {
   if (!LEGACY_STORAGE_EXTENSION_ID.test(extensionId.trim())) return false;
-  if (!isChromeRuntimeExtensionId(job.assignedExtensionId)) return false;
+  const assignedExtensionId = job.assignedExtensionId;
+  if (!assignedExtensionId || !isChromeRuntimeExtensionId(assignedExtensionId)) return false;
 
   const result = await pool.query(
     `select 1
@@ -109,7 +110,7 @@ async function canLegacyStorageExtensionClaimAssignedJob(
         and last_heartbeat_at > now() - interval '5 minutes'
         and ${PUBLISHER_SESSION_FILTER_SQL}
       limit 1`,
-    [job.dealerId, job.assignedExtensionId.trim()],
+    [job.dealerId, assignedExtensionId.trim()],
   );
   return result.rowCount === 1;
 }
@@ -724,7 +725,7 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
       mileageTextEs: vehicle.mileage != null
         ? `${vehicle.mileage.toLocaleString("en-US")} millas`
         : null,
-      lotLocation: lotCity,
+      lotLocation: lotCity ?? null,
     });
 
     function buildBilingualMarketplaceDescription(rawEn?: string | null, rawEs?: string | null, rawCta?: string | null): string {
