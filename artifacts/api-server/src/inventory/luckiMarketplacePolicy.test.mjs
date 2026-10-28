@@ -7,6 +7,7 @@ import {
   fillOnlyWhenBlank,
   getLuckiIncomingValues,
   normalizeLuckiDescription,
+  normalizeLuckiMarketplaceMileage,
 } from "./luckiMarketplacePolicy.ts";
 
 const van = {
@@ -31,6 +32,15 @@ test("Lucki Marketplace policy derives the required condition from mileage", () 
   assert.equal(deriveLuckiCondition(0), "New");
   assert.equal(deriveLuckiCondition(1), "Used");
   assert.equal(getLuckiIncomingValues(van).condition, "Used");
+});
+
+test("Lucki Marketplace policy floors new-vehicle mileage at 300", () => {
+  assert.equal(normalizeLuckiMarketplaceMileage(0), 300);
+  assert.equal(normalizeLuckiMarketplaceMileage(2), 300);
+  assert.equal(normalizeLuckiMarketplaceMileage(299), 300);
+  assert.equal(normalizeLuckiMarketplaceMileage(300), 300);
+  assert.equal(normalizeLuckiMarketplaceMileage(301), 301);
+  assert.equal(normalizeLuckiMarketplaceMileage(null), null);
 });
 
 test("Lucki Marketplace policy fills transmission, body style, and fuel type", () => {

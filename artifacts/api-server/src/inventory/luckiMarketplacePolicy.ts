@@ -32,6 +32,18 @@ export function deriveLuckiCondition(mileage: number | null | undefined): "New" 
   return positiveMileage(mileage) ? "Used" : "New";
 }
 
+/**
+ * Facebook Marketplace rejects mileage values below 300. Lucki's feed uses
+ * small values for new vehicles, so keep the feed rule scoped to Lucki and
+ * expose the Marketplace-safe value to every downstream importer.
+ */
+export function normalizeLuckiMarketplaceMileage(
+  mileage: number | null | undefined,
+): number | null | undefined {
+  if (mileage === null || mileage === undefined) return mileage;
+  return mileage < 300 ? 300 : mileage;
+}
+
 export function deriveLuckiBodyStyle(vehicle: LuckiVehicleInput): string {
   if (!isBlank(vehicle.bodyStyle)) return String(vehicle.bodyStyle).trim();
   const haystack = [vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(" ").toLowerCase();

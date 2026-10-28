@@ -18,7 +18,11 @@ import {
 } from "../lib/dealer";
 import { syncSoldMarketplaceState } from "../marketplace/soldState";
 import { vehicleOperationalColumns, type VehicleOperationalRow } from "../lib/vehicleColumns";
-import { fillOnlyWhenBlank, getLuckiIncomingValues } from "./luckiMarketplacePolicy";
+import {
+  fillOnlyWhenBlank,
+  getLuckiIncomingValues,
+  normalizeLuckiMarketplaceMileage,
+} from "./luckiMarketplacePolicy";
 
 const ACTIVE_STATUSES = ["New", "Active", "Price Changed", "Ready to Publish", "Published"];
 
@@ -162,7 +166,12 @@ export async function importFeed(
     const lotLocation = isLuckiDealer
       ? LUCKI_MAZDA_LOT_WOODBRIDGE
       : resolveImportedLotLocation(dealerId, n.lotLocation);
-    const luckiValues = isLuckiDealer ? getLuckiIncomingValues(n) : null;
+    const normalizedMileage = (isLuckiDealer
+      ? normalizeLuckiMarketplaceMileage(n.mileage)
+      : n.mileage) ?? null;
+    const luckiValues = isLuckiDealer
+      ? getLuckiIncomingValues({ ...n, mileage: normalizedMileage })
+      : null;
     // Track location counts for logging
     const locationKey = lotLocation ?? "unknown";
     locationBreakdown[locationKey] = (locationBreakdown[locationKey] ?? 0) + 1;
@@ -181,7 +190,7 @@ export async function importFeed(
           make: n.make,
           model: n.model,
           trim: n.trim,
-          mileage: n.mileage,
+          mileage: normalizedMileage,
           price: n.price,
           exteriorColor: n.exteriorColor,
           interiorColor: n.interiorColor,
@@ -224,7 +233,9 @@ export async function importFeed(
           make: fillOnlyWhenBlank(prior.make, n.make),
           model: fillOnlyWhenBlank(prior.model, n.model),
           trim: fillOnlyWhenBlank(prior.trim, n.trim),
-          mileage: fillOnlyWhenBlank(prior.mileage, n.mileage),
+          mileage: normalizeLuckiMarketplaceMileage(
+            fillOnlyWhenBlank(prior.mileage, normalizedMileage),
+          ),
           price: fillOnlyWhenBlank(prior.price, n.price),
           exteriorColor: fillOnlyWhenBlank(prior.exteriorColor, n.exteriorColor),
           interiorColor: fillOnlyWhenBlank(prior.interiorColor, n.interiorColor),
