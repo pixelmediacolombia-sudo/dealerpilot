@@ -6,6 +6,7 @@ const worker = readFileSync(new URL("../workers/publishing.worker.ts", import.me
 const autoPublish = readFileSync(new URL("./autoPublish.ts", import.meta.url), "utf8");
 const controlledMode = readFileSync(new URL("../publishing/controlledMode.ts", import.meta.url), "utf8");
 const publishing = readFileSync(new URL("./publishing.ts", import.meta.url), "utf8");
+const importFeed = readFileSync(new URL("../inventory/importFeed.ts", import.meta.url), "utf8");
 
 test("automatic publishing excludes Archived and rechecks terminal status at assignment", () => {
   assert.equal((autoPublish.match(/ne\(vehiclesTable\.status, "Archived"\)/g) ?? []).length, 3);
@@ -18,4 +19,11 @@ test("automatic publishing excludes Archived and rechecks terminal status at ass
 test("publishing completion preserves terminal vehicle states", () => {
   assert.match(publishing, /preserved terminal vehicle status instead of overwriting it with Published/);
   assert.match(publishing, /!NOT_ELIGIBLE_STATUSES\.has\(currentVehicle\.status\)/);
+});
+
+test("Lucki sold inventory cannot be reactivated or resurrect a cancelled publish", () => {
+  assert.match(importFeed, /Lucki sold inventory is sticky/);
+  assert.match(importFeed, /isLuckiVehicleBlockedFromPublish\(prior\)/);
+  assert.match(publishing, /late listing URL resurrect the job as/);
+  assert.match(publishing, /LUCKI_SOLD_VEHICLE/);
 });

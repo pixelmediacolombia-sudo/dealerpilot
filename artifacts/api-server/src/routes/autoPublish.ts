@@ -62,6 +62,7 @@ import {
 } from "../publishing/dealerBatchPriority";
 import { checkLuckiPhotoSetDownloadable } from "../publishing/luckiPhotoReadiness";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
+import { isLuckiVehicleBlockedFromPublish } from "../inventory/luckiMarketplacePolicy";
 import { getAuthenticatedDealerId, resolveDealerId } from "./auth";
 
 const DEFAULT_DEALER_ID = 1;
@@ -250,13 +251,19 @@ function computePriorityScore(vehicle: {
 }
 
 function validateVehicleForPublish(vehicle: {
+  dealerId?: number;
   vin: string;
   year: number | null;
   make: string;
   model: string;
   price: number | null;
   mileage: number | null;
+  status?: string | null;
+  soldAt?: Date | null;
 }, imageCount: number): { eligible: boolean; reason: string | null } {
+  if (vehicle.dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(vehicle)) {
+    return { eligible: false, reason: `Lucki vehicle is sold/removed and cannot be published (status: "${vehicle.status ?? "unknown"}")` };
+  }
   if (!vehicle.vin) return { eligible: false, reason: "Missing VIN" };
   if (!vehicle.year) return { eligible: false, reason: "Missing year" };
   if (!vehicle.price) return { eligible: false, reason: "Missing price" };
@@ -667,6 +674,23 @@ router.post("/auto-publish/batches", async (req, res) => {
   // ahead of a complete one. Alpha keeps the existing selection path.
   const prioritySorted: ScoredVehicle[] = [];
   for (const candidate of priorityCandidates) {
+    // Last-mile inventory read: the feed can mark a Lucki VIN sold after the
+    // initial candidate query. Do not let that stale candidate consume a slot;
+    // continue so the next eligible vehicle fills the requested count.
+    if (dealerId === LUCKI_MAZDA_DEALER_ID) {
+      const [currentVehicle] = await db
+        .select({ status: vehiclesTable.status, soldAt: vehiclesTable.soldAt })
+        .from(vehiclesTable)
+        .where(eq(vehiclesTable.id, candidate.vehicle.id))
+        .limit(1);
+      if (!currentVehicle || isLuckiVehicleBlockedFromPublish(currentVehicle)) {
+        candidate.eligible = false;
+        candidate.ineligibleReason = currentVehicle
+          ? `Lucki vehicle is sold/removed and was excluded before batch creation (status: "${currentVehicle.status}")`
+          : "Vehicle no longer exists and was excluded before batch creation";
+        continue;
+      }
+    }
     if (dealerId === LUCKI_MAZDA_DEALER_ID) {
       const photoReadiness = await checkLuckiPhotoSetDownloadable(imagesByVehicle.get(candidate.vehicle.id) ?? []);
       if (!photoReadiness.ready) {

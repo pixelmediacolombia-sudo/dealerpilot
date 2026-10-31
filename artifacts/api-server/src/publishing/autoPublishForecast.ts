@@ -38,6 +38,7 @@ import { checkLuckiPhotoSetDownloadable } from "./luckiPhotoReadiness";
 import { findLatestNeedsReviewVehicleIds } from "./needsReviewGuard";
 import { photoDirectorPublishBlockReason } from "../photo/publishReadiness";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
+import { isLuckiVehicleBlockedFromPublish } from "../inventory/luckiMarketplacePolicy";
 
 const PLAN_TIME_ZONE = "America/New_York";
 const DISPLAY_TIME_ZONE = "America/Bogota";
@@ -225,6 +226,7 @@ export async function previewAutoPublishVehicles(
     if (listing?.status === "Published") return [];
     if (dealerId === ALPHA_DEALER_ID && (!LOT_CITY_MAP[vehicle.lotLocation ?? ""] || !isAlphaManassasVehicle(vehicle))) return [];
     if (dealerId === LUCKI_MAZDA_DEALER_ID && !isVerifiedDealerPublishingVehicle(vehicle)) return [];
+    if (dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(vehicle)) return [];
     const images = imagesByVehicle.get(vehicle.id) ?? [];
     if (!vehicle.vin || !vehicle.year || !vehicle.price || !vehicle.mileage || images.length < 5) return [];
     if (dealerId === LUCKI_MAZDA_DEALER_ID && !isLuckiVehicleCompleteForPublish(vehicle, images.length)) return [];

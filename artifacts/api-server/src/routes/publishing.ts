@@ -40,6 +40,7 @@ import { getDownPaymentPolicy } from "../downPayment/policy";
 import { ALPHA_DEALER_ID, LUCKI_MAZDA_DEALER_ID, isVerifiedDealerPublishingVehicle } from "../lib/dealer";
 import { buildFallbackMarketplaceCopy } from "../publishing/marketplaceCopy";
 import { vehicleOperationalColumns } from "../lib/vehicleColumns";
+import { isLuckiVehicleBlockedFromPublish } from "../inventory/luckiMarketplacePolicy";
 import { resolveDealerId } from "./auth";
 
 // Dealer scope: Alpha Motorsport = dealer_id 1. Alpha remains restricted to
@@ -292,6 +293,18 @@ router.post("/publishing/jobs/:id/assign", async (req, res) => {
     }
   }
   const [assignVehicle] = await db.select(vehicleOperationalColumns).from(vehiclesTable).where(eq(vehiclesTable.id, job.vehicleId));
+  if (assignVehicle && job.dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(assignVehicle)) {
+    await db.update(publishingJobsTable).set({
+      status: "Cancelled",
+      failedReason: `Lucki vehicle is sold/removed (status: "${assignVehicle.status}") — publishing job cancelled.`,
+      currentStep: "Cancelled - vehicle sold",
+      claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
+    }).where(and(eq(publishingJobsTable.id, id), inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES])));
+    res.status(422).json({ error: "Lucki vehicle is sold/removed and cannot be published", code: "LUCKI_SOLD_VEHICLE" });
+    return;
+  }
   if (!assignVehicle || assignVehicle.dealerId !== job.dealerId || !isVerifiedDealerPublishingVehicle(assignVehicle)) {
     res.status(422).json({ error: "Vehicle is not verified for this dealer's configured lot", code: "NON_VERIFIED_LOT" });
     return;
@@ -426,6 +439,18 @@ router.get("/publishing/jobs/assigned", async (req, res) => {
     res.status(404).json({ error: "Vehicle not found for assigned job", code: "VEHICLE_NOT_FOUND" });
     return;
   }
+  if (row.dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(vehicle)) {
+    await db.update(publishingJobsTable).set({
+      status: "Cancelled",
+      failedReason: `Lucki vehicle is sold/removed (status: "${vehicle.status}") — publishing job cancelled.`,
+      currentStep: "Cancelled - vehicle sold",
+      claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
+    }).where(eq(publishingJobsTable.id, row.id));
+    res.json({ job: null, blocked: true, code: "LUCKI_SOLD_VEHICLE" });
+    return;
+  }
   if (vehicle.dealerId !== row.dealerId || !isVerifiedDealerPublishingVehicle(vehicle)) {
     await db.update(publishingJobsTable).set({
       status: "Needs Review",
@@ -508,6 +533,18 @@ router.get("/publishing/jobs/next", async (req, res) => {
   const [vehicle] = await db.select(vehicleOperationalColumns).from(vehiclesTable).where(eq(vehiclesTable.id, row.vehicleId));
   if (!vehicle) {
     res.status(404).json({ error: "Vehicle not found for job", code: "VEHICLE_NOT_FOUND" });
+    return;
+  }
+  if (row.dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(vehicle)) {
+    await db.update(publishingJobsTable).set({
+      status: "Cancelled",
+      failedReason: `Lucki vehicle is sold/removed (status: "${vehicle.status}") — publishing job cancelled.`,
+      currentStep: "Cancelled - vehicle sold",
+      claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
+    }).where(eq(publishingJobsTable.id, row.id));
+    res.json({ job: null, blocked: true, code: "LUCKI_SOLD_VEHICLE" });
     return;
   }
   if (vehicle.dealerId !== row.dealerId || !isVerifiedDealerPublishingVehicle(vehicle)) {
@@ -601,6 +638,19 @@ router.get("/publishing/jobs/:id/payload", async (req, res) => {
         jobId: id,
         vehicleId: job.vehicleId,
       });
+      return;
+    }
+
+    if (job.dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(vehicle)) {
+      await db.update(publishingJobsTable).set({
+        status: "Cancelled",
+        failedReason: `Lucki vehicle is sold/removed (status: "${vehicle.status}") — publishing job cancelled.`,
+        currentStep: "Cancelled - vehicle sold",
+        claimedByExtension: null,
+        assignedExtensionId: null,
+        assignedAt: null,
+      }).where(eq(publishingJobsTable.id, job.id));
+      res.status(422).json({ error: "Lucki vehicle is sold/removed and cannot be published", code: "LUCKI_SOLD_VEHICLE" });
       return;
     }
 
@@ -864,6 +914,23 @@ router.post("/publishing/jobs/:id/claim", async (req, res) => {
     return;
   }
 
+  const [claimVehicle] = await db
+    .select(vehicleOperationalColumns)
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.id, job.vehicleId));
+  if (claimVehicle && job.dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(claimVehicle)) {
+    await db.update(publishingJobsTable).set({
+      status: "Cancelled",
+      failedReason: `Lucki vehicle is sold/removed (status: "${claimVehicle.status}") — publishing job cancelled.`,
+      currentStep: "Cancelled - vehicle sold",
+      claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
+    }).where(and(eq(publishingJobsTable.id, id), inArray(publishingJobsTable.status, [...ACTIVE_PUBLISHING_JOB_STATUSES])));
+    res.status(422).json({ error: "Lucki vehicle is sold/removed and cannot be published", code: "LUCKI_SOLD_VEHICLE" });
+    return;
+  }
+
   // Atomic claim: the conditional WHERE guarantees only one extension can win
   // the race even if several call claim concurrently for the same job.
   const [updated] = await db
@@ -985,6 +1052,26 @@ router.post("/publishing/jobs/:id/complete", async (req, res) => {
       res.json(enriched);
       return;
     }
+  }
+
+  // A sold sync can cancel a Lucki job while the extension is still finishing
+  // the browser flow. Never let that late listing URL resurrect the job as
+  // Published; the post-publication sold flow remains handled by the sync.
+  const [completionVehicle] = await db
+    .select(vehicleOperationalColumns)
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.id, job.vehicleId));
+  if (completionVehicle && job.dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(completionVehicle)) {
+    await db.update(publishingJobsTable).set({
+      status: "Cancelled",
+      failedReason: `Lucki vehicle is sold/removed (status: "${completionVehicle.status}") — late completion rejected.`,
+      currentStep: "Cancelled - vehicle sold",
+      claimedByExtension: null,
+      assignedExtensionId: null,
+      assignedAt: null,
+    }).where(and(eq(publishingJobsTable.id, id), ne(publishingJobsTable.status, "Published")));
+    res.status(422).json({ error: "Lucki vehicle is sold/removed; late publish completion rejected", code: "LUCKI_SOLD_VEHICLE" });
+    return;
   }
 
   if (!listingUrl) {
@@ -1475,7 +1562,8 @@ router.post("/publishing/bulk-schedule", async (req, res) => {
   let eligible = vehicles.filter((v) => {
     if (alreadyQueued.has(v.id)) return false;
 
-    if (["Published", "Sold/Removed", "Sold", "Removed", "Archived"].includes(v.status)) {
+    if (["Published", "Sold/Removed", "Sold", "Removed", "Archived"].includes(v.status) ||
+        (dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(v))) {
       otherBlocked.push({ vehicleId: v.id, code: "NOT_ELIGIBLE_STATUS", reason: `Vehicle status is "${v.status}"` });
       return false;
     }
@@ -1711,7 +1799,7 @@ router.post("/publishing/jobs/publish-now", async (req, res) => {
   }
 
   const guardrail = await checkPublishGuardrails({
-    vehicle: { id: vehicle.id, dealerId: vehicle.dealerId, status: vehicle.status, lotLocation: vehicle.lotLocation, sourceRaw: vehicle.sourceRaw },
+    vehicle: { id: vehicle.id, dealerId: vehicle.dealerId, status: vehicle.status, soldAt: vehicle.soldAt, lotLocation: vehicle.lotLocation, sourceRaw: vehicle.sourceRaw },
     gmOverride,
     requireExtensionOnline: mode === "Controlled",
   });
@@ -1822,6 +1910,21 @@ router.post("/publishing/jobs/:id/retry", async (req, res) => {
   if (!["Failed", "Retry"].includes(job.status)) {
     res.status(409).json({ error: `Only Failed or Retry jobs can be manually retried (status: ${job.status})` });
     return;
+  }
+  if (job.dealerId === LUCKI_MAZDA_DEALER_ID) {
+    const [retryVehicle] = await db
+      .select(vehicleOperationalColumns)
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.id, job.vehicleId));
+    if (retryVehicle && isLuckiVehicleBlockedFromPublish(retryVehicle)) {
+      await db.update(publishingJobsTable).set({
+        status: "Cancelled",
+        failedReason: `Lucki vehicle is sold/removed (status: "${retryVehicle.status}") — retry blocked.`,
+        currentStep: "Cancelled - vehicle sold",
+      }).where(eq(publishingJobsTable.id, id));
+      res.status(422).json({ error: "Lucki vehicle is sold/removed and cannot be retried", code: "LUCKI_SOLD_VEHICLE" });
+      return;
+    }
   }
 
   const [updated] = await db

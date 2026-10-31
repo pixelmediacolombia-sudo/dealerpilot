@@ -14,7 +14,8 @@ import { and, eq, inArray, isNull, like, or } from "drizzle-orm";
 import { db, extensionConnectionsTable, publishingJobsTable } from "@workspace/db";
 import { getCachedGmDecision } from "../routes/gm";
 import { getDuplicateConflictVehicleIds } from "../workers/market.worker";
-import { ALPHA_DEALER_ID, isVerifiedDealerPublishingVehicle } from "../lib/dealer";
+import { ALPHA_DEALER_ID, LUCKI_MAZDA_DEALER_ID, isVerifiedDealerPublishingVehicle } from "../lib/dealer";
+import { isLuckiVehicleBlockedFromPublish } from "../inventory/luckiMarketplacePolicy";
 
 export const LOT_CITY_MAP: Record<string, string> = {
   Manassas: "Manassas, VA",
@@ -136,7 +137,7 @@ export type GuardrailResult =
  * decision cache (which is itself grounded in a real model call).
  */
 export async function checkPublishGuardrails(params: {
-  vehicle: { id: number; dealerId: number; status: string; lotLocation: string | null; sourceRaw?: string | null };
+  vehicle: { id: number; dealerId: number; status: string; soldAt?: Date | null; lotLocation: string | null; sourceRaw?: string | null };
   gmOverride: boolean;
   requireExtensionOnline: boolean;
   duplicateConflictIds?: Set<number>;
@@ -144,11 +145,14 @@ export async function checkPublishGuardrails(params: {
   const { vehicle, gmOverride, requireExtensionOnline } = params;
 
   // 1. Real inventory — not already Published/Sold/Removed.
-  if (NOT_ELIGIBLE_STATUSES.has(vehicle.status)) {
+  if (NOT_ELIGIBLE_STATUSES.has(vehicle.status) ||
+      (vehicle.dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(vehicle))) {
     return {
       ok: false,
-      code: "NOT_ELIGIBLE_STATUS",
-      reason: `Vehicle status is "${vehicle.status}" — not eligible for publishing.`,
+      code: vehicle.dealerId === LUCKI_MAZDA_DEALER_ID ? "LUCKI_SOLD_VEHICLE" : "NOT_ELIGIBLE_STATUS",
+      reason: vehicle.dealerId === LUCKI_MAZDA_DEALER_ID
+        ? `Lucki vehicle is sold/removed and cannot be published (status: "${vehicle.status}").`
+        : `Vehicle status is "${vehicle.status}" — not eligible for publishing.`,
     };
   }
 

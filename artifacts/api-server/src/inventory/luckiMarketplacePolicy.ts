@@ -2,6 +2,27 @@ import { LUCKI_MAZDA_LOT_WOODBRIDGE } from "../lib/dealer";
 import { LUCKI_MAZDA_PHONE } from "../conversations/dealerMessengerPolicy";
 import type { NormalizedVehicle } from "./xmlEngine";
 
+/**
+ * Lucki vehicles that have already left inventory must not be reactivated by
+ * a later feed that happens to contain the same VIN again. The feed may use
+ * more than one casing/label for a sold vehicle, so publishing checks use a
+ * normalized value instead of exact string comparisons.
+ */
+export const LUCKI_NON_PUBLISHABLE_STATUSES = new Set([
+  "sold",
+  "sold/removed",
+  "removed",
+  "archived",
+]);
+
+export function isLuckiVehicleBlockedFromPublish(vehicle: {
+  status: string | null | undefined;
+  soldAt?: Date | null;
+}): boolean {
+  const normalizedStatus = String(vehicle.status ?? "").trim().toLowerCase();
+  return Boolean(vehicle.soldAt) || LUCKI_NON_PUBLISHABLE_STATUSES.has(normalizedStatus);
+}
+
 type LuckiVehicleInput = Pick<
   NormalizedVehicle,
   | "year"

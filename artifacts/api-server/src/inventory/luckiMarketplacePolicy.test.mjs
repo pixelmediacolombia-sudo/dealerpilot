@@ -6,6 +6,7 @@ import {
   deriveLuckiFuelType,
   fillOnlyWhenBlank,
   getLuckiIncomingValues,
+  isLuckiVehicleBlockedFromPublish,
   normalizeLuckiDescription,
   normalizeLuckiMarketplaceMileage,
 } from "./luckiMarketplacePolicy.ts";
@@ -41,6 +42,13 @@ test("Lucki Marketplace policy floors new-vehicle mileage at 300", () => {
   assert.equal(normalizeLuckiMarketplaceMileage(300), 300);
   assert.equal(normalizeLuckiMarketplaceMileage(301), 301);
   assert.equal(normalizeLuckiMarketplaceMileage(null), null);
+});
+
+test("Lucki sold VINs stay blocked, while Alpha is handled outside this policy", () => {
+  assert.equal(isLuckiVehicleBlockedFromPublish({ status: "Sold/Removed", soldAt: null }), true);
+  assert.equal(isLuckiVehicleBlockedFromPublish({ status: "sold", soldAt: null }), true);
+  assert.equal(isLuckiVehicleBlockedFromPublish({ status: "Active", soldAt: new Date() }), true);
+  assert.equal(isLuckiVehicleBlockedFromPublish({ status: "Active", soldAt: null }), false);
 });
 
 test("Lucki Marketplace policy fills transmission, body style, and fuel type", () => {

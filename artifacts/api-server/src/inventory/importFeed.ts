@@ -21,6 +21,7 @@ import { vehicleOperationalColumns, type VehicleOperationalRow } from "../lib/ve
 import {
   fillOnlyWhenBlank,
   getLuckiIncomingValues,
+  isLuckiVehicleBlockedFromPublish,
   normalizeLuckiMarketplaceMileage,
 } from "./luckiMarketplacePolicy";
 
@@ -314,8 +315,13 @@ export async function importFeed(
 
     // Status transitions.
     let nextStatus = prior.status;
+    const luckiSoldLock = isLuckiDealer && isLuckiVehicleBlockedFromPublish(prior);
     if (prior.status === "Archived") {
       nextStatus = "Archived";
+    } else if (luckiSoldLock) {
+      // Lucki sold inventory is sticky. A later feed containing the same VIN
+      // must not silently reactivate it and make it eligible for Marketplace.
+      nextStatus = prior.status;
     } else {
       if (prior.status === "Sold/Removed" && prior.soldAt) {
         nextStatus = "Active";
@@ -357,8 +363,8 @@ export async function importFeed(
         lastSeenAt: now,
         lastSeenInFeedAt: now,
         missingFeedCount: 0,
-        soldAt: prior.soldAt ? null : prior.soldAt,
-        soldDetectionSource: prior.soldAt ? null : prior.soldDetectionSource,
+        soldAt: luckiSoldLock ? prior.soldAt : prior.soldAt ? null : prior.soldAt,
+        soldDetectionSource: luckiSoldLock ? prior.soldDetectionSource : prior.soldAt ? null : prior.soldDetectionSource,
         lastSyncAt: now,
       })
       .where(eq(vehiclesTable.id, prior.id));

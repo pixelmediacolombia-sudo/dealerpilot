@@ -63,6 +63,7 @@ import {
 import { checkLuckiPhotoSetDownloadable } from "../publishing/luckiPhotoReadiness";
 import { ensurePhotoDirectorReadyForPublish } from "../photo/publishReadiness";
 import { reconcileBatchProgress } from "../features/publishing/infrastructure/publishingRepository";
+import { isLuckiVehicleBlockedFromPublish } from "../inventory/luckiMarketplacePolicy";
 
 const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const DEALER_ID = 1;
@@ -365,6 +366,7 @@ async function maybeCreateAutomaticBatch(
         !vehicle.price ||
         !vehicle.mileage ||
         images.length < 5 ||
+        (dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(vehicle)) ||
         (dealerId === LUCKI_MAZDA_DEALER_ID && !isLuckiVehicleCompleteForPublish(vehicle, images.length)) ||
         listing?.status === "Published" ||
         !lotCity ||
@@ -651,13 +653,16 @@ async function run({ log }: { log: import("pino").Logger }): Promise<WorkerRunOu
     // Last-moment inventory guard: the joined candidate can be stale if an
     // inventory sync or operator action changed the vehicle after selection.
     const [currentVehicle] = await db
-      .select({ status: vehiclesTable.status, dealerId: vehiclesTable.dealerId, lotLocation: vehiclesTable.lotLocation, sourceRaw: vehiclesTable.sourceRaw })
+      .select({ status: vehiclesTable.status, soldAt: vehiclesTable.soldAt, dealerId: vehiclesTable.dealerId, lotLocation: vehiclesTable.lotLocation, sourceRaw: vehiclesTable.sourceRaw })
       .from(vehiclesTable)
       .where(eq(vehiclesTable.id, vehicle.id))
       .limit(1);
-    if (!currentVehicle || NOT_ELIGIBLE_STATUSES.has(currentVehicle.status)) {
+    const luckiSold = currentVehicle?.dealerId === LUCKI_MAZDA_DEALER_ID && isLuckiVehicleBlockedFromPublish(currentVehicle);
+    if (!currentVehicle || NOT_ELIGIBLE_STATUSES.has(currentVehicle.status) || luckiSold) {
       const reason = currentVehicle
-        ? `Vehicle status is "${currentVehicle.status}" — publishing job cancelled.`
+        ? luckiSold
+          ? `Lucki vehicle is sold/removed (status: "${currentVehicle.status}") — publishing job cancelled.`
+          : `Vehicle status is "${currentVehicle.status}" — publishing job cancelled.`
         : "Vehicle no longer exists — publishing job cancelled.";
       const [cancelled] = await db
         .update(publishingJobsTable)
